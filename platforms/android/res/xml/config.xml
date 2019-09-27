@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget android-versionCode="1006001" id="io.fabricate.expedition" version="1.6.1" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:gap="http://phonegap.com/ns/1.0">
+    <feature name="FirebasePlugin">
+        <param name="android-package" value="org.apache.cordova.firebase.FirebasePlugin" />
+        <param name="onload" value="true" />
+    </feature>
+    <feature name="AndroidFullScreen">
+        <param name="android-package" value="com.mesmotronic.plugins.FullScreenPlugin" />
+    </feature>
+    <feature name="GooglePlus">
+        <param name="android-package" value="nl.xservices.plugins.GooglePlus" />
+        <param name="onload" value="true" />
+    </feature>
+    <access origin="https://accounts.google.com/*" />
+    <feature name="Insomnia">
+        <param name="android-package" value="nl.xservices.plugins.Insomnia" />
+    </feature>
+    <feature name="Vibration">
+        <param name="android-package" value="org.apache.cordova.vibration.Vibration" />
+    </feature>
+    <feature name="Whitelist">
+        <param name="android-package" value="org.apache.cordova.whitelist.WhitelistPlugin" />
+        <param name="onload" value="true" />
+    </feature>
+    <feature name="SocialSharing">
+        <param name="android-package" value="nl.xservices.plugins.SocialSharing" />
+    </feature>
+    <feature name="SplashScreen">
+        <param name="android-package" value="org.apache.cordova.splashscreen.SplashScreen" />
+        <param name="onload" value="true" />
+    </feature>
+    <feature name="Device">
+        <param name="android-package" value="org.apache.cordova.device.Device" />
+    </feature>
+    <name>Expedition</name>
+    <description>
+    The Companion App for Expedition: The Roleplaying Card Game.
+  </description>
+    <author email="contact@fabricate.io" href="http://fabricate.io">
+    FabricateIO
+  </author>
+    <content src="index.html" />
+    <icon src="www/images/icon/192x192.png" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <allow-intent href="tel:*" />
+    <allow-intent href="sms:*" />
+    <allow-intent href="mailto:*" />
+    <allow-intent href="geo:*" />
+    <allow-navigation href="http://*/*" />
+    <allow-navigation href="https://*/*" />
+    <allow-navigation href="data:*" />
+    <gap:plugin name="cordova-plugin-googleplus" source="npm">
+        <param name="REVERSED_CLIENT_ID" value="io.fabricate.expedition" />
+    </gap:plugin>
+    <gap:config-file parent="/manifest" platform="android">
+        <application android:debuggable="true" />
+    </gap:config-file>
+    <allow-intent href="market:*" />
+    <icon height="36" src="www/images/icon/36x36.png" width="36" />
+    <icon height="48" src="www/images/icon/48x48.png" width="48" />
+    <icon height="72" src="www/images/icon/72x72.png" width="72" />
+    <icon height="96" src="www/images/icon/96x96.png" width="96" />
+    <icon height="144" src="www/images/icon/144x144.png" width="144" />
+    <icon height="192" src="www/images/icon/192x192.png" width="192" />
+    <splash density="port-ldpi" src="www/images/splash/320x426.png" />
+    <splash density="port-mdpi" src="www/images/splash/320x470.png" />
+    <splash density="port-hdpi" src="www/images/splash/480x640.png" />
+    <splash density="port-xhdpi" src="www/images/splash/720x960.png" />
+    <preference name="loglevel" value="DEBUG" />
+    <preference name="Fullscreen" value="true" />
+    <preference name="BackgroundColor" value="0x00000000" />
+    <preference name="Orientation" value="portrait" />
+    <preference name="SplashMaintainAspectRatio" value="true" />
+    <preference name="android-minSdkVersion" value="21" />
+    <preference name="deployment-target" value="9.0.0" />
+</widget>

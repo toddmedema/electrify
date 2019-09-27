@@ -1,0 +1,260 @@
+{
+    "prepare_queue": {
+        "installed": [],
+        "uninstalled": []
+    },
+    "config_munge": {
+        "files": {
+            "res/xml/config.xml": {
+                "parents": {
+                    "/*": [
+                        {
+                            "xml": "<feature name=\"FirebasePlugin\"><param name=\"android-package\" value=\"org.apache.cordova.firebase.FirebasePlugin\" /><param name=\"onload\" value=\"true\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"AndroidFullScreen\"><param name=\"android-package\" value=\"com.mesmotronic.plugins.FullScreenPlugin\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"GooglePlus\"><param name=\"android-package\" value=\"nl.xservices.plugins.GooglePlus\" /><param name=\"onload\" value=\"true\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<access origin=\"https://accounts.google.com/*\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"Insomnia\"><param name=\"android-package\" value=\"nl.xservices.plugins.Insomnia\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"Vibration\"><param name=\"android-package\" value=\"org.apache.cordova.vibration.Vibration\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"Whitelist\"><param name=\"android-package\" value=\"org.apache.cordova.whitelist.WhitelistPlugin\" /><param name=\"onload\" value=\"true\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"SocialSharing\"><param name=\"android-package\" value=\"nl.xservices.plugins.SocialSharing\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"SplashScreen\"><param name=\"android-package\" value=\"org.apache.cordova.splashscreen.SplashScreen\" /><param name=\"onload\" value=\"true\" /></feature>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<feature name=\"Device\"><param name=\"android-package\" value=\"org.apache.cordova.device.Device\" /></feature>",
+                            "count": 1
+                        }
+                    ]
+                }
+            },
+            "res/values/strings.xml": {
+                "parents": {
+                    "/resources": [
+                        {
+                            "xml": "<string name=\"google_app_id\">@string/google_app_id</string>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<string name=\"google_api_key\">@string/google_api_key</string>",
+                            "count": 1
+                        }
+                    ]
+                }
+            },
+            "AndroidManifest.xml": {
+                "parents": {
+                    "/*": [
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.INTERNET\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.WAKE_LOCK\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />",
+                            "count": 1
+                        }
+                    ],
+                    "/manifest/application": [
+                        {
+                            "xml": "<service android:name=\"org.apache.cordova.firebase.FirebasePluginMessagingService\"><intent-filter><action android:name=\"com.google.firebase.MESSAGING_EVENT\" /></intent-filter></service>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<service android:name=\"org.apache.cordova.firebase.FirebasePluginInstanceIDService\"><intent-filter><action android:name=\"com.google.firebase.INSTANCE_ID_EVENT\" /></intent-filter></service>",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<receiver android:name=\"org.apache.cordova.firebase.OnNotificationOpenReceiver\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<provider android:authorities=\"${applicationId}.sharing.provider\" android:exported=\"false\" android:grantUriPermissions=\"true\" android:name=\"nl.xservices.plugins.FileProvider\"><meta-data android:name=\"android.support.FILE_PROVIDER_PATHS\" android:resource=\"@xml/sharing_paths\" /></provider>",
+                            "count": 1
+                        }
+                    ],
+                    "/manifest": [
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.GET_ACCOUNTS\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.USE_CREDENTIALS\" />",
+                            "count": 1
+                        },
+                        {
+                            "xml": "<uses-permission android:name=\"android.permission.VIBRATE\" />",
+                            "count": 1
+                        }
+                    ]
+                }
+            },
+            "config.xml": {
+                "parents": {
+                    "/*": [
+                        {
+                            "xml": "<preference name=\"Fullscreen\" value=\"true\" />",
+                            "count": 1
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "installed_plugins": {
+        "cordova-plugin-firebase": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-fullscreen": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-googleplus": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-hidden-statusbar-overlay": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-insomnia": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-vibration": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-whitelist": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "es6-promise-plugin": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-x-socialsharing": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-ios-no-export-compliance": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-splashscreen": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        },
+        "cordova-plugin-device": {
+            "PACKAGE_NAME": "io.fabricate.expedition"
+        }
+    },
+    "dependent_plugins": {},
+    "modules": [
+        {
+            "id": "cordova-plugin-firebase.FirebasePlugin",
+            "file": "plugins/cordova-plugin-firebase/www/firebase.js",
+            "pluginId": "cordova-plugin-firebase",
+            "clobbers": [
+                "FirebasePlugin"
+            ]
+        },
+        {
+            "id": "cordova-plugin-fullscreen.AndroidFullScreen",
+            "file": "plugins/cordova-plugin-fullscreen/www/AndroidFullScreen.js",
+            "pluginId": "cordova-plugin-fullscreen",
+            "clobbers": [
+                "AndroidFullScreen"
+            ]
+        },
+        {
+            "id": "cordova-plugin-googleplus.GooglePlus",
+            "file": "plugins/cordova-plugin-googleplus/www/GooglePlus.js",
+            "pluginId": "cordova-plugin-googleplus",
+            "clobbers": [
+                "window.plugins.googleplus"
+            ]
+        },
+        {
+            "id": "cordova-plugin-insomnia.Insomnia",
+            "file": "plugins/cordova-plugin-insomnia/www/Insomnia.js",
+            "pluginId": "cordova-plugin-insomnia",
+            "clobbers": [
+                "window.plugins.insomnia"
+            ]
+        },
+        {
+            "id": "cordova-plugin-vibration.notification",
+            "file": "plugins/cordova-plugin-vibration/www/vibration.js",
+            "pluginId": "cordova-plugin-vibration",
+            "merges": [
+                "navigator.notification",
+                "navigator"
+            ]
+        },
+        {
+            "id": "es6-promise-plugin.Promise",
+            "file": "plugins/es6-promise-plugin/www/promise.js",
+            "pluginId": "es6-promise-plugin",
+            "runs": true
+        },
+        {
+            "id": "cordova-plugin-x-socialsharing.SocialSharing",
+            "file": "plugins/cordova-plugin-x-socialsharing/www/SocialSharing.js",
+            "pluginId": "cordova-plugin-x-socialsharing",
+            "clobbers": [
+                "window.plugins.socialsharing"
+            ]
+        },
+        {
+            "id": "cordova-plugin-splashscreen.SplashScreen",
+            "file": "plugins/cordova-plugin-splashscreen/www/splashscreen.js",
+            "pluginId": "cordova-plugin-splashscreen",
+            "clobbers": [
+                "navigator.splashscreen"
+            ]
+        },
+        {
+            "id": "cordova-plugin-device.device",
+            "file": "plugins/cordova-plugin-device/www/device.js",
+            "pluginId": "cordova-plugin-device",
+            "clobbers": [
+                "device"
+            ]
+        }
+    ],
+    "plugin_metadata": {
+        "cordova-plugin-firebase": "0.1.21",
+        "cordova-plugin-fullscreen": "1.1.0",
+        "cordova-plugin-googleplus": "5.1.1",
+        "cordova-plugin-hidden-statusbar-overlay": "2.0.0",
+        "cordova-plugin-insomnia": "4.3.0",
+        "cordova-plugin-vibration": "2.1.5",
+        "cordova-plugin-whitelist": "1.3.2",
+        "es6-promise-plugin": "4.1.0",
+        "cordova-plugin-x-socialsharing": "5.1.8",
+        "cordova-plugin-ios-no-export-compliance": "0.0.2",
+        "cordova-plugin-splashscreen": "4.0.3",
+        "cordova-plugin-device": "1.1.6"
+    }
+}

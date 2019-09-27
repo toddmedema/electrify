@@ -1,0 +1,104 @@
+{
+  "_args": [
+    [
+      {
+        "raw": "cordova-plugin-insomnia@git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+        "scope": null,
+        "escapedName": "cordova-plugin-insomnia",
+        "name": "cordova-plugin-insomnia",
+        "rawSpec": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+        "spec": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+        "type": "hosted",
+        "hosted": {
+          "type": "github",
+          "ssh": "git@github.com:EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+          "sshUrl": "git+ssh://git@github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+          "httpsUrl": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+          "gitUrl": "git://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+          "shortcut": "github:EddyVerbruggen/Insomnia-PhoneGap-Plugin",
+          "directUrl": "https://raw.githubusercontent.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin/master/package.json"
+        }
+      },
+      "/Users/todd/code/expedition-app/node_modules"
+    ]
+  ],
+  "_from": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+  "_id": "cordova-plugin-insomnia@4.3.0",
+  "_inCache": true,
+  "_location": "/cordova-plugin-insomnia",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "cordova-plugin-insomnia@git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+    "scope": null,
+    "escapedName": "cordova-plugin-insomnia",
+    "name": "cordova-plugin-insomnia",
+    "rawSpec": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+    "spec": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+    "type": "hosted",
+    "hosted": {
+      "type": "github",
+      "ssh": "git@github.com:EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+      "sshUrl": "git+ssh://git@github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+      "httpsUrl": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+      "gitUrl": "git://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+      "shortcut": "github:EddyVerbruggen/Insomnia-PhoneGap-Plugin",
+      "directUrl": "https://raw.githubusercontent.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin/master/package.json"
+    }
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git#8d2c3b01fc0c11d9bc36bc1b5f9a141bd097f908",
+  "_shasum": "e35a6fc62369436f2c5b98df14225dc2dc7484d8",
+  "_shrinkwrap": null,
+  "_spec": "cordova-plugin-insomnia@git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git",
+  "_where": "/Users/todd/code/expedition-app/node_modules",
+  "author": {
+    "name": "Eddy Verbruggen",
+    "email": "eddyverbruggen@gmail.com",
+    "url": "https://github.com/EddyVerbruggen"
+  },
+  "bugs": {
+    "url": "https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin/issues"
+  },
+  "cordova": {
+    "id": "cordova-plugin-insomnia",
+    "platforms": [
+      "ios",
+      "wp8",
+      "windows",
+      "android",
+      "firefoxos"
+    ]
+  },
+  "dependencies": {},
+  "description": "Prevent the screen of the mobile device from falling asleep.",
+  "devDependencies": {},
+  "engines": [
+    {
+      "name": "cordova",
+      "version": ">=3.0.0"
+    }
+  ],
+  "gitHead": "8d2c3b01fc0c11d9bc36bc1b5f9a141bd097f908",
+  "homepage": "https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#readme",
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-ios",
+    "cordova-wp8",
+    "cordova-windows",
+    "cordova-android",
+    "cordova-firefoxos"
+  ],
+  "license": "MIT",
+  "name": "cordova-plugin-insomnia",
+  "optionalDependencies": {},
+  "readme": "# Insomnia-PhoneGap-Plugin\n\nby [Eddy Verbruggen](http://www.x-services.nl)\n\n1. [Description](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#1-description)\n2. [Installation](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#2-installation)\n\t2. [Automatically (CLI / Plugman)](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#automatically-cli--plugman)\n\t2. [Manually](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#manually)\n\t2. [PhoneGap Build](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#phonegap-build)\n3. [Usage](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#3-usage)\n4. [Credits](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#4-credits)\n5. [License](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin#5-license)\n\nThis is for PhoneGap 3.x, [here is the 2.x version](https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin/tree/phonegap-2.x)\n\n## 1. Description\n\nPrevent the screen of the mobile device from falling asleep.\n\n* The device will never fall asleep after calling `keepAwake`.\n* After making your app practically a zombie, you can allow it to sleep again by calling `allowSleepAgain`.\n* Works on Android, probably every version you'd care about.\n* Works on iOS, probably every version you'd care about.\n* Works on Windows and WP8.\n\n## 2. Installation\n\n### Automatically (CLI / Plugman)\nInsomnia is compatible with [Cordova Plugman](https://github.com/apache/cordova-plugman) and ready for the [PhoneGap 2.9.0 CLI](http://docs.phonegap.com/en/2.9.0/guide_cli_index.md.html#The%20Command-line%20Interface_add_features), here's how it works with the CLI:\n\n```\n$ phonegap local plugin add https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git\n```\nor\n```\n$ cordova plugin add https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git\n```\nrun this command afterwards:\n```\n$ cordova prepare\n```\n\nThe javascript bridge is brought in automatically, so no need to reference Insomnia.js from your html.\n\nYou can also get this plugin [from NPM](https://www.npmjs.com/package/cordova-plugin-insomnia).\n\n### Manually\n\n1\\. Add the following xml to your `config.xml` in the root directory of your `www` folder:\n```xml\n<!-- for iOS -->\n<feature name=\"Insomnia\">\n  <param name=\"ios-package\" value=\"Insomnia\" />\n</feature>\n```\n\n```xml\n<!-- for Android -->\n<feature name=\"Insomnia\">\n  <param name=\"android-package\" value=\"nl.xservices.plugins.Insomnia\" />\n</feature>\n```\n\n```xml\n<!-- for wp8 -->\n<feature name=\"Insomnia\">\n  <param name=\"wp-package\" value=\"Insomnia\" />\n</feature>\n```\n\n2\\. Grab a copy of Insomnia.js, add it to your project and reference it in `index.html`:\n```html\n<script type=\"text/javascript\" src=\"js/Insomnia.js\"></script>\n```\n\n3\\. Download the source files for iOS and/or Android and copy them to your project.\n\niOS: Copy `Insomnia.h` and `Insomnia.h` to `platforms/ios/<ProjectName>/Plugins`\n\nAndroid: Copy `Insomnia.java` to `platforms/android/src/nl/xservices/plugins` (create the folders)\n\nwp8: Copy `Insomnia.cs` to `platforms/wp8/Plugins/nl.x-services.plugins.insomnia` (create the folders)\n\n### PhoneGap Build\n\nInsomnia works with PhoneGap build too, look for Insomnia here: https://build.phonegap.com/plugins/\nJust add the following xml to your `config.xml` to always use the latest version of this plugin:\n```xml\n<plugin name=\"cordova-plugin-insomnia\" />\n```\nor to use this exact version:\n```xml\n<plugin name=\"cordova-plugin-insomnia\" version=\"4.1.0\" source=\"npm\" />\n```\n\nThe plugin's  javascript file is brought in automatically. Make sure though you include a reference to cordova.js in your index.html's head:\n```html\n<script type=\"text/javascript\" src=\"cordova.js\"></script>\n```\n\n## 3. Usage\n```html\n<button onclick=\"window.plugins.insomnia.keepAwake()\">keep awake</button>\n<button onclick=\"window.plugins.insomnia.allowSleepAgain()\">allow sleep again</button>\n```\nAn optional successCallback (first argument) will be triggered if the functions succeed. Even calling `keepAwake` twice will fire the successCallback, because the app will respond as expected (being kept awake).\n\nAn optional errorCallback (second argument) will only be triggered if something fatal happened, preventing the plugin to work as expected.\n\n### Quirks\n[In this issue](#29) it was reported that on iOS the app would fall asleep after the Camera has been used,\neven if you previously called `keepAwake`. A similar [issue on Android](#30) where the photo library was accessed during app usage.\n\nSo to make sure your app honors `keepAwake` you have to re-run that method after these kinds of 'external UI' thingies give control back to your app.\n\n## 4. CREDITS ##\n\nThis plugin was enhanced for Plugman / PhoneGap Build by [Eddy Verbruggen](http://www.x-services.nl).\n\nThe Android code was entirely created by the author.\n\nThe iOS code was heavily inspired by [Wolfgang Koller](https://github.com/simplec-dev/powermanagement).\n\nMany thanks to [Jesse MacFadyen](https://github.com/purplecabbage) for implementing the wp8 and windows versions!\n\n## 5. License\n\n[The MIT License (MIT)](http://www.opensource.org/licenses/mit-license.html)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.\n",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EddyVerbruggen/Insomnia-PhoneGap-Plugin.git"
+  },
+  "version": "4.3.0"
+}
