@@ -18,12 +18,6 @@
   src: url(../../../shared/fonts/MinionPro-Regular.woff) format('woff');
 }
 
-@font-face {
-  font-family: 'NothingYouCouldDo';
-  font-style: normal;
-  src: url(../../../shared/fonts/NothingYouCouldDo-Regular.woff2) format('woff2'), url(../../../shared/fonts/NothingYouCouldDo-Regular.woff) format('woff');
-}
-
 // ===============================================
 // Transitional animation classes
 // ===============================================
@@ -310,31 +304,6 @@ body.android .dialog .textfield:focus-within {
     flex-direction: column;
     background-color: $bg_primary;
     color: $font_color_primary;
-    &.card_theme_red {
-      background: $bg_red_primary;
-      color: $font_color_red_primary;
-      .title_container {
-        background-color: $bg_red_titlebar;
-        .title {
-          text-shadow: $white_on_red_text_shadow;
-        }
-        svg {
-          color: $font_color_red_primary !important;
-        }
-      }
-      .article {
-        background: none;
-      }
-      .base_button > button, .base_checkbox button, .base_picker {
-        background-color: $bg_red_interactive !important;
-        svg {
-          color: $font_color_red_primary !important;
-        }
-      }
-      .base_button > button {
-        border: $border_red_primary !important;
-      }
-    }
     .title_container, .base_button > button, .base_checkbox button, .base_picker {
       svg {
         color: $font_color_primary !important;
@@ -360,7 +329,6 @@ body.android .dialog .textfield:focus-within {
       flex: 1;
       padding: size(base) 0;
       font-size: fontsize(flavor);
-      background-image: url(images/papyrus-tiled.jpg);
       background-repeat: repeat;
       background-position: center;
       width: 100%;
@@ -437,29 +405,6 @@ body.android .dialog .textfield:focus-within {
       padding: size(base)/2 size(base) size(base)/2 size(base);
       font-size: fontsize(flavor);
       box-sizing: border-box;
-
-      .searchHeader {
-        width: 100%;
-        max-width: $absmaxdimension;
-        margin: auto;
-        .searchResultInfo {
-          float: left;
-          .inline_icon {
-            opacity: 0.7;
-          }
-        }
-        button {
-          padding: 0 !important;
-          border: 0 !important;
-          margin: 0 !important;
-          background: transparent !important;
-          font-size: fontsize(flavor) !important;
-          min-width: 40px !important;
-        }
-        .inline_icon {
-          height: fontsize(flavor);
-        }
-      }
     }
     .center {
       text-align: center;
@@ -478,33 +423,8 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
-  .inline_icon {
-    height: size(icon);
-    margin-bottom: -(size(tiny));
-  }
-
-  i .inline_icon {
-    margin-left: fontsize(flavor)/8;
-    margin-right: -(fontsize(flavor)/8);
-  }
-
   .inputSpacer { /* for text inputs that are close to bottom, give the screen space to scroll up */
     margin-bottom: 100%;
-  }
-
-  .callout {
-    display: flex;
-    flex-direction: row;
-    p > img {
-      width: size(large);
-      height: size(large);
-      display: inline-block;
-    }
-    .text {
-      font-style: italic;
-      padding-left: size(base);
-      padding-right: size(base);
-    }
   }
 
   .base_main {
@@ -531,77 +451,6 @@ body.android .dialog .textfield:focus-within {
     background-size: cover;
     color: $font_color_dark_primary;
 
-    .playerCounterContainer {
-      width: 100%;
-      height: 100%;
-    }
-
-    .splashProgress {
-      width: size(spinner) !important;
-      height: size(spinner) !important;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      margin-top: -0.5 * size(spinner);
-      margin-left: -0.5 * size(spinner);
-      color: white;
-    }
-
-    .splashMultitouchInstruction {
-      width: 90%;
-      left: 50%;
-      margin-left: -45%;
-      margin-top: -20%;
-      position: absolute;
-      top: 50%;
-      text-align: center;
-    }
-
-    .splashMultitouchPlayerCount {
-      width: 90%;
-      height: size(spinner);
-      left: 50%;
-      margin-left: -45%;
-      margin-top: -0.5 * size(spinner) !important;
-      position: absolute;
-      top: 50%;
-      display: flex;
-      align-items: center;
-
-      h1 {
-        width: 100%;
-        text-align: center;
-      }
-    }
-
-    .splashMultitouchInstruction {
-      font-size: fontsize(flavor);
-      opacity: 0;
-      transition: opacity 1s;
-      -webkit-animation: fadein 1s ease-in;
-         -moz-animation: fadein 1s ease-in;
-          -ms-animation: fadein 1s ease-in;
-           -o-animation: fadein 1s ease-in;
-              animation: fadein 1s ease-in;
-      h2 {
-        margin-bottom: 0;
-      }
-      &.visible {
-        opacity: 1;
-      }
-    }
-    .splashMultitouchPlayerCount {
-      -webkit-animation: fadein 1s ease-in 0s forwards;
-         -moz-animation: fadein 1s ease-in 0s forwards;
-          -ms-animation: fadein 1s ease-in 0s forwards;
-           -o-animation: fadein 1s ease-in 0s forwards;
-              animation: fadein 1s ease-in 0s forwards;
-      h1 {
-        font-size: fontsize(timervalue);
-        margin: 0;
-        font-family: $headerFont;
-      }
-    }
     .logo {
       position: absolute;
       top: size(small);
@@ -615,16 +464,6 @@ body.android .dialog .textfield:focus-within {
         max-width: $absmaxdimension;
         margin: auto;
         display: block;
-      }
-    }
-    .no_multi_button {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      button {
-        text-align: center !important;
-        font-size: fontsize(flavor) !important;
       }
     }
 
@@ -649,11 +488,11 @@ body.android .dialog .textfield:focus-within {
         padding: size(base) !important;
         border: none !important;
         border-radius: 0 !important;
-        background: $bg_red_primary !important;
+        background: blue !important;
         text-align: center !important;
         font-size: fontsize(interactive) !important;
         line-height: $lineheight !important;
-        text-shadow: $white_on_red_text_shadow;
+        text-shadow: white;
       }
       .inline_icon {
         padding-left: 0.2em;
@@ -671,79 +510,6 @@ body.android .dialog .textfield:focus-within {
       bottom: calc(#{size(small)} + env(safe-area-inset-top));
       left: size(base);
       right: size(base);
-    }
-  }
-
-  .remoteplay {
-    .sessionCode {
-      text-align: center;
-      margin: size(base) 0;
-    }
-    .helptext {
-      text-align: center;
-      padding: size(base);
-    }
-
-    .connect_bar {
-      img {
-        width: 20%;
-        display: inline-block;
-        padding: size(small);
-
-        &:nth-child(0) {
-          color: red;
-        }
-      }
-    }
-
-    table {
-      td {
-        padding: size(small);
-
-        span {
-          display: inline-block;
-        }
-      }
-
-      td:first-child {
-        min-width: 17vmin;
-        text-align: center;
-        border-right: $border_accent;
-      }
-
-      padding: size(small);
-      border-collapse: collapse;
-    }
-
-    input {
-      width: 50%;
-      background: rgba(255,255,255,0.3);
-      padding: size(base);
-      font-size: fontsize(interactive) * 2;
-      text-align: center;
-      margin-left: auto;
-      margin-right: auto;
-      display: block;
-    }
-  }
-
-  .combat {
-    &.center {
-      text-align: center;
-      &.damage-label {
-        margin-bottom: 0;
-      }
-      &.damage {
-        margin-top: 0;
-      }
-    }
-    &.draw_enemies {
-      span.meta {
-        display: inline-block;
-        img {
-          padding-bottom: size(small);
-        }
-      }
     }
   }
 
@@ -770,13 +536,6 @@ body.android .dialog .textfield:focus-within {
     text-align: center;
     opacity: 0.7;
     margin-top: size(base);
-  }
-
-  .dialog {
-    background: url(images/papyrus-tiled.jpg) !important;
-    .base_picker, .base_checkbox {
-      color: $font_color_primary !important;
-    }
   }
 
   .menu_popup {
@@ -869,12 +628,6 @@ $fontsizemap: (
     width: 100%;
   }
 
-  .editor_override .app_container {
-    border: none;
-    border-radius: 0;
-    margin-top: 0;
-  }
-
   .app_container {
     position: relative;
     display: block;
@@ -882,14 +635,6 @@ $fontsizemap: (
     height: 100%;
     max-width: 100%;
     max-height: 100%;
-  }
-
-  .base_checkbox .icon {
-    top: size(tiny);
-  }
-
-  .splashMultitouchInstruction, .splashMultitouchPlayerCount {
-    margin-top: -5% !important;
   }
 }
 

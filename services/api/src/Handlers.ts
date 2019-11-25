@@ -4,7 +4,6 @@ import * as express from 'express';
 import * as memoize from 'memoizee';
 import * as request from 'request-promise';
 import Config from './config';
-import { Database } from './models/Database';
 
 const REGEX_SEMVER = /[1-9][0-9]?[0-9]?\.[1-9][0-9]?[0-9]?\.[1-9][0-9]?[0-9]?/g;
 
