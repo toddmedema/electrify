@@ -6,7 +6,6 @@ import {serverstatus} from './ServerStatus';
 import {settings} from './Settings';
 import {snackbar} from './Snackbar';
 import {AppState} from './StateTypes';
-import {user} from './User';
 
 export default function combinedReduce(state: AppState, action: Redux.Action): AppState {
   state = state || ({} as AppState);
@@ -19,6 +18,5 @@ export default function combinedReduce(state: AppState, action: Redux.Action): A
     settings: settings(state.settings, action),
     serverstatus: serverstatus(state.serverstatus, action),
     snackbar: snackbar(state.snackbar, action),
-    user: user(state.user, action),
   } as AppState;
 }

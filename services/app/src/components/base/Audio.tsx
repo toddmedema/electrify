@@ -49,7 +49,7 @@ export default class Audio extends React.Component<Props, {}> {
   // This will fire many times without any audio-related changes since it subscribes to settings
   // So we have to be careful in checking that it's actually an audio-related change,
   // And not a different event that contains valid-looking (but identical) audio info
-  public componentWillReceiveProps(nextProps: Partial<Props>) {
+  public UNSAFE_componentWillReceiveProps(nextProps: Partial<Props>) {
     if (!nextProps.audio) {
       return;
     }

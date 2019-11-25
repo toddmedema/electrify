@@ -10,11 +10,10 @@ import * as Redux from 'redux';
 
 import {NODE_ENV, VERSION} from 'shared/schema/Constants';
 import {audioSet} from './actions/Audio';
-import {fetchServerStatus, setServerStatus} from './actions/ServerStatus';
+import {setServerStatus} from './actions/ServerStatus';
 import {changeSettings} from './actions/Settings';
 import {openSnackbar} from './actions/Snackbar';
-import {silentLogin} from './actions/User';
-import {INIT_DELAY, UNSUPPORTED_BROWSERS} from './Constants';
+import {UNSUPPORTED_BROWSERS} from './Constants';
 import {getDevicePlatform, getDocument, getNavigator, getWindow, setGA} from './Globals';
 import {getStorageBoolean} from './LocalStorage';
 import {createAppStore, getStore} from './Store';
@@ -97,10 +96,6 @@ function setupDevice() {
   if (window.plugins !== undefined && window.plugins.insomnia !== undefined) {
     window.plugins.insomnia.keepAwake(); // keep screen on while app is open
   }
-
-  // silent login here triggers for cordova plugin
-  getStore().dispatch(silentLogin())
-    .catch(console.error);
 }
 
 function setupHotReload() {
@@ -171,11 +166,6 @@ export function init() {
 
   // Only triggers on app builds
   document.addEventListener('deviceready', setupDevice, false);
-  // For non-app builds
-  setTimeout(() => {
-    getStore().dispatch(silentLogin())
-      .catch(console.error);
-  }, INIT_DELAY.SILENT_LOGIN_MILLIS);
 
   setupPolyfills();
   setupGoogleAnalytics(); // before anything else that might log in the user
@@ -191,8 +181,6 @@ export function init() {
         message: 'Unknown browser. Please use a standard browser like Chrome or Firefox for the best experience.',
       },
     }));
-  } else {
-    getStore().dispatch(fetchServerStatus());
   }
 }
 
