@@ -2,7 +2,6 @@ import {mount, unmountAll} from 'app/Testing';
 import * as React from 'react';
 import SplashScreen, { Props } from './SplashScreen';
 import {initialSettings} from '../../reducers/Settings';
-import {loggedOutUser} from 'shared/auth/UserState';
 
 jest.useFakeTimers();
 
@@ -11,8 +10,6 @@ describe('SplashScreen', () => {
 
   function setup(overrides?: Partial<Props>) {
     const props: Props = {
-      announcement: null,
-      onAnnouncementTap: jest.fn(),
       onPlayerCountSelect: jest.fn(),
       onPlayerManualSelect: jest.fn(),
       ...overrides,
