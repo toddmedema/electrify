@@ -3,7 +3,6 @@ import Adapter from 'enzyme-adapter-react-16';
 import * as React from 'react';
 import {Provider} from 'react-redux';
 import {initialCardState} from '../reducers/Card';
-import {initialServerStatusState} from '../reducers/ServerStatus';
 import {initialSettings} from '../reducers/Settings';
 import {initialSnackbar} from '../reducers/Snackbar';
 import {loggedOutUser} from 'shared/auth/UserState';
@@ -21,7 +20,6 @@ function setup(props: Partial<Props>) {
   };
   const store = newMockStore({
     card: props.card || initialCardState,
-    serverstatus: initialServerStatusState,
     settings: initialSettings,
     user: loggedOutUser,
   });

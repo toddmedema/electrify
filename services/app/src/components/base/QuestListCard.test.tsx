@@ -2,7 +2,6 @@ import * as React from 'react';
 import {initialSettings} from '../../reducers/Settings';
 import QuestListCard, {Props} from './QuestListCard';
 import {render} from 'app/Testing';
-import {loggedOutUser} from 'shared/auth/UserState';
 
 describe('QuestListCard', () => {
   function setup(overrides?: Partial<Props>) {
