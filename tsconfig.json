@@ -4,16 +4,40 @@
         "sourceMap": true,
         "noImplicitAny": true,
         "module": "commonjs",
+        "moduleResolution": "node",
         "target": "es6",
         "jsx": "react",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "strictNullChecks": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "noUnusedLocals": true,
+        "baseUrl": "./",
+        "paths": {
+            "api/*": ["services/api/src/*"],
+            "app/*": ["services/app/src/*"],
+            "shared/*": ["shared/*"]
+        },
+        "skipLibCheck": true
     },
+    "include": [
+        "services/**/*",
+        "shared/**/*",
+    ],
     "exclude": [
+        "dist",
         "node_modules",
-        "app/bower_components",
-        "app/quests",
-        "platforms",
-        "plugins",
+        "app/plugins",
+        "app/platforms",
+        "**/*.test.ts",
+        "**/*.test.tsx",
         "www"
-    ]
+    ],
+    "awesomeTypescriptLoaderOptions": {
+        "useBabel": true,
+        "useCache": true,
+        "babelOptions": {
+            "babelrc": true
+        }
+    }
 }
