@@ -1,20 +1,5 @@
-import {UserState as UserStateBase} from 'shared/auth/UserState';
 import {AudioNode} from '../audio/AudioNode';
 import {ThemeManager} from '../audio/ThemeManager';
-
-export interface AnnouncementState {
-  open: boolean;
-  message: string;
-  link?: string;
-}
-
-export interface ServerStatusState {
-  announcement: AnnouncementState;
-  isLatestAppVersion: boolean;
-}
-
-export interface UserState extends UserStateBase {
-}
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
 export interface AudioState {
@@ -78,8 +63,6 @@ export interface AppStateBase {
 
 export interface AppState extends AppStateBase {
   audioData: AudioDataState;
-  serverstatus: ServerStatusState;
   settings: SettingsType;
   snackbar: SnackbarState;
-  user: UserState;
 }

@@ -7,7 +7,7 @@ import {connect} from 'react-redux';
 import {toCard} from '../../actions/Card';
 import {URLS} from '../../Constants';
 import {getDevicePlatform, openWindow} from '../../Globals';
-import {AppState, CardName, SettingsType, UserState} from '../../reducers/StateTypes';
+import {AppState, CardName, SettingsType} from '../../reducers/StateTypes';
 import {getStore} from '../../Store';
 
 // If onMenuSelect or onReturn is not set, default dispatch behavior is used.
@@ -18,7 +18,6 @@ export interface Props extends React.Props<any> {
   title?: string | JSX.Element;
   className?: string;
   settings?: SettingsType;
-  user?: UserState;
   selectedMenu: CardName|undefined;
 }
 
@@ -127,7 +126,6 @@ class Card extends React.Component<Props, IState> {
 
 const mapStateToProps = (state: AppState, ownProps: Partial<Props>): Props => ({
   settings: state.settings,
-  user: state.user,
   selectedMenu: state.card ? state.card.name : undefined,
   ...ownProps,
 });

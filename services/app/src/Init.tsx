@@ -10,7 +10,6 @@ import * as Redux from 'redux';
 
 import {NODE_ENV, VERSION} from 'shared/schema/Constants';
 import {audioSet} from './actions/Audio';
-import {setServerStatus} from './actions/ServerStatus';
 import {changeSettings} from './actions/Settings';
 import {openSnackbar} from './actions/Snackbar';
 import {UNSUPPORTED_BROWSERS} from './Constants';
@@ -175,12 +174,12 @@ export function init() {
 
   // Wait to process settings & dispatch additional UI until render complete
   if (UNSUPPORTED_BROWSERS.test(getNavigator().userAgent)) {
-    getStore().dispatch(setServerStatus({
-      announcement: {
-        open: true,
-        message: 'Unknown browser. Please use a standard browser like Chrome or Firefox for the best experience.',
-      },
-    }));
+    // getStore().dispatch(setServerStatus({
+    //   announcement: {
+    //     open: true,
+    //     message: 'Unknown browser. Please use a standard browser like Chrome or Firefox for the best experience.',
+    //   },
+    // }));
   }
 }
 
