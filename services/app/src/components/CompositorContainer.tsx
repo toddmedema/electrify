@@ -8,7 +8,7 @@ const mapStateToProps = (state: AppState): StateProps => {
   let transition: TransitionClassType = 'next';
   if (state === undefined || Object.keys(state).length === 0) {
     transition = 'instant';
-  } else if (state.card.name === 'SPLASH_CARD') {
+  } else if (state.card.name === 'SPLASH') {
     transition = 'instant';
   } else if (isNavCard(state.card.name)) {
     transition = 'nav';

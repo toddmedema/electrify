@@ -4,8 +4,7 @@ import {NAVIGATION_DEBOUNCE_MS} from '../Constants';
 import {CardName, CardState} from './StateTypes';
 
 export const initialCardState: CardState = {
-  key: '',
-  name: 'SPLASH_CARD' as CardName,
+  name: 'SPLASH' as CardName,
   ts: 0,
 };
 
@@ -15,15 +14,14 @@ export function card(state: CardState = initialCardState, action: Redux.Action):
   switch (action.type) {
     case 'NAVIGATE':
       const to = (action as NavigateAction).to;
-      if (to.key === state.key && to.ts - state.ts < NAVIGATION_DEBOUNCE_MS && !to.overrideDebounce) {
+      if (to.name === state.name && to.ts - state.ts < NAVIGATION_DEBOUNCE_MS && !to.overrideDebounce) {
         return state;
       }
       return to;
-    // case 'QUEST_EXIT':
-    //   return {
-    //     ...initialCardState,
-    //     name: getStorageString(NAV_CARD_STORAGE_KEY, 'TUTORIAL_QUESTS') as CardName,
-    //   };
+    case 'EXIT_GAME':
+      return {
+        ...initialCardState,
+      };
     default:
       return state;
   }

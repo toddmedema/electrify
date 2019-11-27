@@ -18,7 +18,7 @@ deploy:
   script: ./scripts/beta.sh
   skip_cleanup: true
   on:
-    repo: ExpeditionRPG/expedition
+    repo: ToddMedema/electrify
     branch: master
 notifications:
   email: false

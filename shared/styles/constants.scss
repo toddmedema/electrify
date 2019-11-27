@@ -1,25 +1,12 @@
-$fontFamilyBase: MinionPro, serif;
-$headerFont: Cinzel, serif;
-$headerFontLetterSpacing: 0.2px !important;
-
 $font_color_primary: #000000;
 $font_color_faded: #666666;
 
 $border_primary: 0.02in solid #000;
-$border_accent: 0.02in solid #666;
-$border_accent_thin: 0.01in solid #333;
-$border_faded: 0.02in solid #888;
+$border_accent: 0.01in solid #666;
 
-$bg_primary: #F4ECC8;
-$bg_primary_faded: #ebe8da; // AKA The Horror
+$bg_primary: #FFF;
 $bg_inactive: #222222;
-$bg_titlebar: rgba(255, 255, 235, 0.65);
-$bg_interactive: rgba(245, 238, 210, 0.7);
 $bg_active: rgba(255, 255, 255, 0.9);
 
 $font_color_dark_primary: #FFFFFF;
-$border_dark_primary: 0.02in solid #999;
-$border_dark_subtle: 0.02in solid #333;
 $bg_dark_primary: #161011;
-$bg_dark_titlebar: rgba(110, 110, 110, 0.6);
-$bg_dark_interactive: rgba(35, 35, 35, 0.5);
