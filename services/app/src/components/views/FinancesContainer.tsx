@@ -1,27 +1,21 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {toCard} from '../../actions/Card';
 import {AppState} from '../../reducers/StateTypes';
-import QuestListCard, {DispatchProps, StateProps} from '../base/QuestListCard';
+import Finances, {DispatchProps, StateProps} from './Finances';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
-    title: 'tutorials',
-    icon: 'helper',
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onReturn(): void {
-      dispatch(toCard({name: 'SPLASH_CARD'}));
-    },
   };
 };
 
-const TutorialsContainer = connect(
+const FinancesContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(QuestListCard);
+)(Finances);
 
-export default TutorialsContainer;
+export default FinancesContainer;

@@ -1,11 +1,6 @@
 import {setNavigator} from '../Globals';
 import {Action} from '../Testing';
 import {toCard} from './Card';
-import {AUTH_SETTINGS} from '../Constants';
-import {setStorageKeyValue} from '../LocalStorage';
-import {initialSettings} from '../reducers/Settings';
-
-const fetchMock = require('fetch-mock');
 
 describe('Card action', () => {
   describe('toCard', () => {

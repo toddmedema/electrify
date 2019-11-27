@@ -4,7 +4,7 @@ import {CardName} from '../reducers/StateTypes';
 import {getStore} from '../Store';
 import {NavigateAction} from './ActionTypes';
 
-export function toCard(a: {name: CardName, noHistory?: boolean, overrideDebounce?: boolean, vibrateLong?: boolean}) {
+export function toCard(a: {name: CardName, overrideDebounce?: boolean, vibrateLong?: boolean}) {
   const nav = getNavigator();
   const state = getStore().getState();
   const vibration = state.settings && state.settings.vibration;

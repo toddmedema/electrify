@@ -38,14 +38,16 @@ export interface SnackbarState {
 }
 
 export type CardName =
-  'TUTORIAL_QUESTS' |
-  'SPLASH_CARD' |
-  'SETTINGS';
+  'CUSTOMERS' |
+  'FINANCES' |
+  'GENERATORS' |
+  'SETTINGS' |
+  'SPLASH' |
+  'TUTORIAL';
 
 export interface CardState {
   name: CardName;
   ts: number;
-  key: string;
   overrideDebounce?: boolean;
 }
 

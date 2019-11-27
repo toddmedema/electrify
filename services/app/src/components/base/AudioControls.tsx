@@ -22,7 +22,7 @@ export default class AudioControls extends React.Component<Props, {}> {
     if (this.props.audioLoaded === 'ERROR') {
       return (
         <div className="audioControls">
-          <ErrorIcon nativeColor="white" id="audioLoadError"/>
+          <ErrorIcon id="audioLoadError"/>
         </div>
       );
     }
@@ -30,12 +30,12 @@ export default class AudioControls extends React.Component<Props, {}> {
     return (
       <div className="audioControls">
         {this.props.audioLoaded === 'LOADING' && <IconButton disabled={true}>
-          <RefreshIcon nativeColor="white" id="audioLoadingIndicator"/>
+          <RefreshIcon id="audioLoadingIndicator"/>
         </IconButton>}
         <IconButton onClick={() => this.props.onAudioToggle(!this.props.audioEnabled)} id="audioToggle">
           {this.props.audioEnabled ?
-            <VolumeUpIcon nativeColor="white" /> :
-            <VolumeOffIcon nativeColor="white" />
+            <VolumeUpIcon /> :
+            <VolumeOffIcon />
           }
         </IconButton>
       </div>
