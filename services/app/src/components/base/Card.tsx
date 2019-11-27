@@ -10,11 +10,10 @@ import {getDevicePlatform, openWindow} from '../../Globals';
 import {AppState, CardName, SettingsType} from '../../reducers/StateTypes';
 import {getStore} from '../../Store';
 
-// If onMenuSelect or onReturn is not set, default dispatch behavior is used.
+// If onMenuSelect is not set, default dispatch behavior is used.
 export interface Props extends React.Props<any> {
   header?: JSX.Element;
   icon?: string;
-  onReturn?: () => any;
   title?: string | JSX.Element;
   className?: string;
   settings?: SettingsType;
@@ -43,11 +42,8 @@ class Card extends React.Component<Props, IState> {
     const dispatch = getStore().dispatch;
     this.handleMenuClose();
     switch (value) {
-      case 'ABOUT':
-        openWindow(URLS.WEBSITE);
-        break;
       case 'HOME':
-        return dispatch(toCard({name: 'SPLASH_CARD'}));
+        return dispatch(toCard({name: 'SPLASH'}));
       case 'SETTINGS':
         return dispatch(toCard({name: 'SETTINGS'}));
       case 'RATE':
@@ -102,7 +98,7 @@ class Card extends React.Component<Props, IState> {
               anchorEl={anchorEl}
               classes={{paper: 'menu_popup'}}
               onClose={() => this.handleMenuClose()}>
-              <MenuItem id="homeButton" onClick={() => {this.onMenuSelect('HOME'); }}>Home</MenuItem>
+              <MenuItem id="homeButton" onClick={() => {this.onMenuSelect('HOME'); }}>Main Menu</MenuItem>
               <MenuItem {...this.menuItemDisableProps('SETTINGS')}  onClick={() => {this.onMenuSelect('SETTINGS'); }}>Settings</MenuItem>
               {getDevicePlatform() !== 'web' && <MenuItem onClick={() => {this.onMenuSelect('RATE'); }}>Rate the App</MenuItem>}
               <MenuItem onClick={() => {this.onMenuSelect('ABOUT'); }}>About</MenuItem>

@@ -1,6 +1,6 @@
 import Redux, {createStore} from 'redux';
 import {composeWithDevTools} from 'redux-devtools-extension';
-import expeditionApp from './reducers/CombinedReducers';
+import Store from './reducers/CombinedReducers';
 import {AppState} from './reducers/StateTypes';
 
 declare const require: any;
@@ -14,7 +14,7 @@ export function installStore(createdStore: Redux.Store<AppState>) {
 
 export function createAppStore() {
   const composeEnhancers = composeWithDevTools({});
-  installStore(createStore(expeditionApp,  composeEnhancers()));
+  installStore(createStore(Store,  composeEnhancers()));
 
   if (module && module.hot) {
     module.hot.accept('./reducers/CombinedReducers', () => {

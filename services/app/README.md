@@ -1,4 +1,4 @@
-# Expedition: The Companion App
+# Electrify
 
 Learn more about Expedition and play the game at [ExpeditionGame.com](https://expeditiongame.com). The app is available for browsers at [App.ExpeditionGame.com](https://App.ExpeditionGame.com), on the [Android market](https://play.google.com/store/apps/details?id=io.fabricate.expedition) and on the [iOS market](https://itunes.apple.com/us/app/expedition-roleplaying-card/id1085063478?ls=1&mt=8).
 
@@ -10,7 +10,7 @@ Please see CONTRIBUTING.md for how you can contribute!
 
 ### Requirements
 
-Requires NodeJS v8.0 or above. Check your version with `node -v`.
+Requires NodeJS v12.0 or above. Check your version with `node -v`.
 
 We recommend using [NVM](https://github.com/creationix/nvm) to install node to make it easier to swap between and upgrade Node versions in the future.
 

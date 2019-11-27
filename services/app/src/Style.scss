@@ -1,24 +1,6 @@
 @import '../../../shared/styles/constants.scss';
 
 // ===============================================
-// Font setup
-// ===============================================
-
-@font-face {
-  font-family: 'Cinzel';
-  font-style: normal;
-  font-weight: 700;
-  src: url(../../../shared/fonts/Cinzel-Bold.woff2) format('woff2'), url(../../../shared/fonts/Cinzel-Bold.woff) format('woff');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215, U+E0FF, U+EFFD, U+F000;
-}
-
-@font-face {
-  font-family: 'MinionPro';
-  font-style: normal;
-  src: url(../../../shared/fonts/MinionPro-Regular.woff) format('woff');
-}
-
-// ===============================================
 // Transitional animation classes
 // ===============================================
 
@@ -98,27 +80,21 @@ $smallFontMult: 0.8;
 
 $sizemap: (
   appbar: 48px,
-  remotefooter: 50px,
   inputsquare: 48px,
   inputspacing: 16px, /* slightly larger on small devices (to prevent false touches) */
   input: 32px, /* size of input icon-style buttons */
-  watermark: 36vh, /* height-specific */
-  navfooterbtn: 19vw,
   huge: 12vmin,
   large: 6vmin,
   icon: 4.5vmin,
   base: 2vmin,
   small: 1vmin,
   tiny: 0.5vmin,
-  spinner: 40vmin,
 );
 
 $fontsizemap: (
-  timervalue: 24vmin,
   title: 6vmin,
   interactive: 5.5vmin,
   flavor: 4.7vmin,
-  label: 18px, // purposefully fixed-size
 );
 
 @function fontsize($key) {
@@ -151,13 +127,13 @@ html {
 }
 
 body {
+  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
   background-color: $bg_primary;
   overflow: hidden;
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: $fontFamilyBase;
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
@@ -183,7 +159,7 @@ body {
   }
 }
 
-.nav_footer {
+#navfooter {
   position: absolute;
   bottom: 0;
   width: 100%;
@@ -192,58 +168,14 @@ body {
   box-sizing: border-box;
   background-color: $bg_primary;
   border-top: $border_accent;
-
-  button .navlabel {
-    font-family: Cinzel, serif;
-  }
-
-  button {
-    min-width: size(large) !important;
-    max-width: size(navfooterbtn) !important;
-  }
 }
 
-h1, h2, h3 {
-  font-family: $headerFont;
-  margin: 0.5em 0 0.2em 0;
-  line-height: $lineheight;
-}
-h1 {
-  font-size: 2em;
-}
-h2 {
-  font-size: 1.5em;
-  .inline_icon {
-    height: 6.5vmin;
-    margin-bottom: -1.0vmin;
-  }
-}
-h3 {
-  font-size: 1.25em;
-}
-
-p {
-  margin: 0 0 1em 0;
-}
-p:first-child {
-  margin-top: 1em;
-}
-
-a {
-  color: $font_color_primary;
-  &.linkButton {
-    text-decoration: none;
-  }
-}
-
-span.line {
-  display: inline-block;
-}
-
-.freeSpace {
-  text-align: center;
-  font-style: italic;
-  margin-top: size(base);
+.MuiMobileStepper-root {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: $bg_primary;
 }
 
 // Fixes bug with Android apk where keyboard not scrolling view - https://github.com/ExpeditionRPG/expedition/issues/255
@@ -252,47 +184,20 @@ body.android .dialog .textfield:focus-within {
 }
 
 @mixin styling() {
-
-  button {
-    &.large {
-      width: 100% !important;
-      height: auto !important;
-      div {
-        font-size: fontsize(interactive) !important;
-        line-height: $lineheight !important;
-        margin: 0.5em !important;
-      }
-    }
-    &.primary {
-      font-family: $headerFont !important;
-      border: $border_accent !important;
-      background: $bg_interactive !important;
-    }
-  }
-
   .app_container {
     &.largeFont {
       .article {
         font-size: $largeFontMult * fontsize(flavor);
-        .base_button > button {
+        button {
           font-size: $largeFontMult * fontsize(flavor) !important;
-        }
-        .inline_icon {
-          height: $largeFontMult * fontsize(flavor);
         }
       }
     }
     &.smallFont {
       .article {
         font-size: $smallFontMult * fontsize(flavor);
-        .base_button > button {
+        button {
           font-size: $smallFontMult * fontsize(flavor) !important;
-        }
-        .inline_icon {
-          height: $smallFontMult * fontsize(flavor);
-        }
-        h2 .inline_icon {
-          height: 1.1em;
         }
       }
     }
@@ -304,20 +209,6 @@ body.android .dialog .textfield:focus-within {
     flex-direction: column;
     background-color: $bg_primary;
     color: $font_color_primary;
-    .title_container, .base_button > button, .base_checkbox button, .base_picker {
-      svg {
-        color: $font_color_primary !important;
-      }
-    }
-    .base_button.mediumbutton button span {
-      font-size: 130% !important;
-      text-align: center !important;
-      font-family: Cinzel, serif;
-    }
-    .base_button.bigbutton button span {
-      font-size: 200% !important;
-      text-align: center !important;
-    }
     .child_wrapper {
       margin: size(large);
       margin-top: size(small);
@@ -349,77 +240,6 @@ body.android .dialog .textfield:focus-within {
         margin: auto;
         min-height: 50vh;
       }
-      #bgimg {
-        position: absolute;
-        height: size(watermark);
-        width: size(watermark);
-        right: 0;
-        top: size(huge);
-        margin-right: -0.35 * size(watermark);
-        margin-top: 4vh;
-        opacity: 0.2;
-      }
-    }
-
-    .title_container {
-      position: relative;
-      background-color: $bg_titlebar;
-      padding: 0;
-      line-height: size(appbar);
-      height: size(appbar);
-      width: 100%;
-
-      // iPhone X padding fix
-      padding-top: constant(safe-area-inset-top);
-      padding-top: env(safe-area-inset-top);
-
-      > button {
-        float: left;
-        padding: 0 !important;
-        svg {
-          height: size(input) !important;
-          width: size(input) !important;
-        }
-      }
-      .menu {
-        float: right;
-        padding: 0;
-        font-size: fontsize(interactive);
-      }
-      .title {
-        font-family: $headerFont;
-        letter-spacing: $headerFontLetterSpacing;
-
-        font-size: fontsize(title);
-        text-align: center;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        margin: 0 48px;
-      }
-    }
-    .header {
-      width: 100%;
-      background-color: $bg_titlebar;
-      line-height: $lineheight;
-      padding: size(base)/2 size(base) size(base)/2 size(base);
-      font-size: fontsize(flavor);
-      box-sizing: border-box;
-    }
-    .center {
-      text-align: center;
-    }
-  }
-
-  ol, ul {
-    padding-left: size(icon);
-
-    li {
-      padding-bottom: size(small);
-
-      ol li, ul li {
-        padding-bottom: 0;
-      }
     }
   }
 
@@ -433,10 +253,7 @@ body.android .dialog .textfield:focus-within {
     height: 100%;
     box-sizing: border-box;
     display: flex;
-
-    &.has_footer {
-      padding-bottom: size(remotefooter);
-    }
+    text-align: center;
   }
 
   // ===============================================
@@ -446,22 +263,31 @@ body.android .dialog .textfield:focus-within {
     width: 100%;
     height: 100%;
     position: relative;
-    background-color: white;
-    color: $font_color_dark_primary;
+    background-color: $bg_primary;
 
     .logo {
       position: absolute;
-      top: size(base);
-      // iPhone X padding fix
-      top: calc(size(base) + constant(safe-area-inset-top));
-      top: calc(size(base) + env(safe-area-inset-top));
-      left: size(base);
-      right: size(base);
+      top: size(large);
+      left: size(large);
+      right: size(large);
       img {
         width: 100%;
         max-width: $absmaxdimension;
         margin: auto;
         display: block;
+      }
+    }
+
+    #startMenu {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+
+      button {
+        display: block;
+        margin: auto;
+        margin-bottom: size(large);
       }
     }
   }
@@ -485,49 +311,10 @@ body.android .dialog .textfield:focus-within {
     opacity: 0.7;
     margin-top: size(huge);
   }
-  .privacy {
-    text-align: center;
-    opacity: 0.7;
-    margin-top: size(base);
-  }
 
   .menu_popup {
     background-color: $bg_primary;
     color: $font_color_primary;
-  }
-
-  .lds-ellipsis {
-    display: block;
-    margin: size(large) auto 0 auto;
-    position: relative;
-    width: 64px;
-    height: 64px;
-
-    div {
-      position: absolute;
-      top: 27px;
-      width: 11px;
-      height: 11px;
-      border-radius: 50%;
-      background: $bg_dark_titlebar;
-      animation-timing-function: cubic-bezier(0, 1, 1, 0);
-    }
-    div:nth-child(1) {
-      left: 6px;
-      animation: lds-ellipsis1 0.6s infinite;
-    }
-    div:nth-child(2) {
-      left: 6px;
-      animation: lds-ellipsis2 0.6s infinite;
-    }
-    div:nth-child(3) {
-      left: 26px;
-      animation: lds-ellipsis2 0.6s infinite;
-    }
-    div:nth-child(4) {
-      left: 45px;
-      animation: lds-ellipsis3 0.6s infinite;
-    }
   }
 }
 
@@ -543,27 +330,21 @@ $abs_scale_vw: $abswidthmax / 120vmin;
 $abs_scale_vh: $absheightmax / 120vmin;
 
 $sizemap: (
-  appbar: 48px,
-  remotefooter: 50px,
   inputspacing: 14px,
   inputsquare: 48px,
   input: 32px,
-  watermark: 36vmin * $abs_scale_vh, /* note: height-specific */
   huge: 12vmin * $abs_scale_vh,
   large: 6vmin * $abs_scale_vh,
   icon: 4vmin * $abs_scale_vh,
   base: 2vmin * $abs_scale_vh,
   small: 1vmin * $abs_scale_vh,
   tiny: 0.5vmin * $abs_scale_vh,
-  spinner: 40vmin * $abs_scale_vh,
 );
 
 $fontsizemap: (
   title: 6vmin * $abs_scale_vw,
-  timervalue: 24vmin * $abs_scale_vw,
   interactive: 5vmin * $abs_scale_vw,
   flavor: 4.5vmin * $abs_scale_vw,
-  label: 18px,
 );
 
 @media screen and (min-width: $abswidthmax), screen and (min-height: $absheightmax) {
@@ -625,17 +406,4 @@ $fontsizemap: (
 @-ms-keyframes rotate {
   from { transform: rotate(0); }
   to   { transform: rotate(360deg); }
-}
-
-@keyframes lds-ellipsis1 {
-  0% { transform: scale(0); }
-  100% { transform: scale(1); }
-}
-@keyframes lds-ellipsis2 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(19px, 0); }
-}
-@keyframes lds-ellipsis3 {
-  0% { transform: scale(1); }
-  100% { transform: scale(0); }
 }

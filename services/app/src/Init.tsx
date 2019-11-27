@@ -1,7 +1,7 @@
 declare var require: any;
 declare var module: any;
 
-import MuiThemeProvider from '@material-ui/core/styles/MuiThemeProvider';
+import { ThemeProvider } from '@material-ui/core/styles';
 import 'babel-polyfill';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
@@ -192,11 +192,11 @@ function render() {
   }
   ReactDOM.unmountComponentAtNode(base);
   ReactDOM.render(
-    <MuiThemeProvider theme={theme}>
+    <ThemeProvider theme={theme}>
       <Provider store={getStore()}>
         <CompositorContainer store={getStore()}/>
       </Provider>
-    </MuiThemeProvider>,
+    </ThemeProvider>,
     base
   );
 }

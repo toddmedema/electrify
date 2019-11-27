@@ -1,8 +1,6 @@
 // import Checkbox from '@material-ui/core/Checkbox';
 import * as React from 'react';
 import {VERSION} from 'shared/schema/Constants';
-import {URLS} from '../../Constants';
-import {openWindow} from '../../Globals';
 import {DifficultyType, FontSizeType, SettingsType} from '../../reducers/StateTypes';
 
 export interface StateProps {
@@ -23,7 +21,7 @@ export interface Props extends StateProps, DispatchProps {}
 // For all cycles, going to the right = harder, left = easier
 // const difficultyText: { [v: string]: any } = [
 //   {title: 'Story', text: 'You\'re here for the story. Enemies go easy on you.'},
-//   {title: 'Normal', text: 'Expedition as it was meant to be played. Adventurers start here!'},
+//   {title: 'Normal', text: 'As it was meant to be played. Adventurers start here!'},
 //   {title: 'Hard', text: 'Enemies are relentless; a true challenge for seasoned adventurers only.'},
 //   {title: 'Impossible', text: 'You will almost surely die, so make your death a glorious one!'},
 // ];
@@ -61,7 +59,6 @@ const Settings = (props: Props): JSX.Element => {
   return (
     <div>
       <div className="version">Expedition App v{VERSION}</div>
-      <div className="privacy"><a href="#" onClick={() => openWindow(URLS.PRIVACY_POLICY)}>Privacy Policy</a></div>
     </div>
   );
 };

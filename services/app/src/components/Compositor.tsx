@@ -2,6 +2,7 @@ import Button from '@material-ui/core/Button';
 import Snackbar from '@material-ui/core/Snackbar';
 import * as React from 'react';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
+
 import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
 import {
   CardName,
@@ -10,11 +11,15 @@ import {
   SnackbarState,
   TransitionClassType
 } from '../reducers/StateTypes';
+
 import AudioContainer from './base/AudioContainer';
 import NavigationContainer from './base/NavigationContainer';
+import CustomersContainer from './views/CustomersContainer';
+import FinancesContainer from './views/FinancesContainer';
+import GeneratorsContainer from './views/GeneratorsContainer';
 import SettingsContainer from './views/SettingsContainer';
 import SplashScreenContainer from './views/SplashScreenContainer';
-import TutorialsContainer from './views/TutorialsContainer';
+import TutorialBuildContainer from './views/TutorialBuildContainer';
 
 export interface StateProps {
   card: CardState;
@@ -30,12 +35,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export function isNavCard(name: CardName) {
-  for (const n of NAV_CARDS) {
-    if (name === n) {
-      return true;
-    }
-  }
-  return false;
+  return NAV_CARDS.indexOf(name) !== -1;
 }
 
 export default class Compositor extends React.Component<Props, {}> {
@@ -48,26 +48,24 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): JSX.Element {
     switch (this.props.card.name) {
-      case 'SPLASH_CARD':
-        return <SplashScreenContainer />;
-      case 'TUTORIAL_QUESTS':
-        return <TutorialsContainer />;
+      case 'CUSTOMERS':
+        return <CustomersContainer />;
+      case 'FINANCES':
+        return <FinancesContainer />;
+      case 'GENERATORS':
+        return <GeneratorsContainer />;
+      case 'TUTORIAL':
+        return <TutorialBuildContainer />;
       case 'SETTINGS':
         return <SettingsContainer />;
+      case 'SPLASH':
+        return <SplashScreenContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }
   }
 
   private renderFooter(): JSX.Element|null {
-    // Show no footers for certain cards
-    for (const noShow of ['SPLASH_CARD', 'PLAYER_COUNT_SETTING']) {
-      if (this.props.card.name === noShow) {
-        return null;
-      }
-    }
-
-    // Only show nav footer for certain cards
     if (isNavCard(this.props.card.name)) {
       return <NavigationContainer />;
     }
@@ -75,8 +73,8 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public shouldComponentUpdate(nextProps: Props) {
-    // Don't update the main UI if we're on the same card key
-    if (this.props.card.key === nextProps.card.key) {
+    // Don't update the main UI if we're on the same card
+    if (this.props.card.name === nextProps.card.name) {
       return false;
     }
 
@@ -84,14 +82,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-
-    const containerClass = ['app_container'];
-    if (this.props.settings.fontSize === 'SMALL') {
-      containerClass.push('smallFont');
-    } else if (this.props.settings.fontSize === 'LARGE') {
-      containerClass.push('largeFont');
-    }
-
+    const containerClass = ['app_container', this.props.settings.fontSize.toLowerCase() + 'Font'];
     const footer = this.renderFooter();
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
@@ -103,7 +94,7 @@ export default class Compositor extends React.Component<Props, {}> {
               child, {classNames: this.props.transition}
           )}>
           <CSSTransition
-            key={this.props.card.key}
+            key={this.props.card.name}
             classNames={''}
             timeout={{enter: CARD_TRANSITION_ANIMATION_MS, exit: CARD_TRANSITION_ANIMATION_MS}}>
             <div className={'base_main' + ((footer !== null) ? ' has_footer' : '')}>

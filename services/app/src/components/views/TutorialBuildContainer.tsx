@@ -2,7 +2,7 @@ import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
 import {AppState} from '../../reducers/StateTypes';
-import SplashScreen, {DispatchProps, StateProps} from './SplashScreen';
+import TutorialBuild, {DispatchProps, StateProps} from './TutorialBuild';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
@@ -11,21 +11,18 @@ const mapStateToProps = (state: AppState): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onSettings: () => {
-      dispatch(toCard({name: 'SETTINGS'}));
-    },
-    onStart: () => {
+    onNext: () => {
       dispatch(toCard({name: 'GENERATORS'}));
     },
-    onTutorial: () => {
-      dispatch(toCard({name: 'TUTORIAL'}));
+    onPrevious: () => {
+      dispatch(toCard({name: 'SPLASH'}));
     },
   };
 };
 
-const SplashScreenContainer = connect(
+const TutorialBuildContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(SplashScreen);
+)(TutorialBuild);
 
-export default SplashScreenContainer;
+export default TutorialBuildContainer;
