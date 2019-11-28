@@ -1,10 +1,11 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppState} from '../../reducers/StateTypes';
+import {AppState} from '../../Types';
 import Generators, {DispatchProps, StateProps} from './Generators';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
+    gameState: state.gameState,
   };
 };
 

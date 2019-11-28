@@ -3,14 +3,14 @@ import Redux from 'redux';
 import {loadAudioFiles} from '../../actions/Audio';
 import {changeSettings} from '../../actions/Settings';
 import {openSnackbar} from '../../actions/Snackbar';
-import {initialAudioState} from '../../reducers/Audio';
-import {AppState} from '../../reducers/StateTypes';
+import {initialAudio} from '../../reducers/Audio';
+import {AppState} from '../../Types';
 import Audio, {DispatchProps, StateProps} from './Audio';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
     themeManager: (state.audioData || {}).themeManager || null,
-    audio: state.audio || initialAudioState,
+    audio: state.audio || initialAudio,
     enabled: state.settings.audioEnabled,
   };
 };

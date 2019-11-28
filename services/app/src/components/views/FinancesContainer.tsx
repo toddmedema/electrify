@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppState} from '../../reducers/StateTypes';
+import {AppState} from '../../Types';
 import Finances, {DispatchProps, StateProps} from './Finances';
 
 const mapStateToProps = (state: AppState): StateProps => {

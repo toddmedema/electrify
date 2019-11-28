@@ -1,10 +1,10 @@
 import {VIBRATION_LONG_MS, VIBRATION_SHORT_MS} from '../Constants';
 import {getNavigator} from '../Globals';
-import {CardName} from '../reducers/StateTypes';
 import {getStore} from '../Store';
-import {NavigateAction} from './ActionTypes';
+import {CardNameType} from '../Types';
+import {NavigateAction} from '../Types';
 
-export function toCard(a: {name: CardName, overrideDebounce?: boolean, vibrateLong?: boolean}) {
+export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibrateLong?: boolean}) {
   const nav = getNavigator();
   const state = getStore().getState();
   const vibration = state.settings && state.settings.vibration;

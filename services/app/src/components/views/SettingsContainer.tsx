@@ -1,7 +1,8 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
+import {toCard} from '../../actions/Card';
 import {changeSettings} from '../../actions/Settings';
-import {AppState, DifficultyType} from '../../reducers/StateTypes';
+import {AppState, DifficultyType} from '../../Types';
 import Settings, {DispatchProps, fontSizeValues, StateProps} from './Settings';
 
 const mapStateToProps = (state: AppState): StateProps => {
@@ -50,6 +51,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
         i = fontSizeValues.length - 1;
       }
       dispatch(changeSettings({fontSize: fontSizeValues[i]}));
+    },
+    onMainMenu: () => {
+      dispatch(toCard({name: 'MAIN_MENU'}));
     },
     onShowHelpChange: (v: boolean) => {
       dispatch(changeSettings({showHelp: v}));

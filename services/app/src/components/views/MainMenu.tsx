@@ -15,9 +15,9 @@ export interface Props extends StateProps, DispatchProps {}
 // TODO based on if this is their first game or not, change the emphasis to be on tutorial vs play
 // TODO option to resume a saved game; if you try to start a new game w/ a saved game, prompt that it'll delete the save
   // (also, winning / ending a game should clear its save)
-const SplashScreen = (props: Props): JSX.Element => {
+const MainMenu = (props: Props): JSX.Element => {
   return (
-    <div className="splashScreen">
+    <div id="mainMenu">
       <div className="logo">
         <img src="images/logo.svg"></img>
       </div>
@@ -30,4 +30,4 @@ const SplashScreen = (props: Props): JSX.Element => {
   );
 };
 
-export default SplashScreen;
+export default MainMenu;

@@ -4,7 +4,7 @@ import RefreshIcon from '@material-ui/icons/Refresh';
 import VolumeOffIcon from '@material-ui/icons/VolumeOff';
 import VolumeUpIcon from '@material-ui/icons/VolumeUp';
 import * as React from 'react';
-import {AudioLoadingType} from '../../reducers/StateTypes';
+import {AudioLoadingType} from '../../Types';
 
 export interface StateProps extends React.Props<any> {
   audioEnabled: boolean;
