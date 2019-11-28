@@ -2,7 +2,7 @@ import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
 import {AppState} from '../../Types';
-import TutorialBuild, {DispatchProps, StateProps} from './TutorialBuild';
+import Simulate, {DispatchProps, StateProps} from './Simulate';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
@@ -11,18 +11,16 @@ const mapStateToProps = (state: AppState): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onNext: () => {
+    onNextSeason: () => {
+      // TODO "next season" action
       dispatch(toCard({name: 'GENERATORS'}));
-    },
-    onPrevious: () => {
-      dispatch(toCard({name: 'MAIN_MENU'}));
     },
   };
 };
 
-const TutorialBuildContainer = connect(
+const SimulateContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(TutorialBuild);
+)(Simulate);
 
-export default TutorialBuildContainer;
+export default SimulateContainer;

@@ -1,4 +1,4 @@
-import {SnackbarCloseAction, SnackbarOpenAction} from './ActionTypes';
+import {SnackbarCloseAction, SnackbarOpenAction} from '../Types';
 
 export function closeSnackbar(): SnackbarCloseAction {
   return {type: 'SNACKBAR_CLOSE'};

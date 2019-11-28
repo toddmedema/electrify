@@ -1,15 +1,15 @@
 import BottomNavigation from '@material-ui/core/BottomNavigation';
 import BottomNavigationAction from '@material-ui/core/BottomNavigationAction';
 import * as React from 'react';
-import {CardName, CardState, SettingsType} from '../../reducers/StateTypes';
+import {CardNameType, CardType, SettingsType} from '../../Types';
 
 export interface StateProps {
-  card: CardState;
+  card: CardType;
   settings: SettingsType;
 }
 
 export interface DispatchProps {
-  toCard: (name: CardName, settings: SettingsType) => void;
+  toCard: (name: CardNameType, settings: SettingsType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -25,8 +25,8 @@ export default class Navigation extends React.Component<Props, {}> {
       <BottomNavigation
         id="navfooter"
         showLabels
-        value={this.props.card.name || 'SPLASH_SCREEN'}
-        onChange={(e: any, name: CardName) => this.props.toCard(name, this.props.settings)}
+        value={this.props.card.name || 'MAIN_MENU'}
+        onChange={(e: any, name: CardNameType) => this.props.toCard(name, this.props.settings)}
       >
         <BottomNavigationAction classes={{label: 'navlabel'}} id="generators" label="Generators" value="GENERATORS" icon={this.genIcon('generators')} />
         <BottomNavigationAction classes={{label: 'navlabel'}} id="customers" label="Customers" value="CUSTOMERS" icon={this.genIcon('customers')} />
