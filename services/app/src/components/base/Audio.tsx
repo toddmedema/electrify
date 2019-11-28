@@ -1,11 +1,11 @@
 import {ThemeManager} from 'app/audio/ThemeManager';
 import {AUDIO_COMMAND_DEBOUNCE_MS, INIT_DELAY} from 'app/Constants';
-import {AudioState} from 'app/reducers/StateTypes';
+import {AudioType} from 'app/Types';
 import * as React from 'react';
 
 export interface StateProps {
   themeManager: ThemeManager|null;
-  audio: AudioState;
+  audio: AudioType;
   enabled: boolean;
 }
 

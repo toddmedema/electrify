@@ -7,7 +7,7 @@ import {connect} from 'react-redux';
 import {toCard} from '../../actions/Card';
 import {URLS} from '../../Constants';
 import {getDevicePlatform, openWindow} from '../../Globals';
-import {AppState, CardName, SettingsType} from '../../reducers/StateTypes';
+import {AppState, CardNameType, SettingsType} from '../../Types';
 import {getStore} from '../../Store';
 
 // If onMenuSelect is not set, default dispatch behavior is used.
@@ -17,7 +17,7 @@ export interface Props extends React.Props<any> {
   title?: string | JSX.Element;
   className?: string;
   settings?: SettingsType;
-  selectedMenu: CardName|undefined;
+  selectedMenu: CardNameType | undefined;
 }
 
 interface IState {
@@ -43,7 +43,7 @@ class Card extends React.Component<Props, IState> {
     this.handleMenuClose();
     switch (value) {
       case 'HOME':
-        return dispatch(toCard({name: 'SPLASH'}));
+        return dispatch(toCard({name: 'MAIN_MENU'}));
       case 'SETTINGS':
         return dispatch(toCard({name: 'SETTINGS'}));
       case 'RATE':
@@ -70,7 +70,7 @@ class Card extends React.Component<Props, IState> {
     }
   }
 
-  public menuItemDisableProps(value: CardName) {
+  public menuItemDisableProps(value: CardNameType) {
     const isSelected = this.props.selectedMenu === value;
     return {
       disabled: isSelected,
@@ -106,8 +106,8 @@ class Card extends React.Component<Props, IState> {
           </span>
           <div className="title">{this.props.title}</div>
         </div>
-    {this.props.header && <div className="header">{this.props.header}</div>}
-    <div className="article">
+      {this.props.header && <div className="header">{this.props.header}</div>}
+      <div className="article">
           <div className="scrollbox">
             <div className="child_wrapper">
               {this.props.children}

@@ -1,8 +1,8 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
-import {AppState} from '../../reducers/StateTypes';
-import SplashScreen, {DispatchProps, StateProps} from './SplashScreen';
+import {AppState} from '../../Types';
+import MainMenu, {DispatchProps, StateProps} from './MainMenu';
 
 const mapStateToProps = (state: AppState): StateProps => {
   return {
@@ -23,9 +23,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const SplashScreenContainer = connect(
+const MainMenuContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(SplashScreen);
+)(MainMenu);
 
-export default SplashScreenContainer;
+export default MainMenuContainer;

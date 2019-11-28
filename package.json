@@ -78,7 +78,7 @@
     "request": "^2.81.0",
     "request-promise": "^4.2.2",
     "sass-loader": "^7.0.3",
-    "seedrandom": "^2.4.3",
+    "seedrandom": "^3.0.5",
     "send": "^0.16.2",
     "sequelize": "^5.3.3",
     "sinon": "^6.0.0",

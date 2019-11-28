@@ -1,8 +1,7 @@
 import Redux from 'redux';
 import {NODE_ENV} from 'shared/schema/Constants';
-import {ChangeSettingsAction} from '../actions/ActionTypes';
 import {getStorageBoolean, getStorageString, setStorageKeyValue} from '../LocalStorage';
-import {DifficultyType, FontSizeType, SettingsType} from './StateTypes';
+import {ChangeSettingsAction, DifficultyType, FontSizeType, SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBoolean('audioEnabled', false),

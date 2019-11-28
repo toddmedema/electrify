@@ -4,8 +4,8 @@ import {Reducer} from '../Testing';
 import {card} from './Card';
 
 describe('Card reducer', () => {
-  test('Defaults to splash card', () => {
-    expect(card(undefined, {type: 'NO_OP'})).toEqual(jasmine.objectContaining({name: 'SPLASH'} as any));
+  test('Defaults to main menu', () => {
+    expect(card(undefined, {type: 'NO_OP'})).toEqual(jasmine.objectContaining({name: 'MAIN_MENU'} as any));
   });
 
   test('Sets state and phase on toCard', () => {

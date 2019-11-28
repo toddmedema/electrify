@@ -1,7 +1,7 @@
 import * as Redux from 'redux';
 import {setDocument, setWindow} from './Globals';
 import {init} from './Init';
-import {AppState} from './reducers/StateTypes';
+import {AppState} from './Types';
 import {installStore} from './Store';
 import {newMockStoreWithInitializedState} from './Testing';
 

@@ -5,26 +5,27 @@ import {CSSTransition, TransitionGroup} from 'react-transition-group';
 
 import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
 import {
-  CardName,
-  CardState,
+  CardNameType,
+  CardType,
   SettingsType,
-  SnackbarState,
+  SnackbarType,
   TransitionClassType
-} from '../reducers/StateTypes';
+} from '../Types';
 
 import AudioContainer from './base/AudioContainer';
 import NavigationContainer from './base/NavigationContainer';
 import CustomersContainer from './views/CustomersContainer';
 import FinancesContainer from './views/FinancesContainer';
 import GeneratorsContainer from './views/GeneratorsContainer';
+import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
-import SplashScreenContainer from './views/SplashScreenContainer';
+import SimulateContainer from './views/SimulateContainer';
 import TutorialBuildContainer from './views/TutorialBuildContainer';
 
 export interface StateProps {
-  card: CardState;
+  card: CardType;
   settings: SettingsType;
-  snackbar: SnackbarState;
+  snackbar: SnackbarType;
   transition: TransitionClassType;
 }
 
@@ -34,7 +35,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export function isNavCard(name: CardName) {
+export function isNavCard(name: CardNameType) {
   return NAV_CARDS.indexOf(name) !== -1;
 }
 
@@ -58,8 +59,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <TutorialBuildContainer />;
       case 'SETTINGS':
         return <SettingsContainer />;
-      case 'SPLASH':
-        return <SplashScreenContainer />;
+      case 'SIMULATE':
+        return <SimulateContainer />;
+      case 'MAIN_MENU':
+        return <MainMenuContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }

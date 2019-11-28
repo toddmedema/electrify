@@ -1,7 +1,8 @@
+import Button from '@material-ui/core/Button';
 // import Checkbox from '@material-ui/core/Checkbox';
 import * as React from 'react';
 import {VERSION} from 'shared/schema/Constants';
-import {DifficultyType, FontSizeType, SettingsType} from '../../reducers/StateTypes';
+import {DifficultyType, FontSizeType, SettingsType} from '../../Types';
 
 export interface StateProps {
   settings: SettingsType;
@@ -12,6 +13,7 @@ export interface DispatchProps {
   onDifficultyDelta: (difficulty: DifficultyType, i: number) => void;
   onExperimentalChange: (change: boolean) => void;
   onFontSizeDelta: (idx: number, delta: number) => void;
+  onMainMenu: () => void;
   onShowHelpChange: (change: boolean) => void;
   onVibrationChange: (change: boolean) => void;
 }
@@ -58,6 +60,7 @@ const Settings = (props: Props): JSX.Element => {
 
   return (
     <div>
+      <Button variant="contained" color="primary" onClick={props.onMainMenu}>Return to main menu</Button>
       <div className="version">Expedition App v{VERSION}</div>
     </div>
   );

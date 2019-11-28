@@ -1,7 +1,7 @@
 import Redux, {createStore} from 'redux';
 import {composeWithDevTools} from 'redux-devtools-extension';
 import Store from './reducers/CombinedReducers';
-import {AppState} from './reducers/StateTypes';
+import {AppState} from './Types';
 
 declare const require: any;
 declare const module: any;

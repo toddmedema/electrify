@@ -178,6 +178,10 @@ body {
   background: $bg_primary;
 }
 
+span.weak {
+  font-weight: 100;
+}
+
 // Fixes bug with Android apk where keyboard not scrolling view - https://github.com/ExpeditionRPG/expedition/issues/255
 body.android .dialog .textfield:focus-within {
   padding-bottom: 300px;
@@ -253,17 +257,21 @@ body.android .dialog .textfield:focus-within {
     height: 100%;
     box-sizing: border-box;
     display: flex;
-    text-align: center;
+
+    & > div {
+      width: 100%;
+    }
   }
 
   // ===============================================
   // Card-specific styles
   // ===============================================
-  .splashScreen {
+  #mainMenu {
     width: 100%;
     height: 100%;
     position: relative;
     background-color: $bg_primary;
+    text-align: center;
 
     .logo {
       position: absolute;
@@ -290,6 +298,14 @@ body.android .dialog .textfield:focus-within {
         margin-bottom: size(large);
       }
     }
+  }
+
+  #tutorialCard {
+    text-align: center;
+  }
+
+  #buildCard {
+
   }
 
   .audioControls {

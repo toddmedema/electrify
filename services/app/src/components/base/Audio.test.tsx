@@ -1,7 +1,7 @@
 import {configure, shallow} from 'enzyme';
 import * as React from 'react';
 import Audio, {ThemeManager, Props} from './Audio';
-import {initialAudioState} from '../../reducers/Audio';
+import {initialAudio} from '../../reducers/Audio';
 import Adapter from 'enzyme-adapter-react-16';
 import {INIT_DELAY, AUDIO_COMMAND_DEBOUNCE_MS} from '../../Constants';
 configure({ adapter: new Adapter() });
@@ -28,7 +28,7 @@ describe('Audio', () => {
   function setup(overrides: Partial<Props> = {}): Env {
     const props: Props = {
       themeManager: fakeThemeManager(),
-      audio: {...initialAudioState},
+      audio: {...initialAudio},
       enabled: true,
       disableAudio: jasmine.createSpy('disableAudio'),
       onLoadChange: jasmine.createSpy('onLoadChange'),
@@ -60,10 +60,10 @@ describe('Audio', () => {
     expect(props.loadAudio).toHaveBeenCalledTimes(1);
   });
 
-  function activeProps(audioOverrides?: Partial<AudioState>): Partial<Props> {
+  function activeProps(audioOverrides?: Partial<Audio>): Partial<Props> {
     return {
       audio: {
-        ...initialAudioState,
+        ...initialAudio,
         intensity: 1,
         peakIntensity: 2,
         paused: false,

@@ -1,5 +1,5 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
-import {CardName} from './reducers/StateTypes';
+import {CardNameType, GeneratorType} from './Types';
 
 export const AUTH_SETTINGS = {
   ...AUTH_SETTINGS_BASE,
@@ -17,6 +17,22 @@ export const URLS = {
 export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
+
+export const GENERATORS = [
+  {
+    name: 'Coal',
+    fuel: 'coal',
+    cost: 20000000,
+    peakMWh: 200,
+    spinMinutes: 60,
+  },
+  {
+    name: 'Wind',
+    fuel: 'wind',
+    cost: 20000000,
+    peakMWh: 200,
+  },
+] as GeneratorType[];
 
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const VIBRATION_SHORT_MS = 30; // for navigation / card changes
@@ -68,4 +84,4 @@ export const MUSIC_DEFINITIONS: {[key: string]: {[key: string]: MusicDefinition}
 
 export const MUSIC_FADE_SECONDS = 1.5;
 
-export const NAV_CARDS = ['GENERATORS', 'CUSTOMERS', 'FINANCES'] as CardName[];
+export const NAV_CARDS = ['GENERATORS', 'CUSTOMERS', 'FINANCES'] as CardNameType[];

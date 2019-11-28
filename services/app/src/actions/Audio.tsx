@@ -3,8 +3,8 @@ import {AudioNode} from '../audio/AudioNode';
 import {ThemeManager} from '../audio/ThemeManager';
 import {MUSIC_DEFINITIONS} from '../Constants';
 import {getAudioContext} from '../Globals';
-import {AudioDataState, AudioState} from '../reducers/StateTypes';
-import {AudioDataSetAction, AudioSetAction} from './ActionTypes';
+import {AudioDataType, AudioType} from '../Types';
+import {AudioDataSetAction, AudioSetAction} from '../Types';
 const eachLimit = require('async/eachLimit');
 
 export function getAllMusicFiles(): string[] {
@@ -40,7 +40,7 @@ export function loadAudioLocalFile(context: AudioContext, url: string, callback:
   request.send();
 }
 
-function audioDataSet(data: Partial<AudioDataState>): AudioDataSetAction {
+function audioDataSet(data: Partial<AudioDataType>): AudioDataSetAction {
   return {type: 'AUDIO_DATA_SET', data};
 }
 
@@ -75,7 +75,7 @@ export function loadAudioFiles() {
   };
 }
 
-export function audioSet(delta: Partial<AudioState>): AudioSetAction {
+export function audioSet(delta: Partial<AudioType>): AudioSetAction {
   return {
     delta: {
       sfx: null, // default to not playing a sfx

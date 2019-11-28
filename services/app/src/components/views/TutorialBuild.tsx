@@ -101,7 +101,7 @@ const forecastLongBlackout = [
 const tutorialSteps = [
   <div>
     <p><strong>Congratulations!</strong></p>
-    <p>You are the new CEO of a local electric company trying to give your customers what they want: cheap, reliable electrons.</p>
+    <p>You are the new CEO of a Californian electric company trying to give your customers what they want: cheap, reliable electrons.</p>
     <p>Let’s get you comfortable with how to run  your company.</p>
   </div>,
   <div>
@@ -166,7 +166,7 @@ const TutorialBuild = (props: Props): JSX.Element => {
   };
 
   return (
-    <div className="base_tutorial">
+    <div id="tutorialCard">
       <SwipeableViews
         axis="x"
         index={activeStep}
