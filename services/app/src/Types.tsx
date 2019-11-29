@@ -55,7 +55,18 @@ export interface FinanceType {
   cash: number;
 }
 
+// All amounts are the average for the whole hour
+export interface ForecastType {
+  hour: number;
+  supply: number;
+  demand: number;
+  solarOutput: number; // 0-1 multiplier
+  windOutput: number; // 0-1 multiplier
+  temperature: number;
+}
+
 export interface GameStateType {
+  generators: GeneratorType[];
   finances: FinanceType;
   season: SeasonType;
   seedPrefix: number; // actual seed is prefix + turn
@@ -65,9 +76,9 @@ export interface GameStateType {
 }
 
 export type CardNameType =
-  'CUSTOMERS' |
+  'DEMAND' |
   'FINANCES' |
-  'GENERATORS' |
+  'SUPPLY' |
   'MAIN_MENU' |
   'SETTINGS' |
   'SIMULATE' |
@@ -79,25 +90,23 @@ export interface CardType {
   overrideDebounce?: boolean;
 }
 
-export type FuelType = 'coal' | 'wind'
+export type FuelType = 'Coal' | 'Wind' | 'Sun';
 
 export interface GeneratorType {
   name: string;
   fuel: FuelType;
   cost: number;
-  peakMWh: number;
+  peakMW: number;
   spinMinutes?: number;
 }
 
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
-export type FontSizeType = 'SMALL' | 'NORMAL' | 'LARGE';
 
 export interface SettingsType {
   [index: string]: any;
   audioEnabled: boolean;
   difficulty: DifficultyType;
   experimental: boolean;
-  fontSize: FontSizeType;
   showHelp: boolean;
   vibration: boolean;
 }
@@ -112,7 +121,7 @@ export interface SnackbarType {
 
 export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
 
-export interface AppState {
+export interface AppStateType {
   audio: AudioType;
   audioData: AudioDataType;
   card: CardType;

@@ -1,14 +1,14 @@
 import Redux, {createStore} from 'redux';
 import {composeWithDevTools} from 'redux-devtools-extension';
 import Store from './reducers/CombinedReducers';
-import {AppState} from './Types';
+import {AppStateType} from './Types';
 
 declare const require: any;
 declare const module: any;
 
-let store: Redux.Store<AppState>;
+let store: Redux.Store<AppStateType>;
 
-export function installStore(createdStore: Redux.Store<AppState>) {
+export function installStore(createdStore: Redux.Store<AppStateType>) {
   store = createdStore;
 }
 

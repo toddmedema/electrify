@@ -4,9 +4,10 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemAvatar from '@material-ui/core/ListItemAvatar';
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
+import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import * as React from 'react';
-import {GENERATORS} from '../../Constants';
+// import {GENERATORS} from '../../Constants';
 import {GameStateType, GeneratorType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
@@ -15,6 +16,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onBuildGenerator: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -24,17 +26,14 @@ interface GeneratorListItemProps {
 }
 
 const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
-  const value = 1;
-  const labelId = 'Foo';
   return (
-    <ListItem key={1} button>
+    <ListItem button>
       <ListItemAvatar>
-        <span>{props.generator.name}</span>
+        <span>IMG</span>
       </ListItemAvatar>
       <ListItemText
-        id={labelId}
-        primary={`Line item ${value + 1}`}
-        secondary="200MWh"
+        primary={props.generator.name}
+        secondary={props.generator.peakMW + 'MW'}
       />
       <ListItemSecondaryAction>
         <span>HI</span>
@@ -43,16 +42,20 @@ const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
   );
 };
 
-const GeneratorsBuild = (props: Props): JSX.Element => {
+const SupplyBuild = (props: Props): JSX.Element => {
   return (
     <BuildCard className="generators">
-      <Typography variant="h6">Generators</Typography>
-      <Button variant="outlined" color="primary">BUILD</Button>
-      <List dense>
-        {GENERATORS.map((g: GeneratorType) => <GeneratorListItem generator={g} />)}
-      </List>
+      <Toolbar>
+        <Typography variant="h6">Generators</Typography>
+        <Button size="small" variant="outlined" color="primary" onClick={props.onBuildGenerator}>BUILD</Button>
+      </Toolbar>
+      <div id="contents">
+        <List dense>
+          {props.gameState.generators.map((g: GeneratorType, i: number) => <GeneratorListItem generator={g} key={i} />)}
+        </List>
+      </div>
     </BuildCard>
   );
 };
 
-export default GeneratorsBuild;
+export default SupplyBuild;

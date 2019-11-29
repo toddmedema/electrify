@@ -12,7 +12,6 @@ describe('Settings', () => {
       onAudioChange: jasmine.createSpy('onAudioChange'),
       onDifficultyDelta: jasmine.createSpy('onDifficultyDelta'),
       onExperimentalChange: jasmine.createSpy('onExperimentalChange'),
-      onFontSizeDelta: jasmine.createSpy('onFontSizeDelta'),
       onShowHelpChange: jasmine.createSpy('onShowHelpChange'),
       onVibrationChange: jasmine.createSpy('onVibrationChange'),
       ...overrides,

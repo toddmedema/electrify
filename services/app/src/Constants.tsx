@@ -21,16 +21,22 @@ export const INIT_DELAY = {
 export const GENERATORS = [
   {
     name: 'Coal',
-    fuel: 'coal',
+    fuel: 'Coal',
     cost: 20000000,
-    peakMWh: 200,
+    peakMW: 200,
     spinMinutes: 60,
   },
+  // {
+  //   name: 'Wind',
+  //   fuel: 'Wind',
+  //   cost: 20000000,
+  //   peakMW: 200,
+  // },
   {
-    name: 'Wind',
-    fuel: 'wind',
+    name: 'Solar',
+    fuel: 'Sun',
     cost: 20000000,
-    peakMWh: 200,
+    peakMW: 200,
   },
 ] as GeneratorType[];
 
@@ -84,4 +90,4 @@ export const MUSIC_DEFINITIONS: {[key: string]: {[key: string]: MusicDefinition}
 
 export const MUSIC_FADE_SECONDS = 1.5;
 
-export const NAV_CARDS = ['GENERATORS', 'CUSTOMERS', 'FINANCES'] as CardNameType[];
+export const NAV_CARDS = ['DEMAND', 'SUPPLY', 'FINANCES'] as CardNameType[];

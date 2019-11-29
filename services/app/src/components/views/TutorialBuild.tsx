@@ -112,7 +112,7 @@ const tutorialSteps = [
     <p><strong>Avoid blackouts</strong> to keep your customers paying</p>
   </div>,
   <div>
-    <Typography variant="h6">Forecast for average Spring '98 day</Typography>
+    <Typography variant="h6">Forecast for average Spring day</Typography>
     <Chart
       height={200}
       sunrise={7}
@@ -129,7 +129,7 @@ const tutorialSteps = [
       sunset={19}
       forecast={forecastShortBlackout}
     />
-    <p><strong>Short blackouts</strong> are best solved with batteries or small “peaker” generators that spin up quickly</p>
+    <p><strong>Short blackouts</strong> are best solved with batteries or “peaking” generators that spin up quickly</p>
     <Chart
       height={160}
       sunrise={7}
@@ -138,7 +138,7 @@ const tutorialSteps = [
     />
     <p><strong>Extended blackouts</strong> mean you need more “baseload” generators or fewer customers</p>
     <br/>
-    <p><strong>Acquire customers</strong> to increase demand - but don’t grow faster than your capacity!</p>
+    <p><strong>Acquire customers</strong> to increase demand - but don’t grow faster than your capacity</p>
     <p>That’s all you need to get started. Good luck!</p>
   </div>,
 ];

@@ -83,88 +83,91 @@ const Chart = (props: Props): JSX.Element => {
     });
   }
 
+  // Wrapping in spare div prevents weird excessive height bug
   return (
-    <VictoryChart
-      theme={VictoryTheme.material}
-      padding={{ top: 10, bottom: 25, left: 50, right: 10 }}
-      domain={{ y: [domainMin * .95, domainMax] }}
-      height={props.height || 300}
-    >
-      <VictoryAxis
-        tickValues={[props.sunrise, props.sunset]}
-        tickFormat={['sunrise', 'sunset']}
-        tickLabelComponent={<VictoryLabel dy={-5} />}
-        axisLabelComponent={<VictoryLabel dy={2} />}
-        style={{
-          axis: {
-            stroke: 'black', strokeWidth: 1,
-          },
-          grid: {
-            display: 'none',
-          },
-        }}
-      />
-      <VictoryAxis dependentAxis
-        tickFormat={(i) => numbro(i).format({spaceSeparated: false, average: true}) + 'W'}
-        tickLabelComponent={<VictoryLabel dx={5} />}
-        fixLabelOverlap={true}
-        style={{
-          axis: {
-            stroke: 'black', strokeWidth: 1,
-          },
-          grid: {
-            display: 'none',
-          },
-        }}
-      />
-      <VictoryArea
-        data={props.forecast}
-        interpolation="monotoneX"
-        x="hour"
-        y="supply"
-        style={{
-          data: {
-            stroke: supplyColor,
-            fill: '#e3f2fd', // blue50
-          },
-        }}
-      />
-      <VictoryLine
-        data={props.forecast}
-        interpolation="monotoneX"
-        x="hour"
-        y="demand"
-        style={{
-          data: {
-            stroke: demandColor,
-            strokeWidth: 3,
-          },
-        }}
-      />
-      <VictoryArea
-        data={blackouts}
-        x="hour"
-        y="value"
-        style={{
-          data: {
-            stroke: 'none',
-            fill: blackoutColor,
-            opacity: 0.35,
-          },
-        }}
-      />
-      <VictoryLegend x={280} y={12}
-        centerTitle
-        orientation="vertical"
-        rowGutter={-5}
-        symbolSpacer={5}
-        data={[
-          { name: 'Supply', symbol: { fill: supplyColor } },
-          { name: 'Demand', symbol: { fill: demandColor } },
-          { name: 'Blackout', symbol: { fill: blackoutColor } },
-        ]}
-      />
-    </VictoryChart>
+    <div>
+      <VictoryChart
+        theme={VictoryTheme.material}
+        padding={{ top: 10, bottom: 25, left: 50, right: 10 }}
+        domain={{ y: [domainMin * .95, domainMax] }}
+        height={props.height || 300}
+      >
+        <VictoryAxis
+          tickValues={[props.sunrise, props.sunset]}
+          tickFormat={['sunrise', 'sunset']}
+          tickLabelComponent={<VictoryLabel dy={-5} />}
+          axisLabelComponent={<VictoryLabel dy={2} />}
+          style={{
+            axis: {
+              stroke: 'black', strokeWidth: 1,
+            },
+            grid: {
+              display: 'none',
+            },
+          }}
+        />
+        <VictoryAxis dependentAxis
+          tickFormat={(i) => numbro(i).format({spaceSeparated: false, average: true}) + 'W'}
+          tickLabelComponent={<VictoryLabel dx={5} />}
+          fixLabelOverlap={true}
+          style={{
+            axis: {
+              stroke: 'black', strokeWidth: 1,
+            },
+            grid: {
+              display: 'none',
+            },
+          }}
+        />
+        <VictoryArea
+          data={props.forecast}
+          interpolation="monotoneX"
+          x="hour"
+          y="supply"
+          style={{
+            data: {
+              stroke: supplyColor,
+              fill: '#e3f2fd', // blue50
+            },
+          }}
+        />
+        <VictoryLine
+          data={props.forecast}
+          interpolation="monotoneX"
+          x="hour"
+          y="demand"
+          style={{
+            data: {
+              stroke: demandColor,
+              strokeWidth: 3,
+            },
+          }}
+        />
+        <VictoryArea
+          data={blackouts}
+          x="hour"
+          y="value"
+          style={{
+            data: {
+              stroke: 'none',
+              fill: blackoutColor,
+              opacity: 0.35,
+            },
+          }}
+        />
+        <VictoryLegend x={280} y={12}
+          centerTitle
+          orientation="vertical"
+          rowGutter={-5}
+          symbolSpacer={5}
+          data={[
+            { name: 'Supply', symbol: { fill: supplyColor } },
+            { name: 'Demand', symbol: { fill: demandColor } },
+            { name: 'Blackout', symbol: { fill: blackoutColor } },
+          ]}
+        />
+      </VictoryChart>
+    </div>
   );
 };
 export default Chart;

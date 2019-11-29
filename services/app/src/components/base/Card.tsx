@@ -7,7 +7,7 @@ import {connect} from 'react-redux';
 import {toCard} from '../../actions/Card';
 import {URLS} from '../../Constants';
 import {getDevicePlatform, openWindow} from '../../Globals';
-import {AppState, CardNameType, SettingsType} from '../../Types';
+import {AppStateType, CardNameType, SettingsType} from '../../Types';
 import {getStore} from '../../Store';
 
 // If onMenuSelect is not set, default dispatch behavior is used.
@@ -120,7 +120,7 @@ class Card extends React.Component<Props, IState> {
   }
 }
 
-const mapStateToProps = (state: AppState, ownProps: Partial<Props>): Props => ({
+const mapStateToProps = (state: AppStateType, ownProps: Partial<Props>): Props => ({
   settings: state.settings,
   selectedMenu: state.card ? state.card.name : undefined,
   ...ownProps,

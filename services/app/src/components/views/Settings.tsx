@@ -2,7 +2,7 @@ import Button from '@material-ui/core/Button';
 // import Checkbox from '@material-ui/core/Checkbox';
 import * as React from 'react';
 import {VERSION} from 'shared/schema/Constants';
-import {DifficultyType, FontSizeType, SettingsType} from '../../Types';
+import {DifficultyType, SettingsType} from '../../Types';
 
 export interface StateProps {
   settings: SettingsType;
@@ -12,7 +12,6 @@ export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onDifficultyDelta: (difficulty: DifficultyType, i: number) => void;
   onExperimentalChange: (change: boolean) => void;
-  onFontSizeDelta: (idx: number, delta: number) => void;
   onMainMenu: () => void;
   onShowHelpChange: (change: boolean) => void;
   onVibrationChange: (change: boolean) => void;
@@ -28,8 +27,6 @@ export interface Props extends StateProps, DispatchProps {}
 //   {title: 'Impossible', text: 'You will almost surely die, so make your death a glorious one!'},
 // ];
 // const difficultyValues: string[] = ['EASY', 'NORMAL', 'HARD', 'IMPOSSIBLE'];
-
-export const fontSizeValues: FontSizeType[] = ['SMALL', 'NORMAL', 'LARGE'];
 
 const Settings = (props: Props): JSX.Element => {
   // const difficultyIdx = difficultyValues.indexOf(props.settings.difficulty);

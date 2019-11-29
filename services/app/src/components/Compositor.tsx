@@ -14,12 +14,12 @@ import {
 
 import AudioContainer from './base/AudioContainer';
 import NavigationContainer from './base/NavigationContainer';
-import CustomersContainer from './views/CustomersContainer';
+import DemandContainer from './views/DemandContainer';
 import FinancesContainer from './views/FinancesContainer';
-import GeneratorsContainer from './views/GeneratorsContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
 import SimulateContainer from './views/SimulateContainer';
+import SupplyContainer from './views/SupplyContainer';
 import TutorialBuildContainer from './views/TutorialBuildContainer';
 
 export interface StateProps {
@@ -49,12 +49,12 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): JSX.Element {
     switch (this.props.card.name) {
-      case 'CUSTOMERS':
-        return <CustomersContainer />;
+      case 'DEMAND':
+        return <DemandContainer />;
       case 'FINANCES':
         return <FinancesContainer />;
-      case 'GENERATORS':
-        return <GeneratorsContainer />;
+      case 'SUPPLY':
+        return <SupplyContainer />;
       case 'TUTORIAL':
         return <TutorialBuildContainer />;
       case 'SETTINGS':
@@ -85,7 +85,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const containerClass = ['app_container', this.props.settings.fontSize.toLowerCase() + 'Font'];
+    const containerClass = ['app_container'];
     const footer = this.renderFooter();
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9

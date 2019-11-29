@@ -75,9 +75,6 @@ $absheightmax: 1025px;
 $absmaxdimension: 1025px;
 $lineheight: 1.2;
 
-$largeFontMult: 1.25;
-$smallFontMult: 0.8;
-
 $sizemap: (
   appbar: 48px,
   inputsquare: 48px,
@@ -159,6 +156,14 @@ body {
   }
 }
 
+.MuiToolbar-root {
+  min-height: 0 !important;
+
+  h6 {
+    flex-grow: 1;
+  }
+}
+
 #navfooter {
   position: absolute;
   bottom: 0;
@@ -188,25 +193,6 @@ body.android .dialog .textfield:focus-within {
 }
 
 @mixin styling() {
-  .app_container {
-    &.largeFont {
-      .article {
-        font-size: $largeFontMult * fontsize(flavor);
-        button {
-          font-size: $largeFontMult * fontsize(flavor) !important;
-        }
-      }
-    }
-    &.smallFont {
-      .article {
-        font-size: $smallFontMult * fontsize(flavor);
-        button {
-          font-size: $smallFontMult * fontsize(flavor) !important;
-        }
-      }
-    }
-  }
-
   .base_card {
     flex: 1;
     display: flex;
@@ -302,10 +288,15 @@ body.android .dialog .textfield:focus-within {
 
   #tutorialCard {
     text-align: center;
+    padding: size(base);
+    box-sizing: border-box;
   }
 
   #buildCard {
-
+    #contents {
+      padding: 0 16px;
+      box-sizing: border-box;
+    }
   }
 
   .audioControls {
