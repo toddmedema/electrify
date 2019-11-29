@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {closeSnackbar} from '../actions/Snackbar';
-import {AppState, TransitionClassType} from '../Types';
+import {AppStateType, TransitionClassType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
 
-const mapStateToProps = (state: AppState): StateProps => {
+const mapStateToProps = (state: AppStateType): StateProps => {
   let transition: TransitionClassType = 'next';
   if (state === undefined || Object.keys(state).length === 0) {
     transition = 'instant';

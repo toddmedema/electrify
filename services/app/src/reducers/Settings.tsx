@@ -1,13 +1,12 @@
 import Redux from 'redux';
 import {NODE_ENV} from 'shared/schema/Constants';
 import {getStorageBoolean, getStorageString, setStorageKeyValue} from '../LocalStorage';
-import {ChangeSettingsAction, DifficultyType, FontSizeType, SettingsType} from '../Types';
+import {ChangeSettingsAction, DifficultyType, SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBoolean('audioEnabled', false),
   difficulty: getStorageString('difficulty', 'NORMAL') as DifficultyType,
   experimental: getStorageBoolean('experimental', false) || NODE_ENV === 'dev',
-  fontSize: getStorageString('fontSize', 'NORMAL') as FontSizeType,
   showHelp: getStorageBoolean('showHelp', true),
   vibration: getStorageBoolean('vibration', true),
 };

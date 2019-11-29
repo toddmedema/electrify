@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {changeSettings} from '../../actions/Settings';
-import {AppState} from '../../Types';
+import {AppStateType} from '../../Types';
 import AudioControls, {DispatchProps, StateProps} from './AudioControls';
 
-const mapStateToProps = (state: AppState): StateProps => {
+const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     audioEnabled: state.settings.audioEnabled,
     audioLoaded: state.audio.loaded,
