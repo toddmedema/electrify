@@ -1,3 +1,4 @@
+import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import * as React from 'react';
 import BuildCard from '../base/BuildCard';
@@ -10,13 +11,17 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const CustomersBuild = (props: Props): JSX.Element => {
+const DemandBuild = (props: Props): JSX.Element => {
   return (
     <BuildCard className="Customers">
-      <Typography variant="h6">Customers</Typography>
-      <div>Numbers...</div>
+      <Toolbar>
+        <Typography variant="h6">Customers</Typography>
+      </Toolbar>
+      <div id="contents">
+        Numbers...
+      </div>
     </BuildCard>
   );
 };
 
-export default CustomersBuild;
+export default DemandBuild;

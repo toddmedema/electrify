@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
-import {AppState} from '../../Types';
+import {AppStateType} from '../../Types';
 import TutorialBuild, {DispatchProps, StateProps} from './TutorialBuild';
 
-const mapStateToProps = (state: AppState): StateProps => {
+const mapStateToProps = (state: AppStateType): StateProps => {
   return {
   };
 };
@@ -12,7 +12,7 @@ const mapStateToProps = (state: AppState): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onNext: () => {
-      dispatch(toCard({name: 'GENERATORS'}));
+      dispatch(toCard({name: 'SUPPLY'}));
     },
     onPrevious: () => {
       dispatch(toCard({name: 'MAIN_MENU'}));

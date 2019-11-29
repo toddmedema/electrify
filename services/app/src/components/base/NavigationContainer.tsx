@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
-import {AppState, CardNameType} from '../../Types';
+import {AppStateType, CardNameType} from '../../Types';
 import Navigation, {DispatchProps, Props, StateProps} from './Navigation';
 
-const mapStateToProps = (state: AppState, ownProps: Partial<Props>): StateProps => {
+const mapStateToProps = (state: AppStateType, ownProps: Partial<Props>): StateProps => {
   return {
     card: state.card,
     settings: state.settings,

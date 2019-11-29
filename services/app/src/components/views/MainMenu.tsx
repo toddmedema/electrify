@@ -22,7 +22,7 @@ const MainMenu = (props: Props): JSX.Element => {
         <img src="images/logo.svg"></img>
       </div>
       <div id="startMenu">
-        <Button variant="contained" color="primary" onClick={props.onStart}>Play</Button>
+        <Button size="large" variant="contained" color="primary" onClick={props.onStart}>Play</Button>
         <Button variant="outlined" color="primary" onClick={props.onTutorial}>Tutorial</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Settings</Button>
       </div>

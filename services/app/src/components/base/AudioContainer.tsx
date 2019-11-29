@@ -4,10 +4,10 @@ import {loadAudioFiles} from '../../actions/Audio';
 import {changeSettings} from '../../actions/Settings';
 import {openSnackbar} from '../../actions/Snackbar';
 import {initialAudio} from '../../reducers/Audio';
-import {AppState} from '../../Types';
+import {AppStateType} from '../../Types';
 import Audio, {DispatchProps, StateProps} from './Audio';
 
-const mapStateToProps = (state: AppState): StateProps => {
+const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     themeManager: (state.audioData || {}).themeManager || null,
     audio: state.audio || initialAudio,

@@ -1,21 +1,25 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {AppStateType} from '../../Types';
-import Finances, {DispatchProps, StateProps} from './Finances';
+import Supply, {DispatchProps, StateProps} from './Supply';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
+    gameState: state.gameState,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
+    onBuildGenerator: () => {
+      dispatch({type: 'BUILD_GENERATOR'});
+    },
   };
 };
 
-const FinancesContainer = connect(
+const SupplyContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(Finances);
+)(Supply);
 
-export default FinancesContainer;
+export default SupplyContainer;

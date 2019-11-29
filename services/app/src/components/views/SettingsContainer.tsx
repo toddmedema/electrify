@@ -2,10 +2,10 @@ import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
 import {changeSettings} from '../../actions/Settings';
-import {AppState, DifficultyType} from '../../Types';
-import Settings, {DispatchProps, fontSizeValues, StateProps} from './Settings';
+import {AppStateType, DifficultyType} from '../../Types';
+import Settings, {DispatchProps, StateProps} from './Settings';
 
-const mapStateToProps = (state: AppState): StateProps => {
+const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     settings: state.settings,
   };
@@ -42,15 +42,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onExperimentalChange: (v: boolean) => {
       dispatch(changeSettings({experimental: v}));
-    },
-    onFontSizeDelta: (idx: number, delta: number) => {
-      let i = idx + delta;
-      if (i >= fontSizeValues.length) {
-        i = 0;
-      } else if (i < 0) {
-        i = fontSizeValues.length - 1;
-      }
-      dispatch(changeSettings({fontSize: fontSizeValues[i]}));
     },
     onMainMenu: () => {
       dispatch(toCard({name: 'MAIN_MENU'}));

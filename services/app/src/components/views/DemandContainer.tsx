@@ -1,7 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {AppStateType} from '../../Types';
-import Finances, {DispatchProps, StateProps} from './Finances';
+import Demand, {DispatchProps, StateProps} from './Demand';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -13,9 +13,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const FinancesContainer = connect(
+const DemandContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(Finances);
+)(Demand);
 
-export default FinancesContainer;
+export default DemandContainer;

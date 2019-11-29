@@ -28,8 +28,8 @@ export default class Navigation extends React.Component<Props, {}> {
         value={this.props.card.name || 'MAIN_MENU'}
         onChange={(e: any, name: CardNameType) => this.props.toCard(name, this.props.settings)}
       >
-        <BottomNavigationAction classes={{label: 'navlabel'}} id="generators" label="Generators" value="GENERATORS" icon={this.genIcon('generators')} />
-        <BottomNavigationAction classes={{label: 'navlabel'}} id="customers" label="Customers" value="CUSTOMERS" icon={this.genIcon('customers')} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="supply" label="Supply" value="SUPPLY" icon={this.genIcon('supply')} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="demand" label="Demand" value="DEMAND" icon={this.genIcon('demand')} />
         <BottomNavigationAction classes={{label: 'navlabel'}} id="finances" label="Finances" value="FINANCES" icon={this.genIcon('finances')} />
       </BottomNavigation>
     );
