@@ -6,20 +6,18 @@ import {AppStateType, GameStateType, GeneratorType, SeasonType} from '../Types';
 const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
+  cash: 1000000,
   generators: [] as GeneratorType[],
   season: 'Spring' as SeasonType,
   seedPrefix: Math.random(),
   turn: 1,
   turnMax: 16,
-  finances: {
-    cash: 1000000,
-  },
 };
 
 const getGameState = (state: AppStateType) => state.gameState;
 const getSeason = (state: AppStateType) => state.gameState.season;
 
-// Based on Pittsburgh for now, v2 change by location
+// Based on SF/California for now, v2 change by location
 export const getSunrise = createSelector(
   [getSeason],
   (season) => {
@@ -37,7 +35,7 @@ export const getSunrise = createSelector(
   }
 );
 
-// Based on Pittsburgh for now, v2 change by location
+// Based on SF/California for now, v2 change by location
 export const getSunset = createSelector(
   [getSeason],
   (season) => {
@@ -55,10 +53,11 @@ export const getSunset = createSelector(
   }
 );
 
-export function getSolarOutputCurve(hour: number, sunrise: number, sunset: number) {
+export function getSunshine(hour: number, sunrise: number, sunset: number) {
   if (hour >= sunrise && hour <= sunset) {
     const hoursFromDark = Math.min(hour - sunrise, sunset - hour);
-    // TODO improve approximation
+    // TODO improve approximation curve
+    // Day length / hours from dark used as proxy for season / max sun height
     // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.8+*+%28x+-+3%29%29%29+from+0+to+7
     // Solar panels generally follow a Bell curve: https://www.solarpaneltalk.com/forum/solar/solar-energy-facts/374711-please-help-me-understand-my-production-rate-vs-my-system-size-confused
     return 1 / (1 + Math.pow(Math.E, (-0.8 * (hoursFromDark - 3))));
@@ -66,25 +65,41 @@ export function getSolarOutputCurve(hour: number, sunrise: number, sunset: numbe
   return 0;
 }
 
+export function getDemand(hour: number) {
+  // TODO curve based on time of day (non-seasonal)
+  // TODO curve based on more evening demand when darker (lighting)
+  // TODO curve based on warm temperature (semi-exponential above 70F for cooling)
+  return 1000;
+}
+
 export const getForecasts = createSelector(
   [getGameState, getSunrise, getSunset],
   (gameState, sunrise, sunset) => {
     const rng = seedrandom(gameState.seedPrefix + gameState.turn);
+    // TODO cloudiness probabilities based on real life + season
+    let cloudiness = rng();
     const forecasts = [];
     for (let hour = 1; hour <= 24; hour++) {
-      // TODO add a bit of cloudy randomness
-      const solarOutput = getSolarOutputCurve(hour, sunrise, sunset);
+      // Cloudiness moves at most 0.25 per hour, can never be "100%" (solar panels still produce 10-25% when overcast)
+      cloudiness = Math.min(0.85, Math.max(0, cloudiness + rng() * 0.5 - 0.25));
+      const sunshine = (1 - cloudiness) * getSunshine(hour, sunrise, sunset);
 
-      const windOutput = 0; // TODO
-      const temperature = 0; // TODO
+      const windOutput = rng(); // TODO
+      const temperature = rng(); // TODO
 
-      const demand = rng() * 1000; // TODO
+      // TODO temperature changes solarOutput
+      const solarOutput = sunshine;
+
+      const demand = getDemand(hour);
 
       let supply = 0;
       gameState.generators.forEach((generator: GeneratorType) => {
         switch (generator.fuel) {
           case 'Sun':
             supply += generator.peakMW * solarOutput;
+            break;
+          case 'Wind':
+            supply += generator.peakMW * windOutput;
             break;
           default:
             supply += generator.peakMW;

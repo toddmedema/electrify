@@ -35,7 +35,7 @@ export function BuildCard(props: Props) {
           <Typography variant="h6">
             {props.gameState.season}
             <span className="weak"> ({props.gameState.turn}/{props.gameState.turnMax})</span>
-            &nbsp;&nbsp;&nbsp;${numbro(props.gameState.finances.cash).format({ average: true, totalLength: 3 }).toUpperCase()}
+            &nbsp;&nbsp;&nbsp;${numbro(props.gameState.cash).format({ average: true, totalLength: 3 }).toUpperCase()}
           </Typography>
           <IconButton onClick={props.onPlay} color="primary" aria-label="play" edge="end">
             <PlayCircleFilledIcon />

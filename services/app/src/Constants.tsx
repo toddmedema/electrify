@@ -24,14 +24,15 @@ export const GENERATORS = [
     fuel: 'Coal',
     cost: 20000000,
     peakMW: 200,
+    fuelConsumption: 10,
     spinMinutes: 60,
   },
-  // {
-  //   name: 'Wind',
-  //   fuel: 'Wind',
-  //   cost: 20000000,
-  //   peakMW: 200,
-  // },
+  {
+    name: 'Wind',
+    fuel: 'Wind',
+    cost: 20000000,
+    peakMW: 200,
+  },
   {
     name: 'Solar',
     fuel: 'Sun',

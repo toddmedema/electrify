@@ -45,7 +45,7 @@ const Chart = (props: Props): JSX.Element => {
   // BLACKOUT CALCULATION
   const blackouts = [{
     hour: 1,
-    value: domainMin,
+    value: 0,
   }] as BlackoutEdges[];
   let prev = props.forecast[0];
   let isBlackout = prev.demand > prev.supply;
@@ -59,13 +59,13 @@ const Chart = (props: Props): JSX.Element => {
     const intersectionTime = getIntersectionX(d.hour - 1, prev.supply, d.hour, d.supply, d.hour - 1, prev.demand, d.hour, d.demand);
     if (d.demand > d.supply && !isBlackout) {
       // Blackout starting: low then high edge
-      blackouts.push({ hour: intersectionTime, value: domainMin });
+      blackouts.push({ hour: intersectionTime, value: 0 });
       blackouts.push({ hour: intersectionTime, value: domainMax });
       isBlackout = true;
     } else if (d.demand < d.supply && isBlackout) {
       // Blackout ending: high then low edge
       blackouts.push({ hour: intersectionTime, value: domainMax });
-      blackouts.push({ hour: intersectionTime, value: domainMin });
+      blackouts.push({ hour: intersectionTime, value: 0 });
       isBlackout = false;
     }
     prev = d;
@@ -79,7 +79,7 @@ const Chart = (props: Props): JSX.Element => {
   } else {
     blackouts.push({
       hour: 24,
-      value: domainMin,
+      value: 0,
     });
   }
 
@@ -107,7 +107,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={(i) => numbro(i).format({spaceSeparated: false, average: true}) + 'W'}
+          tickFormat={(i) => numbro(i * 1000000).format({spaceSeparated: false, average: true}).toUpperCase() + 'W'}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{

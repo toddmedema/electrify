@@ -51,10 +51,6 @@ export interface AudioDataType {
 
 export type SeasonType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 
-export interface FinanceType {
-  cash: number;
-}
-
 // All amounts are the average for the whole hour
 export interface ForecastType {
   hour: number;
@@ -67,7 +63,7 @@ export interface ForecastType {
 
 export interface GameStateType {
   generators: GeneratorType[];
-  finances: FinanceType;
+  cash: number;
   season: SeasonType;
   seedPrefix: number; // actual seed is prefix + turn
     // and is supplied as the seed at the start of any function that uses randomness
@@ -97,6 +93,7 @@ export interface GeneratorType {
   fuel: FuelType;
   cost: number;
   peakMW: number;
+  fuelConsumption?: number; // at peak
   spinMinutes?: number;
 }
 
