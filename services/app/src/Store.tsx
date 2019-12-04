@@ -22,6 +22,8 @@ export function createAppStore() {
       store.replaceReducer(updated);
     });
   }
+
+  store.dispatch({type: 'GAME_TICK'});
 }
 
 export function getStore() {
