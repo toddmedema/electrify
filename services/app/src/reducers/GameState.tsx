@@ -151,10 +151,10 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         ...initialGameState,
       };
     case 'GAME_TICK':
+      // TODO better forecasting
       const tempForecast = state.timeline.shift();
       if (tempForecast) {
         tempForecast.hour = state.timeline[state.timeline.length - 1].hour + 1;
-        console.log(tempForecast);
         state.timeline.push(tempForecast);
       }
       const newState = {

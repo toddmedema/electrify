@@ -21,7 +21,7 @@ export interface Props {
   timeline: ChartData[];
 }
 
-/// http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
+// http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
 function getIntersectionX(line1StartX: number, line1StartY: number, line1EndX: number, line1EndY: number, line2StartX: number, line2StartY: number, line2EndX: number, line2EndY: number) {
     const denominator = ((line2EndY - line2StartY) * (line1EndX - line1StartX)) - ((line2EndX - line2StartX) * (line1EndY - line1StartY));
     if (denominator === 0) {
@@ -33,24 +33,42 @@ function getIntersectionX(line1StartX: number, line1StartY: number, line1EndX: n
     return line1StartX + (numerator1 / denominator * (line1EndX - line1StartX));
 }
 
+// TODO how to indicate reality vs forecast? Perhaps current time as a prop, and then split it in the chart
+// and don't actually differentiate between reality +  forecast in data?
 const Chart = (props: Props): JSX.Element => {
+  // Figure out the boundaries of the chart data
   let domainMin = 999999999999;
   let domainMax = 0;
+  let rangeMin = 999999999999;
+  let rangeMax = 0;
   props.timeline.forEach((d: ChartData) => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
+    rangeMin = Math.min(rangeMin, d.hour);
+    rangeMax = Math.max(rangeMax, d.hour);
   });
+
+  // Use that to slide sunrise / sunset forward to the correct hour
+  const midnight = Math.floor(rangeMin / 24) * 24;
+  let sunrise = midnight + props.sunrise;
+  let sunset = midnight + props.sunset;
+  if (sunrise < rangeMin) {
+    sunrise += 24;
+  }
+  if (sunset < rangeMin) {
+    sunset += 24;
+  }
 
   // BLACKOUT CALCULATION
   const blackouts = [{
-    hour: 1,
+    hour: rangeMin,
     value: 0,
   }] as BlackoutEdges[];
   let prev = props.timeline[0];
   let isBlackout = prev.demandW > prev.supplyW;
   if (isBlackout) {
     blackouts.push({
-      hour: 1,
+      hour: rangeMin,
       value: domainMax,
     });
   }
@@ -72,12 +90,12 @@ const Chart = (props: Props): JSX.Element => {
   // Final entry
   if (isBlackout) {
     blackouts.push({
-      hour: 24,
+      hour: rangeMax,
       value: domainMax,
     });
   } else {
     blackouts.push({
-      hour: 24,
+      hour: rangeMax,
       value: 0,
     });
   }
@@ -92,7 +110,7 @@ const Chart = (props: Props): JSX.Element => {
         height={props.height || 300}
       >
         <VictoryAxis
-          tickValues={[props.sunrise, props.sunset]}
+          tickValues={[sunrise, sunset]}
           tickFormat={['sunrise', 'sunset']}
           tickLabelComponent={<VictoryLabel dy={-5} />}
           axisLabelComponent={<VictoryLabel dy={2} />}
