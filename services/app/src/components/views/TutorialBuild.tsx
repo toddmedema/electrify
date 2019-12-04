@@ -11,8 +11,8 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onPrevious: () => any;
-  onNext: () => any;
+  onCancel: () => any;
+  onStart: () => any;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -157,9 +157,9 @@ const TutorialBuild = (props: Props): JSX.Element => {
 
   const handleStepChange = (step: any) => {
     if (step < 0) {
-      props.onPrevious();
+      props.onCancel();
     } else if (step >= maxStep) {
-      props.onNext();
+      props.onStart();
     } else {
       setActiveStep(step);
     }

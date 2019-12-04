@@ -62,17 +62,16 @@ export interface TimelineType {
 }
 
 export interface GameStateType {
-  seedPrefix: number; // actual seed is prefix + tick
+  inGame: boolean;
+  seedPrefix: number; // actual seed is prefix + the first hour in timeline
     // and is supplied as the seed at the start of any function that uses randomness
-
-  generators: GeneratorType[];
   timeline: TimelineType[];
-
-  cash: number;
-
-  tick: number;
   season: SeasonType;
   year: number;
+
+  generators: GeneratorType[];
+
+  cash: number;
 }
 
 export type CardNameType =

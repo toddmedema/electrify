@@ -7,8 +7,10 @@ import {AppStateType, GameStateType, GeneratorType, SeasonType, TimelineType} fr
 const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
+  inGame: false,
   cash: 1000000,
   generators: [] as GeneratorType[],
+  // TODO generate real data when you start playing
   timeline: [  {hour: 1, supplyW: 10000, demandW: 11500},
   {hour: 2, supplyW: 10000, demandW: 11400},
   {hour: 3, supplyW: 10000, demandW: 12000},
@@ -35,7 +37,6 @@ export const initialGameState: GameStateType = {
   {hour: 24, supplyW: 10000, demandW: 11500}] as TimelineType[],
   season: 'Spring' as SeasonType,
   seedPrefix: Math.random(),
-  tick: 0,
   year: 1990,
 };
 
@@ -100,7 +101,7 @@ export function getDemand(hour: number) {
 export const getForecasts = createSelector(
   [getGameState, getSunrise, getSunset],
   (gameState, sunrise, sunset) => {
-    const rng = seedrandom(gameState.seedPrefix + gameState.tick);
+    const rng = seedrandom(gameState.seedPrefix + gameState.timeline[0].hour);
     // TODO cloudiness probabilities based on real life + season
     let cloudiness = rng();
     const forecasts = [];
@@ -146,24 +147,34 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         ...state,
         generators: [...state.generators, newGenerator],
       };
-    case 'EXIT_GAME':
+    case 'GAME_START':
+      // TODO GENERATE STUFF
+      return {
+        ...state,
+        inGame: true,
+      };
+    case 'GAME_EXIT':
       return {
         ...initialGameState,
       };
     case 'GAME_TICK':
-      // TODO better forecasting
-      const tempForecast = state.timeline.shift();
-      if (tempForecast) {
-        tempForecast.hour = state.timeline[state.timeline.length - 1].hour + 1;
-        state.timeline.push(tempForecast);
-      }
-      const newState = {
-        ...state,
-        tick: state.tick + 1,
-      };
+      console.log('Tick! Hour: ' + state.timeline[0].hour);
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1000);
-      console.log(newState.tick);
-      return newState;
+
+      if (state.inGame) {
+        const newState = {...state};
+
+        // Generate the new forecast and remove the oldest data point
+        // TODO better forecasting, which will also fix the state manipulation
+        const newForecast = state.timeline[0];
+        if (newForecast) {
+          newForecast.hour = state.timeline[state.timeline.length - 1].hour + 1;
+          state.timeline.push(newForecast);
+        }
+        newState.timeline.shift();
+        return newState;
+      }
+      return state;
     default:
       return state;
   }
