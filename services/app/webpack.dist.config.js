@@ -1,6 +1,6 @@
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const Merge = require('webpack-merge');
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+// const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 const Webpack = require('webpack');
 const shared = require('../../shared/webpack.dist.shared');
 const dev = require('./webpack.config');
@@ -18,26 +18,26 @@ const options = {
       { from: 'src/robots.txt' },
       { from: 'src/manifest.json' },
       { from: 'src/images', to: 'images'},
-      { from: 'src/quests', to: 'quests'},
       { from: { glob: '**/*.mp3' }, context: 'src/audio', to: './audio' },
-      { from: { glob: '../../shared/images/icons/*.svg' }, flatten: true, to: './images' },
-      { from: { glob: '../../shared/images/art/*.png' }, flatten: true, to: './images' },
+      { from: { glob: '../../shared/images/*.svg' }, flatten: true, to: './images' },
+      { from: { glob: '../../shared/images/*.png' }, flatten: true, to: './images' },
     ]),
   ],
   optimization: {
-    minimizer: [
-      new UglifyJsPlugin({
-        sourceMap: true,
-        uglifyOptions: {
-          mangle: {
-            keep_fnames: true, // Critical for multiplayer / remoteify!
-          },
-          compress: {
-            keep_fnames: true, // Critical for multiplayer / remoteify!
-          },
-        },
-      }),
-    ],
+    // TODO fixme, probably by switching to a different module: https://github.com/webpack-contrib/uglifyjs-webpack-plugin/issues/362
+    // minimizer: [
+    //   new UglifyJsPlugin({
+    //     sourceMap: true,
+    //     uglifyOptions: {
+    //       mangle: {
+    //         keep_fnames: true, // Critical for multiplayer / remoteify!
+    //       },
+    //       compress: {
+    //         keep_fnames: true, // Critical for multiplayer / remoteify!
+    //       },
+    //     },
+    //   }),
+    // ],
   },
 };
 
