@@ -1,6 +1,7 @@
 import Redux from 'redux';
 import { createSelector } from 'reselect';
 import {GENERATORS} from '../Constants';
+import {getStore} from '../Store';
 import {AppStateType, GameStateType, GeneratorType, SeasonType} from '../Types';
 
 const seedrandom = require('seedrandom');
@@ -10,8 +11,8 @@ export const initialGameState: GameStateType = {
   generators: [] as GeneratorType[],
   season: 'Spring' as SeasonType,
   seedPrefix: Math.random(),
-  turn: 1,
-  turnMax: 16,
+  tick: 0,
+  year: 1990,
 };
 
 const getGameState = (state: AppStateType) => state.gameState;
@@ -75,7 +76,7 @@ export function getDemand(hour: number) {
 export const getForecasts = createSelector(
   [getGameState, getSunrise, getSunset],
   (gameState, sunrise, sunset) => {
-    const rng = seedrandom(gameState.seedPrefix + gameState.turn);
+    const rng = seedrandom(gameState.seedPrefix + gameState.tick);
     // TODO cloudiness probabilities based on real life + season
     let cloudiness = rng();
     const forecasts = [];
@@ -125,6 +126,14 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       return {
         ...initialGameState,
       };
+    case 'GAME_TICK':
+      const newState = {
+        ...state,
+        tick: state.tick + 1,
+      };
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1000);
+      console.log(newState.tick);
+      return newState;
     default:
       return state;
   }

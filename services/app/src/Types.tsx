@@ -65,10 +65,10 @@ export interface GameStateType {
   generators: GeneratorType[];
   cash: number;
   season: SeasonType;
-  seedPrefix: number; // actual seed is prefix + turn
+  seedPrefix: number; // actual seed is prefix + tick
     // and is supplied as the seed at the start of any function that uses randomness
-  turn: number;
-  turnMax: number;
+  tick: number;
+  year: number;
 }
 
 export type CardNameType =
