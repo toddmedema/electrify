@@ -1,13 +1,12 @@
 import * as React from 'react';
+import {formatWatts} from 'shared/Helpers/Format';
 import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
 import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme } from 'victory';
 
-const numbro = require('numbro');
-
 interface ChartData {
   hour: number;
-  supply: number;
-  demand: number;
+  supplyW: number;
+  demandW: number;
 }
 
 interface BlackoutEdges {
@@ -19,7 +18,7 @@ export interface Props {
   height?: number;
   sunrise: number;
   sunset: number;
-  forecast: ChartData[];
+  timeline: ChartData[];
 }
 
 /// http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
@@ -37,9 +36,9 @@ function getIntersectionX(line1StartX: number, line1StartY: number, line1EndX: n
 const Chart = (props: Props): JSX.Element => {
   let domainMin = 999999999999;
   let domainMax = 0;
-  props.forecast.forEach((d: ChartData) => {
-    domainMin = Math.min(domainMin, d.supply, d.demand);
-    domainMax = Math.max(domainMax, d.supply, d.demand);
+  props.timeline.forEach((d: ChartData) => {
+    domainMin = Math.min(domainMin, d.supplyW, d.demandW);
+    domainMax = Math.max(domainMax, d.supplyW, d.demandW);
   });
 
   // BLACKOUT CALCULATION
@@ -47,22 +46,22 @@ const Chart = (props: Props): JSX.Element => {
     hour: 1,
     value: 0,
   }] as BlackoutEdges[];
-  let prev = props.forecast[0];
-  let isBlackout = prev.demand > prev.supply;
+  let prev = props.timeline[0];
+  let isBlackout = prev.demandW > prev.supplyW;
   if (isBlackout) {
     blackouts.push({
       hour: 1,
       value: domainMax,
     });
   }
-  props.forecast.forEach((d: ChartData) => {
-    const intersectionTime = getIntersectionX(d.hour - 1, prev.supply, d.hour, d.supply, d.hour - 1, prev.demand, d.hour, d.demand);
-    if (d.demand > d.supply && !isBlackout) {
+  props.timeline.forEach((d: ChartData) => {
+    const intersectionTime = getIntersectionX(d.hour - 1, prev.supplyW, d.hour, d.supplyW, d.hour - 1, prev.demandW, d.hour, d.demandW);
+    if (d.demandW > d.supplyW && !isBlackout) {
       // Blackout starting: low then high edge
       blackouts.push({ hour: intersectionTime, value: 0 });
       blackouts.push({ hour: intersectionTime, value: domainMax });
       isBlackout = true;
-    } else if (d.demand < d.supply && isBlackout) {
+    } else if (d.demandW < d.supplyW && isBlackout) {
       // Blackout ending: high then low edge
       blackouts.push({ hour: intersectionTime, value: domainMax });
       blackouts.push({ hour: intersectionTime, value: 0 });
@@ -107,7 +106,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={(i) => numbro(i * 1000000).format({spaceSeparated: false, average: true}).toUpperCase() + 'W'}
+          tickFormat={formatWatts}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
@@ -120,10 +119,10 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
-          data={props.forecast}
+          data={props.timeline}
           interpolation="monotoneX"
           x="hour"
-          y="supply"
+          y="supplyW"
           style={{
             data: {
               stroke: supplyColor,
@@ -132,10 +131,10 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={props.forecast}
+          data={props.timeline}
           interpolation="monotoneX"
           x="hour"
-          y="demand"
+          y="demandW"
           style={{
             data: {
               stroke: demandColor,

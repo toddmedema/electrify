@@ -51,23 +51,27 @@ export interface AudioDataType {
 
 export type SeasonType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 
-// All amounts are the average for the whole hour
-export interface ForecastType {
+// All amounts are the average across the time window
+export interface TimelineType {
   hour: number;
-  supply: number;
-  demand: number;
+  supplyW: number; // Watts
+  demandW: number; // Watts
   solarOutput: number; // 0-1 multiplier
   windOutput: number; // 0-1 multiplier
   temperature: number;
 }
 
 export interface GameStateType {
-  generators: GeneratorType[];
-  cash: number;
-  season: SeasonType;
   seedPrefix: number; // actual seed is prefix + tick
     // and is supplied as the seed at the start of any function that uses randomness
+
+  generators: GeneratorType[];
+  timeline: TimelineType[];
+
+  cash: number;
+
   tick: number;
+  season: SeasonType;
   year: number;
 }
 

@@ -2,13 +2,37 @@ import Redux from 'redux';
 import { createSelector } from 'reselect';
 import {GENERATORS} from '../Constants';
 import {getStore} from '../Store';
-import {AppStateType, GameStateType, GeneratorType, SeasonType} from '../Types';
+import {AppStateType, GameStateType, GeneratorType, SeasonType, TimelineType} from '../Types';
 
 const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
   cash: 1000000,
   generators: [] as GeneratorType[],
+  timeline: [  {hour: 1, supplyW: 10000, demandW: 11500},
+  {hour: 2, supplyW: 10000, demandW: 11400},
+  {hour: 3, supplyW: 10000, demandW: 12000},
+  {hour: 4, supplyW: 10000, demandW: 11800},
+  {hour: 5, supplyW: 10000, demandW: 12100},
+  {hour: 6, supplyW: 10000, demandW: 12900},
+  {hour: 7, supplyW: 13000, demandW: 13600},
+  {hour: 8, supplyW: 15000, demandW: 14700},
+  {hour: 9, supplyW: 15600, demandW: 15300},
+  {hour: 10, supplyW: 16500, demandW: 16000},
+  {hour: 11, supplyW: 16000, demandW: 15700},
+  {hour: 12, supplyW: 17000, demandW: 15800},
+  {hour: 13, supplyW: 16500, demandW: 15600},
+  {hour: 14, supplyW: 17500, demandW: 15500},
+  {hour: 15, supplyW: 16000, demandW: 15600},
+  {hour: 16, supplyW: 16200, demandW: 15900},
+  {hour: 17, supplyW: 15500, demandW: 15500},
+  {hour: 18, supplyW: 14500, demandW: 14000},
+  {hour: 19, supplyW: 11000, demandW: 13000},
+  {hour: 20, supplyW: 10000, demandW: 12900},
+  {hour: 21, supplyW: 10000, demandW: 12800},
+  {hour: 22, supplyW: 10000, demandW: 12700},
+  {hour: 23, supplyW: 10000, demandW: 12000},
+  {hour: 24, supplyW: 10000, demandW: 11500}] as TimelineType[],
   season: 'Spring' as SeasonType,
   seedPrefix: Math.random(),
   tick: 0,
@@ -54,7 +78,7 @@ export const getSunset = createSelector(
   }
 );
 
-export function getSunshine(hour: number, sunrise: number, sunset: number) {
+export function getSunshinePercent(hour: number, sunrise: number, sunset: number) {
   if (hour >= sunrise && hour <= sunset) {
     const hoursFromDark = Math.min(hour - sunrise, sunset - hour);
     // TODO improve approximation curve
@@ -83,7 +107,7 @@ export const getForecasts = createSelector(
     for (let hour = 1; hour <= 24; hour++) {
       // Cloudiness moves at most 0.25 per hour, can never be "100%" (solar panels still produce 10-25% when overcast)
       cloudiness = Math.min(0.85, Math.max(0, cloudiness + rng() * 0.5 - 0.25));
-      const sunshine = (1 - cloudiness) * getSunshine(hour, sunrise, sunset);
+      const sunshine = (1 - cloudiness) * getSunshinePercent(hour, sunrise, sunset);
 
       const windOutput = rng(); // TODO
       const temperature = rng(); // TODO
@@ -127,6 +151,12 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         ...initialGameState,
       };
     case 'GAME_TICK':
+      const tempForecast = state.timeline.shift();
+      if (tempForecast) {
+        tempForecast.hour = state.timeline[state.timeline.length - 1].hour + 1;
+        console.log(tempForecast);
+        state.timeline.push(tempForecast);
+      }
       const newState = {
         ...state,
         tick: state.tick + 1,

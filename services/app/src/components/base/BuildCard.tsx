@@ -6,8 +6,8 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
-import {getForecasts, getSunrise, getSunset} from '../../reducers/GameState';
-import {AppStateType, ForecastType, GameStateType} from '../../Types';
+import {getSunrise, getSunset} from '../../reducers/GameState';
+import {AppStateType, GameStateType} from '../../Types';
 import Chart from './Chart';
 
 const numbro = require('numbro');
@@ -16,7 +16,6 @@ export interface BuildCardProps extends React.Props<any> {
   children?: JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
-  forecasts: ForecastType[];
   sunrise: number;
   sunset: number;
 }
@@ -46,7 +45,7 @@ export function BuildCard(props: Props) {
         height={180}
         sunrise={props.sunrise}
         sunset={props.sunset}
-        forecast={props.forecasts}
+        timeline={props.gameState.timeline}
       />
       {props.children}
     </div >
@@ -55,7 +54,6 @@ export function BuildCard(props: Props) {
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<BuildCardProps>): BuildCardProps => ({
   gameState: state.gameState,
-  forecasts: getForecasts(state),
   sunrise: getSunrise(state),
   sunset: getSunset(state),
   ...ownProps,
