@@ -11,10 +11,10 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onNext: () => {
-      dispatch(toCard({name: 'SUPPLY'}));
+    onStart: () => {
+      dispatch({type: 'GAME_START'});
     },
-    onPrevious: () => {
+    onCancel: () => {
       dispatch(toCard({name: 'MAIN_MENU'}));
     },
   };
