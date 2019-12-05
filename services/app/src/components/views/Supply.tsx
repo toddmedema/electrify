@@ -7,6 +7,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import * as React from 'react';
+import {formatWatts} from 'shared/helpers/Format';
 // import {GENERATORS} from '../../Constants';
 import {GameStateType, GeneratorType} from '../../Types';
 import BuildCard from '../base/BuildCard';
@@ -33,7 +34,7 @@ const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
-        secondary={props.generator.peakMW + 'MW'}
+        secondary={formatWatts(props.generator.peakW)}
       />
       <ListItemSecondaryAction>
         <span>HI</span>
