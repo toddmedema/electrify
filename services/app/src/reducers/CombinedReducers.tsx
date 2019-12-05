@@ -5,7 +5,7 @@ import {audioData} from './AudioData';
 import {card} from './Card';
 import {gameState} from './GameState';
 import {settings} from './Settings';
-import {snackbar} from './Snackbar';
+import {ui} from './UI';
 
 export default function combinedReduce(state: AppStateType, action: Redux.Action): AppStateType {
   state = state || ({} as AppStateType);
@@ -17,6 +17,6 @@ export default function combinedReduce(state: AppStateType, action: Redux.Action
     card: card(state.card, action),
     gameState: gameState(state.gameState, action),
     settings: settings(state.settings, action),
-    snackbar: snackbar(state.snackbar, action),
+    ui: ui(state.ui, action),
   } as AppStateType;
 }
