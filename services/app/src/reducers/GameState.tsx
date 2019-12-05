@@ -11,32 +11,7 @@ export const initialGameState: GameStateType = {
   generators: [] as GeneratorType[],
   // TODO generate real data when you start playing
   currentMinute: 0,
-  timeline: [
-    {minute: 0, supplyW: 10000, demandW: 11500},
-    {minute: 60, supplyW: 10000, demandW: 11400},
-    {minute: 120, supplyW: 10000, demandW: 12000},
-    {minute: 180, supplyW: 10000, demandW: 11800},
-    {minute: 240, supplyW: 10000, demandW: 12100},
-    {minute: 300, supplyW: 10000, demandW: 12900},
-    {minute: 360, supplyW: 13000, demandW: 13600},
-    {minute: 420, supplyW: 15000, demandW: 14700},
-    {minute: 480, supplyW: 15600, demandW: 15300},
-    {minute: 540, supplyW: 16500, demandW: 16000},
-    {minute: 600, supplyW: 16000, demandW: 15700},
-    {minute: 660, supplyW: 17000, demandW: 15800},
-    {minute: 720, supplyW: 16500, demandW: 15600},
-    {minute: 780, supplyW: 17500, demandW: 15500},
-    {minute: 840, supplyW: 16000, demandW: 15600},
-    {minute: 900, supplyW: 16200, demandW: 15900},
-    {minute: 960, supplyW: 15500, demandW: 15500},
-    {minute: 1020, supplyW: 14500, demandW: 14000},
-    {minute: 1080, supplyW: 11000, demandW: 13000},
-    {minute: 1140, supplyW: 10000, demandW: 12900},
-    {minute: 1200, supplyW: 10000, demandW: 12800},
-    {minute: 1260, supplyW: 10000, demandW: 12700},
-    {minute: 1320, supplyW: 10000, demandW: 12000},
-    {minute: 1380, supplyW: 10000, demandW: 11500},
-  ] as TimelineType[],
+  timeline: [] as TimelineType[],
   seedPrefix: Math.random(),
 };
 
@@ -52,12 +27,41 @@ export const initialGameState: GameStateType = {
 //   return 0;
 // }
 
-// export function getDemand(minute: number) {
-//   // TODO curve based on time of day (non-seasonal)
-//   // TODO curve based on more evening demand when darker (lighting)
-//   // TODO curve based on warm temperature (semi-exponential above 70F for cooling)
-//   return 1000;
-// }
+export function getDemandW(minute: number, gameState: GameStateType) {
+  // TODO curve based on time of day (non-seasonal)
+  // TODO curve based on more evening demand when darker (lighting)
+  // TODO curve based on warm temperature (semi-exponential above 70F for cooling)
+  return 250000000;
+}
+
+export function getSupplyW(minute: number, gameState: GameStateType) {
+  let supply = 0;
+  gameState.generators.forEach((generator: GeneratorType) => {
+    switch (generator.fuel) {
+      case 'Sun':
+        supply += generator.peakW; // TODO * solarOutput;
+        break;
+      case 'Wind':
+        supply += generator.peakW; // TODO * windOutput;
+        break;
+      default:
+        supply += generator.peakW;
+        break;
+    }
+  });
+  return supply;
+}
+
+export function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
+  return ({
+    minute,
+    supplyW: getSupplyW(minute, gameState),
+    demandW: getDemandW(minute, gameState),
+    solarOutput: 0,
+    windOutput: 0,
+    temperature: 0,
+  });
+}
 
 // export const getForecasts = createSelector(
 //   [getGameState, getSunrise, getSunset],
@@ -118,9 +122,13 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         generators: [...state.generators, newGenerator],
       };
     case 'GAME_START':
-      // TODO GENERATE STUFF (at the right time interval... perhaps that should be a constant since it's used here + GAME_TICK)
+      const timeline = [] as TimelineType[];
+      for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
+        timeline.push(generateTimelineDatapoint(minute, state));
+      }
       return {
         ...state,
+        timeline,
         inGame: true,
       };
     case 'GAME_EXIT':
@@ -128,7 +136,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         ...initialGameState,
       };
     case 'GAME_TICK':
-      console.log('Tick! Minute: ' + state.timeline[0].minute, state.currentMinute);
+      console.log('Tick! Minute: ' + state.currentMinute);
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
 
       if (state.inGame) {
@@ -137,18 +145,13 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           currentMinute: state.currentMinute + TICK_MINUTES,
         };
 
-        // Generate the new forecast and remove the oldest data point
-        // TODO better forecasting, which will also fix the state manipulation
-        const newForecast = state.timeline[0];
-        if (newForecast) {
-          newForecast.minute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-          state.timeline.push(newForecast);
-        }
+        // Update timeline
         newState.timeline.shift();
+        const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
+        state.timeline.push(generateTimelineDatapoint(newMinute, state));
 
+        // Update finances
         newState.cash += calculateProfitAndLoss(state);
-
-        // TODO decide when to increment season + year
 
         return newState;
       }

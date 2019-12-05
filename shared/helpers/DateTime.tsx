@@ -1,33 +1,65 @@
-import {DAYS_PER_SEASON, DAYS_PER_YEAR, SEASONS, STARTING_YEAR} from 'app/Constants';
-import {SeasonType} from 'app/Types';
+import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, STARTING_YEAR} from 'app/Constants';
+import {MonthType} from 'app/Types';
 
 // Based on SF/California for now, v2 take in / change by location
-export function getSunrise(season: SeasonType) {
-  switch (season) {
-    case 'Spring':
-      return 400;
-    case 'Summer':
-      return 352;
-    case 'Fall':
-      return 426;
-    case 'Winter': // jan 1
-    default:
+export function getSunrise(month: MonthType) {
+  switch (month) {
+    case 'Jan':
       return 445;
+    case 'Feb':
+      return 430;
+    case 'Mar':
+      return 415;
+    case 'Apr':
+      return 400;
+    case 'May':
+      return 385;
+    case 'June':
+      return 365;
+    case 'July':
+      return 352;
+    case 'Aug':
+      return 374;
+    case 'Sept':
+      return 396;
+    case 'Oct':
+      return 426;
+    case 'Nov':
+      return 434;
+    case 'Dec':
+    default:
+      return 440;
   }
 }
 
 // Based on SF/California for now, v2 change by location
-export function getSunset(season: SeasonType) {
-  switch (season) {
-    case 'Spring':
-      return 1084;
-    case 'Summer':
-      return 1235;
-    case 'Fall':
-      return 1132;
-    case 'Winter': // jan 1
-    default:
+export function getSunset(month: MonthType) {
+  switch (month) {
+    case 'Jan':
       return 1020;
+    case 'Feb':
+      return 1041;
+    case 'Mar':
+      return 1062;
+    case 'Apr':
+      return 1084;
+    case 'May':
+      return 1134;
+    case 'June':
+      return 1184;
+    case 'July':
+      return 1235;
+    case 'Aug':
+      return 1200;
+    case 'Sept':
+      return 1164;
+    case 'Oct':
+      return 1132;
+    case 'Nov':
+      return 1095;
+    case 'Dec':
+    default:
+      return 1055;
   }
 }
 
@@ -38,14 +70,14 @@ export function getDateFromMinute(minute: number) {
   // const dayOfSeason = dayOfYear % DAYS_PER_SEASON;
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
   const year = yearsEllapsed + STARTING_YEAR;
-  const seasonNumber = Math.floor(dayOfYear / DAYS_PER_SEASON);
-  const season = SEASONS[seasonNumber];
-  const minuteOfSeason = minute - (yearsEllapsed * DAYS_PER_YEAR + seasonNumber * DAYS_PER_SEASON) * 1440;
-  const percentOfSeason = minuteOfSeason / (DAYS_PER_SEASON * 1440);
+  const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH);
+  const month = MONTHS[monthNumber];
+  const minuteOfYear = minute - (yearsEllapsed * DAYS_PER_YEAR) * 1440;
+  const percentOfYear = minuteOfYear / (DAYS_PER_YEAR * 1440);
 
   return {
-    percentOfSeason,
-    season,
+    percentOfYear,
+    month,
     year,
   };
 }

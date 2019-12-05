@@ -248,8 +248,9 @@ body.android .dialog .textfield:focus-within {
       width: 100%;
     }
 
-    #seasonProgressBar {
-      height: 5px;
+    #yearProgressBar {
+      margin-top: -5px;
+      height: 2px;
       background: $font_color_faded;
     }
   }

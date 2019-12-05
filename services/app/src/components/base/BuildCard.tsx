@@ -32,7 +32,7 @@ export function BuildCard(props: Props) {
       <div id="topbar">
         <Toolbar>
           <Typography variant="h6">
-            {date.season}
+            {date.month}
             <span className="weak"> {date.year}</span>
             &nbsp;&nbsp;&nbsp;${numbro(props.gameState.cash).format({ average: true, totalLength: 3 }).toUpperCase()}
           </Typography>
@@ -40,7 +40,7 @@ export function BuildCard(props: Props) {
             <PlayCircleFilledIcon />
           </IconButton>
         </Toolbar>
-        <div id="seasonProgressBar" style={{width: `${date.percentOfSeason * 100}%`, transition: `width ${TICK_MS / 1000}s linear`}}/>
+        <div id="yearProgressBar" style={{width: `${date.percentOfYear * 100}%`, transition: `width ${TICK_MS / 1000}s linear`}}/>
       </div>
       <Chart
         height={180}

@@ -1,17 +1,12 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
-import {CardNameType, GeneratorType, SeasonType} from './Types';
+import {CardNameType, GeneratorType, MonthType} from './Types';
 
 export const TICK_MS = 100;
 export const TICK_MINUTES = 60;
-export const DAYS_PER_SEASON = 7;
-export const DAYS_PER_YEAR = DAYS_PER_SEASON * 4;
+export const DAYS_PER_MONTH = 1;
+export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const STARTING_YEAR = 1990;
-export const SEASONS = [
-  'Winter',
-  'Spring',
-  'Summer',
-  'Fall',
-] as SeasonType[];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];
 
 export const AUTH_SETTINGS = {
   ...AUTH_SETTINGS_BASE,
@@ -35,7 +30,7 @@ export const GENERATORS = [
     name: 'Coal',
     fuel: 'Coal',
     cost: 20000000,
-    peakMW: 200,
+    peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 60,
   },
@@ -43,13 +38,13 @@ export const GENERATORS = [
     name: 'Wind',
     fuel: 'Wind',
     cost: 20000000,
-    peakMW: 200,
+    peakW: 200000000,
   },
   {
     name: 'Solar',
     fuel: 'Sun',
     cost: 20000000,
-    peakMW: 200,
+    peakW: 200000000,
   },
 ] as GeneratorType[];
 

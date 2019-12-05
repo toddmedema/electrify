@@ -49,7 +49,7 @@ export interface AudioDataType {
   themeManager: ThemeManager|null;
 }
 
-export type SeasonType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
+export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
 
 // All amounts are the average across the time window
 export interface TimelineType {
@@ -94,7 +94,7 @@ export interface GeneratorType {
   name: string;
   fuel: FuelType;
   cost: number;
-  peakMW: number;
+  peakW: number;
   fuelConsumption?: number; // at peak
   spinMinutes?: number;
 }

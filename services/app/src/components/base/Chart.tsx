@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {getDateFromMinute, getSunrise, getSunset} from 'shared/helpers/DateTime';
-import {formatWatts} from 'shared/Helpers/Format';
+import {formatWatts} from 'shared/helpers/Format';
 import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
 import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme } from 'victory';
 
@@ -50,8 +50,8 @@ const Chart = (props: Props): JSX.Element => {
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
-  let sunrise = midnight + getSunrise(date.season);
-  let sunset = midnight + getSunset(date.season);
+  let sunrise = midnight + getSunrise(date.month);
+  let sunset = midnight + getSunset(date.month);
   if (sunrise < rangeMin) {
     sunrise += 1440;
   }
@@ -105,7 +105,7 @@ const Chart = (props: Props): JSX.Element => {
     <div>
       <VictoryChart
         theme={VictoryTheme.material}
-        padding={{ top: 10, bottom: 25, left: 50, right: 10 }}
+        padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
         domain={{ y: [domainMin * .95, domainMax] }}
         height={props.height || 300}
       >
