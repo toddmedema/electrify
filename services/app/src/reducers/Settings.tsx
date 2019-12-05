@@ -11,6 +11,9 @@ export const initialSettings: SettingsType = {
   vibration: getStorageBoolean('vibration', true),
 };
 
+// Settings are game-independent settings that persist across app opens (such as volume)
+// Things that don't persist are part of UI
+// Things that do persist, but are per-game, should be part of gameState
 export function settings(state: SettingsType = initialSettings, action: Redux.Action): SettingsType {
   switch (action.type) {
     case 'CHANGE_SETTINGS':

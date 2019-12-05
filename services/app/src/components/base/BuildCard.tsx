@@ -5,8 +5,9 @@ import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
+import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {toCard} from '../../actions/Card';
-import {getSunrise, getSunset} from '../../reducers/GameState';
+import {TICK_MS} from '../../Constants';
 import {AppStateType, GameStateType} from '../../Types';
 import Chart from './Chart';
 
@@ -16,8 +17,6 @@ export interface BuildCardProps extends React.Props<any> {
   children?: JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
-  sunrise: number;
-  sunset: number;
 }
 
 export interface DispatchProps {
@@ -27,24 +26,24 @@ export interface DispatchProps {
 export interface Props extends BuildCardProps, DispatchProps {}
 
 export function BuildCard(props: Props) {
+  const date = getDateFromMinute(props.gameState.currentMinute);
   return (
     <div className={props.className} id="buildCard">
       <div id="topbar">
         <Toolbar>
           <Typography variant="h6">
-            {props.gameState.season}
-            <span className="weak"> {props.gameState.year}</span>
+            {date.season}
+            <span className="weak"> {date.year}</span>
             &nbsp;&nbsp;&nbsp;${numbro(props.gameState.cash).format({ average: true, totalLength: 3 }).toUpperCase()}
           </Typography>
           <IconButton onClick={props.onPlay} color="primary" aria-label="play" edge="end">
             <PlayCircleFilledIcon />
           </IconButton>
         </Toolbar>
+        <div id="seasonProgressBar" style={{width: `${date.percentOfSeason * 100}%`, transition: `width ${TICK_MS / 1000}s linear`}}/>
       </div>
       <Chart
         height={180}
-        sunrise={props.sunrise}
-        sunset={props.sunset}
         timeline={props.gameState.timeline}
       />
       {props.children}
@@ -54,8 +53,6 @@ export function BuildCard(props: Props) {
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<BuildCardProps>): BuildCardProps => ({
   gameState: state.gameState,
-  sunrise: getSunrise(state),
-  sunset: getSunset(state),
   ...ownProps,
 });
 

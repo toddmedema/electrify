@@ -17,7 +17,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     card: state.card,
     settings: state.settings,
-    snackbar: state.snackbar,
+    ui: state.ui,
     transition,
   };
 };

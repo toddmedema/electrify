@@ -18,84 +18,84 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const forecastGood = [
-  {hour: 1, supplyW: 13000, demandW: 11500},
-  {hour: 2, supplyW: 13000, demandW: 11400},
-  {hour: 3, supplyW: 13000, demandW: 12000},
-  {hour: 4, supplyW: 13000, demandW: 11800},
-  {hour: 5, supplyW: 13000, demandW: 12100},
-  {hour: 6, supplyW: 13200, demandW: 12850},
-  {hour: 7, supplyW: 14000, demandW: 13600},
-  {hour: 8, supplyW: 15000, demandW: 14700},
-  {hour: 9, supplyW: 16000, demandW: 15800},
-  {hour: 10, supplyW: 16400, demandW: 16000},
-  {hour: 11, supplyW: 16300, demandW: 15700},
-  {hour: 12, supplyW: 16800, demandW: 15800},
-  {hour: 13, supplyW: 16600, demandW: 15600},
-  {hour: 14, supplyW: 17400, demandW: 15500},
-  {hour: 15, supplyW: 16200, demandW: 15600},
-  {hour: 16, supplyW: 16400, demandW: 15900},
-  {hour: 17, supplyW: 15500, demandW: 15400},
-  {hour: 18, supplyW: 14500, demandW: 14000},
-  {hour: 19, supplyW: 13200, demandW: 12950},
-  {hour: 20, supplyW: 13000, demandW: 12900},
-  {hour: 21, supplyW: 13000, demandW: 12800},
-  {hour: 22, supplyW: 13000, demandW: 12700},
-  {hour: 23, supplyW: 13000, demandW: 12000},
-  {hour: 24, supplyW: 13000, demandW: 11500},
+  {minute: 1, supplyW: 13000, demandW: 11500},
+  {minute: 2, supplyW: 13000, demandW: 11400},
+  {minute: 3, supplyW: 13000, demandW: 12000},
+  {minute: 4, supplyW: 13000, demandW: 11800},
+  {minute: 5, supplyW: 13000, demandW: 12100},
+  {minute: 6, supplyW: 13200, demandW: 12850},
+  {minute: 7, supplyW: 14000, demandW: 13600},
+  {minute: 8, supplyW: 15000, demandW: 14700},
+  {minute: 9, supplyW: 16000, demandW: 15800},
+  {minute: 10, supplyW: 16400, demandW: 16000},
+  {minute: 11, supplyW: 16300, demandW: 15700},
+  {minute: 12, supplyW: 16800, demandW: 15800},
+  {minute: 13, supplyW: 16600, demandW: 15600},
+  {minute: 14, supplyW: 17400, demandW: 15500},
+  {minute: 15, supplyW: 16200, demandW: 15600},
+  {minute: 16, supplyW: 16400, demandW: 15900},
+  {minute: 17, supplyW: 15500, demandW: 15400},
+  {minute: 18, supplyW: 14500, demandW: 14000},
+  {minute: 19, supplyW: 13200, demandW: 12950},
+  {minute: 20, supplyW: 13000, demandW: 12900},
+  {minute: 21, supplyW: 13000, demandW: 12800},
+  {minute: 22, supplyW: 13000, demandW: 12700},
+  {minute: 23, supplyW: 13000, demandW: 12000},
+  {minute: 24, supplyW: 13000, demandW: 11500},
 ];
 
 const forecastShortBlackout = [
-  {hour: 1, supplyW: 13000, demandW: 11500},
-  {hour: 2, supplyW: 13000, demandW: 11400},
-  {hour: 3, supplyW: 13000, demandW: 12000},
-  {hour: 4, supplyW: 13000, demandW: 11800},
-  {hour: 5, supplyW: 13000, demandW: 12100},
-  {hour: 6, supplyW: 13000, demandW: 12900},
-  {hour: 7, supplyW: 14000, demandW: 13600},
-  {hour: 8, supplyW: 15000, demandW: 14700},
-  {hour: 9, supplyW: 14600, demandW: 15400},
-  {hour: 10, supplyW: 16500, demandW: 16000},
-  {hour: 11, supplyW: 16000, demandW: 15700},
-  {hour: 12, supplyW: 17000, demandW: 15800},
-  {hour: 13, supplyW: 16500, demandW: 15600},
-  {hour: 14, supplyW: 17500, demandW: 15500},
-  {hour: 15, supplyW: 16000, demandW: 15600},
-  {hour: 16, supplyW: 16200, demandW: 15900},
-  {hour: 17, supplyW: 15500, demandW: 15500},
-  {hour: 18, supplyW: 14500, demandW: 14000},
-  {hour: 19, supplyW: 13000, demandW: 13000},
-  {hour: 20, supplyW: 13000, demandW: 12900},
-  {hour: 21, supplyW: 13000, demandW: 12800},
-  {hour: 22, supplyW: 13000, demandW: 12700},
-  {hour: 23, supplyW: 13000, demandW: 12000},
-  {hour: 24, supplyW: 13000, demandW: 11500},
+  {minute: 1, supplyW: 13000, demandW: 11500},
+  {minute: 2, supplyW: 13000, demandW: 11400},
+  {minute: 3, supplyW: 13000, demandW: 12000},
+  {minute: 4, supplyW: 13000, demandW: 11800},
+  {minute: 5, supplyW: 13000, demandW: 12100},
+  {minute: 6, supplyW: 13000, demandW: 12900},
+  {minute: 7, supplyW: 14000, demandW: 13600},
+  {minute: 8, supplyW: 15000, demandW: 14700},
+  {minute: 9, supplyW: 14600, demandW: 15400},
+  {minute: 10, supplyW: 16500, demandW: 16000},
+  {minute: 11, supplyW: 16000, demandW: 15700},
+  {minute: 12, supplyW: 17000, demandW: 15800},
+  {minute: 13, supplyW: 16500, demandW: 15600},
+  {minute: 14, supplyW: 17500, demandW: 15500},
+  {minute: 15, supplyW: 16000, demandW: 15600},
+  {minute: 16, supplyW: 16200, demandW: 15900},
+  {minute: 17, supplyW: 15500, demandW: 15500},
+  {minute: 18, supplyW: 14500, demandW: 14000},
+  {minute: 19, supplyW: 13000, demandW: 13000},
+  {minute: 20, supplyW: 13000, demandW: 12900},
+  {minute: 21, supplyW: 13000, demandW: 12800},
+  {minute: 22, supplyW: 13000, demandW: 12700},
+  {minute: 23, supplyW: 13000, demandW: 12000},
+  {minute: 24, supplyW: 13000, demandW: 11500},
 ];
 
 const forecastLongBlackout = [
-  {hour: 1, supplyW: 10000, demandW: 11500},
-  {hour: 2, supplyW: 10000, demandW: 11400},
-  {hour: 3, supplyW: 10000, demandW: 12000},
-  {hour: 4, supplyW: 10000, demandW: 11800},
-  {hour: 5, supplyW: 10000, demandW: 12100},
-  {hour: 6, supplyW: 10000, demandW: 12900},
-  {hour: 7, supplyW: 13000, demandW: 13600},
-  {hour: 8, supplyW: 15000, demandW: 14700},
-  {hour: 9, supplyW: 15600, demandW: 15300},
-  {hour: 10, supplyW: 16500, demandW: 16000},
-  {hour: 11, supplyW: 16000, demandW: 15700},
-  {hour: 12, supplyW: 17000, demandW: 15800},
-  {hour: 13, supplyW: 16500, demandW: 15600},
-  {hour: 14, supplyW: 17500, demandW: 15500},
-  {hour: 15, supplyW: 16000, demandW: 15600},
-  {hour: 16, supplyW: 16200, demandW: 15900},
-  {hour: 17, supplyW: 15500, demandW: 15500},
-  {hour: 18, supplyW: 14500, demandW: 14000},
-  {hour: 19, supplyW: 11000, demandW: 13000},
-  {hour: 20, supplyW: 10000, demandW: 12900},
-  {hour: 21, supplyW: 10000, demandW: 12800},
-  {hour: 22, supplyW: 10000, demandW: 12700},
-  {hour: 23, supplyW: 10000, demandW: 12000},
-  {hour: 24, supplyW: 10000, demandW: 11500},
+  {minute: 1, supplyW: 10000, demandW: 11500},
+  {minute: 2, supplyW: 10000, demandW: 11400},
+  {minute: 3, supplyW: 10000, demandW: 12000},
+  {minute: 4, supplyW: 10000, demandW: 11800},
+  {minute: 5, supplyW: 10000, demandW: 12100},
+  {minute: 6, supplyW: 10000, demandW: 12900},
+  {minute: 7, supplyW: 13000, demandW: 13600},
+  {minute: 8, supplyW: 15000, demandW: 14700},
+  {minute: 9, supplyW: 15600, demandW: 15300},
+  {minute: 10, supplyW: 16500, demandW: 16000},
+  {minute: 11, supplyW: 16000, demandW: 15700},
+  {minute: 12, supplyW: 17000, demandW: 15800},
+  {minute: 13, supplyW: 16500, demandW: 15600},
+  {minute: 14, supplyW: 17500, demandW: 15500},
+  {minute: 15, supplyW: 16000, demandW: 15600},
+  {minute: 16, supplyW: 16200, demandW: 15900},
+  {minute: 17, supplyW: 15500, demandW: 15500},
+  {minute: 18, supplyW: 14500, demandW: 14000},
+  {minute: 19, supplyW: 11000, demandW: 13000},
+  {minute: 20, supplyW: 10000, demandW: 12900},
+  {minute: 21, supplyW: 10000, demandW: 12800},
+  {minute: 22, supplyW: 10000, demandW: 12700},
+  {minute: 23, supplyW: 10000, demandW: 12000},
+  {minute: 24, supplyW: 10000, demandW: 11500},
 ];
 
 const tutorialSteps = [
@@ -115,8 +115,6 @@ const tutorialSteps = [
     <Typography variant="h6">Forecast for average Spring day</Typography>
     <Chart
       height={200}
-      sunrise={7}
-      sunset={19}
       timeline={forecastGood}
     />
     <p>This graph shows your forecasted demand and maximum supply for next season. It represents <strong> an average day </strong> for the season.</p>
@@ -125,15 +123,11 @@ const tutorialSteps = [
   <div>
     <Chart
       height={160}
-      sunrise={7}
-      sunset={19}
       timeline={forecastShortBlackout}
     />
     <p><strong>Short blackouts</strong> are best solved with batteries or “peaking” generators that spin up quickly</p>
     <Chart
       height={160}
-      sunrise={7}
-      sunset={19}
       timeline={forecastLongBlackout}
     />
     <p><strong>Extended blackouts</strong> mean you need more “baseload” generators or fewer customers</p>

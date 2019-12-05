@@ -1,5 +1,17 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
-import {CardNameType, GeneratorType} from './Types';
+import {CardNameType, GeneratorType, SeasonType} from './Types';
+
+export const TICK_MS = 100;
+export const TICK_MINUTES = 60;
+export const DAYS_PER_SEASON = 7;
+export const DAYS_PER_YEAR = DAYS_PER_SEASON * 4;
+export const STARTING_YEAR = 1990;
+export const SEASONS = [
+  'Winter',
+  'Spring',
+  'Summer',
+  'Fall',
+] as SeasonType[];
 
 export const AUTH_SETTINGS = {
   ...AUTH_SETTINGS_BASE,

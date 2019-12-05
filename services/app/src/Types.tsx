@@ -53,7 +53,7 @@ export type SeasonType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 
 // All amounts are the average across the time window
 export interface TimelineType {
-  hour: number;
+  minute: number;
   supplyW: number; // Watts
   demandW: number; // Watts
   solarOutput: number; // 0-1 multiplier
@@ -63,11 +63,10 @@ export interface TimelineType {
 
 export interface GameStateType {
   inGame: boolean;
-  seedPrefix: number; // actual seed is prefix + the first hour in timeline
+  seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
-  timeline: TimelineType[];
-  season: SeasonType;
-  year: number;
+  currentMinute: number;
+  timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
 
   generators: GeneratorType[];
 
@@ -111,12 +110,14 @@ export interface SettingsType {
   vibration: boolean;
 }
 
-export interface SnackbarType {
-  action?: (e: any) => void;
-  actionLabel?: string;
-  open: boolean;
-  message: string;
-  timeout: number;
+export interface UIType {
+  snackbar: {
+    action?: (e: any) => void;
+    actionLabel?: string;
+    open: boolean;
+    message: string;
+    timeout: number;
+  }
 }
 
 export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
@@ -127,5 +128,5 @@ export interface AppStateType {
   card: CardType;
   gameState: GameStateType;
   settings: SettingsType;
-  snackbar: SnackbarType;
+  ui: UIType;
 }

@@ -8,8 +8,8 @@ import {
   CardNameType,
   CardType,
   SettingsType,
-  SnackbarType,
-  TransitionClassType
+  TransitionClassType,
+  UIType
 } from '../Types';
 
 import AudioContainer from './base/AudioContainer';
@@ -25,7 +25,7 @@ import TutorialBuildContainer from './views/TutorialBuildContainer';
 export interface StateProps {
   card: CardType;
   settings: SettingsType;
-  snackbar: SnackbarType;
+  ui: UIType;
   transition: TransitionClassType;
 }
 
@@ -42,8 +42,8 @@ export function isNavCard(name: CardNameType) {
 export default class Compositor extends React.Component<Props, {}> {
 
   public snackbarActionClicked(e: React.MouseEvent<HTMLElement>) {
-    if (this.props.snackbar.action) {
-      this.props.snackbar.action(e);
+    if (this.props.ui.snackbar.action) {
+      this.props.ui.snackbar.action(e);
     }
   }
 
@@ -108,11 +108,11 @@ export default class Compositor extends React.Component<Props, {}> {
         {footer}
         <Snackbar
           className="snackbar"
-          open={this.props.snackbar.open}
-          message={<span>{this.props.snackbar.message}</span>}
-          autoHideDuration={this.props.snackbar.timeout}
+          open={this.props.ui.snackbar.open}
+          message={<span>{this.props.ui.snackbar.message}</span>}
+          autoHideDuration={this.props.ui.snackbar.timeout}
           onClose={this.props.closeSnackbar}
-          action={(this.props.snackbar.actionLabel) ? [<Button key={1} onClick={(e: React.MouseEvent<HTMLElement>) => this.snackbarActionClicked(e)}>{this.props.snackbar.actionLabel}</Button>] : []}
+          action={(this.props.ui.snackbar.actionLabel) ? [<Button key={1} onClick={(e: React.MouseEvent<HTMLElement>) => this.snackbarActionClicked(e)}>{this.props.ui.snackbar.actionLabel}</Button>] : []}
         />
         <AudioContainer />
       </div>

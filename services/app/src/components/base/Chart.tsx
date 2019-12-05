@@ -1,23 +1,22 @@
 import * as React from 'react';
+import {getDateFromMinute, getSunrise, getSunset} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/Helpers/Format';
 import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
 import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme } from 'victory';
 
 interface ChartData {
-  hour: number;
+  minute: number;
   supplyW: number;
   demandW: number;
 }
 
 interface BlackoutEdges {
-  hour: number;
+  minute: number;
   value: number;
 }
 
 export interface Props {
   height?: number;
-  sunrise: number;
-  sunset: number;
   timeline: ChartData[];
 }
 
@@ -44,45 +43,46 @@ const Chart = (props: Props): JSX.Element => {
   props.timeline.forEach((d: ChartData) => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
-    rangeMin = Math.min(rangeMin, d.hour);
-    rangeMax = Math.max(rangeMax, d.hour);
+    rangeMin = Math.min(rangeMin, d.minute);
+    rangeMax = Math.max(rangeMax, d.minute);
   });
 
-  // Use that to slide sunrise / sunset forward to the correct hour
-  const midnight = Math.floor(rangeMin / 24) * 24;
-  let sunrise = midnight + props.sunrise;
-  let sunset = midnight + props.sunset;
+  // Get sunrise and sunset, sliding forward if it's actually in the next day
+  const date = getDateFromMinute(rangeMin);
+  const midnight = Math.floor(rangeMin / 1440) * 1440;
+  let sunrise = midnight + getSunrise(date.season);
+  let sunset = midnight + getSunset(date.season);
   if (sunrise < rangeMin) {
-    sunrise += 24;
+    sunrise += 1440;
   }
   if (sunset < rangeMin) {
-    sunset += 24;
+    sunset += 1440;
   }
 
   // BLACKOUT CALCULATION
   const blackouts = [{
-    hour: rangeMin,
+    minute: rangeMin,
     value: 0,
   }] as BlackoutEdges[];
   let prev = props.timeline[0];
   let isBlackout = prev.demandW > prev.supplyW;
   if (isBlackout) {
     blackouts.push({
-      hour: rangeMin,
+      minute: rangeMin,
       value: domainMax,
     });
   }
   props.timeline.forEach((d: ChartData) => {
-    const intersectionTime = getIntersectionX(d.hour - 1, prev.supplyW, d.hour, d.supplyW, d.hour - 1, prev.demandW, d.hour, d.demandW);
+    const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
     if (d.demandW > d.supplyW && !isBlackout) {
       // Blackout starting: low then high edge
-      blackouts.push({ hour: intersectionTime, value: 0 });
-      blackouts.push({ hour: intersectionTime, value: domainMax });
+      blackouts.push({ minute: intersectionTime, value: 0 });
+      blackouts.push({ minute: intersectionTime, value: domainMax });
       isBlackout = true;
     } else if (d.demandW < d.supplyW && isBlackout) {
       // Blackout ending: high then low edge
-      blackouts.push({ hour: intersectionTime, value: domainMax });
-      blackouts.push({ hour: intersectionTime, value: 0 });
+      blackouts.push({ minute: intersectionTime, value: domainMax });
+      blackouts.push({ minute: intersectionTime, value: 0 });
       isBlackout = false;
     }
     prev = d;
@@ -90,12 +90,12 @@ const Chart = (props: Props): JSX.Element => {
   // Final entry
   if (isBlackout) {
     blackouts.push({
-      hour: rangeMax,
+      minute: rangeMax,
       value: domainMax,
     });
   } else {
     blackouts.push({
-      hour: rangeMax,
+      minute: rangeMax,
       value: 0,
     });
   }
@@ -139,7 +139,7 @@ const Chart = (props: Props): JSX.Element => {
         <VictoryArea
           data={props.timeline}
           interpolation="monotoneX"
-          x="hour"
+          x="minute"
           y="supplyW"
           style={{
             data: {
@@ -151,7 +151,7 @@ const Chart = (props: Props): JSX.Element => {
         <VictoryLine
           data={props.timeline}
           interpolation="monotoneX"
-          x="hour"
+          x="minute"
           y="demandW"
           style={{
             data: {
@@ -162,7 +162,7 @@ const Chart = (props: Props): JSX.Element => {
         />
         <VictoryArea
           data={blackouts}
-          x="hour"
+          x="minute"
           y="value"
           style={{
             data: {
