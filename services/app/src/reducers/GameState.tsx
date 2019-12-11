@@ -1,11 +1,12 @@
 import Redux from 'redux';
 import {GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
-import {GameStateType, GeneratorType, TimelineType} from '../Types';
+import {GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
+  speed: 'NORMAL',
   inGame: false,
   cash: 1000000,
   generators: [] as GeneratorType[],
@@ -14,6 +15,10 @@ export const initialGameState: GameStateType = {
   timeline: [] as TimelineType[],
   seedPrefix: Math.random(),
 };
+
+export function setSpeed(speed: SpeedType): SetSpeedAction {
+  return { type: 'SET_SPEED', speed };
+}
 
 // export function getSunshinePercent(minute: number, sunrise: number, sunset: number) {
 //   if (minute >= sunrise && minute <= sunset) {
@@ -131,29 +136,41 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         timeline,
         inGame: true,
       };
+    case 'SET_SPEED':
+      return {...state, speed: (action as SetSpeedAction).speed};
     case 'GAME_EXIT':
-      return {
-        ...initialGameState,
-      };
+      return {...initialGameState};
     case 'GAME_TICK':
       console.log('Tick! Minute: ' + state.currentMinute);
-      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
 
       if (state.inGame) {
-        const newState = {
-          ...state,
-          currentMinute: state.currentMinute + TICK_MINUTES,
-        };
+        if (state.speed !== 'PAUSED') {
+          const newState = {
+            ...state,
+            currentMinute: state.currentMinute + TICK_MINUTES,
+          };
 
-        // Update timeline
-        newState.timeline.shift();
-        const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-        state.timeline.push(generateTimelineDatapoint(newMinute, state));
+          // Update timeline
+          newState.timeline.shift();
+          const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
+          state.timeline.push(generateTimelineDatapoint(newMinute, state));
 
-        // Update finances
-        newState.cash += calculateProfitAndLoss(state);
+          // Update finances
+          newState.cash += calculateProfitAndLoss(state);
 
-        return newState;
+          if (state.speed === 'SLOW') {
+            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
+          } else if (state.speed === 'FAST') {
+            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS / 3);
+          } else {
+            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
+          }
+          return newState;
+        } else {
+          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
+        }
+      } else {
+        setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
       }
       return state;
     default:

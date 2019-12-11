@@ -34,6 +34,16 @@ export interface SnackbarCloseAction extends Redux.Action {
   type: 'SNACKBAR_CLOSE';
 }
 
+export interface SetSpeedAction extends Redux.Action {
+  type: 'SET_SPEED';
+  speed: SpeedType
+}
+
+export interface UiDeltaAction extends Redux.Action {
+  type: 'UI_DELTA';
+  delta: Partial<UIType>;
+}
+
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
 export interface AudioType {
   loaded: AudioLoadingType;
@@ -50,6 +60,9 @@ export interface AudioDataType {
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
+export type FuelType = 'Coal' | 'Wind' | 'Sun';
+export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
+export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
 // All amounts are the average across the time window
 export interface TimelineType {
@@ -62,6 +75,7 @@ export interface TimelineType {
 }
 
 export interface GameStateType {
+  speed: SpeedType;
   inGame: boolean;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
@@ -88,8 +102,6 @@ export interface CardType {
   overrideDebounce?: boolean;
 }
 
-export type FuelType = 'Coal' | 'Wind' | 'Sun';
-
 export interface GeneratorType {
   name: string;
   fuel: FuelType;
@@ -98,8 +110,6 @@ export interface GeneratorType {
   fuelConsumption?: number; // at peak
   spinMinutes?: number;
 }
-
-export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 
 export interface SettingsType {
   [index: string]: any;

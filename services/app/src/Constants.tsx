@@ -1,7 +1,7 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
 import {CardNameType, GeneratorType, MonthType} from './Types';
 
-export const TICK_MS = 100;
+export const TICK_MS = 150;
 export const TICK_MINUTES = 60;
 export const DAYS_PER_MONTH = 1;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
