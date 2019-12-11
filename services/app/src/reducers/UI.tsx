@@ -1,5 +1,5 @@
 import Redux from 'redux';
-import {UIType} from '../Types';
+import {UiDeltaAction, UIType} from '../Types';
 
 export const initialUI: UIType = {
   snackbar: {
@@ -9,8 +9,14 @@ export const initialUI: UIType = {
   },
 };
 
+export function uiDelta(delta: Partial<UIType>): UiDeltaAction {
+  return { type: 'UI_DELTA', delta };
+}
+
 export function ui(state: UIType = initialUI, action: Redux.Action): UIType {
   switch (action.type) {
+    case 'UI_DELTA':
+      return {...state, ...(action as UiDeltaAction).delta};
     // case 'SNACKBAR_OPEN':
     //   const openAction = (action as SnackbarOpenAction);
     //   if (openAction.message && openAction.message !== '') {
