@@ -10,8 +10,7 @@ export const initialGameState: GameStateType = {
   inGame: false,
   cash: 1000000,
   generators: [] as GeneratorType[],
-  // TODO generate real data when you start playing
-  currentMinute: 0,
+  currentMinute: 180, // This is the line where the chart switches from historic to forecast
   timeline: [] as TimelineType[],
   seedPrefix: Math.random(),
 };

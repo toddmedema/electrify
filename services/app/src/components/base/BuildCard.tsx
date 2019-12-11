@@ -52,11 +52,15 @@ export function BuildCard(props: Props) {
             <FastForwardIcon />
           </IconButton>
         </Toolbar>
-        <div id="yearProgressBar" style={{width: `${date.percentOfYear * 100}%`, transition: `width ${TICK_MS / 1000}s linear`}}/>
+        <div id="yearProgressBar" style={{
+          width: `${date.percentOfYear * 100}%`,
+          transition: `width ${(date.percentOfYear > 0.05) ? TICK_MS / 1000 : 0}s linear`,
+        }}/>
       </div>
       <Chart
         height={180}
         timeline={props.gameState.timeline}
+        currentMinute={props.gameState.currentMinute}
       />
       {props.children}
     </div >

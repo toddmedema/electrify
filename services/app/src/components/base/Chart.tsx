@@ -16,6 +16,7 @@ interface BlackoutEdges {
 }
 
 export interface Props {
+  currentMinute?: number;
   height?: number;
   timeline: ChartData[];
 }
@@ -100,6 +101,11 @@ const Chart = (props: Props): JSX.Element => {
     });
   }
 
+  // Divide between historic and forcast
+  const currentMinute = props.currentMinute || rangeMax;
+  const historic = [...props.timeline].filter((d: ChartData) => d.minute <= currentMinute);
+  const forecast = [...props.timeline].filter((d: ChartData) => d.minute >= currentMinute);
+
   // Wrapping in spare div prevents weird excessive height bug
   return (
     <div>
@@ -137,7 +143,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
-          data={props.timeline}
+          data={historic}
           interpolation="monotoneX"
           x="minute"
           y="supplyW"
@@ -149,7 +155,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={props.timeline}
+          data={historic}
           interpolation="monotoneX"
           x="minute"
           y="demandW"
@@ -157,6 +163,32 @@ const Chart = (props: Props): JSX.Element => {
             data: {
               stroke: demandColor,
               strokeWidth: 3,
+            },
+          }}
+        />
+        <VictoryArea
+          data={forecast}
+          interpolation="monotoneX"
+          x="minute"
+          y="supplyW"
+          style={{
+            data: {
+              stroke: supplyColor,
+              strokeDasharray: 5,
+              fill: '#e3f2fd', // blue50
+            },
+          }}
+        />
+        <VictoryLine
+          data={forecast}
+          interpolation="monotoneX"
+          x="minute"
+          y="demandW"
+          style={{
+            data: {
+              stroke: demandColor,
+              strokeWidth: 3,
+              strokeDasharray: 5,
             },
           }}
         />
