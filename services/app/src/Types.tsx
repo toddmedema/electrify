@@ -69,9 +69,9 @@ export interface TimelineType {
   minute: number;
   supplyW: number; // Watts
   demandW: number; // Watts
-  solarOutput: number; // 0-1 multiplier
-  windOutput: number; // 0-1 multiplier
-  temperature: number;
+  sunlight: number; // 0-1 multiplier
+  windKph: number;
+  temperatureC: number;
 }
 
 export interface GameStateType {

@@ -1,4 +1,5 @@
 import Redux from 'redux';
+import {getDateFromMinute, getSunrise, getSunset} from 'shared/helpers/DateTime';
 import {GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
 import {GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
@@ -19,34 +20,35 @@ export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
 }
 
-// export function getSunshinePercent(minute: number, sunrise: number, sunset: number) {
-//   if (minute >= sunrise && minute <= sunset) {
-//     const minutesFromDark = Math.min(minute - sunrise, sunset - minute);
-//     // TODO improve approximation curve
-//     // Day length / minutes from dark used as proxy for season / max sun height
-//     // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.8+*+%28x+-+3%29%29%29+from+0+to+7
-//     // Solar panels generally follow a Bell curve: https://www.solarpaneltalk.com/forum/solar/solar-energy-facts/374711-please-help-me-understand-my-production-rate-vs-my-system-size-confused
-//     return 1 / (1 + Math.pow(Math.E, (-0.8 * (minutesFromDark - 3))));
-//   }
-//   return 0;
-// }
+export function forecastSunlightPercent(minute: number, sunrise: number, sunset: number) {
+  if (minute >= sunrise && minute <= sunset) {
+    const minutesFromDark = Math.min(minute - sunrise, sunset - minute);
+    // TODO incorporate weather forecast (cloudiness)
+    // Day length / minutes from dark used as proxy for season / max sun height
+    // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.02+*+%28x+-+200%29%29%29+from+0+to+420
+    // Solar panels generally follow a Bell curve
+    return 1 / (1 + Math.pow(Math.E, (-0.02 * (minutesFromDark - 200))));
+  }
+  return 0;
+}
 
-export function getDemandW(minute: number, gameState: GameStateType) {
+export function getDemandW(minute: number, gameState: GameStateType, sunlight: number, temperatureC: number) {
   // TODO curve based on time of day (non-seasonal)
   // TODO curve based on more evening demand when darker (lighting)
   // TODO curve based on warm temperature (semi-exponential above 70F for cooling)
   return 250000000;
 }
 
-export function getSupplyW(minute: number, gameState: GameStateType) {
+export function getSupplyW(minute: number, gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
   let supply = 0;
   gameState.generators.forEach((generator: GeneratorType) => {
     switch (generator.fuel) {
       case 'Sun':
-        supply += generator.peakW; // TODO * solarOutput;
+        // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+        supply += generator.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
         break;
       case 'Wind':
-        supply += generator.peakW; // TODO * windOutput;
+        supply += generator.peakW * windKph / 30;
         break;
       default:
         supply += generator.peakW;
@@ -57,13 +59,19 @@ export function getSupplyW(minute: number, gameState: GameStateType) {
 }
 
 export function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
+  const date = getDateFromMinute(minute);
+  const sunrise = getSunrise(date.month);
+  const sunset = getSunset(date.month);
+  const sunlight = forecastSunlightPercent(date.minuteOfDay, sunrise, sunset);
+  const windKph = Math.random() * 30;
+  const temperatureC = Math.random() * 30;
   return ({
     minute,
-    supplyW: getSupplyW(minute, gameState),
-    demandW: getDemandW(minute, gameState),
-    solarOutput: 0,
-    windOutput: 0,
-    temperature: 0,
+    supplyW: getSupplyW(minute, gameState, sunlight, windKph, temperatureC),
+    demandW: getDemandW(minute, gameState, sunlight, temperatureC),
+    sunlight,
+    windKph,
+    temperatureC,
   });
 }
 
