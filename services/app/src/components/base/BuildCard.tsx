@@ -9,7 +9,6 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {TICK_MS} from '../../Constants';
 import {setSpeed} from '../../reducers/GameState';
 import {AppStateType, GameStateType, SpeedType} from '../../Types';
 import Chart from './Chart';

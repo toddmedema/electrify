@@ -54,10 +54,10 @@ const Chart = (props: Props): JSX.Element => {
   let sunrise = midnight + date.sunrise;
   let sunset = midnight + date.sunset;
   if (sunrise < rangeMin) {
-    sunrise += 1440;
+    sunrise = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunrise;
   }
   if (sunset < rangeMin) {
-    sunset += 1440;
+    sunset = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunset;
   }
 
   // BLACKOUT CALCULATION
