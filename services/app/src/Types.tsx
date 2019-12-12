@@ -64,6 +64,15 @@ export type FuelType = 'Coal' | 'Wind' | 'Sun';
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
+export interface DateType {
+  minuteOfDay: number;
+  percentOfYear: number; // 0 - 1
+  month: MonthType;
+  year: number;
+  sunrise: number;
+  sunset: number;
+}
+
 // All amounts are the average across the time window
 export interface TimelineType {
   minute: number;

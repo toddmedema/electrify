@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {getDateFromMinute, getSunrise, getSunset} from 'shared/helpers/DateTime';
+import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/helpers/Format';
 import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
 import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme } from 'victory';
@@ -51,8 +51,8 @@ const Chart = (props: Props): JSX.Element => {
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
-  let sunrise = midnight + getSunrise(date.month);
-  let sunset = midnight + getSunset(date.month);
+  let sunrise = midnight + date.sunrise;
+  let sunset = midnight + date.sunset;
   if (sunrise < rangeMin) {
     sunrise += 1440;
   }
@@ -101,11 +101,6 @@ const Chart = (props: Props): JSX.Element => {
     });
   }
 
-  // Divide between historic and forcast
-  const currentMinute = props.currentMinute || rangeMax;
-  const historic = [...props.timeline].filter((d: ChartData) => d.minute <= currentMinute);
-  const forecast = [...props.timeline].filter((d: ChartData) => d.minute >= currentMinute);
-
   // Wrapping in spare div prevents weird excessive height bug
   return (
     <div>
@@ -143,7 +138,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
-          data={historic}
+          data={props.timeline}
           interpolation="monotoneX"
           x="minute"
           y="supplyW"
@@ -155,7 +150,7 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={historic}
+          data={props.timeline}
           interpolation="monotoneX"
           x="minute"
           y="demandW"
@@ -163,32 +158,6 @@ const Chart = (props: Props): JSX.Element => {
             data: {
               stroke: demandColor,
               strokeWidth: 3,
-            },
-          }}
-        />
-        <VictoryArea
-          data={forecast}
-          interpolation="monotoneX"
-          x="minute"
-          y="supplyW"
-          style={{
-            data: {
-              stroke: supplyColor,
-              strokeDasharray: 5,
-              fill: '#e3f2fd', // blue50
-            },
-          }}
-        />
-        <VictoryLine
-          data={forecast}
-          interpolation="monotoneX"
-          x="minute"
-          y="demandW"
-          style={{
-            data: {
-              stroke: demandColor,
-              strokeWidth: 3,
-              strokeDasharray: 5,
             },
           }}
         />

@@ -1,8 +1,8 @@
 import Redux from 'redux';
-import {getDateFromMinute, getSunrise, getSunset} from 'shared/helpers/DateTime';
+import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
-import {GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {DateType, GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -20,26 +20,31 @@ export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
 }
 
-export function forecastSunlightPercent(minute: number, sunrise: number, sunset: number) {
-  if (minute >= sunrise && minute <= sunset) {
-    const minutesFromDark = Math.min(minute - sunrise, sunset - minute);
+export function forecastSunlightPercent(date: DateType) {
+  if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
+    const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
     // TODO incorporate weather forecast (cloudiness)
     // Day length / minutes from dark used as proxy for season / max sun height
-    // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.02+*+%28x+-+200%29%29%29+from+0+to+420
+    // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
     // Solar panels generally follow a Bell curve
-    return 1 / (1 + Math.pow(Math.E, (-0.02 * (minutesFromDark - 200))));
+    return 1 / (1 + Math.pow(Math.E, (-0.015 * (minutesFromDark - 260))));
   }
   return 0;
 }
 
-export function getDemandW(minute: number, gameState: GameStateType, sunlight: number, temperatureC: number) {
-  // TODO curve based on time of day (non-seasonal)
-  // TODO curve based on more evening demand when darker (lighting)
-  // TODO curve based on warm temperature (semi-exponential above 70F for cooling)
-  return 250000000;
+export function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
+  // https://www.eia.gov/todayinenergy/detail.php?id=830
+  // https://www.e-education.psu.edu/ebf200/node/151
+  // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
+  // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
+  const temperatureNormalized = temperatureC / 30;
+  const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
+  const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
+      // + 192.12 * (Weekday variable)
+  return demandMultiple * 1000000;
 }
 
-export function getSupplyW(minute: number, gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
+export function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
   let supply = 0;
   gameState.generators.forEach((generator: GeneratorType) => {
     switch (generator.fuel) {
@@ -60,15 +65,15 @@ export function getSupplyW(minute: number, gameState: GameStateType, sunlight: n
 
 export function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
   const date = getDateFromMinute(minute);
-  const sunrise = getSunrise(date.month);
-  const sunset = getSunset(date.month);
-  const sunlight = forecastSunlightPercent(date.minuteOfDay, sunrise, sunset);
+  const sunlight = forecastSunlightPercent(date);
+
+  // TODO use real weather data
   const windKph = Math.random() * 30;
   const temperatureC = Math.random() * 30;
   return ({
     minute,
-    supplyW: getSupplyW(minute, gameState, sunlight, windKph, temperatureC),
-    demandW: getDemandW(minute, gameState, sunlight, temperatureC),
+    supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC),
+    demandW: getDemandW(date, gameState, sunlight, temperatureC),
     sunlight,
     windKph,
     temperatureC,
@@ -168,7 +173,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           if (state.speed === 'SLOW') {
             setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
           } else if (state.speed === 'FAST') {
-            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS / 3);
+            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS / 4);
           } else {
             setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
           }

@@ -1,8 +1,8 @@
 import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, STARTING_YEAR} from 'app/Constants';
-import {MonthType} from 'app/Types';
+import {DateType, MonthType} from 'app/Types';
 
 // Based on SF/California for now, v2 take in / change by location
-export function getSunrise(month: MonthType) {
+function getSunrise(month: MonthType) {
   switch (month) {
     case 'Jan':
       return 445;
@@ -33,7 +33,7 @@ export function getSunrise(month: MonthType) {
 }
 
 // Based on SF/California for now, v2 change by location
-export function getSunset(month: MonthType) {
+function getSunset(month: MonthType) {
   switch (month) {
     case 'Jan':
       return 1020;
@@ -64,7 +64,7 @@ export function getSunset(month: MonthType) {
 }
 
 // TODO if per issues, check how many times per tick this gets called, could make it a selector based on gameState currentMinute
-export function getDateFromMinute(minute: number) {
+export function getDateFromMinute(minute: number): DateType {
   const minuteOfDay = minute % 1440;
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
@@ -81,5 +81,7 @@ export function getDateFromMinute(minute: number) {
     percentOfYear,
     month,
     year,
+    sunrise: getSunrise(month),
+    sunset: getSunset(month),
   };
 }

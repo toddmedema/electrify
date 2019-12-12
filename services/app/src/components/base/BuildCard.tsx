@@ -54,7 +54,6 @@ export function BuildCard(props: Props) {
         </Toolbar>
         <div id="yearProgressBar" style={{
           width: `${date.percentOfYear * 100}%`,
-          transition: `width ${(date.percentOfYear > 0.05) ? TICK_MS / 1000 : 0}s linear`,
         }}/>
       </div>
       <Chart
