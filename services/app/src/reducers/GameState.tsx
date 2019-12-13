@@ -1,8 +1,8 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
+import {TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
-import {DateType, GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -68,8 +68,8 @@ export function generateTimelineDatapoint(minute: number, gameState: GameStateTy
   const sunlight = forecastSunlightPercent(date);
 
   // TODO use real weather data
-  const windKph = Math.random() * 30;
-  const temperatureC = Math.random() * 30;
+  const windKph = 10;
+  const temperatureC = 10;
   return ({
     minute,
     supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC),
@@ -133,10 +133,9 @@ function calculateProfitAndLoss(gameState: GameStateType) {
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   switch (action.type) {
     case 'BUILD_GENERATOR':
-      const newGenerator = GENERATORS[Math.floor(Math.random() * GENERATORS.length)];
       return {
         ...state,
-        generators: [...state.generators, newGenerator],
+        generators: [...state.generators, (action as BuildGeneratorAction).generator],
       };
     case 'GAME_START':
       const timeline = [] as TimelineType[];
@@ -153,8 +152,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     case 'GAME_EXIT':
       return {...initialGameState};
     case 'GAME_TICK':
-      console.log('Tick! Minute: ' + state.currentMinute);
-
       if (state.inGame) {
         if (state.speed !== 'PAUSED') {
           const newState = {

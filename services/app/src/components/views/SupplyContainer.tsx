@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType} from '../../Types';
+import {AppStateType, GeneratorType} from '../../Types';
 import Supply, {DispatchProps, StateProps} from './Supply';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -11,8 +11,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onBuildGenerator: () => {
-      dispatch({type: 'BUILD_GENERATOR'});
+    onBuildGenerator: (generator: GeneratorType) => {
+      dispatch({type: 'BUILD_GENERATOR', generator});
     },
   };
 };

@@ -12,6 +12,11 @@ export interface AudioDataSetAction extends Redux.Action {
   data: Partial<AudioDataType>;
 }
 
+export interface BuildGeneratorAction extends Redux.Action {
+  type: 'BUILD_GENERATOR';
+  generator: GeneratorType;
+}
+
 export interface NavigateAction extends Redux.Action {
   type: 'NAVIGATE';
   to: CardType;

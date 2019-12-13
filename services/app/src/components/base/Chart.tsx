@@ -107,7 +107,7 @@ const Chart = (props: Props): JSX.Element => {
       <VictoryChart
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
-        domain={{ y: [domainMin * .95, domainMax] }}
+        domain={{ y: [domainMin * .93, domainMax * 1.05] }}
         height={props.height || 300}
       >
         <VictoryAxis
