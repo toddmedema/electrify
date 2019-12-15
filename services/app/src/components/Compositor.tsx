@@ -13,7 +13,6 @@ import {
 } from '../Types';
 
 import AudioContainer from './base/AudioContainer';
-import NavigationContainer from './base/NavigationContainer';
 import FinancesContainer from './views/FinancesContainer';
 import GeneratorsContainer from './views/GeneratorsContainer';
 import MainMenuContainer from './views/MainMenuContainer';
@@ -65,13 +64,6 @@ export default class Compositor extends React.Component<Props, {}> {
     }
   }
 
-  private renderFooter(): JSX.Element|null {
-    if (isNavCard(this.props.card.name)) {
-      return <NavigationContainer />;
-    }
-    return null;
-  }
-
   public shouldComponentUpdate(nextProps: Props) {
     // Don't update the main UI if we're on the same card
     if (this.props.card.name === nextProps.card.name) {
@@ -83,7 +75,6 @@ export default class Compositor extends React.Component<Props, {}> {
 
   public render() {
     const containerClass = ['app_container'];
-    const footer = this.renderFooter();
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -97,12 +88,11 @@ export default class Compositor extends React.Component<Props, {}> {
             key={this.props.card.name}
             classNames={''}
             timeout={{enter: CARD_TRANSITION_ANIMATION_MS, exit: CARD_TRANSITION_ANIMATION_MS}}>
-            <div className={'base_main' + ((footer !== null) ? ' has_footer' : '')}>
+            <div className="base_main">
               {this.renderCard()}
             </div>
           </CSSTransition>
         </TransitionGroup>
-        {footer}
         <Snackbar
           className="snackbar"
           open={this.props.ui.snackbar.open}

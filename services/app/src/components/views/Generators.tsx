@@ -35,9 +35,9 @@ interface GeneratorListItemProps {
   onSellGenerator: (id: number) => void;
 }
 
-const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
+function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
   return (
-    <ListItem button>
+    <ListItem>
       <ListItemAvatar>
         <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
@@ -52,7 +52,7 @@ const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
       </ListItemSecondaryAction>
     </ListItem>
   );
-};
+}
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -60,15 +60,18 @@ interface GeneratorBuildItemProps {
   onBuild: DispatchProps['onBuildGenerator'];
 }
 
-const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
+function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   return (
-    <ListItem button>
+    <ListItem alignItems="flex-start">
       <ListItemAvatar>
         <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
-        secondary={formatWatts(props.generator.peakW)}
+        secondary={<span>
+          Peak output: {formatWatts(props.generator.peakW)}<br/>
+          Operating cost: {formatMoneyConcise(props.generator.annualOperatingCost)}/yr
+        </span>}
       />
       <ListItemSecondaryAction>
         <Button
@@ -78,14 +81,14 @@ const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
           onClick={(e: any) => props.onBuild(props.generator)}
           disabled={props.generator.buildCost > props.cash}
         >
-          ${formatMoneyConcise(props.generator.buildCost)}
+          {formatMoneyConcise(props.generator.buildCost)}
         </Button>
       </ListItemSecondaryAction>
     </ListItem>
   );
-};
+}
 
-export default function GeneratorsBuild(props: Props) {
+export default function GeneratorsBuild(props: Props): JSX.Element {
   const [open, setOpen] = React.useState(false);
 
   const handleClickOpen = () => {
@@ -102,7 +105,7 @@ export default function GeneratorsBuild(props: Props) {
         <Typography variant="h6">Generators</Typography>
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
       </Toolbar>
-      <List dense>
+      <List dense className="scrollable">
         {props.generators.map((g: GeneratorOperatingType) =>
           <GeneratorListItem generator={g} key={g.id} onSellGenerator={(id: number) => props.onSellGenerator(id)} />)
         }
@@ -113,7 +116,7 @@ export default function GeneratorsBuild(props: Props) {
         onClose={handleClose}
       >
         <Toolbar>
-          <Typography variant="h6">Build a Generator (${formatMoneyStable(props.cash)})</Typography>
+          <Typography variant="h6">Build a Generator ({formatMoneyStable(props.cash)})</Typography>
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
@@ -130,7 +133,6 @@ export default function GeneratorsBuild(props: Props) {
             )}
           </List>
         </DialogContent>
-
       </Dialog>
     </BuildCard>
   );

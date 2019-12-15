@@ -165,13 +165,6 @@ body {
 }
 
 #navfooter {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: row;
-  box-sizing: border-box;
-  background-color: $bg_primary;
   border-top: $border_accent;
 }
 
@@ -296,6 +289,19 @@ body.android .dialog .textfield:focus-within {
     text-align: center;
     padding: size(base);
     box-sizing: border-box;
+  }
+
+  #buildCard {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+    & > div {
+      flex: 0 1 auto;
+    }
+    .scrollable {
+      flex: 1 1 auto;
+      overflow-y: auto;
+    }
   }
 
   .MuiDialogContent-root {
