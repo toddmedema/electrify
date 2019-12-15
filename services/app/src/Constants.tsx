@@ -1,7 +1,11 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
 import {CardNameType, GeneratorShoppingType, MonthType} from './Types';
 
-export const TICK_MS = 30;
+export const TICK_MS = {
+  SLOW: 80,
+  NORMAL: 40,
+  FAST: 1,
+};
 export const TICK_MINUTES = 15;
 export const DAYS_PER_MONTH = 1;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
@@ -30,74 +34,84 @@ export const GENERATORS = [
   {
     name: 'Coal',
     fuel: 'Coal',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 60,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Wind',
     fuel: 'Wind',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Solar',
     fuel: 'Sun',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Tidal',
     fuel: 'Tides',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Nuclear',
     fuel: 'Uranium',
-    cost: 200000000,
+    buildCost: 200000000,
     peakW: 200000000,
     fuelConsumption: 1,
     spinMinutes: 600,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Oil',
     fuel: 'Oil',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 10,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Geothermal',
     fuel: 'Ground Heat',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Hydro',
     fuel: 'Rain',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 1,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Natural Gas',
     fuel: 'Natural Gas',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 10,
+    annualOperatingCost: 1000000,
   },
   {
     name: 'Trash Incinerator',
     fuel: 'Trash',
-    cost: 20000000,
+    buildCost: 20000000,
     peakW: 200000000,
     fuelConsumption: 10,
     spinMinutes: 60,
+    annualOperatingCost: 1000000,
   },
 ] as GeneratorShoppingType[];
 

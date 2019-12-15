@@ -128,7 +128,8 @@ export interface GeneratorOperatingType extends GeneratorShoppingType {
 export interface GeneratorShoppingType {
   name: string;
   fuel: FuelType;
-  cost: number;
+  buildCost: number;
+  annualOperatingCost: number;
   peakW: number;
   fuelConsumption?: number; // at peak
   spinMinutes?: number;

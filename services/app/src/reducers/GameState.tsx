@@ -1,13 +1,13 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
+import {DAYS_PER_YEAR, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
 const startingGenerator = {
-  ...GENERATORS.filter((g: GeneratorShoppingType) => g.name === 'Coal')[0],
+  ...GENERATORS.find((g: GeneratorShoppingType) => g.name === 'Coal'),
   id: Math.random(),
 } as GeneratorOperatingType;
 
@@ -126,13 +126,32 @@ export function generateTimelineDatapoint(minute: number, gameState: GameStateTy
 //   }
 // );
 
-function calculateProfitAndLoss(gameState: GameStateType) {
-  const dollarsPerWh = 0.14 / 1000; // TODO actually calculate sale value
-  const supplyW = 100000000;
+function calculateProfitAndLoss(gameState: GameStateType): number {
+  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.currentMinute);
+  if (!now) {
+    return 0;
+  }
 
-  const expenses = 1; // TODO make sure this is in the right units (i.e. if generators op expenses are per year but this is per TICK_MINUTES, and how many "days" are in a year?)
+  // TODO actually calculate market price / sale value
+  const dollarsPerWh = 0.07 / 1000;
+  const supplyW = Math.min(now.supplyW, now.demandW);
+  const profits = supplyW * dollarsPerWh * 60 / TICK_MINUTES;
 
-  return supplyW * dollarsPerWh * 60 / TICK_MINUTES - expenses;
+  // TODO fuel expenses, ???
+  const generatorOperatingExpenses = gameState.generators
+    .reduce((acc: number, g: GeneratorOperatingType) => acc + g.annualOperatingCost, 0) / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
+  const expenses = generatorOperatingExpenses;
+
+  return profits - expenses;
+}
+
+function reforecast(newState: GameStateType): TimelineType[] {
+  return newState.timeline.map((t: TimelineType) => {
+    if (t.minute > newState.currentMinute) {
+      return generateTimelineDatapoint(t.minute, newState);
+    }
+    return t;
+  });
 }
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
@@ -144,37 +163,23 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       id: Math.random(),
     } as GeneratorOperatingType;
     newState.generators.push(generator);
-    newState.cash -= generator.cost;
-
-    // TODO consolidate into a reforecast function
-    newState.timeline = newState.timeline.map((t: TimelineType) => {
-      if (t.minute > newState.currentMinute) {
-        return generateTimelineDatapoint(t.minute, newState);
-      }
-      return t;
-    });
+    newState.cash -= generator.buildCost;
+    newState.timeline = reforecast(newState);
     return newState;
   } else if (action.type === 'SELL_GENERATOR') {
     const newState = {...state};
     const generatorId = (action as SellGeneratorAction).id;
-    console.log(generatorId, state.generators);
 
     // in one loop, refund cash from selling + remove from list of generators
     newState.generators = newState.generators.filter((g: GeneratorOperatingType) => {
       if (g.id === generatorId) {
-        newState.cash += g.cost * GENERATOR_SELL_MULTIPLIER;
+        newState.cash += g.buildCost * GENERATOR_SELL_MULTIPLIER;
         return false;
       }
       return true;
     });
 
-    // TODO consolidate into a reforecast function
-    newState.timeline = newState.timeline.map((t: TimelineType) => {
-      if (t.minute > newState.currentMinute) {
-        return generateTimelineDatapoint(t.minute, newState);
-      }
-      return t;
-    });
+    newState.timeline = reforecast(newState);
     return newState;
   } else if (action.type === 'GAME_START') {
     const timeline = [] as TimelineType[];
@@ -191,41 +196,30 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
   } else if (action.type === 'GAME_EXIT') {
     return {...initialGameState};
   } else if (action.type === 'GAME_TICK') {
-    if (state.inGame) {
-      if (state.speed !== 'PAUSED') {
-        const newState = {
-          ...state,
-          currentMinute: state.currentMinute + TICK_MINUTES,
-        };
+    if (state.inGame && state.speed !== 'PAUSED') {
+      const newState = {
+        ...state,
+        currentMinute: state.currentMinute + TICK_MINUTES,
+      };
 
-        // Update timeline
-        // TODO change from forecast to history, and recalculate rest of forecast based on what just happened
-        // newState.timeline.shift();
-        const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-        // If it's a new day, generate the new forecast
-        if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
-          newState.timeline = [newState.timeline[newState.timeline.length - 1]]; // keep just the last data point
-          for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-            newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
-          }
+      // Update timeline
+      // TODO (WARNING: PERFORMANCE HIT?) recalculate rest of forecast based on what just happened
+      const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
+      // If it's a new day, generate the new forecast - keep the current (last) data point, recalculate everything else
+      if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
+        newState.timeline = newState.timeline.slice(-1);
+        for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
+          newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
         }
-
-        // Update finances
-        newState.cash += calculateProfitAndLoss(state);
-
-        if (state.speed === 'SLOW') {
-          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
-        } else if (state.speed === 'FAST') {
-          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1);
-        } else {
-          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
-        }
-        return newState;
-      } else {
-        setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
       }
+
+      // Update finances
+      newState.cash += calculateProfitAndLoss(state);
+
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
+      return newState;
     } else {
-      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS.SLOW);
     }
     return state;
   }

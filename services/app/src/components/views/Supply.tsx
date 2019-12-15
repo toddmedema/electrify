@@ -76,9 +76,9 @@ const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
           variant="contained"
           color="primary"
           onClick={(e: any) => props.onBuild(props.generator)}
-          disabled={props.generator.cost > props.cash}
+          disabled={props.generator.buildCost > props.cash}
         >
-          ${formatMoneyConcise(props.generator.cost)}
+          ${formatMoneyConcise(props.generator.buildCost)}
         </Button>
       </ListItemSecondaryAction>
     </ListItem>
