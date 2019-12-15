@@ -17,7 +17,7 @@ const StorageBuild = (props: Props): JSX.Element => {
       <Toolbar>
         <Typography variant="h6">Storage</Typography>
       </Toolbar>
-      <div id="contents">
+      <div className="scrollable">
         Numbers...
       </div>
     </BuildCard>

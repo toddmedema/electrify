@@ -17,7 +17,7 @@ const FinancesBuild = (props: Props): JSX.Element => {
       <Toolbar>
         <Typography variant="h6">Finances</Typography>
       </Toolbar>
-      <div id="contents">
+      <div className="scrollable">
         Numbers...
       </div>
     </BuildCard>
