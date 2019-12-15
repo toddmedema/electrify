@@ -11,11 +11,11 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const DemandBuild = (props: Props): JSX.Element => {
+const StorageBuild = (props: Props): JSX.Element => {
   return (
-    <BuildCard className="Customers">
+    <BuildCard className="Storage">
       <Toolbar>
-        <Typography variant="h6">Customers</Typography>
+        <Typography variant="h6">Storage</Typography>
       </Toolbar>
       <div id="contents">
         Numbers...
@@ -24,4 +24,4 @@ const DemandBuild = (props: Props): JSX.Element => {
   );
 };
 
-export default DemandBuild;
+export default StorageBuild;

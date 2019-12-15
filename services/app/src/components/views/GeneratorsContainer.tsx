@@ -1,7 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {AppStateType, BuildGeneratorAction, GeneratorShoppingType, SellGeneratorAction} from '../../Types';
-import Supply, {DispatchProps, StateProps} from './Supply';
+import Generators, {DispatchProps, StateProps} from './Generators';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -21,9 +21,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const SupplyContainer = connect(
+const GeneratorsContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(Supply);
+)(Generators);
 
-export default SupplyContainer;
+export default GeneratorsContainer;
