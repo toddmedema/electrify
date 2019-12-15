@@ -1,16 +1,21 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {TICK_MINUTES, TICK_MS} from '../Constants';
+import {GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, DateType, GameStateType, GeneratorType, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
+
+const startingGenerator = {
+  ...GENERATORS.filter((g: GeneratorShoppingType) => g.name === 'Coal')[0],
+  id: Math.random(),
+} as GeneratorOperatingType;
 
 export const initialGameState: GameStateType = {
   speed: 'NORMAL',
   inGame: false,
   cash: 1000000,
-  generators: [] as GeneratorType[],
+  generators: [startingGenerator] as GeneratorOperatingType[],
   currentMinute: 180, // This is the line where the chart switches from historic to forecast
   timeline: [] as TimelineType[],
   seedPrefix: Math.random(),
@@ -46,7 +51,7 @@ export function getDemandW(date: DateType, gameState: GameStateType, sunlight: n
 
 export function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
   let supply = 0;
-  gameState.generators.forEach((generator: GeneratorType) => {
+  gameState.generators.forEach((generator: GeneratorOperatingType) => {
     switch (generator.fuel) {
       case 'Sun':
         // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
@@ -131,70 +136,98 @@ function calculateProfitAndLoss(gameState: GameStateType) {
 }
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
-  switch (action.type) {
-    case 'BUILD_GENERATOR':
-      const newState = {...state};
-      newState.generators.push((action as BuildGeneratorAction).generator);
-      newState.timeline = newState.timeline.map((t: TimelineType) => {
-        if (t.minute > newState.currentMinute) {
-          return generateTimelineDatapoint(t.minute, newState);
-        }
-        return t;
-      });
-      return newState;
-    case 'GAME_START':
-      const timeline = [] as TimelineType[];
-      for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-        timeline.push(generateTimelineDatapoint(minute, state));
+  // If statements instead of switch here b/c compiler was complaining about newState being redeclared in block-scope
+  if (action.type === 'BUILD_GENERATOR') {
+    const newState = {...state};
+    const generator = {
+      ...(action as BuildGeneratorAction).generator,
+      id: Math.random(),
+    } as GeneratorOperatingType;
+    newState.generators.push(generator);
+    newState.cash -= generator.cost;
+
+    // TODO consolidate into a reforecast function
+    newState.timeline = newState.timeline.map((t: TimelineType) => {
+      if (t.minute > newState.currentMinute) {
+        return generateTimelineDatapoint(t.minute, newState);
       }
-      return {
-        ...state,
-        timeline,
-        inGame: true,
-      };
-    case 'SET_SPEED':
-      return {...state, speed: (action as SetSpeedAction).speed};
-    case 'GAME_EXIT':
-      return {...initialGameState};
-    case 'GAME_TICK':
-      if (state.inGame) {
-        if (state.speed !== 'PAUSED') {
-          const newState = {
-            ...state,
-            currentMinute: state.currentMinute + TICK_MINUTES,
-          };
+      return t;
+    });
+    return newState;
+  } else if (action.type === 'SELL_GENERATOR') {
+    const newState = {...state};
+    const generatorId = (action as SellGeneratorAction).id;
+    console.log(generatorId, state.generators);
 
-          // Update timeline
-          // TODO change from forecast to history, and recalculate rest of forecast based on what just happened
-          // newState.timeline.shift();
-          const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-          // If it's a new day, generate the new forecast
-          if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
-            newState.timeline = [newState.timeline[newState.timeline.length - 1]]; // keep just the last data point
-            for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-              newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
-            }
+    // in one loop, refund cash from selling + remove from list of generators
+    newState.generators = newState.generators.filter((g: GeneratorOperatingType) => {
+      if (g.id === generatorId) {
+        newState.cash += g.cost * GENERATOR_SELL_MULTIPLIER;
+        return false;
+      }
+      return true;
+    });
+
+    // TODO consolidate into a reforecast function
+    newState.timeline = newState.timeline.map((t: TimelineType) => {
+      if (t.minute > newState.currentMinute) {
+        return generateTimelineDatapoint(t.minute, newState);
+      }
+      return t;
+    });
+    return newState;
+  } else if (action.type === 'GAME_START') {
+    const timeline = [] as TimelineType[];
+    for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
+      timeline.push(generateTimelineDatapoint(minute, state));
+    }
+    return {
+      ...state,
+      timeline,
+      inGame: true,
+    };
+  } else if (action.type === 'SET_SPEED') {
+    return {...state, speed: (action as SetSpeedAction).speed};
+  } else if (action.type === 'GAME_EXIT') {
+    return {...initialGameState};
+  } else if (action.type === 'GAME_TICK') {
+    if (state.inGame) {
+      if (state.speed !== 'PAUSED') {
+        const newState = {
+          ...state,
+          currentMinute: state.currentMinute + TICK_MINUTES,
+        };
+
+        // Update timeline
+        // TODO change from forecast to history, and recalculate rest of forecast based on what just happened
+        // newState.timeline.shift();
+        const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
+        // If it's a new day, generate the new forecast
+        if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
+          newState.timeline = [newState.timeline[newState.timeline.length - 1]]; // keep just the last data point
+          for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
+            newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
           }
+        }
 
-          // Update finances
-          newState.cash += calculateProfitAndLoss(state);
+        // Update finances
+        newState.cash += calculateProfitAndLoss(state);
 
-          if (state.speed === 'SLOW') {
-            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
-          } else if (state.speed === 'FAST') {
-            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1);
-          } else {
-            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
-          }
-          return newState;
+        if (state.speed === 'SLOW') {
+          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
+        } else if (state.speed === 'FAST') {
+          setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1);
         } else {
           setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
         }
+        return newState;
       } else {
         setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
       }
-      return state;
-    default:
-      return state;
+    } else {
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
+    }
+    return state;
   }
+  return state;
 }

@@ -11,24 +11,28 @@ import ListItemText from '@material-ui/core/ListItemText';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import CloseIcon from '@material-ui/icons/Close';
+import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import * as React from 'react';
-import {formatMoneyConcise, formatWatts} from 'shared/helpers/Format';
+import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
-import {GeneratorType} from '../../Types';
+import {GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
 export interface StateProps {
-  generators: GeneratorType[];
+  cash: number;
+  generators: GeneratorOperatingType[];
 }
 
 export interface DispatchProps {
-  onBuildGenerator: (generator: GeneratorType) => void;
+  onBuildGenerator: (generator: GeneratorShoppingType) => void;
+  onSellGenerator: (id: number) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
 interface GeneratorListItemProps {
-  generator: GeneratorType;
+  generator: GeneratorOperatingType;
+  onSellGenerator: (id: number) => void;
 }
 
 const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
@@ -42,14 +46,17 @@ const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
         secondary={formatWatts(props.generator.peakW)}
       />
       <ListItemSecondaryAction>
-        <span>HI</span>
+        <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
+          <DeleteForeverIcon />
+        </IconButton>
       </ListItemSecondaryAction>
     </ListItem>
   );
 };
 
 interface GeneratorBuildItemProps {
-  generator: GeneratorType;
+  cash: number;
+  generator: GeneratorShoppingType;
   onBuild: DispatchProps['onBuildGenerator'];
 }
 
@@ -64,7 +71,13 @@ const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
         secondary={formatWatts(props.generator.peakW)}
       />
       <ListItemSecondaryAction>
-        <Button size="small" variant="contained" color="primary" onClick={(e: any) => props.onBuild(props.generator)}>
+        <Button
+          size="small"
+          variant="contained"
+          color="primary"
+          onClick={(e: any) => props.onBuild(props.generator)}
+          disabled={props.generator.cost > props.cash}
+        >
           ${formatMoneyConcise(props.generator.cost)}
         </Button>
       </ListItemSecondaryAction>
@@ -90,7 +103,9 @@ export default function SupplyBuild(props: Props) {
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
       </Toolbar>
       <List dense>
-        {props.generators.map((g: GeneratorType, i: number) => <GeneratorListItem generator={g} key={i} />)}
+        {props.generators.map((g: GeneratorOperatingType) =>
+          <GeneratorListItem generator={g} key={g.id} onSellGenerator={(id: number) => props.onSellGenerator(id)} />)
+        }
       </List>
       <Dialog
         fullScreen
@@ -98,14 +113,21 @@ export default function SupplyBuild(props: Props) {
         onClose={handleClose}
       >
         <Toolbar>
-          <Typography variant="h6">Build a Generator</Typography>
+          <Typography variant="h6">Build a Generator (${formatMoneyStable(props.cash)})</Typography>
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
         </Toolbar>
         <DialogContent>
           <List dense>
-            {GENERATORS.map((g: GeneratorType, i: number) => <GeneratorBuildItem generator={g} key={i} onBuild={(generator: GeneratorType) => { props.onBuildGenerator(generator); handleClose(); }} />)}
+            {GENERATORS.map((g: GeneratorShoppingType, i: number) =>
+              <GeneratorBuildItem
+                generator={g}
+                key={i}
+                cash={props.cash}
+                onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); handleClose(); }}
+              />
+            )}
           </List>
         </DialogContent>
 

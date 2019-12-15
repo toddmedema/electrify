@@ -1,5 +1,5 @@
 import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
-import {CardNameType, GeneratorType, MonthType} from './Types';
+import {CardNameType, GeneratorShoppingType, MonthType} from './Types';
 
 export const TICK_MS = 30;
 export const TICK_MINUTES = 15;
@@ -25,6 +25,7 @@ export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
 
+export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const GENERATORS = [
   {
     name: 'Coal',
@@ -98,7 +99,7 @@ export const GENERATORS = [
     fuelConsumption: 10,
     spinMinutes: 60,
   },
-] as GeneratorType[];
+] as GeneratorShoppingType[];
 
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const VIBRATION_SHORT_MS = 30; // for navigation / card changes

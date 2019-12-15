@@ -14,7 +14,12 @@ export interface AudioDataSetAction extends Redux.Action {
 
 export interface BuildGeneratorAction extends Redux.Action {
   type: 'BUILD_GENERATOR';
-  generator: GeneratorType;
+  generator: GeneratorShoppingType;
+}
+
+export interface SellGeneratorAction extends Redux.Action {
+  type: 'SELL_GENERATOR';
+  id: number;
 }
 
 export interface NavigateAction extends Redux.Action {
@@ -96,7 +101,7 @@ export interface GameStateType {
   currentMinute: number;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
 
-  generators: GeneratorType[];
+  generators: GeneratorOperatingType[];
 
   cash: number;
 }
@@ -116,7 +121,11 @@ export interface CardType {
   overrideDebounce?: boolean;
 }
 
-export interface GeneratorType {
+export interface GeneratorOperatingType extends GeneratorShoppingType {
+  id: number;
+}
+
+export interface GeneratorShoppingType {
   name: string;
   fuel: FuelType;
   cost: number;
