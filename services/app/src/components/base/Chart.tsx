@@ -39,13 +39,11 @@ const Chart = (props: Props): JSX.Element => {
   // Figure out the boundaries of the chart data
   let domainMin = 999999999999;
   let domainMax = 0;
-  let rangeMin = 999999999999;
-  let rangeMax = 0;
+  const rangeMin = props.timeline[0].minute;
+  const rangeMax = props.timeline[props.timeline.length - 1].minute;
   props.timeline.forEach((d: ChartData) => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
-    rangeMin = Math.min(rangeMin, d.minute);
-    rangeMax = Math.max(rangeMax, d.minute);
   });
   domainMin *= 0.93; // padding
   domainMax *= 1.05; // padding
@@ -76,14 +74,15 @@ const Chart = (props: Props): JSX.Element => {
     });
   }
   props.timeline.forEach((d: ChartData) => {
-    const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
     if (d.demandW > d.supplyW && !isBlackout) {
       // Blackout starting: low then high edge
+      const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
       blackouts.push({ minute: intersectionTime, value: 0 });
       blackouts.push({ minute: intersectionTime, value: domainMax });
       isBlackout = true;
     } else if (d.demandW < d.supplyW && isBlackout) {
       // Blackout ending: high then low edge
+      const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
       blackouts.push({ minute: intersectionTime, value: domainMax });
       blackouts.push({ minute: intersectionTime, value: 0 });
       isBlackout = false;
