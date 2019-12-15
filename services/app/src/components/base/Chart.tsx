@@ -47,6 +47,8 @@ const Chart = (props: Props): JSX.Element => {
     rangeMin = Math.min(rangeMin, d.minute);
     rangeMax = Math.max(rangeMax, d.minute);
   });
+  domainMin *= 0.93; // padding
+  domainMax *= 1.05; // padding
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin);
@@ -101,13 +103,18 @@ const Chart = (props: Props): JSX.Element => {
     });
   }
 
-  // Wrapping in spare div prevents weird excessive height bug
+  // Divide between historic and forcast
+  const currentMinute = props.currentMinute || rangeMax;
+  const historic = [...props.timeline].filter((d: ChartData) => d.minute <= currentMinute);
+  const forecast = [...props.timeline].filter((d: ChartData) => d.minute >= currentMinute);
+
+  // Wrapping in spare div prevents excessive height bug
   return (
     <div>
       <VictoryChart
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
-        domain={{ y: [domainMin * .93, domainMax * 1.05] }}
+        domain={{ y: [domainMin, domainMax] }}
         height={props.height || 300}
       >
         <VictoryAxis
@@ -138,26 +145,50 @@ const Chart = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
-          data={props.timeline}
-          interpolation="monotoneX"
+          data={historic}
           x="minute"
           y="supplyW"
+          samples={24}
           style={{
             data: {
               stroke: supplyColor,
+              strokeWidth: 2,
               fill: '#e3f2fd', // blue50
             },
           }}
         />
         <VictoryLine
-          data={props.timeline}
-          interpolation="monotoneX"
+          data={historic}
           x="minute"
           y="demandW"
+          samples={24}
           style={{
             data: {
               stroke: demandColor,
-              strokeWidth: 3,
+              strokeWidth: 4,
+            },
+          }}
+        />
+        <VictoryLine
+          data={forecast}
+          x="minute"
+          y="supplyW"
+          samples={24}
+          style={{
+            data: {
+              stroke: supplyColor,
+              strokeWidth: 1,
+            },
+          }}
+        />
+        <VictoryLine
+          data={forecast}
+          x="minute"
+          y="demandW"
+          samples={24}
+          style={{
+            data: {
+              stroke: demandColor,
             },
           }}
         />
@@ -169,7 +200,17 @@ const Chart = (props: Props): JSX.Element => {
             data: {
               stroke: 'none',
               fill: blackoutColor,
-              opacity: 0.35,
+              opacity: 0.3,
+            },
+          }}
+        />
+        <VictoryLine
+          data={[{x: currentMinute, y: domainMin}, {x: currentMinute, y: domainMax}]}
+          style={{
+            data: {
+              stroke: '#000000',
+              strokeWidth: 1,
+              opacity: 0.5,
             },
           }}
         />

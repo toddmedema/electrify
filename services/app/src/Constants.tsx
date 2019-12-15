@@ -46,6 +46,58 @@ export const GENERATORS = [
     cost: 20000000,
     peakW: 200000000,
   },
+  {
+    name: 'Tidal',
+    fuel: 'Tides',
+    cost: 20000000,
+    peakW: 200000000,
+  },
+  {
+    name: 'Nuclear',
+    fuel: 'Uranium',
+    cost: 200000000,
+    peakW: 200000000,
+    fuelConsumption: 1,
+    spinMinutes: 600,
+  },
+  {
+    name: 'Oil',
+    fuel: 'Oil',
+    cost: 20000000,
+    peakW: 200000000,
+    fuelConsumption: 10,
+    spinMinutes: 10,
+  },
+  {
+    name: 'Geothermal',
+    fuel: 'Ground Heat',
+    cost: 20000000,
+    peakW: 200000000,
+  },
+  {
+    name: 'Hydro',
+    fuel: 'Rain',
+    cost: 20000000,
+    peakW: 200000000,
+    fuelConsumption: 10,
+    spinMinutes: 1,
+  },
+  {
+    name: 'Natural Gas',
+    fuel: 'Natural Gas',
+    cost: 20000000,
+    peakW: 200000000,
+    fuelConsumption: 10,
+    spinMinutes: 10,
+  },
+  {
+    name: 'Trash Incinerator',
+    fuel: 'Trash',
+    cost: 20000000,
+    peakW: 200000000,
+    fuelConsumption: 10,
+    spinMinutes: 60,
+  },
 ] as GeneratorType[];
 
 export const CARD_TRANSITION_ANIMATION_MS = 300;

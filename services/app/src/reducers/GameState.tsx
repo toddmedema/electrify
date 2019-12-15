@@ -122,7 +122,7 @@ export function generateTimelineDatapoint(minute: number, gameState: GameStateTy
 // );
 
 function calculateProfitAndLoss(gameState: GameStateType) {
-  const dollarsPerWh = 0.14 / 1000;
+  const dollarsPerWh = 0.14 / 1000; // TODO actually calculate sale value
   const supplyW = 100000000;
 
   const expenses = 1; // TODO make sure this is in the right units (i.e. if generators op expenses are per year but this is per TICK_MINUTES, and how many "days" are in a year?)
@@ -133,10 +133,15 @@ function calculateProfitAndLoss(gameState: GameStateType) {
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   switch (action.type) {
     case 'BUILD_GENERATOR':
-      return {
-        ...state,
-        generators: [...state.generators, (action as BuildGeneratorAction).generator],
-      };
+      const newState = {...state};
+      newState.generators.push((action as BuildGeneratorAction).generator);
+      newState.timeline = newState.timeline.map((t: TimelineType) => {
+        if (t.minute > newState.currentMinute) {
+          return generateTimelineDatapoint(t.minute, newState);
+        }
+        return t;
+      });
+      return newState;
     case 'GAME_START':
       const timeline = [] as TimelineType[];
       for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
@@ -160,9 +165,16 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           };
 
           // Update timeline
-          newState.timeline.shift();
+          // TODO change from forecast to history, and recalculate rest of forecast based on what just happened
+          // newState.timeline.shift();
           const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-          state.timeline.push(generateTimelineDatapoint(newMinute, state));
+          // If it's a new day, generate the new forecast
+          if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
+            newState.timeline = [newState.timeline[newState.timeline.length - 1]]; // keep just the last data point
+            for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
+              newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
+            }
+          }
 
           // Update finances
           newState.cash += calculateProfitAndLoss(state);
@@ -170,7 +182,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           if (state.speed === 'SLOW') {
             setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS * 2);
           } else if (state.speed === 'FAST') {
-            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS / 4);
+            setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), 1);
           } else {
             setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS);
           }

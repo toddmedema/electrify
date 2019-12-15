@@ -9,11 +9,10 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
+import {formatMoneyStable} from 'shared/helpers/Format';
 import {setSpeed} from '../../reducers/GameState';
 import {AppStateType, GameStateType, SpeedType} from '../../Types';
 import Chart from './Chart';
-
-const numbro = require('numbro');
 
 export interface BuildCardProps extends React.Props<any> {
   children?: JSX.Element[] | undefined;
@@ -36,7 +35,7 @@ export function BuildCard(props: Props) {
           <Typography variant="h6">
             {date.month}
             <span className="weak"> {date.year}</span>
-            &nbsp;&nbsp;&nbsp;${numbro(props.gameState.cash).format({ average: true, totalLength: 3 }).toUpperCase()}
+            &nbsp;&nbsp;&nbsp;${formatMoneyStable(props.gameState.cash)}
           </Typography>
           <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={props.gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
             <PauseIcon />

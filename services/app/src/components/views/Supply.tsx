@@ -1,5 +1,7 @@
+import Avatar from '@material-ui/core/Avatar';
 import Button from '@material-ui/core/Button';
 import Dialog from '@material-ui/core/Dialog';
+import DialogContent from '@material-ui/core/DialogContent';
 import IconButton from '@material-ui/core/IconButton';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
@@ -10,13 +12,13 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import CloseIcon from '@material-ui/icons/Close';
 import * as React from 'react';
-import {formatWatts} from 'shared/helpers/Format';
+import {formatMoneyConcise, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
-import {GameStateType, GeneratorType} from '../../Types';
+import {GeneratorType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
 export interface StateProps {
-  gameState: GameStateType;
+  generators: GeneratorType[];
 }
 
 export interface DispatchProps {
@@ -33,7 +35,7 @@ const GeneratorListItem = (props: GeneratorListItemProps): JSX.Element => {
   return (
     <ListItem button>
       <ListItemAvatar>
-        <span>IMG</span>
+        <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
@@ -55,14 +57,16 @@ const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
   return (
     <ListItem button>
       <ListItemAvatar>
-        <span>IMG</span>
+        <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
         secondary={formatWatts(props.generator.peakW)}
       />
       <ListItemSecondaryAction>
-        <Button size="small" variant="outlined" color="primary" onClick={(e: any) => props.onBuild(props.generator)}>BUILD</Button>
+        <Button size="small" variant="contained" color="primary" onClick={(e: any) => props.onBuild(props.generator)}>
+          ${formatMoneyConcise(props.generator.cost)}
+        </Button>
       </ListItemSecondaryAction>
     </ListItem>
   );
@@ -85,21 +89,26 @@ export default function SupplyBuild(props: Props) {
         <Typography variant="h6">Generators</Typography>
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
       </Toolbar>
-      <div id="contents">
-        <List dense>
-          {props.gameState.generators.map((g: GeneratorType, i: number) => <GeneratorListItem generator={g} key={i} />)}
-        </List>
-      </div>
-      <Dialog fullScreen open={open} onClose={handleClose}>
+      <List dense>
+        {props.generators.map((g: GeneratorType, i: number) => <GeneratorListItem generator={g} key={i} />)}
+      </List>
+      <Dialog
+        fullScreen
+        open={open}
+        onClose={handleClose}
+      >
         <Toolbar>
           <Typography variant="h6">Build a Generator</Typography>
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
         </Toolbar>
-        <List dense>
-          {GENERATORS.map((g: GeneratorType, i: number) => <GeneratorBuildItem generator={g} key={i} onBuild={(generator: GeneratorType) => { props.onBuildGenerator(generator); handleClose(); }} />)}
-        </List>
+        <DialogContent>
+          <List dense>
+            {GENERATORS.map((g: GeneratorType, i: number) => <GeneratorBuildItem generator={g} key={i} onBuild={(generator: GeneratorType) => { props.onBuildGenerator(generator); handleClose(); }} />)}
+          </List>
+        </DialogContent>
+
       </Dialog>
     </BuildCard>
   );
