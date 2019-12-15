@@ -14,3 +14,12 @@ export function formatWatts(i: number) {
     .replace('t', 'T') // Capitalize TeraWatts
     + 'W';
 }
+
+// used for numbers that flicker rapidly to preserve length / visual stability
+export function formatMoneyStable(i: number) {
+  return numbro(i).format({ average: true, totalLength: 3 }).toUpperCase();
+}
+
+export function formatMoneyConcise(i: number) {
+  return numbro(i).format({ average: true, totalLength: 3, trimMantissa: true }).toUpperCase();
+}

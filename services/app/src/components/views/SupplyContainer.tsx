@@ -5,7 +5,7 @@ import Supply, {DispatchProps, StateProps} from './Supply';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    generators: state.gameState.generators,
   };
 };
 
