@@ -14,12 +14,11 @@ import {
 
 import AudioContainer from './base/AudioContainer';
 import NavigationContainer from './base/NavigationContainer';
-import DemandContainer from './views/DemandContainer';
 import FinancesContainer from './views/FinancesContainer';
+import GeneratorsContainer from './views/GeneratorsContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
-import SimulateContainer from './views/SimulateContainer';
-import SupplyContainer from './views/SupplyContainer';
+import StorageContainer from './views/StorageContainer';
 import TutorialBuildContainer from './views/TutorialBuildContainer';
 
 export interface StateProps {
@@ -49,18 +48,16 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): JSX.Element {
     switch (this.props.card.name) {
-      case 'DEMAND':
-        return <DemandContainer />;
+      case 'STORAGE':
+        return <StorageContainer />;
       case 'FINANCES':
         return <FinancesContainer />;
-      case 'SUPPLY':
-        return <SupplyContainer />;
+      case 'GENERATORS':
+        return <GeneratorsContainer />;
       case 'TUTORIAL':
         return <TutorialBuildContainer />;
       case 'SETTINGS':
         return <SettingsContainer />;
-      case 'SIMULATE':
-        return <SimulateContainer />;
       case 'MAIN_MENU':
         return <MainMenuContainer />;
       default:

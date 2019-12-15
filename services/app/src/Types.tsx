@@ -107,12 +107,11 @@ export interface GameStateType {
 }
 
 export type CardNameType =
-  'DEMAND' |
+  'STORAGE' |
   'FINANCES' |
-  'SUPPLY' |
+  'GENERATORS' |
   'MAIN_MENU' |
   'SETTINGS' |
-  'SIMULATE' |
   'TUTORIAL';
 
 export interface CardType {

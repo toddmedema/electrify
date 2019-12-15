@@ -115,6 +115,7 @@ export const GENERATORS = [
   },
 ] as GeneratorShoppingType[];
 
+export const NAV_CARDS = ['GENERATORS', 'STORAGE', 'FINANCES'] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const VIBRATION_SHORT_MS = 30; // for navigation / card changes
 export const VIBRATION_LONG_MS = 400; // for unique events, like start of the timer
@@ -164,5 +165,3 @@ export const MUSIC_DEFINITIONS: {[key: string]: {[key: string]: MusicDefinition}
 };
 
 export const MUSIC_FADE_SECONDS = 1.5;
-
-export const NAV_CARDS = ['DEMAND', 'SUPPLY', 'FINANCES'] as CardNameType[];

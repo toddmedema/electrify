@@ -19,7 +19,7 @@ export function card(state: CardType = initialCard, action: Redux.Action): CardT
       return to;
     case 'GAME_START':
       return {
-        name: 'SUPPLY',
+        name: 'GENERATORS',
         ts: Date.now(),
       };
     case 'GAME_EXIT':

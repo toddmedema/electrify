@@ -25,7 +25,7 @@ export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
 }
 
-export function forecastSunlightPercent(date: DateType) {
+function forecastSunlightPercent(date: DateType) {
   if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
     const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
     // TODO incorporate weather forecast (cloudiness)
@@ -37,7 +37,7 @@ export function forecastSunlightPercent(date: DateType) {
   return 0;
 }
 
-export function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
+function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
@@ -49,7 +49,7 @@ export function getDemandW(date: DateType, gameState: GameStateType, sunlight: n
   return demandMultiple * 1000000;
 }
 
-export function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
+function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
   let supply = 0;
   gameState.generators.forEach((generator: GeneratorOperatingType) => {
     switch (generator.fuel) {
@@ -68,7 +68,7 @@ export function getSupplyW(gameState: GameStateType, sunlight: number, windKph: 
   return supply;
 }
 
-export function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
+function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
   const date = getDateFromMinute(minute);
   const sunlight = forecastSunlightPercent(date);
 

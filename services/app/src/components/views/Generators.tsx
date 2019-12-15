@@ -85,7 +85,7 @@ const GeneratorBuildItem = (props: GeneratorBuildItemProps): JSX.Element => {
   );
 };
 
-export default function SupplyBuild(props: Props) {
+export default function GeneratorsBuild(props: Props) {
   const [open, setOpen] = React.useState(false);
 
   const handleClickOpen = () => {
