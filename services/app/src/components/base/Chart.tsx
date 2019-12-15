@@ -61,6 +61,7 @@ const Chart = (props: Props): JSX.Element => {
   }
 
   // BLACKOUT CALCULATION
+  let blackoutCount = 0;
   const blackouts = [{
     minute: rangeMin,
     value: 0,
@@ -72,6 +73,7 @@ const Chart = (props: Props): JSX.Element => {
       minute: rangeMin,
       value: domainMax,
     });
+    blackoutCount++;
   }
   props.timeline.forEach((d: ChartData) => {
     if (d.demandW > d.supplyW && !isBlackout) {
@@ -80,6 +82,7 @@ const Chart = (props: Props): JSX.Element => {
       blackouts.push({ minute: intersectionTime, value: 0 });
       blackouts.push({ minute: intersectionTime, value: domainMax });
       isBlackout = true;
+      blackoutCount++;
     } else if (d.demandW < d.supplyW && isBlackout) {
       // Blackout ending: high then low edge
       const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
@@ -191,7 +194,7 @@ const Chart = (props: Props): JSX.Element => {
             },
           }}
         />
-        <VictoryArea
+        {blackoutCount > 0 && <VictoryArea
           data={blackouts}
           x="minute"
           y="value"
@@ -202,8 +205,8 @@ const Chart = (props: Props): JSX.Element => {
               opacity: 0.3,
             },
           }}
-        />
-        <VictoryLine
+        />}
+        {currentMinute !== rangeMax && <VictoryLine
           data={[{x: currentMinute, y: domainMin}, {x: currentMinute, y: domainMax}]}
           style={{
             data: {
@@ -212,7 +215,7 @@ const Chart = (props: Props): JSX.Element => {
               opacity: 0.5,
             },
           }}
-        />
+        />}
         <VictoryLegend x={280} y={12}
           centerTitle
           orientation="vertical"
