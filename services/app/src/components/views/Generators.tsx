@@ -1,5 +1,9 @@
 import Avatar from '@material-ui/core/Avatar';
 import Button from '@material-ui/core/Button';
+import Card from '@material-ui/core/Card';
+import CardContent from '@material-ui/core/CardContent';
+import CardHeader from '@material-ui/core/CardHeader';
+import Collapse from '@material-ui/core/Collapse';
 import Dialog from '@material-ui/core/Dialog';
 import DialogContent from '@material-ui/core/DialogContent';
 import IconButton from '@material-ui/core/IconButton';
@@ -10,29 +14,24 @@ import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
+import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
+import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CloseIcon from '@material-ui/icons/Close';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
+import InfoIcon from '@material-ui/icons/Info';
+
 import * as React from 'react';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
 import {GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
-export interface StateProps {
-  cash: number;
-  generators: GeneratorOperatingType[];
-}
-
-export interface DispatchProps {
-  onBuildGenerator: (generator: GeneratorShoppingType) => void;
-  onSellGenerator: (id: number) => void;
-}
-
-export interface Props extends StateProps, DispatchProps {}
-
 interface GeneratorListItemProps {
   generator: GeneratorOperatingType;
+  spotInList: number;
+  listLength: number;
   onSellGenerator: (id: number) => void;
+  onReprioritizeGenerator: (spotInList: number, delta: number) => void;
 }
 
 function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
@@ -46,6 +45,12 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
         secondary={formatWatts(props.generator.peakW)}
       />
       <ListItemSecondaryAction>
+        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} color="primary">
+          <ArrowUpwardIcon />
+        </IconButton>}
+        {props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} color="primary">
+          <ArrowDownwardIcon />
+        </IconButton>}
         <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
           <DeleteForeverIcon />
         </IconButton>
@@ -61,35 +66,63 @@ interface GeneratorBuildItemProps {
 }
 
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
+  const [expanded, setExpanded] = React.useState(false);
+
+  const handleExpandClick = () => {
+    setExpanded(!expanded);
+  };
+
   return (
-    <ListItem alignItems="flex-start">
-      <ListItemAvatar>
-        <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
-      </ListItemAvatar>
-      <ListItemText
-        primary={props.generator.name}
-        secondary={<span>
-          Peak output: {formatWatts(props.generator.peakW)}<br/>
-          Operating cost: {formatMoneyConcise(props.generator.annualOperatingCost)}/yr
-        </span>}
+    <Card>
+      <CardHeader
+        avatar={<Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />}
+        action={
+          <span>
+            <IconButton onClick={handleExpandClick} aria-label="show more">
+              <InfoIcon color="primary" />
+            </IconButton>
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              onClick={(e: any) => props.onBuild(props.generator)}
+              disabled={props.generator.buildCost > props.cash}
+            >
+              {formatMoneyConcise(props.generator.buildCost)}
+            </Button>
+          </span>
+        }
+        title={props.generator.name}
+        subheader={props.generator.description}
       />
-      <ListItemSecondaryAction>
-        <Button
-          size="small"
-          variant="contained"
-          color="primary"
-          onClick={(e: any) => props.onBuild(props.generator)}
-          disabled={props.generator.buildCost > props.cash}
-        >
-          {formatMoneyConcise(props.generator.buildCost)}
-        </Button>
-      </ListItemSecondaryAction>
-    </ListItem>
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <CardContent>
+          <span>
+            Peak output: {formatWatts(props.generator.peakW)}<br/>
+            Operating cost: {formatMoneyConcise(props.generator.annualOperatingCost)}/yr
+          </span>
+        </CardContent>
+      </Collapse>
+    </Card>
   );
 }
 
+export interface StateProps {
+  cash: number;
+  generators: GeneratorOperatingType[];
+}
+
+export interface DispatchProps {
+  onBuildGenerator: (generator: GeneratorShoppingType) => void;
+  onSellGenerator: (id: number) => void;
+  onReprioritizeGenerator: (spotInList: number, delta: number) => void;
+}
+
+export interface Props extends StateProps, DispatchProps {}
+
 export default function GeneratorsBuild(props: Props): JSX.Element {
   const [open, setOpen] = React.useState(false);
+  const generatorCount = props.generators.length;
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -106,9 +139,16 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
       </Toolbar>
       <List dense className="scrollable">
-        {props.generators.map((g: GeneratorOperatingType) =>
-          <GeneratorListItem generator={g} key={g.id} onSellGenerator={(id: number) => props.onSellGenerator(id)} />)
-        }
+        {props.generators.map((g: GeneratorOperatingType, i: number) =>
+          <GeneratorListItem
+            generator={g}
+            key={g.id}
+            onSellGenerator={(id: number) => props.onSellGenerator(id)}
+            onReprioritizeGenerator={props.onReprioritizeGenerator}
+            spotInList={i}
+            listLength={generatorCount}
+          />
+        )}
       </List>
       <Dialog
         fullScreen
@@ -121,17 +161,15 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
             <CloseIcon />
           </IconButton>
         </Toolbar>
-        <DialogContent>
-          <List dense>
-            {GENERATORS.map((g: GeneratorShoppingType, i: number) =>
-              <GeneratorBuildItem
-                generator={g}
-                key={i}
-                cash={props.cash}
-                onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); handleClose(); }}
-              />
-            )}
-          </List>
+        <DialogContent classes={{root: 'generatorBuildList'}}>
+          {GENERATORS.map((g: GeneratorShoppingType, i: number) =>
+            <GeneratorBuildItem
+              generator={g}
+              key={i}
+              cash={props.cash}
+              onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); handleClose(); }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </BuildCard>

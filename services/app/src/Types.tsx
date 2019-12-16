@@ -22,6 +22,12 @@ export interface SellGeneratorAction extends Redux.Action {
   id: number;
 }
 
+export interface ReprioritizeGeneratorAction extends Redux.Action {
+  type: 'REPRIORITIZE_GENERATOR';
+  spotInList: number;
+  delta: number;
+}
+
 export interface NavigateAction extends Redux.Action {
   type: 'NAVIGATE';
   to: CardType;
@@ -128,8 +134,10 @@ export interface GeneratorShoppingType {
   name: string;
   fuel: FuelType;
   buildCost: number;
+  description: string;
   annualOperatingCost: number;
   peakW: number;
+  priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
   fuelConsumption?: number; // at peak
   spinMinutes?: number;
 }

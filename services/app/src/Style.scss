@@ -168,6 +168,11 @@ body {
   border-top: $border_accent;
 }
 
+.MuiToolbar-root {
+  border-bottom: $border_accent;
+  flex: 0 0 auto;
+}
+
 .MuiMobileStepper-root {
   position: absolute;
   bottom: 0;
@@ -180,11 +185,17 @@ span.weak {
   font-weight: 100;
 }
 
+// for text inputs that are close to bottom, give the screen space to scroll up
+.inputSpacer {
+  margin-bottom: 100%;
+}
+
 // Fixes bug with Android apk where keyboard not scrolling view - https://github.com/ExpeditionRPG/expedition/issues/255
 body.android .dialog .textfield:focus-within {
   padding-bottom: 300px;
 }
 
+// For things that use size() / get recalulcated on larger displays
 @mixin styling() {
   .base_card {
     flex: 1;
@@ -226,10 +237,6 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
-  .inputSpacer { /* for text inputs that are close to bottom, give the screen space to scroll up */
-    margin-bottom: 100%;
-  }
-
   .base_main {
     position: absolute;
     width: 100%;
@@ -241,10 +248,28 @@ body.android .dialog .textfield:focus-within {
       width: 100%;
     }
 
+    .MuiToolbar-root {
+      border: none !important;
+    }
+
     #yearProgressBar {
       margin-top: -5px;
       height: 2px;
       background: $font_color_faded;
+    }
+  }
+
+  .MuiDialogContent-root {
+    padding: 0 !important;
+  }
+
+  .MuiCard-root {
+    margin-bottom: size(small);
+    margin: 0 size(small) size(base) size(small);
+    border-radius: 0;
+
+    .MuiCardHeader-root {
+      align-items: flex-start;
     }
   }
 
@@ -295,31 +320,20 @@ body.android .dialog .textfield:focus-within {
     display: flex;
     flex-flow: column;
     height: 100%;
+
     & > div {
       flex: 0 1 auto;
     }
+
     .scrollable {
       flex: 1 1 auto;
       overflow-y: auto;
     }
   }
 
-  .MuiDialogContent-root {
-    padding: 0 !important;
-  }
-
-  .audioControls {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    opacity: 0.8;
-    #audioLoadingIndicator {
-      -webkit-animation: rotate 4s;
-         -moz-animation: rotate 4s;
-          -ms-animation: rotate 4s;
-           -o-animation: rotate 4s;
-              animation: rotate 4s;
-    }
+  .generatorBuildList {
+    background: #ddd;
+    padding-top: size(small) !important;
   }
 
   .version {

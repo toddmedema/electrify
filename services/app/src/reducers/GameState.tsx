@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {DAYS_PER_YEAR, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -14,7 +14,7 @@ const startingGenerator = {
 export const initialGameState: GameStateType = {
   speed: 'NORMAL',
   inGame: false,
-  cash: 1000000,
+  cash: 10000000,
   generators: [startingGenerator] as GeneratorOperatingType[],
   currentMinute: 180, // This is the line where the chart switches from historic to forecast
   timeline: [] as TimelineType[],
@@ -47,6 +47,10 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
   return demandMultiple * 1000000;
+}
+
+function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperatingType) {
+  return a.priority < b.priority ? 1 : -1;
 }
 
 function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
@@ -157,12 +161,15 @@ function reforecast(newState: GameStateType): TimelineType[] {
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState being redeclared in block-scope
   if (action.type === 'BUILD_GENERATOR') {
+    const a = action as BuildGeneratorAction;
     const newState = {...state};
     const generator = {
-      ...(action as BuildGeneratorAction).generator,
+      ...a.generator,
       id: Math.random(),
+      priority: a.generator.priority + Math.random(), // Vary priorities slightly
     } as GeneratorOperatingType;
     newState.generators.push(generator);
+    newState.generators.sort(sortGeneratorsByPriority);
     newState.cash -= generator.buildCost;
     newState.timeline = reforecast(newState);
     return newState;
@@ -180,6 +187,16 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     });
 
     newState.timeline = reforecast(newState);
+    return newState;
+  } else if (action.type === 'REPRIORITIZE_GENERATOR') {
+    const a = action as ReprioritizeGeneratorAction;
+    const newState = {...state};
+    const leftGenerator = newState.generators[a.spotInList];
+    const rightGenerator = newState.generators[a.spotInList + a.delta];
+    const leftPriority = leftGenerator.priority;
+    leftGenerator.priority = rightGenerator.priority;
+    rightGenerator.priority = leftPriority;
+    newState.generators.sort(sortGeneratorsByPriority);
     return newState;
   } else if (action.type === 'GAME_START') {
     const timeline = [] as TimelineType[];
