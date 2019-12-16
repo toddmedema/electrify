@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, BuildGeneratorAction, GeneratorShoppingType, SellGeneratorAction} from '../../Types';
+import {AppStateType, BuildGeneratorAction, GeneratorShoppingType, ReprioritizeGeneratorAction, SellGeneratorAction} from '../../Types';
 import Generators, {DispatchProps, StateProps} from './Generators';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -17,6 +17,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onSellGenerator: (id: number) => {
       dispatch({type: 'SELL_GENERATOR', id} as SellGeneratorAction);
+    },
+    onReprioritizeGenerator: (spotInList: number, delta: number) => {
+      dispatch({type: 'REPRIORITIZE_GENERATOR', spotInList, delta} as ReprioritizeGeneratorAction);
     },
   };
 };
