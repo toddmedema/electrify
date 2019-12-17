@@ -1,6 +1,6 @@
 # Electrify
 
-Learn more about Expedition and play the game at [ExpeditionGame.com](https://expeditiongame.com). The app is available for browsers at [App.ExpeditionGame.com](https://App.ExpeditionGame.com), on the [Android market](https://play.google.com/store/apps/details?id=io.fabricate.expedition) and on the [iOS market](https://itunes.apple.com/us/app/expedition-roleplaying-card/id1085063478?ls=1&mt=8).
+Learn more about Electrify and play the game at [ElectrifyGame.com](https://electrifygame.com). The app is also available on the [Android market](https://play.google.com/store/apps/details?id=io.fabricate.expedition) and on the [iOS App Store](https://itunes.apple.com/us/app/expedition-roleplaying-card/id1085063478?ls=1&mt=8).
 
 ## Contributing
 
@@ -54,7 +54,7 @@ Tests require Chrome. Please make sure you have the Chrome browser installed and
 
 #### Release checklist & deployment
 
-Before deploying to production, run `./scripts/beta.sh` to deploy to beta.expeditiongame.com and create beta versions of the Android and iOS apps. Then run through the beta test checklist: https://docs.google.com/document/d/1HkHct0-AEMaHpkpU0uqSi6mhj2GJId78bXc23mo-2qg/edit
+Before deploying to production, run `./scripts/beta.sh` to deploy to beta.electrifygame.com and create beta versions of the Android and iOS apps. Then run through the beta test checklist: https://docs.google.com/document/d/1HkHct0-AEMaHpkpU0uqSi6mhj2GJId78bXc23mo-2qg/edit
 
 Once functionality is verified, you can deploy prod web & generate prod versions of the Android and iOS apps with `./scripts/prod.sh`.
 
@@ -100,21 +100,9 @@ Notes and debugging:
 
 - requires a Mac with XCode installed
 - auth issues? Read https://github.com/EddyVerbruggen/cordova-plugin-googleplus
-  - app crashing because of invalid REVERSE_CLIENT_ID? Check to see if `/platforms/ios/Expedition/Resources/GoogleService-Info.plist` or `/platforms/ios/Expedition/Resources/Resources/GoogleService-Info.plist` is corrupted. Replace it, and re-run `cordova build ios`
+  - app crashing because of invalid REVERSE_CLIENT_ID? Check to see if `/platforms/ios/Electrify/Resources/GoogleService-Info.plist` or `/platforms/ios/Electrify/Resources/Resources/GoogleService-Info.plist` is corrupted. Replace it, and re-run `cordova build ios`
 - if Xcode complains about signing, try going to the project settings in Xcode, disabling automatic signing, re-enabling it, and then selecting your team again.
 
 #### Troubleshooting builds
 
 If you're having trouble with UglifyJS when running `webpack -p`, try removing webpack's dependence on uglify-js and letting the dev-dependency version be used (see [here](https://github.com/mishoo/UglifyJS2/issues/448)).
-
-### Local Quests
-
-To add an XML version of a quest to the app (aka featured quest or special game mode):
-
-1. Write the quest in the [Quest Creator](http://quests.expeditiongame.com)
-2. Open the Chrome Javascript console in the Quest Creator
-3. Hit "Publish"
-4. Go to the network tab and find the network POST event to `http://quests.expeditiongame.com/publish/...`
-5. Scroll down to "Form Data" and hit "View Source"
-6. Copy that into [http://xmlbeautifier.com](http://xmlbeautifier.com); make sure to set the "indent size" formatting option to 2
-7. Paste the XML file into the `/quests` directory, and add it to the list in the FeaturedQuestsContainer component

@@ -4,7 +4,7 @@ We welcome contributions from the community and are pleased to have them.  Pleas
 
 ## Logging Issues
 
-All issues should be created using the [new issue form](https://github.com/ExpeditionRPG/expedition/issues/new).  Clearly describe the issue including steps to reproduce if there are any.  Also, make sure to indicate what device / browser you are running it on.
+All issues should be created using the [new issue form](https://github.com/toddmedema/electrify/issues/new).  Clearly describe the issue including steps to reproduce if there are any.  Also, make sure to indicate what device / browser you are running it on.
 
 ## Patching Code
 
@@ -13,7 +13,7 @@ Code changes are welcome and should follow the guidelines below.
 * Fork the repository on GitHub.
 * Fix the issue, making sure that you follow the style guide (below).
 * Please leave the code nicer than you found it by including at least one new unit test for any functionality you're adding!
-* [Pull requests](http://help.github.com/send-pull-requests/) should be made to the [master branch](https://github.com/ExpeditionRPG/expedition/tree/master).
+* [Pull requests](http://help.github.com/send-pull-requests/) should be made to the [master branch](https://github.com/toddmedema/electrify/tree/master).
 
 ## Testing
 
@@ -42,7 +42,7 @@ We recommend developing in Sublime Text, and require that the following style se
 
 Git can get a bit confusing when it comes to pushing and pulling other folks' branches, so here's a quick reference:
 
-Add a remote repo to your git (aka someone's fork): `git remote add <username> https://github.com/<username>/expedition`
+Add a remote repo to your git (aka someone's fork): `git remote add <username> https://github.com/<username>/electrify`
 
 Fetch all of the new branches: `git fetch`
 
@@ -52,4 +52,4 @@ Check out a Renovate branch: `git checkout origin/renovate/<branch name>`
 
 ## Questions?
 
-Email us at Expedition@Fabricate.io
+Email us at Contact@Fabricate.io

@@ -48,7 +48,6 @@ const options = {
     new Webpack.DefinePlugin({
       // Default to beta for safety
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'dev'),
-      'process.env.API_HOST': JSON.stringify(process.env.API_HOST || 'http://betaapi.expeditiongame.com'),
       'process.env.OAUTH2_CLIENT_ID': JSON.stringify(process.env.OAUTH2_CLIENT_ID || '545484140970-jq9jp7gdqdugil9qoapuualmkupigpdl.apps.googleusercontent.com'),
     }),
     new Webpack.IgnorePlugin(/^\.\/locale$/, /moment$/), // Don't import bloated Moment locales

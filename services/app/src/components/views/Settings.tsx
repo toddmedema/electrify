@@ -58,7 +58,7 @@ const Settings = (props: Props): JSX.Element => {
   return (
     <div>
       <Button variant="contained" color="primary" onClick={props.onMainMenu}>Return to main menu</Button>
-      <div className="version">Expedition App v{VERSION}</div>
+      <div className="version">Electrify App v{VERSION}</div>
     </div>
   );
 };

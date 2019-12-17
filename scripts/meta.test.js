@@ -135,7 +135,7 @@ describe('Typescript files', () => {
       const name = f.split('.');
       const extension = name.pop();
       if (['tsx', 'ts'].indexOf(extension) !== -1) {
-        const base = (name[0].split('/expedition/')[1] || name[0]).replace(
+        const base = (name[0].split('/electrify/')[1] || name[0]).replace(
           '.test',
           '',
         ); // filename relative to repo

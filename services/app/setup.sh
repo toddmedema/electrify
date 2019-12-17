@@ -197,21 +197,21 @@ if [[ $init = 1 ]] || [[ $icons = 1 ]] ; then
         cp www/images/splash/720x960.png platforms/android/res/drawable-land-xhdpi/screen.png
 
         message_info "Copying iOS app icons and splash screen images..."
-        cp www/images/icon/40x40.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon-40.png
-        cp www/images/icon/80x80.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon-40@2x.png
-        cp www/images/icon/57x57.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon.png
-        cp www/images/icon/114x114.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon@2x.png
-        cp www/images/icon/72x72.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon-72.png
-        cp www/images/icon/144x144.png platforms/ios/Expedition/Images.xcassets/AppIcon.appiconset/icon-72@2x.png
+        cp www/images/icon/40x40.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-40.png
+        cp www/images/icon/80x80.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-40@2x.png
+        cp www/images/icon/57x57.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon.png
+        cp www/images/icon/114x114.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon@2x.png
+        cp www/images/icon/72x72.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-72.png
+        cp www/images/icon/144x144.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-72@2x.png
 
-        cp www/images/splash/640x960.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default~iphone.png
-        cp www/images/splash/750x1334.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default@2x~iphone.png
-        cp www/images/splash/640x1136.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default-568h@2x~iphone.png
-        cp www/images/splash/768x1024.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default-Portrait~ipad.png
-        cp www/images/splash/1536x2048.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default-Portrait@2x~ipad.png
+        cp www/images/splash/640x960.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default~iphone.png
+        cp www/images/splash/750x1334.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default@2x~iphone.png
+        cp www/images/splash/640x1136.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-568h@2x~iphone.png
+        cp www/images/splash/768x1024.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Portrait~ipad.png
+        cp www/images/splash/1536x2048.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Portrait@2x~ipad.png
         # These will show up sideways. Whatever.
-        cp www/images/splash/768x1024.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default-Landscape~ipad.png
-        cp www/images/splash/1536x2048.png platforms/ios/Expedition/Images.xcassets/LaunchImage.launchimage/Default-Landscape@2x~ipad.png
+        cp www/images/splash/768x1024.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Landscape~ipad.png
+        cp www/images/splash/1536x2048.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Landscape@2x~ipad.png
 fi
 
 # ----
