@@ -1,4 +1,3 @@
-import {AUTH_SETTINGS as AUTH_SETTINGS_BASE} from 'shared/schema/Constants';
 import {CardNameType, GeneratorShoppingType, MonthType} from './Types';
 
 export const TICK_MS = {
@@ -11,10 +10,6 @@ export const DAYS_PER_MONTH = 1;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const STARTING_YEAR = 1990;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];
-
-export const AUTH_SETTINGS = {
-  ...AUTH_SETTINGS_BASE,
-};
 
 export const UNSUPPORTED_BROWSERS = /^(.*amazon silk.*)|(.*(iphone|ipad|ipod|ios) os 9_.*)$/i;
 

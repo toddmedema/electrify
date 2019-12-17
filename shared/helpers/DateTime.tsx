@@ -63,7 +63,6 @@ function getSunset(month: MonthType) {
   }
 }
 
-// TODO if per issues, check how many times per tick this gets called, could make it a selector based on gameState currentMinute
 export function getDateFromMinute(minute: number): DateType {
   const minuteOfDay = minute % 1440;
   const dayOfGame = Math.floor(minute / 1440);
@@ -75,9 +74,11 @@ export function getDateFromMinute(minute: number): DateType {
   const month = MONTHS[monthNumber];
   const minuteOfYear = minute - (yearsEllapsed * DAYS_PER_YEAR) * 1440;
   const percentOfYear = minuteOfYear / (DAYS_PER_YEAR * 1440);
+  const hourOfFullYear = Math.floor(monthNumber * 30 * 24 + minuteOfDay / 60);
 
   return {
     minuteOfDay,
+    hourOfFullYear,
     percentOfYear,
     month,
     year,

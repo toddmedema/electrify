@@ -21,7 +21,6 @@ prebuild() {
 betabuild() {
   prebuild
   export NODE_ENV='dev'
-  export API_HOST='http://betaapi.electrifygame.com'
   read -p "Also build the Android & iOS apps? (Y/n) " -n 1
   echo
   if [[ $REPLY =~ ^(y| ) ]] || [[ -z $REPLY ]]; then
@@ -51,7 +50,6 @@ prodbuild() {
 
   # Rebuild the web app files
   export NODE_ENV='production'
-  export API_HOST='https://api.electrifygame.com'
   export OAUTH2_CLIENT_ID='545484140970-r95j0rmo8q1mefo0pko6l3v6p4s771ul.apps.googleusercontent.com'
 
   read -p "Also build the Android & iOS apps? (Y/n) " -n 1

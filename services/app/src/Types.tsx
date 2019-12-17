@@ -82,11 +82,23 @@ export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
 export interface DateType {
   minuteOfDay: number;
+  hourOfFullYear: number;
   percentOfYear: number; // 0 - 1
   month: MonthType;
   year: number;
   sunrise: number;
   sunset: number;
+}
+
+export interface RawWeatherType {
+  COOLING_HRS: number;
+  HEATING_HRS: number;
+  TEMP_C: number;
+  CLOUD_PCT_NO: number; // 0 - 1
+  CLOUD_PCT_FEW: number; // 0 - 1
+  CLOUD_PCT_ALL: number; // 0 - 1
+  WIND_KPH: number;
+  WIND_PCT_CALM: number; // 0 - 1
 }
 
 // All amounts are the average across the time window

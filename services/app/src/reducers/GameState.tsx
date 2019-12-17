@@ -1,5 +1,6 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
+import {getWeather} from 'shared/schema/Weather';
 import {DAYS_PER_YEAR, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
@@ -25,7 +26,7 @@ export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
 }
 
-function forecastSunlightPercent(date: DateType) {
+function getRawSunlightPercent(date: DateType) {
   if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
     const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
     // TODO incorporate weather forecast (cloudiness)
@@ -62,6 +63,7 @@ function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number,
         supply += generator.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
         break;
       case 'Wind':
+        // TODO what is the real number / curve for wind speed efficiency?
         supply += generator.peakW * windKph / 30;
         break;
       default:
@@ -74,11 +76,11 @@ function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number,
 
 function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
   const date = getDateFromMinute(minute);
-  const sunlight = forecastSunlightPercent(date);
+  const weather = getWeather('SF', date.hourOfFullYear);
+  const sunlight = getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2);
+  const windKph = weather.WIND_KPH;
+  const temperatureC = weather.TEMP_C;
 
-  // TODO use real weather data
-  const windKph = 10;
-  const temperatureC = 10;
   return ({
     minute,
     supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC),
