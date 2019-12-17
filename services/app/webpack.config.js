@@ -17,6 +17,7 @@ const options = {
     new CopyWebpackPlugin([
       { from: { glob: '../../shared/images/*.svg' }, flatten: true, to: './images' },
       { from: { glob: '../../shared/images/*.png' }, flatten: true, to: './images' },
+      { from: { glob: '../../shared/schema/*.csv' }, flatten: true, to: './data' },
     ]),
   ],
 }
