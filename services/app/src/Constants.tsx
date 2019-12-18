@@ -1,4 +1,4 @@
-import {CardNameType, GeneratorShoppingType, MonthType} from './Types';
+import {CardNameType, FuelType, GeneratorShoppingType, MonthType} from './Types';
 
 export const TICK_MS = {
   SLOW: 80,
@@ -23,6 +23,17 @@ export const URLS = {
 export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
+
+export const FUELS = {
+  Coal: {
+    costPerMBtu: 1, // TODO what is the sanest, most consistent way of measuring this?
+    tGHGperMBtu: 1, // TODO what is the sanest, most consistent way of measuring this?
+    // It seems like the raw energy contained in coal, nat gas, oil, etc is pretty consistent
+    // So then the question is, is there a sane way of converting from Btu to watts?
+    // Like, instead of a fuel consumption, should a generator have a concept of efficiency
+    // and then fuel consumption = currentW * efficiency * CONVERSION_FACTOR?
+  },
+} as { [fuel: string]: FuelType };
 
 export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const GENERATORS = [

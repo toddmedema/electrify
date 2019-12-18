@@ -7,9 +7,11 @@ import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, G
 
 // const seedrandom = require('seedrandom');
 
+const COAL_GENERATOR = GENERATORS.find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
 const startingGenerator = {
-  ...GENERATORS.find((g: GeneratorShoppingType) => g.name === 'Coal'),
+  ...COAL_GENERATOR,
   id: Math.random(),
+  currentW: COAL_GENERATOR.peakW,
 } as GeneratorOperatingType;
 
 export const initialGameState: GameStateType = {
@@ -169,6 +171,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       ...a.generator,
       id: Math.random(),
       priority: a.generator.priority + Math.random(), // Vary priorities slightly
+      currentW: 0, // TODO it starts at 0, and spins up in future ticks
     } as GeneratorOperatingType;
     newState.generators.push(generator);
     newState.generators.sort(sortGeneratorsByPriority);

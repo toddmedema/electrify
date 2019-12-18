@@ -42,7 +42,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
-        secondary={formatWatts(props.generator.peakW)}
+        secondary={`${formatWatts(props.generator.currentW).replace(/\D/g, '')}/${formatWatts(props.generator.peakW)}`}
       />
       <ListItemSecondaryAction>
         {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} color="primary">

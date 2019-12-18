@@ -76,7 +76,7 @@ export interface AudioDataType {
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
-export type FuelType = 'Coal' | 'Wind' | 'Sun';
+export type FuelNameType = 'Coal' | 'Wind' | 'Sun';
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
@@ -118,9 +118,7 @@ export interface GameStateType {
     // and is supplied as the seed at the start of any function that uses randomness
   currentMinute: number;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
-
   generators: GeneratorOperatingType[];
-
   cash: number;
 }
 
@@ -138,13 +136,19 @@ export interface CardType {
   overrideDebounce?: boolean;
 }
 
+export interface FuelType {
+  costPerMBtu: number;
+  tGHGperMBtu: number;
+}
+
 export interface GeneratorOperatingType extends GeneratorShoppingType {
   id: number;
+  currentW: number;
 }
 
 export interface GeneratorShoppingType {
   name: string;
-  fuel: FuelType;
+  fuel: FuelNameType;
   buildCost: number;
   description: string;
   annualOperatingCost: number;
