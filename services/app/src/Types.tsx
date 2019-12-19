@@ -137,24 +137,29 @@ export interface CardType {
 }
 
 export interface FuelType {
-  costPerMBtu: number;
-  tGHGperMBtu: number;
+  costPerBtu: number; // Measured from raw stock / before generator efficiency loss
+    // all costs should be in that year's $ / not account for inflation when possible
+  kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }
 
 export interface GeneratorOperatingType extends GeneratorShoppingType {
   id: number;
   currentW: number;
+  yearsToBuildLeft: number;
 }
 
 export interface GeneratorShoppingType {
   name: string;
+  description: string;
   fuel: FuelNameType;
   buildCost: number;
-  description: string;
+    // all costs should be in that year's $ / not account for inflation when possible
   annualOperatingCost: number;
+    // all costs should be in that year's $ / not account for inflation when possible
   peakW: number;
+  yearsToBuild: number;
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
-  fuelConsumption?: number; // at peak
+  btuPerW?: number; // Heat Rate, but per W for less math per frame
   spinMinutes?: number;
 }
 

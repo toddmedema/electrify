@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getWeather} from 'shared/schema/Weather';
-import {DAYS_PER_YEAR, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS} from '../Constants';
+import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
@@ -12,6 +12,7 @@ const startingGenerator = {
   ...COAL_GENERATOR,
   id: Math.random(),
   currentW: COAL_GENERATOR.peakW,
+  yearsToBuildLeft: 0,
 } as GeneratorOperatingType;
 
 export const initialGameState: GameStateType = {
@@ -145,9 +146,26 @@ function calculateProfitAndLoss(gameState: GameStateType): number {
   const supplyW = Math.min(now.supplyW, now.demandW);
   const profits = supplyW * dollarsPerWh * 60 / TICK_MINUTES;
 
-  // TODO fuel expenses, ???
+  // TODO fuel expenses
   const generatorOperatingExpenses = gameState.generators
-    .reduce((acc: number, g: GeneratorOperatingType) => acc + g.annualOperatingCost, 0) / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
+    .reduce((acc: number, g: GeneratorOperatingType) => {
+      if (g.yearsToBuildLeft > 0) {
+        return acc;
+      }
+
+      let fuelCosts = 0;
+      if (FUELS[g.fuel]) {
+        const fuelBtu = g.currentW * (g.btuPerW || 0);
+        fuelCosts = fuelBtu * FUELS[g.fuel].costPerBtu;
+      }
+
+      const operatingCosts = g.annualOperatingCost / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
+
+      // Annual total cost:
+      // console.log((operatingCosts + fuelCosts) *  DAYS_PER_YEAR * 1440 / TICK_MINUTES);
+
+      return acc + operatingCosts + fuelCosts;
+    }, 0);
   const expenses = generatorOperatingExpenses;
 
   return profits - expenses;
@@ -162,6 +180,21 @@ function reforecast(newState: GameStateType): TimelineType[] {
   });
 }
 
+// Updates generator construction / spin up status
+function updateGenerators(state: GameStateType): GeneratorOperatingType[] {
+  return state.generators.map((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft > 0) {
+      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
+    } else {
+      // TODO automanage based on demand, don't blindly spin up to max
+      if (g.currentW < g.peakW) {
+        g.currentW = Math.min(g.peakW, g.currentW + g.peakW / (g.spinMinutes || 1) * TICK_MINUTES);
+      }
+    }
+    return g;
+  });
+}
+
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState being redeclared in block-scope
   if (action.type === 'BUILD_GENERATOR') {
@@ -172,6 +205,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       id: Math.random(),
       priority: a.generator.priority + Math.random(), // Vary priorities slightly
       currentW: 0, // TODO it starts at 0, and spins up in future ticks
+      yearsToBuildLeft: a.generator.yearsToBuild,
     } as GeneratorOperatingType;
     newState.generators.push(generator);
     newState.generators.sort(sortGeneratorsByPriority);
@@ -185,7 +219,11 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     // in one loop, refund cash from selling + remove from list of generators
     newState.generators = newState.generators.filter((g: GeneratorOperatingType) => {
       if (g.id === generatorId) {
-        newState.cash += g.buildCost * GENERATOR_SELL_MULTIPLIER;
+        // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
+        // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
+        const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
+        const lostFromSelling = g.buildCost * GENERATOR_SELL_MULTIPLIER;
+        newState.cash += g.buildCost - lostFromSelling * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
         return false;
       }
       return true;
@@ -222,6 +260,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       const newState = {
         ...state,
         currentMinute: state.currentMinute + TICK_MINUTES,
+        generators: updateGenerators(state),
       };
 
       // Update timeline

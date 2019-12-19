@@ -16,6 +16,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
+import CancelIcon from '@material-ui/icons/Cancel';
 import CloseIcon from '@material-ui/icons/Close';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import InfoIcon from '@material-ui/icons/Info';
@@ -35,25 +36,35 @@ interface GeneratorListItemProps {
 }
 
 function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
+  const underConstruction = (props.generator.yearsToBuildLeft > 0);
+  let secondaryText = '';
+  if (underConstruction) {
+    secondaryText = `Building: ${Math.round((props.generator.yearsToBuild - props.generator.yearsToBuildLeft) / props.generator.yearsToBuild * 100)}%`;
+  } else {
+    secondaryText = `${formatWatts(props.generator.currentW).replace(/\D/g, '')}/${formatWatts(props.generator.peakW)}`;
+  }
   return (
-    <ListItem>
+    <ListItem disabled={underConstruction}>
       <ListItemAvatar>
         <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
         primary={props.generator.name}
-        secondary={`${formatWatts(props.generator.currentW).replace(/\D/g, '')}/${formatWatts(props.generator.peakW)}`}
+        secondary={secondaryText}
       />
       <ListItemSecondaryAction>
-        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} color="primary">
+        {!underConstruction && props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} color="primary">
           <ArrowUpwardIcon />
         </IconButton>}
-        {props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} color="primary">
+        {!underConstruction && props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
-        <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
+        {!underConstruction && <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
           <DeleteForeverIcon />
-        </IconButton>
+        </IconButton>}
+        {underConstruction && <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
+          <CancelIcon />
+        </IconButton>}
       </ListItemSecondaryAction>
     </ListItem>
   );

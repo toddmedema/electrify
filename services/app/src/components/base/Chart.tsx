@@ -150,7 +150,6 @@ const Chart = (props: Props): JSX.Element => {
           data={historic}
           x="minute"
           y="supplyW"
-          samples={24}
           style={{
             data: {
               stroke: supplyColor,
@@ -163,7 +162,6 @@ const Chart = (props: Props): JSX.Element => {
           data={historic}
           x="minute"
           y="demandW"
-          samples={24}
           style={{
             data: {
               stroke: demandColor,
@@ -175,7 +173,6 @@ const Chart = (props: Props): JSX.Element => {
           data={forecast}
           x="minute"
           y="supplyW"
-          samples={24}
           style={{
             data: {
               stroke: supplyColor,
@@ -187,7 +184,6 @@ const Chart = (props: Props): JSX.Element => {
           data={forecast}
           x="minute"
           y="demandW"
-          samples={24}
           style={{
             data: {
               stroke: demandColor,

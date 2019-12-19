@@ -71,6 +71,10 @@ export function loadAudioFiles() {
       dispatch(audioSet({loaded: 'LOADED'}));
       const themeManager = new ThemeManager(audioNodes, Math.random);
       dispatch(audioDataSet({audioNodes, themeManager}));
+
+      // TODO why doesn't this start playing as soon as it's available?
+      // Perhaps because audio must be triggered by a user interaction?
+      dispatch(audioSet({intensity: 30, paused: false}));
     });
   };
 }
