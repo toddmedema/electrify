@@ -270,6 +270,11 @@ body.android .dialog .textfield:focus-within {
 
     .MuiCardHeader-root {
       align-items: flex-start;
+      padding: size(base);
+    }
+
+    .MuiCardHeader-action {
+      margin-right: 0 !important;
     }
   }
 
@@ -333,7 +338,7 @@ body.android .dialog .textfield:focus-within {
 
   .generatorBuildList {
     background: #ddd;
-    padding-top: size(small) !important;
+    padding-top: size(base) !important;
   }
 
   .version {

@@ -5,8 +5,7 @@ import Generators, {DispatchProps, StateProps} from './Generators';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    cash: state.gameState.cash,
-    generators: state.gameState.generators,
+    gameState: state.gameState,
   };
 };
 

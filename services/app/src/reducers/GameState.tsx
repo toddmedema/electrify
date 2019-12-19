@@ -7,19 +7,11 @@ import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, G
 
 // const seedrandom = require('seedrandom');
 
-const COAL_GENERATOR = GENERATORS.find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
-const startingGenerator = {
-  ...COAL_GENERATOR,
-  id: Math.random(),
-  currentW: COAL_GENERATOR.peakW,
-  yearsToBuildLeft: 0,
-} as GeneratorOperatingType;
-
 export const initialGameState: GameStateType = {
   speed: 'NORMAL',
   inGame: false,
-  cash: 10000000,
-  generators: [startingGenerator] as GeneratorOperatingType[],
+  cash: 1000000000,
+  generators: [] as GeneratorOperatingType[],
   currentMinute: 180, // This is the line where the chart switches from historic to forecast
   timeline: [] as TimelineType[],
   seedPrefix: Math.random(),
@@ -50,7 +42,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * 1000000;
+  return demandMultiple * 3000000;
 }
 
 function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperatingType) {
@@ -60,18 +52,20 @@ function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperati
 function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
   let supply = 0;
   gameState.generators.forEach((generator: GeneratorOperatingType) => {
-    switch (generator.fuel) {
-      case 'Sun':
-        // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-        supply += generator.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
-        break;
-      case 'Wind':
-        // TODO what is the real number / curve for wind speed efficiency?
-        supply += generator.peakW * windKph / 30;
-        break;
-      default:
-        supply += generator.peakW;
-        break;
+    if (generator.yearsToBuildLeft === 0) {
+      switch (generator.fuel) {
+        case 'Sun':
+          // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+          supply += generator.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
+          break;
+        case 'Wind':
+          // TODO what is the real number / curve for wind speed efficiency?
+          supply += generator.peakW * windKph / 30;
+          break;
+        default:
+          supply += generator.peakW;
+          break;
+      }
     }
   });
   return supply;
@@ -93,47 +87,6 @@ function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
     temperatureC,
   });
 }
-
-// export const getForecasts = createSelector(
-//   [getGameState, getSunrise, getSunset],
-//   (gameState, sunrise, sunset) => {
-//     const rng = seedrandom(gameState.seedPrefix + gameState.timeline[0].minute);
-//     // TODO cloudiness probabilities based on real life + season
-//     let cloudiness = rng();
-//     const forecasts = [];
-//     for (let minute = 1; minute <= 24; minute++) {
-//       // Cloudiness moves at most 0.25 per minute, can never be "100%" (solar panels still produce 10-25% when overcast)
-//       cloudiness = Math.min(0.85, Math.max(0, cloudiness + rng() * 0.5 - 0.25));
-//       const sunshine = (1 - cloudiness) * getSunshinePercent(minute, sunrise, sunset);
-
-//       const windOutput = rng(); // TODO
-//       const temperature = rng(); // TODO
-
-//       // TODO temperature changes solarOutput
-//       const solarOutput = sunshine;
-
-//       const demand = getDemand(minute);
-
-//       let supply = 0;
-//       gameState.generators.forEach((generator: GeneratorType) => {
-//         switch (generator.fuel) {
-//           case 'Sun':
-//             supply += generator.peakMW * solarOutput;
-//             break;
-//           case 'Wind':
-//             supply += generator.peakMW * windOutput;
-//             break;
-//           default:
-//             supply += generator.peakMW;
-//             break;
-//         }
-//       });
-//       forecasts.push({ minute, supply, demand, solarOutput, windOutput, temperature });
-//     }
-
-//     return forecasts;
-//   }
-// );
 
 function calculateProfitAndLoss(gameState: GameStateType): number {
   const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.currentMinute);
@@ -195,23 +148,31 @@ function updateGenerators(state: GameStateType): GeneratorOperatingType[] {
   });
 }
 
+// Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
+// which can be done once after multiple builds
+function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameStateType {
+  const newGame = state.timeline.length === 0;
+  const generator = {
+    ...g,
+    id: Math.random(),
+    priority: g.priority + Math.random(), // Vary priorities slightly
+    currentW: 0, // TODO it starts at 0, and spins up in future ticks
+    yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
+  } as GeneratorOperatingType;
+  state.generators.push(generator);
+  state.generators.sort(sortGeneratorsByPriority);
+  state.cash -= newGame ? 0 : generator.buildCost;
+  return state;
+}
+
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState being redeclared in block-scope
   if (action.type === 'BUILD_GENERATOR') {
     const a = action as BuildGeneratorAction;
-    const newState = {...state};
-    const generator = {
-      ...a.generator,
-      id: Math.random(),
-      priority: a.generator.priority + Math.random(), // Vary priorities slightly
-      currentW: 0, // TODO it starts at 0, and spins up in future ticks
-      yearsToBuildLeft: a.generator.yearsToBuild,
-    } as GeneratorOperatingType;
-    newState.generators.push(generator);
-    newState.generators.sort(sortGeneratorsByPriority);
-    newState.cash -= generator.buildCost;
+    const newState = buildGenerator({...state}, a.generator);
     newState.timeline = reforecast(newState);
     return newState;
+
   } else if (action.type === 'SELL_GENERATOR') {
     const newState = {...state};
     const generatorId = (action as SellGeneratorAction).id;
@@ -231,6 +192,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
     newState.timeline = reforecast(newState);
     return newState;
+
   } else if (action.type === 'REPRIORITIZE_GENERATOR') {
     const a = action as ReprioritizeGeneratorAction;
     const newState = {...state};
@@ -241,20 +203,25 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     rightGenerator.priority = leftPriority;
     newState.generators.sort(sortGeneratorsByPriority);
     return newState;
+
   } else if (action.type === 'GAME_START') {
-    const timeline = [] as TimelineType[];
+    let newState = {...state, inGame: true, timeline: [] as TimelineType[]};
+
+    // TODO this is where different scenarios could have different generator starting conditions
+    const COAL_GENERATOR = GENERATORS(newState, 2000000000).find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
+    newState = buildGenerator(newState, COAL_GENERATOR);
+
     for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-      timeline.push(generateTimelineDatapoint(minute, state));
+      newState.timeline.push(generateTimelineDatapoint(minute, state));
     }
-    return {
-      ...state,
-      timeline,
-      inGame: true,
-    };
+    return newState;
+
   } else if (action.type === 'SET_SPEED') {
     return {...state, speed: (action as SetSpeedAction).speed};
+
   } else if (action.type === 'GAME_EXIT') {
     return {...initialGameState};
+
   } else if (action.type === 'GAME_TICK') {
     if (state.inGame && state.speed !== 'PAUSED') {
       const newState = {

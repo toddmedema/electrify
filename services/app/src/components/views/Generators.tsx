@@ -12,6 +12,7 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemAvatar from '@material-ui/core/ListItemAvatar';
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
+import Slider from '@material-ui/core/Slider';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
@@ -24,7 +25,7 @@ import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
-import {GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
+import {GameStateType, GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
 interface GeneratorListItemProps {
@@ -118,9 +119,20 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   );
 }
 
+// Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0
+// (i.e. 1->2MW, 9->10 MW, 10->20MW)
+function getW(tick: number) {
+  const exponent = Math.floor(tick / 9) + 6;
+  const frontNumber = tick % 9 + 1;
+  return frontNumber * Math.pow(10, exponent);
+}
+
+function valueLabelFormat(x: number) {
+  return formatWatts(getW(x));
+}
+
 export interface StateProps {
-  cash: number;
-  generators: GeneratorOperatingType[];
+  gameState: GameStateType;
 }
 
 export interface DispatchProps {
@@ -132,8 +144,10 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function GeneratorsBuild(props: Props): JSX.Element {
+  const {gameState} = props;
   const [open, setOpen] = React.useState(false);
-  const generatorCount = props.generators.length;
+  const [sliderTick, setSliderTick] = React.useState<number>(9);
+  const generatorCount = gameState.generators.length;
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -143,6 +157,10 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
     setOpen(false);
   };
 
+  const handleSliderChange = (event: any, newValue: number) => {
+    setSliderTick(newValue);
+  };
+
   return (
     <BuildCard className="generators">
       <Toolbar>
@@ -150,7 +168,7 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
       </Toolbar>
       <List dense className="scrollable">
-        {props.generators.map((g: GeneratorOperatingType, i: number) =>
+        {gameState.generators.map((g: GeneratorOperatingType, i: number) =>
           <GeneratorListItem
             generator={g}
             key={g.id}
@@ -167,17 +185,30 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
         onClose={handleClose}
       >
         <Toolbar>
-          <Typography variant="h6">Build a Generator ({formatMoneyStable(props.cash)})</Typography>
+          <Typography variant="h6">Build a Generator ({formatMoneyStable(gameState.cash)})</Typography>
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
         </Toolbar>
+        <Toolbar>
+          <Slider
+            value={sliderTick}
+            aria-labelledby="peak-output"
+            valueLabelDisplay="auto"
+            min={0}
+            step={1}
+            max={36}
+            getAriaValueText={valueLabelFormat}
+            valueLabelFormat={valueLabelFormat}
+            onChange={handleSliderChange}
+          />
+        </Toolbar>
         <DialogContent classes={{root: 'generatorBuildList'}}>
-          {GENERATORS.map((g: GeneratorShoppingType, i: number) =>
+          {GENERATORS(gameState, getW(sliderTick)).map((g: GeneratorShoppingType, i: number) =>
             <GeneratorBuildItem
               generator={g}
               key={i}
-              cash={props.cash}
+              cash={gameState.cash}
               onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); handleClose(); }}
             />
           )}
