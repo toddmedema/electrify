@@ -42,7 +42,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * 3000000;
+  return demandMultiple * 4200000;
 }
 
 function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperatingType) {
@@ -99,7 +99,6 @@ function calculateProfitAndLoss(gameState: GameStateType): number {
   const supplyW = Math.min(now.supplyW, now.demandW);
   const profits = supplyW * dollarsPerWh * 60 / TICK_MINUTES;
 
-  // TODO fuel expenses
   const generatorOperatingExpenses = gameState.generators
     .reduce((acc: number, g: GeneratorOperatingType) => {
       if (g.yearsToBuildLeft > 0) {
@@ -114,7 +113,7 @@ function calculateProfitAndLoss(gameState: GameStateType): number {
 
       const operatingCosts = g.annualOperatingCost / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
 
-      // Annual total cost:
+      // Annual cost: (easier to compare against real life examples)
       // console.log((operatingCosts + fuelCosts) *  DAYS_PER_YEAR * 1440 / TICK_MINUTES);
 
       return acc + operatingCosts + fuelCosts;

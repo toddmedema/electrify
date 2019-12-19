@@ -70,9 +70,9 @@ export const FUELS = {
   },
 } as { [fuel: string]: FuelType };
 
-// Generates values based on a wide variety of factors
-// Output is sorted lowest cost first
-// 1 MWh = 0.1KWy
+// TODO additional sources of inforomation
+// Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
+// Output is sorted lowest cost first (TODO let user choose sort)
 export function GENERATORS(state: GameStateType, peakW: number) {
   return [
     // FUELED

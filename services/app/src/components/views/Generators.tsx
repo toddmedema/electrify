@@ -14,6 +14,7 @@ import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
 import Slider from '@material-ui/core/Slider';
 import Toolbar from '@material-ui/core/Toolbar';
+import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
@@ -40,7 +41,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
   const underConstruction = (props.generator.yearsToBuildLeft > 0);
   let secondaryText = '';
   if (underConstruction) {
-    secondaryText = `Building: ${Math.round((props.generator.yearsToBuild - props.generator.yearsToBuildLeft) / props.generator.yearsToBuild * 100)}%`;
+    secondaryText = `Building: ${Math.round((props.generator.yearsToBuild - props.generator.yearsToBuildLeft) / props.generator.yearsToBuild * 100)}%, ${Math.ceil(props.generator.yearsToBuildLeft * 12)} months left`;
   } else {
     secondaryText = `${formatWatts(props.generator.currentW).replace(/\D/g, '')}/${formatWatts(props.generator.peakW)}`;
   }
@@ -102,6 +103,9 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             >
               {formatMoneyConcise(props.generator.buildCost)}
             </Button>
+            <Typography variant="body2" color="textSecondary">
+              {props.generator.yearsToBuild} years to build
+            </Typography>
           </span>
         }
         title={props.generator.name}
@@ -129,6 +133,20 @@ function getW(tick: number) {
 
 function valueLabelFormat(x: number) {
   return formatWatts(getW(x));
+}
+
+interface ValueLabelProps {
+  children: any;
+  open: boolean;
+  value: number;
+}
+
+function ValueLabelComponent(props: ValueLabelProps) {
+  return (
+    <Tooltip open={props.open} enterTouchDelay={0} placement="top" title={props.value} disableTouchListener={true} arrow={true}>
+      {props.children}
+    </Tooltip>
+  );
 }
 
 export interface StateProps {
@@ -200,6 +218,7 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
             max={36}
             getAriaValueText={valueLabelFormat}
             valueLabelFormat={valueLabelFormat}
+            ValueLabelComponent={ValueLabelComponent}
             onChange={handleSliderChange}
           />
         </Toolbar>
