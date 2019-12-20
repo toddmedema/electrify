@@ -81,6 +81,7 @@ export function getDateFromMinute(minute: number): DateType {
     hourOfFullYear,
     percentOfYear,
     month,
+    monthNumber,
     year,
     sunrise: getSunrise(month),
     sunset: getSunset(month),

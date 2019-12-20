@@ -3,17 +3,17 @@ import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getWeather} from 'shared/schema/Weather';
 import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
   speed: 'NORMAL',
   inGame: false,
-  cash: 1000000000,
   generators: [] as GeneratorOperatingType[],
   currentMinute: 180, // This is the line where the chart switches from historic to forecast
   timeline: [] as TimelineType[],
+  monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
 };
 
@@ -88,39 +88,43 @@ function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
   });
 }
 
-function calculateProfitAndLoss(gameState: GameStateType): number {
+// Update the month's history with cumulative values -> use that to update finances
+function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
+  const monthlyHistory = gameState.monthlyHistory[0];
   const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.currentMinute);
   if (!now) {
-    return 0;
+    return monthlyHistory;
   }
 
   // TODO actually calculate market price / sale value
   const dollarsPerWh = 0.07 / 1000;
-  const supplyW = Math.min(now.supplyW, now.demandW);
-  const profits = supplyW * dollarsPerWh * 60 / TICK_MINUTES;
+  const supplyWh = Math.min(now.supplyW, now.demandW) * TICK_MINUTES / 60;
+  const demandWh = now.demandW * TICK_MINUTES / 60;
+  const revenue = supplyWh * dollarsPerWh;
 
-  const generatorOperatingExpenses = gameState.generators
-    .reduce((acc: number, g: GeneratorOperatingType) => {
-      if (g.yearsToBuildLeft > 0) {
-        return acc;
-      }
-
-      let fuelCosts = 0;
+  let expensesOM = 0;
+  let expensesFuel = 0;
+  const expensesTaxesFees = 0; // TODO
+  gameState.generators.forEach((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft === 0) {
+      expensesOM += g.annualOperatingCost / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
       if (FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerW || 0);
-        fuelCosts = fuelBtu * FUELS[g.fuel].costPerBtu;
+        expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
       }
+    }
+  });
 
-      const operatingCosts = g.annualOperatingCost / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
-
-      // Annual cost: (easier to compare against real life examples)
-      // console.log((operatingCosts + fuelCosts) *  DAYS_PER_YEAR * 1440 / TICK_MINUTES);
-
-      return acc + operatingCosts + fuelCosts;
-    }, 0);
-  const expenses = generatorOperatingExpenses;
-
-  return profits - expenses;
+  return {
+    ...monthlyHistory,
+    revenue: monthlyHistory.revenue + revenue,
+    expensesOM: monthlyHistory.expensesOM + expensesOM,
+    expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
+    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees,
+    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees),
+    supplyWh: monthlyHistory.supplyWh + supplyWh,
+    demandWh: monthlyHistory.demandWh + demandWh,
+  };
 }
 
 function reforecast(newState: GameStateType): TimelineType[] {
@@ -160,8 +164,29 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
   } as GeneratorOperatingType;
   state.generators.push(generator);
   state.generators.sort(sortGeneratorsByPriority);
-  state.cash -= newGame ? 0 : generator.buildCost;
+  state.monthlyHistory[0].cash -= newGame ? 0 : generator.buildCost;
   return state;
+}
+
+function newMonthlyHistoryEntry(minute: number, cash: number): MonthlyHistoryType {
+  const date = getDateFromMinute(minute);
+  return {
+    year: date.year,
+    month: date.monthNumber,
+    supplyWh: 0,
+    demandWh: 0,
+    cash,
+    netWorth: 0,
+    revenue: 0,
+    expensesFuel: 0,
+    expensesOM: 0,
+    expensesTaxesFees: 0,
+  };
+}
+
+// TODO account for generators + depreciationc
+function getNetWorth(gameState: GameStateType): number {
+  return gameState.monthlyHistory[0].cash;
 }
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
@@ -183,7 +208,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
         const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
         const lostFromSelling = g.buildCost * GENERATOR_SELL_MULTIPLIER;
-        newState.cash += g.buildCost - lostFromSelling * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
+        newState.monthlyHistory[0].cash += g.buildCost - lostFromSelling * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
         return false;
       }
       return true;
@@ -204,7 +229,12 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     return newState;
 
   } else if (action.type === 'GAME_START') {
-    let newState = {...state, inGame: true, timeline: [] as TimelineType[]};
+    let newState = {
+      ...state,
+      inGame: true,
+      timeline: [] as TimelineType[],
+      monthlyHistory: [newMonthlyHistoryEntry(state.currentMinute, 1000000000)],
+    };
 
     // TODO this is where different scenarios could have different generator starting conditions
     const COAL_GENERATOR = GENERATORS(newState, 2000000000).find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
@@ -229,19 +259,22 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         generators: updateGenerators(state),
       };
 
+      newState.monthlyHistory[0] = updateMonthlyHistory(state);
+
       // Update timeline
       // TODO (WARNING: PERFORMANCE HIT?) recalculate rest of forecast based on what just happened
       const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-      // If it's a new day, generate the new forecast - keep the current (last) data point, recalculate everything else
-      if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) {
+      if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) { // If it's a new day / month
+        // Record final history for the month
+        newState.monthlyHistory[0].netWorth = getNetWorth(newState);
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newMinute, newState.monthlyHistory[0].cash));
+
+        // Update timeline -keep the current (last) data point, recalculate everything else
         newState.timeline = newState.timeline.slice(-1);
         for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
           newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
         }
       }
-
-      // Update finances
-      newState.cash += calculateProfitAndLoss(state);
 
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
       return newState;

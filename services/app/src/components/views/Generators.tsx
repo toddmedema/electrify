@@ -55,10 +55,10 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
         secondary={secondaryText}
       />
       <ListItemSecondaryAction>
-        {!underConstruction && props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} color="primary">
+        {!underConstruction && props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} edge="end" color="primary">
           <ArrowUpwardIcon />
         </IconButton>}
-        {!underConstruction && props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} color="primary">
+        {!underConstruction && props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
         {!underConstruction && <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
@@ -151,6 +151,7 @@ function ValueLabelComponent(props: ValueLabelProps) {
 
 export interface StateProps {
   gameState: GameStateType;
+  cash: number;
 }
 
 export interface DispatchProps {
@@ -162,9 +163,9 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function GeneratorsBuild(props: Props): JSX.Element {
-  const {gameState} = props;
+  const {gameState, cash} = props;
   const [open, setOpen] = React.useState(false);
-  const [sliderTick, setSliderTick] = React.useState<number>(9);
+  const [sliderTick, setSliderTick] = React.useState<number>(18);
   const generatorCount = gameState.generators.length;
 
   const handleClickOpen = () => {
@@ -203,7 +204,7 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
         onClose={handleClose}
       >
         <Toolbar>
-          <Typography variant="h6">Build a Generator ({formatMoneyStable(gameState.cash)})</Typography>
+          <Typography variant="h6">Build a Generator ({formatMoneyStable(cash)})</Typography>
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
@@ -227,7 +228,7 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
             <GeneratorBuildItem
               generator={g}
               key={i}
-              cash={gameState.cash}
+              cash={cash}
               onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); handleClose(); }}
             />
           )}

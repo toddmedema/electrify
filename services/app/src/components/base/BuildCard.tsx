@@ -19,6 +19,7 @@ export interface BuildCardProps extends React.Props<any> {
   children?: JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
+  cash: number;
 }
 
 export interface DispatchProps {
@@ -36,7 +37,7 @@ export function BuildCard(props: Props) {
           <Typography variant="h6">
             {date.month}
             <span className="weak"> {date.year}</span>
-            &nbsp;&nbsp;&nbsp;{formatMoneyStable(props.gameState.cash)}
+            &nbsp;&nbsp;&nbsp;{formatMoneyStable(props.cash)}
           </Typography>
           <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={props.gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
             <PauseIcon />
@@ -68,6 +69,7 @@ export function BuildCard(props: Props) {
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<BuildCardProps>): BuildCardProps => ({
   gameState: state.gameState,
+  cash: state.gameState.monthlyHistory[0].cash,
   ...ownProps,
 });
 

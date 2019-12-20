@@ -1,12 +1,12 @@
 const numbro = require('numbro');
 
-export function formatWatts(i: number): string {
+export function formatWatts(i: number, mantissa = 1): string {
   return numbro(i)
     .format({
       spaceSeparated: false,
       average: true,
       trimMantissa: true,
-      mantissa: 1,
+      mantissa,
     })
     // lowercase k for thousands in both cases
     .replace('m', 'M') // Capitalize MegaWatts

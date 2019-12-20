@@ -85,6 +85,7 @@ export interface DateType {
   hourOfFullYear: number;
   percentOfYear: number; // 0 - 1
   month: MonthType;
+  monthNumber: number; // 0 - 11
   year: number;
   sunrise: number;
   sunset: number;
@@ -111,6 +112,19 @@ export interface TimelineType {
   temperatureC: number;
 }
 
+export interface MonthlyHistoryType {
+  year: number;
+  month: number;
+  supplyWh: number; // total
+  demandWh: number; // total
+  cash: number; // ending (this is a live value in the current month)
+  netWorth: number; // ending
+  revenue: number; // total
+  expensesFuel: number; // total
+  expensesOM: number; // total
+  expensesTaxesFees: number; // total
+}
+
 export interface GameStateType {
   speed: SpeedType;
   inGame: boolean;
@@ -118,8 +132,8 @@ export interface GameStateType {
     // and is supplied as the seed at the start of any function that uses randomness
   currentMinute: number;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
+  monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   generators: GeneratorOperatingType[];
-  cash: number;
 }
 
 export type CardNameType =
