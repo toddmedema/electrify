@@ -25,6 +25,9 @@ function getRawSunlightPercent(date: DateType) {
   if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
     const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
     // TODO incorporate weather forecast (cloudiness)
+    // TODO fix the pointiness, esp in shorter winter months
+    // Maybe by factoring in day lenght to determine the shape of the curve?
+
     // Day length / minutes from dark used as proxy for season / max sun height
     // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
     // Solar panels generally follow a Bell curve
@@ -97,6 +100,7 @@ function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
   }
 
   // TODO actually calculate market price / sale value
+  // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const dollarsPerWh = 0.07 / 1000;
   const supplyWh = Math.min(now.supplyW, now.demandW) * TICK_MINUTES / 60;
   const demandWh = now.demandW * TICK_MINUTES / 60;

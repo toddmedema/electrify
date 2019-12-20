@@ -104,7 +104,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               {formatMoneyConcise(props.generator.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {props.generator.yearsToBuild} years to build
+              {Math.round(props.generator.yearsToBuild * 12)} months
             </Typography>
           </span>
         }

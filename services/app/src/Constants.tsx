@@ -74,6 +74,9 @@ export const FUELS = {
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
 // Output is sorted lowest cost first (TODO let user choose sort)
 export function GENERATORS(state: GameStateType, peakW: number) {
+  // 0 = 1MW, 4 = 10GW (+1 for each 10x)
+  const magnitude = Math.log10(peakW) - 6;
+
   return [
     // FUELED
     {
@@ -96,8 +99,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 3,
-      yearsToBuild: 4,
-        // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 3 + magnitude / 3,
+        // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     },
     {
       name: 'Nuclear',
@@ -116,7 +119,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 2,
-      yearsToBuild: 6,
+      yearsToBuild: 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     },
     // {
@@ -156,7 +159,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 4,
-      yearsToBuild: 3,
+      yearsToBuild: 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     },
     // {
@@ -187,8 +190,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       annualOperatingCost: 0.04 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 1,
-      yearsToBuild: 3,
-        // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 1 + magnitude / 2,
+        // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     },
     {
       name: 'Solar',
@@ -205,8 +208,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       priority: 1,
-      yearsToBuild: 2,
-        // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 1 + magnitude / 3,
+        // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     },
     // {
     //   name: 'Tidal',
