@@ -172,7 +172,8 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
   return state;
 }
 
-function newMonthlyHistoryEntry(minute: number, cash: number): MonthlyHistoryType {
+// TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
+function newMonthlyHistoryEntry(minute: number, cash: number, netWorth: number): MonthlyHistoryType {
   const date = getDateFromMinute(minute);
   return {
     year: date.year,
@@ -180,7 +181,7 @@ function newMonthlyHistoryEntry(minute: number, cash: number): MonthlyHistoryTyp
     supplyWh: 0,
     demandWh: 0,
     cash,
-    netWorth: 0,
+    netWorth,
     revenue: 0,
     expensesFuel: 0,
     expensesOM: 0,
@@ -188,7 +189,9 @@ function newMonthlyHistoryEntry(minute: number, cash: number): MonthlyHistoryTyp
   };
 }
 
-// TODO account for generators + depreciationc
+// TODO account for generators + depreciation
+// (once that's done, need to udpate newMonthlyHistoryEntry to just use gameState to calculate...)
+// (but, there's a circular dependency with declaring cash in the timeline...)
 function getNetWorth(gameState: GameStateType): number {
   return gameState.monthlyHistory[0].cash;
 }
@@ -237,7 +240,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       ...state,
       inGame: true,
       timeline: [] as TimelineType[],
-      monthlyHistory: [newMonthlyHistoryEntry(state.currentMinute, 1000000000)],
+      monthlyHistory: [newMonthlyHistoryEntry(state.currentMinute, 1000000000, 1000000000)],
     };
 
     // TODO this is where different scenarios could have different generator starting conditions
@@ -269,11 +272,11 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       // TODO (WARNING: PERFORMANCE HIT?) recalculate rest of forecast based on what just happened
       const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
       if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) { // If it's a new day / month
-        // Record final history for the month
+        // Record final history for the month, then insert a new blank month
         newState.monthlyHistory[0].netWorth = getNetWorth(newState);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newMinute, newState.monthlyHistory[0].cash));
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newMinute, newState.monthlyHistory[0].cash, getNetWorth(state)));
 
-        // Update timeline -keep the current (last) data point, recalculate everything else
+        // Update timeline - keep the current (last) data point, recalculate everything else
         newState.timeline = newState.timeline.slice(-1);
         for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
           newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
