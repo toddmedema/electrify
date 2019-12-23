@@ -12,6 +12,7 @@ import ListItemAvatar from '@material-ui/core/ListItemAvatar';
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
 import Slider from '@material-ui/core/Slider';
+import { withStyles } from '@material-ui/core/styles';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
@@ -121,13 +122,29 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           <Table size="small" aria-label="generator properties">
             <TableBody>
               <TableRow>
-                <TableCell>Peak output</TableCell>
+                <TableCell>Peak output
+                  <Typography variant="body2" color="textSecondary">
+                    In optimal conditions
+                  </Typography>
+                </TableCell>
                 <TableCell align="right">{formatWatts(props.generator.peakW)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Operating costs (/yr)</TableCell>
+                <TableCell>Operating costs (/yr)
+                  <Typography variant="body2" color="textSecondary">
+                    Costs regardless of output
+                  </Typography>
+                </TableCell>
                 <TableCell align="right">{formatMoneyConcise(props.generator.annualOperatingCost)}</TableCell>
               </TableRow>
+              {props.generator.spinMinutes && <TableRow>
+                <TableCell>Spin up/down time
+                  <Typography variant="body2" color="textSecondary">
+                    To go from zero to full output
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">{props.generator.spinMinutes} min</TableCell>
+              </TableRow>}
             </TableBody>
           </Table>
         </TableContainer>
@@ -154,11 +171,17 @@ interface ValueLabelProps {
   value: number;
 }
 
+const TooltipLarge = withStyles((theme) => ({
+  tooltip: {
+    fontSize: 14,
+  },
+}))(Tooltip);
+
 function ValueLabelComponent(props: ValueLabelProps) {
   return (
-    <Tooltip open={props.open} enterTouchDelay={0} placement="top" title={props.value} disableTouchListener={true} arrow={true}>
+    <TooltipLarge open={props.open} enterTouchDelay={0} placement="top" title={props.value} disableTouchListener arrow>
       {props.children}
-    </Tooltip>
+    </TooltipLarge>
   );
 }
 
@@ -178,7 +201,7 @@ export interface Props extends StateProps, DispatchProps {}
 export default function GeneratorsBuild(props: Props): JSX.Element {
   const {gameState, cash} = props;
   const [open, setOpen] = React.useState(false);
-  const [sliderTick, setSliderTick] = React.useState<number>(18);
+  const [sliderTick, setSliderTick] = React.useState<number>(22);
   const generatorCount = gameState.generators.length;
 
   const handleClickOpen = () => {
@@ -221,10 +244,13 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
+          <Typography id="peak-output">
+            Generator capacity
+          </Typography>
           <Slider
             value={sliderTick}
             aria-labelledby="peak-output"
-            valueLabelDisplay="auto"
+            valueLabelDisplay="on"
             min={0}
             step={1}
             max={36}

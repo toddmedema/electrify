@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getWeather} from 'shared/schema/Weather';
-import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, TICK_MINUTES, TICK_MS, YEARS_PER_TICK} from '../Constants';
+import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
@@ -52,23 +52,32 @@ function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperati
   return a.priority < b.priority ? 1 : -1;
 }
 
-function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number) {
+// Calculate how much is needed to be supplied to meet demandW
+function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number, demandW: number) {
   let supply = 0;
-  gameState.generators.forEach((generator: GeneratorOperatingType) => {
-    if (generator.yearsToBuildLeft === 0) {
-      switch (generator.fuel) {
+  // Executed in sort order
+  gameState.generators.forEach((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft === 0) {
+      switch (g.fuel) {
         case 'Sun':
           // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-          supply += generator.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
+          g.currentW = g.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
+          console.log(g.currentW);
           break;
         case 'Wind':
           // TODO what is the real number / curve for wind speed efficiency?
-          supply += generator.peakW * windKph / 30;
+          g.currentW = g.peakW * windKph / 30;
           break;
         default:
-          supply += generator.peakW;
+          // TODO base off existing state + spin rate
+          // TODO be intelligent about this
+          // How? if the forecast is increasing / decreasing, have larger / smaller reserve?
+          // Account for spin up / down time?
+          const targetW = Math.max(0, demandW * (1 + RESERVE_MARGIN) - supply);
+          g.currentW = Math.min(g.peakW, targetW);
           break;
       }
+      supply += g.currentW;
     }
   });
   return supply;
@@ -80,18 +89,19 @@ function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
   const sunlight = getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2);
   const windKph = weather.WIND_KPH;
   const temperatureC = weather.TEMP_C;
+  const demandW = getDemandW(date, gameState, sunlight, temperatureC);
 
   return ({
     minute,
-    supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC),
-    demandW: getDemandW(date, gameState, sunlight, temperatureC),
+    supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC, demandW),
+    demandW,
     sunlight,
     windKph,
     temperatureC,
   });
 }
 
-// Update the month's history with cumulative values -> use that to update finances
+// Each frame, update the month's history with cumulative values -> use that to update finances
 function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
   const monthlyHistory = gameState.monthlyHistory[0];
   const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.currentMinute);
