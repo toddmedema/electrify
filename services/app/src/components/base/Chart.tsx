@@ -45,8 +45,8 @@ const Chart = (props: Props): JSX.Element => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
   });
-  domainMin *= 0.93; // padding
-  domainMax *= 1.05; // padding
+  domainMin *= 0.94; // padding
+  domainMax *= 1.02; // padding
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin);

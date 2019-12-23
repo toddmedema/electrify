@@ -158,6 +158,9 @@ body {
 
 .MuiToolbar-root {
   min-height: 0 !important;
+  border-bottom: $border_accent;
+  flex: 0 0 auto;
+  flex-flow: wrap !important;
 
   h6 {
     flex-grow: 1;
@@ -166,11 +169,6 @@ body {
 
 #navfooter {
   border-top: $border_accent;
-}
-
-.MuiToolbar-root {
-  border-bottom: $border_accent;
-  flex: 0 0 auto;
 }
 
 .MuiMobileStepper-root {
@@ -183,6 +181,10 @@ body {
 
 span.weak {
   font-weight: 100;
+}
+
+.MuiSlider-root {
+  flex-basis: 100%;
 }
 
 // for text inputs that are close to bottom, give the screen space to scroll up

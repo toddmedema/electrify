@@ -55,7 +55,6 @@ export default function FinancesBuild(props: Props): JSX.Element {
       summary.expensesOM += history[i].expensesOM;
       summary.expensesTaxesFees += history[i].expensesTaxesFees;
       summary.netWorth = history[i].netWorth;
-      console.log(year, history[i].year, history[i].netWorth);
     }
   }
   const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees;

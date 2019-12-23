@@ -1,7 +1,6 @@
 import Avatar from '@material-ui/core/Avatar';
 import Button from '@material-ui/core/Button';
 import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
 import CardHeader from '@material-ui/core/CardHeader';
 import Collapse from '@material-ui/core/Collapse';
 import Dialog from '@material-ui/core/Dialog';
@@ -13,9 +12,15 @@ import ListItemAvatar from '@material-ui/core/ListItemAvatar';
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
 import Slider from '@material-ui/core/Slider';
+import Table from '@material-ui/core/Table';
+import TableBody from '@material-ui/core/TableBody';
+import TableCell from '@material-ui/core/TableCell';
+import TableContainer from '@material-ui/core/TableContainer';
+import TableRow from '@material-ui/core/TableRow';
 import Toolbar from '@material-ui/core/Toolbar';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
+
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
@@ -112,12 +117,20 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         subheader={props.generator.description}
       />
       <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <CardContent>
-          <span>
-            Peak output: {formatWatts(props.generator.peakW)}<br/>
-            Operating cost: {formatMoneyConcise(props.generator.annualOperatingCost)}/yr
-          </span>
-        </CardContent>
+        <TableContainer>
+          <Table size="small" aria-label="generator properties">
+            <TableBody>
+              <TableRow>
+                <TableCell>Peak output</TableCell>
+                <TableCell align="right">{formatWatts(props.generator.peakW)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Operating costs (/yr)</TableCell>
+                <TableCell align="right">{formatMoneyConcise(props.generator.annualOperatingCost)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Collapse>
     </Card>
   );
@@ -208,8 +221,6 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
-        </Toolbar>
-        <Toolbar>
           <Slider
             value={sliderTick}
             aria-labelledby="peak-output"
