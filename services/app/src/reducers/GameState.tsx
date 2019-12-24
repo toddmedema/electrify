@@ -115,12 +115,12 @@ function getSupplyWAndUpdateGenerators(generators: GeneratorOperatingType[], t: 
           g.currentW = g.peakW * t.windKph / 30;
           break;
         default:
-          // TODO base off existing state + spin rate
-          // TODO be intelligent about this
-          // How? if the forecast is increasing / decreasing, have larger / smaller reserve?
-          // Account for spin up / down time?
           const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
-          g.currentW = Math.min(g.peakW, targetW);
+          if (targetW < g.currentW) { // spinning down
+            g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / (g.spinMinutes || 1));
+          } else { // spinning up
+            g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / (g.spinMinutes || 1));
+          }
           break;
       }
       supply += g.currentW;
@@ -130,7 +130,8 @@ function getSupplyWAndUpdateGenerators(generators: GeneratorOperatingType[], t: 
 }
 
 function reforecastSupply(state: GameStateType): TimelineType[] {
-  const generators = [...state.generators]; // Make a temporary copy so that it can be revised in place
+  // Make temporary deep copy so that it can be revised in place
+  const generators = state.generators.map((g: GeneratorOperatingType) => ({...g}));
   return state.timeline.map((t: TimelineType) => {
     if (t.minute >= state.date.minute) {
       return {
@@ -189,7 +190,7 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
     ...g,
     id: Math.random(),
     priority: g.priority + Math.random(), // Vary priorities slightly
-    currentW: 0, // TODO it starts at 0, and spins up in future ticks
+    currentW: 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as GeneratorOperatingType;
   state.generators.push(generator);
