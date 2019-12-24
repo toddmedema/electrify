@@ -77,6 +77,7 @@ export function getDateFromMinute(minute: number): DateType {
   const hourOfFullYear = Math.floor(monthNumber * 30 * 24 + minuteOfDay / 60);
 
   return {
+    minute,
     minuteOfDay,
     hourOfFullYear,
     percentOfYear,

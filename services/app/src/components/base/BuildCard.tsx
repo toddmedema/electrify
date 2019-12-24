@@ -8,10 +8,9 @@ import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {setSpeed} from '../../reducers/GameState';
-import {AppStateType, GameStateType, SpeedType} from '../../Types';
+import {AppStateType, DateType, GameStateType, SpeedType} from '../../Types';
 import Chart from './Chart';
 import NavigationContainer from './NavigationContainer';
 
@@ -20,6 +19,7 @@ export interface BuildCardProps extends React.Props<any> {
   className?: string | undefined;
   gameState: GameStateType;
   cash: number;
+  date: DateType;
 }
 
 export interface DispatchProps {
@@ -29,14 +29,13 @@ export interface DispatchProps {
 export interface Props extends BuildCardProps, DispatchProps {}
 
 export function BuildCard(props: Props) {
-  const date = getDateFromMinute(props.gameState.currentMinute);
   return (
     <div className={props.className} id="buildCard">
       <div id="topbar">
         <Toolbar>
           <Typography variant="h6">
-            {date.month}
-            <span className="weak"> {date.year}</span>
+            {props.date.month}
+            <span className="weak"> {props.date.year}</span>
             &nbsp;&nbsp;&nbsp;{formatMoneyStable(props.cash)}
           </Typography>
           <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={props.gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
@@ -53,13 +52,13 @@ export function BuildCard(props: Props) {
           </IconButton>
         </Toolbar>
         <div id="yearProgressBar" style={{
-          width: `${date.percentOfYear * 100}%`,
+          width: `${props.date.percentOfYear * 100}%`,
         }}/>
       </div>
       <Chart
         height={180}
         timeline={props.gameState.timeline}
-        currentMinute={props.gameState.currentMinute}
+        currentMinute={props.date.minute}
       />
       {props.children}
       <NavigationContainer />
@@ -69,6 +68,7 @@ export function BuildCard(props: Props) {
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<BuildCardProps>): BuildCardProps => ({
   gameState: state.gameState,
+  date: state.gameState.date,
   cash: state.gameState.monthlyHistory[0].cash,
   ...ownProps,
 });

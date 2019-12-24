@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {getWeather} from 'shared/schema/Weather';
-import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, YEARS_PER_TICK} from '../Constants';
+import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
+import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
@@ -11,7 +11,7 @@ export const initialGameState: GameStateType = {
   speed: 'NORMAL',
   inGame: false,
   generators: [] as GeneratorOperatingType[],
-  currentMinute: 180, // This is the line where the chart switches from historic to forecast
+  date: getDateFromMinute(0),
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
@@ -19,21 +19,6 @@ export const initialGameState: GameStateType = {
 
 export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
-}
-
-function getRawSunlightPercent(date: DateType) {
-  if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
-    const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
-    // TODO incorporate weather forecast (cloudiness)
-    // TODO fix the pointiness, esp in shorter winter months
-    // Maybe by factoring in day lenght to determine the shape of the curve?
-
-    // Day length / minutes from dark used as proxy for season / max sun height
-    // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
-    // Solar panels generally follow a Bell curve
-    return 1 / (1 + Math.pow(Math.E, (-0.015 * (minutesFromDark - 260))));
-  }
-  return 0;
 }
 
 function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
@@ -104,7 +89,7 @@ function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
 // Each frame, update the month's history with cumulative values -> use that to update finances
 function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
   const monthlyHistory = gameState.monthlyHistory[0];
-  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.currentMinute);
+  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
   if (!now) {
     return monthlyHistory;
   }
@@ -143,11 +128,26 @@ function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
 
 function reforecast(newState: GameStateType): TimelineType[] {
   return newState.timeline.map((t: TimelineType) => {
-    if (t.minute > newState.currentMinute) {
+    if (t.minute >= newState.date.minute) {
       return generateTimelineDatapoint(t.minute, newState);
     }
     return t;
   });
+}
+
+function generateNewTimeline(startingMinute: number): TimelineType[] {
+  const array = new Array(TICKS_PER_DAY) as TimelineType[];
+  for (let i = 0; i < TICKS_PER_DAY; i++) {
+    array[i] = {
+      minute: startingMinute + i * TICK_MINUTES,
+      supplyW: 0,
+      demandW: 0,
+      sunlight: 0,
+      windKph: 0,
+      temperatureC: 0,
+    };
+  }
+  return array;
 }
 
 // Updates generator construction / spin up status
@@ -183,8 +183,7 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
 }
 
 // TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
-function newMonthlyHistoryEntry(minute: number, cash: number, netWorth: number): MonthlyHistoryType {
-  const date = getDateFromMinute(minute);
+function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number): MonthlyHistoryType {
   return {
     year: date.year,
     month: date.monthNumber,
@@ -243,6 +242,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     leftGenerator.priority = rightGenerator.priority;
     rightGenerator.priority = leftPriority;
     newState.generators.sort(sortGeneratorsByPriority);
+    newState.timeline = reforecast(newState);
     return newState;
 
   } else if (action.type === 'GAME_START') {
@@ -250,16 +250,14 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       ...state,
       inGame: true,
       timeline: [] as TimelineType[],
-      monthlyHistory: [newMonthlyHistoryEntry(state.currentMinute, 1000000000, 1000000000)],
+      monthlyHistory: [newMonthlyHistoryEntry(state.date, 1000000000, 1000000000)],
     };
 
     // TODO this is where different scenarios could have different generator starting conditions
     const COAL_GENERATOR = GENERATORS(newState, 2000000000).find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
     newState = buildGenerator(newState, COAL_GENERATOR);
-
-    for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-      newState.timeline.push(generateTimelineDatapoint(minute, state));
-    }
+    newState.timeline = generateNewTimeline(0);
+    newState.timeline = reforecast(newState);
     return newState;
 
   } else if (action.type === 'SET_SPEED') {
@@ -272,25 +270,20 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     if (state.inGame && state.speed !== 'PAUSED') {
       const newState = {
         ...state,
-        currentMinute: state.currentMinute + TICK_MINUTES,
+        date: getDateFromMinute(state.date.minute + TICK_MINUTES),
         generators: updateGenerators(state),
       };
 
       newState.monthlyHistory[0] = updateMonthlyHistory(state);
 
-      // Update timeline
-      // TODO (WARNING: PERFORMANCE HIT?) recalculate rest of forecast based on what just happened
-      const newMinute = state.timeline[state.timeline.length - 1].minute + TICK_MINUTES;
-      if (Math.floor(newState.currentMinute / 1440) > Math.floor(state.currentMinute / 1440)) { // If it's a new day / month
+      if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
         // Record final history for the month, then insert a new blank month
         newState.monthlyHistory[0].netWorth = getNetWorth(newState);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newMinute, newState.monthlyHistory[0].cash, getNetWorth(state)));
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.monthlyHistory[0].cash, getNetWorth(state)));
 
-        // Update timeline - keep the current (last) data point, recalculate everything else
-        newState.timeline = newState.timeline.slice(-1);
-        for (let minute = 0; minute < 1440; minute += TICK_MINUTES) {
-          newState.timeline.push(generateTimelineDatapoint(newMinute + minute, newState));
-        }
+        // Populate a new forecast timeline
+        newState.timeline = generateNewTimeline(newState.date.minute);
+        newState.timeline = reforecast(newState);
       }
 
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);

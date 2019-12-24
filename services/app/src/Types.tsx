@@ -81,6 +81,7 @@ export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
 export interface DateType {
+  minute: number;
   minuteOfDay: number;
   hourOfFullYear: number;
   percentOfYear: number; // 0 - 1
@@ -130,7 +131,7 @@ export interface GameStateType {
   inGame: boolean;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
-  currentMinute: number;
+  date: DateType;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   generators: GeneratorOperatingType[];

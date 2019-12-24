@@ -9,13 +9,13 @@ import Typography from '@material-ui/core/Typography';
 
 import {STARTING_YEAR} from 'app/Constants';
 import * as React from 'react';
-import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {GameStateType, MonthlyHistoryType} from '../../Types';
+import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import BuildCard from '../base/BuildCard';
 
 export interface StateProps {
   gameState: GameStateType;
+  date: DateType;
 }
 
 export interface DispatchProps {
@@ -24,14 +24,13 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function FinancesBuild(props: Props): JSX.Element {
-  const date = getDateFromMinute(props.gameState.currentMinute);
   const years = [];
   // Go in reverse so that newest value (current year) is on top
-  for (let i = date.year; i >= STARTING_YEAR; i--) {
+  for (let i = props.date.year; i >= STARTING_YEAR; i--) {
     years.push(i);
   }
 
-  const [year, setYear] = React.useState(date.year);
+  const [year, setYear] = React.useState(props.date.year);
   const handleYearSelect = (newYear: number) => {
     setYear(newYear);
   };
@@ -63,7 +62,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
     <BuildCard className="Finances">
       <Toolbar>
         <Typography variant="h6">Finances for </Typography>
-        <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
+        <Select defaultValue={props.date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
           {years.map((y: number) => {
             return <MenuItem value={y} key={y}>{y}</MenuItem>;
           })}

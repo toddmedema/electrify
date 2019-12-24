@@ -244,10 +244,11 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
           <IconButton edge="end" color="primary" onClick={handleClose} aria-label="close">
             <CloseIcon />
           </IconButton>
-          <Typography id="peak-output">
+          <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
             Generator capacity
           </Typography>
           <Slider
+            className="flex-newline"
             value={sliderTick}
             aria-labelledby="peak-output"
             valueLabelDisplay="on"

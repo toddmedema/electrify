@@ -11,6 +11,7 @@ export const TICK_MS = {
 export const RESERVE_MARGIN = 0.15;
 export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const TICK_MINUTES = 15;
+export const TICKS_PER_DAY = Math.ceil(1440 / TICK_MINUTES);
 export const DAYS_PER_MONTH = 1;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const STARTING_YEAR = 1990;
