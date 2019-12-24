@@ -33,66 +33,9 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   return demandMultiple * 4200000;
 }
 
-function sortGeneratorsByPriority(a: GeneratorOperatingType, b: GeneratorOperatingType) {
-  return a.priority < b.priority ? 1 : -1;
-}
-
-// Calculate how much is needed to be supplied to meet demandW
-function getSupplyW(gameState: GameStateType, sunlight: number, windKph: number, temperatureC: number, demandW: number) {
-  let supply = 0;
-  // Executed in sort order
-  gameState.generators.forEach((g: GeneratorOperatingType) => {
-    if (g.yearsToBuildLeft === 0) {
-      switch (g.fuel) {
-        case 'Sun':
-          // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-          g.currentW = g.peakW * sunlight * Math.max(1, 1 - (temperatureC - 10) / 100);
-          console.log(g.currentW);
-          break;
-        case 'Wind':
-          // TODO what is the real number / curve for wind speed efficiency?
-          g.currentW = g.peakW * windKph / 30;
-          break;
-        default:
-          // TODO base off existing state + spin rate
-          // TODO be intelligent about this
-          // How? if the forecast is increasing / decreasing, have larger / smaller reserve?
-          // Account for spin up / down time?
-          const targetW = Math.max(0, demandW * (1 + RESERVE_MARGIN) - supply);
-          g.currentW = Math.min(g.peakW, targetW);
-          break;
-      }
-      supply += g.currentW;
-    }
-  });
-  return supply;
-}
-
-function generateTimelineDatapoint(minute: number, gameState: GameStateType) {
-  const date = getDateFromMinute(minute);
-  const weather = getWeather('SF', date.hourOfFullYear);
-  const sunlight = getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2);
-  const windKph = weather.WIND_KPH;
-  const temperatureC = weather.TEMP_C;
-  const demandW = getDemandW(date, gameState, sunlight, temperatureC);
-
-  return ({
-    minute,
-    supplyW: getSupplyW(gameState, sunlight, windKph, temperatureC, demandW),
-    demandW,
-    sunlight,
-    windKph,
-    temperatureC,
-  });
-}
-
 // Each frame, update the month's history with cumulative values -> use that to update finances
-function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
+function updateMonthlyHistory(gameState: GameStateType, now: TimelineType): MonthlyHistoryType {
   const monthlyHistory = gameState.monthlyHistory[0];
-  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
-  if (!now) {
-    return monthlyHistory;
-  }
 
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
@@ -126,13 +69,85 @@ function updateMonthlyHistory(gameState: GameStateType): MonthlyHistoryType {
   };
 }
 
-function reforecast(newState: GameStateType): TimelineType[] {
-  return newState.timeline.map((t: TimelineType) => {
-    if (t.minute >= newState.date.minute) {
-      return generateTimelineDatapoint(t.minute, newState);
+function reforecastWeather(state: GameStateType): TimelineType[] {
+  return state.timeline.map((t: TimelineType) => {
+    if (t.minute >= state.date.minute) {
+      const date = getDateFromMinute(t.minute);
+      const weather = getWeather('SF', date.hourOfFullYear);
+      return {
+        ...t,
+        sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2),
+        windKph: weather.WIND_KPH,
+        temperatureC: weather.TEMP_C,
+      };
     }
     return t;
   });
+}
+
+function reforecastDemand(state: GameStateType): TimelineType[] {
+  return state.timeline.map((t: TimelineType) => {
+    if (t.minute >= state.date.minute) {
+      const date = getDateFromMinute(t.minute);
+      return {
+        ...t,
+        demandW: getDemandW(date, state, t.sunlight, t.temperatureC),
+      };
+    }
+    return t;
+  });
+}
+
+// Calculate how much is needed to be supplied to meet demandW
+// and changes generator status (in place)
+function getSupplyWAndUpdateGenerators(generators: GeneratorOperatingType[], t: TimelineType) {
+  let supply = 0;
+  // Executed in sort order, aka highest priority first
+  generators.forEach((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft === 0) {
+      switch (g.fuel) {
+        case 'Sun':
+          // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+          g.currentW = g.peakW * t.sunlight * Math.max(1, 1 - (t.temperatureC - 10) / 100);
+          break;
+        case 'Wind':
+          // TODO what is the real number / curve for wind speed efficiency?
+          g.currentW = g.peakW * t.windKph / 30;
+          break;
+        default:
+          // TODO base off existing state + spin rate
+          // TODO be intelligent about this
+          // How? if the forecast is increasing / decreasing, have larger / smaller reserve?
+          // Account for spin up / down time?
+          const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
+          g.currentW = Math.min(g.peakW, targetW);
+          break;
+      }
+      console.log(g.currentW, g.peakW);
+      supply += g.currentW;
+    }
+  });
+  return supply;
+}
+
+function reforecastSupply(state: GameStateType): TimelineType[] {
+  const generators = [...state.generators]; // Make a temporary copy so that it can be revised in place
+  return state.timeline.map((t: TimelineType) => {
+    if (t.minute >= state.date.minute) {
+      return {
+        ...t,
+        supplyW: getSupplyWAndUpdateGenerators(generators, t),
+      };
+    }
+    return t;
+  });
+}
+
+function reforecastAll(newState: GameStateType): TimelineType[] {
+  newState.timeline = reforecastWeather(newState);
+  newState.timeline = reforecastDemand(newState);
+  newState.timeline = reforecastSupply(newState);
+  return newState.timeline;
 }
 
 function generateNewTimeline(startingMinute: number): TimelineType[] {
@@ -150,17 +165,10 @@ function generateNewTimeline(startingMinute: number): TimelineType[] {
   return array;
 }
 
-// Updates generator construction / spin up status
-function updateGenerators(state: GameStateType): GeneratorOperatingType[] {
-  return state.generators.map((g: GeneratorOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-    } else {
-      // TODO automanage based on demand, don't blindly spin up to max
-      if (g.currentW < g.peakW) {
-        g.currentW = Math.min(g.peakW, g.currentW + g.peakW / (g.spinMinutes || 1) * TICK_MINUTES);
-      }
-    }
+// Updates generator construction status
+function updateGeneratorConstruction(generators: GeneratorOperatingType[]): GeneratorOperatingType[] {
+  return generators.map((g: GeneratorOperatingType) => {
+    g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
     return g;
   });
 }
@@ -177,7 +185,7 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as GeneratorOperatingType;
   state.generators.push(generator);
-  state.generators.sort(sortGeneratorsByPriority);
+  state.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
   state.monthlyHistory[0].cash -= newGame ? 0 : generator.buildCost;
   return state;
 }
@@ -206,17 +214,18 @@ function getNetWorth(gameState: GameStateType): number {
 }
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
-  // If statements instead of switch here b/c compiler was complaining about newState being redeclared in block-scope
+  // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
   if (action.type === 'BUILD_GENERATOR') {
+
     const a = action as BuildGeneratorAction;
     const newState = buildGenerator({...state}, a.generator);
-    newState.timeline = reforecast(newState);
+    newState.timeline = reforecastSupply(newState);
     return newState;
 
   } else if (action.type === 'SELL_GENERATOR') {
+
     const newState = {...state};
     const generatorId = (action as SellGeneratorAction).id;
-
     // in one loop, refund cash from selling + remove from list of generators
     newState.generators = newState.generators.filter((g: GeneratorOperatingType) => {
       if (g.id === generatorId) {
@@ -229,11 +238,11 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       }
       return true;
     });
-
-    newState.timeline = reforecast(newState);
+    newState.timeline = reforecastSupply(newState);
     return newState;
 
   } else if (action.type === 'REPRIORITIZE_GENERATOR') {
+
     const a = action as ReprioritizeGeneratorAction;
     const newState = {...state};
     const leftGenerator = newState.generators[a.spotInList];
@@ -241,40 +250,46 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     const leftPriority = leftGenerator.priority;
     leftGenerator.priority = rightGenerator.priority;
     rightGenerator.priority = leftPriority;
-    newState.generators.sort(sortGeneratorsByPriority);
-    newState.timeline = reforecast(newState);
+    newState.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
+    newState.timeline = reforecastSupply(newState);
     return newState;
 
   } else if (action.type === 'GAME_START') {
+
     let newState = {
       ...state,
       inGame: true,
       timeline: [] as TimelineType[],
       monthlyHistory: [newMonthlyHistoryEntry(state.date, 1000000000, 1000000000)],
     };
-
     // TODO this is where different scenarios could have different generator starting conditions
     const COAL_GENERATOR = GENERATORS(newState, 2000000000).find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
     newState = buildGenerator(newState, COAL_GENERATOR);
     newState.timeline = generateNewTimeline(0);
-    newState.timeline = reforecast(newState);
+    newState.timeline = reforecastAll(newState);
     return newState;
 
   } else if (action.type === 'SET_SPEED') {
+
     return {...state, speed: (action as SetSpeedAction).speed};
 
   } else if (action.type === 'GAME_EXIT') {
+
     return {...initialGameState};
 
   } else if (action.type === 'GAME_TICK') {
+
     if (state.inGame && state.speed !== 'PAUSED') {
       const newState = {
         ...state,
         date: getDateFromMinute(state.date.minute + TICK_MINUTES),
-        generators: updateGenerators(state),
+        generators: updateGeneratorConstruction(state.generators),
       };
-
-      newState.monthlyHistory[0] = updateMonthlyHistory(state);
+      const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
+      if (now) {
+        getSupplyWAndUpdateGenerators(newState.generators, now);
+        newState.monthlyHistory[0] = updateMonthlyHistory(state, now);
+      }
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
         // Record final history for the month, then insert a new blank month
@@ -283,7 +298,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
-        newState.timeline = reforecast(newState);
+        newState.timeline = reforecastAll(newState);
       }
 
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);

@@ -49,7 +49,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
   if (underConstruction) {
     secondaryText = `Building: ${Math.round((props.generator.yearsToBuild - props.generator.yearsToBuildLeft) / props.generator.yearsToBuild * 100)}%, ${Math.ceil(props.generator.yearsToBuildLeft * 12)} months left`;
   } else {
-    secondaryText = `${formatWatts(props.generator.currentW).replace(/\D/g, '')}/${formatWatts(props.generator.peakW)}`;
+    secondaryText = `${formatWatts(props.generator.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(props.generator.peakW)}`;
   }
   return (
     <ListItem disabled={underConstruction}>
