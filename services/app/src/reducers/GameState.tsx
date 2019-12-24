@@ -123,7 +123,6 @@ function getSupplyWAndUpdateGenerators(generators: GeneratorOperatingType[], t: 
           g.currentW = Math.min(g.peakW, targetW);
           break;
       }
-      console.log(g.currentW, g.peakW);
       supply += g.currentW;
     }
   });
@@ -166,11 +165,20 @@ function generateNewTimeline(startingMinute: number): TimelineType[] {
 }
 
 // Updates generator construction status
-function updateGeneratorConstruction(generators: GeneratorOperatingType[]): GeneratorOperatingType[] {
-  return generators.map((g: GeneratorOperatingType) => {
-    g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-    return g;
+// reforecasts supply if any complete
+function updateGeneratorConstruction(state: GameStateType): void {
+  let oneFinished = false;
+  state.generators.forEach((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft > 0) {
+      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
+      if (g.yearsToBuildLeft === 0) {
+        oneFinished = true;
+      }
+    }
   });
+  if (oneFinished) {
+    state.timeline = reforecastSupply(state);
+  }
 }
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
@@ -283,8 +291,8 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       const newState = {
         ...state,
         date: getDateFromMinute(state.date.minute + TICK_MINUTES),
-        generators: updateGeneratorConstruction(state.generators),
       };
+      updateGeneratorConstruction(newState);
       const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
       if (now) {
         getSupplyWAndUpdateGenerators(newState.generators, now);
