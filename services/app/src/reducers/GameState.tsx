@@ -30,7 +30,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * 4200000;
+  return demandMultiple * 4300000;
 }
 
 // Each frame, update the month's history with cumulative values -> use that to update finances
