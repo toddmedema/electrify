@@ -15,7 +15,7 @@ const DUMMY_WEATHER = {
   WIND_PCT_CALM: 50,
 };
 
-export function initWeather(location: string) {
+export function initWeather(location: string, callback?: any) {
   weather[location] = new Array(8760); // Perf optimization: initialize at expected length
   let rowNumber = 0;
   Papa.parse(`/data/WeatherRaw${location}.csv`, {
@@ -28,6 +28,9 @@ export function initWeather(location: string) {
     },
     complete() {
       console.log('Weather downloaded for ' + location);
+      if (callback) {
+        callback();
+      }
     },
   });
 }

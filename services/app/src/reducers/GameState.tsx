@@ -3,7 +3,7 @@ import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -190,7 +190,7 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameSta
     ...g,
     id: Math.random(),
     priority: g.priority + Math.random(), // Vary priorities slightly
-    currentW: 0,
+    currentW: newGame ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as GeneratorOperatingType;
   state.generators.push(generator);
@@ -263,20 +263,32 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     newState.timeline = reforecastSupply(newState);
     return newState;
 
-  } else if (action.type === 'GAME_START') {
+  } else if (action.type === 'NEW_GAME') {
 
+    const a = action as NewGameAction;
     let newState = {
       ...state,
-      inGame: true,
       timeline: [] as TimelineType[],
-      monthlyHistory: [newMonthlyHistoryEntry(state.date, 1000000000, 1000000000)],
+      monthlyHistory: [newMonthlyHistoryEntry(state.date, a.cash, a.cash)],
     };
-    // TODO this is where different scenarios could have different generator starting conditions
-    const COAL_GENERATOR = GENERATORS(newState, 2000000000).find((g: GeneratorShoppingType) => g.name === 'Coal') as GeneratorShoppingType;
-    newState = buildGenerator(newState, COAL_GENERATOR);
+    a.generators.forEach((search: Partial<GeneratorShoppingType>) => {
+      const newGen = GENERATORS(newState, search.peakW || 1000000).find((g: GeneratorShoppingType) => {
+        for (const property in search) {
+          if (g[property] !== search[property]) {
+            return false;
+          }
+        }
+        return true;
+      }) as GeneratorShoppingType;
+      newState = buildGenerator(newState, newGen);
+    });
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
     return newState;
+
+  } else if (action.type === 'GAME_LOADED') {
+
+    return {...state, inGame: true};
 
   } else if (action.type === 'SET_SPEED') {
 

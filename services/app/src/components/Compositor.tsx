@@ -15,6 +15,7 @@ import {
 import AudioContainer from './base/AudioContainer';
 import FinancesContainer from './views/FinancesContainer';
 import GeneratorsContainer from './views/GeneratorsContainer';
+import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
 import StorageContainer from './views/StorageContainer';
@@ -59,6 +60,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <SettingsContainer />;
       case 'MAIN_MENU':
         return <MainMenuContainer />;
+      case 'LOADING':
+        return <LoadingContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }

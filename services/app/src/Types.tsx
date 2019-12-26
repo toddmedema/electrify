@@ -60,6 +60,12 @@ export interface UiDeltaAction extends Redux.Action {
   delta: Partial<UIType>;
 }
 
+export interface NewGameAction extends Redux.Action {
+  type: 'NEW_GAME';
+  generators: Partial<GeneratorShoppingType>[];
+  cash: number;
+}
+
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
 export interface AudioType {
   loaded: AudioLoadingType;
@@ -139,6 +145,7 @@ export type CardNameType =
   'STORAGE' |
   'FINANCES' |
   'GENERATORS' |
+  'LOADING' |
   'MAIN_MENU' |
   'SETTINGS' |
   'TUTORIAL';
@@ -162,6 +169,7 @@ export interface GeneratorOperatingType extends GeneratorShoppingType {
 }
 
 export interface GeneratorShoppingType {
+  [index: string]: any;
   name: string;
   description: string;
   fuel: FuelNameType;
