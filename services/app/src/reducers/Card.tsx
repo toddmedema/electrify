@@ -19,6 +19,11 @@ export function card(state: CardType = initialCard, action: Redux.Action): CardT
       return to;
     case 'GAME_START':
       return {
+        name: 'LOADING',
+        ts: Date.now(),
+      };
+    case 'GAME_LOADED':
+      return {
         name: 'GENERATORS',
         ts: Date.now(),
       };
