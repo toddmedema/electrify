@@ -6,7 +6,6 @@ import Generators, {DispatchProps, StateProps} from './Generators';
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     gameState: state.gameState,
-    date: state.gameState.date,
     cash: state.gameState.monthlyHistory[0].cash,
   };
 };
