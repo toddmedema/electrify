@@ -11,7 +11,7 @@ import {STARTING_YEAR} from 'app/Constants';
 import * as React from 'react';
 import {formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
-import BuildCard from '../base/BuildCard';
+import GameCard from '../base/GameCard';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -59,7 +59,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
   const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees;
 
   return (
-    <BuildCard className="Finances">
+    <GameCard className="Finances">
       <Toolbar>
         <Typography variant="h6">Finances for </Typography>
         <Select defaultValue={props.date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
@@ -106,6 +106,6 @@ export default function FinancesBuild(props: Props): JSX.Element {
           </TableBody>
         </Table>
       </div>
-    </BuildCard>
+    </GameCard>
   );
 }

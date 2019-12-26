@@ -14,7 +14,7 @@ import {AppStateType, DateType, GameStateType, SpeedType} from '../../Types';
 import Chart from './Chart';
 import NavigationContainer from './NavigationContainer';
 
-export interface BuildCardProps extends React.Props<any> {
+export interface GameCardProps extends React.Props<any> {
   children?: JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
@@ -26,11 +26,11 @@ export interface DispatchProps {
   onSpeedChange: (speed: SpeedType) => void;
 }
 
-export interface Props extends BuildCardProps, DispatchProps {}
+export interface Props extends GameCardProps, DispatchProps {}
 
-export function BuildCard(props: Props) {
+export function GameCard(props: Props) {
   return (
-    <div className={props.className} id="buildCard">
+    <div className={props.className} id="gameCard">
       <div id="topbar">
         <Toolbar>
           <Typography variant="h6">
@@ -66,7 +66,7 @@ export function BuildCard(props: Props) {
   );
 }
 
-const mapStateToProps = (state: AppStateType, ownProps: Partial<BuildCardProps>): BuildCardProps => ({
+const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>): GameCardProps => ({
   gameState: state.gameState,
   date: state.gameState.date,
   cash: state.gameState.monthlyHistory[0].cash,
@@ -81,9 +81,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const BuildCardContainer = connect(
+const GameCardContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(BuildCard);
+)(GameCard);
 
-export default BuildCardContainer;
+export default GameCardContainer;

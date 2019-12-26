@@ -11,7 +11,7 @@ import * as React from 'react';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
 import {GameStateType, GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
-import BuildCard from '../base/BuildCard';
+import GameCard from '../base/GameCard';
 
 interface GeneratorListItemProps {
   generator: GeneratorOperatingType;
@@ -195,7 +195,7 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
   };
 
   return (
-    <BuildCard className="generators">
+    <GameCard className="generators">
       <Toolbar>
         <Typography variant="h6">Generators</Typography>
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>
@@ -250,6 +250,6 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
           )}
         </DialogContent>
       </Dialog>
-    </BuildCard>
+    </GameCard>
   );
 }
