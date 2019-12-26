@@ -39,7 +39,7 @@ function updateMonthlyHistory(gameState: GameStateType, now: TimelineType): Mont
 
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
-  const dollarsPerWh = 0.07 / 1000;
+  const dollarsPerWh = 0.07 / 1000 * 4; // TODO bump factor just to see a profit
   const supplyWh = Math.min(now.supplyW, now.demandW) * TICK_MINUTES / 60;
   const demandWh = now.demandW * TICK_MINUTES / 60;
   const revenue = supplyWh * dollarsPerWh;

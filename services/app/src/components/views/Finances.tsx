@@ -11,6 +11,7 @@ import {STARTING_YEAR} from 'app/Constants';
 import * as React from 'react';
 import {formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
+import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
 
 export interface StateProps {
@@ -44,22 +45,33 @@ export default function FinancesBuild(props: Props): JSX.Element {
     expensesOM: 0,
     expensesTaxesFees: 0,
   } as MonthlyHistoryType;
+  const timeline = [];
   // Go in reverse so that the last values for ending values (like net worth are used)
   for (let i = history.length - 1; i >= 0 ; i--) {
-    if (!year || history[i].year === year) {
-      summary.supplyWh += history[i].supplyWh;
-      summary.demandWh += history[i].demandWh;
-      summary.revenue += history[i].revenue;
-      summary.expensesFuel += history[i].expensesFuel;
-      summary.expensesOM += history[i].expensesOM;
-      summary.expensesTaxesFees += history[i].expensesTaxesFees;
-      summary.netWorth = history[i].netWorth;
+    const h = history[i];
+    if (!year || h.year === year) {
+      timeline.push({
+        month: h.year * 12 + h.month,
+        year: h.year,
+        profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees),
+      });
+      summary.supplyWh += h.supplyWh;
+      summary.demandWh += h.demandWh;
+      summary.revenue += h.revenue;
+      summary.expensesFuel += h.expensesFuel;
+      summary.expensesOM += h.expensesOM;
+      summary.expensesTaxesFees += h.expensesTaxesFees;
+      summary.netWorth = h.netWorth;
     }
   }
   const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees;
 
   return (
     <GameCard className="Finances">
+      <ChartFinances
+        height={180}
+        timeline={timeline}
+      />
       <Toolbar>
         <Typography variant="h6">Finances for </Typography>
         <Select defaultValue={props.date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>

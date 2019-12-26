@@ -43,7 +43,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
         {!underConstruction && props.spotInList > 0 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, -1)} edge="end" color="primary">
           <ArrowUpwardIcon />
         </IconButton>}
-        {!underConstruction && props.spotInList < props.listLength - 1 && <IconButton onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} edge="end" color="primary">
+        {!underConstruction && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritizeGenerator(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
         {!underConstruction && <IconButton onClick={() => props.onSellGenerator(props.generator.id)} edge="end" color="primary">
