@@ -39,8 +39,10 @@ export const FUELS = {
   // Thus 1GJ = 32kg
   // Historic price per short ton (907kg): https://www.eia.gov/energyexplained/coal/prices-and-outlook.php
   // Just CO2 emission per MBTu (215lb/1.05GJ): https://www.eia.gov/tools/faqs/faq.php?id=73&t=11
+  // TODO I arrived at this number by tweaking it in the simulation vs EIA numbers
+    // Need to figure out where my calculations went wrong
   'Coal': {
-    costPerBtu: 0.0000017, // pretty even 2000-2018
+    costPerBtu: 0.000002, // pretty even 2000-2018
     kgCO2ePerBtu: 0.000098,
   },
 
@@ -50,30 +52,34 @@ export const FUELS = {
     // California about national average, but does vary by location: http://www.ppinys.org/reports/jtf2004/naturalgas.htm
   // Natural gas has a large methane component, not just CO2 https://www.epa.gov/sites/production/files/2018-01/documents/2018_executive_summary.pdf
   // 15lbs CO2e per 100cf http://www.co2list.org/files/carbon.htm
+  // TODO I arrived at this number by tweaking it in the simulation vs EIA numbers
+    // Need to figure out where my calculations went wrong
   'Natural Gas': {
-    costPerBtu: 0.0000000049, // Between 2000 and 2018, sometimes spiked to 3x price - using $5/1k cf avg here, ranges $4-12
+    costPerBtu: 0.000003, // Between 2000 and 2018, sometimes spiked to 3x price - using $5/1k cf avg here, ranges $4-12
     kgCO2ePerBtu: 0.000000066,
   },
 
-  // TODO  - once I do oil, check to see whether it's closer to natural gas or coal, one of those is off by ~2 orders
-  // TODO sanity check vs fuel costs here - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-  'Oil': {
-    costPerBtu: 999,
-    kgCO2ePerBtu: 999,
-  },
-
   // TODO
+  // 'Oil': {
+  //   costPerBtu: 999,
+  //   kgCO2ePerBtu: 999,
+  // },
+
+  // $0.71 per million BTU https://www.eia.gov/opendata/qb.php?category=40290&sdid=SEDS.NUETD.WI.A
   'Uranium': {
-    costPerBtu: 999,
-    kgCO2ePerBtu: 999,
+    costPerBtu: 0.00000071,
+    kgCO2ePerBtu: 0,
   },
 
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
-  'Trash': {
-    costPerBtu: 999,
-    kgCO2ePerBtu: 999,
-  },
+  // 'Trash': {
+  //   costPerBtu: 999,
+  //   kgCO2ePerBtu: 999,
+  // },
 } as { [fuel: string]: FuelType };
+
+const DUTY_CYCLE_ONDEMAND = 0.5;
+const DUTY_CYCLE_RENEWABLE = 0.3;
 
 // TODO additional sources of inforomation
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
@@ -96,11 +102,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2019 avg plant is 430 MW and cost $1.5b
         // 1/4 fixed = $376m, 3/4 variable = $2.6/w
       peakW,
-      btuPerW: 10.5,
+      btuPerWh: 10.5,
         // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 60,
-      annualOperatingCost: 0.05 * peakW,
+      annualOperatingCost: 0.0051 * peakW * DUTY_CYCLE_ONDEMAND,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 3,
@@ -117,10 +123,10 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2019 avg plant is ~1GW and cost $6b
         // 1/4 fixed = $1.5b, 3/4 variable = $4.5/w
       peakW,
-      btuPerW: 10.5,
+      btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.1 * peakW,
+      annualOperatingCost: 0.01 * peakW * DUTY_CYCLE_ONDEMAND,
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 2,
@@ -155,11 +161,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2018/9 avg plant is 284MW and cost $284M
         // 1/4 fixed = $71m, 3/4 variable = $0.75/w
       peakW,
-      btuPerW: 7.8,
+      btuPerWh: 7.8,
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.01 * peakW,
+      annualOperatingCost: 0.0025 * peakW * DUTY_CYCLE_ONDEMAND,
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -192,7 +198,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 90MW and cost $172m
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
-      annualOperatingCost: 0.04 * peakW,
+      annualOperatingCost: 0.004 * peakW * DUTY_CYCLE_RENEWABLE,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       priority: 1,
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
@@ -209,7 +215,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
-      annualOperatingCost: 0.023 * peakW,
+      annualOperatingCost: 0.0023 * peakW * DUTY_CYCLE_RENEWABLE,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       priority: 1,

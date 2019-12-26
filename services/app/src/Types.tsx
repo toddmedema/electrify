@@ -181,7 +181,7 @@ export interface GeneratorShoppingType {
   peakW: number;
   yearsToBuild: number;
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
-  btuPerW?: number; // Heat Rate, but per W for less math per frame
+  btuPerWh?: number; // Heat Rate, but per W for less math per frame
   spinMinutes?: number;
 }
 
