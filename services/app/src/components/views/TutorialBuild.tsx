@@ -5,7 +5,7 @@ import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
 import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import * as React from 'react';
 import SwipeableViews from 'react-swipeable-views';
-import Chart from '../base/Chart';
+import ChartSupplyDemand from '../base/ChartSupplyDemand';
 
 export interface StateProps {
 }
@@ -113,7 +113,7 @@ const tutorialSteps = [
   </div>,
   <div>
     <Typography variant="h6">Forecast for average Spring day</Typography>
-    <Chart
+    <ChartSupplyDemand
       height={200}
       timeline={forecastGood}
     />
@@ -121,12 +121,12 @@ const tutorialSteps = [
     <p>Use it to help decide which generators to build and when to acquire customers.</p>
   </div>,
   <div>
-    <Chart
+    <ChartSupplyDemand
       height={160}
       timeline={forecastShortBlackout}
     />
     <p><strong>Short blackouts</strong> are best solved with batteries or “peaking” generators that spin up quickly</p>
-    <Chart
+    <ChartSupplyDemand
       height={160}
       timeline={forecastLongBlackout}
     />

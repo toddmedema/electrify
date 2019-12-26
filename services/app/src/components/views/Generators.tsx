@@ -1,5 +1,5 @@
 import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogContent, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Tooltip, Typography} from '@material-ui/core';
-import { withStyles } from '@material-ui/core/styles';
+import {withStyles} from '@material-ui/core/styles';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
@@ -10,7 +10,8 @@ import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {GENERATORS} from '../../Constants';
-import {GameStateType, GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
+import {DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
+import ChartSupplyDemand from '../base/ChartSupplyDemand';
 import GameCard from '../base/GameCard';
 
 interface GeneratorListItemProps {
@@ -166,6 +167,7 @@ function ValueLabelComponent(props: ValueLabelProps) {
 export interface StateProps {
   gameState: GameStateType;
   cash: number;
+  date: DateType;
 }
 
 export interface DispatchProps {
@@ -196,6 +198,11 @@ export default function GeneratorsBuild(props: Props): JSX.Element {
 
   return (
     <GameCard className="generators">
+      <ChartSupplyDemand
+        height={180}
+        timeline={props.gameState.timeline}
+        currentMinute={props.date.minute}
+      />
       <Toolbar>
         <Typography variant="h6">Generators</Typography>
         <Button size="small" variant="outlined" color="primary" onClick={handleClickOpen}>BUILD</Button>

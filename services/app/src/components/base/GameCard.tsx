@@ -11,7 +11,6 @@ import Redux from 'redux';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {setSpeed} from '../../reducers/GameState';
 import {AppStateType, DateType, GameStateType, SpeedType} from '../../Types';
-import Chart from './Chart';
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.Props<any> {
@@ -55,11 +54,6 @@ export function GameCard(props: Props) {
           width: `${props.date.percentOfYear * 100}%`,
         }}/>
       </div>
-      <Chart
-        height={180}
-        timeline={props.gameState.timeline}
-        currentMinute={props.date.minute}
-      />
       {props.children}
       <NavigationContainer />
     </div >

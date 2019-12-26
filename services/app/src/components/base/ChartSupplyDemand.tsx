@@ -35,7 +35,7 @@ function getIntersectionX(line1StartX: number, line1StartY: number, line1EndX: n
 
 // TODO how to indicate reality vs forecast? Perhaps current time as a prop, and then split it in the chart
 // and don't actually differentiate between reality +  forecast in data?
-const Chart = (props: Props): JSX.Element => {
+const ChartSupplyDemand = (props: Props): JSX.Element => {
   // Figure out the boundaries of the chart data
   let domainMin = 999999999999;
   let domainMax = 0;
@@ -227,4 +227,4 @@ const Chart = (props: Props): JSX.Element => {
     </div>
   );
 };
-export default Chart;
+export default ChartSupplyDemand;
