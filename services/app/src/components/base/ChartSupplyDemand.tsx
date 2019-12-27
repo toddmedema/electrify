@@ -134,7 +134,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={formatWatts}
+          tickFormat={(t: number) => formatWatts(t)}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{

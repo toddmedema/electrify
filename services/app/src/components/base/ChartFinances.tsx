@@ -56,7 +56,7 @@ const ChartFinances = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={formatMoneyConcise}
+          tickFormat={(t) => formatMoneyConcise(t)}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
