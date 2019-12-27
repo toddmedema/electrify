@@ -180,7 +180,7 @@ export default function GeneratorsBuildDialog(props: Props): JSX.Element {
       onClose={props.toggleOpen}
     >
       <Toolbar>
-        <Typography variant="h6">Build a Generator ({formatMoneyStable(cash)})</Typography>
+        <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={props.toggleOpen} aria-label="close">
           <CloseIcon />
         </IconButton>

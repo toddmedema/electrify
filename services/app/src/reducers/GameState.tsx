@@ -4,7 +4,7 @@ import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -20,6 +20,10 @@ export const initialGameState: GameStateType = {
 
 export function setSpeed(speed: SpeedType): SetSpeedAction {
   return { type: 'SET_SPEED', speed };
+}
+
+export function quitGame(): QuitGameAction {
+  return { type: 'GAME_EXIT' };
 }
 
 function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
@@ -226,7 +230,7 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType, financed
     currentW: newGame ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as GeneratorOperatingType;
-  state.generators.push(generator);
+  state.generators = [...state.generators, generator];
   state.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
   return state;
 }

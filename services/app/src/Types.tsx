@@ -56,6 +56,10 @@ export interface SetSpeedAction extends Redux.Action {
   speed: SpeedType
 }
 
+export interface QuitGameAction extends Redux.Action {
+  type: 'GAME_EXIT';
+}
+
 export interface UiDeltaAction extends Redux.Action {
   type: 'UI_DELTA';
   delta: Partial<UIType>;
