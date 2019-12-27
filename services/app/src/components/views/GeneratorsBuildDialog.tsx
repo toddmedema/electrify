@@ -5,17 +5,19 @@ import InfoIcon from '@material-ui/icons/Info';
 
 import * as React from 'react';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {GENERATORS} from '../../Constants';
+import {DOWNPAYMENT_PERCENT, GENERATORS} from '../../Constants';
 import {GameStateType, GeneratorShoppingType} from '../../Types';
 
 interface GeneratorBuildItemProps {
   cash: number;
   generator: GeneratorShoppingType;
-  onBuild: DispatchProps['onBuildGenerator'];
+  onBuild: (financed: boolean) => void;
 }
 
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
+  const {generator, cash} = props;
   const [expanded, setExpanded] = React.useState(false);
+  const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
 
   const handleExpandClick = () => {
     setExpanded(!expanded);
@@ -24,7 +26,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   return (
     <Card>
       <CardHeader
-        avatar={<Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />}
+        avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.png`} />}
         action={
           <span>
             <IconButton onClick={handleExpandClick} aria-label="show more">
@@ -33,19 +35,19 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             <Button
               size="small"
               variant="contained"
-              color="primary"
-              onClick={(e: any) => props.onBuild(props.generator)}
-              disabled={props.generator.buildCost > props.cash}
+              color={cash > generator.buildCost ? 'primary' : 'secondary'}
+              onClick={(e: any) => props.onBuild(cash < generator.buildCost)}
+              disabled={downpayment > cash}
             >
-              {formatMoneyConcise(props.generator.buildCost)}
+              {formatMoneyConcise(generator.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {Math.round(props.generator.yearsToBuild * 12)} months
+              {Math.round(generator.yearsToBuild * 12)} months
             </Typography>
           </span>
         }
-        title={props.generator.name}
-        subheader={props.generator.description}
+        title={generator.name}
+        subheader={generator.description}
       />
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
@@ -57,7 +59,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                     In optimal conditions
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatWatts(props.generator.peakW)}</TableCell>
+                <TableCell align="right">{formatWatts(generator.peakW)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>Operating costs (/yr)
@@ -65,15 +67,15 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                     Costs regardless of output
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(props.generator.annualOperatingCost)}</TableCell>
+                <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}</TableCell>
               </TableRow>
-              {props.generator.spinMinutes && <TableRow>
+              {generator.spinMinutes && <TableRow>
                 <TableCell>Spin up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{props.generator.spinMinutes} min</TableCell>
+                <TableCell align="right">{generator.spinMinutes} min</TableCell>
               </TableRow>}
             </TableBody>
           </Table>
@@ -123,7 +125,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildGenerator: (generator: GeneratorShoppingType) => void;
+  onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -170,7 +172,7 @@ export default function GeneratorsBuildDialog(props: Props): JSX.Element {
             generator={g}
             key={i}
             cash={cash}
-            onBuild={(generator: GeneratorShoppingType) => { props.onBuildGenerator(generator); props.toggleOpen(); }}
+            onBuild={(financed: boolean) => { props.onBuildGenerator(g, financed); props.toggleOpen(); }}
           />
         )}
       </DialogContent>

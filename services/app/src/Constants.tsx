@@ -10,9 +10,15 @@ export const TICK_MS = {
 };
 export const RESERVE_MARGIN = 0.15;
 export const GENERATOR_SELL_MULTIPLIER = 0.5;
+export const DOWNPAYMENT_PERCENT = 0.2;
+export const INTEREST_RATE_YEARLY = 0.04;
+export const LOAN_MONTHS = 30 * 12;
+
 export const TICK_MINUTES = 15;
 export const TICKS_PER_DAY = Math.ceil(1440 / TICK_MINUTES);
 export const DAYS_PER_MONTH = 1;
+export const TICKS_PER_MONTH = TICKS_PER_DAY / DAYS_PER_MONTH;
+export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const STARTING_YEAR = 1990;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];

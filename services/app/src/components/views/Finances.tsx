@@ -44,6 +44,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
     expensesFuel: 0,
     expensesOM: 0,
     expensesTaxesFees: 0,
+    expensesInterest: 0,
   } as MonthlyHistoryType;
   const timeline = [];
   // Go in reverse so that the last values for ending values (like net worth are used)
@@ -53,7 +54,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
       timeline.push({
         month: h.year * 12 + h.month,
         year: h.year,
-        profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees),
+        profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees + h.expensesInterest),
       });
       summary.supplyWh += h.supplyWh;
       summary.demandWh += h.demandWh;
@@ -61,10 +62,11 @@ export default function FinancesBuild(props: Props): JSX.Element {
       summary.expensesFuel += h.expensesFuel;
       summary.expensesOM += h.expensesOM;
       summary.expensesTaxesFees += h.expensesTaxesFees;
+      summary.expensesInterest += h.expensesInterest;
       summary.netWorth = h.netWorth;
     }
   }
-  const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees;
+  const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees + summary.expensesInterest;
 
   return (
     <GameCard className="Finances">
@@ -85,7 +87,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
         <Table size="small">
           <TableBody>
             <TableRow>
-              <TableCell colSpan={2}>Revenue</TableCell>
+              <TableCell colSpan={2}>Income</TableCell>
               <TableCell align="right">{formatMoneyStable(summary.revenue)}</TableCell>
             </TableRow>
             <TableRow>
@@ -101,6 +103,11 @@ export default function FinancesBuild(props: Props): JSX.Element {
               <TableCell></TableCell>
               <TableCell>Operations</TableCell>
               <TableCell align="right">{formatMoneyStable(summary.expensesOM)}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell></TableCell>
+              <TableCell>Interest</TableCell>
+              <TableCell align="right">{formatMoneyStable(summary.expensesInterest)}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell></TableCell>

@@ -15,6 +15,7 @@ export interface AudioDataSetAction extends Redux.Action {
 export interface BuildGeneratorAction extends Redux.Action {
   type: 'BUILD_GENERATOR';
   generator: GeneratorShoppingType;
+  financed: boolean;
 }
 
 export interface SellGeneratorAction extends Redux.Action {
@@ -128,6 +129,7 @@ export interface MonthlyHistoryType {
   expensesFuel: number; // total
   expensesOM: number; // total
   expensesTaxesFees: number; // total
+  expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
 }
 
 export interface GameStateType {
@@ -166,6 +168,9 @@ export interface GeneratorOperatingType extends GeneratorShoppingType {
   id: number;
   currentW: number;
   yearsToBuildLeft: number;
+  loanAmountTotal: number;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
 }
 
 export interface GeneratorShoppingType {

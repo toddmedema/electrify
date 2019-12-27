@@ -15,8 +15,8 @@ interface GeneratorListItemProps {
   generator: GeneratorOperatingType;
   spotInList: number;
   listLength: number;
-  onSellGenerator: (id: number) => void;
-  onReprioritizeGenerator: (spotInList: number, delta: number) => void;
+  onSellGenerator: DispatchProps['onSellGenerator'];
+  onReprioritizeGenerator: DispatchProps['onReprioritizeGenerator'];
 }
 
 function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
@@ -60,7 +60,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildGenerator: (generator: GeneratorShoppingType) => void;
+  onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => void;
   onSellGenerator: (id: number) => void;
   onReprioritizeGenerator: (spotInList: number, delta: number) => void;
 }

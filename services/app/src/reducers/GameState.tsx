@@ -1,7 +1,8 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
+import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {DAYS_PER_YEAR, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, YEARS_PER_TICK} from '../Constants';
+import {DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, ReprioritizeGeneratorAction, SellGeneratorAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
@@ -46,14 +47,25 @@ function updateMonthlyHistory(gameState: GameStateType, now: TimelineType): Mont
 
   let expensesOM = 0;
   let expensesFuel = 0;
+  let expensesInterest = 0;
+  let principalRepayment = 0;
   const expensesTaxesFees = 0; // TODO
   gameState.generators.forEach((g: GeneratorOperatingType) => {
     if (g.yearsToBuildLeft === 0) {
-      expensesOM += g.annualOperatingCost / DAYS_PER_YEAR / 1440 * TICK_MINUTES;
+      expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerWh || 0) * TICK_MINUTES / 60;
         expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
       }
+      if (g.loanAmountLeft > 0) {
+        const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
+        const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
+        expensesInterest += paymentInterest / TICKS_PER_MONTH;
+        principalRepayment += paymentPrincipal / TICKS_PER_MONTH;
+        g.loanAmountLeft -= paymentPrincipal / TICKS_PER_MONTH;
+      }
+    } else {
+      expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
     }
   });
 
@@ -63,7 +75,8 @@ function updateMonthlyHistory(gameState: GameStateType, now: TimelineType): Mont
     expensesOM: monthlyHistory.expensesOM + expensesOM,
     expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
     expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees,
-    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees),
+    expensesInterest: monthlyHistory.expensesInterest + expensesInterest,
+    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees - expensesInterest - principalRepayment),
     supplyWh: monthlyHistory.supplyWh + supplyWh,
     demandWh: monthlyHistory.demandWh + demandWh,
   };
@@ -184,18 +197,36 @@ function updateGeneratorConstruction(state: GameStateType): void {
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
 // which can be done once after multiple builds
-function buildGenerator(state: GameStateType, g: GeneratorShoppingType): GameStateType {
+function buildGenerator(state: GameStateType, g: GeneratorShoppingType, financed: boolean): GameStateType {
   const newGame = state.timeline.length === 0;
+  let financing = {
+    loanAmountTotal: 0,
+    loanAmountLeft: 0,
+    loanMonthlyPayment: 0,
+  };
+  if (newGame) {
+    // Don't charge anything for initial generators
+  } else if (financed) {
+    state.monthlyHistory[0].cash -= g.buildCost * DOWNPAYMENT_PERCENT;
+    const loanAmount = g.buildCost * (1 - DOWNPAYMENT_PERCENT);
+    financing = {
+      loanAmountTotal: loanAmount,
+      loanAmountLeft: loanAmount,
+      loanMonthlyPayment: getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS),
+    };
+  } else { // purchased in cash
+    state.monthlyHistory[0].cash -= g.buildCost;
+  }
   const generator = {
     ...g,
+    ...financing,
     id: Math.random(),
-    priority: g.priority + Math.random(), // Vary priorities slightly
+    priority: g.priority + Math.random(), // Vary priorities slightly for consistent sorting
     currentW: newGame ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as GeneratorOperatingType;
   state.generators.push(generator);
   state.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
-  state.monthlyHistory[0].cash -= newGame ? 0 : generator.buildCost;
   return state;
 }
 
@@ -212,10 +243,11 @@ function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number):
     expensesFuel: 0,
     expensesOM: 0,
     expensesTaxesFees: 0,
+    expensesInterest: 0,
   };
 }
 
-// TODO account for generators + depreciation
+// TODO account for generator current value (incl depreciation) + debts (i.e. outstanding loan principle)
 // (once that's done, need to udpate newMonthlyHistoryEntry to just use gameState to calculate...)
 // (but, there's a circular dependency with declaring cash in the timeline...)
 function getNetWorth(gameState: GameStateType): number {
@@ -227,7 +259,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
   if (action.type === 'BUILD_GENERATOR') {
 
     const a = action as BuildGeneratorAction;
-    const newState = buildGenerator({...state}, a.generator);
+    const newState = buildGenerator({...state}, a.generator, a.financed);
     newState.timeline = reforecastSupply(newState);
     return newState;
 
@@ -280,7 +312,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         }
         return true;
       }) as GeneratorShoppingType;
-      newState = buildGenerator(newState, newGen);
+      newState = buildGenerator(newState, newGen, false);
     });
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
