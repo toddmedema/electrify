@@ -37,29 +37,34 @@ export function GameCard(props: Props) {
     return <span/>;
   }
 
-  const [anchorEl, setAnchorEl] = React.useState(null);
-
-  const handleClick = (event: any) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+  const [speedAnchorEl, setSpeedAnchorEl] = React.useState(null);
+  const handleMenuClick = (event: any) => setMenuAnchorEl(event.currentTarget);
+  const handleMenuClose = () => setMenuAnchorEl(null);
+  const handleSpeedClick = (event: any) => setSpeedAnchorEl(event.currentTarget);
+  const handleSpeedClose = () => setSpeedAnchorEl(null);
+  let speedIcon = <PlayArrowIcon />;
+  switch (props.gameState.speed) {
+    case 'PAUSED': speedIcon = <PauseIcon />; break;
+    case 'SLOW': speedIcon = <ChevronRightIcon />; break;
+    case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
+    case 'FAST': speedIcon = <FastForwardIcon />; break;
+    default: break;
+  }
 
   return (
     <div className={props.className} id="gameCard">
       <div id="topbar">
         <Toolbar>
-          <IconButton onClick={handleClick} aria-label="menu" edge="start" color="primary">
+          <IconButton onClick={handleMenuClick} aria-label="menu" edge="start" color="primary">
             <MoreVertIcon />
           </IconButton>
           <Menu
             id="gameCardMenu"
-            anchorEl={anchorEl}
+            anchorEl={menuAnchorEl}
             keepMounted
-            open={Boolean(anchorEl)}
-            onClose={handleClose}
+            open={Boolean(menuAnchorEl)}
+            onClose={handleMenuClose}
           >
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
@@ -67,18 +72,29 @@ export function GameCard(props: Props) {
             <span className="weak">{props.date.month} {props.date.year}</span>
             &nbsp;({formatMoneyStable(props.cash)})
           </Typography>
-          <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={props.gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
-            <PauseIcon />
+          <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary">
+            {speedIcon}
           </IconButton>
-          <IconButton onClick={() => props.onSpeedChange('SLOW')} disabled={props.gameState.speed === 'SLOW'} aria-label="slow-speed" edge="end" color="primary">
-            <ChevronRightIcon />
-          </IconButton>
-          <IconButton onClick={() => props.onSpeedChange('NORMAL')} disabled={props.gameState.speed === 'NORMAL'} aria-label="normal-speed" edge="end" color="primary">
-            <PlayArrowIcon />
-          </IconButton>
-          <IconButton onClick={() => props.onSpeedChange('FAST')} disabled={props.gameState.speed === 'FAST'} aria-label="fast-speed" edge="end" color="primary">
-            <FastForwardIcon />
-          </IconButton>
+          <Menu
+            id="speedMenu"
+            anchorEl={speedAnchorEl}
+            keepMounted
+            open={Boolean(speedAnchorEl)}
+            onClose={handleSpeedClose}
+          >
+            <MenuItem onClick={() => { props.onSpeedChange('PAUSED'); handleSpeedClose(); }} disabled={props.gameState.speed === 'PAUSED'} aria-label="pause">
+              <PauseIcon color="primary" />
+            </MenuItem>
+            <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={props.gameState.speed === 'SLOW'} aria-label="slow-speed">
+              <ChevronRightIcon color="primary" />
+            </MenuItem>
+            <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={props.gameState.speed === 'NORMAL'} aria-label="normal-speed">
+              <PlayArrowIcon color="primary" />
+            </MenuItem>
+            <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={props.gameState.speed === 'FAST'} aria-label="fast-speed">
+              <FastForwardIcon color="primary" />
+            </MenuItem>
+          </Menu>
         </Toolbar>
         <div id="yearProgressBar" style={{
           width: `${props.date.percentOfYear * 100}%`,
