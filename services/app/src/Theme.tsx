@@ -1,3 +1,4 @@
+import amber from '@material-ui/core/colors/amber';
 import {createMuiTheme} from '@material-ui/core/styles';
 import {defaultTheme} from 'shared/Theme';
 
@@ -6,5 +7,6 @@ export default createMuiTheme({
   palette: {
     ...defaultTheme.palette,
     type: 'light',
+    secondary: amber,
   },
 });
