@@ -1,11 +1,11 @@
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogContent, IconButton, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Tooltip, Typography} from '@material-ui/core';
-import {withStyles} from '@material-ui/core/styles';
+import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
 import CloseIcon from '@material-ui/icons/Close';
 import InfoIcon from '@material-ui/icons/Info';
 
 import * as React from 'react';
+import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {DOWNPAYMENT_PERCENT, GENERATORS} from '../../Constants';
+import {DOWNPAYMENT_PERCENT, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GameStateType, GeneratorShoppingType} from '../../Types';
 
 interface GeneratorBuildItemProps {
@@ -17,10 +17,18 @@ interface GeneratorBuildItemProps {
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const {generator, cash} = props;
   const [expanded, setExpanded] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
+  const loanAmount = props.generator.buildCost - downpayment;
+  const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
+  const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
 
   const handleExpandClick = () => {
     setExpanded(!expanded);
+  };
+
+  const toggleOpen = () => {
+    setOpen(!open);
   };
 
   return (
@@ -36,7 +44,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               size="small"
               variant="contained"
               color={cash > generator.buildCost ? 'primary' : 'secondary'}
-              onClick={(e: any) => props.onBuild(cash < generator.buildCost)}
+              onClick={(e: any) => (cash < generator.buildCost) ? toggleOpen() : props.onBuild(false)}
               disabled={downpayment > cash}
             >
               {formatMoneyConcise(generator.buildCost)}
@@ -81,6 +89,53 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           </Table>
         </TableContainer>
       </Collapse>
+
+      <Dialog
+        open={open}
+        onClose={toggleOpen}
+      >
+        <DialogTitle>Take a loan to build {generator.name}?</DialogTitle>
+        <DialogContent dividers>
+          <TableContainer>
+            <Table size="small" aria-label="loan properties">
+              <TableBody>
+                <TableRow>
+                  <TableCell>Loan amount</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(loanAmount)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Downpayment</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Interest rate (/yr)</TableCell>
+                  <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Payments during construction (interest only)</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Payments once complete (principle + interest)</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Loan duration</TableCell>
+                  <TableCell align="right">Construction + {LOAN_MONTHS / 12} years</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button autoFocus color="primary" onClick={toggleOpen}>
+            Cancel
+          </Button>
+          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(); }}>
+            Built it
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }
@@ -95,26 +150,6 @@ function getW(tick: number) {
 
 function valueLabelFormat(x: number) {
   return formatWatts(getW(x));
-}
-
-interface ValueLabelProps {
-  children: any;
-  open: boolean;
-  value: number;
-}
-
-const TooltipLarge = withStyles((theme) => ({
-  tooltip: {
-    fontSize: 14,
-  },
-}))(Tooltip);
-
-function ValueLabelComponent(props: ValueLabelProps) {
-  return (
-    <TooltipLarge open={props.open} enterTouchDelay={0} placement="top" title={props.value} disableTouchListener arrow>
-      {props.children}
-    </TooltipLarge>
-  );
 }
 
 export interface StateProps {
@@ -150,19 +185,16 @@ export default function GeneratorsBuildDialog(props: Props): JSX.Element {
           <CloseIcon />
         </IconButton>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Generator capacity
+          Generator capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography>
         </Typography>
         <Slider
           className="flex-newline"
           value={sliderTick}
           aria-labelledby="peak-output"
-          valueLabelDisplay="on"
+          valueLabelDisplay="off"
           min={0}
           step={1}
           max={36}
-          getAriaValueText={valueLabelFormat}
-          valueLabelFormat={valueLabelFormat}
-          ValueLabelComponent={ValueLabelComponent}
           onChange={handleSliderChange}
         />
       </Toolbar>

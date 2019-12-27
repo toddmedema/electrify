@@ -4,9 +4,10 @@ import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 
+import {TICK_MINUTES} from 'app/Constants';
+import {GameStateType, GeneratorOperatingType, GeneratorShoppingType} from 'app/Types';
 import * as React from 'react';
 import {formatWatts} from 'shared/helpers/Format';
-import {GameStateType, GeneratorOperatingType, GeneratorShoppingType} from '../../Types';
 import ChartSupplyDemand from '../base/ChartSupplyDemand';
 import GameCard from '../base/GameCard';
 import GeneratorsBuildDialog from './GeneratorsBuildDialog';
@@ -66,40 +67,56 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
+interface State {
+  open: boolean;
+}
 
-export default function Generators(props: Props): JSX.Element {
-  const {gameState, cash} = props;
-  const [open, setOpen] = React.useState(false);
-  const generatorCount = gameState.generators.length;
+export default class extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = {open: false};
+  }
 
-  const toggleOpen = () => {
-    setOpen(!open);
-  };
+  public shouldComponentUpdate(nextProps: Props, nextState: any) {
+    if (nextProps.gameState.speed === 'FAST') {
+      return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0); // skip rendering alternating frames so that CPU can focus on simulation
+    }
+    return true;
+  }
 
-  return (
-    <GameCard className="generators">
-      <ChartSupplyDemand
-        height={180}
-        timeline={gameState.timeline}
-        currentMinute={gameState.date.minute}
-      />
-      <Toolbar>
-        <Typography variant="h6">Generators</Typography>
-        <Button size="small" variant="outlined" color="primary" onClick={toggleOpen}>BUILD</Button>
-      </Toolbar>
-      <List dense className="scrollable">
-        {gameState.generators.map((g: GeneratorOperatingType, i: number) =>
-          <GeneratorListItem
-            generator={g}
-            key={g.id}
-            onSellGenerator={(id: number) => props.onSellGenerator(id)}
-            onReprioritizeGenerator={props.onReprioritizeGenerator}
-            spotInList={i}
-            listLength={generatorCount}
-          />
-        )}
-      </List>
-      <GeneratorsBuildDialog open={open} toggleOpen={toggleOpen} gameState={gameState} cash={cash} onBuildGenerator={props.onBuildGenerator} />
-    </GameCard>
-  );
+  public render() {
+    const {gameState, cash, onSellGenerator, onReprioritizeGenerator, onBuildGenerator} = this.props;
+    const generatorCount = gameState.generators.length;
+
+    const toggleOpen = () => {
+      this.setState((state: any) => ({open: !state.open }));
+    };
+
+    return (
+      <GameCard className="generators">
+        {this.state.open ? <span/> : <ChartSupplyDemand
+          height={180}
+          timeline={gameState.timeline}
+          currentMinute={gameState.date.minute}
+        />}
+        <Toolbar>
+          <Typography variant="h6">Generators</Typography>
+          <Button size="small" variant="outlined" color="primary" onClick={toggleOpen}>BUILD</Button>
+        </Toolbar>
+        <List dense className="scrollable">
+          {gameState.generators.map((g: GeneratorOperatingType, i: number) =>
+            <GeneratorListItem
+              generator={g}
+              key={g.id}
+              onSellGenerator={(id: number) => onSellGenerator(id)}
+              onReprioritizeGenerator={onReprioritizeGenerator}
+              spotInList={i}
+              listLength={generatorCount}
+            />
+          )}
+        </List>
+        <GeneratorsBuildDialog open={this.state.open} toggleOpen={toggleOpen} gameState={gameState} cash={cash} onBuildGenerator={onBuildGenerator} />
+      </GameCard>
+    );
+  }
 }

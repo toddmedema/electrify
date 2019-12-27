@@ -213,7 +213,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Solar',
       fuel: 'Sun',
-      description: 'Produces during the day, more during the summer',
+      description: 'Produces most during summer daytime',
       buildCost: 3900000 + 1.275 * peakW,
         // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf

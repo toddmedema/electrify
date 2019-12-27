@@ -207,8 +207,9 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType, financed
   if (newGame) {
     // Don't charge anything for initial generators
   } else if (financed) {
-    state.monthlyHistory[0].cash -= g.buildCost * DOWNPAYMENT_PERCENT;
-    const loanAmount = g.buildCost * (1 - DOWNPAYMENT_PERCENT);
+    const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
+    state.monthlyHistory[0].cash -= downpayment;
+    const loanAmount = g.buildCost - downpayment;
     financing = {
       loanAmountTotal: loanAmount,
       loanAmountLeft: loanAmount,
