@@ -12,8 +12,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onBuildGenerator: (generator: GeneratorShoppingType) => {
-      dispatch({type: 'BUILD_GENERATOR', generator} as BuildGeneratorAction);
+    onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => {
+      dispatch({type: 'BUILD_GENERATOR', generator, financed} as BuildGeneratorAction);
     },
     onSellGenerator: (id: number) => {
       dispatch({type: 'SELL_GENERATOR', id} as SellGeneratorAction);
