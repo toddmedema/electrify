@@ -46,8 +46,8 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const dollarsPerWh = 0.07 / 1000;
-  const supplyWh = Math.min(now.supplyW, now.demandW) * TICK_MINUTES / 60;
-  const demandWh = now.demandW * TICK_MINUTES / 60;
+  const supplyWh = Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR;
+  const demandWh = now.demandW / TICKS_PER_HOUR;
   const revenue = supplyWh * dollarsPerWh;
 
   let expensesOM = 0;
@@ -59,7 +59,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
     if (g.yearsToBuildLeft === 0) {
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (FUELS[g.fuel]) {
-        const fuelBtu = g.currentW * (g.btuPerWh || 0) * TICK_MINUTES / 60;
+        const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR;
         expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
       }
       if (g.loanAmountLeft > 0) {
@@ -134,10 +134,11 @@ function reforecastDemand(state: GameStateType): TimelineType[] {
 // and changes generator / storage status (in place)
 // (doesn't count storage charging against supply created)
 function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType[], storage: StorageOperatingType[], t: TimelineType) {
-  const target = t.demandW * (1 + RESERVE_MARGIN);
   let supply = 0;
   let charge = 0;
   // Executed in sort order, aka highest priority first
+  // Renewables produce what they will
+  // On demand should target producing up to demand + reserve margin
   generators.forEach((g: GeneratorOperatingType) => {
     if (g.yearsToBuildLeft === 0) {
       switch (g.fuel) {
@@ -150,7 +151,7 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
           g.currentW = g.peakW * t.windKph / 30;
           break;
         default:
-          const targetW = Math.max(0, target - supply);
+          const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
           if (targetW < g.currentW) { // spinning down
             g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / (g.spinMinutes || 1));
           } else { // spinning up
@@ -165,11 +166,11 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
   storage.forEach((g: StorageOperatingType) => {
     if (g.yearsToBuildLeft === 0) {
       if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
-        g.currentW = Math.min(g.peakW, target - supply, g.currentWh);
+        g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
         g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
         supply += g.currentW;
       } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
-        g.currentW = Math.min(g.peakW, supply - t.demandW - charge, g.peakWh - g.currentWh);
+        g.currentW = Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
         g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR);
         charge += g.currentW;
       }

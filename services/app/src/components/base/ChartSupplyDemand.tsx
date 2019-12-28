@@ -18,6 +18,7 @@ interface BlackoutEdges {
 export interface Props {
   currentMinute?: number;
   height?: number;
+  legend?: boolean;
   timeline: ChartData[];
 }
 
@@ -212,7 +213,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             },
           }}
         />}
-        <VictoryLegend x={280} y={12}
+        {props.legend && <VictoryLegend x={280} y={12}
           centerTitle
           orientation="vertical"
           rowGutter={-5}
@@ -222,7 +223,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             { name: 'Demand', symbol: { fill: demandColor } },
             { name: 'Blackout', symbol: { fill: blackoutColor } },
           ]}
-        />
+        />}
       </VictoryChart>
     </div>
   );

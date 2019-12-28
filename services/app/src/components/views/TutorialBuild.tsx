@@ -114,6 +114,7 @@ const tutorialSteps = [
   <div>
     <Typography variant="h6">Forecast for average Spring day</Typography>
     <ChartSupplyDemand
+      legend={true}
       height={200}
       timeline={forecastGood}
     />
@@ -122,11 +123,13 @@ const tutorialSteps = [
   </div>,
   <div>
     <ChartSupplyDemand
+      legend={true}
       height={160}
       timeline={forecastShortBlackout}
     />
     <p><strong>Short blackouts</strong> are best solved with batteries or “peaking” generators that spin up quickly</p>
     <ChartSupplyDemand
+      legend={true}
       height={160}
       timeline={forecastLongBlackout}
     />
