@@ -15,6 +15,10 @@ export function formatWatts(i: number, mantissa = 1): string {
     + 'W';
 }
 
+export function formatWattHours(i: number, mantissa = 1): string {
+  return formatWatts(i, mantissa) + 'h';
+}
+
 // used for numbers that flicker rapidly to preserve length / visual stability
 export function formatMoneyStable(i: number): string {
   return '$' + numbro(i).format({ average: true, totalLength: 3 }).toUpperCase();

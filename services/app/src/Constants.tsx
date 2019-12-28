@@ -1,5 +1,5 @@
 import {NODE_ENV} from 'shared/schema/Constants';
-import {CardNameType, FuelType, GameStateType, GeneratorShoppingType, MonthType} from './Types';
+import {CardNameType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
 const DEV = (NODE_ENV === 'dev');
 
@@ -15,6 +15,7 @@ export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;
 
 export const TICK_MINUTES = 15;
+export const TICKS_PER_HOUR = 60 / TICK_MINUTES;
 export const TICKS_PER_DAY = Math.ceil(1440 / TICK_MINUTES);
 export const DAYS_PER_MONTH = 1;
 export const TICKS_PER_MONTH = TICKS_PER_DAY / DAYS_PER_MONTH;
@@ -265,6 +266,36 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     // },
   ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as GeneratorShoppingType[];
+}
+
+// TODO additional sources of inforomation
+// Output is sorted lowest cost first (TODO let user choose sort)
+export function STORAGE(state: GameStateType, peakW: number, peakWh: number) {
+  // 0 = 1MW, 4 = 10GW (+1 for each 10x)
+  const magnitude = Math.log10(peakW) - 6;
+
+  return [
+    {
+      name: 'Battery',
+      fuel: 'Battery',
+      description: 'Fast, but limited capacity',
+      buildCost: 43000000 + 1.4 * peakW,
+        // TODO
+      peakW,
+      peakWh,
+      lifespanYears: 15,
+        // https://www.nrel.gov/docs/fy19osti/73222.pdf
+      roundTripEfficiency: 0.85,
+        // https://www.nrel.gov/docs/fy19osti/73222.pdf
+      monthlyLoss: 0.5,
+        // TODO
+      annualOperatingCost: 0.004 * peakW * DUTY_CYCLE_RENEWABLE,
+        // TODO
+      priority: 1,
+      yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
+        // TODO
+    },
+  ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as StorageShoppingType[];
 }
 
 export const NAV_CARDS = ['GENERATORS', 'STORAGE', 'FINANCES'] as CardNameType[];

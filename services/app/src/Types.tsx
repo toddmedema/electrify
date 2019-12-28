@@ -29,6 +29,23 @@ export interface ReprioritizeGeneratorAction extends Redux.Action {
   delta: number;
 }
 
+export interface BuildStorageAction extends Redux.Action {
+  type: 'BUILD_STORAGE';
+  storage: StorageShoppingType;
+  financed: boolean;
+}
+
+export interface SellStorageAction extends Redux.Action {
+  type: 'SELL_STORAGE';
+  id: number;
+}
+
+export interface ReprioritizeStorageAction extends Redux.Action {
+  type: 'REPRIORITIZE_STORAGE';
+  spotInList: number;
+  delta: number;
+}
+
 export interface NavigateAction extends Redux.Action {
   type: 'NAVIGATE';
   to: CardType;
@@ -87,7 +104,7 @@ export interface AudioDataType {
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
-export type FuelNameType = 'Coal' | 'Wind' | 'Sun';
+export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
@@ -136,17 +153,6 @@ export interface MonthlyHistoryType {
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
 }
 
-export interface GameStateType {
-  speed: SpeedType;
-  inGame: boolean;
-  seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
-    // and is supplied as the seed at the start of any function that uses randomness
-  date: DateType;
-  timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
-  monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
-  generators: GeneratorOperatingType[];
-}
-
 export type CardNameType =
   'STORAGE' |
   'FINANCES' |
@@ -168,13 +174,28 @@ export interface FuelType {
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }
 
-export interface GeneratorOperatingType extends GeneratorShoppingType {
+export interface GeneratorOperatingType extends GeneratorShoppingType, LoanInfo {
   id: number;
   currentW: number;
   yearsToBuildLeft: number;
+}
+
+export interface StorageOperatingType extends StorageShoppingType, LoanInfo {
+  id: number;
+  currentWh: number;
+  yearsToBuildLeft: number;
+}
+
+interface LoanInfo {
   loanAmountTotal: number;
   loanAmountLeft: number;
   loanMonthlyPayment: number;
+}
+
+export interface StorageShoppingType extends GeneratorShoppingType {
+  peakWh: number;
+  roundTripEfficiency: number; // 0 - 1, percentage (even though it's round trip, applied when inserting so capacity looks correct-to-user)
+  monthlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
 }
 
 export interface GeneratorShoppingType {
@@ -188,10 +209,25 @@ export interface GeneratorShoppingType {
   annualOperatingCost: number;
     // all costs should be in that year's $ / not account for inflation when possible
   peakW: number;
+  lifespanYears: number;
   yearsToBuild: number;
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
   btuPerWh?: number; // Heat Rate, but per W for less math per frame
   spinMinutes?: number;
+}
+
+
+
+export interface GameStateType {
+  speed: SpeedType;
+  inGame: boolean;
+  seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
+    // and is supplied as the seed at the start of any function that uses randomness
+  date: DateType;
+  timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
+  monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
+  generators: GeneratorOperatingType[];
+  storage: StorageOperatingType[];
 }
 
 export interface SettingsType {
