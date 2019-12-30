@@ -49,7 +49,10 @@ export interface ReprioritizeStorageAction extends Redux.Action {
 export interface NavigateAction extends Redux.Action {
   type: 'NAVIGATE';
   to: CardType;
-  dontUpdateUrl: boolean;
+}
+
+export interface NavigateBackAction extends Redux.Action {
+  type: 'NAVIGATE_BACK';
 }
 
 export interface ChangeSettingsAction extends Redux.Action {
@@ -166,6 +169,7 @@ export interface CardType {
   name: CardNameType;
   ts: number;
   overrideDebounce?: boolean;
+  history: CardNameType[];
 }
 
 export interface FuelType {

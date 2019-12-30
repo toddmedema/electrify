@@ -113,6 +113,10 @@ export function getNavigator(): any {
   return refs.navigator;
 }
 
+export function getHistoryApi(): any {
+  return refs.history;
+}
+
 export function getCheerio(): CheerioAPI {
   return refs.cheerio;
 }

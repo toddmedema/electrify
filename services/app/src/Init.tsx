@@ -10,6 +10,7 @@ import * as Redux from 'redux';
 
 import {NODE_ENV, VERSION} from 'shared/schema/Constants';
 import {audioSet} from './actions/Audio';
+import {toPrevious} from './actions/Card';
 import {changeSettings} from './actions/Settings';
 import {openSnackbar} from './actions/Snackbar';
 import {UNSUPPORTED_BROWSERS} from './Constants';
@@ -81,7 +82,7 @@ function setupDevice() {
   }
 
   getDocument().addEventListener('backbutton', () => {
-    // TODO do something when user tries to go back
+    getStore().dispatch(toPrevious());
   }, false);
 
   getDocument().addEventListener('pause', () => {
@@ -152,7 +153,7 @@ export function init() {
 
   window.platform = window.cordova ? 'cordova' : 'web';
   window.onpopstate = (e) => {
-    // TODO do something when user tries to go back
+    getStore().dispatch(toPrevious());
     e.preventDefault();
   };
   document.addEventListener('visibilitychange', () => {
