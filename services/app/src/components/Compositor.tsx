@@ -13,6 +13,8 @@ import {
 } from '../Types';
 
 import AudioContainer from './base/AudioContainer';
+import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
+import BuildStorageContainer from './views/BuildStorageContainer';
 import FinancesContainer from './views/FinancesContainer';
 import GeneratorsContainer from './views/GeneratorsContainer';
 import LoadingContainer from './views/LoadingContainer';
@@ -48,6 +50,10 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): JSX.Element {
     switch (this.props.card.name) {
+      case 'BUILD_GENERATORS':
+        return <BuildGeneratorsContainer />;
+      case 'BUILD_STORAGE':
+        return <BuildStorageContainer />;
       case 'STORAGE':
         return <StorageContainer />;
       case 'FINANCES':

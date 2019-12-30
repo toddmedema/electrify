@@ -1,4 +1,4 @@
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
 import CloseIcon from '@material-ui/icons/Close';
 import InfoIcon from '@material-ui/icons/Info';
 
@@ -155,33 +155,30 @@ function valueLabelFormat(x: number) {
 export interface StateProps {
   gameState: GameStateType;
   cash: number;
-  open: boolean;
-  toggleOpen: () => void;
 }
 
 export interface DispatchProps {
   onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => void;
+  onBack: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default function GeneratorsBuildDialog(props: Props): JSX.Element {
-  const {gameState, cash} = props;
+export default function BuildGenerators(props: Props): JSX.Element {
+  const {gameState, cash, onBack} = props;
   const [sliderTick, setSliderTick] = React.useState<number>(22);
 
   const handleSliderChange = (event: any, newValue: number) => {
     setSliderTick(newValue);
   };
 
+  // TODO use the main card template
+
   return (
-    <Dialog
-      fullScreen
-      open={props.open}
-      onClose={props.toggleOpen}
-    >
+    <div>
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
-        <IconButton edge="end" color="primary" onClick={props.toggleOpen} aria-label="close">
+        <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
@@ -198,16 +195,16 @@ export default function GeneratorsBuildDialog(props: Props): JSX.Element {
           onChange={handleSliderChange}
         />
       </Toolbar>
-      <DialogContent classes={{root: 'generatorBuildList'}}>
+      <List dense className="scrollable generatorBuildList">
         {GENERATORS(gameState, getW(sliderTick)).map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
             generator={g}
             key={i}
             cash={cash}
-            onBuild={(financed: boolean) => { props.onBuildGenerator(g, financed); props.toggleOpen(); }}
+            onBuild={(financed: boolean) => { props.onBuildGenerator(g, financed); onBack(); }}
           />
         )}
-      </DialogContent>
-    </Dialog>
+      </List>
+    </div>
   );
 }

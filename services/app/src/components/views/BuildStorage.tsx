@@ -1,4 +1,4 @@
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
 import CloseIcon from '@material-ui/icons/Close';
 import InfoIcon from '@material-ui/icons/Info';
 
@@ -155,18 +155,17 @@ function valueLabelFormat(x: number) {
 export interface StateProps {
   gameState: GameStateType;
   cash: number;
-  open: boolean;
-  toggleOpen: () => void;
 }
 
 export interface DispatchProps {
   onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
+  onBack: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
 export default function StorageBuildDialog(props: Props): JSX.Element {
-  const {gameState, cash} = props;
+  const {gameState, cash, onBack} = props;
   const [sliderTick, setSliderTick] = React.useState<number>(22);
 
   const handleSliderChange = (event: any, newValue: number) => {
@@ -176,14 +175,10 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   // TODO separate sliders for max output rate vs storage capacity, plug into STORAGE
 
   return (
-    <Dialog
-      fullScreen
-      open={props.open}
-      onClose={props.toggleOpen}
-    >
+    <div>
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build Storage</span> ({formatMoneyStable(cash)})</Typography>
-        <IconButton edge="end" color="primary" onClick={props.toggleOpen} aria-label="close">
+        <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
@@ -200,16 +195,16 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           onChange={handleSliderChange}
         />
       </Toolbar>
-      <DialogContent classes={{root: 'storageBuildList'}}>
+      <List dense className="scrollable storageBuildList">
         {STORAGE(gameState, getW(sliderTick), getW(sliderTick)).map((g: StorageShoppingType, i: number) =>
           <StorageBuildItem
             storage={g}
             key={i}
             cash={cash}
-            onBuild={(financed: boolean) => { props.onBuildStorage(g, financed); props.toggleOpen(); }}
+            onBuild={(financed: boolean) => { props.onBuildStorage(g, financed); onBack(); }}
           />
         )}
-      </DialogContent>
-    </Dialog>
+      </List>
+    </div>
   );
 }

@@ -49,6 +49,7 @@ export interface ReprioritizeStorageAction extends Redux.Action {
 export interface NavigateAction extends Redux.Action {
   type: 'NAVIGATE';
   to: CardType;
+  dontRemember?: boolean;
 }
 
 export interface NavigateBackAction extends Redux.Action {
@@ -157,6 +158,8 @@ export interface MonthlyHistoryType {
 }
 
 export type CardNameType =
+  'BUILD_GENERATORS' |
+  'BUILD_STORAGE' |
   'STORAGE' |
   'FINANCES' |
   'GENERATORS' |

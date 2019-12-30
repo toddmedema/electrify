@@ -4,7 +4,7 @@ import {getStore} from '../Store';
 import {CardNameType} from '../Types';
 import {NavigateAction, NavigateBackAction} from '../Types';
 
-export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibrateLong?: boolean}) {
+export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibrateLong?: boolean, dontRemember?: boolean}) {
   const nav = getNavigator();
   const state = getStore().getState();
   const vibration = state.settings && state.settings.vibration;
@@ -15,7 +15,7 @@ export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibra
 
   getHistoryApi().pushState(null, '', '#');
 
-  return {type: 'NAVIGATE', to: {...a, ts: Date.now()}} as NavigateAction;
+  return {type: 'NAVIGATE', to: {...a, ts: Date.now()}, dontRemember: a.dontRemember} as NavigateAction;
 }
 
 export function toPrevious() {
