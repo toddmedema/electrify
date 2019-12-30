@@ -163,7 +163,7 @@ const TutorialBuild = (props: Props): JSX.Element => {
   };
 
   return (
-    <div id="tutorialCard">
+    <div id="tutorialCard" className="flexContainer">
       <SwipeableViews
         axis="x"
         index={activeStep}

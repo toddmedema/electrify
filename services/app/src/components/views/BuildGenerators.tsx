@@ -175,7 +175,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
   // TODO use the main card template
 
   return (
-    <div>
+    <div className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">

@@ -86,7 +86,7 @@ export default class extends React.Component<Props, {}> {
           currentMinute={gameState.date.minute}
         />
         <Toolbar>
-          <Typography variant="h6">Storage</Typography>
+          <Typography variant="h6">Energy Storage</Typography>
           <Button size="small" variant="outlined" color="primary" onClick={onBuild}>BUILD</Button>
         </Toolbar>
         <List dense className="scrollable">

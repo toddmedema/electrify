@@ -175,7 +175,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   // TODO separate sliders for max output rate vs storage capacity, plug into STORAGE
 
   return (
-    <div>
+    <div className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build Storage</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">

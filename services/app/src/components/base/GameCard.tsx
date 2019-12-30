@@ -53,7 +53,7 @@ export function GameCard(props: Props) {
   }
 
   return (
-    <div className={props.className} id="gameCard">
+    <div className={props.className + ' flexContainer'} id="gameCard">
       <div id="topbar">
         <Toolbar>
           <IconButton onClick={handleMenuClick} aria-label="menu" edge="start" color="primary">

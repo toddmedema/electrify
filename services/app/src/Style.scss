@@ -324,18 +324,21 @@ body.android .dialog .textfield:focus-within {
     box-sizing: border-box;
   }
 
-  #gameCard {
+  .flexContainer {
     display: flex;
     flex-flow: column;
-    height: 100%;
-
-    & > div {
-      flex: 0 1 auto;
-    }
 
     .scrollable {
       flex: 1 1 auto;
       overflow-y: auto;
+    }
+  }
+
+  #gameCard {
+    height: 100%;
+
+    & > div {
+      flex: 0 1 auto;
     }
   }
 
