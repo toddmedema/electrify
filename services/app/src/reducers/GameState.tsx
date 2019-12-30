@@ -9,7 +9,7 @@ import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, Gener
 // const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
-  speed: 'NORMAL',
+  speed: 'PAUSED',
   inGame: false,
   generators: [] as GeneratorOperatingType[],
   storage: [] as StorageOperatingType[],

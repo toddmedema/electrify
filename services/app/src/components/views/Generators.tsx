@@ -84,6 +84,7 @@ export default class extends React.Component<Props, {}> {
           height={180}
           timeline={gameState.timeline}
           currentMinute={gameState.date.minute}
+          legend={gameState.speed === 'PAUSED'}
         />
         <Toolbar>
           <Typography variant="h6">Generators</Typography>
