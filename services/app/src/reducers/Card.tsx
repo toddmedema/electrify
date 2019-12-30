@@ -13,17 +13,19 @@ export const initialCard: CardType = {
 export function card(state: CardType = initialCard, action: Redux.Action): CardType {
   switch (action.type) {
     case 'NAVIGATE':
-      const to = (action as NavigateAction).to;
+      const a = (action as NavigateAction);
+      const to = a.to;
       if (to.name === state.name && to.ts - state.ts < NAVIGATION_DEBOUNCE_MS && !to.overrideDebounce) {
         return state;
       }
+      // TODO better implementation for don't remember, right now it still makes an entry!
       return {
         ...to,
-        history: [to.name, ...state.history],
+        history: [(a.dontRemember) ? state.name : to.name, ...state.history],
       };
     case 'NAVIGATE_BACK':
       return {
-        name: state.history[1], // Look 2 back since first is current card
+        name: state.history[1] || 'MAIN_MENU', // Look 2 back since first is current card
         ts: Date.now(),
         history: state.history.slice(1),
       };
