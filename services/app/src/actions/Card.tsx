@@ -1,8 +1,8 @@
 import {VIBRATION_LONG_MS, VIBRATION_SHORT_MS} from '../Constants';
-import {getNavigator} from '../Globals';
+import {getHistoryApi, getNavigator} from '../Globals';
 import {getStore} from '../Store';
 import {CardNameType} from '../Types';
-import {NavigateAction} from '../Types';
+import {NavigateAction, NavigateBackAction} from '../Types';
 
 export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibrateLong?: boolean}) {
   const nav = getNavigator();
@@ -13,5 +13,11 @@ export function toCard(a: {name: CardNameType, overrideDebounce?: boolean, vibra
     nav.vibrate((a.vibrateLong) ? VIBRATION_LONG_MS : VIBRATION_SHORT_MS);
   }
 
+  getHistoryApi().pushState(null, '', '#');
+
   return {type: 'NAVIGATE', to: {...a, ts: Date.now()}} as NavigateAction;
+}
+
+export function toPrevious() {
+  return {type: 'NAVIGATE_BACK'} as NavigateBackAction;
 }
