@@ -1,24 +1,24 @@
+import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, BuildStorageAction, ReprioritizeStorageAction, SellStorageAction, StorageShoppingType} from '../../Types';
+import {AppStateType, ReprioritizeStorageAction, SellStorageAction} from '../../Types';
 import Storage, {DispatchProps, StateProps} from './Storage';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     gameState: state.gameState,
-    cash: (state.gameState.monthlyHistory[0] || {}).cash,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onBuildStorage: (storage: StorageShoppingType, financed: boolean) => {
-      dispatch({type: 'BUILD_STORAGE', storage, financed} as BuildStorageAction);
+    onBuild: () => {
+      dispatch(toCard({name: 'BUILD_STORAGE', dontRemember: true}));
     },
-    onSellStorage: (id: number) => {
+    onSell: (id: number) => {
       dispatch({type: 'SELL_STORAGE', id} as SellStorageAction);
     },
-    onReprioritizeStorage: (spotInList: number, delta: number) => {
+    onReprioritize: (spotInList: number, delta: number) => {
       dispatch({type: 'REPRIORITIZE_STORAGE', spotInList, delta} as ReprioritizeStorageAction);
     },
   };
