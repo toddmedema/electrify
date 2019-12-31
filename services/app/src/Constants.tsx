@@ -8,6 +8,7 @@ export const TICK_MS = {
   NORMAL: 40,
   FAST: 1,
 };
+export const REGIONAL_GROWTH_MAX_ANNUAL = 0.05;
 export const RESERVE_MARGIN = 0.15;
 export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const DOWNPAYMENT_PERCENT = 0.2;
@@ -85,9 +86,6 @@ export const FUELS = {
   // },
 } as { [fuel: string]: FuelType };
 
-const DUTY_CYCLE_ONDEMAND = 0.5;
-const DUTY_CYCLE_RENEWABLE = 0.3;
-
 // TODO additional sources of inforomation
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
 // Output is sorted lowest cost first (TODO let user choose sort)
@@ -100,7 +98,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Coal',
       fuel: 'Coal',
-      description: 'Dirty, but cheap for dispatchable',
+      description: 'On-demand but dirty',
       buildCost: 376000000 + 2.6 * peakW, // TODO update to factor in cost growth over time (this is 2008 cost)
         // ~$3500/kw in 2008 - https://schlissel-technical.com/docs/reports_35.pdf
         // $3,500 to $5,000 in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -113,9 +111,10 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 60,
-      annualOperatingCost: 0.0051 * peakW * DUTY_CYCLE_ONDEMAND,
+      annualOperatingCost: 0.0051 * peakW * 0.7,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 3,
       yearsToBuild: (DEV) ? 0.1 : 3 + magnitude / 3,
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -123,7 +122,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Nuclear',
       fuel: 'Uranium',
-      description: 'Consistent and no air pollution, but expensive',
+      description: 'Consistent and no pollution, but expensive',
       buildCost: 1500000000 + 4.5 * peakW,
         // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
@@ -133,9 +132,10 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.01 * peakW * DUTY_CYCLE_ONDEMAND,
+      annualOperatingCost: 0.01 * peakW * 0.89,
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 2,
       yearsToBuild: (DEV) ? 0.1 : 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -160,7 +160,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Natural Gas',
       fuel: 'Natural Gas',
-      description: 'Dispatchable and cleaner than coal',
+      description: 'On-demand and cleaner than coal',
       buildCost: 71000000 + 0.75 * peakW,
         // ~$1,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 1,854 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
@@ -172,10 +172,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.0025 * peakW * DUTY_CYCLE_ONDEMAND,
+      annualOperatingCost: 0.0025 * peakW * 0.38,
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 4,
       yearsToBuild: (DEV) ? 0.1 : 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -205,8 +206,10 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 90MW and cost $172m
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
-      annualOperatingCost: 0.004 * peakW * DUTY_CYCLE_RENEWABLE,
+      annualOperatingCost: 0.004 * peakW * 0.25,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
+        // TODO depends on location
       priority: 1,
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -214,7 +217,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Solar',
       fuel: 'Sun',
-      description: 'Produces most during summer daytime',
+      description: 'Brightest summer at noon',
       buildCost: 3900000 + 1.275 * peakW,
         // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
@@ -222,9 +225,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
-      annualOperatingCost: 0.0023 * peakW * DUTY_CYCLE_RENEWABLE,
+      annualOperatingCost: 0.0023 * peakW * 0.2,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+        // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
+        // TODO depends on location
       priority: 1,
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -260,7 +265,9 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       // 100GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
     //   peakW,
     //   spinMinutes: 1,
-    //   annualOperatingCost: 1000000, // about 0.0017/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
+    //   annualOperatingCost: 1000000 * 0.4,
+      // about 0.0017/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
+      // ~40% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
     //   priority: 3,
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -276,25 +283,35 @@ export function STORAGE(state: GameStateType, peakW: number, peakWh: number) {
 
   return [
     {
-      name: 'Battery',
+      name: 'Lithium-Ion Battery',
       fuel: 'Battery',
-      description: 'Fast, but limited capacity',
-      buildCost: 43000000 + 1.4 * peakW,
-        // TODO
+      description: 'Fast charge/discharge',
+      buildCost: 10000 + 0.4 * peakWh,
+        // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
       peakW,
       peakWh,
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
       roundTripEfficiency: 0.85,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
-      monthlyLoss: 0.5,
+      monthlyLoss: 0.25,
         // TODO
-      annualOperatingCost: 0.004 * peakW * DUTY_CYCLE_RENEWABLE,
-        // TODO
+        // TODO implement mechanic
+      annualOperatingCost: 0.004 * peakWh,
+        // LCOE ~$500/MWh served in 2016 - https://www.greentechmedia.com/articles/read/report-levelized-cost-of-energy-for-lithium-ion-batteries-bnef
+        // ($0.5/kWh served)
+        // 1 kWh build capacity = 30,000 kWh over 15 years at ~25% duty cycle
+        // Which means construction costs are about $0.015/kWh served
+        // TODO this math needs to be double checked
       priority: 1,
-      yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
+      yearsToBuild: (DEV) ? 0.1 : 0.5 + magnitude / 3,
         // TODO
     },
+    // TODO thermal storage
+    // TODO pumped hydro
+      // slower and larger fixed costs, but cheaper per capacity
+      // ~$50/kWh? https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
+      // long project lead times
   ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as StorageShoppingType[];
 }
 

@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
 
@@ -17,6 +17,7 @@ export const initialGameState: GameStateType = {
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
+  regionPopulation: 1000000,
 };
 
 export function setSpeed(speed: SpeedType): SetSpeedAction {
@@ -36,7 +37,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * 4300000;
+  return demandMultiple * gameState.regionPopulation;
 }
 
 // Each frame, update the month's history with cumulative values -> use that to update finances
@@ -167,11 +168,11 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
     if (g.yearsToBuildLeft === 0) {
       if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
         g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
-        g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
+        g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR) * g.roundTripEfficiency;
         supply += g.currentW;
       } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
         g.currentW = Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
-        g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR);
+        g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR) * g.roundTripEfficiency;
         charge += g.currentW;
       }
     }
@@ -424,6 +425,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     const a = action as NewGameAction;
     let newState = {
       ...state,
+      regionPopulation: a.regionPopulation,
       timeline: [] as TimelineType[],
       monthlyHistory: [newMonthlyHistoryEntry(state.date, a.cash, a.cash)],
     };
@@ -472,6 +474,13 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         // Record final history for the month, then insert a new blank month
         newState.monthlyHistory[0].netWorth = getNetWorth(newState);
         newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.monthlyHistory[0].cash, getNetWorth(state)));
+
+        // Update popultion
+        // TODO base on blackout performance over the past month
+        // use demand vs demandSupplied to determine % met
+        // AVG across the past 3 months
+        // ~reduce growth rate by 1% per 1% unment, i.e. if 5% unment, region shouldn't grow (5% - 5% = 0)
+        newState.regionPopulation = state.regionPopulation * (1 + REGIONAL_GROWTH_MAX_ANNUAL / 12);
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);

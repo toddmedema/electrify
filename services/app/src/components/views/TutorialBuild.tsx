@@ -105,11 +105,11 @@ const tutorialSteps = [
     <p>Let’s get you comfortable with how to run  your company.</p>
   </div>,
   <div>
-    <p>Your goal: <strong>Maximize your net worth</strong><br/>(in 4 years  / 16 turns)</p>
-    <p><strong>Use forecasts</strong> to predict supply and demand</p>
+    <p>Your goal: <strong>Maximize your net worth</strong></p>
+    <p><strong>Use the forecast</strong> to predict supply and demand</p>
     <p><strong>Build generators</strong> to expand your capacity</p>
-    <p><strong>Acquire customers</strong> to increase your demand</p>
-    <p><strong>Avoid blackouts</strong> to keep your customers paying</p>
+    <p><strong>Build storage</strong> to smooth out supply</p>
+    <p><strong>Avoid blackouts</strong>, otherwise you'll lose customers</p>
   </div>,
   <div>
     <Typography variant="h6">Forecast for average Spring day</Typography>
@@ -118,8 +118,8 @@ const tutorialSteps = [
       height={200}
       timeline={forecastGood}
     />
-    <p>This graph shows your forecasted demand and maximum supply for next season. It represents <strong> an average day </strong> for the season.</p>
-    <p>Use it to help decide which generators to build and when to acquire customers.</p>
+    <p>This graph shows your forecasted demand and supply for this month. It represents <strong> an average day </strong> for the season.</p>
+    <p>Use it to help decide which generators to build and storage.</p>
   </div>,
   <div>
     <ChartSupplyDemand
@@ -127,15 +127,15 @@ const tutorialSteps = [
       height={160}
       timeline={forecastShortBlackout}
     />
-    <p><strong>Short blackouts</strong> are best solved with batteries or “peaking” generators that spin up quickly</p>
+    <p><strong>Short blackouts</strong> are best solved with batteries or generators that spin up quickly</p>
     <ChartSupplyDemand
       legend={true}
       height={160}
       timeline={forecastLongBlackout}
     />
-    <p><strong>Extended blackouts</strong> mean you need more “baseload” generators or fewer customers</p>
+    <p><strong>Extended blackouts</strong> mean you need more “baseload” generators that produce cheap power</p>
     <br/>
-    <p><strong>Acquire customers</strong> to increase demand - but don’t grow faster than your capacity</p>
+    <p>If you do well, the region (and demand) will grow. Blackouts will cost you customers.</p>
     <p>That’s all you need to get started. Good luck!</p>
   </div>,
 ];

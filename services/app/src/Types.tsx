@@ -90,6 +90,7 @@ export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
   generators: Partial<GeneratorShoppingType>[];
   cash: number;
+  regionPopulation: number;
 }
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
@@ -235,6 +236,7 @@ export interface GameStateType {
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   generators: GeneratorOperatingType[];
   storage: StorageOperatingType[];
+  regionPopulation: number;
 }
 
 export interface SettingsType {
