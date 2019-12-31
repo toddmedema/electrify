@@ -480,7 +480,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         // use demand vs demandSupplied to determine % met
         // AVG across the past 3 months
         // ~reduce growth rate by 1% per 1% unment, i.e. if 5% unment, region shouldn't grow (5% - 5% = 0)
-        newState.regionPopulation = state.regionPopulation * (1 + REGIONAL_GROWTH_MAX_ANNUAL / 12);
+        newState.regionPopulation = Math.round(state.regionPopulation * (1 + REGIONAL_GROWTH_MAX_ANNUAL / 12));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);

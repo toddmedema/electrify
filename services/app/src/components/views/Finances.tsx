@@ -14,6 +14,8 @@ import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
 
+const numbro = require('numbro');
+
 export interface StateProps {
   gameState: GameStateType;
   date: DateType;
@@ -70,9 +72,11 @@ export default function FinancesBuild(props: Props): JSX.Element {
 
   return (
     <GameCard className="Finances">
+      <Typography variant="body2">Current population served: {numbro(props.gameState.regionPopulation).format({ thousandSeparated: true })}</Typography>
       <ChartFinances
         height={180}
         timeline={timeline}
+        title={year + ' profit'}
       />
       <Toolbar>
         <Typography variant="h6">Finances for </Typography>

@@ -12,6 +12,7 @@ interface ChartData {
 
 export interface Props {
   height?: number;
+  title: string;
   timeline: ChartData[];
 }
 
@@ -80,7 +81,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         <VictoryLabel
           textAnchor="middle"
           x={200} y={7}
-          text="Profit"
+          text={props.title}
         />
       </VictoryChart>
     </div>
