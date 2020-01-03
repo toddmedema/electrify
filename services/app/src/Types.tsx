@@ -220,8 +220,8 @@ export interface GeneratorShoppingType {
   lifespanYears: number;
   yearsToBuild: number;
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
+  spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh?: number; // Heat Rate, but per W for less math per frame
-  spinMinutes?: number;
 }
 
 

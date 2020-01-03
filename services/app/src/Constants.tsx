@@ -213,6 +213,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       priority: 1,
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      spinMinutes: 1,
     },
     {
       name: 'Solar',
@@ -233,6 +234,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       priority: 1,
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      spinMinutes: 1,
     },
     // {
     //   name: 'Tidal',
@@ -243,6 +245,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   annualOperatingCost: 1000000,
     //   priority: 1,
     //   yearsToBuild: 1,
+      // spinMinutes: 1,
     // },
     // {
         // Still only has a capacity factor of .733, why? https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
@@ -255,6 +258,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   priority: 1,
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      // spinMinutes: 1,
     // },
     // {
     //   name: 'Hydro',

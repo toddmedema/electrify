@@ -131,10 +131,22 @@ function reforecastDemand(state: GameStateType): TimelineType[] {
   });
 }
 
-// Calculate how much is needed to be supplied to meet demandW
+// Updates generator + storage construction status
+// then calculates how much is needed to be supplied to meet demandW
 // and changes generator / storage status (in place)
 // (doesn't count storage charging against supply created)
 function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType[], storage: StorageOperatingType[], t: TimelineType) {
+  generators.forEach((g: GeneratorOperatingType) => {
+    if (g.yearsToBuildLeft > 0) {
+      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
+    }
+  });
+  storage.forEach((g: StorageOperatingType) => {
+    if (g.yearsToBuildLeft > 0) {
+      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
+    }
+  });
+
   let supply = 0;
   let charge = 0;
   // Executed in sort order, aka highest priority first
@@ -154,9 +166,9 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
         default:
           const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
           if (targetW < g.currentW) { // spinning down
-            g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / (g.spinMinutes || 1));
+            g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / g.spinMinutes);
           } else { // spinning up
-            g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / (g.spinMinutes || 1));
+            g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
           }
           break;
       }
@@ -215,31 +227,6 @@ function generateNewTimeline(startingMinute: number): TimelineType[] {
     };
   }
   return array;
-}
-
-// Updates generator + storage construction status
-// reforecasts supply if any complete
-function updateConstruction(state: GameStateType): void {
-  let oneFinished = false;
-  state.generators.forEach((g: GeneratorOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-      if (g.yearsToBuildLeft === 0) {
-        oneFinished = true;
-      }
-    }
-  });
-  state.storage.forEach((g: StorageOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-      if (g.yearsToBuildLeft === 0) {
-        oneFinished = true;
-      }
-    }
-  });
-  if (oneFinished) {
-    state.timeline = reforecastSupply(state);
-  }
 }
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
@@ -463,7 +450,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         ...state,
         date: getDateFromMinute(state.date.minute + TICK_MINUTES),
       };
-      updateConstruction(newState);
       const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
       if (now) {
         getSupplyWAndUpdateGeneratorsStorage(newState.generators, newState.storage, now);
