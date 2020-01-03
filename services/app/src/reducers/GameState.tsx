@@ -180,11 +180,11 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
     if (g.yearsToBuildLeft === 0) {
       if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
         g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
-        g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR) * g.roundTripEfficiency;
+        g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
         supply += g.currentW;
       } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
         g.currentW = Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
-        g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR) * g.roundTripEfficiency;
+        g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR * g.roundTripEfficiency);
         charge += g.currentW;
       }
     }
