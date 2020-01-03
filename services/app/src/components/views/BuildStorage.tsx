@@ -62,11 +62,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           <Table size="small" aria-label="storage properties">
             <TableBody>
               <TableRow>
-                <TableCell>Peak output
-                  <Typography variant="body2" color="textSecondary">
-                    In optimal conditions
-                  </Typography>
-                </TableCell>
+                <TableCell>Peak output</TableCell>
                 <TableCell align="right">{formatWatts(storage.peakW)}</TableCell>
               </TableRow>
               <TableRow>
@@ -77,7 +73,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(storage.annualOperatingCost)}</TableCell>
               </TableRow>
-              {storage.spinMinutes && <TableRow>
+              {storage.spinMinutes > 1 && <TableRow>
                 <TableCell>Spin up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
@@ -182,7 +178,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           <CloseIcon />
         </IconButton>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Storage peak output: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography>
+          Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography>
         </Typography>
         <Slider
           className="flex-newline"
@@ -196,7 +192,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
         />
       </Toolbar>
       <List dense className="scrollable storageBuildList">
-        {STORAGE(gameState, getW(sliderTick), getW(sliderTick)).map((g: StorageShoppingType, i: number) =>
+        {STORAGE(gameState, getW(sliderTick)).map((g: StorageShoppingType, i: number) =>
           <StorageBuildItem
             storage={g}
             key={i}

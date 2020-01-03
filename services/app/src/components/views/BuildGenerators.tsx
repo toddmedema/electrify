@@ -62,12 +62,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           <Table size="small" aria-label="generator properties">
             <TableBody>
               <TableRow>
-                <TableCell>Peak output
+                <TableCell>Average output
                   <Typography variant="body2" color="textSecondary">
-                    In optimal conditions
+                    Across a year
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatWatts(generator.peakW)}</TableCell>
+                <TableCell align="right">{formatWatts(generator.peakW * generator.capacityFactor)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>Operating costs (/yr)
@@ -77,7 +77,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}</TableCell>
               </TableRow>
-              {generator.spinMinutes && <TableRow>
+              {generator.spinMinutes > 1 && <TableRow>
                 <TableCell>Spin up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output

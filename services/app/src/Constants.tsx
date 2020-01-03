@@ -118,6 +118,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       priority: 3,
       yearsToBuild: (DEV) ? 0.1 : 3 + magnitude / 3,
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      capacityFactor: 0.66,
+        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
     },
     {
       name: 'Nuclear',
@@ -139,6 +141,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       priority: 2,
       yearsToBuild: (DEV) ? 0.1 : 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      capacityFactor: 0.93,
+        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
     },
     // {
     //   name: 'Oil', // Aka petroleum
@@ -156,6 +160,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   priority: 5,
     //   yearsToBuild: 2,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      // capacityFactor: 0.66,
+        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
     // },
     {
       name: 'Natural Gas',
@@ -180,6 +186,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       priority: 4,
       yearsToBuild: (DEV) ? 0.1 : 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      capacityFactor: 0.55,
+        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
     },
     // {
     //   name: 'Trash Incinerator',
@@ -214,6 +222,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
+      capacityFactor: 0.37,
+        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
     },
     {
       name: 'Solar',
@@ -235,6 +245,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
+      capacityFactor: 0.26,
+        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
     },
     // {
     //   name: 'Tidal',
@@ -281,9 +293,9 @@ export function GENERATORS(state: GameStateType, peakW: number) {
 
 // TODO additional sources of inforomation
 // Output is sorted lowest cost first (TODO let user choose sort)
-export function STORAGE(state: GameStateType, peakW: number, peakWh: number) {
+export function STORAGE(state: GameStateType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
-  const magnitude = Math.log10(peakW) - 6;
+  const magnitude = Math.log10(peakWh) - 6;
 
   return [
     {
@@ -292,7 +304,8 @@ export function STORAGE(state: GameStateType, peakW: number, peakWh: number) {
       description: 'Fast charge/discharge',
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-      peakW,
+      peakW: 0.35 * peakWh,
+        // ~0.35x c rating - https://www.tesla.com/sites/default/files/pdfs/powerwall/Powerwall%202_AC_Datasheet_en_northamerica.pdf
       peakWh,
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
