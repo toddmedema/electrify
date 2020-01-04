@@ -14,7 +14,7 @@ export function getPaymentInterest(balance: number, interestRate: number, monthl
   return balance * monthlyRate;
 }
 
-export function LCOE(g: GeneratorShoppingType) {
+export function LCWH(g: GeneratorShoppingType) {
   const fuel = FUELS[g.fuel] || {};
   const totalWh = g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh = (g.buildCost + g.annualOperatingCost * g.lifespanYears + (fuel.costPerBtu || 0) * g.btuPerWh * totalWh) / totalWh;

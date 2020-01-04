@@ -1,3 +1,4 @@
+import {LCWH} from 'shared/helpers/Financials';
 import {NODE_ENV} from 'shared/schema/Constants';
 import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
@@ -114,7 +115,6 @@ export const FUELS = {
 // TODO additional sources of inforomation
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
 // LCOE across many fuel types - https://www.eia.gov/outlooks/aeo/pdf/electricity_generation.pdf
-// Output is sorted lowest cost first (TODO let user choose sort)
 export function GENERATORS(state: GameStateType, peakW: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakW) - 6;
@@ -152,7 +152,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Nuclear',
       fuel: 'Uranium',
-      description: 'Consistent and no pollution, but expensive',
+      description: 'No pollution, but slow-moving',
       buildCost: 1500000000 + 4.5 * peakW,
         // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
@@ -248,7 +248,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
       btuPerWh: 0,
-      annualOperatingCost: 0.008 * peakW,
+      annualOperatingCost: 0.012 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // TODO depends on location
       priority: 1,
@@ -273,7 +273,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
       btuPerWh: 0,
-      annualOperatingCost: 0.003 * peakW,
+      annualOperatingCost: 0.008 * peakW,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // TODO depends on location
@@ -327,11 +327,12 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     // },
-  ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as GeneratorShoppingType[];
+  ] as GeneratorShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   generators.forEach((g: GeneratorShoppingType) => {
+    g.lcWh = LCWH(g);
     g.buildCost *= difficulty.buildCost;
     if (DEV) {
       g.yearsToBuild = 0.06;

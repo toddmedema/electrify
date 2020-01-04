@@ -187,6 +187,11 @@ span.weak {
   flex-basis: 100%;
 }
 
+.MuiSlider-root {
+  width: 50%;
+  flex-grow: 1;
+}
+
 // for text inputs that are close to bottom, give the screen space to scroll up
 .inputSpacer {
   margin-bottom: 100%;

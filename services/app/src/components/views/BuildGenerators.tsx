@@ -1,10 +1,11 @@
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Menu, MenuItem, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
+import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
-import {getMonthlyPayment, getPaymentInterest, LCOE} from 'shared/helpers/Financials';
+import {getMonthlyPayment, getPaymentInterest } from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GameStateType, GeneratorShoppingType} from '../../Types';
@@ -12,6 +13,7 @@ import {GameStateType, GeneratorShoppingType} from '../../Types';
 interface GeneratorBuildItemProps {
   cash: number;
   generator: GeneratorShoppingType;
+  secondaryMetric?: string;
   onBuild: (financed: boolean) => void;
 }
 
@@ -24,6 +26,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const loanAmount = props.generator.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+  let secondaryMetric = `${Math.round(generator.yearsToBuild * 12)}m to build`;
+  if (props.secondaryMetric === 'lcWh') {
+    secondaryMetric = `${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`;
+  }
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -52,9 +58,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
-            <Typography variant="body2" color="textSecondary">
-              {Math.round(generator.yearsToBuild * 12)}m to build
-            </Typography>
+            <Typography variant="body2" color="textSecondary">{secondaryMetric}</Typography>
           </span>
         }
         title={generator.name}
@@ -66,14 +70,14 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         <TableContainer>
           <Table size="small" aria-label="generator properties">
             <TableBody>
-              <TableRow>
+              {props.secondaryMetric !== 'lcWh' && <TableRow>
                 <TableCell>Total energy cost
                   <Typography variant="body2" color="textSecondary">
                     Across lifespan
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(LCOE(generator) * 1000000)}/MWh</TableCell>
-              </TableRow>
+                <TableCell align="right">{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</TableCell>
+              </TableRow>}
               <TableRow>
                 <TableCell>Average output
                   <Typography variant="body2" color="textSecondary">
@@ -110,6 +114,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 <TableCell>Expected lifespan</TableCell>
                 <TableCell align="right">{generator.lifespanYears} years</TableCell>
               </TableRow>
+              {props.secondaryMetric !== 'yearsToBuild' && <TableRow>
+                <TableCell>Time to build</TableCell>
+                <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
+              </TableRow>}
             </TableBody>
           </Table>
         </TableContainer>
@@ -192,12 +200,26 @@ export interface Props extends StateProps, DispatchProps {}
 export default function BuildGenerators(props: Props): JSX.Element {
   const {gameState, cash, onBack} = props;
   const [sliderTick, setSliderTick] = React.useState<number>(22);
+  const [sort, setSort] = React.useState<string>('buildCost');
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const generators = GENERATORS(gameState, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
-  const handleSliderChange = (event: any, newValue: number) => {
+  const onSlider = (event: any, newValue: number) => {
     setSliderTick(newValue);
   };
 
-  // TODO use the main card template
+  const onSort = (newValue: string) => {
+    setSort(newValue);
+    onSortClose();
+  };
+
+  const onSortOpen = (event: any) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const onSortClose = () => {
+    setAnchorEl(null);
+  };
 
   return (
     <div className="flexContainer">
@@ -210,22 +232,36 @@ export default function BuildGenerators(props: Props): JSX.Element {
           Generator capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography>
         </Typography>
         <Slider
-          className="flex-newline"
           value={sliderTick}
           aria-labelledby="peak-output"
           valueLabelDisplay="off"
           min={0}
           step={1}
           max={36}
-          onChange={handleSliderChange}
+          onChange={onSlider}
         />
+        <IconButton edge="end" color="primary" onClick={onSortOpen} aria-label="sort">
+          <SortIcon />
+        </IconButton>
+        <Menu
+          id="sort-menu"
+          anchorEl={anchorEl}
+          keepMounted
+          open={Boolean(anchorEl)}
+          onClose={onSortClose}
+        >
+          <MenuItem onClick={() => onSort('buildCost')}>Build Cost</MenuItem>
+          <MenuItem onClick={() => onSort('yearsToBuild')}>Build Time</MenuItem>
+          <MenuItem onClick={() => onSort('lcWh')}>Cost per MWh</MenuItem>
+        </Menu>
       </Toolbar>
       <List dense className="scrollable buildList">
-        {GENERATORS(gameState, getW(sliderTick)).map((g: GeneratorShoppingType, i: number) =>
+        {generators.map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
             generator={g}
             key={i}
             cash={cash}
+            secondaryMetric={(sort === 'buildCost') ? 'yearsToBuild' : sort}
             onBuild={(financed: boolean) => { props.onBuildGenerator(g, financed); onBack(); }}
           />
         )}
