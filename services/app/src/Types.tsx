@@ -119,6 +119,24 @@ export interface DifficultyMultipliersType {
   buildTime: number;
 }
 
+export type CardNameType =
+  'BUILD_GENERATORS' |
+  'BUILD_STORAGE' |
+  'STORAGE' |
+  'FINANCES' |
+  'GENERATORS' |
+  'LOADING' |
+  'MAIN_MENU' |
+  'SETTINGS' |
+  'GAME_SETUP';
+
+export interface CardType {
+  name: CardNameType;
+  ts: number;
+  overrideDebounce?: boolean;
+  history: CardNameType[];
+}
+
 export interface DateType {
   minute: number;
   minuteOfDay: number;
@@ -162,24 +180,6 @@ export interface MonthlyHistoryType {
   expensesOM: number; // total
   expensesTaxesFees: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-}
-
-export type CardNameType =
-  'BUILD_GENERATORS' |
-  'BUILD_STORAGE' |
-  'STORAGE' |
-  'FINANCES' |
-  'GENERATORS' |
-  'LOADING' |
-  'MAIN_MENU' |
-  'SETTINGS' |
-  'GAME_SETUP';
-
-export interface CardType {
-  name: CardNameType;
-  ts: number;
-  overrideDebounce?: boolean;
-  history: CardNameType[];
 }
 
 

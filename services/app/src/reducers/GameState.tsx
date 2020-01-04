@@ -462,16 +462,14 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       }
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
+        // Update popultion, reduce growth rate by 1% per 1% unment, i.e. if 5% unment, region shouldn't grow (5% - 5% = 0)
+        const {demandWh, supplyWh} = newState.monthlyHistory[0];
+        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - (demandWh - supplyWh) / demandWh;
+        newState.regionPopulation = Math.round(state.regionPopulation * (1 + growthRate / 12));
+
         // Record final history for the month, then insert a new blank month
         newState.monthlyHistory[0].netWorth = getNetWorth(newState);
         newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.monthlyHistory[0].cash, getNetWorth(state)));
-
-        // Update popultion
-        // TODO base on blackout performance over the past month
-        // use demand vs demandSupplied to determine % met
-        // AVG across the past 3 months
-        // ~reduce growth rate by 1% per 1% unment, i.e. if 5% unment, region shouldn't grow (5% - 5% = 0)
-        newState.regionPopulation = Math.round(state.regionPopulation * (1 + REGIONAL_GROWTH_MAX_ANNUAL / 12));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
