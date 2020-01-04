@@ -113,6 +113,12 @@ export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
+export interface DifficultyMultipliersType {
+  buildCost: number;
+  expenses: number;
+  buildTime: number;
+}
+
 export interface DateType {
   minute: number;
   minuteOfDay: number;
@@ -176,6 +182,9 @@ export interface CardType {
   history: CardNameType[];
 }
 
+
+
+
 export interface FuelType {
   costPerBtu: number; // Measured from raw stock / before generator efficiency loss
     // all costs should be in that year's $ / not account for inflation when possible
@@ -227,7 +236,9 @@ export interface GeneratorShoppingType {
 
 
 
+
 export interface GameStateType {
+  difficulty: DifficultyType;
   speed: SpeedType;
   inGame: boolean;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
@@ -243,7 +254,6 @@ export interface GameStateType {
 export interface SettingsType {
   [index: string]: any;
   audioEnabled: boolean;
-  difficulty: DifficultyType;
   experimental: boolean;
   showHelp: boolean;
   vibration: boolean;

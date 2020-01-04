@@ -1,7 +1,30 @@
 import {NODE_ENV} from 'shared/schema/Constants';
-import {CardNameType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
+import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
 const DEV = (NODE_ENV === 'dev');
+
+export const DIFFICULTIES = {
+  EASY: {
+    buildCost: 0.6,
+    expenses: 0.6,
+    buildTime: 0.5,
+  },
+  MEDIUM: {
+    buildCost: 0.8,
+    expenses: 0.8,
+    buildTime: 0.8,
+  },
+  HARD: {
+    buildCost: 1,
+    expenses: 1,
+    buildTime: 1,
+  },
+  IMPOSSIBLE: {
+    buildCost: 1.2,
+    expenses: 1.1,
+    buildTime: 1,
+  },
+} as {[index: string]: DifficultyMultipliersType};
 
 export const TICK_MS = {
   SLOW: 80,
@@ -93,7 +116,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakW) - 6;
 
-  return [
+  const generators = [
     // FUELED
     {
       name: 'Coal',
@@ -116,7 +139,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 3,
-      yearsToBuild: (DEV) ? 0.1 : 3 + magnitude / 3,
+      yearsToBuild: 3 + magnitude / 3,
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.66,
         // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
@@ -139,7 +162,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 2,
-      yearsToBuild: (DEV) ? 0.1 : 5 + magnitude / 4,
+      yearsToBuild: 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.93,
         // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
@@ -184,7 +207,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 4,
-      yearsToBuild: (DEV) ? 0.1 : 2 + magnitude / 3,
+      yearsToBuild: 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.55,
         // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
@@ -219,7 +242,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
         // TODO depends on location
       priority: 1,
-      yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 2,
+      yearsToBuild: 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
       capacityFactor: 0.37,
@@ -242,7 +265,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
         // TODO depends on location
       priority: 1,
-      yearsToBuild: (DEV) ? 0.1 : 1 + magnitude / 3,
+      yearsToBuild: 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
       capacityFactor: 0.26,
@@ -289,6 +312,19 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     // },
   ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as GeneratorShoppingType[];
+
+  // update with calculations that occur across all entries, like difficulty multipliers
+  const difficulty = DIFFICULTIES[state.difficulty];
+  generators.forEach((g: GeneratorShoppingType) => {
+    g.buildCost *= difficulty.buildCost;
+    if (DEV) {
+      g.yearsToBuild = 0.06;
+    } else {
+      g.yearsToBuild *= difficulty.buildTime;
+    }
+  });
+
+  return generators;
 }
 
 // TODO additional sources of inforomation
@@ -297,7 +333,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
 
-  return [
+  const storage = [
     {
       name: 'Lithium-Ion Battery',
       fuel: 'Battery',
@@ -321,7 +357,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
         // Which means construction costs are about $0.015/kWh served
         // TODO this math needs to be double checked
       priority: 1,
-      yearsToBuild: (DEV) ? 0.1 : 0.5 + magnitude / 3,
+      yearsToBuild: 0.5 + magnitude / 3,
         // TODO
     },
     // TODO thermal storage
@@ -330,6 +366,19 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       // ~$50/kWh? https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
       // long project lead times
   ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as StorageShoppingType[];
+
+  // update with calculations that occur across all entries, like difficulty multipliers
+  const difficulty = DIFFICULTIES[state.difficulty];
+  storage.forEach((g: StorageShoppingType) => {
+    g.buildCost *= difficulty.buildCost;
+    if (DEV) {
+      g.yearsToBuild = 0.06;
+    } else {
+      g.yearsToBuild *= difficulty.buildTime;
+    }
+  });
+
+  return storage;
 }
 
 export const NAV_CARDS = ['GENERATORS', 'STORAGE', 'FINANCES'] as CardNameType[];

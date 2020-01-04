@@ -258,6 +258,14 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
+  #footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: size(large);
+  }
+
   // ===============================================
   // Card-specific styles
   // ===============================================

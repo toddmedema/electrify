@@ -2,13 +2,14 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
+  difficulty: 'EASY',
   speed: 'PAUSED',
   inGame: false,
   generators: [] as GeneratorOperatingType[],
@@ -43,6 +44,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
 // Each frame, update the month's history with cumulative values -> use that to update finances
 function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): MonthlyHistoryType {
   const monthlyHistory = gameState.monthlyHistory[0];
+  const difficulty = DIFFICULTIES[gameState.difficulty];
 
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
@@ -92,10 +94,10 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   return {
     ...monthlyHistory,
     revenue: monthlyHistory.revenue + revenue,
-    expensesOM: monthlyHistory.expensesOM + expensesOM,
-    expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
-    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees,
-    expensesInterest: monthlyHistory.expensesInterest + expensesInterest,
+    expensesOM: monthlyHistory.expensesOM + expensesOM * difficulty.expenses,
+    expensesFuel: monthlyHistory.expensesFuel + expensesFuel * difficulty.expenses,
+    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees * difficulty.expenses,
+    expensesInterest: monthlyHistory.expensesInterest + expensesInterest * difficulty.expenses,
     cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees - expensesInterest - principalRepayment),
     supplyWh: monthlyHistory.supplyWh + supplyWh,
     demandWh: monthlyHistory.demandWh + demandWh,
@@ -328,7 +330,11 @@ function getNetWorth(gameState: GameStateType): number {
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
-  if (action.type === 'BUILD_GENERATOR') {
+  if (action.type === 'GAMESTATE_DELTA') {
+
+    return {...state, ...(action as any).delta};
+
+  } else if (action.type === 'BUILD_GENERATOR') {
 
     const a = action as BuildGeneratorAction;
     const newState = buildGenerator({...state}, a.generator, a.financed);
@@ -356,7 +362,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
   } else if (action.type === 'REPRIORITIZE_GENERATOR') {
 
-// TODO
     const a = action as ReprioritizeGeneratorAction;
     const newState = {...state};
     const left = newState.generators[a.spotInList];

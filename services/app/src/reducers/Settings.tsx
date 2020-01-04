@@ -1,11 +1,10 @@
 import Redux from 'redux';
 import {NODE_ENV} from 'shared/schema/Constants';
-import {getStorageBoolean, getStorageString, setStorageKeyValue} from '../LocalStorage';
-import {ChangeSettingsAction, DifficultyType, SettingsType} from '../Types';
+import {getStorageBoolean, setStorageKeyValue} from '../LocalStorage';
+import {ChangeSettingsAction, SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBoolean('audioEnabled', false),
-  difficulty: getStorageString('difficulty', 'NORMAL') as DifficultyType,
   experimental: getStorageBoolean('experimental', false) || NODE_ENV === 'dev',
   showHelp: getStorageBoolean('showHelp', true),
   vibration: getStorageBoolean('vibration', true),
