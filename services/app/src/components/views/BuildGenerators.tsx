@@ -6,7 +6,7 @@ import CloseIcon from '@material-ui/icons/Close';
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest, LCOE} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {DOWNPAYMENT_PERCENT, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
+import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GameStateType, GeneratorShoppingType} from '../../Types';
 
 interface GeneratorBuildItemProps {
@@ -17,6 +17,7 @@ interface GeneratorBuildItemProps {
 
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const {generator, cash} = props;
+  const fuel = FUELS[generator.fuel] || {};
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
@@ -88,6 +89,14 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                   </Typography>
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}/yr</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Fuel costs
+                  <Typography variant="body2" color="textSecondary">
+                    Varies with fuel prices
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuel.costPerBtu || 0)}/MWh</TableCell>
               </TableRow>
               {generator.spinMinutes > 1 && <TableRow>
                 <TableCell>Spin up/down time
