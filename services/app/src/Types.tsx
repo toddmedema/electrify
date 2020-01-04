@@ -231,7 +231,7 @@ export interface GeneratorShoppingType {
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
   capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
-  btuPerWh?: number; // Heat Rate, but per W for less math per frame
+  btuPerWh: number; // Heat Rate, but per W for less math per frame
 }
 
 

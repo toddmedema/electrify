@@ -4,7 +4,7 @@ import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
 
 import * as React from 'react';
-import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
+import {getMonthlyPayment, getPaymentInterest, LCOE} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GameStateType, GeneratorShoppingType} from '../../Types';
@@ -66,6 +66,14 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           <Table size="small" aria-label="generator properties">
             <TableBody>
               <TableRow>
+                <TableCell>Total energy cost
+                  <Typography variant="body2" color="textSecondary">
+                    Across lifespan
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">{formatMoneyConcise(LCOE(generator) * 1000000)}/MWh</TableCell>
+              </TableRow>
+              <TableRow>
                 <TableCell>Average output
                   <Typography variant="body2" color="textSecondary">
                     Across a year
@@ -74,12 +82,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 <TableCell align="right">{formatWatts(generator.peakW * generator.capacityFactor)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Operating costs (/yr)
+                <TableCell>Operating costs
                   <Typography variant="body2" color="textSecondary">
-                    Costs regardless of output
+                    Regardless of output
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}</TableCell>
+                <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}/yr</TableCell>
               </TableRow>
               {generator.spinMinutes > 1 && <TableRow>
                 <TableCell>Spin up/down time
@@ -89,6 +97,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{generator.spinMinutes} min</TableCell>
               </TableRow>}
+              <TableRow>
+                <TableCell>Expected lifespan</TableCell>
+                <TableCell align="right">{generator.lifespanYears} years</TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </TableContainer>

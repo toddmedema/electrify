@@ -45,6 +45,7 @@ export const DAYS_PER_MONTH = 1;
 export const TICKS_PER_MONTH = TICKS_PER_DAY / DAYS_PER_MONTH;
 export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
+export const HOURS_PER_YEAR_REAL = 24 * 365;
 export const STARTING_YEAR = 1990;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
@@ -143,6 +144,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.66,
         // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      lifespanYears: 50,
+        // https://www.fool.com/investing/2018/06/18/could-us-retire-most-coal-fired-power-plants-2040.aspx
     },
     {
       name: 'Nuclear',
@@ -166,6 +169,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.93,
         // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+      lifespanYears: 80,
+        // https://www.scientificamerican.com/article/nuclear-power-plant-aging-reactor-replacement-/
     },
     // {
     //   name: 'Oil', // Aka petroleum
@@ -211,6 +216,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.55,
         // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      lifespanYears: 30,
+        // TODO
     },
     // {
     //   name: 'Trash Incinerator',
@@ -237,6 +244,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 90MW and cost $172m
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
+      btuPerWh: 0,
       annualOperatingCost: 0.004 * peakW * 0.25,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
@@ -247,6 +255,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       spinMinutes: 1,
       capacityFactor: 0.37,
         // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+      lifespanYears: 25,
+        // http://insideenergy.org/2016/09/09/where-do-wind-turbines-go-to-die/
     },
     {
       name: 'Solar',
@@ -259,6 +269,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
+      btuPerWh: 0,
       annualOperatingCost: 0.0023 * peakW * 0.2,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -270,6 +281,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       spinMinutes: 1,
       capacityFactor: 0.26,
         // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+      lifespanYears: 30,
+        // https://energyinformative.org/lifespan-solar-panels/
     },
     // {
     //   name: 'Tidal',
