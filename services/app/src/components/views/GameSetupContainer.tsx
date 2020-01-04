@@ -1,8 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {toCard} from '../../actions/Card';
 import {AppStateType} from '../../Types';
-import TutorialBuild, {DispatchProps, StateProps} from './TutorialBuild';
+import GameSetup, {DispatchProps, StateProps} from './GameSetup';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -14,15 +13,12 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onStart: () => {
       dispatch({type: 'GAME_START'});
     },
-    onCancel: () => {
-      dispatch(toCard({name: 'MAIN_MENU'}));
-    },
   };
 };
 
-const TutorialBuildContainer = connect(
+const GameSetupContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(TutorialBuild);
+)(GameSetup);
 
-export default TutorialBuildContainer;
+export default GameSetupContainer;
