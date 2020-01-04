@@ -56,7 +56,8 @@
   <!-- Preload front page assets before scripts / css can insert them -->
   <link rel="preload" href="images/logo.svg" as="image" />
 
-  <!-- Preload low priority assets -->
-  <!-- <script async type="text/javascript" src="https://js.stripe.com/v3/"></script> -->
+  <!-- Prefetch low priority assets -->
+  <link rel="prefetch" href="data/WeatherRawSF.csv" />
+  <!-- <script async type="text/javascript" src="something.js"></script> -->
 </body>
 </html>

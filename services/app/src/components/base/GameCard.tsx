@@ -13,6 +13,7 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {formatMoneyStable} from 'shared/helpers/Format';
+import {openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
 import {AppStateType, DateType, GameStateType, SpeedType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
@@ -66,6 +67,7 @@ export function GameCard(props: Props) {
             open={Boolean(menuAnchorEl)}
             onClose={handleMenuClose}
           >
+            <MenuItem onClick={() => openWindow('mailto:todd@fabricate.io')}>Send feedback</MenuItem>
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
