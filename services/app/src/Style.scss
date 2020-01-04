@@ -303,6 +303,13 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
+  .blackout-pulsing {
+    animation-name: pulsered;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+  }
+
   .flexContainer {
     display: flex;
     flex-flow: column;
@@ -426,4 +433,20 @@ $fontsizemap: (
 @-ms-keyframes rotate {
   from { transform: rotate(0); }
   to   { transform: rotate(360deg); }
+}
+
+@keyframes pulsered {
+  0% { background-color: $bg_primary; }
+  50% { background-color: $blackout_red; }
+  100% { background-color: $bg_primary; }
+}
+@-webkit-keyframes pulsered {
+  0% { background-color: $bg_primary; }
+  50% { background-color: $blackout_red; }
+  100% { background-color: $bg_primary; }
+}
+@-ms-keyframes pulsered {
+  0% { background-color: $bg_primary; }
+  50% { background-color: $blackout_red; }
+  100% { background-color: $bg_primary; }
 }

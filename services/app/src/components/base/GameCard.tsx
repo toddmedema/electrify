@@ -15,7 +15,7 @@ import Redux from 'redux';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
-import {AppStateType, DateType, GameStateType, SpeedType} from '../../Types';
+import {AppStateType, DateType, GameStateType, SpeedType, TimelineType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.Props<any> {
@@ -34,7 +34,8 @@ export interface DispatchProps {
 export interface Props extends GameCardProps, DispatchProps {}
 
 export function GameCard(props: Props) {
-  if (!props.gameState.inGame) {
+  const {gameState, date} = props;
+  if (!gameState.inGame) {
     return <span/>;
   }
 
@@ -53,10 +54,14 @@ export function GameCard(props: Props) {
     default: break;
   }
 
+  // TODO perf this is a linear lookup every frame, ouch!
+  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
+  const inBlackout = now && now.supplyW < now.demandW;
+
   return (
     <div className={props.className + ' flexContainer'} id="gameCard">
       <div id="topbar">
-        <Toolbar>
+        <Toolbar className={inBlackout ? 'blackout-pulsing' : ''}>
           <IconButton onClick={handleMenuClick} aria-label="menu" edge="start" color="primary">
             <MoreVertIcon />
           </IconButton>
@@ -71,10 +76,10 @@ export function GameCard(props: Props) {
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
-            <span className="weak">{props.date.month} {props.date.year}</span>
+            <span className="weak">{date.month} {date.year}</span>
             &nbsp;({formatMoneyStable(props.cash)})
           </Typography>
-          {props.gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
+          {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
             <PauseIcon color="primary" />
           </IconButton>}
           <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary">
@@ -87,19 +92,19 @@ export function GameCard(props: Props) {
             open={Boolean(speedAnchorEl)}
             onClose={handleSpeedClose}
           >
-            <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={props.gameState.speed === 'SLOW'} aria-label="slow-speed">
+            <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={gameState.speed === 'SLOW'} aria-label="slow-speed">
               <ChevronRightIcon color="primary" />
             </MenuItem>
-            <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={props.gameState.speed === 'NORMAL'} aria-label="normal-speed">
+            <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={gameState.speed === 'NORMAL'} aria-label="normal-speed">
               <PlayArrowIcon color="primary" />
             </MenuItem>
-            <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={props.gameState.speed === 'FAST'} aria-label="fast-speed">
+            <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={gameState.speed === 'FAST'} aria-label="fast-speed">
               <FastForwardIcon color="primary" />
             </MenuItem>
           </Menu>
         </Toolbar>
         <div id="yearProgressBar" style={{
-          width: `${props.date.percentOfYear * 100}%`,
+          width: `${date.percentOfYear * 100}%`,
         }}/>
       </div>
       {props.children}
