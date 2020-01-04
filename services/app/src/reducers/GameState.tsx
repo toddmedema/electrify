@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
 
@@ -49,8 +49,8 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const dollarsPerWh = 0.07 / 1000;
-  const supplyWh = Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR;
-  const demandWh = now.demandW / TICKS_PER_HOUR;
+  const supplyWh = Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+  const demandWh = now.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
   const revenue = supplyWh * dollarsPerWh;
 
   let expensesOM = 0;
@@ -62,7 +62,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
     if (g.yearsToBuildLeft === 0) {
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (FUELS[g.fuel]) {
-        const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR;
+        const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
       }
       if (g.loanAmountLeft > 0) {

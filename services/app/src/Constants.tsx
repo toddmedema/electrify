@@ -46,6 +46,7 @@ export const TICKS_PER_MONTH = TICKS_PER_DAY / DAYS_PER_MONTH;
 export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const HOURS_PER_YEAR_REAL = 24 * 365;
+export const GAME_TO_REAL_YEARS = 365 / DAYS_PER_YEAR;
 export const STARTING_YEAR = 1990;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
@@ -112,6 +113,7 @@ export const FUELS = {
 
 // TODO additional sources of inforomation
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
+// LCOE across many fuel types - https://www.eia.gov/outlooks/aeo/pdf/electricity_generation.pdf
 // Output is sorted lowest cost first (TODO let user choose sort)
 export function GENERATORS(state: GameStateType, peakW: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
@@ -135,15 +137,15 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 60,
-      annualOperatingCost: 0.0051 * peakW * 0.7,
+      annualOperatingCost: 0.09 * peakW,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-        // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 3,
       yearsToBuild: 3 + magnitude / 3,
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      capacityFactor: 0.66,
-        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      capacityFactor: 0.68,
+        // 66% = Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+        // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 50,
         // https://www.fool.com/investing/2018/06/18/could-us-retire-most-coal-fired-power-plants-2040.aspx
     },
@@ -160,15 +162,15 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.01 * peakW * 0.89,
+      annualOperatingCost: 0.12 * peakW,
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-        // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       priority: 2,
       yearsToBuild: 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.93,
-        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+        // 93% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+        // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 80,
         // https://www.scientificamerican.com/article/nuclear-power-plant-aging-reactor-replacement-/
     },
@@ -206,16 +208,17 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.0025 * peakW * 0.38,
+      annualOperatingCost: 0.05 * peakW,
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-        // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
+
       priority: 4,
       yearsToBuild: 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      capacityFactor: 0.55,
-        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+      capacityFactor: 0.45,
+        // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
+        // 55% = max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
       lifespanYears: 30,
         // TODO
     },
@@ -245,16 +248,16 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
       btuPerWh: 0,
-      annualOperatingCost: 0.004 * peakW * 0.25,
+      annualOperatingCost: 0.008 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-        // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
         // TODO depends on location
       priority: 1,
       yearsToBuild: 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
-      capacityFactor: 0.37,
-        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+      capacityFactor: 0.31,
+        // 37% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+        // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 25,
         // http://insideenergy.org/2016/09/09/where-do-wind-turbines-go-to-die/
     },
@@ -270,17 +273,17 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
       btuPerWh: 0,
-      annualOperatingCost: 0.0023 * peakW * 0.2,
+      annualOperatingCost: 0.003 * peakW,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-        // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
         // TODO depends on location
       priority: 1,
       yearsToBuild: 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
-      capacityFactor: 0.26,
-        // Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+      capacityFactor: 0.22,
+        // 26% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
+        // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 30,
         // https://energyinformative.org/lifespan-solar-panels/
     },
