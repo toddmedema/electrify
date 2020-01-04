@@ -115,7 +115,7 @@ export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
 export interface DifficultyMultipliersType {
   buildCost: number;
-  expenses: number;
+  expensesOM: number;
   buildTime: number;
 }
 

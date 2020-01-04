@@ -7,22 +7,22 @@ const DEV = (NODE_ENV === 'dev');
 export const DIFFICULTIES = {
   EASY: {
     buildCost: 0.6,
-    expenses: 0.6,
+    expensesOM: 0.6,
     buildTime: 0.5,
   },
   MEDIUM: {
     buildCost: 0.8,
-    expenses: 0.8,
+    expensesOM: 0.8,
     buildTime: 0.8,
   },
   HARD: {
     buildCost: 1,
-    expenses: 1,
+    expensesOM: 1,
     buildTime: 1,
   },
   IMPOSSIBLE: {
     buildCost: 1.2,
-    expenses: 1.1,
+    expensesOM: 1.1,
     buildTime: 1,
   },
 } as {[index: string]: DifficultyMultipliersType};
@@ -332,13 +332,14 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
   generators.forEach((g: GeneratorShoppingType) => {
-    g.lcWh = LCWH(g);
     g.buildCost *= difficulty.buildCost;
+    g.annualOperatingCost *= difficulty.expensesOM;
     if (DEV) {
       g.yearsToBuild = 0.06;
     } else {
       g.yearsToBuild *= difficulty.buildTime;
     }
+    g.lcWh = LCWH(g);
   });
 
   return generators;
@@ -388,6 +389,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
   const difficulty = DIFFICULTIES[state.difficulty];
   storage.forEach((g: StorageShoppingType) => {
     g.buildCost *= difficulty.buildCost;
+    g.annualOperatingCost *= difficulty.expensesOM;
     if (DEV) {
       g.yearsToBuild = 0.06;
     } else {

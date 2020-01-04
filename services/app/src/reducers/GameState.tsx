@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import { DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
 
@@ -44,7 +44,6 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
 // Each frame, update the month's history with cumulative values -> use that to update finances
 function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): MonthlyHistoryType {
   const monthlyHistory = gameState.monthlyHistory[0];
-  const difficulty = DIFFICULTIES[gameState.difficulty];
 
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
@@ -94,10 +93,10 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   return {
     ...monthlyHistory,
     revenue: monthlyHistory.revenue + revenue,
-    expensesOM: monthlyHistory.expensesOM + expensesOM * difficulty.expenses,
-    expensesFuel: monthlyHistory.expensesFuel + expensesFuel * difficulty.expenses,
-    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees * difficulty.expenses,
-    expensesInterest: monthlyHistory.expensesInterest + expensesInterest * difficulty.expenses,
+    expensesOM: monthlyHistory.expensesOM + expensesOM,
+    expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
+    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees,
+    expensesInterest: monthlyHistory.expensesInterest + expensesInterest,
     cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees - expensesInterest - principalRepayment),
     supplyWh: monthlyHistory.supplyWh + supplyWh,
     demandWh: monthlyHistory.demandWh + demandWh,
