@@ -16,12 +16,12 @@ import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
 import BuildStorageContainer from './views/BuildStorageContainer';
 import FinancesContainer from './views/FinancesContainer';
+import GameSetupContainer from './views/GameSetupContainer';
 import GeneratorsContainer from './views/GeneratorsContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
 import StorageContainer from './views/StorageContainer';
-import TutorialBuildContainer from './views/TutorialBuildContainer';
 
 export interface StateProps {
   card: CardType;
@@ -58,10 +58,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <StorageContainer />;
       case 'FINANCES':
         return <FinancesContainer />;
+      case 'GAME_SETUP':
+        return <GameSetupContainer />;
       case 'GENERATORS':
         return <GeneratorsContainer />;
-      case 'TUTORIAL':
-        return <TutorialBuildContainer />;
       case 'SETTINGS':
         return <SettingsContainer />;
       case 'MAIN_MENU':

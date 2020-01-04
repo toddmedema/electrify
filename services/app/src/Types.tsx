@@ -167,7 +167,7 @@ export type CardNameType =
   'LOADING' |
   'MAIN_MENU' |
   'SETTINGS' |
-  'TUTORIAL';
+  'GAME_SETUP';
 
 export interface CardType {
   name: CardNameType;

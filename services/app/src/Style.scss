@@ -199,46 +199,6 @@ body.android .dialog .textfield:focus-within {
 
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
-  .base_card {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: $bg_primary;
-    color: $font_color_primary;
-    .child_wrapper {
-      margin: size(large);
-      margin-top: size(small);
-      margin-bottom: 9vw;
-      position: relative;
-    }
-    .article {
-      position: relative;
-      flex: 1;
-      padding: size(base) 0;
-      font-size: fontsize(flavor);
-      background-repeat: repeat;
-      background-position: center;
-      width: 100%;
-      overflow-x: hidden;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-
-      // iPhone X padding fix
-      padding-bottom: constant(safe-area-inset-bottom);
-      padding-bottom: env(safe-area-inset-bottom);
-
-      .scrollbox {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        max-width: $absmaxdimension;
-        margin: auto;
-        min-height: 50vh;
-      }
-    }
-  }
-
   .base_main {
     position: absolute;
     width: 100%;
@@ -301,7 +261,7 @@ body.android .dialog .textfield:focus-within {
   // ===============================================
   // Card-specific styles
   // ===============================================
-  #mainMenu {
+  #menuCard {
     width: 100%;
     height: 100%;
     position: relative;
@@ -321,7 +281,7 @@ body.android .dialog .textfield:focus-within {
       }
     }
 
-    #startMenu {
+    #centeredMenu {
       position: absolute;
       top: 50%;
       left: 0;
@@ -333,12 +293,6 @@ body.android .dialog .textfield:focus-within {
         margin-bottom: size(large);
       }
     }
-  }
-
-  #tutorialCard {
-    text-align: center;
-    padding: size(base);
-    box-sizing: border-box;
   }
 
   .flexContainer {
