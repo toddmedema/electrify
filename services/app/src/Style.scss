@@ -275,9 +275,26 @@ body.android .dialog .textfield:focus-within {
       padding: size(base);
     }
 
+    .MuiCardHeader-avatar {
+      margin-right: size(base);
+    }
+
     .MuiCardHeader-action {
       margin-right: 0 !important;
+      margin-top: 0 !important;
+      margin-left: 8px;
       text-align: right;
+
+      p.MuiTypography-colorTextSecondary {
+        margin-top: size(small);
+      }
+    }
+
+    .expand-icon {
+      margin: auto;
+      display: block;
+      height: 20px;
+      margin-top: -18px;
     }
   }
 
@@ -342,7 +359,7 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
-  .generatorBuildList {
+  .buildList {
     background: #ddd;
     padding-top: size(base) !important;
   }

@@ -1,6 +1,7 @@
 import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
-import InfoIcon from '@material-ui/icons/Info';
 
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
@@ -23,40 +24,43 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
 
-  const handleExpandClick = () => {
+  const toggleExpand = () => {
     setExpanded(!expanded);
   };
 
-  const toggleOpen = () => {
+  const toggleOpen = (e: any) => {
     setOpen(!open);
+    e.stopPropagation();
   };
 
   return (
-    <Card>
+    <Card onClick={toggleExpand}>
       <CardHeader
         avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.png`} />}
         action={
           <span>
-            <IconButton onClick={handleExpandClick} aria-label="show more">
-              <InfoIcon color="primary" />
-            </IconButton>
             <Button
               size="small"
               variant="contained"
               color={cash > generator.buildCost ? 'primary' : 'secondary'}
-              onClick={(e: any) => (cash < generator.buildCost) ? toggleOpen() : props.onBuild(false)}
+              onClick={(e: any) => {
+                if (cash < generator.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
+                e.stopPropagation();
+              }}
               disabled={downpayment > cash}
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {Math.round(generator.yearsToBuild * 12)} months
+              {Math.round(generator.yearsToBuild * 12)}m to build
             </Typography>
           </span>
         }
         title={generator.name}
         subheader={generator.description}
       />
+      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
+      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="generator properties">
@@ -131,7 +135,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           <Button autoFocus color="primary" onClick={toggleOpen}>
             Cancel
           </Button>
-          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(); }}>
+          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
             Built it
           </Button>
         </DialogActions>
@@ -195,7 +199,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           onChange={handleSliderChange}
         />
       </Toolbar>
-      <List dense className="scrollable generatorBuildList">
+      <List dense className="scrollable buildList">
         {GENERATORS(gameState, getW(sliderTick)).map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
             generator={g}

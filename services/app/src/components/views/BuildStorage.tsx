@@ -1,6 +1,7 @@
 import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
+import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
-import InfoIcon from '@material-ui/icons/Info';
 
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
@@ -23,40 +24,43 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
 
-  const handleExpandClick = () => {
+  const toggleExpand = () => {
     setExpanded(!expanded);
   };
 
-  const toggleOpen = () => {
+  const toggleOpen = (e: any) => {
     setOpen(!open);
+    e.stopPropagation();
   };
 
   return (
-    <Card>
+    <Card onClick={toggleExpand}>
       <CardHeader
         avatar={<Avatar alt={storage.name} src={`/images/${storage.name.toLowerCase()}.png`} />}
         action={
           <span>
-            <IconButton onClick={handleExpandClick} aria-label="show more">
-              <InfoIcon color="primary" />
-            </IconButton>
             <Button
               size="small"
               variant="contained"
               color={cash > storage.buildCost ? 'primary' : 'secondary'}
-              onClick={(e: any) => (cash < storage.buildCost) ? toggleOpen() : props.onBuild(false)}
+              onClick={(e: any) => {
+                if (cash < storage.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
+                e.stopPropagation();
+              }}
               disabled={downpayment > cash}
             >
               {formatMoneyConcise(storage.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {Math.round(storage.yearsToBuild * 12)} months
+              {Math.round(storage.yearsToBuild * 12)}m to build
             </Typography>
           </span>
         }
         title={storage.name}
         subheader={storage.description}
       />
+      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
+      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
@@ -127,7 +131,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           <Button autoFocus color="primary" onClick={toggleOpen}>
             Cancel
           </Button>
-          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(); }}>
+          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
             Built it
           </Button>
         </DialogActions>
@@ -187,11 +191,11 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           valueLabelDisplay="off"
           min={0}
           step={1}
-          max={36}
+          max={39}
           onChange={handleSliderChange}
         />
       </Toolbar>
-      <List dense className="scrollable storageBuildList">
+      <List dense className="scrollable buildList">
         {STORAGE(gameState, getW(sliderTick)).map((g: StorageShoppingType, i: number) =>
           <StorageBuildItem
             storage={g}

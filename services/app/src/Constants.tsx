@@ -304,8 +304,8 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       description: 'Fast charge/discharge',
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-      peakW: 0.35 * peakWh,
-        // ~0.35x c rating - https://www.tesla.com/sites/default/files/pdfs/powerwall/Powerwall%202_AC_Datasheet_en_northamerica.pdf
+      peakW: 0.8 * peakWh,
+        // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
       peakWh,
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
