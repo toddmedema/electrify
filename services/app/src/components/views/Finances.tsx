@@ -76,7 +76,7 @@ export default function FinancesBuild(props: Props): JSX.Element {
       <ChartFinances
         height={180}
         timeline={timeline}
-        title={year + ' profit'}
+        title={(year || 'All time') + ' profit'}
       />
       <Toolbar>
         <Typography variant="h6">Finances for </Typography>

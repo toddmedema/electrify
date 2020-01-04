@@ -308,7 +308,7 @@ body.android .dialog .textfield:focus-within {
     flex-flow: column;
 
     .scrollable {
-      flex: 1 1 auto;
+      flex: 1 1 auto !important;
       overflow-y: auto;
     }
   }

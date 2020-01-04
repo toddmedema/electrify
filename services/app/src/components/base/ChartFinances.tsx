@@ -2,7 +2,7 @@ import {MONTHS} from 'app/Constants';
 import * as React from 'react';
 import {formatMoneyConcise} from 'shared/helpers/Format';
 import {demandColor} from 'shared/Theme';
-import {VictoryAxis, VictoryBar, VictoryChart, VictoryLabel, VictoryTheme} from 'victory';
+import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
 
 interface ChartData {
   month: number; // unique across years
@@ -42,7 +42,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
         domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-        domainPadding={{x: [5, 5], y: [6, 6]}}
+        domainPadding={{y: [6, 6]}}
         height={props.height || 300}
       >
         <VictoryAxis
@@ -66,12 +66,10 @@ const ChartFinances = (props: Props): JSX.Element => {
             },
           }}
         />
-        <VictoryBar
+        <VictoryLine
           data={props.timeline}
           x="month"
           y="profit"
-          barWidth={10}
-          // barRatio={0.9}
           style={{
             data: {
               stroke: demandColor,
