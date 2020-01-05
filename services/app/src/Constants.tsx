@@ -32,6 +32,7 @@ export const DIFFICULTIES = {
 } as {[index: string]: DifficultyMultipliersType};
 
 export const TICK_MS = {
+  PAUSED: 150,
   SLOW: 80,
   NORMAL: 40,
   FAST: 1,

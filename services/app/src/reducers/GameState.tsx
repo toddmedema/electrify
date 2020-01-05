@@ -481,7 +481,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
       return newState;
     } else {
-      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS.SLOW);
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
     }
     return state;
   }

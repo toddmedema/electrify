@@ -4,8 +4,8 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
+import DoubleArrowIcon from '@material-ui/icons/DoubleArrow';
 import FastForwardIcon from '@material-ui/icons/FastForward';
-import FlashOnIcon from '@material-ui/icons/FlashOn';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import PauseIcon from '@material-ui/icons/Pause';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
@@ -52,7 +52,7 @@ export function GameCard(props: Props) {
     case 'SLOW': speedIcon = <ChevronRightIcon />; break;
     case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
     case 'FAST': speedIcon = <FastForwardIcon />; break;
-    case 'LIGHTNING': speedIcon = <FlashOnIcon />; break;
+    case 'LIGHTNING': speedIcon = <DoubleArrowIcon />; break;
     default: break;
   }
 
@@ -104,7 +104,7 @@ export function GameCard(props: Props) {
               <FastForwardIcon color="primary" />
             </MenuItem>
             <MenuItem onClick={() => { props.onSpeedChange('LIGHTNING'); handleSpeedClose(); }} disabled={gameState.speed === 'LIGHTNING'} aria-label="lightning-speed">
-              <FlashOnIcon color="primary" />
+              <DoubleArrowIcon color="primary" />
             </MenuItem>
           </Menu>
         </Toolbar>
