@@ -1,6 +1,8 @@
 import Button from '@material-ui/core/Button';
 import * as React from 'react';
 
+import {openWindow} from '../../Globals';
+
 export interface StateProps {
 }
 
@@ -24,6 +26,7 @@ const MainMenu = (props: Props): JSX.Element => {
         <Button size="large" variant="contained" color="primary" onClick={props.onStart}>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onTutorial}>Tutorial</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Settings</Button>
+        <Button variant="outlined" color="primary" onClick={() => openWindow('/about.html')}>About</Button>
       </div>
     </div>
   );
