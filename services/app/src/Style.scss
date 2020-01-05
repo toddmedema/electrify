@@ -188,7 +188,7 @@ span.weak {
 }
 
 .MuiSlider-root {
-  width: 50%;
+  width: 50% !important;
   flex-grow: 1;
 }
 
@@ -347,6 +347,15 @@ body.android .dialog .textfield:focus-within {
   .menu_popup {
     background-color: $bg_primary;
     color: $font_color_primary;
+  }
+
+  .outputProgressBar {
+    background: #eeeeee; /* grey200 */
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: -1;
   }
 }
 

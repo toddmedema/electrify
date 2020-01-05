@@ -29,6 +29,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
   }
   return (
     <ListItem disabled={underConstruction}>
+      <div className="outputProgressBar" style={{width: `${props.generator.currentW / props.generator.peakW * 100}%`}}/>
       <ListItemAvatar>
         <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
