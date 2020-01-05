@@ -35,6 +35,7 @@ export const TICK_MS = {
   SLOW: 80,
   NORMAL: 40,
   FAST: 1,
+  LIGHTNING: 0,
 };
 export const REGIONAL_GROWTH_MAX_ANNUAL = 0.05;
 export const RESERVE_MARGIN = 0.15;
@@ -369,24 +370,46 @@ export function STORAGE(state: GameStateType, peakWh: number) {
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
       roundTripEfficiency: 0.85,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
-      monthlyLoss: 0.25,
-        // TODO
+      hourlyLoss: 0.0001,
+        // TODO #'s
         // TODO implement mechanic
-      annualOperatingCost: 0.004 * peakWh,
+      annualOperatingCost: 0.003 * peakWh,
         // LCOE ~$500/MWh served in 2016 - https://www.greentechmedia.com/articles/read/report-levelized-cost-of-energy-for-lithium-ion-batteries-bnef
         // ($0.5/kWh served)
         // 1 kWh build capacity = 30,000 kWh over 15 years at ~25% duty cycle
         // Which means construction costs are about $0.015/kWh served
         // TODO this math needs to be double checked
-      priority: 1,
+      priority: 2,
       yearsToBuild: 0.5 + magnitude / 3,
         // TODO
     },
-    // TODO thermal storage
-    // TODO pumped hydro
-      // slower and larger fixed costs, but cheaper per capacity
-      // ~$50/kWh? https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-      // long project lead times
+    {
+      name: 'Pumped Hydro',
+      fuel: 'Water',
+      description: 'Slow to build and charge / discharge but large capacity',
+      buildCost: 2000000 + 0.05 * peakWh,
+        // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
+          // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity
+        // ~$50/kWh in 2017 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
+        // ~$350-800/kW in 2000 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
+      peakW: 0.1 * peakWh,
+        // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
+      peakWh,
+      lifespanYears: 75,
+        // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
+      roundTripEfficiency: 0.8,
+        // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
+      hourlyLoss: 0.001,
+        // TODO #'s
+        // TODO implement mechanic
+      annualOperatingCost: 0.01 * 0.15 * peakWh,
+        // ~$5/kw in 2000, so about $10 in 2018 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
+        // (multiplied by the peakWh -> W rate)
+      priority: 1,
+      yearsToBuild: 6 + magnitude,
+        // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
+    },
+    // TODO thermal storage, hydrogen, ...
   ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as StorageShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers

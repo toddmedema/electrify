@@ -111,7 +111,7 @@ export interface AudioDataType {
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
-export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
+export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 
 export interface DifficultyMultipliersType {
   buildCost: number;
@@ -213,7 +213,7 @@ interface LoanInfo {
 export interface StorageShoppingType extends GeneratorShoppingType {
   peakWh: number;
   roundTripEfficiency: number; // 0 - 1, percentage (even though it's round trip, applied when inserting so capacity looks correct-to-user)
-  monthlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
+  hourlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
 }
 
 export interface GeneratorShoppingType {

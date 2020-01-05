@@ -69,10 +69,15 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default class extends React.Component<Props, {}> {
   public shouldComponentUpdate(nextProps: Props, nextState: any) {
-    if (nextProps.gameState.speed === 'FAST') {
-      return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0); // skip rendering alternating frames so that CPU can focus on simulation
+    // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
+    switch (nextProps.gameState.speed) {
+      case 'FAST':
+        return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0);
+      case 'LIGHTNING':
+        return (nextProps.gameState.date.minute / TICK_MINUTES % 4 === 0);
+      default:
+        return true;
     }
-    return true;
   }
 
   public render() {
