@@ -6,6 +6,7 @@ export function formatWatts(i: number, mantissa = 1): string {
       spaceSeparated: false,
       average: true,
       trimMantissa: true,
+      totalLength: 2,
       mantissa,
     })
     // lowercase k for thousands in both cases
