@@ -9,21 +9,25 @@ export const DIFFICULTIES = {
     buildCost: 0.6,
     expensesOM: 0.6,
     buildTime: 0.5,
+    blackoutPenalty: 2,
   },
   MEDIUM: {
     buildCost: 0.8,
     expensesOM: 0.8,
     buildTime: 0.8,
+    blackoutPenalty: 4,
   },
   HARD: {
     buildCost: 1,
     expensesOM: 1,
     buildTime: 1,
+    blackoutPenalty: 8,
   },
   IMPOSSIBLE: {
     buildCost: 1.2,
     expensesOM: 1.1,
     buildTime: 1,
+    blackoutPenalty: 12,
   },
 } as {[index: string]: DifficultyMultipliersType};
 

@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import { DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
 
@@ -461,9 +461,12 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       }
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-        // Update popultion, reduce growth rate by 1% per 1% unment, i.e. if 5% unment, region shouldn't grow (5% - 5% = 0)
+        const difficulty = DIFFICULTIES[state.difficulty];
+
+        // Update popultion, reduce growth rate when blackouts (can even go negative)
         const {demandWh, supplyWh} = newState.monthlyHistory[0];
-        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - (demandWh - supplyWh) / demandWh;
+        const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
+        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
         newState.regionPopulation = Math.round(state.regionPopulation * (1 + growthRate / 12));
 
         // Record final history for the month, then insert a new blank month

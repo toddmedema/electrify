@@ -117,6 +117,7 @@ export interface DifficultyMultipliersType {
   buildCost: number;
   expensesOM: number;
   buildTime: number;
+  blackoutPenalty: number; // for each % of demand unfulfilled, how much the regional growth rate is reduced
 }
 
 export type CardNameType =
