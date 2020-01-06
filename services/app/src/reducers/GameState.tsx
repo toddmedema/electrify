@@ -137,6 +137,7 @@ function reforecastDemand(state: GameStateType): TimelineType[] {
 // and changes generator / storage status (in place)
 // (doesn't count storage charging against supply created)
 function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType[], storage: StorageOperatingType[], t: TimelineType) {
+  // UPDATE CONSTRUCTION STATUS
   generators.forEach((g: GeneratorOperatingType) => {
     if (g.yearsToBuildLeft > 0) {
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
@@ -150,19 +151,27 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
 
   let supply = 0;
   let charge = 0;
+  const turbineWindMS = t.windKph * Math.pow(100 / 10, 0.34) / 5; // 5kph = 1m/s
+    // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
+
   // Executed in sort order, aka highest priority first
-  // Renewables produce what they will
-  // On demand should target producing up to demand + reserve margin
+  // Renewables produce what they will; on-demand produces up to demand + reserve margin
   generators.forEach((g: GeneratorOperatingType) => {
     if (g.yearsToBuildLeft === 0) {
       switch (g.fuel) {
         case 'Sun':
           // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+          // TODO what about rain and snow, esp panels covered in snow?
           g.currentW = g.peakW * t.sunlight * Math.max(1, 1 - (t.temperatureC - 10) / 100);
           break;
         case 'Wind':
-          // TODO what is the real number / curve for wind speed efficiency?
-          g.currentW = g.peakW * t.windKph / 30;
+          // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
+          if (turbineWindMS < 3 || turbineWindMS > 25) {
+            g.currentW = 0;
+          } else {
+            const outputFactor = Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
+            g.currentW = g.peakW * outputFactor;
+          }
           break;
         default:
           const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);

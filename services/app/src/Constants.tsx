@@ -130,7 +130,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Coal',
       fuel: 'Coal',
-      description: 'On-demand but dirty',
+      description: 'On-demand but dirty and slow',
       buildCost: 376000000 + 2.6 * peakW, // TODO update to factor in cost growth over time (this is 2008 cost)
         // ~$3500/kw in 2008 - https://schlissel-technical.com/docs/reports_35.pdf
         // $3,500 to $5,000 in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -142,7 +142,9 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       btuPerWh: 10.5,
         // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      spinMinutes: 60,
+      spinMinutes: 360,
+        // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
+        // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
       annualOperatingCost: 0.09 * peakW,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -158,7 +160,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Nuclear',
       fuel: 'Uranium',
-      description: 'No pollution, but slow-moving',
+      description: 'No pollution, but very slow',
       buildCost: 1500000000 + 4.5 * peakW,
         // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
@@ -202,9 +204,9 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Natural Gas',
       fuel: 'Natural Gas',
-      description: 'On-demand and cleaner than coal',
+      description: 'On-demand, faster and cleaner than coal',
       buildCost: 71000000 + 0.75 * peakW,
-        // ~$1,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~$1,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls and still in 2019 https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 1,854 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
         // 528GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
         // Thus 2018/9 avg plant is 284MW and cost $284M
@@ -218,7 +220,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-
       priority: 4,
       yearsToBuild: 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -248,6 +249,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       description: 'Blows strongest at night',
       buildCost: 43000000 + 1.4 * peakW,
         // ~$1,900/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+        // ~$1,600/kw in 2019 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 95GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
         // Added in 2017: 64 generators, 5.8GW total - https://www.eia.gov/electricity/generatorcosts/
         // Thus 2017 new avg plant is 90MW and cost $172m
@@ -364,6 +366,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       description: 'Fast charge/discharge',
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
+          // Also, Tesla grid-scale batteries around $400/kWh in 2019 - https://cleantechnica.com/2019/11/24/what-a-108-26-per-kwh-battery-pack-would-mean-for-tesla/
       peakW: 0.8 * peakWh,
         // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
       peakWh,
@@ -374,15 +377,13 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       hourlyLoss: 0.0001,
         // TODO #'s
         // TODO implement mechanic
-      annualOperatingCost: 0.003 * peakWh,
+      annualOperatingCost: 0.002 * peakWh,
+        // ~$3/kWh of capacity, assuming 100% load factor - https://www.nrel.gov/docs/fy19osti/73222.pdf
+        // ~$2/kWh at a more realistic 50% load factor
         // LCOE ~$500/MWh served in 2016 - https://www.greentechmedia.com/articles/read/report-levelized-cost-of-energy-for-lithium-ion-batteries-bnef
-        // ($0.5/kWh served)
-        // 1 kWh build capacity = 30,000 kWh over 15 years at ~25% duty cycle
-        // Which means construction costs are about $0.015/kWh served
-        // TODO this math needs to be double checked
       priority: 2,
-      yearsToBuild: 0.5 + magnitude / 3,
-        // TODO
+      yearsToBuild: 0.2 + magnitude / 3,
+        // Took Tesla ~6 months to build 120MWh of capacity - https://en.wikipedia.org/wiki/Hornsdale_Power_Reserve
     },
     {
       name: 'Pumped Hydro',
