@@ -192,6 +192,14 @@ span.weak {
   flex-grow: 1;
 }
 
+.MuiAvatar-root {
+  transition: opacity .3s;
+
+  &.offline {
+    opacity: 0.5;
+  }
+}
+
 // for text inputs that are close to bottom, give the screen space to scroll up
 .inputSpacer {
   margin-bottom: 100%;

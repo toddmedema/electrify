@@ -20,21 +20,22 @@ interface StorageListItemProps {
 }
 
 function StorageListItem(props: StorageListItemProps): JSX.Element {
-  const underConstruction = (props.storage.yearsToBuildLeft > 0);
+  const {storage} = props;
+  const underConstruction = (storage.yearsToBuildLeft > 0);
   let secondaryText = '';
   if (underConstruction) {
-    secondaryText = `Building: ${Math.round((props.storage.yearsToBuild - props.storage.yearsToBuildLeft) / props.storage.yearsToBuild * 100)}%, ${Math.ceil(props.storage.yearsToBuildLeft * 12)} months left`;
+    secondaryText = `Building: ${Math.round((storage.yearsToBuild - storage.yearsToBuildLeft) / storage.yearsToBuild * 100)}%, ${Math.ceil(props.storage.yearsToBuildLeft * 12)} months left`;
   } else {
-    secondaryText = `${formatWattHours(props.storage.currentWh).replace(/[^0-9.,]/g, '')}/${formatWattHours(props.storage.peakWh)}`;
+    secondaryText = `${formatWattHours(storage.currentWh).replace(/[^0-9.,]/g, '')}/${formatWattHours(storage.peakWh)}`;
   }
   return (
     <ListItem disabled={underConstruction}>
-      <div className="outputProgressBar" style={{width: `${props.storage.currentWh / props.storage.peakWh * 100}%`}}/>
+      <div className="outputProgressBar" style={{width: `${storage.currentWh / storage.peakWh * 100}%`}}/>
       <ListItemAvatar>
-        <Avatar alt={props.storage.name} src={`/images/${props.storage.name.toLowerCase()}.png`} />
+        <Avatar className={(storage.currentWh === 0 ? 'offline' : '')} alt={storage.name} src={`/images/${storage.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
-        primary={props.storage.name}
+        primary={storage.name}
         secondary={secondaryText}
       />
       <ListItemSecondaryAction>
@@ -44,10 +45,10 @@ function StorageListItem(props: StorageListItemProps): JSX.Element {
         {!underConstruction && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
-        {!underConstruction && <IconButton onClick={() => props.onSell(props.storage.id)} edge="end" color="primary">
+        {!underConstruction && <IconButton onClick={() => props.onSell(storage.id)} edge="end" color="primary">
           <DeleteForeverIcon />
         </IconButton>}
-        {underConstruction && <IconButton onClick={() => props.onSell(props.storage.id)} edge="end" color="primary">
+        {underConstruction && <IconButton onClick={() => props.onSell(storage.id)} edge="end" color="primary">
           <CancelIcon />
         </IconButton>}
       </ListItemSecondaryAction>

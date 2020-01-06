@@ -246,7 +246,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Wind',
       fuel: 'Wind',
-      description: 'Blows strongest at night',
+      description: 'Windiest at spring and fall evenings',
       buildCost: 43000000 + 1.4 * peakW,
         // ~$1,900/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$1,600/kw in 2019 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -272,7 +272,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Solar',
       fuel: 'Sun',
-      description: 'Brightest summer at noon',
+      description: 'Sunniest at summer noon',
       buildCost: 3900000 + 1.275 * peakW,
         // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
@@ -363,7 +363,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
     {
       name: 'Lithium-Ion Battery',
       fuel: 'Battery',
-      description: 'Fast charge/discharge',
+      description: 'Fast to build and charge / discharge',
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
           // Also, Tesla grid-scale batteries around $400/kWh in 2019 - https://cleantechnica.com/2019/11/24/what-a-108-26-per-kwh-battery-pack-would-mean-for-tesla/

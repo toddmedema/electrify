@@ -20,21 +20,22 @@ interface GeneratorListItemProps {
 }
 
 function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
-  const underConstruction = (props.generator.yearsToBuildLeft > 0);
+  const {generator} = props;
+  const underConstruction = (generator.yearsToBuildLeft > 0);
   let secondaryText = '';
   if (underConstruction) {
-    secondaryText = `Building: ${Math.round((props.generator.yearsToBuild - props.generator.yearsToBuildLeft) / props.generator.yearsToBuild * 100)}%, ${Math.ceil(props.generator.yearsToBuildLeft * 12)} months left`;
+    secondaryText = `Building: ${Math.round((generator.yearsToBuild - generator.yearsToBuildLeft) / generator.yearsToBuild * 100)}%, ${Math.ceil(props.generator.yearsToBuildLeft * 12)} months left`;
   } else {
-    secondaryText = `${formatWatts(props.generator.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(props.generator.peakW)}`;
+    secondaryText = `${formatWatts(generator.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(generator.peakW)}`;
   }
   return (
     <ListItem disabled={underConstruction}>
-      <div className="outputProgressBar" style={{width: `${props.generator.currentW / props.generator.peakW * 100}%`}}/>
+      <div className="outputProgressBar" style={{width: `${generator.currentW / generator.peakW * 100}%`}}/>
       <ListItemAvatar>
-        <Avatar alt={props.generator.name} src={`/images/${props.generator.name.toLowerCase()}.png`} />
+        <Avatar className={(generator.currentW === 0 ? 'offline' : '')} alt={generator.name} src={`/images/${generator.name.toLowerCase()}.png`} />
       </ListItemAvatar>
       <ListItemText
-        primary={props.generator.name}
+        primary={generator.name}
         secondary={secondaryText}
       />
       <ListItemSecondaryAction>
@@ -44,10 +45,10 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
         {!underConstruction && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
-        {!underConstruction && <IconButton onClick={() => props.onSell(props.generator.id)} edge="end" color="primary">
+        {!underConstruction && <IconButton onClick={() => props.onSell(generator.id)} edge="end" color="primary">
           <DeleteForeverIcon />
         </IconButton>}
-        {underConstruction && <IconButton onClick={() => props.onSell(props.generator.id)} edge="end" color="primary">
+        {underConstruction && <IconButton onClick={() => props.onSell(generator.id)} edge="end" color="primary">
           <CancelIcon />
         </IconButton>}
       </ListItemSecondaryAction>
