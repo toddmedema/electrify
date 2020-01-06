@@ -210,17 +210,23 @@ interface LoanInfo {
   loanMonthlyPayment: number;
 }
 
-export interface StorageShoppingType extends GeneratorShoppingType {
+export interface StorageShoppingType extends SharedShoppingType {
   peakWh: number;
   roundTripEfficiency: number; // 0 - 1, percentage (even though it's round trip, applied when inserting so capacity looks correct-to-user)
   hourlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
 }
 
-export interface GeneratorShoppingType {
+export interface GeneratorShoppingType extends SharedShoppingType {
+  fuel: FuelNameType;
+  capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
+  spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
+  btuPerWh: number; // Heat Rate, but per W for less math per frame
+}
+
+interface SharedShoppingType {
   [index: string]: any;
   name: string;
   description: string;
-  fuel: FuelNameType;
   buildCost: number; // Partially fixed, partially variable (such as size dependent)
     // When more information is not available, assume that average costs = 1/4 fixed (for avg size), 3/4 variable
     // all costs should be in that year's $ / not account for inflation when possible
@@ -230,9 +236,6 @@ export interface GeneratorShoppingType {
   lifespanYears: number;
   yearsToBuild: number;
   priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
-  capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
-  spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
-  btuPerWh: number; // Heat Rate, but per W for less math per frame
 }
 
 

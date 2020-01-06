@@ -1,7 +1,8 @@
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Menu, MenuItem, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@material-ui/core';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
+import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
@@ -140,6 +141,11 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   );
 }
 
+const sortOptions = [
+  ['buildCost', 'Build Cost'],
+  ['yearsToBuild', 'Build Time'],
+];
+
 // Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0
 // (i.e. 1->2MW, 9->10 MW, 10->20MW)
 function getW(tick: number) {
@@ -167,12 +173,26 @@ export interface Props extends StateProps, DispatchProps {}
 export default function StorageBuildDialog(props: Props): JSX.Element {
   const {gameState, cash, onBack} = props;
   const [sliderTick, setSliderTick] = React.useState<number>(22);
+  const [sort, setSort] = React.useState<string>('buildCost');
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const storage = STORAGE(gameState, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
   const handleSliderChange = (event: any, newValue: number) => {
     setSliderTick(newValue);
   };
 
-  // TODO separate sliders for max output rate vs storage capacity, plug into STORAGE
+  const onSort = (newValue: string) => {
+    setSort(newValue);
+    onSortClose();
+  };
+
+  const onSortOpen = (event: any) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const onSortClose = () => {
+    setAnchorEl(null);
+  };
 
   return (
     <div className="flexContainer">
@@ -185,18 +205,33 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography>
         </Typography>
         <Slider
-          className="flex-newline"
           value={sliderTick}
           aria-labelledby="peak-output"
           valueLabelDisplay="off"
-          min={0}
+          min={4}
           step={1}
           max={39}
           onChange={handleSliderChange}
         />
+        <IconButton edge="end" color="primary" onClick={onSortOpen} aria-label="sort">
+          <SortIcon />
+        </IconButton>
+        <Menu
+          id="sort-menu"
+          anchorEl={anchorEl}
+          keepMounted
+          open={Boolean(anchorEl)}
+          onClose={onSortClose}
+        >
+          {sortOptions.map((option) => {
+            return <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
+              {sort === option[0] ? <strong>{option[1]}</strong> : <span className="weak">{option[1]}</span>}
+            </MenuItem>;
+          })}
+        </Menu>
       </Toolbar>
       <List dense className="scrollable buildList">
-        {STORAGE(gameState, getW(sliderTick)).map((g: StorageShoppingType, i: number) =>
+        {storage.map((g: StorageShoppingType, i: number) =>
           <StorageBuildItem
             storage={g}
             key={i}

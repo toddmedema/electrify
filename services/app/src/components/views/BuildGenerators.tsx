@@ -173,6 +173,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   );
 }
 
+const sortOptions = [
+  ['buildCost', 'Build Cost'],
+  ['yearsToBuild', 'Build Time'],
+  ['lcWh', 'Cost per MWh'],
+];
+
 // Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0
 // (i.e. 1->2MW, 9->10 MW, 10->20MW)
 function getW(tick: number) {
@@ -250,9 +256,11 @@ export default function BuildGenerators(props: Props): JSX.Element {
           open={Boolean(anchorEl)}
           onClose={onSortClose}
         >
-          <MenuItem onClick={() => onSort('buildCost')}>Build Cost</MenuItem>
-          <MenuItem onClick={() => onSort('yearsToBuild')}>Build Time</MenuItem>
-          <MenuItem onClick={() => onSort('lcWh')}>Cost per MWh</MenuItem>
+          {sortOptions.map((option) => {
+            return <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
+              {sort === option[0] ? <strong>{option[1]}</strong> : <span className="weak">{option[1]}</span>}
+            </MenuItem>;
+          })}
         </Menu>
       </Toolbar>
       <List dense className="scrollable buildList">

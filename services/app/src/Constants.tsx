@@ -353,8 +353,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   return generators;
 }
 
-// TODO additional sources of inforomation
-// Output is sorted lowest cost first (TODO let user choose sort)
 export function STORAGE(state: GameStateType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
@@ -362,7 +360,6 @@ export function STORAGE(state: GameStateType, peakWh: number) {
   const storage = [
     {
       name: 'Lithium-Ion Battery',
-      fuel: 'Battery',
       description: 'Fast to build and charge / discharge',
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
@@ -387,7 +384,6 @@ export function STORAGE(state: GameStateType, peakWh: number) {
     },
     {
       name: 'Pumped Hydro',
-      fuel: 'Water',
       description: 'Slow to build and charge / discharge but large capacity',
       buildCost: 2000000 + 0.05 * peakWh,
         // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
@@ -412,7 +408,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
         // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
     },
     // TODO thermal storage, hydrogen, ...
-  ].sort((a, b) => a.buildCost > b.buildCost ? 1 : -1) as StorageShoppingType[];
+  ] as StorageShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
