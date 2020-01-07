@@ -26,8 +26,17 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class extends React.Component<Props, {}> {
-  public shouldComponentUpdate(nextProps: Props, nextState: any) {
+interface State {
+  year: number;
+}
+
+export default class extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = {year: props.date.year};
+  }
+
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
     // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
     switch (nextProps.gameState.speed) {
       case 'FAST':
@@ -41,15 +50,15 @@ export default class extends React.Component<Props, {}> {
 
   public render() {
     const {date, gameState} = this.props;
+    const {year} = this.state;
     const years = [];
     // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= STARTING_YEAR; i--) {
       years.push(i);
     }
 
-    const [year, setYear] = React.useState(date.year);
     const handleYearSelect = (newYear: number) => {
-      setYear(newYear);
+      this.setState({year: newYear});
     };
 
     const history = gameState.monthlyHistory;
