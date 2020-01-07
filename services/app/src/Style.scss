@@ -198,6 +198,10 @@ span.weak {
   &.offline {
     opacity: 0.5;
   }
+
+  .MuiAvatar-img {
+    background-color: inherit !important;
+  }
 }
 
 // for text inputs that are close to bottom, give the screen space to scroll up

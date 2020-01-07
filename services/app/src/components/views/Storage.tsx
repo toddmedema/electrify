@@ -32,7 +32,7 @@ function StorageListItem(props: StorageListItemProps): JSX.Element {
     <ListItem disabled={underConstruction}>
       <div className="outputProgressBar" style={{width: `${storage.currentWh / storage.peakWh * 100}%`}}/>
       <ListItemAvatar>
-        <Avatar className={(storage.currentWh === 0 ? 'offline' : '')} alt={storage.name} src={`/images/${storage.name.toLowerCase()}.png`} />
+        <Avatar className={(storage.currentWh === 0 ? 'offline' : '')} alt={storage.name} src={`/images/${storage.name.toLowerCase()}.svg`} />
       </ListItemAvatar>
       <ListItemText
         primary={storage.name}

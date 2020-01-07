@@ -32,7 +32,7 @@ function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
     <ListItem disabled={underConstruction}>
       <div className="outputProgressBar" style={{width: `${generator.currentW / generator.peakW * 100}%`}}/>
       <ListItemAvatar>
-        <Avatar className={(generator.currentW === 0 ? 'offline' : '')} alt={generator.name} src={`/images/${generator.name.toLowerCase()}.png`} />
+        <Avatar className={(generator.currentW === 0 ? 'offline' : '')} alt={generator.name} src={`/images/${generator.name.toLowerCase()}.svg`} />
       </ListItemAvatar>
       <ListItemText
         primary={generator.name}

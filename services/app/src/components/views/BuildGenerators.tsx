@@ -43,7 +43,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   return (
     <Card onClick={toggleExpand}>
       <CardHeader
-        avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.png`} />}
+        avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.svg`} />}
         action={
           <span>
             <Button
