@@ -235,6 +235,7 @@ body.android .dialog .textfield:focus-within {
       margin-top: -5px;
       height: 2px;
       background: $font_color_faded;
+      z-index: 100;
     }
   }
 

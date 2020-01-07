@@ -73,7 +73,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               {props.secondaryMetric !== 'lcWh' && <TableRow>
                 <TableCell>Total energy cost
                   <Typography variant="body2" color="textSecondary">
-                    Across lifespan
+                    Across life, based on {Math.round(generator.capacityFactor * 100)}% uptime
                   </Typography>
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</TableCell>
@@ -228,12 +228,16 @@ export default function BuildGenerators(props: Props): JSX.Element {
   };
 
   return (
-    <div className="flexContainer">
+    <div id="topbar">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
+        <div className="flex-newline"></div>
+        <div id="yearProgressBar" style={{
+          width: `${gameState.date.percentOfYear * 100}%`,
+        }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
           Generator capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography>
         </Typography>

@@ -108,10 +108,10 @@ export function GameCard(props: Props) {
             </MenuItem>
           </Menu>
         </Toolbar>
-        <div id="yearProgressBar" style={{
-          width: `${date.percentOfYear * 100}%`,
-        }}/>
       </div>
+      <div id="yearProgressBar" style={{
+        width: `${date.percentOfYear * 100}%`,
+      }}/>
       {props.children}
       <NavigationContainer />
     </div >

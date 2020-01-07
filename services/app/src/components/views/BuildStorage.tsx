@@ -201,6 +201,10 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
+        <div className="flex-newline"></div>
+        <div id="yearProgressBar" style={{
+          width: `${gameState.date.percentOfYear * 100}%`,
+        }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
           Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography>
         </Typography>
