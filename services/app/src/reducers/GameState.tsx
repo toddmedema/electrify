@@ -52,6 +52,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   const demandWh = now.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
   const revenue = supplyWh * dollarsPerWh;
 
+  let kgco2e = 0;
   let expensesOM = 0;
   let expensesFuel = 0;
   let expensesInterest = 0;
@@ -63,6 +64,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
       if (FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
+        kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
@@ -100,6 +102,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
     cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees - expensesInterest - principalRepayment),
     supplyWh: monthlyHistory.supplyWh + supplyWh,
     demandWh: monthlyHistory.demandWh + demandWh,
+    kgco2e: monthlyHistory.kgco2e + kgco2e,
   };
 }
 
@@ -319,6 +322,7 @@ function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number):
     month: date.monthNumber,
     supplyWh: 0,
     demandWh: 0,
+    kgco2e: 0,
     cash,
     netWorth,
     revenue: 0,

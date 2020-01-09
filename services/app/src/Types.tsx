@@ -174,6 +174,7 @@ export interface MonthlyHistoryType {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  kgco2e: number; // total
   cash: number; // ending (this is a live value in the current month)
   netWorth: number; // ending
   revenue: number; // total

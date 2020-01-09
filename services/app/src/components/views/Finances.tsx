@@ -65,6 +65,7 @@ export default class extends React.Component<Props, State> {
     const summary = {
       supplyWh: 0,
       demandWh: 0,
+      kgco2e: 0,
       revenue: 0,
       expensesFuel: 0,
       expensesOM: 0,
@@ -83,6 +84,7 @@ export default class extends React.Component<Props, State> {
         });
         summary.supplyWh += h.supplyWh;
         summary.demandWh += h.demandWh;
+        summary.kgco2e += h.kgco2e;
         summary.revenue += h.revenue;
         summary.expensesFuel += h.expensesFuel;
         summary.expensesOM += h.expensesOM;
@@ -148,6 +150,10 @@ export default class extends React.Component<Props, State> {
               <TableRow>
                 <TableCell colSpan={2}>Supply generated</TableCell>
                 <TableCell align="right">{formatWatts(summary.supplyWh, 0)}h</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell colSpan={2}>Pollution (CO2e)</TableCell>
+                <TableCell align="right">{Math.round(summary.kgco2e / (summary.supplyWh / 1000000))}kg/MWh</TableCell>
               </TableRow>
             </TableBody>
           </Table>
