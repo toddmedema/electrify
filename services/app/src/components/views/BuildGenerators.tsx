@@ -30,6 +30,8 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   if (props.secondaryMetric === 'lcWh') {
     secondaryMetric = `${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`;
   }
+  const buildable = props.generator.peakW <= props.generator.maxPeakW;
+  const secondaryText = (buildable) ? generator.description : `Too large for current tech; max size ${formatWatts(props.generator.maxPeakW)}`;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -54,7 +56,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 if (cash < generator.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
                 e.stopPropagation();
               }}
-              disabled={downpayment > cash}
+              disabled={downpayment > cash || !buildable}
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
@@ -62,7 +64,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           </span>
         }
         title={generator.name}
-        subheader={generator.description}
+        subheader={secondaryText}
       />
       {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
       {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
@@ -255,7 +257,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           valueLabelDisplay="off"
           min={0}
           step={1}
-          max={36}
+          max={34}
           onChange={onSlider}
         />
         <IconButton edge="end" color="primary" onClick={onSortOpen} aria-label="sort">

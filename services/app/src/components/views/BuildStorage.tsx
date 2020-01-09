@@ -24,6 +24,8 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+  const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
+  const secondaryText = (buildable) ? storage.description : `Too large for current tech; max size ${formatWatts(props.storage.maxPeakWh)}h`;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -48,7 +50,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
                 if (cash < storage.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
                 e.stopPropagation();
               }}
-              disabled={downpayment > cash}
+              disabled={downpayment > cash || !buildable}
             >
               {formatMoneyConcise(storage.buildCost)}
             </Button>
@@ -58,7 +60,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           </span>
         }
         title={storage.name}
-        subheader={storage.description}
+        subheader={secondaryText}
       />
       {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
       {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
@@ -214,7 +216,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           valueLabelDisplay="off"
           min={4}
           step={1}
-          max={39}
+          max={37}
           onChange={handleSliderChange}
         />
         <IconButton edge="end" color="primary" onClick={onSortOpen} aria-label="sort">

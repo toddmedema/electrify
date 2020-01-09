@@ -139,6 +139,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2019 avg plant is 430 MW and cost $1.5b
         // 1/4 fixed = $376m, 3/4 variable = $2.6/w
       peakW,
+      maxPeakW: 6000000000,
+        // ~6GW, start in the late 90's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 10.5,
         // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -167,6 +169,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2019 avg plant is ~1GW and cost $6b
         // 1/4 fixed = $1.5b, 3/4 variable = $4.5/w
       peakW,
+      maxPeakW: 8000000000,
+        // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
       btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
@@ -212,6 +216,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2018/9 avg plant is 284MW and cost $284M
         // 1/4 fixed = $71m, 3/4 variable = $0.75/w
       peakW,
+      maxPeakW: 6000000000,
+        // ~6GW, build in the late 80's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
       btuPerWh: 7.8,
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -255,6 +261,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 90MW and cost $172m
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
       peakW,
+      maxPeakW: 1500000000,
+        // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
       annualOperatingCost: 0.012 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -280,6 +288,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
+      maxPeakW: 2000000000,
+        // ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
       annualOperatingCost: 0.008 * peakW,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -301,6 +311,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   description: 'Stable output except 4 times per day',
     //   buildCost: 200000000,
     //   peakW,
+    // maxPeakW: 250000000,
+    // ~250MW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
     //   annualOperatingCost: 1000000,
     //   priority: 1,
     //   yearsToBuild: 1,
@@ -313,6 +325,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   description: 'Cheap and always on, but limited location options',
     //   buildCost: 200000000,
     //   peakW,
+    // maxPeakW: 800000000,
+    // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
     //   annualOperatingCost: 1000000,
     //   priority: 1,
     //   yearsToBuild: 4,
@@ -326,7 +340,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   buildCost: 200000000,
       // 1,458 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
       // 100GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
+
+      // $1k-5k/kW - https://www.hydro.org/waterpower/why-hydro/affordable/
     //   peakW,
+    // maxPeakW: 10000000000,
+    // ~10GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
     //   spinMinutes: 1,
     //   annualOperatingCost: 1000000 * 0.4,
       // about 0.0017/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
@@ -367,6 +385,10 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       peakW: 0.8 * peakWh,
         // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
       peakWh,
+      maxPeakWh: 200000000,
+        // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
+        // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
+        // ~2MWh in 2014, 1MWh before that
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
       roundTripEfficiency: 0.85,
@@ -385,14 +407,18 @@ export function STORAGE(state: GameStateType, peakWh: number) {
     {
       name: 'Pumped Hydro',
       description: 'Slow to build and charge / discharge but large capacity',
-      buildCost: 2000000 + 0.05 * peakWh,
+      buildCost: 2000000 + 0.15 * peakWh,
         // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
           // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity
         // ~$50/kWh in 2017 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-        // ~$350-800/kW in 2000 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
+        // ~$350-800/kW in 2000, thus about 1,600 in 2018 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
+        // ~$1,700-2500/kW in 2018 - https://www.hydro.org/wp-content/uploads/2018/04/2018-NHA-Pumped-Storage-Report.pdf
       peakW: 0.1 * peakWh,
         // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
       peakWh,
+      maxPeakWh: 20000000000,
+        // 24GWh, build in 1970's - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
+        // BUT, very location dependent...
       lifespanYears: 75,
         // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       roundTripEfficiency: 0.8,

@@ -213,12 +213,14 @@ interface LoanInfo {
 
 export interface StorageShoppingType extends SharedShoppingType {
   peakWh: number;
+  maxPeakWh: number; // Maximum size the technology is currently buildable
   roundTripEfficiency: number; // 0 - 1, percentage (even though it's round trip, applied when inserting so capacity looks correct-to-user)
   hourlyLoss: number; // 0 - 1, percentage (water evaporation, heat loss, etc)
 }
 
 export interface GeneratorShoppingType extends SharedShoppingType {
   fuel: FuelNameType;
+  maxPeakW: number; // Maximum size the technology is currently buildable
   capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
