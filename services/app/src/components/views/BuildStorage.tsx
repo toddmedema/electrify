@@ -195,7 +195,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   };
 
   return (
-    <div className="flexContainer">
+    <div id="topbar" className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build Storage</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">

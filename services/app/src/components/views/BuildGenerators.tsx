@@ -94,14 +94,14 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}/yr</TableCell>
               </TableRow>
-              <TableRow>
+              {fuel.costPerBtu && <TableRow>
                 <TableCell>Fuel costs
                   <Typography variant="body2" color="textSecondary">
                     Varies with fuel prices
                   </Typography>
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuel.costPerBtu || 0)}/MWh</TableCell>
-              </TableRow>
+              </TableRow>}
               {generator.spinMinutes > 1 && <TableRow>
                 <TableCell>Spin up/down time
                   <Typography variant="body2" color="textSecondary">
@@ -117,6 +117,14 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               {props.secondaryMetric !== 'yearsToBuild' && <TableRow>
                 <TableCell>Time to build</TableCell>
                 <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
+              </TableRow>}
+              {fuel.kgCO2ePerBtu && <TableRow>
+                <TableCell>Air pollution
+                  <Typography variant="body2" color="textSecondary">
+                    (kg of CO2 equivalent)
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">{Math.round(1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0)}kg/MWh</TableCell>
               </TableRow>}
             </TableBody>
           </Table>
@@ -228,7 +236,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
   };
 
   return (
-    <div id="topbar">
+    <div id="topbar" className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">

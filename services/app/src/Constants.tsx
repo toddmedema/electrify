@@ -99,17 +99,17 @@ export const FUELS = {
     kgCO2ePerBtu: 0.000000066,
   },
 
-  // TODO
-  // 'Oil': {
-  //   costPerBtu: 999,
-  //   kgCO2ePerBtu: 999,
-  // },
-
   // $0.71 per million BTU https://www.eia.gov/opendata/qb.php?category=40290&sdid=SEDS.NUETD.WI.A
   'Uranium': {
     costPerBtu: 0.00000071,
     kgCO2ePerBtu: 0,
   },
+
+  // TODO
+  // 'Oil': {
+  //   costPerBtu: 999,
+  //   kgCO2ePerBtu: 999,
+  // },
 
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
   // 'Trash': {
