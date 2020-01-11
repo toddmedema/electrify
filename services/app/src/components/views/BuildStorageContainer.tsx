@@ -1,7 +1,7 @@
 import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, BuildStorageAction, StorageShoppingType} from '../../Types';
+import {AppStateType, BuildFacilityAction, StorageShoppingType} from '../../Types';
 import BuildStorage, {DispatchProps, StateProps} from './BuildStorage';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -16,8 +16,8 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onBack: () => {
       dispatch(toCard({name: 'FACILITIES'}));
     },
-    onBuildStorage: (storage: StorageShoppingType, financed: boolean) => {
-      dispatch({type: 'BUILD_STORAGE', storage, financed} as BuildStorageAction);
+    onBuildStorage: (facility: StorageShoppingType, financed: boolean) => {
+      dispatch({type: 'BUILD_FACILITY', facility, financed} as BuildFacilityAction);
     },
   };
 };
