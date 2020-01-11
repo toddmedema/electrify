@@ -38,7 +38,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   };
 
   return (
-    <Card onClick={toggleExpand}>
+    <Card onClick={toggleExpand} className="build-list-item">
       <CardHeader
         avatar={<Avatar alt={storage.name} src={`/images/${storage.name.toLowerCase()}.svg`} />}
         action={

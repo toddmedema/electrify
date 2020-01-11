@@ -12,6 +12,7 @@ export const initialGameState: GameStateType = {
   difficulty: 'EASY',
   speed: 'PAUSED',
   inGame: false,
+  tutorialStep: -1,
   facilities: [] as FacilityOperatingType[],
   date: getDateFromMinute(0),
   timeline: [] as TimelineType[],

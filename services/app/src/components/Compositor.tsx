@@ -1,16 +1,10 @@
-import Button from '@material-ui/core/Button';
-import Snackbar from '@material-ui/core/Snackbar';
+import {Button, Snackbar, Typography} from '@material-ui/core';
 import * as React from 'react';
+import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
 
 import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
-import {
-  CardNameType,
-  CardType,
-  SettingsType,
-  TransitionClassType,
-  UIType
-} from '../Types';
+import {CardNameType, CardType, SettingsType, TransitionClassType, UIType} from '../Types';
 
 import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
@@ -23,15 +17,77 @@ import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import SettingsContainer from './views/SettingsContainer';
 
+const TUTORIAL_STEPS = [
+  {
+    target: '#topbar',
+    content: 'Your goal: Make as much money as possible. You lose if you run out of money!',
+  },
+  {
+    target: '.VictoryContainer',
+    content: 'Make money by supplying demand for electricity',
+  },
+  {
+    target: '.button-buildGenerator',
+    content: 'Build generators and storage to meet demand',
+  },
+  {
+    target: '#speedChangeButton',
+    content: 'Control the speed of the game',
+  },
+  {
+    target: '#financesNav',
+    content: 'Review your financial progress, net worth, and regional information',
+  },
+  {
+    target: '#forecastsNav',
+    content: 'Plan for future demand, weather and technology',
+  },
+  {
+    target: '#topbar',
+    content: 'That\'s all it takes - good luck!',
+  },
+];
+
+interface TooltipProps {
+  continuous: any;
+  index: any;
+  step: any;
+  backProps: any;
+  closeProps: any;
+  primaryProps: any;
+  tooltipProps: any;
+}
+
+function Tooltip(props: TooltipProps): JSX.Element {
+  const {continuous, index, step, backProps, closeProps, primaryProps, tooltipProps} = props;
+  return <div id="tutorial-tooltip" {...tooltipProps}>
+    {step.title && <Typography variant="h6" gutterBottom>{step.title}</Typography>}
+    <Typography variant="body1">{step.content}</Typography>
+    <div>
+      {index > 0 && (
+        <Button {...backProps} variant="outlined" color="primary">
+          Back
+        </Button>
+      )}
+      <Button {...primaryProps} variant="contained" color="primary">
+        Next
+      </Button>
+    </div>
+    <div style={{clear: 'both'}}></div>
+  </div>;
+}
+
 export interface StateProps {
   card: CardType;
   settings: SettingsType;
   ui: UIType;
   transition: TransitionClassType;
+  tutorialStep: number;
 }
 
 export interface DispatchProps {
   closeSnackbar: () => void;
+  onTutorialStep: (newStep: number) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -41,6 +97,12 @@ export function isNavCard(name: CardNameType) {
 }
 
 export default class Compositor extends React.Component<Props, {}> {
+  public handleJoyrideCallback = (data: any) => {
+    const { action, index, type } = data;
+    if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
+      this.props.onTutorialStep(index + (action === ACTIONS.PREV ? -1 : 1));
+    }
+  }
 
   public snackbarActionClicked(e: React.MouseEvent<HTMLElement>) {
     if (this.props.ui.snackbar.action) {
@@ -74,6 +136,11 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public shouldComponentUpdate(nextProps: Props) {
+    // Explicitly update if changing tutorial step
+    if (this.props.tutorialStep !== nextProps.tutorialStep) {
+      return true;
+    }
+
     // Don't update the main UI if we're on the same card
     if (this.props.card.name === nextProps.card.name) {
       return false;
@@ -83,12 +150,12 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const containerClass = ['app_container'];
+    const { tutorialStep } = this.props;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
     return (
-      <div className={containerClass.join(' ')}>
+      <div className="app_container">
         <TransitionGroup
           childFactory={(child) => React.cloneElement(
               child, {classNames: this.props.transition}
@@ -102,6 +169,20 @@ export default class Compositor extends React.Component<Props, {}> {
             </div>
           </CSSTransition>
         </TransitionGroup>
+        <Joyride
+          callback={this.handleJoyrideCallback}
+          continuous={true}
+          showProgress={true}
+          run={tutorialStep >= 0}
+          tooltipComponent={Tooltip}
+          stepIndex={tutorialStep}
+          steps={TUTORIAL_STEPS}
+          styles={{
+            options: {
+              overlayColor: 'rgba(0, 0, 0, 0)',
+            },
+          }}
+        />
         <Snackbar
           className="snackbar"
           open={this.props.ui.snackbar.open}

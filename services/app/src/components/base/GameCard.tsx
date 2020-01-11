@@ -84,7 +84,7 @@ export function GameCard(props: Props) {
           {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
             <PauseIcon color="primary" />
           </IconButton>}
-          <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary">
+          <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary" id="speedChangeButton">
             {speedIcon}
           </IconButton>
           <Menu

@@ -235,6 +235,7 @@ export interface GameStateType {
   difficulty: DifficultyType;
   speed: SpeedType;
   inGame: boolean;
+  tutorialStep: number;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
   date: DateType;

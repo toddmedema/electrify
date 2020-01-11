@@ -82,7 +82,7 @@ $sizemap: (
   input: 32px, /* size of input icon-style buttons */
   huge: 12vmin,
   large: 6vmin,
-  icon: 4.5vmin,
+  medium: 4vmin,
   base: 2vmin,
   small: 1vmin,
   tiny: 0.5vmin,
@@ -204,6 +204,27 @@ span.weak {
   }
 }
 
+.react-joyride__spotlight {
+  background: none !important;
+}
+
+#tutorial-tooltip {
+  background: $bg_primary;
+  padding: size(medium);
+  margin: auto;
+  width: 90%;
+  max-width: 500px;
+  box-sizing: border-box;
+
+  button {
+    margin-top: size(medium);
+  }
+
+  .MuiButton-containedPrimary {
+    float: right;
+  }
+}
+
 // for text inputs that are close to bottom, give the screen space to scroll up
 .inputSpacer {
   margin-bottom: 100%;
@@ -294,7 +315,7 @@ body.android .dialog .textfield:focus-within {
     background-color: $bg_primary;
     text-align: center;
 
-    .logo {
+    #logo {
       position: absolute;
       top: size(large);
       left: size(large);
@@ -422,7 +443,7 @@ $sizemap: (
   input: 32px,
   huge: 12vmin * $abs_scale_vh,
   large: 6vmin * $abs_scale_vh,
-  icon: 4vmin * $abs_scale_vh,
+  medium: 4vmin * $abs_scale_vh,
   base: 2vmin * $abs_scale_vh,
   small: 1vmin * $abs_scale_vh,
   tiny: 0.5vmin * $abs_scale_vh,
