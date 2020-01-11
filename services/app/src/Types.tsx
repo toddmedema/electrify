@@ -108,6 +108,7 @@ export type CardNameType =
   'BUILD_STORAGE' |
   'FACILITIES' |
   'FINANCES' |
+  'FORECASTS' |
   'LOADING' |
   'MAIN_MENU' |
   'SETTINGS' |

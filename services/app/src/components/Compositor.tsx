@@ -17,6 +17,7 @@ import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
 import BuildStorageContainer from './views/BuildStorageContainer';
 import FacilitiesContainer from './views/FacilitiesContainer';
 import FinancesContainer from './views/FinancesContainer';
+import ForecastsContainer from './views/ForecastsContainer';
 import GameSetupContainer from './views/GameSetupContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
@@ -55,6 +56,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <BuildStorageContainer />;
       case 'FINANCES':
         return <FinancesContainer />;
+      case 'FORECASTS':
+        return <ForecastsContainer />;
       case 'GAME_SETUP':
         return <GameSetupContainer />;
       case 'FACILITIES':
