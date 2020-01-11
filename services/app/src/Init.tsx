@@ -116,7 +116,7 @@ function setupGoogleAnalytics() {
     });
     return console.log('Google Analytics disabled during local dev.');
   }
-  ReactGA.initialize('UA-47408800-9', {
+  ReactGA.initialize('G-BYRYY6BG1Y', {
     gaOptions: {
       appName: getDevicePlatform(),
       appVersion: VERSION,

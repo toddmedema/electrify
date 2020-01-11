@@ -1,8 +1,4 @@
-import IconButton from '@material-ui/core/IconButton';
-import Menu from '@material-ui/core/Menu';
-import MenuItem from '@material-ui/core/MenuItem';
-import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
+import {IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 import DoubleArrowIcon from '@material-ui/icons/DoubleArrow';
 import FastForwardIcon from '@material-ui/icons/FastForward';

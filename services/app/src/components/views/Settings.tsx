@@ -1,4 +1,4 @@
-import Button from '@material-ui/core/Button';
+import {Button} from '@material-ui/core';
 // import Checkbox from '@material-ui/core/Checkbox';
 import * as React from 'react';
 import {VERSION} from 'shared/schema/Constants';
@@ -19,21 +19,8 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-// For all cycles, going to the right = harder, left = easier
-// const difficultyText: { [v: string]: any } = [
-//   {title: 'Story', text: 'You\'re here for the story. Enemies go easy on you.'},
-//   {title: 'Normal', text: 'As it was meant to be played. Adventurers start here!'},
-//   {title: 'Hard', text: 'Enemies are relentless; a true challenge for seasoned adventurers only.'},
-//   {title: 'Impossible', text: 'You will almost surely die, so make your death a glorious one!'},
-// ];
-// const difficultyValues: string[] = ['EASY', 'NORMAL', 'HARD', 'IMPOSSIBLE'];
-
 const Settings = (props: Props): JSX.Element => {
-  // const difficultyIdx = difficultyValues.indexOf(props.settings.difficulty);
   // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
-  // <Picker label="Difficulty" value={difficultyText[difficultyIdx].title} onDelta={(i: number) => props.onDifficultyDelta(props.settings.difficulty, i)}>
-  //   {difficultyText[difficultyIdx].text}
-  // </Picker>
 
   // <Checkbox id="sound" label="Sound" checked={props.settings.audioEnabled} onChange={(e) => props.onAudioChange(e.target.checked)}>
   //   {(props.settings.audioEnabled) ? 'Music and sound effects enabled.' : 'Music and sound effects disabled.'}
@@ -58,6 +45,7 @@ const Settings = (props: Props): JSX.Element => {
   return (
     <div>
       <Button variant="contained" color="primary" onClick={props.onMainMenu}>Return to main menu</Button>
+      TODO: enable / disable music, font size, auto-pause while looking at build options, ...?
       <div className="version">Electrify App v{VERSION}</div>
     </div>
   );

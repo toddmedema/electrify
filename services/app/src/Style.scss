@@ -88,21 +88,6 @@ $sizemap: (
   tiny: 0.5vmin,
 );
 
-$fontsizemap: (
-  title: 6vmin,
-  interactive: 5.5vmin,
-  flavor: 4.7vmin,
-);
-
-@function fontsize($key) {
-  @if map-has-key($fontsizemap, $key) {
-    @return map-get($fontsizemap, $key);
-  }
-
-  @warn "Unknown `#{$key}` in $fontsizemap.";
-  @return null;
-}
-
 @function size($key) {
   @if map-has-key($sizemap, $key) {
     @return map-get($sizemap, $key);
@@ -214,20 +199,67 @@ span.weak {
   background: none !important;
 }
 
-#tutorial-tooltip {
-  background: $bg_primary;
-  padding: size(medium);
-  margin: auto;
-  width: 90%;
-  max-width: 500px;
+.base_main {
+  position: absolute;
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
+  display: flex;
 
-  button {
-    margin-top: size(medium);
+  & > div {
+    width: 100%;
   }
 
-  .MuiButton-containedPrimary {
-    float: right;
+  .MuiToolbar-root {
+    border: none !important;
+  }
+
+  #yearProgressBar {
+    margin-top: -5px;
+    height: 2px;
+    background: $font_color_faded;
+    z-index: 100;
+  }
+}
+
+.MuiDialogContent-root {
+  padding: 0 !important;
+}
+
+.blackout-pulsing {
+  &:before {
+    content: "";
+    animation-name: pulsered;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+    position: absolute;
+    top: 0;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    z-index: -2;
+  }
+
+  &:after {
+    content: "";
+    background-image: linear-gradient(rgba(255,255,255,0), rgba(255,255,255,255));
+    position: absolute;
+    top: 0;
+    bottom: -6px;
+    left: 0;
+    right: 0;
+    z-index: -1;
+  }
+}
+
+.flexContainer {
+  display: flex;
+  flex-flow: column;
+
+  .scrollable {
+    flex: 1 1 auto !important;
+    overflow-y: auto;
   }
 }
 
@@ -243,33 +275,6 @@ body.android .dialog .textfield:focus-within {
 
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
-  .base_main {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    display: flex;
-
-    & > div {
-      width: 100%;
-    }
-
-    .MuiToolbar-root {
-      border: none !important;
-    }
-
-    #yearProgressBar {
-      margin-top: -5px;
-      height: 2px;
-      background: $font_color_faded;
-      z-index: 100;
-    }
-  }
-
-  .MuiDialogContent-root {
-    padding: 0 !important;
-  }
-
   .MuiCard-root {
     margin-bottom: size(small);
     margin: 0 size(small) size(base) size(small);
@@ -311,6 +316,23 @@ body.android .dialog .textfield:focus-within {
     padding: size(large);
   }
 
+  #tutorial-tooltip {
+    background: $bg_primary;
+    padding: size(medium);
+    margin: auto;
+    width: 90%;
+    max-width: 500px;
+    box-sizing: border-box;
+
+    button {
+      margin-top: size(medium);
+    }
+
+    .MuiButton-containedPrimary {
+      float: right;
+    }
+  }
+
   // ===============================================
   // Card-specific styles
   // ===============================================
@@ -345,43 +367,6 @@ body.android .dialog .textfield:focus-within {
         margin: auto;
         margin-bottom: size(large);
       }
-    }
-  }
-
-  .blackout-pulsing {
-    &:before {
-      content: "";
-      animation-name: pulsered;
-      animation-duration: 2s;
-      animation-iteration-count: infinite;
-      animation-timing-function: ease-in-out;
-      position: absolute;
-      top: 0;
-      bottom: -4px;
-      left: 0;
-      right: 0;
-      z-index: -2;
-    }
-
-    &:after {
-      content: "";
-      background-image: linear-gradient(rgba(255,255,255,0), rgba(255,255,255,255));
-      position: absolute;
-      top: 0;
-      bottom: -6px;
-      left: 0;
-      right: 0;
-      z-index: -1;
-    }
-  }
-
-  .flexContainer {
-    display: flex;
-    flex-flow: column;
-
-    .scrollable {
-      flex: 1 1 auto !important;
-      overflow-y: auto;
     }
   }
 
@@ -455,12 +440,6 @@ $sizemap: (
   tiny: 0.5vmin * $abs_scale_vh,
 );
 
-$fontsizemap: (
-  title: 6vmin * $abs_scale_vw,
-  interactive: 5vmin * $abs_scale_vw,
-  flavor: 4.5vmin * $abs_scale_vw,
-);
-
 @media screen and (min-width: $abswidthmax), screen and (min-height: $absheightmax) {
   // Use the new desktop values defined above, only at this size
   @include styling();
@@ -480,30 +459,12 @@ $fontsizemap: (
   }
 }
 
+// KEYFRAMES
 @keyframes fadein {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-@-webkit-keyframes fadein {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@-ms-keyframes fadein {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
 @keyframes fadeout {
-  0% { opacity: 1; height: 100%; }
-  99% { opacity: 0; height: 100%; }
-  100% { opacity: 0; height: 0; }
-}
-@-webkit-keyframes fadeout {
-  0% { opacity: 1; height: 100%; }
-  99% { opacity: 0; height: 100%; }
-  100% { opacity: 0; height: 0; }
-}
-@-ms-keyframes fadeout {
   0% { opacity: 1; height: 100%; }
   99% { opacity: 0; height: 100%; }
   100% { opacity: 0; height: 0; }
@@ -513,26 +474,8 @@ $fontsizemap: (
   from { transform: rotate(0); }
   to   { transform: rotate(360deg); }
 }
-@-webkit-keyframes rotate {
-  from { transform: rotate(0); }
-  to   { transform: rotate(360deg); }
-}
-@-ms-keyframes rotate {
-  from { transform: rotate(0); }
-  to   { transform: rotate(360deg); }
-}
 
 @keyframes pulsered {
-  0% { background-color: $bg_primary; }
-  50% { background-color: $blackout_red; }
-  100% { background-color: $bg_primary; }
-}
-@-webkit-keyframes pulsered {
-  0% { background-color: $bg_primary; }
-  50% { background-color: $blackout_red; }
-  100% { background-color: $bg_primary; }
-}
-@-ms-keyframes pulsered {
   0% { background-color: $bg_primary; }
   50% { background-color: $blackout_red; }
   100% { background-color: $bg_primary; }
