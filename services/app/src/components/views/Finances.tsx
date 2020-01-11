@@ -120,6 +120,17 @@ export default class extends React.Component<Props, State> {
                 <TableCell align="right">{formatMoneyStable(summary.revenue)}</TableCell>
               </TableRow>
               <TableRow>
+                <TableCell></TableCell>
+                <TableCell>Power sold</TableCell>
+                <TableCell align="right">{formatWatts(summary.supplyWh, 0)}h</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell></TableCell>
+                <TableCell>Average rate</TableCell>
+                <TableCell align="right">{formatMoneyStable(summary.revenue / (summary.supplyWh || 1) * 1000)}/kWh</TableCell>
+              </TableRow>
+
+              <TableRow>
                 <TableCell colSpan={2}>Expenses</TableCell>
                 <TableCell align="right">{formatMoneyStable(expenses)}</TableCell>
               </TableRow>
@@ -148,12 +159,8 @@ export default class extends React.Component<Props, State> {
                 <TableCell align="right">{formatMoneyStable(summary.netWorth)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell colSpan={2}>Supply generated</TableCell>
-                <TableCell align="right">{formatWatts(summary.supplyWh, 0)}h</TableCell>
-              </TableRow>
-              <TableRow>
                 <TableCell colSpan={2}>Pollution (CO2e)</TableCell>
-                <TableCell align="right">{Math.round(summary.kgco2e / (summary.supplyWh / 1000000))}kg/MWh</TableCell>
+                <TableCell align="right">{numbro(summary.kgco2e / ((summary.supplyWh || 1) / 1000000)).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
               </TableRow>
             </TableBody>
           </Table>

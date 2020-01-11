@@ -322,10 +322,30 @@ body.android .dialog .textfield:focus-within {
   }
 
   .blackout-pulsing {
-    animation-name: pulsered;
-    animation-duration: 2s;
-    animation-iteration-count: infinite;
-    animation-timing-function: ease-in-out;
+    &:before {
+      content: "";
+      animation-name: pulsered;
+      animation-duration: 2s;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
+      position: absolute;
+      top: 0;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      z-index: -2;
+    }
+
+    &:after {
+      content: "";
+      background-image: linear-gradient(rgba(0,0,0,0), rgba(255,255,255,255));
+      position: absolute;
+      top: 0;
+      bottom: -6px;
+      left: 0;
+      right: 0;
+      z-index: -1;
+    }
   }
 
   .flexContainer {
