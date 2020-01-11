@@ -14,7 +14,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(toCard({name: 'STORAGE'}));
+      dispatch(toCard({name: 'FACILITIES'}));
     },
     onBuildStorage: (storage: StorageShoppingType, financed: boolean) => {
       dispatch({type: 'BUILD_STORAGE', storage, financed} as BuildStorageAction);
