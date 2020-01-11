@@ -59,18 +59,18 @@ interface TooltipProps {
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const {continuous, index, step, backProps, closeProps, primaryProps, tooltipProps} = props;
+  const {index, step, backProps, primaryProps, tooltipProps} = props;
   return <div id="tutorial-tooltip" {...tooltipProps}>
     {step.title && <Typography variant="h6" gutterBottom>{step.title}</Typography>}
     <Typography variant="body1">{step.content}</Typography>
     <div>
       {index > 0 && (
-        <Button {...backProps} variant="outlined" color="primary">
+        <Button {...backProps} color="primary">
           Back
         </Button>
       )}
       <Button {...primaryProps} variant="contained" color="primary">
-        Next
+        {index < TUTORIAL_STEPS.length - 1 ? 'Next' : 'Play'}
       </Button>
     </div>
     <div style={{clear: 'both'}}></div>

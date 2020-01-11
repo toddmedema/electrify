@@ -121,6 +121,7 @@ $border_desktop: size(base) solid #777;
 html {
   width: 100%;
   height: 100%;
+  background: #eee;
 }
 
 body {
@@ -129,11 +130,16 @@ body {
   overflow: hidden;
   width: 100%;
   height: 100%;
-  margin: 0;
+  max-width: 600px;
+  margin: auto;
   padding: 0;
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
+}
+
+#react-app {
+  overflow: hidden;
 }
 
 .app_container {
