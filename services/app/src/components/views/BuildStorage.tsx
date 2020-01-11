@@ -2,13 +2,14 @@ import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, Dialo
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
+import PauseIcon from '@material-ui/icons/Pause';
 import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS, STORAGE} from '../../Constants';
-import {GameStateType, StorageShoppingType} from '../../Types';
+import {GameStateType, SpeedType, StorageShoppingType} from '../../Types';
 
 interface StorageBuildItemProps {
   cash: number;
@@ -168,6 +169,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
   onBack: () => void;
+  onSpeedChange: (speed: SpeedType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -200,6 +202,9 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build Storage</span> ({formatMoneyStable(cash)})</Typography>
+        {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
+          <PauseIcon color="primary" />
+        </IconButton>}
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>

@@ -2,13 +2,14 @@ import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, Dialo
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import CloseIcon from '@material-ui/icons/Close';
+import PauseIcon from '@material-ui/icons/Pause';
 import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest } from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
-import {GameStateType, GeneratorShoppingType} from '../../Types';
+import {GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -209,6 +210,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => void;
   onBack: () => void;
+  onSpeedChange: (speed: SpeedType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -241,6 +243,9 @@ export default function BuildGenerators(props: Props): JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar>
         <Typography variant="h6"><span className="weak">Build a Generator</span> ({formatMoneyStable(cash)})</Typography>
+        {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
+          <PauseIcon color="primary" />
+        </IconButton>}
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
