@@ -1,7 +1,7 @@
 import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction} from '../../Types';
+import {AppStateType, ReprioritizeFacilityAction, SellFacilityAction} from '../../Types';
 import Facilities, {DispatchProps, StateProps} from './Facilities';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -15,20 +15,14 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onGeneratorBuild: () => {
       dispatch(toCard({name: 'BUILD_GENERATORS', dontRemember: true}));
     },
-    onGeneratorSell: (id: number) => {
-      dispatch({type: 'SELL_GENERATOR', id} as SellGeneratorAction);
+    onSell: (id: number) => {
+      dispatch({type: 'SELL_FACILITY', id} as SellFacilityAction);
     },
-    onGeneratorReprioritize: (spotInList: number, delta: number) => {
-      dispatch({type: 'REPRIORITIZE_GENERATOR', spotInList, delta} as ReprioritizeGeneratorAction);
+    onReprioritize: (spotInList: number, delta: number) => {
+      dispatch({type: 'REPRIORITIZE_FACILITY', spotInList, delta} as ReprioritizeFacilityAction);
     },
     onStorageBuild: () => {
       dispatch(toCard({name: 'BUILD_STORAGE', dontRemember: true}));
-    },
-    onStorageSell: (id: number) => {
-      dispatch({type: 'SELL_STORAGE', id} as SellStorageAction);
-    },
-    onStorageReprioritize: (spotInList: number, delta: number) => {
-      dispatch({type: 'REPRIORITIZE_STORAGE', spotInList, delta} as ReprioritizeStorageAction);
     },
   };
 };
