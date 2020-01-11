@@ -12,36 +12,19 @@ export interface AudioDataSetAction extends Redux.Action {
   data: Partial<AudioDataType>;
 }
 
-export interface BuildGeneratorAction extends Redux.Action {
-  type: 'BUILD_GENERATOR';
-  generator: GeneratorShoppingType;
+export interface BuildFacilityAction extends Redux.Action {
+  type: 'BUILD_FACILITY';
+  facility: FacilityShoppingType;
   financed: boolean;
 }
 
-export interface SellGeneratorAction extends Redux.Action {
-  type: 'SELL_GENERATOR';
+export interface SellFacilityAction extends Redux.Action {
+  type: 'SELL_FACILITY';
   id: number;
 }
 
-export interface ReprioritizeGeneratorAction extends Redux.Action {
-  type: 'REPRIORITIZE_GENERATOR';
-  spotInList: number;
-  delta: number;
-}
-
-export interface BuildStorageAction extends Redux.Action {
-  type: 'BUILD_STORAGE';
-  storage: StorageShoppingType;
-  financed: boolean;
-}
-
-export interface SellStorageAction extends Redux.Action {
-  type: 'SELL_STORAGE';
-  id: number;
-}
-
-export interface ReprioritizeStorageAction extends Redux.Action {
-  type: 'REPRIORITIZE_STORAGE';
+export interface ReprioritizeFacilityAction extends Redux.Action {
+  type: 'REPRIORITIZE_FACILITY';
   spotInList: number;
   delta: number;
 }
@@ -88,7 +71,7 @@ export interface UiDeltaAction extends Redux.Action {
 
 export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
-  generators: Partial<GeneratorShoppingType>[];
+  facilities: Partial<FacilityShoppingType>[];
   cash: number;
   regionPopulation: number;
 }
@@ -192,6 +175,8 @@ export interface FuelType {
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }
 
+export type FacilityOperatingType = GeneratorOperatingType | StorageOperatingType;
+
 export interface GeneratorOperatingType extends GeneratorShoppingType, LoanInfo {
   id: number;
   currentW: number;
@@ -209,6 +194,8 @@ interface LoanInfo {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
 }
+
+export type FacilityShoppingType = StorageShoppingType | GeneratorShoppingType;
 
 export interface StorageShoppingType extends SharedShoppingType {
   peakWh: number;
@@ -252,8 +239,7 @@ export interface GameStateType {
   date: DateType;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
-  generators: GeneratorOperatingType[];
-  storage: StorageOperatingType[];
+  facilities: (StorageOperatingType|GeneratorOperatingType)[];
   regionPopulation: number;
 }
 

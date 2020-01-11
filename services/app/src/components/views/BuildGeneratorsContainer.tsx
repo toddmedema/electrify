@@ -1,7 +1,7 @@
 import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, BuildGeneratorAction, GeneratorShoppingType} from '../../Types';
+import {AppStateType, BuildFacilityAction, GeneratorShoppingType} from '../../Types';
 import BuildGenerators, {DispatchProps, StateProps} from './BuildGenerators';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -16,8 +16,8 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onBack: () => {
       dispatch(toCard({name: 'FACILITIES'}));
     },
-    onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => {
-      dispatch({type: 'BUILD_GENERATOR', generator, financed} as BuildGeneratorAction);
+    onBuildGenerator: (facility: GeneratorShoppingType, financed: boolean) => {
+      dispatch({type: 'BUILD_FACILITY', facility, financed} as BuildFacilityAction);
     },
   };
 };

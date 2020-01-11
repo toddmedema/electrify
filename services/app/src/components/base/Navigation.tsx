@@ -2,6 +2,7 @@ import BottomNavigation from '@material-ui/core/BottomNavigation';
 import BottomNavigationAction from '@material-ui/core/BottomNavigationAction';
 import AttachMoneyIcon from '@material-ui/icons/AttachMoney';
 import FlashOnIcon from '@material-ui/icons/FlashOn';
+import InsertChartIcon from '@material-ui/icons/InsertChart';
 import * as React from 'react';
 import {CardNameType, CardType, SettingsType} from '../../Types';
 
@@ -32,6 +33,7 @@ export default class Navigation extends React.Component<Props, {}> {
       >
         <BottomNavigationAction classes={{label: 'navlabel'}} id="faciliies" label="Facilities" value="FACILITIES" icon={<FlashOnIcon />} />
         <BottomNavigationAction classes={{label: 'navlabel'}} id="finances" label="Finances" value="FINANCES" icon={<AttachMoneyIcon />} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="forecasts" label="Forecasts" value="FORECASTS" icon={<InsertChartIcon />} />
       </BottomNavigation>
     );
   }

@@ -4,7 +4,7 @@ import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
-import {BuildGeneratorAction, BuildStorageAction, DateType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeGeneratorAction, ReprioritizeStorageAction, SellGeneratorAction, SellStorageAction, SetSpeedAction, SpeedType, StorageOperatingType, StorageShoppingType, TimelineType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -12,8 +12,7 @@ export const initialGameState: GameStateType = {
   difficulty: 'EASY',
   speed: 'PAUSED',
   inGame: false,
-  generators: [] as GeneratorOperatingType[],
-  storage: [] as StorageOperatingType[],
+  facilities: [] as FacilityOperatingType[],
   date: getDateFromMinute(0),
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
@@ -58,28 +57,14 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   let expensesInterest = 0;
   let principalRepayment = 0;
   const expensesTaxesFees = 0; // TODO
-  gameState.generators.forEach((g: GeneratorOperatingType) => {
+  gameState.facilities.forEach((g: FacilityShoppingType) => {
     if (g.yearsToBuildLeft === 0) {
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
-      if (FUELS[g.fuel]) {
+      if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
         kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
-      if (g.loanAmountLeft > 0) {
-        const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
-        const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
-        expensesInterest += paymentInterest / TICKS_PER_MONTH;
-        principalRepayment += paymentPrincipal / TICKS_PER_MONTH;
-        g.loanAmountLeft -= paymentPrincipal / TICKS_PER_MONTH;
-      }
-    } else {
-      expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
-    }
-  });
-  gameState.storage.forEach((g: StorageOperatingType) => {
-    if (g.yearsToBuildLeft === 0) {
-      expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
         const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
@@ -135,18 +120,13 @@ function reforecastDemand(state: GameStateType): TimelineType[] {
   });
 }
 
-// Updates generator + storage construction status
+// Updates construction status
 // then calculates how much is needed to be supplied to meet demandW
 // and changes generator / storage status (in place)
 // (doesn't count storage charging against supply created)
-function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType[], storage: StorageOperatingType[], t: TimelineType) {
+function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: TimelineType) {
   // UPDATE CONSTRUCTION STATUS
-  generators.forEach((g: GeneratorOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-    }
-  });
-  storage.forEach((g: StorageOperatingType) => {
+  facilities.forEach((g: FacilityOperatingType) => {
     if (g.yearsToBuildLeft > 0) {
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
     }
@@ -159,63 +139,62 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
 
   // Executed in sort order, aka highest priority first
   // Renewables produce what they will; on-demand produces up to demand + reserve margin
-  generators.forEach((g: GeneratorOperatingType) => {
+  facilities.forEach((g: FacilityOperatingType) => {
     if (g.yearsToBuildLeft === 0) {
-      switch (g.fuel) {
-        case 'Sun':
-          // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-          // TODO what about rain and snow, esp panels covered in snow?
-          g.currentW = g.peakW * t.sunlight * Math.max(1, 1 - (t.temperatureC - 10) / 100);
-          break;
-        case 'Wind':
-          // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
-          if (turbineWindMS < 3 || turbineWindMS > 25) {
-            g.currentW = 0;
-          } else {
-            const outputFactor = Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
-            g.currentW = g.peakW * outputFactor;
-          }
-          break;
-        default:
-          const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
-          if (targetW < g.currentW) { // spinning down
-            g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / g.spinMinutes);
-          } else { // spinning up
-            g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
-          }
-          break;
-      }
-      supply += g.currentW;
-    }
-  });
-  // Executed in sort order, aka highest priority first
-  storage.forEach((g: StorageOperatingType) => {
-    if (g.yearsToBuildLeft === 0) {
-      if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
-        g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
-        g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
+      if (g.fuel) { // Capable of generating electricity
+        switch (g.fuel) {
+          case 'Sun':
+            // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+            // TODO what about rain and snow, esp panels covered in snow?
+            g.currentW = g.peakW * t.sunlight * Math.max(1, 1 - (t.temperatureC - 10) / 100);
+            break;
+          case 'Wind':
+            // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
+            if (turbineWindMS < 3 || turbineWindMS > 25) {
+              g.currentW = 0;
+            } else {
+              const outputFactor = Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
+              g.currentW = g.peakW * outputFactor;
+            }
+            break;
+          default:
+            const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
+            if (targetW < g.currentW) { // spinning down
+              g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / g.spinMinutes);
+            } else { // spinning up
+              g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
+            }
+            break;
+        }
         supply += g.currentW;
-      } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
-        g.currentW = -Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
-        g.currentWh = Math.min(g.peakWh, g.currentWh - g.currentW / TICKS_PER_HOUR);
-        charge -= g.currentW / g.roundTripEfficiency;
-      } else {
-        g.currentW = 0;
+      }
+      if (g.peakWh) { // Capable of storing electricity
+        if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
+          g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
+          g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
+          supply += g.currentW;
+        } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
+          g.currentW = -Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
+          g.currentWh = Math.min(g.peakWh, g.currentWh - g.currentW / TICKS_PER_HOUR);
+          charge -= g.currentW / g.roundTripEfficiency;
+        } else {
+          g.currentW = 0;
+        }
       }
     }
   });
+
   return supply;
 }
 
 function reforecastSupply(state: GameStateType): TimelineType[] {
   // Make temporary deep copy so that it can be revised in place
-  const generators = state.generators.map((g: GeneratorOperatingType) => ({...g}));
-  const storage = state.storage.map((g: StorageOperatingType) => ({...g}));
+  const facilities = state.facilities.map((g: FacilityOperatingType) => ({...g}));
   return state.timeline.map((t: TimelineType) => {
     if (t.minute >= state.date.minute) {
       return {
         ...t,
-        supplyW: getSupplyWAndUpdateGeneratorsStorage(generators, storage, t),
+        supplyW: getSupplyWAndUpdateFacilities(facilities, t),
       };
     }
     return t;
@@ -246,7 +225,7 @@ function generateNewTimeline(startingMinute: number): TimelineType[] {
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
 // which should be done once after multiple builds
-function buildGenerator(state: GameStateType, g: GeneratorShoppingType, financed: boolean): GameStateType {
+function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean): GameStateType {
   const newGame = state.timeline.length === 0;
   let financing = {
     loanAmountTotal: 0,
@@ -267,53 +246,19 @@ function buildGenerator(state: GameStateType, g: GeneratorShoppingType, financed
   } else { // purchased in cash
     state.monthlyHistory[0].cash -= g.buildCost;
   }
-  const generator = {
+  const facility = {
     ...g,
     ...financing,
     id: Math.random(),
     priority: g.priority + Math.random(), // Vary priorities slightly for consistent sorting
-    currentW: newGame ? g.peakW : 0,
+    currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
-  } as GeneratorOperatingType;
-  state.generators = [...state.generators, generator];
-  state.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
-  return state;
-}
-
-// Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
-// which should be done once after multiple builds
-function buildStorage(state: GameStateType, g: StorageShoppingType, financed: boolean): GameStateType {
-  const newGame = state.timeline.length === 0;
-  let financing = {
-    loanAmountTotal: 0,
-    loanAmountLeft: 0,
-    loanMonthlyPayment: 0,
-  };
-  if (newGame) {
-    // Don't charge anything for initial builds
-  } else if (financed) {
-    const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
-    state.monthlyHistory[0].cash -= downpayment;
-    const loanAmount = g.buildCost - downpayment;
-    financing = {
-      loanAmountTotal: loanAmount,
-      loanAmountLeft: loanAmount,
-      loanMonthlyPayment: getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS),
-    };
-  } else { // purchased in cash
-    state.monthlyHistory[0].cash -= g.buildCost;
+  } as FacilityOperatingType;
+  if (g.peakWh) {
+    facility.currentWh = 0;
   }
-  const storage = {
-    ...g,
-    ...financing,
-    id: Math.random(),
-    priority: g.priority + Math.random(), // Vary priorities slightly for consistent sorting
-    currentW: 0,
-    currentWh: 0,
-    yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
-  } as StorageOperatingType;
-  state.storage = [...state.storage, storage];
-  state.storage.sort((i, j) => i.priority < j.priority ? 1 : -1);
+  state.facilities = [...state.facilities, facility];
+  state.facilities.sort((i, j) => i.priority < j.priority ? 1 : -1);
   return state;
 }
 
@@ -348,19 +293,19 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
     return {...state, ...(action as any).delta};
 
-  } else if (action.type === 'BUILD_GENERATOR') {
+  } else if (action.type === 'BUILD_FACILITY') {
 
-    const a = action as BuildGeneratorAction;
-    const newState = buildGenerator({...state}, a.generator, a.financed);
+    const a = action as BuildFacilityAction;
+    const newState = buildFacility({...state}, a.facility, a.financed);
     newState.timeline = reforecastSupply(newState);
     return newState;
 
-  } else if (action.type === 'SELL_GENERATOR') {
+  } else if (action.type === 'SELL_FACILITY') {
 
     const newState = {...state};
-    const id = (action as SellGeneratorAction).id;
+    const id = (action as SellFacilityAction).id;
     // in one loop, refund cash from selling + remove from list
-    newState.generators = newState.generators.filter((g: GeneratorOperatingType) => {
+    newState.facilities = newState.facilities.filter((g: GeneratorOperatingType) => {
       if (g.id === id) {
         // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
         // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
@@ -374,60 +319,22 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     newState.timeline = reforecastSupply(newState);
     return newState;
 
-  } else if (action.type === 'REPRIORITIZE_GENERATOR') {
+  } else if (action.type === 'REPRIORITIZE_FACILITY') {
 
-    const a = action as ReprioritizeGeneratorAction;
+    const a = action as ReprioritizeFacilityAction;
     const newState = {...state};
-    const left = newState.generators[a.spotInList];
-    const right = newState.generators[a.spotInList + a.delta];
+    const left = newState.facilities[a.spotInList];
+    const right = newState.facilities[a.spotInList + a.delta];
     const leftPriority = left.priority;
     left.priority = right.priority;
     right.priority = leftPriority;
-    newState.generators.sort((i, j) => i.priority < j.priority ? 1 : -1);
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'BUILD_STORAGE') {
-
-    const a = action as BuildStorageAction;
-    const newState = buildStorage({...state}, a.storage, a.financed);
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'SELL_STORAGE') {
-
-    const newState = {...state};
-    const id = (action as SellStorageAction).id;
-    // in one loop, refund cash from selling + remove from list
-    newState.storage = newState.storage.filter((g: StorageOperatingType) => {
-      if (g.id === id) {
-        // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
-        // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
-        const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
-        const lostFromSelling = g.buildCost * GENERATOR_SELL_MULTIPLIER;
-        newState.monthlyHistory[0].cash += g.buildCost - lostFromSelling * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
-        return false;
-      }
-      return true;
-    });
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'REPRIORITIZE_STORAGE') {
-
-    const a = action as ReprioritizeStorageAction;
-    const newState = {...state};
-    const left = newState.storage[a.spotInList];
-    const right = newState.storage[a.spotInList + a.delta];
-    const leftPriority = left.priority;
-    left.priority = right.priority;
-    right.priority = leftPriority;
-    newState.storage.sort((i, j) => i.priority < j.priority ? 1 : -1);
+    newState.facilities.sort((i, j) => i.priority < j.priority ? 1 : -1);
     newState.timeline = reforecastSupply(newState);
     return newState;
 
   } else if (action.type === 'NEW_GAME') {
 
+    // TODO also search STORAGE
     const a = action as NewGameAction;
     let newState = {
       ...state,
@@ -435,8 +342,8 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       timeline: [] as TimelineType[],
       monthlyHistory: [newMonthlyHistoryEntry(state.date, a.cash, a.cash)],
     };
-    a.generators.forEach((search: Partial<GeneratorShoppingType>) => {
-      const newGen = GENERATORS(newState, search.peakW || 1000000).find((g: GeneratorShoppingType) => {
+    a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
+      const newFacility = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
         for (const property in search) {
           if (g[property] !== search[property]) {
             return false;
@@ -444,7 +351,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         }
         return true;
       }) as GeneratorShoppingType;
-      newState = buildGenerator(newState, newGen, false);
+      newState = buildFacility(newState, newFacility, false);
     });
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
@@ -471,7 +378,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       };
       const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
       if (now) {
-        getSupplyWAndUpdateGeneratorsStorage(newState.generators, newState.storage, now);
+        getSupplyWAndUpdateFacilities(newState.facilities, now);
         newState.monthlyHistory[0] = updateMonthlyFinances(state, now);
       }
 

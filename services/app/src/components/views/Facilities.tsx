@@ -5,85 +5,42 @@ import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 
 import {TICK_MINUTES} from 'app/Constants';
-import {GameStateType, GeneratorOperatingType, StorageOperatingType} from 'app/Types';
+import {FacilityOperatingType, GameStateType} from 'app/Types';
 import * as React from 'react';
 import {formatWattHours, formatWatts} from 'shared/helpers/Format';
 import ChartSupplyDemand from '../base/ChartSupplyDemand';
 import GameCard from '../base/GameCard';
 
-interface GeneratorListItemProps {
-  generator: GeneratorOperatingType;
+interface FacilityListItemProps {
+  facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
-  onSell: DispatchProps['onGeneratorSell'];
-  onReprioritize: DispatchProps['onGeneratorReprioritize'];
+  onSell: DispatchProps['onSell'];
+  onReprioritize: DispatchProps['onReprioritize'];
 }
 
-function GeneratorListItem(props: GeneratorListItemProps): JSX.Element {
-  const {generator} = props;
-  const underConstruction = (generator.yearsToBuildLeft > 0);
+function FacilityListItem(props: FacilityListItemProps): JSX.Element {
+  const {facility} = props;
+  const underConstruction = (facility.yearsToBuildLeft > 0);
   let secondaryText = '';
   if (underConstruction) {
-    secondaryText = `Building: ${Math.round((generator.yearsToBuild - generator.yearsToBuildLeft) / generator.yearsToBuild * 100)}%, ${Math.ceil(props.generator.yearsToBuildLeft * 12)} months left`;
+    secondaryText = `Building: ${Math.round((facility.yearsToBuild - facility.yearsToBuildLeft) / facility.yearsToBuild * 100)}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
+  } else if (facility.peakWh) {
+    secondaryText = `${formatWattHours(facility.currentWh).replace(/[^0-9.,]/g, '')}/${formatWattHours(facility.peakWh)}, ${formatWatts(facility.peakW)}`;
   } else {
-    secondaryText = `${formatWatts(generator.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(generator.peakW)}`;
+    secondaryText = `${formatWatts(facility.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(facility.peakW)}`;
   }
   return (
     <ListItem disabled={underConstruction}>
-      <div className="outputProgressBar" style={{width: `${generator.currentW / generator.peakW * 100}%`}}/>
-      <ListItemAvatar>
-        <Avatar className={(generator.currentW === 0 ? 'offline' : '')} alt={generator.name} src={`/images/${generator.name.toLowerCase()}.svg`} />
-      </ListItemAvatar>
-      <ListItemText
-        primary={generator.name}
-        secondary={secondaryText}
-      />
-      <ListItemSecondaryAction>
-        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
-          <ArrowUpwardIcon />
-        </IconButton>}
-        {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
-          <ArrowDownwardIcon />
-        </IconButton>}
-        {!underConstruction && props.listLength > 1 && <IconButton onClick={() => props.onSell(generator.id)} edge="end" color="primary">
-          <DeleteForeverIcon />
-        </IconButton>}
-        {underConstruction && <IconButton onClick={() => props.onSell(generator.id)} edge="end" color="primary">
-          <CancelIcon />
-        </IconButton>}
-      </ListItemSecondaryAction>
-    </ListItem>
-  );
-}
-
-interface StorageListItemProps {
-  storage: StorageOperatingType;
-  spotInList: number;
-  listLength: number;
-  onSell: DispatchProps['onStorageSell'];
-  onReprioritize: DispatchProps['onStorageReprioritize'];
-}
-
-function StorageListItem(props: StorageListItemProps): JSX.Element {
-  const {storage} = props;
-  const underConstruction = (storage.yearsToBuildLeft > 0);
-  let secondaryText = '';
-  if (underConstruction) {
-    secondaryText = `Building: ${Math.round((storage.yearsToBuild - storage.yearsToBuildLeft) / storage.yearsToBuild * 100)}%, ${Math.ceil(props.storage.yearsToBuildLeft * 12)} months left`;
-  } else {
-    secondaryText = `${formatWattHours(storage.currentWh).replace(/[^0-9.,]/g, '')}/${formatWattHours(storage.peakWh)}`;
-  }
-  return (
-    <ListItem disabled={underConstruction}>
-      <div className="outputProgressBar" style={{width: `${storage.currentW / storage.peakW * 100}%`}}/>
+      <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>
       <ListItemAvatar>
         <div>
-          <Avatar className={(storage.currentWh === 0 ? 'offline' : '')} alt={storage.name} src={`/images/${storage.name.toLowerCase()}.svg`} />
-          <div className="capacityProgressBar" style={{height: `${storage.currentWh / storage.peakWh * 100}%`}}/>
+          <Avatar className={(facility.currentWh === 0 ? 'offline' : '')} alt={facility.name} src={`/images/${facility.name.toLowerCase()}.svg`} />
+          <div className="capacityProgressBar" style={{height: `${facility.currentWh / facility.peakWh * 100}%`}}/>
         </div>
       </ListItemAvatar>
       <ListItemText
-        primary={storage.name}
+        primary={facility.name}
         secondary={secondaryText}
       />
       <ListItemSecondaryAction>
@@ -93,10 +50,10 @@ function StorageListItem(props: StorageListItemProps): JSX.Element {
         {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
-        {!underConstruction && props.listLength > 1 && <IconButton onClick={() => props.onSell(storage.id)} edge="end" color="primary">
+        {!underConstruction && props.listLength > 1 && <IconButton onClick={() => props.onSell(facility.id)} edge="end" color="primary">
           <DeleteForeverIcon />
         </IconButton>}
-        {underConstruction && <IconButton onClick={() => props.onSell(storage.id)} edge="end" color="primary">
+        {underConstruction && <IconButton onClick={() => props.onSell(facility.id)} edge="end" color="primary">
           <CancelIcon />
         </IconButton>}
       </ListItemSecondaryAction>
@@ -110,11 +67,9 @@ export interface StateProps {
 
 export interface DispatchProps {
   onGeneratorBuild: () => void;
-  onGeneratorSell: (id: number) => void;
-  onGeneratorReprioritize: (spotInList: number, delta: number) => void;
+  onSell: (id: number) => void;
+  onReprioritize: (spotInList: number, delta: number) => void;
   onStorageBuild: () => void;
-  onStorageSell: (id: number) => void;
-  onStorageReprioritize: (spotInList: number, delta: number) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -133,9 +88,8 @@ export default class extends React.Component<Props, {}> {
   }
 
   public render() {
-    const {gameState, onGeneratorBuild, onGeneratorSell, onGeneratorReprioritize, onStorageBuild, onStorageSell, onStorageReprioritize} = this.props;
-    const generatorCount = gameState.generators.length;
-    const storageCount = gameState.storage.length;
+    const {gameState, onGeneratorBuild, onSell, onReprioritize, onStorageBuild} = this.props;
+    const facilitiesCount = gameState.facilities.length;
 
     return (
       <GameCard>
@@ -151,24 +105,14 @@ export default class extends React.Component<Props, {}> {
           <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>+ STORE</Button>
         </Toolbar>
         <List dense className="scrollable">
-          {gameState.generators.map((g: GeneratorOperatingType, i: number) =>
-            <GeneratorListItem
-              generator={g}
+          {gameState.facilities.map((g: FacilityOperatingType, i: number) =>
+            <FacilityListItem
+              facility={g}
               key={g.id}
-              onSell={onGeneratorSell}
-              onReprioritize={onGeneratorReprioritize}
+              onSell={onSell}
+              onReprioritize={onReprioritize}
               spotInList={i}
-              listLength={generatorCount}
-            />
-          )}
-          {gameState.storage.map((g: StorageOperatingType, i: number) =>
-            <StorageListItem
-              storage={g}
-              key={g.id}
-              onSell={onStorageSell}
-              onReprioritize={onStorageReprioritize}
-              spotInList={i}
-              listLength={storageCount}
+              listLength={facilitiesCount}
             />
           )}
         </List>
