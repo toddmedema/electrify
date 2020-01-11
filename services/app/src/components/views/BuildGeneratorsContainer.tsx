@@ -1,7 +1,8 @@
 import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, BuildFacilityAction, GeneratorShoppingType} from '../../Types';
+import {setSpeed} from '../../reducers/GameState';
+import {AppStateType, BuildFacilityAction, GeneratorShoppingType, SpeedType} from '../../Types';
 import BuildGenerators, {DispatchProps, StateProps} from './BuildGenerators';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -18,6 +19,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onBuildGenerator: (facility: GeneratorShoppingType, financed: boolean) => {
       dispatch({type: 'BUILD_FACILITY', facility, financed} as BuildFacilityAction);
+    },
+    onSpeedChange: (speed: SpeedType) => {
+      dispatch(setSpeed(speed));
     },
   };
 };
