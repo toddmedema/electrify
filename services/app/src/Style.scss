@@ -370,6 +370,19 @@ body.android .dialog .textfield:focus-within {
     left: 0;
     z-index: -1;
   }
+
+  .MuiListItemAvatar-root {
+    position: relative;
+
+    .capacityProgressBar {
+      width: 40px;
+      background-color: #bdbdbd; /* grey 400 */
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      z-index: -1;
+    }
+  }
 }
 
 @include styling();

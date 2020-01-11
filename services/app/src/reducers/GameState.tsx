@@ -196,9 +196,13 @@ function getSupplyWAndUpdateGeneratorsStorage(generators: GeneratorOperatingType
         g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
         supply += g.currentW;
       } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
-        g.currentW = Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
-        g.currentWh = Math.min(g.peakWh, g.currentWh + g.currentW / TICKS_PER_HOUR * g.roundTripEfficiency);
-        charge += g.currentW;
+        g.currentW = -Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
+        g.currentWh = Math.min(g.peakWh, g.currentWh - g.currentW / TICKS_PER_HOUR);
+        charge -= g.currentW / g.roundTripEfficiency;
+
+        console.log(g.currentWh);
+      } else {
+        g.currentW = 0;
       }
     }
   });
