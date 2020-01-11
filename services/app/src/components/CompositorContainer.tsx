@@ -19,6 +19,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     settings: state.settings,
     ui: state.ui,
     transition,
+    tutorialStep: state.gameState.tutorialStep,
   };
 };
 
@@ -26,6 +27,9 @@ export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps
   return {
     closeSnackbar(): void {
       dispatch(closeSnackbar());
+    },
+    onTutorialStep(newStep: number): void {
+      dispatch({type: 'GAMESTATE_DELTA', delta: { tutorialStep: newStep }});
     },
   };
 };
