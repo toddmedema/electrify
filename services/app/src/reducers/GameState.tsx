@@ -4,7 +4,7 @@ import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, GeneratorShoppingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 
@@ -263,7 +263,7 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
 }
 
 // TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
-function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number): MonthlyHistoryType {
+function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number): MonthlyHistoryType {
   return {
     year: date.year,
     month: date.monthNumber,
@@ -271,7 +271,7 @@ function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number):
     demandWh: 0,
     kgco2e: 0,
     cash,
-    netWorth,
+    netWorth: getNetWorth(facilities, cash),
     revenue: 0,
     expensesFuel: 0,
     expensesOM: 0,
@@ -280,11 +280,17 @@ function newMonthlyHistoryEntry(date: DateType, cash: number, netWorth: number):
   };
 }
 
-// TODO account for generator current value (incl depreciation) + debts (i.e. outstanding loan principle)
-// (once that's done, need to udpate newMonthlyHistoryEntry to just use gameState to calculate...)
-// (but, there's a circular dependency with declaring cash in the timeline...)
-function getNetWorth(gameState: GameStateType): number {
-  return gameState.monthlyHistory[0].cash;
+// TODO account for generator current value better - get rid of SELL_MULTIPLIER everywhere and depreciate buildCost over time
+function getNetWorth(facilities: FacilityOperatingType[], cash: number): number {
+  let netWorth = cash;
+  facilities.forEach((g: FacilityOperatingType) => {
+    if (g.yearsToBuildLeft === 0) {
+      netWorth += g.buildCost * GENERATOR_SELL_MULTIPLIER - g.loanAmountLeft;
+    } else {
+      netWorth += g.buildCost * DOWNPAYMENT_PERCENT;
+    }
+  });
+  return netWorth;
 }
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
@@ -340,7 +346,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       ...state,
       regionPopulation: a.regionPopulation,
       timeline: [] as TimelineType[],
-      monthlyHistory: [newMonthlyHistoryEntry(state.date, a.cash, a.cash)],
     };
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
       const newFacility = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
@@ -350,9 +355,10 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           }
         }
         return true;
-      }) as GeneratorShoppingType;
+      }) as FacilityShoppingType;
       newState = buildFacility(newState, newFacility, false);
     });
+    newState.monthlyHistory = [newMonthlyHistoryEntry(state.date, newState.facilities, a.cash)]; // after building facilities
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
     return newState;
@@ -392,8 +398,9 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         newState.regionPopulation = Math.round(state.regionPopulation * (1 + growthRate / 12));
 
         // Record final history for the month, then insert a new blank month
-        newState.monthlyHistory[0].netWorth = getNetWorth(newState);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.monthlyHistory[0].cash, getNetWorth(state)));
+        const cash = newState.monthlyHistory[0].cash;
+        newState.monthlyHistory[0].netWorth = getNetWorth(newState.facilities, cash);
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
