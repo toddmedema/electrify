@@ -123,9 +123,8 @@ export interface DifficultyMultipliersType {
 export type CardNameType =
   'BUILD_GENERATORS' |
   'BUILD_STORAGE' |
-  'STORAGE' |
+  'FACILITIES' |
   'FINANCES' |
-  'GENERATORS' |
   'LOADING' |
   'MAIN_MENU' |
   'SETTINGS' |
