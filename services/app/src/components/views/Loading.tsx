@@ -1,4 +1,4 @@
-import CircularProgress from '@material-ui/core/CircularProgress';
+import {CircularProgress} from '@material-ui/core';
 import {GameStateType} from 'app/Types';
 import * as React from 'react';
 

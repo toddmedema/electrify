@@ -1,5 +1,4 @@
-import BottomNavigation from '@material-ui/core/BottomNavigation';
-import BottomNavigationAction from '@material-ui/core/BottomNavigationAction';
+import {BottomNavigation, BottomNavigationAction} from '@material-ui/core';
 import AttachMoneyIcon from '@material-ui/icons/AttachMoney';
 import FlashOnIcon from '@material-ui/icons/FlashOn';
 import InsertChartIcon from '@material-ui/icons/InsertChart';
