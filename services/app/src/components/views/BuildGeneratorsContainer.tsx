@@ -14,7 +14,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(toCard({name: 'GENERATORS'}));
+      dispatch(toCard({name: 'FACILITIES'}));
     },
     onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => {
       dispatch({type: 'BUILD_GENERATOR', generator, financed} as BuildGeneratorAction);

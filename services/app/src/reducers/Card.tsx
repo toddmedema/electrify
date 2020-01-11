@@ -37,9 +37,9 @@ export function card(state: CardType = initialCard, action: Redux.Action): CardT
       };
     case 'GAME_LOADED':
       return {
-        name: 'GENERATORS',
+        name: 'FACILITIES',
         ts: Date.now(),
-        history: ['GENERATORS', ...state.history],
+        history: ['FACILITIES', ...state.history],
       };
     case 'GAME_EXIT':
       return {
