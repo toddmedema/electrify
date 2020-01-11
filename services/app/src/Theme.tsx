@@ -9,4 +9,9 @@ export default createMuiTheme({
     type: 'light',
     secondary: amber,
   },
+  typography: {
+    body1: {
+      lineHeight: 1.2,
+    },
+  },
 });

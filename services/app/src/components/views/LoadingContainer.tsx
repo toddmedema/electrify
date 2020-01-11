@@ -1,17 +1,18 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {initWeather} from 'shared/schema/Weather';
-import {AppStateType, NewGameAction} from '../../Types';
+import {AppStateType, GameStateType, NewGameAction} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
+    gameState: state.gameState,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    load: () => {
+    load: (gameState: GameStateType) => {
       initWeather('SF', () => {
         // TODO load game state from localstorage if loading
 
@@ -24,6 +25,10 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
         } as NewGameAction);
 
         dispatch({type: 'GAME_LOADED'});
+
+        if (gameState.tutorialStep === -2) {
+          setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
+        }
       });
     },
   };

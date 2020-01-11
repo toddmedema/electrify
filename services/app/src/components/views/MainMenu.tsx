@@ -19,7 +19,7 @@ export interface Props extends StateProps, DispatchProps {}
 const MainMenu = (props: Props): JSX.Element => {
   return (
     <div id="menuCard">
-      <div className="logo">
+      <div id="logo">
         <img src="images/logo.svg"></img>
       </div>
       <div id="centeredMenu">

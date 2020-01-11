@@ -31,9 +31,9 @@ export default class Navigation extends React.Component<Props, {}> {
         value={this.props.card.name || 'MAIN_MENU'}
         onChange={(e: any, name: CardNameType) => this.props.toCard(name, this.props.settings)}
       >
-        <BottomNavigationAction classes={{label: 'navlabel'}} id="faciliies" label="Facilities" value="FACILITIES" icon={<FlashOnIcon />} />
-        <BottomNavigationAction classes={{label: 'navlabel'}} id="finances" label="Finances" value="FINANCES" icon={<AttachMoneyIcon />} />
-        <BottomNavigationAction classes={{label: 'navlabel'}} id="forecasts" label="Forecasts" value="FORECASTS" icon={<InsertChartIcon />} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="faciltiesNav" label="Facilities" value="FACILITIES" icon={<FlashOnIcon />} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="financesNav" label="Finances" value="FINANCES" icon={<AttachMoneyIcon />} />
+        <BottomNavigationAction classes={{label: 'navlabel'}} id="forecastsNav" label="Forecasts" value="FORECASTS" icon={<InsertChartIcon />} />
       </BottomNavigation>
     );
   }
