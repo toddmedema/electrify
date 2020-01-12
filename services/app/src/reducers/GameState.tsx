@@ -138,10 +138,21 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
   const turbineWindMS = t.windKph * Math.pow(100 / 10, 0.34) / 5; // 5kph = 1m/s
     // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
 
+  let indexOfLastUnchargedBattery = -1;
+  let totalChargeNeeded = 0;
+  // TODO maybe also calculate the total charge needed, and reduce that amount by 'charge' when checking to see if more power is needed
+  facilities.forEach((g: FacilityOperatingType, i: number) => {
+    if (g.currentWh < g.peakWh && g.yearsToBuildLeft === 0) {
+      indexOfLastUnchargedBattery = i;
+      totalChargeNeeded += Math.min(g.peakW, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
+    }
+  });
+
   // Executed in sort order, aka highest priority first
   // Renewables produce what they will; on-demand produces up to demand + reserve margin
-  facilities.forEach((g: FacilityOperatingType) => {
+  facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.yearsToBuildLeft === 0) {
+      const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
       if (g.fuel) { // Capable of generating electricity
         switch (g.fuel) {
           case 'Sun':
@@ -159,19 +170,22 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
             }
             break;
           default:
-            const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
-            if (targetW < g.currentW) { // spinning down
+            if (targetW > g.currentW || i < indexOfLastUnchargedBattery) { // spinning up
+              if (indexOfLastUnchargedBattery >= 0) { // If there's a battery to charge, output as much as possible to charge it beyond demand
+                g.currentW = Math.min(t.demandW + totalChargeNeeded - charge, g.peakW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
+              } else { // Otherwise just try to fulfill demand + reserve margin
+                g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
+              }
+            } else {
               g.currentW = Math.max(0, targetW, g.currentW - g.peakW * TICK_MINUTES / g.spinMinutes);
-            } else { // spinning up
-              g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
             }
             break;
         }
         supply += g.currentW;
       }
       if (g.peakWh) { // Capable of storing electricity
-        if (g.currentWh > 0 && supply < t.demandW) { // If there's a blackout and we have charge, discharge
-          g.currentW = Math.min(g.peakW, t.demandW - supply, g.currentWh * TICKS_PER_HOUR);
+        if (g.currentWh > 0 && targetW > 0) { // If there's a need and we have charge, discharge
+          g.currentW = Math.min(g.peakW, targetW, g.currentWh * TICKS_PER_HOUR);
           g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
           supply += g.currentW;
         } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge

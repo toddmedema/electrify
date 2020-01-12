@@ -263,6 +263,10 @@ span.weak {
   }
 }
 
+.MuiButton-containedPrimary:hover {
+  background-color: #1976d2; /* blue600->700 on hover */
+}
+
 // for text inputs that are close to bottom, give the screen space to scroll up
 .inputSpacer {
   margin-bottom: 100%;

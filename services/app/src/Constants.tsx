@@ -39,7 +39,7 @@ export const TICK_MS = {
   LIGHTNING: 0,
 };
 export const REGIONAL_GROWTH_MAX_ANNUAL = 0.05;
-export const RESERVE_MARGIN = 0.15;
+export const RESERVE_MARGIN = 0.05;
 export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
