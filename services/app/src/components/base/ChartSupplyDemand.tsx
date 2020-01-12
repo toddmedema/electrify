@@ -111,6 +111,14 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
   const historic = [...props.timeline].filter((d: ChartData) => d.minute <= currentMinute);
   const forecast = [...props.timeline].filter((d: ChartData) => d.minute >= currentMinute);
 
+  const legendItems = [
+    { name: 'Supply', symbol: { fill: supplyColor } },
+    { name: 'Demand', symbol: { fill: demandColor } },
+  ];
+  if (blackoutCount > 0) {
+    legendItems.push({ name: 'Blackout', symbol: { fill: blackoutColor } });
+  }
+
   // Wrapping in spare div prevents excessive height bug
   return (
     <div>
@@ -218,11 +226,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           orientation="vertical"
           rowGutter={-5}
           symbolSpacer={5}
-          data={[
-            { name: 'Supply', symbol: { fill: supplyColor } },
-            { name: 'Demand', symbol: { fill: demandColor } },
-            { name: 'Blackout', symbol: { fill: blackoutColor } },
-          ]}
+          data={legendItems}
         />}
       </VictoryChart>
     </div>

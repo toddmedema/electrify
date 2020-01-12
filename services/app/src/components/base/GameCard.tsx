@@ -56,6 +56,12 @@ export function GameCard(props: Props) {
   const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
   const inBlackout = now && now.supplyW < now.demandW;
 
+  // TODO only add this back when it's clearly faster... aka probably a lot of optimization on game tick loop
+  // (user feedback is that going faster is not super important right now)
+  // <MenuItem onClick={() => { props.onSpeedChange('LIGHTNING'); handleSpeedClose(); }} disabled={gameState.speed === 'LIGHTNING'} aria-label="lightning-speed">
+  //   <DoubleArrowIcon color="primary" />
+  // </MenuItem>
+
   return (
     <div className={props.className + ' flexContainer'} id="gameCard">
       <div id="topbar">
@@ -98,9 +104,6 @@ export function GameCard(props: Props) {
             </MenuItem>
             <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={gameState.speed === 'FAST'} aria-label="fast-speed">
               <FastForwardIcon color="primary" />
-            </MenuItem>
-            <MenuItem onClick={() => { props.onSpeedChange('LIGHTNING'); handleSpeedClose(); }} disabled={gameState.speed === 'LIGHTNING'} aria-label="lightning-speed">
-              <DoubleArrowIcon color="primary" />
             </MenuItem>
           </Menu>
         </Toolbar>
