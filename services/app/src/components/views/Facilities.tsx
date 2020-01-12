@@ -32,7 +32,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
   }
   return (
     <ListItem disabled={underConstruction}>
-      <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>
+      {facility.currentW > 0 && <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>}
       <ListItemAvatar>
         <div>
           <Avatar className={(facility.currentWh === 0 ? 'offline' : '')} alt={facility.name} src={`/images/${facility.name.toLowerCase()}.svg`} />

@@ -195,6 +195,7 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
         } else {
           g.currentW = 0;
         }
+        console.log(g.currentW / g.peakW, g.currentW, g.currentWh);
       }
     }
   });

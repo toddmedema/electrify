@@ -70,7 +70,7 @@
 // Constants
 // ===============================================
 
-$abswidthmax: 769px;
+$abswidthmax: 650px;
 $absheightmax: 1025px;
 $absmaxdimension: 1025px;
 $lineheight: 1.2;
@@ -97,8 +97,6 @@ $sizemap: (
   @return null;
 }
 
-$border_desktop: size(base) solid #777;
-
 // ===============================================
 // Base/General Styles
 // ===============================================
@@ -115,13 +113,22 @@ body {
   overflow: hidden;
   width: 100%;
   height: 100%;
-  max-width: 600px;
+  max-width: $abswidthmax;
   margin: auto;
   padding: 0;
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
 }
+
+@media screen and (min-width: $abswidthmax) {
+  #react-app {
+    border-left: 1px solid #bdbdbd; /* grey400 */
+    border-right: 1px solid #bdbdbd; /* grey400 */
+    box-sizing: border-box;
+  }
+}
+
 
 #react-app {
   overflow: hidden;
@@ -224,6 +231,10 @@ span.weak {
 
 .MuiDialogContent-root {
   padding: 0 !important;
+}
+
+.MuiListItemText-root {
+  z-index: 1;
 }
 
 .blackout-pulsing {
@@ -404,7 +415,6 @@ body.android .dialog .textfield:focus-within {
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: -1;
   }
 
   .MuiListItemAvatar-root {
