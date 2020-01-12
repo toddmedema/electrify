@@ -416,12 +416,21 @@ body.android .dialog .textfield:focus-within {
     position: relative;
 
     .capacityProgressBar {
-      width: 40px;
-      background-color: #bdbdbd; /* grey 400 */
+      width: 12px;
+      background-color: #212121; /* grey 900 */
       position: absolute;
       bottom: 0;
-      left: 0;
-      border-radius: 2px;
+      left: -14px;
+
+      &:after {
+        content: '';
+        height: 39px;
+        border: 1px solid #bdbdbd; /* grey 400 */
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
     }
   }
 }

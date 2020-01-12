@@ -72,6 +72,7 @@ export function getDateFromMinute(minute: number): DateType {
   const year = yearsEllapsed + STARTING_YEAR;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH);
   const month = MONTHS[monthNumber];
+  const percentOfMonth = minuteOfDay / 1440;
   const minuteOfYear = minute - (yearsEllapsed * DAYS_PER_YEAR) * 1440;
   const percentOfYear = minuteOfYear / (DAYS_PER_YEAR * 1440);
   const hourOfFullYear = Math.floor(monthNumber * 30 * 24 + minuteOfDay / 60);
@@ -80,7 +81,8 @@ export function getDateFromMinute(minute: number): DateType {
     minute,
     minuteOfDay,
     hourOfFullYear,
-    percentOfYear,
+    percentOfMonth: percentOfMonth || 0.00001,
+    percentOfYear: percentOfYear || 0.00001,
     month,
     monthNumber,
     year,

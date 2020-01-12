@@ -68,11 +68,17 @@ export default class extends React.Component<Props, State> {
     // Go in reverse so that the last values for ending values (like net worth are used)
     for (let i = history.length - 1; i >= 0 ; i--) {
       const h = history[i];
-      if (!year || h.year === year) {
+      if ((!year || h.year === year) && h.revenue !== 0) {
+        let profit = h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees + h.expensesInterest);
+        const projected = (h.month === date.monthNumber && h.year === date.year);
+        if (projected) {
+          profit /= date.percentOfMonth;
+        }
         timeline.push({
           month: h.year * 12 + h.month,
           year: h.year,
-          profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees + h.expensesInterest),
+          profit,
+          projected,
         });
         summary.supplyWh += h.supplyWh;
         summary.demandWh += h.demandWh;
@@ -90,18 +96,18 @@ export default class extends React.Component<Props, State> {
     return (
       <GameCard className="Finances">
         <Typography variant="body2">Current population served: {numbro(gameState.regionPopulation).format({ thousandSeparated: true })}</Typography>
-        <ChartFinances
+        {timeline.length > 0 ? <ChartFinances
           height={180}
           timeline={timeline}
           title={(year || 'All time') + ' profit'}
-        />
+        /> : <span/>}
         <Toolbar>
           <Typography variant="h6">Finances for </Typography>
           <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
+            <MenuItem value={0}>All time</MenuItem>
             {years.map((y: number) => {
               return <MenuItem value={y} key={y}>{y}</MenuItem>;
             })}
-            <MenuItem value={0}>all time</MenuItem>
           </Select>
         </Toolbar>
         <div className="scrollable">

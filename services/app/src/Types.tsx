@@ -125,6 +125,7 @@ export interface DateType {
   minute: number;
   minuteOfDay: number;
   hourOfFullYear: number;
+  percentOfMonth: number; // 0 - 1
   percentOfYear: number; // 0 - 1
   month: MonthType;
   monthNumber: number; // 0 - 11
