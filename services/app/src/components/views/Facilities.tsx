@@ -101,8 +101,9 @@ export default class extends React.Component<Props, {}> {
         />
         <Toolbar>
           <Typography variant="h6">Facilities</Typography>
-          <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">+ GEN</Button>
-          <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>+ STORE</Button>
+          <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
+          &nbsp;&nbsp;&nbsp;
+          <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>Storage</Button>
         </Toolbar>
         <List dense className="scrollable">
           {gameState.facilities.map((g: FacilityOperatingType, i: number) =>

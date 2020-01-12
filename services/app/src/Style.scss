@@ -73,14 +73,8 @@
 $abswidthmax: 650px;
 $absheightmax: 1025px;
 $absmaxdimension: 1025px;
-$lineheight: 1.2;
 
 $sizemap: (
-  appbar: 48px,
-  inputsquare: 48px,
-  inputspacing: 16px, /* slightly larger on small devices (to prevent false touches) */
-  input: 32px, /* size of input icon-style buttons */
-  huge: 12vmin,
   large: 6vmin,
   medium: 4vmin,
   base: 2vmin,
@@ -192,6 +186,7 @@ span.weak {
 
 .MuiAvatar-root {
   transition: opacity .3s;
+  z-index: 1;
 
   &.offline {
     opacity: 0.5;
@@ -401,7 +396,7 @@ body.android .dialog .textfield:focus-within {
   .version {
     text-align: center;
     opacity: 0.7;
-    margin-top: size(huge);
+    margin-top: size(large);
   }
 
   .menu_popup {
@@ -426,7 +421,7 @@ body.android .dialog .textfield:focus-within {
       position: absolute;
       bottom: 0;
       left: 0;
-      z-index: -1;
+      border-radius: 2px;
     }
   }
 }
@@ -443,12 +438,8 @@ $abs_scale_vw: $abswidthmax / 120vmin;
 $abs_scale_vh: $absheightmax / 120vmin;
 
 $sizemap: (
-  inputspacing: 14px,
-  inputsquare: 48px,
-  input: 32px,
-  huge: 12vmin * $abs_scale_vh,
-  large: 6vmin * $abs_scale_vh,
-  medium: 4vmin * $abs_scale_vh,
+  large: 5vmin * $abs_scale_vh,
+  medium: 3vmin * $abs_scale_vh,
   base: 2vmin * $abs_scale_vh,
   small: 1vmin * $abs_scale_vh,
   tiny: 0.5vmin * $abs_scale_vh,
