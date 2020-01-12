@@ -1,13 +1,13 @@
-import {Avatar, Button, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Toolbar, Typography} from '@material-ui/core';
 import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 
-import {TICK_MINUTES} from 'app/Constants';
+import {GENERATOR_SELL_MULTIPLIER, TICK_MINUTES} from 'app/Constants';
 import {FacilityOperatingType, GameStateType} from 'app/Types';
 import * as React from 'react';
-import {formatWattHours, formatWatts} from 'shared/helpers/Format';
+import {formatMoneyConcise, formatWattHours, formatWatts} from 'shared/helpers/Format';
 import ChartSupplyDemand from '../base/ChartSupplyDemand';
 import GameCard from '../base/GameCard';
 
@@ -20,6 +20,11 @@ interface FacilityListItemProps {
 }
 
 function FacilityListItem(props: FacilityListItemProps): JSX.Element {
+  const [open, setOpen] = React.useState(false);
+  const toggleDialog = () => {
+    setOpen(!open);
+  };
+
   const {facility} = props;
   const underConstruction = (facility.yearsToBuildLeft > 0);
   let secondaryText = '';
@@ -50,13 +55,32 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
         {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
           <ArrowDownwardIcon />
         </IconButton>}
-        {!underConstruction && props.listLength > 1 && <IconButton onClick={() => props.onSell(facility.id)} edge="end" color="primary">
+        {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
           <DeleteForeverIcon />
         </IconButton>}
-        {underConstruction && <IconButton onClick={() => props.onSell(facility.id)} edge="end" color="primary">
+        {underConstruction && <IconButton onClick={toggleDialog} edge="end" color="primary">
           <CancelIcon />
         </IconButton>}
       </ListItemSecondaryAction>
+      <Dialog
+        open={open}
+        onClose={toggleDialog}
+      >
+        <DialogTitle>Sell {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            For {formatMoneyConcise(facility.buildCost * GENERATOR_SELL_MULTIPLIER)}<br/>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={toggleDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={() => { props.onSell(facility.id); toggleDialog(); }} color="primary" variant="contained" autoFocus>
+            Sell
+          </Button>
+        </DialogActions>
+      </Dialog>
     </ListItem>
   );
 }

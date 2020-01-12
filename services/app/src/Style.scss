@@ -224,12 +224,16 @@ span.weak {
   }
 }
 
-.MuiDialogContent-root {
+.noPadding {
   padding: 0 !important;
 }
 
 .MuiListItemText-root, .MuiListItemSecondaryAction-root {
   z-index: 1;
+}
+
+.expandable:hover {
+  cursor: pointer;
 }
 
 .blackout-pulsing {
@@ -449,7 +453,7 @@ $abs_scale_vh: $absheightmax / 120vmin;
 $sizemap: (
   large: 5vmin * $abs_scale_vh,
   medium: 3vmin * $abs_scale_vh,
-  base: 2vmin * $abs_scale_vh,
+  base: 1.5vmin * $abs_scale_vh,
   small: 1vmin * $abs_scale_vh,
   tiny: 0.5vmin * $abs_scale_vh,
 );

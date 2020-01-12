@@ -23,7 +23,7 @@ const MainMenu = (props: Props): JSX.Element => {
         <img src="images/logo.svg"></img>
       </div>
       <div id="centeredMenu">
-        <Button size="large" variant="contained" color="primary" onClick={props.onStart}>New Game</Button>
+        <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onTutorial}>Tutorial</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Settings</Button>
         <Button variant="outlined" color="primary" onClick={() => openWindow('/about.html')}>About</Button>

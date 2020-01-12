@@ -38,7 +38,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   };
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item">
+    <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
         avatar={<Avatar alt={storage.name} src={`/images/${storage.name.toLowerCase()}.svg`} />}
         action={
@@ -70,7 +70,11 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           <Table size="small" aria-label="storage properties">
             <TableBody>
               <TableRow>
-                <TableCell>Peak output</TableCell>
+                <TableCell>Peak output
+                  <Typography variant="body2" color="textSecondary">
+                    Increases with capacity
+                  </Typography>
+                </TableCell>
                 <TableCell align="right">{formatWatts(storage.peakW)}</TableCell>
               </TableRow>
               <TableRow>
@@ -99,7 +103,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
         onClose={toggleOpen}
       >
         <DialogTitle>Take a loan to build {storage.name}?</DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers className="noPadding">
           <TableContainer>
             <Table size="small" aria-label="loan properties">
               <TableBody>

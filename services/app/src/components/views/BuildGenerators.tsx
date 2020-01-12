@@ -44,7 +44,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   };
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item">
+    <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
         avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.svg`} />}
         action={
@@ -139,7 +139,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         onClose={toggleOpen}
       >
         <DialogTitle>Take a loan to build {generator.name}?</DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers className="noPadding">
           <TableContainer>
             <Table size="small" aria-label="loan properties">
               <TableBody>
