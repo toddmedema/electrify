@@ -48,7 +48,7 @@ export default function GameSetup(props: Props): JSX.Element {
         </FormControl>
       </div>
       <div id="footer">
-        <Button size="large" variant="contained" color="primary" onClick={props.onStart}>Play</Button>
+        <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>Play</Button>
       </div>
     </div>
   );
