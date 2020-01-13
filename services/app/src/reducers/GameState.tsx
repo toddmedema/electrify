@@ -376,6 +376,14 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     newState.monthlyHistory = [newMonthlyHistoryEntry(state.date, newState.facilities, a.cash)]; // after building facilities
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
+
+    // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
+    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
+    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
+    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
+    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
+    newState.timeline = reforecastSupply(newState);
+
     return newState;
 
   } else if (action.type === 'GAME_LOADED') {
