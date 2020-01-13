@@ -1,11 +1,20 @@
-import {TICKS_PER_YEAR} from 'app/Constants';
-import {GameStateType} from 'app/Types';
+import {Table, TableBody, TableCell, TableRow} from '@material-ui/core';
 import * as React from 'react';
+
+import {TICKS_PER_YEAR} from 'app/Constants';
+import {GameStateType, TimelineType} from 'app/Types';
+import {formatHour, getDateFromMinute} from 'shared/helpers/DateTime';
+import {formatWattHours, formatWatts} from 'shared/helpers/Format';
 import {generateNewTimeline, reforecastAll} from '../../reducers/GameState';
 import ChartForecastSupplyDemand from '../base/ChartForecastSupplyDemand';
 import GameCard from '../base/GameCard';
 
 const FORECAST_YEARS = 1;
+
+interface BlackoutEdges {
+  minute: number;
+  value: number;
+}
 
 export interface StateProps {
   gameState: GameStateType;
@@ -32,17 +41,132 @@ export default class extends React.Component<Props, State> {
   }
 
   public render() {
+    // Generate the forecast
     const newState = {...this.props.gameState};
     newState.timeline = generateNewTimeline(newState.date.minute, TICKS_PER_YEAR * FORECAST_YEARS);
     newState.timeline = reforecastAll(newState);
+    const timeline = newState.timeline;
+
+    // Figure out the boundaries of the chart data
+    let domainMin = 999999999999;
+    let domainMax = 0;
+    const rangeMin = timeline[0].minute;
+    const rangeMax = timeline[timeline.length - 1].minute;
+    timeline.forEach((d: TimelineType) => {
+      domainMin = Math.min(domainMin, d.supplyW, d.demandW);
+      domainMax = Math.max(domainMax, d.supplyW, d.demandW);
+    });
+
+    // BLACKOUT CALCULATION
+    // Less precise than the realtime calculator b/c longer term
+    // But also tracks blackout metrics for reporting
+    let blackoutTotalWh = 0;
+    let currentBlackout = {
+      wh: 0,
+      peakW: 0,
+      start: rangeMin,
+      end: rangeMin,
+    };
+    let largestBlackout = currentBlackout;
+    const blackouts = [{
+      minute: rangeMin,
+      value: 0,
+    }] as BlackoutEdges[];
+    let prev = timeline[0];
+    let isBlackout = prev.demandW > prev.supplyW;
+    if (isBlackout) {
+      blackouts.push({
+        minute: rangeMin,
+        value: domainMax,
+      });
+    }
+    timeline.forEach((d: TimelineType) => {
+      if (d.demandW > d.supplyW) {
+        if (!isBlackout) {
+          // Blackout starting: low then high edge, start a new current blackout entryr
+          blackouts.push({ minute: d.minute, value: 0 });
+          blackouts.push({ minute: d.minute, value: domainMax });
+          isBlackout = true;
+          currentBlackout = {
+            wh: 0,
+            peakW: 0,
+            start: d.minute,
+            end: d.minute,
+          };
+        }
+        const amount = d.demandW - d.supplyW;
+        blackoutTotalWh += amount;
+        currentBlackout.wh += amount;
+        currentBlackout.peakW = Math.max(currentBlackout.peakW, amount);
+      } else if (d.demandW < d.supplyW && isBlackout) {
+        // Blackout ending: high then low edge, close current blackout entry
+        blackouts.push({ minute: d.minute, value: domainMax });
+        blackouts.push({ minute: d.minute, value: 0 });
+        isBlackout = false;
+        currentBlackout.end = d.minute;
+        if (currentBlackout.wh > largestBlackout.wh) {
+          largestBlackout = currentBlackout;
+        }
+      }
+      prev = d;
+    });
+    // Close out
+    blackouts.push({
+      minute: rangeMax,
+      value: (isBlackout) ? domainMax : 0,
+    });
+    if (currentBlackout.wh > largestBlackout.wh) {
+      largestBlackout = currentBlackout;
+    }
+    largestBlackout.end = largestBlackout.end || rangeMax;
+
+    const blackoutStart = getDateFromMinute(largestBlackout.start);
+    const blackoutEnd = getDateFromMinute(largestBlackout.end);
+
+    // TODO Other long term forecasts - see more than 1 year in the future, weather, ???
     return (
       <GameCard className="Forecasts">
         <ChartForecastSupplyDemand
           height={180}
-          timeline={newState.timeline}
-          currentMinute={newState.date.minute}
+          timeline={timeline}
+          blackouts={blackouts}
+          domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
         />
-        <div className="scrollable">Long term forecasts - future weather, demand + supply, ???</div>
+        <div className="scrollable">
+          <Table size="small">
+            {blackoutTotalWh > 0 ?
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={2}>Total blackouts</TableCell>
+                  <TableCell align="right">~{formatWattHours(blackoutTotalWh)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={2}>Largest blackout</TableCell>
+                  <TableCell align="right">~{formatWattHours(largestBlackout.wh)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell></TableCell>
+                  <TableCell>Peak shortage</TableCell>
+                  <TableCell align="right">~{formatWatts(largestBlackout.peakW)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell></TableCell>
+                  <TableCell>When</TableCell>
+                  <TableCell align="right">
+                    {blackoutStart.month} {formatHour(blackoutStart)} -
+                    {blackoutStart.month !== blackoutEnd.month ? `${blackoutEnd.month} ` : ''} {formatHour(blackoutEnd)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+              :
+              <TableBody>
+                <TableRow>
+                  <TableCell>No blackouts forecasted</TableCell>
+                </TableRow>
+              </TableBody>
+            }
+          </Table>
+        </div>
       </GameCard>
     );
   }

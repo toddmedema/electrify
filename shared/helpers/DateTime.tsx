@@ -8,6 +8,11 @@ export function formatMonthChartAxis(t: number, multiyear: boolean) {
   return MONTHS[t % 12];
 }
 
+export function formatHour(date: DateType): string {
+  const time = new Date(`${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`);
+  return time.toLocaleString('en-US', { hour: 'numeric', hour12: true });
+}
+
 // Based on SF/California for now, v2 take in / change by location
 function getSunrise(month: MonthType) {
   switch (month) {

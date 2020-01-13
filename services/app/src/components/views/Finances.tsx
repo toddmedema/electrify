@@ -1,6 +1,7 @@
 import {MenuItem, Select, Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@material-ui/core';
-import {STARTING_YEAR, TICK_MINUTES} from 'app/Constants';
 import * as React from 'react';
+
+import {STARTING_YEAR, TICK_MINUTES} from 'app/Constants';
 import {formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';

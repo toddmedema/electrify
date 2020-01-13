@@ -1,14 +1,9 @@
+import {TimelineType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/helpers/Format';
 import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
 import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme } from 'victory';
-
-interface ChartData {
-  minute: number;
-  supplyW: number;
-  demandW: number;
-}
 
 interface BlackoutEdges {
   minute: number;
@@ -16,102 +11,21 @@ interface BlackoutEdges {
 }
 
 export interface Props {
-  currentMinute?: number;
   height?: number;
-  timeline: ChartData[];
+  timeline: TimelineType[];
+  blackouts: BlackoutEdges[];
+  domain: { x: [number, number], y: [number, number] };
 }
 
-// http://jsfiddle.net/justin_c_rounds/Gd2S2/light/
-function getIntersectionX(line1StartX: number, line1StartY: number, line1EndX: number, line1EndY: number, line2StartX: number, line2StartY: number, line2EndX: number, line2EndY: number) {
-    const denominator = ((line2EndY - line2StartY) * (line1EndX - line1StartX)) - ((line2EndX - line2StartX) * (line1EndY - line1StartY));
-    if (denominator === 0) {
-      return 0;
-    }
-    const a = line1StartY - line2StartY;
-    const b = line1StartX - line2StartX;
-    const numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
-    return line1StartX + (numerator1 / denominator * (line1EndX - line1StartX));
-}
-
-// TODO how to indicate reality vs forecast? Perhaps current time as a prop, and then split it in the chart
-// and don't actually differentiate between reality +  forecast in data?
 const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
-  // Figure out the boundaries of the chart data
-  let domainMin = 999999999999;
-  let domainMax = 0;
-  const rangeMin = props.timeline[0].minute;
-  const rangeMax = props.timeline[props.timeline.length - 1].minute;
-  props.timeline.forEach((d: ChartData) => {
-    domainMin = Math.min(domainMin, d.supplyW, d.demandW);
-    domainMax = Math.max(domainMax, d.supplyW, d.demandW);
-  });
-  domainMin *= 0.94; // padding
-  domainMax *= 1.02; // padding
-
-  // Get sunrise and sunset, sliding forward if it's actually in the next day
-  const date = getDateFromMinute(rangeMin);
-  const midnight = Math.floor(rangeMin / 1440) * 1440;
-  let sunrise = midnight + date.sunrise;
-  let sunset = midnight + date.sunset;
-  if (sunrise < rangeMin) {
-    sunrise = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunrise;
-  }
-  if (sunset < rangeMin) {
-    sunset = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunset;
-  }
-
-  // BLACKOUT CALCULATION
-  let blackoutCount = 0;
-  const blackouts = [{
-    minute: rangeMin,
-    value: 0,
-  }] as BlackoutEdges[];
-  let prev = props.timeline[0];
-  let isBlackout = prev.demandW > prev.supplyW;
-  if (isBlackout) {
-    blackouts.push({
-      minute: rangeMin,
-      value: domainMax,
-    });
-    blackoutCount++;
-  }
-  props.timeline.forEach((d: ChartData) => {
-    if (d.demandW > d.supplyW && !isBlackout) {
-      // Blackout starting: low then high edge
-      const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
-      blackouts.push({ minute: intersectionTime, value: 0 });
-      blackouts.push({ minute: intersectionTime, value: domainMax });
-      isBlackout = true;
-      blackoutCount++;
-    } else if (d.demandW < d.supplyW && isBlackout) {
-      // Blackout ending: high then low edge
-      const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
-      blackouts.push({ minute: intersectionTime, value: domainMax });
-      blackouts.push({ minute: intersectionTime, value: 0 });
-      isBlackout = false;
-    }
-    prev = d;
-  });
-  // Final entry
-  if (isBlackout) {
-    blackouts.push({
-      minute: rangeMax,
-      value: domainMax,
-    });
-  } else {
-    blackouts.push({
-      minute: rangeMax,
-      value: 0,
-    });
-  }
-
   // Wrapping in spare div prevents excessive height bug
   return (
     <div>
       <VictoryChart
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
-        domain={{ y: [domainMin, domainMax] }}
+        domain={props.domain}
+        domainPadding={{y: [6, 6]}}
         height={props.height || 300}
       >
         <VictoryAxis
@@ -162,8 +76,8 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
             },
           }}
         />
-        {blackoutCount > 0 && <VictoryArea
-          data={blackouts}
+        <VictoryArea
+          data={props.blackouts}
           x="minute"
           y="value"
           style={{
@@ -173,7 +87,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
               opacity: 0.3,
             },
           }}
-        />}
+        />
       </VictoryChart>
     </div>
   );
