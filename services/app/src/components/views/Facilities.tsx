@@ -48,20 +48,6 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
         primary={facility.name}
         secondary={secondaryText}
       />
-      <ListItemSecondaryAction>
-        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
-          <ArrowUpwardIcon />
-        </IconButton>}
-        {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
-          <ArrowDownwardIcon />
-        </IconButton>}
-        {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
-          <DeleteForeverIcon />
-        </IconButton>}
-        {underConstruction && <IconButton onClick={toggleDialog} edge="end" color="primary">
-          <CancelIcon />
-        </IconButton>}
-      </ListItemSecondaryAction>
       <Dialog
         open={open}
         onClose={toggleDialog}
@@ -81,6 +67,20 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
           </Button>
         </DialogActions>
       </Dialog>
+      <ListItemSecondaryAction>
+        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
+          <ArrowUpwardIcon />
+        </IconButton>}
+        {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
+          <ArrowDownwardIcon />
+        </IconButton>}
+        {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
+          <DeleteForeverIcon />
+        </IconButton>}
+        {underConstruction && <IconButton onClick={toggleDialog} edge="end" color="primary">
+          <CancelIcon />
+        </IconButton>}
+      </ListItemSecondaryAction>
     </ListItem>
   );
 }

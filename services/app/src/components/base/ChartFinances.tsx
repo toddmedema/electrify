@@ -1,5 +1,5 @@
-import {MONTHS} from 'app/Constants';
 import * as React from 'react';
+import {formatMonthChartAxis} from 'shared/helpers/DateTime';
 import {formatMoneyConcise} from 'shared/helpers/Format';
 import {demandColor} from 'shared/Theme';
 import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
@@ -15,13 +15,6 @@ export interface Props {
   height?: number;
   title: string;
   timeline: ChartData[];
-}
-
-function formatMonth(t: number, multiyear: boolean) {
-  if (multiyear) {
-    return (t % 12 + 1) + '/' + Math.floor(t / 12).toString().slice(-2);
-  }
-  return MONTHS[t % 12];
 }
 
 const ChartFinances = (props: Props): JSX.Element => {
@@ -57,7 +50,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         height={props.height || 300}
       >
         <VictoryAxis
-          tickFormat={(t) => formatMonth(t, multiyear)}
+          tickFormat={(t) => formatMonthChartAxis(t, multiyear)}
           style={{
             axis: {
               stroke: 'black', strokeWidth: 1,

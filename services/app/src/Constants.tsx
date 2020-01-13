@@ -83,7 +83,7 @@ export const FUELS = {
     // Need to figure out where my calculations went wrong
   'Coal': {
     costPerBtu: 0.000002, // pretty even 2000-2018
-    kgCO2ePerBtu: 0.000098,
+    kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
 
   // ~1030Btu/cf https://www.eia.gov/todayinenergy/detail.php?id=18371
@@ -96,7 +96,7 @@ export const FUELS = {
     // Need to figure out where my calculations went wrong
   'Natural Gas': {
     costPerBtu: 0.000003, // Between 2000 and 2018, sometimes spiked to 3x price - using $5/1k cf avg here, ranges $4-12
-    kgCO2ePerBtu: 0.000000066,
+    kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
 
   // $0.71 per million BTU https://www.eia.gov/opendata/qb.php?category=40290&sdid=SEDS.NUETD.WI.A

@@ -85,14 +85,14 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(storage.annualOperatingCost)}</TableCell>
               </TableRow>
-              {storage.spinMinutes > 1 && <TableRow>
-                <TableCell>Spin up/down time
+              <TableRow>
+                <TableCell>Ramp up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
                   </Typography>
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
-              </TableRow>}
+              </TableRow>
             </TableBody>
           </Table>
         </TableContainer>

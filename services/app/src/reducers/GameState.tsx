@@ -216,16 +216,16 @@ function reforecastSupply(state: GameStateType): TimelineType[] {
   });
 }
 
-function reforecastAll(newState: GameStateType): TimelineType[] {
+export function reforecastAll(newState: GameStateType): TimelineType[] {
   newState.timeline = reforecastWeather(newState);
   newState.timeline = reforecastDemand(newState);
   newState.timeline = reforecastSupply(newState);
   return newState.timeline;
 }
 
-function generateNewTimeline(startingMinute: number): TimelineType[] {
-  const array = new Array(TICKS_PER_DAY) as TimelineType[];
-  for (let i = 0; i < TICKS_PER_DAY; i++) {
+export function generateNewTimeline(startingMinute: number, ticks = TICKS_PER_DAY): TimelineType[] {
+  const array = new Array(ticks) as TimelineType[];
+  for (let i = 0; i < ticks; i++) {
     array[i] = {
       minute: startingMinute + i * TICK_MINUTES,
       supplyW: 0,

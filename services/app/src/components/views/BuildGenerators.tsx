@@ -106,7 +106,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuel.costPerBtu || 0)}/MWh</TableCell>
               </TableRow>}
               {generator.spinMinutes > 1 && <TableRow>
-                <TableCell>Spin up/down time
+                <TableCell>Ramp up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
                   </Typography>
@@ -121,7 +121,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 <TableCell>Time to build</TableCell>
                 <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
               </TableRow>}
-              {fuel.kgCO2ePerBtu && <TableRow>
+              {fuel.kgCO2ePerBtu > 0 && <TableRow>
                 <TableCell>Air pollution
                   <Typography variant="body2" color="textSecondary">
                     (kg of CO2 equivalent)

@@ -1,6 +1,13 @@
 import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, STARTING_YEAR} from 'app/Constants';
 import {DateType, MonthType} from 'app/Types';
 
+export function formatMonthChartAxis(t: number, multiyear: boolean) {
+  if (multiyear) {
+    return (t % 12 + 1) + '/' + Math.floor(t / 12).toString().slice(-2);
+  }
+  return MONTHS[t % 12];
+}
+
 // Based on SF/California for now, v2 take in / change by location
 function getSunrise(month: MonthType) {
   switch (month) {
