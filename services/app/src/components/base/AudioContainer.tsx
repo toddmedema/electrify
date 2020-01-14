@@ -2,7 +2,7 @@ import {connect} from 'react-redux';
 import Redux from 'redux';
 import {loadAudioFiles} from '../../actions/Audio';
 import {changeSettings} from '../../actions/Settings';
-import {openSnackbar} from '../../actions/Snackbar';
+import {openSnackbar} from '../../actions/UI';
 import {initialAudio} from '../../reducers/Audio';
 import {AppStateType} from '../../Types';
 import Audio, {DispatchProps, StateProps} from './Audio';

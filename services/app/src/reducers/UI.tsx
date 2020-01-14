@@ -1,7 +1,12 @@
 import Redux from 'redux';
-import {UiDeltaAction, UIType} from '../Types';
+import {DialogOpenAction, UiDeltaAction, UIType} from '../Types';
 
 export const initialUI: UIType = {
+  dialog: {
+    title: '',
+    message: '',
+    open: false,
+  },
   snackbar: {
     message: '',
     open: false,
@@ -29,8 +34,13 @@ export function ui(state: UIType = initialUI, action: Redux.Action): UIType {
     //     };
     //   }
     //   return state;
-    // case 'SNACKBAR_CLOSE':
-    //   return {...initialUI};
+    case 'SNACKBAR_CLOSE':
+      return {...state, snackbar: {...initialUI.snackbar}};
+    case 'DIALOG_OPEN':
+      return {...state, dialog: {...(action as DialogOpenAction).dialog}};
+    case 'DIALOG_CLOSE':
+    case 'GAME_EXIT':
+      return {...state, dialog: {...initialUI.dialog}};
     default:
       return state;
   }
