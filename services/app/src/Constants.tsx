@@ -1,14 +1,17 @@
 import {LCWH} from 'shared/helpers/Financials';
-import {NODE_ENV} from 'shared/schema/Constants';
 import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
-const DEV = (NODE_ENV === 'dev');
-
 export const DIFFICULTIES = {
+  TUTORIAL: {
+    buildCost: 0.6,
+    expensesOM: 0.6,
+    buildTime: 0.1,
+    blackoutPenalty: 2,
+  },
   EASY: {
     buildCost: 0.6,
     expensesOM: 0.6,
-    buildTime: 0.5,
+    buildTime: 0.4,
     blackoutPenalty: 2,
   },
   MEDIUM: {
@@ -162,7 +165,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     {
       name: 'Nuclear',
       fuel: 'Uranium',
-      description: 'No pollution, but very slow',
+      description: 'On-demand and clean, but very slow',
       buildCost: 1500000000 + 4.5 * peakW,
         // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
@@ -360,11 +363,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   generators.forEach((g: GeneratorShoppingType) => {
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
-    if (DEV) {
-      g.yearsToBuild = 0.06;
-    } else {
-      g.yearsToBuild *= difficulty.buildTime;
-    }
+    g.yearsToBuild *= difficulty.buildTime;
     g.lcWh = LCWH(g);
   });
 
@@ -403,6 +402,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       priority: 2,
       yearsToBuild: 0.2 + magnitude / 3,
         // Took Tesla ~6 months to build 120MWh of capacity - https://en.wikipedia.org/wiki/Hornsdale_Power_Reserve
+      spinMinutes: 1,
     },
     {
       name: 'Pumped Hydro',
@@ -432,6 +432,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       priority: 1,
       yearsToBuild: 6 + magnitude,
         // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
+      spinMinutes: 10,
     },
     // TODO thermal storage, hydrogen, ...
   ] as StorageShoppingType[];
@@ -441,11 +442,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
   storage.forEach((g: StorageShoppingType) => {
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
-    if (DEV) {
-      g.yearsToBuild = 0.06;
-    } else {
-      g.yearsToBuild *= difficulty.buildTime;
-    }
+    g.yearsToBuild *= difficulty.buildTime;
   });
 
   return storage;

@@ -28,7 +28,7 @@ const TUTORIAL_STEPS = [
   },
   {
     target: '.button-buildGenerator',
-    content: 'Build generators and storage to meet demand',
+    content: 'Build generators and storage to meet demand (options and prices change as new technologies become available)',
   },
   {
     target: '#speedChangeButton',

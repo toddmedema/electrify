@@ -1,4 +1,4 @@
-import {Table, TableBody, TableCell, TableRow} from '@material-ui/core';
+import {Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@material-ui/core';
 import * as React from 'react';
 
 import {TICKS_PER_YEAR} from 'app/Constants';
@@ -132,6 +132,9 @@ export default class extends React.Component<Props, State> {
           blackouts={blackouts}
           domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
         />
+        <Toolbar>
+          <Typography variant="h6">1 year forecast</Typography>
+        </Toolbar>
         <div className="scrollable">
           <Table size="small">
             {blackoutTotalWh > 0 ?

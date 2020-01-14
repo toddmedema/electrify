@@ -18,7 +18,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(toCard({name: 'GAME_SETUP'}));
     },
     onTutorial: () => {
-      dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: -2}});
+      dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: -2, difficulty: 'TUTORIAL'}});
       dispatch({type: 'GAME_START'});
     },
   };

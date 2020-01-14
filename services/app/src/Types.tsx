@@ -93,7 +93,7 @@ export interface AudioDataType {
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
-export type DifficultyType = 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
+export type DifficultyType = 'TUTORAIL' | 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 
 export interface DifficultyMultipliersType {

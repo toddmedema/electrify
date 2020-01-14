@@ -159,6 +159,12 @@ body {
   }
 }
 
+// Fixes bug with desktop alignment
+.MuiToolbar-gutters {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
 #navfooter {
   border-top: $border_accent;
 }

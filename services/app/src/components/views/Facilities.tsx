@@ -41,7 +41,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
       <ListItemAvatar>
         <div>
           <Avatar className={(facility.currentWh === 0 ? 'offline' : '')} alt={facility.name} src={`/images/${facility.name.toLowerCase()}.svg`} />
-          {facility.peakWh > 0 && <div className="capacityProgressBar" style={{height: `${facility.currentWh / facility.peakWh * 100}%`}}/>}
+          {facility.peakWh > 0 && !underConstruction && <div className="capacityProgressBar" style={{height: `${facility.currentWh / facility.peakWh * 100}%`}}/>}
         </div>
       </ListItemAvatar>
       <ListItemText
