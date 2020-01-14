@@ -12,7 +12,7 @@ import {NODE_ENV, VERSION} from 'shared/schema/Constants';
 import {audioSet} from './actions/Audio';
 import {toPrevious} from './actions/Card';
 import {changeSettings} from './actions/Settings';
-import {openSnackbar} from './actions/Snackbar';
+import {openSnackbar} from './actions/UI';
 import {UNSUPPORTED_BROWSERS} from './Constants';
 import {getDevicePlatform, getDocument, getNavigator, getWindow, setGA} from './Globals';
 import {getStorageBoolean} from './LocalStorage';

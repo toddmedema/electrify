@@ -55,6 +55,15 @@ export interface SnackbarCloseAction extends Redux.Action {
   type: 'SNACKBAR_CLOSE';
 }
 
+export interface DialogOpenAction extends Redux.Action {
+  type: 'DIALOG_OPEN';
+  dialog: DialogType;
+}
+
+export interface DialogCloseAction extends Redux.Action {
+  type: 'DIALOG_CLOSE';
+}
+
 export interface SetSpeedAction extends Redux.Action {
   type: 'SET_SPEED';
   speed: SpeedType
@@ -93,7 +102,7 @@ export interface AudioDataType {
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
-export type DifficultyType = 'TUTORAIL' | 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
+export type DifficultyType = 'TUTORIAL' | 'EASY' | 'NORMAL' | 'HARD' | 'IMPOSSIBLE';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 
 export interface DifficultyMultipliersType {
@@ -129,6 +138,7 @@ export interface DateType {
   percentOfYear: number; // 0 - 1
   month: MonthType;
   monthNumber: number; // 0 - 11
+  monthsEllapsed: number;
   year: number;
   sunrise: number;
   sunset: number;
@@ -254,7 +264,17 @@ export interface SettingsType {
   vibration: boolean;
 }
 
+export interface DialogType {
+  message: string;
+  title: string;
+  action?: (e: any) => void;
+  actionLabel?: string;
+  closeText?: string;
+  open: boolean,
+}
+
 export interface UIType {
+  dialog: DialogType,
   snackbar: {
     action?: (e: any) => void;
     actionLabel?: string;

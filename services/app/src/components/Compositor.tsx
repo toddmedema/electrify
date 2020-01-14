@@ -1,4 +1,4 @@
-import {Button, Snackbar, Typography} from '@material-ui/core';
+import {Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography} from '@material-ui/core';
 import * as React from 'react';
 import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
@@ -86,6 +86,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  closeDialog: () => void;
   closeSnackbar: () => void;
   onTutorialStep: (newStep: number) => void;
 }
@@ -136,8 +137,13 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public shouldComponentUpdate(nextProps: Props) {
-    // Explicitly update if changing tutorial step
+    // Update if changing tutorial step
     if (this.props.tutorialStep !== nextProps.tutorialStep) {
+      return true;
+    }
+
+    // Update if dialog / snackbar changes
+    if (this.props.ui.dialog.open !== nextProps.ui.dialog.open || this.props.ui.snackbar.open !== nextProps.ui.snackbar.open) {
       return true;
     }
 
@@ -150,7 +156,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const { tutorialStep } = this.props;
+    const { tutorialStep, ui, closeDialog } = this.props;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -184,6 +190,21 @@ export default class Compositor extends React.Component<Props, {}> {
             },
           }}
         />
+        <Dialog
+          open={ui.dialog.open}
+          onClose={closeDialog}
+        >
+          <DialogTitle>{ui.dialog.title}</DialogTitle>
+          <DialogContent>{ui.dialog.message}</DialogContent>
+          <DialogActions>
+            <Button color="primary" onClick={closeDialog}>
+              {ui.dialog.closeText || (ui.dialog.action ? 'Cancel' : 'OK')}
+            </Button>
+            {ui.dialog.action && <Button color="primary" variant="contained" onClick={ui.dialog.action}>
+              {ui.dialog.actionLabel || 'OK'}
+            </Button>}
+          </DialogActions>
+        </Dialog>
         <Snackbar
           className="snackbar"
           open={this.props.ui.snackbar.open}

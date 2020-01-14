@@ -2,6 +2,7 @@ import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
+import {openDialog} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
@@ -394,6 +395,10 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
     return {...state, speed: (action as SetSpeedAction).speed};
 
+  } else if (action.type === 'DIALOG_OPEN') {
+
+    return {...state, speed: 'PAUSED'};
+
   } else if (action.type === 'GAME_EXIT') {
 
     return {...initialGameState};
@@ -428,6 +433,20 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
         newState.timeline = reforecastAll(newState);
+
+        // Time-based tutorial triggers
+        if (newState.difficulty === 'TUTORIAL') {
+          if (newState.date.monthsEllapsed === 12) {
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: 'Tutorial complete!',
+              message: '',
+              open: true,
+              closeText: 'Keep playing',
+              actionLabel: 'Return to menu',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
+          }
+        }
       }
 
       setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);

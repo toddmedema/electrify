@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {closeSnackbar} from '../actions/Snackbar';
+import {closeDialog, closeSnackbar} from '../actions/UI';
 import {AppStateType, TransitionClassType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
 
@@ -25,6 +25,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
+    closeDialog(): void {
+      dispatch(closeDialog());
+    },
     closeSnackbar(): void {
       dispatch(closeSnackbar());
     },

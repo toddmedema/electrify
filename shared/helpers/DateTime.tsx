@@ -80,6 +80,7 @@ export function getDateFromMinute(minute: number): DateType {
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
   // const dayOfSeason = dayOfYear % DAYS_PER_SEASON;
+  const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
   const year = yearsEllapsed + STARTING_YEAR;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH);
@@ -97,6 +98,7 @@ export function getDateFromMinute(minute: number): DateType {
     percentOfYear: percentOfYear || 0.00001,
     month,
     monthNumber,
+    monthsEllapsed,
     year,
     sunrise: getSunrise(month),
     sunset: getSunset(month),
