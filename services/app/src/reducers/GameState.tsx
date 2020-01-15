@@ -10,7 +10,7 @@ import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingTy
 // const seedrandom = require('seedrandom');
 
 export const initialGameState: GameStateType = {
-  difficulty: 'EASY',
+  difficulty: 'EMPLOYEE',
   speed: 'PAUSED',
   inGame: false,
   tutorialStep: -1,

@@ -3,33 +3,45 @@ import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, Genera
 
 export const DIFFICULTIES = {
   TUTORIAL: {
-    buildCost: 0.6,
-    expensesOM: 0.6,
+    buildCost: 0.5,
+    expensesOM: 0.5,
     buildTime: 0.1,
     blackoutPenalty: 2,
   },
-  EASY: {
+  INTERN: {
     buildCost: 0.6,
     expensesOM: 0.6,
-    buildTime: 0.4,
+    buildTime: 0.3,
     blackoutPenalty: 2,
   },
-  MEDIUM: {
-    buildCost: 0.8,
-    expensesOM: 0.8,
-    buildTime: 0.8,
+  EMPLOYEE: {
+    buildCost: 0.7,
+    expensesOM: 0.7,
+    buildTime: 0.4,
     blackoutPenalty: 4,
   },
-  HARD: {
+  MANAGER: {
+    buildCost: 0.8,
+    expensesOM: 0.8,
+    buildTime: 0.6,
+    blackoutPenalty: 6,
+  },
+  VP: {
+    buildCost: 0.9,
+    expensesOM: 0.9,
+    buildTime: 0.8,
+    blackoutPenalty: 8,
+  },
+  CEO: {
     buildCost: 1,
     expensesOM: 1,
     buildTime: 1,
-    blackoutPenalty: 8,
+    blackoutPenalty: 10,
   },
-  IMPOSSIBLE: {
+  GURU: {
     buildCost: 1.2,
     expensesOM: 1.1,
-    buildTime: 1,
+    buildTime: 1.1,
     blackoutPenalty: 12,
   },
 } as {[index: string]: DifficultyMultipliersType};

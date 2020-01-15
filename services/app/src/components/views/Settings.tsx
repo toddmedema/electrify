@@ -2,7 +2,7 @@ import {Button} from '@material-ui/core';
 // import Checkbox from '@material-ui/core/Checkbox';
 import * as React from 'react';
 import {VERSION} from 'shared/schema/Constants';
-import {DifficultyType, SettingsType} from '../../Types';
+import {SettingsType} from '../../Types';
 
 export interface StateProps {
   settings: SettingsType;
@@ -10,7 +10,6 @@ export interface StateProps {
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
-  onDifficultyDelta: (difficulty: DifficultyType, i: number) => void;
   onExperimentalChange: (change: boolean) => void;
   onMainMenu: () => void;
   onShowHelpChange: (change: boolean) => void;
