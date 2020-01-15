@@ -20,6 +20,7 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function GameSetup(props: Props): JSX.Element {
   // TODO info button should show a help dialog
+  // or, instead, each item should have its own info / help button
   return (
     <div id="menuCard">
       <div id="topbar">
@@ -35,7 +36,7 @@ export default function GameSetup(props: Props): JSX.Element {
       </div>
       <div id="centeredMenu">
         <FormControl>
-          <InputLabel shrink>Difficulty</InputLabel>
+          <InputLabel>Difficulty</InputLabel>
           <Select
             id="difficulty"
             value={props.gameState.difficulty}
