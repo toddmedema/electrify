@@ -278,7 +278,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           })}
         </Menu>
       </Toolbar>
-      <List dense className="scrollable buildList">
+      <List dense className="scrollable expandableList">
         {generators.map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
             generator={g}

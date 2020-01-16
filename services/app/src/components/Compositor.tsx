@@ -15,6 +15,7 @@ import ForecastsContainer from './views/ForecastsContainer';
 import GameSetupContainer from './views/GameSetupContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
+import ManualContainer from './views/ManualContainer';
 import SettingsContainer from './views/SettingsContainer';
 
 const TUTORIAL_STEPS = [
@@ -129,6 +130,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <SettingsContainer />;
       case 'MAIN_MENU':
         return <MainMenuContainer />;
+      case 'MANUAL':
+        return <ManualContainer />;
       case 'LOADING':
         return <LoadingContainer />;
       default:

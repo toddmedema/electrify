@@ -220,6 +220,7 @@ span.weak {
 
   .MuiToolbar-root {
     border: none !important;
+    z-index: 0; /* fixes bug with psuedo element z-index not working as expected */
   }
 
   #yearProgressBar {
@@ -238,8 +239,13 @@ span.weak {
   z-index: 1;
 }
 
-.expandable:hover {
-  cursor: pointer;
+.expandable {
+  &:hover {
+    cursor: pointer;
+  }
+  .MuiCardContent-root {
+    padding-top: 0;
+  }
 }
 
 .blackout-pulsing {
@@ -299,6 +305,7 @@ body.android .dialog .textfield:focus-within {
     margin-bottom: size(small);
     margin: 0 size(small) size(base) size(small);
     border-radius: 0;
+    position: relative;
 
     .MuiCardHeader-root {
       align-items: flex-start;
@@ -321,10 +328,10 @@ body.android .dialog .textfield:focus-within {
     }
 
     .expand-icon {
-      margin: auto;
-      display: block;
-      height: 20px;
-      margin-top: -18px;
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translatex(-50%);
     }
   }
 
@@ -378,7 +385,7 @@ body.android .dialog .textfield:focus-within {
 
     #centeredMenu {
       position: absolute;
-      top: 50%;
+      top: 40%;
       left: 0;
       right: 0;
 
@@ -398,7 +405,7 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
-  .buildList {
+  .expandableList {
     background: #ddd;
     padding-top: size(base) !important;
   }

@@ -120,6 +120,7 @@ export type CardNameType =
   'FORECASTS' |
   'LOADING' |
   'MAIN_MENU' |
+  'MANUAL' |
   'SETTINGS' |
   'GAME_SETUP';
 

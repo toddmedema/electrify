@@ -113,7 +113,7 @@ export function GameCard(props: Props) {
       }}/>
       {props.children}
       <NavigationContainer />
-    </div >
+    </div>
   );
 }
 
