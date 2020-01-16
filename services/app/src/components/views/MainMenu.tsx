@@ -7,9 +7,10 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onSettings: () => any;
-  onStart: () => any;
-  onTutorial: () => any;
+  onSettings: () => void;
+  onManual: () => void;
+  onStart: () => void;
+  onTutorial: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -25,6 +26,7 @@ const MainMenu = (props: Props): JSX.Element => {
       <div id="centeredMenu">
         <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onTutorial}>Tutorial</Button>
+        <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Settings</Button>
         <Button variant="outlined" color="primary" onClick={() => openWindow('/about.html')}>About</Button>
       </div>
