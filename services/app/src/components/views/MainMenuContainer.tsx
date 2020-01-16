@@ -11,6 +11,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
+    onManual: () => {
+      dispatch(toCard({name: 'MANUAL'}));
+    },
     onSettings: () => {
       dispatch(toCard({name: 'SETTINGS'}));
     },
