@@ -229,6 +229,7 @@ interface SharedShoppingType {
   [index: string]: any;
   name: string;
   description: string;
+  available: boolean;
   buildCost: number; // Partially fixed, partially variable (such as size dependent)
     // When more information is not available, assume that average costs = 1/4 fixed (for avg size), 3/4 variable
     // all costs should be in that year's $ / not account for inflation when possible

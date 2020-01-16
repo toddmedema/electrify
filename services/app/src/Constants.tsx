@@ -140,12 +140,13 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakW) - 6;
 
-  const generators = [
+  let generators = [
     // FUELED
     {
       name: 'Coal',
       fuel: 'Coal',
       description: 'On-demand but dirty and slow',
+      available: true, // Coal was first type of electric plant
       buildCost: 376000000 + 2.6 * peakW, // TODO update to factor in cost growth over time (this is 2008 cost)
         // ~$3500/kw in 2008 - https://schlissel-technical.com/docs/reports_35.pdf
         // $3,500 to $5,000 in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -178,6 +179,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       name: 'Nuclear',
       fuel: 'Uranium',
       description: 'On-demand and clean, but very slow',
+      available: (state.date.year > 1956), // First full scale plant was Calder Hall in 1956
       buildCost: 1500000000 + 4.5 * peakW,
         // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
@@ -201,29 +203,11 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       lifespanYears: 80,
         // https://www.scientificamerican.com/article/nuclear-power-plant-aging-reactor-replacement-/
     },
-    // {
-    //   name: 'Oil', // Aka petroleum
-    //   fuel: 'Oil',
-    //   description: 'Dispatchable, but fuel prices swing',
-    //   buildCost: 200000000,
-      // 1,087 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
-      // 40 GW in 2019 ("fuel oil") - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-    //   peakW,
-    //   btuPerW: 11,
-    //     // varies by ~1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
-    //   spinMinutes: 10,
-    //   annualOperatingCost: 1000000, // TODO make variable
-    //     // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    //   priority: 5,
-    //   yearsToBuild: 2,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // capacityFactor: 0.66,
-        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
-    // },
     {
       name: 'Natural Gas',
       fuel: 'Natural Gas',
       description: 'On-demand, faster and cleaner than coal',
+      available: (state.date.year > 1940), // First full scale plant was 4MW in Switzerland in 1940
       buildCost: 71000000 + 0.75 * peakW,
         // ~$1,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls and still in 2019 https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 1,854 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
@@ -262,12 +246,32 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   priority: 4,
     //   yearsToBuild: 1,
     // },
+    // {
+    //   name: 'Oil', // Aka petroleum
+    //   fuel: 'Oil',
+    //   description: 'Dispatchable, but fuel prices swing',
+    //   buildCost: 200000000,
+      // 1,087 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
+      // 40 GW in 2019 ("fuel oil") - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
+    //   peakW,
+    //   btuPerW: 11,
+    //     // varies by ~1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
+    //   spinMinutes: 10,
+    //   annualOperatingCost: 1000000, // TODO make variable
+    //     // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
+    //   priority: 5,
+    //   yearsToBuild: 2,
+      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      // capacityFactor: 0.66,
+        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
+    // },
 
     // RENEWABLE
     {
       name: 'Wind',
       fuel: 'Wind',
       description: 'Windiest at spring and fall evenings',
+      available: (state.date.year > 1941), // First megawatt-size turbine was in Vermont in 1941
       buildCost: 43000000 + 1.4 * peakW,
         // ~$1,900/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$1,600/kw in 2019 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -296,6 +300,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       name: 'Solar',
       fuel: 'Sun',
       description: 'Sunniest at summer noon',
+      available: (state.date.year > 1982), // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       buildCost: 3900000 + 1.275 * peakW,
         // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
@@ -303,8 +308,9 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
       peakW,
-      maxPeakW: 2000000000,
-        // ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
+      maxPeakW: (state.date.year < 2000) ? 100000000 : 2000000000,
+        // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
+        // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
       annualOperatingCost: 0.008 * peakW,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -337,7 +343,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // Still only has a capacity factor of .733, why? https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
     //   name: 'Geothermal',
     //   fuel: 'Ground Heat',
-    //   description: 'Cheap and always on, but limited location options',
+    //   description: 'Cheap and always on, but limited locations',
     //   buildCost: 200000000,
     //   peakW,
     // maxPeakW: 800000000,
@@ -372,11 +378,12 @@ export function GENERATORS(state: GameStateType, peakW: number) {
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
-  generators.forEach((g: GeneratorShoppingType) => {
+  generators = generators.filter((g: GeneratorShoppingType) => {
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
     g.yearsToBuild *= difficulty.buildTime;
     g.lcWh = LCWH(g);
+    return g.available;
   });
 
   return generators;
@@ -386,10 +393,11 @@ export function STORAGE(state: GameStateType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
 
-  const storage = [
+  let storage = [
     {
       name: 'Lithium-Ion Battery',
       description: 'Fast to build and charge / discharge',
+      available: (state.date.year > 2008), // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
           // Also, Tesla grid-scale batteries around $400/kWh in 2019 - https://cleantechnica.com/2019/11/24/what-a-108-26-per-kwh-battery-pack-would-mean-for-tesla/
@@ -418,7 +426,8 @@ export function STORAGE(state: GameStateType, peakWh: number) {
     },
     {
       name: 'Pumped Hydro',
-      description: 'Slow to build and charge / discharge but large capacity',
+      description: 'Slow to build and charge / discharge',
+      available: (state.date.year > 1930), // New Milfrod plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.15 * peakWh,
         // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
           // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity
@@ -451,10 +460,11 @@ export function STORAGE(state: GameStateType, peakWh: number) {
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
-  storage.forEach((g: StorageShoppingType) => {
+  storage = storage.filter((g: StorageShoppingType) => {
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
     g.yearsToBuild *= difficulty.buildTime;
+    return g.available;
   });
 
   return storage;
