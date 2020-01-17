@@ -79,12 +79,11 @@ export function getDateFromMinute(minute: number): DateType {
   const minuteOfDay = minute % 1440;
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
-  // const dayOfSeason = dayOfYear % DAYS_PER_SEASON;
   const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
   const year = yearsEllapsed + STARTING_YEAR;
-  const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH);
-  const month = MONTHS[monthNumber];
+  const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
+  const month = MONTHS[monthNumber - 1];
   const percentOfMonth = minuteOfDay / 1440;
   const minuteOfYear = minute - (yearsEllapsed * DAYS_PER_YEAR) * 1440;
   const percentOfYear = minuteOfYear / (DAYS_PER_YEAR * 1440);

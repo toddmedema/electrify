@@ -101,9 +101,15 @@ export interface AudioDataType {
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
-export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export type DifficultyType = 'INTERN' | 'EMPLOYEE' | 'MANAGER' | 'VP' | 'CEO' | 'GURU';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
+
+export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
+export interface FuelPricesType {
+  Coal?: number;
+  'Natural Gas'?: number;
+  Uranium?: number;
+}
 
 export interface DifficultyMultipliersType {
   buildCost: number;
@@ -138,7 +144,7 @@ export interface DateType {
   percentOfMonth: number; // 0 - 1
   percentOfYear: number; // 0 - 1
   month: MonthType;
-  monthNumber: number; // 0 - 11
+  monthNumber: number; // 1 - 12
   monthsEllapsed: number;
   year: number;
   sunrise: number;
@@ -155,7 +161,7 @@ export interface RawWeatherType {
 }
 
 // All amounts are the average across the time window
-export interface TimelineType {
+export interface TimelineType extends FuelPricesType {
   minute: number;
   supplyW: number; // Watts
   demandW: number; // Watts

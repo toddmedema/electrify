@@ -6,6 +6,7 @@ import {GameStateType, TimelineType} from 'app/Types';
 import {formatHour, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWattHours, formatWatts} from 'shared/helpers/Format';
 import {generateNewTimeline, reforecastAll} from '../../reducers/GameState';
+import ChartForecastFuelPrices from '../base/ChartForecastFuelPrices';
 import ChartForecastSupplyDemand from '../base/ChartForecastSupplyDemand';
 import GameCard from '../base/GameCard';
 
@@ -123,19 +124,19 @@ export default class extends React.Component<Props, State> {
     const blackoutStart = getDateFromMinute(largestBlackout.start);
     const blackoutEnd = getDateFromMinute(largestBlackout.end);
 
-    // TODO Other long term forecasts - see more than 1 year in the future, weather, ???
+    // TODO user ability to see more than one year in the future
     return (
       <GameCard className="Forecasts">
-        <ChartForecastSupplyDemand
-          height={180}
-          timeline={timeline}
-          blackouts={blackouts}
-          domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-        />
         <Toolbar>
-          <Typography variant="h6">1 year forecast</Typography>
+          <Typography variant="h6">Forecasts for 1 year</Typography>
         </Toolbar>
         <div className="scrollable">
+          <ChartForecastSupplyDemand
+            height={140}
+            timeline={timeline}
+            blackouts={blackouts}
+            domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
+          />
           <Table size="small">
             {blackoutTotalWh > 0 ?
               <TableBody>
@@ -169,6 +170,13 @@ export default class extends React.Component<Props, State> {
               </TableBody>
             }
           </Table>
+          <br/>
+          <br/>
+          <ChartForecastFuelPrices
+            height={140}
+            timeline={timeline}
+            domain={{ x: [rangeMin, rangeMax] }}
+          />
         </div>
       </GameCard>
     );

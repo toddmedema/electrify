@@ -1,5 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
+import {initFuelPrices} from 'shared/schema/FuelPrices';
 import {initWeather} from 'shared/schema/Weather';
 import {AppStateType, GameStateType, NewGameAction} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
@@ -16,19 +17,21 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       initWeather('SF', () => {
         // TODO load game state from localstorage if loading
 
-        // Otherwise, generate from scratch
-        dispatch({
-          type: 'NEW_GAME',
-          facilities: [{fuel: 'Coal', peakW: 500000000}],
-          cash: 200000000,
-          population: 1080000,
-        } as NewGameAction);
+        initFuelPrices(() => {
+          // Otherwise, generate from scratch
+          dispatch({
+            type: 'NEW_GAME',
+            facilities: [{fuel: 'Coal', peakW: 500000000}],
+            cash: 200000000,
+            population: 1080000,
+          } as NewGameAction);
 
-        dispatch({type: 'GAME_LOADED'});
+          dispatch({type: 'GAME_LOADED'});
 
-        if (gameState.inTutorial) {
-          setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
-        }
+          if (gameState.inTutorial) {
+            setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
+          }
+        });
       });
     },
   };

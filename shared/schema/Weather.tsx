@@ -27,7 +27,6 @@ export function initWeather(location: string, callback?: any) {
       weather[location][rowNumber++] = row.data as RawWeatherType;
     },
     complete() {
-      console.log('Weather downloaded for ' + location);
       if (callback) {
         callback();
       }
@@ -38,12 +37,7 @@ export function initWeather(location: string, callback?: any) {
 // TODO download weather with a 1s init delay, like loading audio
 // But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
 export function getWeather(location: string, hourOfYear: number): RawWeatherType {
-  if (!weather[location]) {
-    initWeather(location);
-    return DUMMY_WEATHER;
-  } else {
-    return weather[location][hourOfYear] || DUMMY_WEATHER;
-  }
+  return weather[location][hourOfYear] || DUMMY_WEATHER;
 }
 
 // 0-1, percent of sun's energy hitting a unit of land relative to max

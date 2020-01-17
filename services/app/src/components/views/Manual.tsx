@@ -70,6 +70,10 @@ const MANUAL_ENTRIES = [
     entry: <p>You don’t lose money for not providing service (utilities can’t be sued for blackouts), but you’ll lose customers</p>,
   },
   {
+    title: `BTU and MBTU`,
+    entry: <p>The British Thermal Unit is a measure of heat energy. MBTU stands for one million BTU, and equals approximately 300 kWh of electrical energy.</p>,
+  },
+  {
     title: `Forecasts`,
     entry: <p>TODO how to read the forecast</p>,
   },

@@ -1,6 +1,7 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
+import {getFuelPrices} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
@@ -94,13 +95,15 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   };
 }
 
-function reforecastWeather(state: GameStateType): TimelineType[] {
+function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
   return state.timeline.map((t: TimelineType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute);
       const weather = getWeather('SF', date.hourOfFullYear);
+      const fuelPrices = getFuelPrices(date);
       return {
         ...t,
+        ...fuelPrices,
         sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2),
         windKph: weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
@@ -219,7 +222,7 @@ function reforecastSupply(state: GameStateType): TimelineType[] {
 }
 
 export function reforecastAll(newState: GameStateType): TimelineType[] {
-  newState.timeline = reforecastWeather(newState);
+  newState.timeline = reforecastWeatherAndPrices(newState);
   newState.timeline = reforecastDemand(newState);
   newState.timeline = reforecastSupply(newState);
   return newState.timeline;

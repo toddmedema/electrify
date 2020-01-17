@@ -1,23 +1,17 @@
 import {TimelineType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
-import {formatWatts} from 'shared/helpers/Format';
-import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
-import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme } from 'victory';
-
-interface BlackoutEdges {
-  minute: number;
-  value: number;
-}
+import {formatMoneyConcise} from 'shared/helpers/Format';
+import {coalColor, naturalGasColor, uraniumColor} from 'shared/Theme';
+import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme} from 'victory';
 
 export interface Props {
   height?: number;
   timeline: TimelineType[];
-  blackouts: BlackoutEdges[];
-  domain: { x: [number, number], y: [number, number] };
+  domain: { x: [number, number] };
 }
 
-const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
+const ChartForecastFuelPrices = (props: Props): JSX.Element => {
   // Wrapping in spare div prevents excessive height bug
   return (
     <div>
@@ -43,7 +37,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={(t: number) => formatWatts(t)}
+          tickFormat={(t: number) => formatMoneyConcise(t)}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
@@ -58,10 +52,10 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
         <VictoryLine
           data={props.timeline}
           x="minute"
-          y="supplyW"
+          y="Natural Gas"
           style={{
             data: {
-              stroke: supplyColor,
+              stroke: naturalGasColor,
               strokeWidth: 1,
             },
           }}
@@ -69,32 +63,43 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
         <VictoryLine
           data={props.timeline}
           x="minute"
-          y="demandW"
+          y="Coal"
           style={{
             data: {
-              stroke: demandColor,
+              stroke: coalColor,
+              strokeWidth: 1,
             },
           }}
         />
-        <VictoryArea
-          data={props.blackouts}
+        <VictoryLine
+          data={props.timeline}
           x="minute"
-          y="value"
+          y="Uranium"
           style={{
             data: {
-              stroke: 'none',
-              fill: blackoutColor,
-              opacity: 0.3,
+              stroke: uraniumColor,
+              strokeWidth: 1,
             },
           }}
+        />
+        <VictoryLegend x={270} y={15}
+          centerTitle
+          orientation="vertical"
+          rowGutter={-5}
+          symbolSpacer={5}
+          data={[
+            { name: 'Coal', symbol: { fill: coalColor } },
+            { name: 'Natural Gas', symbol: { fill: naturalGasColor } },
+            { name: 'Uranium', symbol: { fill: uraniumColor } },
+          ]}
         />
         <VictoryLabel
           textAnchor="middle"
           x={200} y={7}
-          text="Supply & Demand"
+          text="Fuel prices (/mbtu)"
         />
       </VictoryChart>
     </div>
   );
 };
-export default ChartForecastSupplyDemand;
+export default ChartForecastFuelPrices;
