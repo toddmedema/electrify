@@ -1,10 +1,10 @@
-import { Button, FormControl, IconButton, InputLabel, MenuItem, Select, Toolbar, Typography } from '@material-ui/core';
+import {Button, Checkbox, FormControl, FormControlLabel, IconButton, InputLabel, MenuItem, Select, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
-import { DIFFICULTIES } from 'app/Constants';
-import { DifficultyType, GameStateType } from 'app/Types';
+import {DIFFICULTIES} from 'app/Constants';
+import {DifficultyType, GameStateType} from 'app/Types';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -47,6 +47,17 @@ export default function GameSetup(props: Props): JSX.Element {
             })}
           </Select>
         </FormControl>
+        <br/>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={props.gameState.inTutorial}
+              onChange={(e: any) => props.onDelta({ inTutorial: !props.gameState.inTutorial })}
+              color="primary"
+            />
+          }
+          label="Show tutorial prompts"
+        />
       </div>
       <div id="footer">
         <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>Play</Button>

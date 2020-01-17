@@ -2,12 +2,6 @@ import {LCWH} from 'shared/helpers/Financials';
 import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
 export const DIFFICULTIES = {
-  TUTORIAL: {
-    buildCost: 0.5,
-    expensesOM: 0.5,
-    buildTime: 0.1,
-    blackoutPenalty: 2,
-  },
   INTERN: {
     buildCost: 0.6,
     expensesOM: 0.6,

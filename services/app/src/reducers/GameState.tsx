@@ -13,7 +13,8 @@ export const initialGameState: GameStateType = {
   difficulty: 'EMPLOYEE',
   speed: 'PAUSED',
   inGame: false,
-  tutorialStep: -1,
+  inTutorial: true,
+  tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
   date: getDateFromMinute(0),
   timeline: [] as TimelineType[],
@@ -435,7 +436,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         newState.timeline = reforecastAll(newState);
 
         // Time-based tutorial triggers
-        if (newState.difficulty === 'TUTORIAL') {
+        if (newState.inTutorial) {
           if (newState.date.monthsEllapsed === 12) {
             setTimeout(() => getStore().dispatch(openDialog({
               title: 'Tutorial complete!',

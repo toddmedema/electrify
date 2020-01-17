@@ -102,7 +102,7 @@ export interface AudioDataType {
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
-export type DifficultyType = 'TUTORIAL' | 'INTERN' | 'EMPLOYEE' | 'MANAGER' | 'VP' | 'CEO' | 'GURU';
+export type DifficultyType = 'INTERN' | 'EMPLOYEE' | 'MANAGER' | 'VP' | 'CEO' | 'GURU';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 
 export interface DifficultyMultipliersType {
@@ -248,6 +248,7 @@ export interface GameStateType {
   difficulty: DifficultyType;
   speed: SpeedType;
   inGame: boolean;
+  inTutorial: boolean;
   tutorialStep: number;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness

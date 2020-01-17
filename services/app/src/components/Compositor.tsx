@@ -83,6 +83,7 @@ export interface StateProps {
   settings: SettingsType;
   ui: UIType;
   transition: TransitionClassType;
+  inTutorial: boolean;
   tutorialStep: number;
 }
 
@@ -159,7 +160,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const { tutorialStep, ui, closeDialog } = this.props;
+    const { tutorialStep, ui, closeDialog, inTutorial } = this.props;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -178,7 +179,7 @@ export default class Compositor extends React.Component<Props, {}> {
             </div>
           </CSSTransition>
         </TransitionGroup>
-        <Joyride
+        {inTutorial && <Joyride
           callback={this.handleJoyrideCallback}
           continuous={true}
           showProgress={true}
@@ -192,7 +193,7 @@ export default class Compositor extends React.Component<Props, {}> {
               overlayColor: 'rgba(0, 0, 0, 0)',
             },
           }}
-        />
+        />}
         <Dialog
           open={ui.dialog.open}
           onClose={closeDialog}
