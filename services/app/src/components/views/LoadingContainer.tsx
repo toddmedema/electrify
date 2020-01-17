@@ -26,7 +26,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
         dispatch({type: 'GAME_LOADED'});
 
-        if (gameState.tutorialStep === -2) {
+        if (gameState.inTutorial) {
           setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
         }
       });
