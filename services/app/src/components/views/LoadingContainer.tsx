@@ -21,7 +21,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
           type: 'NEW_GAME',
           facilities: [{fuel: 'Coal', peakW: 500000000}],
           cash: 200000000,
-          regionPopulation: 1080000,
+          population: 1080000,
         } as NewGameAction);
 
         dispatch({type: 'GAME_LOADED'});
