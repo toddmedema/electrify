@@ -5,25 +5,25 @@ export const DIFFICULTIES = {
   INTERN: {
     buildCost: 0.6,
     expensesOM: 0.6,
-    buildTime: 0.3,
+    buildTime: 0.2,
     blackoutPenalty: 2,
   },
   EMPLOYEE: {
     buildCost: 0.7,
     expensesOM: 0.7,
-    buildTime: 0.4,
+    buildTime: 0.3,
     blackoutPenalty: 4,
   },
   MANAGER: {
     buildCost: 0.8,
     expensesOM: 0.8,
-    buildTime: 0.6,
+    buildTime: 0.5,
     blackoutPenalty: 6,
   },
   VP: {
     buildCost: 0.9,
     expensesOM: 0.9,
-    buildTime: 0.8,
+    buildTime: 0.75,
     blackoutPenalty: 8,
   },
   CEO: {
@@ -35,7 +35,7 @@ export const DIFFICULTIES = {
   GURU: {
     buildCost: 1.2,
     expensesOM: 1.1,
-    buildTime: 1.1,
+    buildTime: 1,
     blackoutPenalty: 12,
   },
 } as {[index: string]: DifficultyMultipliersType};

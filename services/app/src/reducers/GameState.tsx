@@ -20,7 +20,6 @@ export const initialGameState: GameStateType = {
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
-  regionPopulation: 1000000,
 };
 
 export function setSpeed(speed: SpeedType): SetSpeedAction {
@@ -40,7 +39,7 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * gameState.regionPopulation;
+  return demandMultiple * gameState.monthlyHistory[0].population;
 }
 
 // Each frame, update the month's history with cumulative values -> use that to update finances
@@ -82,6 +81,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
 
   return {
     ...monthlyHistory,
+    // population not affected by finance calculations
     revenue: monthlyHistory.revenue + revenue,
     expensesOM: monthlyHistory.expensesOM + expensesOM,
     expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
@@ -280,13 +280,14 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
 }
 
 // TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
-function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number): MonthlyHistoryType {
+function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number, population: number): MonthlyHistoryType {
   return {
     year: date.year,
     month: date.monthNumber,
     supplyWh: 0,
     demandWh: 0,
     kgco2e: 0,
+    population,
     cash,
     netWorth: getNetWorth(facilities, cash),
     revenue: 0,
@@ -361,7 +362,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     const a = action as NewGameAction;
     let newState = {
       ...state,
-      regionPopulation: a.regionPopulation,
       timeline: [] as TimelineType[],
     };
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
@@ -375,7 +375,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       }) as FacilityShoppingType;
       newState = buildFacility(newState, newFacility, false);
     });
-    newState.monthlyHistory = [newMonthlyHistoryEntry(state.date, newState.facilities, a.cash)]; // after building facilities
+    newState.monthlyHistory = [newMonthlyHistoryEntry(state.date, newState.facilities, a.cash, a.population)]; // after building facilities
     newState.timeline = generateNewTimeline(0);
     newState.timeline = reforecastAll(newState);
 
@@ -420,16 +420,14 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
         const difficulty = DIFFICULTIES[state.difficulty];
 
-        // Update popultion, reduce growth rate when blackouts (can even go negative)
+        // Record final history for the month, then insert a new blank month
+        const cash = newState.monthlyHistory[0].cash;
         const {demandWh, supplyWh} = newState.monthlyHistory[0];
         const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
         const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
-        newState.regionPopulation = Math.round(state.regionPopulation * (1 + growthRate / 12));
-
-        // Record final history for the month, then insert a new blank month
-        const cash = newState.monthlyHistory[0].cash;
+        const population = Math.round(newState.monthlyHistory[0].population * (1 + growthRate / 12));
         newState.monthlyHistory[0].netWorth = getNetWorth(newState.facilities, cash);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash));
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);

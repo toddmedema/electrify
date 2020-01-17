@@ -58,6 +58,7 @@ export default class extends React.Component<Props, State> {
     const summary = {
       supplyWh: 0,
       demandWh: 0,
+      population: 0,
       kgco2e: 0,
       revenue: 0,
       expensesFuel: 0,
@@ -89,6 +90,7 @@ export default class extends React.Component<Props, State> {
         summary.expensesOM += h.expensesOM;
         summary.expensesTaxesFees += h.expensesTaxesFees;
         summary.expensesInterest += h.expensesInterest;
+        summary.population = h.population;
         summary.netWorth = h.netWorth;
       }
     }
@@ -96,7 +98,6 @@ export default class extends React.Component<Props, State> {
 
     return (
       <GameCard className="Finances">
-        <Typography variant="body2">Current population served: {numbro(gameState.regionPopulation).format({ thousandSeparated: true })}</Typography>
         {timeline.length > 0 ? <ChartFinances
           height={180}
           timeline={timeline}
@@ -114,6 +115,10 @@ export default class extends React.Component<Props, State> {
         <div className="scrollable">
           <Table size="small">
             <TableBody>
+              <TableRow>
+                <TableCell colSpan={2}>Population served</TableCell>
+                <TableCell align="right">{numbro(summary.population).format({thousandSeparated: true, mantissa: 0})}</TableCell>
+              </TableRow>
               <TableRow>
                 <TableCell colSpan={2}>Income</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.revenue)}</TableCell>

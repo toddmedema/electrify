@@ -82,7 +82,7 @@ export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
   facilities: Partial<FacilityShoppingType>[];
   cash: number;
-  regionPopulation: number;
+  population: number;
 }
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
@@ -171,6 +171,7 @@ export interface MonthlyHistoryType {
   demandWh: number; // total
   kgco2e: number; // total
   cash: number; // ending (this is a live value in the current month)
+  population: number; // ending (this is a live value in the current month)
   netWorth: number; // ending
   revenue: number; // total
   expensesFuel: number; // total
@@ -256,7 +257,6 @@ export interface GameStateType {
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   facilities: (StorageOperatingType|GeneratorOperatingType)[];
-  regionPopulation: number;
 }
 
 export interface SettingsType {
