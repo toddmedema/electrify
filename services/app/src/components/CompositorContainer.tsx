@@ -19,6 +19,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     settings: state.settings,
     ui: state.ui,
     transition,
+    inTutorial: state.gameState.inTutorial,
     tutorialStep: state.gameState.tutorialStep,
   };
 };
