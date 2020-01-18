@@ -48,6 +48,20 @@ export default function GameSetup(props: Props): JSX.Element {
           </Select>
         </FormControl>
         <br/>
+        <FormControl>
+          <InputLabel>Carbon Fee</InputLabel>
+          <Select
+            id="carbonfee"
+            value={props.gameState.feePerKgCO2e}
+            onChange={(e: any) => props.onDelta({ feePerKgCO2e: e.target.value })}
+          >
+            <MenuItem value={0}>$0/ton</MenuItem>
+            <MenuItem value={20 / 1000}>$20/ton</MenuItem>
+            <MenuItem value={50 / 1000}>$50/ton</MenuItem>
+            <MenuItem value={100 / 1000}>$100/ton</MenuItem>
+          </Select>
+        </FormControl>
+        <br/>
         <FormControlLabel
           control={
             <Checkbox

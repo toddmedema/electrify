@@ -255,6 +255,7 @@ export interface GameStateType {
   difficulty: DifficultyType;
   speed: SpeedType;
   inGame: boolean;
+  feePerKgCO2e: number;
   inTutorial: boolean;
   tutorialStep: number;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline

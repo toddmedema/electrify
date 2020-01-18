@@ -376,7 +376,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
     g.yearsToBuild *= difficulty.buildTime;
-    g.lcWh = LCWH(g);
+    g.lcWh = LCWH(g, state.feePerKgCO2e);
     return g.available;
   });
 

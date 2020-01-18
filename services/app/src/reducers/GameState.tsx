@@ -15,6 +15,7 @@ export const initialGameState: GameStateType = {
   speed: 'PAUSED',
   inGame: false,
   inTutorial: true,
+  feePerKgCO2e: 20 / 1000, // ~$20/ton
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
   date: getDateFromMinute(0),
@@ -59,7 +60,6 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;
-  const expensesTaxesFees = 0; // TODO
   gameState.facilities.forEach((g: FacilityShoppingType) => {
     if (g.yearsToBuildLeft === 0) {
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
@@ -79,6 +79,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
       expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
     }
   });
+  const expensesTaxesFees = gameState.feePerKgCO2e * kgco2e;
 
   return {
     ...monthlyHistory,
