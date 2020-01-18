@@ -4,7 +4,7 @@ import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getFuelPrices} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
-import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DAYS_PER_YEAR, DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, STARTING_YEAR, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
@@ -18,7 +18,7 @@ export const initialGameState: GameStateType = {
   feePerKgCO2e: 20 / 1000, // ~$20/ton
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
-  date: getDateFromMinute(0),
+  date: getDateFromMinute((2000 - STARTING_YEAR) * DAYS_PER_YEAR * 1440),
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
@@ -379,8 +379,8 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
       }) as FacilityShoppingType;
       newState = buildFacility(newState, newFacility, false);
     });
-    newState.monthlyHistory = [newMonthlyHistoryEntry(state.date, newState.facilities, a.cash, a.population)]; // after building facilities
-    newState.timeline = generateNewTimeline(0);
+    newState.monthlyHistory = [newMonthlyHistoryEntry(newState.date, newState.facilities, a.cash, a.population)]; // after building facilities
+    newState.timeline = generateNewTimeline(newState.date.minute);
     newState.timeline = reforecastAll(newState);
 
     // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state

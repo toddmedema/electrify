@@ -16,6 +16,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     load: (gameState: GameStateType) => {
       initWeather('SF', () => {
         // TODO load game state from localstorage if loading
+        // TODO cash based on starting year (gameState.date.year)
 
         initFuelPrices(() => {
           // Otherwise, generate from scratch
