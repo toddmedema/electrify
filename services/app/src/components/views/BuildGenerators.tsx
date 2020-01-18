@@ -48,7 +48,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             <Button
               size="small"
               variant="contained"
-              color={cash > generator.buildCost ? 'primary' : 'secondary'}
+              color="primary"
               onClick={(e: any) => {
                 if (cash < generator.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
                 e.stopPropagation();
@@ -140,15 +140,11 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             <Table size="small" aria-label="loan properties">
               <TableBody>
                 <TableRow>
-                  <TableCell>Loan amount</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(loanAmount)}</TableCell>
-                </TableRow>
-                <TableRow>
                   <TableCell>Downpayment</TableCell>
                   <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Interest rate (/yr)</TableCell>
+                  <TableCell>Interest rate</TableCell>
                   <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
                 </TableRow>
                 <TableRow>
@@ -156,7 +152,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                   <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Payments once complete (principle + interest)</TableCell>
+                  <TableCell>Payments once built (principle + interest)</TableCell>
                   <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
                 </TableRow>
                 <TableRow>
