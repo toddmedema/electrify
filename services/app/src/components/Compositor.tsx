@@ -21,31 +21,40 @@ import SettingsContainer from './views/SettingsContainer';
 const TUTORIAL_STEPS = [
   {
     target: '#topbar',
-    content: 'Your goal: Make as much money as possible. You lose if you run out of money!',
+    content: <Typography variant="body1">
+      Welcome! You're the new CEO of a regional power generation company.<br/><br/>
+      Your goal: Make as much money as possible. You lose if you run out of money.
+    </Typography>,
   },
   {
     target: '.VictoryContainer',
-    content: 'Make money by supplying demand for electricity',
+    content: `Make money by supplying demand for electricity.`,
   },
   {
     target: '.button-buildGenerator',
-    content: 'Build generators and storage to meet demand (options and prices change as new technologies become available)',
+    content: <Typography variant="body1">
+      Build generators and storage to meet demand (options and prices change as new tech become available).<br/><br/>
+      You earn money for every watt-hour of demand you meet (one watt-hour equals one watt for one hour).
+    </Typography>,
   },
   {
     target: '#speedChangeButton',
-    content: 'Control the speed of the game',
+    content: `Control the speed of the game - it starts paused so that you can look around.`,
   },
   {
     target: '#financesNav',
-    content: 'Review your financial progress, net worth, and regional information',
+    content: `Review your financial progress, net worth, and regional information in the Finances tab.`,
   },
   {
     target: '#forecastsNav',
-    content: 'Plan for future demand, weather and technology',
+    content: `Plan for future demand and fuel prices in the Forecasts tab.`,
   },
   {
     target: '#topbar',
-    content: 'That\'s all it takes - good luck!',
+    content: <Typography variant="body1">
+      That's all it takes - good luck!<br/><br/>
+      If you have questions or want to learn more, open the top left menu and select "Manual".
+    </Typography>,
   },
 ];
 
@@ -61,9 +70,10 @@ interface TooltipProps {
 
 function Tooltip(props: TooltipProps): JSX.Element {
   const {index, step, backProps, primaryProps, tooltipProps} = props;
+  const isString = typeof step.content === 'string';
   return <div id="tutorial-tooltip" {...tooltipProps}>
     {step.title && <Typography variant="h6" gutterBottom>{step.title}</Typography>}
-    <Typography variant="body1">{step.content}</Typography>
+    {isString ? <Typography variant="body1">{step.content}</Typography> : step.content}
     <div>
       {index > 0 && (
         <Button {...backProps} color="primary">
@@ -183,6 +193,7 @@ export default class Compositor extends React.Component<Props, {}> {
           callback={this.handleJoyrideCallback}
           continuous={true}
           showProgress={true}
+          disableScrolling={true}
           run={tutorialStep >= 0}
           tooltipComponent={Tooltip}
           stepIndex={tutorialStep}
