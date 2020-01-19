@@ -43,6 +43,8 @@ export default class extends React.PureComponent<Props, {}> {
             }}
           />
           <VictoryAxis dependentAxis
+            axisLabelComponent={<VictoryLabel dy={-30} />}
+            label="Per MMBTU"
             tickFormat={(t: number) => formatMoneyConcise(t)}
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
@@ -105,7 +107,7 @@ export default class extends React.PureComponent<Props, {}> {
           <VictoryLabel
             textAnchor="middle"
             x={200} y={7}
-            text="Fuel prices (/mbtu)"
+            text="Fuel prices"
           />
         </VictoryChart>
       </div>

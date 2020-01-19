@@ -8,7 +8,7 @@ import SortIcon from '@material-ui/icons/Sort';
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest } from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {getFuelPrices} from 'shared/schema/FuelPrices';
+import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {DateType, GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
 
@@ -23,7 +23,7 @@ interface GeneratorBuildItemProps {
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const {generator, cash} = props;
   const fuel = FUELS[generator.fuel] || {};
-  const fuelPrices = getFuelPrices(props.date);
+  const fuelPrices = getFuelPricesPerMBTU(props.date);
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;

@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
-import {getFuelPrices} from 'shared/schema/FuelPrices';
+import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
 import {DAYS_PER_YEAR, DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, STARTING_YEAR, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
@@ -65,7 +65,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        expensesFuel += fuelBtu * getFuelPrices(gameState.date)[g.fuel] / 1000000;
+        expensesFuel += fuelBtu * getFuelPricesPerMBTU(gameState.date)[g.fuel] / 1000000;
         kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
       if (g.loanAmountLeft > 0) {
@@ -101,7 +101,7 @@ function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute);
       const weather = getWeather('SF', date.hourOfFullYear);
-      const fuelPrices = getFuelPrices(date);
+      const fuelPrices = getFuelPricesPerMBTU(date);
       return {
         ...t,
         ...fuelPrices,

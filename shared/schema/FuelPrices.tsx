@@ -50,7 +50,7 @@ function getRandomArbitrary(min: number, max: number) {
 }
 
 // Returns fuel prices per MBTU (UNITS!!!)
-export function getFuelPrices(date: DateType): FuelPricesType {
+export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
     let referenceYear = date.year - 1;
     while (fuelPrices[referenceYear] === undefined) {
