@@ -106,9 +106,10 @@ export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export interface FuelPricesType {
-  Coal?: number;
-  'Natural Gas'?: number;
-  Uranium?: number;
+  [index: string]: number;
+  'Natural Gas': number; // $/btu
+  Coal: number; // $/btu
+  Uranium: number; // $/btu
 }
 
 export interface DifficultyMultipliersType {
@@ -161,7 +162,7 @@ export interface RawWeatherType {
 }
 
 // All amounts are the average across the time window
-export interface TimelineType extends FuelPricesType {
+export type TimelineType = Partial<FuelPricesType> & {
   minute: number;
   supplyW: number; // Watts
   demandW: number; // Watts
@@ -190,7 +191,7 @@ export interface MonthlyHistoryType {
 
 
 export interface FuelType {
-  costPerBtu: number; // Measured from raw stock / before generator efficiency loss
+  // costPerBtu: number; // Measured from raw stock / before generator efficiency loss
     // all costs should be in that year's $ / not account for inflation when possible
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }

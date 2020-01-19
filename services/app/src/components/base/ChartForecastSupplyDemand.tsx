@@ -96,7 +96,7 @@ export default class extends React.PureComponent<Props, {}> {
           x={200} y={7}
           text="Supply & Demand"
         />
-      </VictoryChart>;
+      </VictoryChart>
     </div>;
   }
 }

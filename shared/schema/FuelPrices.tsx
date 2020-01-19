@@ -2,7 +2,7 @@ import {INFLATION} from 'app/Constants';
 import {DateType, FuelPricesType} from 'app/Types';
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
-// Sources: (all prices real / in that year's $'s)
+// Sources: (all prices real / in that year's $'s, per million BTU)
 // Coal: lignite https://www.eia.gov/totalenergy/data/annual/xls/stb0709.xls
 // ^^ 1949 - 2011, whole years only
 // Natural gas: https://www.eia.gov/dnav/ng/hist/n3020us3M.htm
@@ -49,6 +49,7 @@ function getRandomArbitrary(min: number, max: number) {
   return Math.random() * (max - min) + min;
 }
 
+// Returns fuel prices per MBTU (UNITS!!!)
 export function getFuelPrices(date: DateType): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
     let referenceYear = date.year - 1;
@@ -65,5 +66,5 @@ export function getFuelPrices(date: DateType): FuelPricesType {
       previous = {...fuelPrices[date.year][month]};
     }
   }
-  return fuelPrices[date.year][date.monthNumber] || {};
+  return fuelPrices[date.year][date.monthNumber];
 }

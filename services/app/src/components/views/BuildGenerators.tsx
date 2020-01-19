@@ -8,11 +8,13 @@ import SortIcon from '@material-ui/icons/Sort';
 import * as React from 'react';
 import {getMonthlyPayment, getPaymentInterest } from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
+import {getFuelPrices} from 'shared/schema/FuelPrices';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
-import {GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
+import {DateType, GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
 
 interface GeneratorBuildItemProps {
   cash: number;
+  date: DateType;
   generator: GeneratorShoppingType;
   secondaryMetric?: string;
   onBuild: (financed: boolean) => void;
@@ -21,6 +23,7 @@ interface GeneratorBuildItemProps {
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const {generator, cash} = props;
   const fuel = FUELS[generator.fuel] || {};
+  const fuelPrices = getFuelPrices(props.date);
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
@@ -93,13 +96,13 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                 </TableCell>
                 <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}/yr</TableCell>
               </TableRow>
-              {fuel.costPerBtu && <TableRow>
+              {fuelPrices[generator.fuel] && <TableRow>
                 <TableCell>Fuel costs
                   <Typography variant="body2" color="textSecondary">
                     Varies with fuel prices
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuel.costPerBtu || 0)}/MWh</TableCell>
+                <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuelPrices[generator.fuel] || 0)}/MWh</TableCell>
               </TableRow>}
               {generator.spinMinutes > 1 && <TableRow>
                 <TableCell>Ramp up/down time
@@ -277,6 +280,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
       <List dense className="scrollable expandableList">
         {generators.map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
+            date={gameState.date}
             generator={g}
             key={i}
             cash={cash}

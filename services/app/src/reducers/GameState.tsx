@@ -65,7 +65,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
       expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
       if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        expensesFuel += fuelBtu * FUELS[g.fuel].costPerBtu;
+        expensesFuel += fuelBtu * getFuelPrices(gameState.date)[g.fuel];
         kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
       if (g.loanAmountLeft > 0) {
