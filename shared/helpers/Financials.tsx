@@ -1,5 +1,6 @@
 import {FUELS, HOURS_PER_YEAR_REAL} from 'app/Constants';
-import {GeneratorShoppingType} from 'app/Types';
+import {DateType, GeneratorShoppingType} from 'app/Types';
+import {getFuelPrices} from 'shared/schema/FuelPrices';
 
 // Get the monthly payment amount for a new loan
 // https://codepen.io/joeymack47/pen/fHwvd?editors=1010
@@ -14,10 +15,12 @@ export function getPaymentInterest(balance: number, interestRate: number, monthl
   return balance * monthlyRate;
 }
 
-export function LCWH(g: GeneratorShoppingType, feePerKgCO2e: number) {
+// TODO extrapolate future fuel prices over plant lifetime
+export function LCWH(g: GeneratorShoppingType, date: DateType, feePerKgCO2e: number) {
   const fuel = FUELS[g.fuel] || {};
-  const fuelCostPerWh = ((fuel.costPerBtu || 0) + (feePerKgCO2e * fuel.kgCO2ePerBtu || 0)) * g.btuPerWh;
+  const fuelCostPerWh = (getFuelPrices(date)[g.fuel] || 0) * g.btuPerWh / 1000000;
+  const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   const totalWh = g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
-  const costPerWh = (g.buildCost + g.annualOperatingCost * g.lifespanYears + fuelCostPerWh * totalWh) / totalWh;
+  const costPerWh = (g.buildCost + g.annualOperatingCost * g.lifespanYears + (fuelCostPerWh + carbonCostPerWh) * totalWh) / totalWh;
   return costPerWh;
 }
