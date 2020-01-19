@@ -15,10 +15,10 @@ export const initialGameState: GameStateType = {
   speed: 'PAUSED',
   inGame: false,
   inTutorial: true,
-  feePerKgCO2e: 20 / 1000, // ~$20/ton
+  feePerKgCO2e: 0, // Start on easy mode
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
-  date: getDateFromMinute((2000 - STARTING_YEAR) * DAYS_PER_YEAR * 1440),
+  date: getDateFromMinute((2020 - STARTING_YEAR) * DAYS_PER_YEAR * 1440),
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),

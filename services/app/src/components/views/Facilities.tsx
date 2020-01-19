@@ -123,13 +123,13 @@ export default class extends React.Component<Props, {}> {
           currentMinute={gameState.date.minute}
           legend={gameState.speed === 'PAUSED'}
         />
-        <Toolbar>
-          <Typography variant="h6">Facilities</Typography>
-          <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
-          &nbsp;&nbsp;&nbsp;
-          <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>Storage</Button>
-        </Toolbar>
         <List dense className="scrollable">
+          <Toolbar>
+            <Typography variant="h6">Facilities</Typography>
+            <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
+            &nbsp;&nbsp;&nbsp;
+            <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>Storage</Button>
+          </Toolbar>
           {gameState.facilities.map((g: FacilityOperatingType, i: number) =>
             <FacilityListItem
               facility={g}
