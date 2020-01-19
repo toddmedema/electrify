@@ -33,27 +33,15 @@ const TUTORIAL_STEPS = [
   {
     target: '.button-buildGenerator',
     content: <Typography variant="body1">
-      Build generators and storage to meet demand (options and prices change as new tech become available).<br/><br/>
-      You earn money for every watt-hour of demand you meet (one watt-hour equals one watt for one hour).
+      Build generators and storage to meet demand (options and prices change as new tech become available).
     </Typography>,
   },
   {
     target: '#speedChangeButton',
-    content: `Control the speed of the game - it starts paused so that you can look around.`,
-  },
-  {
-    target: '#financesNav',
-    content: `Review your financial progress, net worth, and regional information in the Finances tab.`,
-  },
-  {
-    target: '#forecastsNav',
-    content: `Plan for future demand and fuel prices in the Forecasts tab.`,
-  },
-  {
-    target: '#topbar',
     content: <Typography variant="body1">
-      That's all it takes - good luck!<br/><br/>
-      If you have questions or want to learn more, open the top left menu and select "Manual".
+      Start the game by unpausing it.<br/><br/>
+      For questions and learning more, select "Manual" from the top left menu.<br/><br/>
+      Good luck!
     </Typography>,
   },
 ];
