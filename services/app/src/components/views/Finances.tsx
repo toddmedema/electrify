@@ -98,21 +98,21 @@ export default class extends React.Component<Props, State> {
 
     return (
       <GameCard className="Finances">
-        {timeline.length > 0 ? <ChartFinances
-          height={180}
-          timeline={timeline}
-          title={(year || 'All time') + ' profit'}
-        /> : <span/>}
-        <Toolbar>
-          <Typography variant="h6">Finances for </Typography>
-          <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
-            <MenuItem value={0}>All time</MenuItem>
-            {years.map((y: number) => {
-              return <MenuItem value={y} key={y}>{y}</MenuItem>;
-            })}
-          </Select>
-        </Toolbar>
         <div className="scrollable">
+          {timeline.length > 0 ? <ChartFinances
+            height={180}
+            timeline={timeline}
+            title={(year || 'All time') + ' profit'}
+          /> : <span/>}
+          <Toolbar>
+            <Typography variant="h6">Finances for </Typography>
+            <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
+              <MenuItem value={0}>All time</MenuItem>
+              {years.map((y: number) => {
+                return <MenuItem value={y} key={y}>{y}</MenuItem>;
+              })}
+            </Select>
+          </Toolbar>
           <Table size="small">
             <TableBody>
               <TableRow>

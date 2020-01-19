@@ -127,10 +127,10 @@ export default class extends React.Component<Props, State> {
     // TODO user ability to see more than one year in the future
     return (
       <GameCard className="Forecasts">
-        <Toolbar>
-          <Typography variant="h6">Forecasts for 1 year</Typography>
-        </Toolbar>
         <div className="scrollable">
+          <Toolbar>
+            <Typography variant="h6">Forecasts for 1 year</Typography>
+          </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
             timeline={timeline}

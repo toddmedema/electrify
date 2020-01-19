@@ -47,6 +47,8 @@ export const TICK_MS = {
   FAST: 1,
   LIGHTNING: 0,
 };
+
+export const INFLATION = 0.03;
 export const REGIONAL_GROWTH_MAX_ANNUAL = 0.05;
 export const RESERVE_MARGIN = 0.05;
 export const GENERATOR_SELL_MULTIPLIER = 0.5;

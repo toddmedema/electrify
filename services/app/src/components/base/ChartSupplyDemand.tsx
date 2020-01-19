@@ -35,8 +35,6 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
   });
-  domainMin *= 0.94; // padding
-  domainMax *= 1.02; // padding
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin);
@@ -108,6 +106,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
         domain={{ y: [domainMin, domainMax] }}
+        domainPadding={{y: [6, 6]}}
         height={props.height || 300}
       >
         <VictoryAxis

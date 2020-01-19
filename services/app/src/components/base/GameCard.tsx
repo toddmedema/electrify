@@ -16,7 +16,7 @@ import {AppStateType, DateType, GameStateType, SpeedType, TimelineType} from '..
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.Props<any> {
-  children?: JSX.Element[] | undefined;
+  children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
   cash: number;

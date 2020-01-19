@@ -17,16 +17,19 @@ export interface Props {
   domain: { x: [number, number], y: [number, number] };
 }
 
-const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
-  // Wrapping in spare div prevents excessive height bug
-  return (
-    <div>
+// This is a pureComponent because its props should change much less frequently than it renders
+export default class extends React.PureComponent<Props, {}> {
+  public render() {
+    const {domain, height, timeline, blackouts} = this.props;
+
+    // Wrapping in spare div prevents excessive height bug
+    return <div>
       <VictoryChart
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
-        domain={props.domain}
+        domain={domain}
         domainPadding={{y: [6, 6]}}
-        height={props.height || 300}
+        height={height || 300}
       >
         <VictoryAxis
           tickCount={6}
@@ -56,7 +59,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={props.timeline}
+          data={timeline}
           x="minute"
           y="supplyW"
           style={{
@@ -67,7 +70,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={props.timeline}
+          data={timeline}
           x="minute"
           y="demandW"
           style={{
@@ -77,7 +80,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
-          data={props.blackouts}
+          data={blackouts}
           x="minute"
           y="value"
           style={{
@@ -93,8 +96,7 @@ const ChartForecastSupplyDemand = (props: Props): JSX.Element => {
           x={200} y={7}
           text="Supply & Demand"
         />
-      </VictoryChart>
-    </div>
-  );
-};
-export default ChartForecastSupplyDemand;
+      </VictoryChart>;
+    </div>;
+  }
+}
