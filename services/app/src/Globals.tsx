@@ -64,6 +64,17 @@ export function getDevicePlatform(): 'android' | 'ios' | 'web' {
   return 'web';
 }
 
+export function isSmallScreen(): boolean {
+  const width = Math.max(
+    document.body.scrollWidth,
+    document.documentElement.scrollWidth,
+    document.body.offsetWidth,
+    document.documentElement.offsetWidth,
+    document.documentElement.clientWidth
+  );
+  return width < 375;
+}
+
 export function getPlatformDump(): string {
   return (window.navigator.platform || '') + ': ' + (window.navigator.userAgent || '') + ': ' + (window.navigator.cookieEnabled ? 'W/COOKIES' : 'NO COOKIES');
 }

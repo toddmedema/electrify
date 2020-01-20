@@ -11,7 +11,7 @@ import Redux from 'redux';
 
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {toCard} from '../../actions/Card';
-import {openWindow} from '../../Globals';
+import {isSmallScreen, openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
 import {AppStateType, DateType, GameStateType, SpeedType, TimelineType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
@@ -44,19 +44,63 @@ export function GameCard(props: Props) {
   const handleMenuClose = () => setMenuAnchorEl(null);
   const handleSpeedClick = (event: any) => setSpeedAnchorEl(event.currentTarget);
   const handleSpeedClose = () => setSpeedAnchorEl(null);
-  let speedIcon = <PlayArrowIcon />;
-  switch (props.gameState.speed) {
-    case 'PAUSED': speedIcon = <PauseIcon />; break;
-    case 'SLOW': speedIcon = <ChevronRightIcon />; break;
-    case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
-    case 'FAST': speedIcon = <FastForwardIcon />; break;
-    case 'LIGHTNING': speedIcon = <DoubleArrowIcon />; break;
-    default: break;
-  }
 
   // TODO perf this is a linear lookup every frame, ouch!
   const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
   const inBlackout = now && now.supplyW < now.demandW;
+
+  let speedOptions = <span/>;
+  if (isSmallScreen()) {
+    let speedIcon = <PlayArrowIcon />;
+    switch (props.gameState.speed) {
+      case 'PAUSED': speedIcon = <PlayArrowIcon />; break;
+      case 'SLOW': speedIcon = <ChevronRightIcon />; break;
+      case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
+      case 'FAST': speedIcon = <FastForwardIcon />; break;
+      case 'LIGHTNING': speedIcon = <DoubleArrowIcon />; break;
+      default: break;
+    }
+    speedOptions = <span>
+      {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
+        <PauseIcon color="primary" />
+      </IconButton>}
+      <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary" id="speedChangeButton">
+        {speedIcon}
+      </IconButton>
+      <Menu
+        id="speedMenu"
+        anchorEl={speedAnchorEl}
+        keepMounted
+        open={Boolean(speedAnchorEl)}
+        onClose={handleSpeedClose}
+      >
+        <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={gameState.speed === 'SLOW'} aria-label="slow-speed">
+          <ChevronRightIcon color="primary" />
+        </MenuItem>
+        <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={gameState.speed === 'NORMAL'} aria-label="normal-speed">
+          <PlayArrowIcon color="primary" />
+        </MenuItem>
+        <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={gameState.speed === 'FAST'} aria-label="fast-speed">
+          <FastForwardIcon color="primary" />
+        </MenuItem>
+      </Menu>
+    </span>;
+  } else {
+    speedOptions = <span>
+      <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
+        <PauseIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('SLOW')} disabled={gameState.speed === 'SLOW'} aria-label="slow speed" edge="end" color="primary">
+        <ChevronRightIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('NORMAL')} disabled={gameState.speed === 'NORMAL'} aria-label="normal speed" edge="end" color="primary">
+        <PlayArrowIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('FAST')} disabled={gameState.speed === 'FAST'} aria-label="fast speed" edge="end" color="primary">
+        <FastForwardIcon />
+      </IconButton>
+    </span>;
+  }
 
   // TODO only add this back when it's clearly faster... aka probably a lot of optimization on game tick loop
   // (user feedback is that going faster is not super important right now)
@@ -83,32 +127,9 @@ export function GameCard(props: Props) {
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
-            <span className="weak">{date.month} {date.year}</span>
-            &nbsp;({formatMoneyStable(props.cash)})
+            {formatMoneyStable(props.cash)}, <span className="weak">{date.month} {date.year}</span>
           </Typography>
-          {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
-            <PauseIcon color="primary" />
-          </IconButton>}
-          <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary" id="speedChangeButton">
-            {speedIcon}
-          </IconButton>
-          <Menu
-            id="speedMenu"
-            anchorEl={speedAnchorEl}
-            keepMounted
-            open={Boolean(speedAnchorEl)}
-            onClose={handleSpeedClose}
-          >
-            <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={gameState.speed === 'SLOW'} aria-label="slow-speed">
-              <ChevronRightIcon color="primary" />
-            </MenuItem>
-            <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={gameState.speed === 'NORMAL'} aria-label="normal-speed">
-              <PlayArrowIcon color="primary" />
-            </MenuItem>
-            <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={gameState.speed === 'FAST'} aria-label="fast-speed">
-              <FastForwardIcon color="primary" />
-            </MenuItem>
-          </Menu>
+          {speedOptions}
         </Toolbar>
       </div>
       <div id="yearProgressBar" style={{

@@ -317,7 +317,58 @@ function getNetWorth(facilities: FacilityOperatingType[], cash: number): number 
 
 export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
-  if (action.type === 'GAMESTATE_DELTA') {
+  if (action.type === 'GAME_TICK') { // Game tick first because it's called the most by far, shortens lookup
+
+    if (state.inGame && state.speed !== 'PAUSED') {
+      const newState = {
+        ...state,
+        date: getDateFromMinute(state.date.minute + TICK_MINUTES),
+      };
+      const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
+      if (now) {
+        getSupplyWAndUpdateFacilities(newState.facilities, now);
+        newState.monthlyHistory[0] = updateMonthlyFinances(state, now);
+      }
+
+      if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
+        const difficulty = DIFFICULTIES[state.difficulty];
+
+        // Record final history for the month, then insert a new blank month
+        const cash = newState.monthlyHistory[0].cash;
+        const {demandWh, supplyWh} = newState.monthlyHistory[0];
+        const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
+        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
+        const population = Math.round(newState.monthlyHistory[0].population * (1 + growthRate / 12));
+        newState.monthlyHistory[0].netWorth = getNetWorth(newState.facilities, cash);
+        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
+
+        // Populate a new forecast timeline
+        newState.timeline = generateNewTimeline(newState.date.minute);
+        newState.timeline = reforecastAll(newState);
+
+        // Time-based tutorial triggers
+        if (newState.inTutorial) {
+          if (newState.date.monthsEllapsed === 12) {
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: 'Tutorial complete!',
+              message: '',
+              open: true,
+              closeText: 'Keep playing',
+              actionLabel: 'Return to menu',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
+          }
+        }
+      }
+
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
+      return newState;
+    } else {
+      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
+    }
+    return state;
+
+  } else if (action.type === 'GAMESTATE_DELTA') {
 
     return {...state, ...(action as any).delta};
 
@@ -404,56 +455,6 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
     return {...initialGameState};
 
-  } else if (action.type === 'GAME_TICK') {
-
-    if (state.inGame && state.speed !== 'PAUSED') {
-      const newState = {
-        ...state,
-        date: getDateFromMinute(state.date.minute + TICK_MINUTES),
-      };
-      const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
-      if (now) {
-        getSupplyWAndUpdateFacilities(newState.facilities, now);
-        newState.monthlyHistory[0] = updateMonthlyFinances(state, now);
-      }
-
-      if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-        const difficulty = DIFFICULTIES[state.difficulty];
-
-        // Record final history for the month, then insert a new blank month
-        const cash = newState.monthlyHistory[0].cash;
-        const {demandWh, supplyWh} = newState.monthlyHistory[0];
-        const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
-        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
-        const population = Math.round(newState.monthlyHistory[0].population * (1 + growthRate / 12));
-        newState.monthlyHistory[0].netWorth = getNetWorth(newState.facilities, cash);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
-
-        // Populate a new forecast timeline
-        newState.timeline = generateNewTimeline(newState.date.minute);
-        newState.timeline = reforecastAll(newState);
-
-        // Time-based tutorial triggers
-        if (newState.inTutorial) {
-          if (newState.date.monthsEllapsed === 12) {
-            setTimeout(() => getStore().dispatch(openDialog({
-              title: 'Tutorial complete!',
-              message: '',
-              open: true,
-              closeText: 'Keep playing',
-              actionLabel: 'Return to menu',
-              action: () => getStore().dispatch(quitGame()),
-            })), 1);
-          }
-        }
-      }
-
-      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
-      return newState;
-    } else {
-      setTimeout(() => getStore().dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
-    }
-    return state;
   }
   return state;
 }

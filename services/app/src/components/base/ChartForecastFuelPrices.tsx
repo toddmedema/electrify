@@ -1,4 +1,4 @@
-import {TICK_MINUTES, TICKS_PER_DAY} from 'app/Constants';
+import {TICK_MINUTES} from 'app/Constants';
 import {TimelineType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
@@ -17,7 +17,11 @@ export default class extends React.PureComponent<Props, {}> {
   public render() {
     const {domain, height, timeline} = this.props;
     // Downsample the data to one per day to make it more vague / forecast-y
-    const data = timeline.filter((t: TimelineType) => t.minute % TICKS_PER_DAY < TICK_MINUTES);
+    const data = timeline.filter((t: TimelineType) => t.minute % 1440 < TICK_MINUTES);
+    // Make sure it gets the first + last entries for a full chart
+    data.unshift(timeline[0]);
+    data.push(timeline[timeline.length - 1]);
+
     // Wrapping in spare div prevents excessive height bug
     return (
       <div>
