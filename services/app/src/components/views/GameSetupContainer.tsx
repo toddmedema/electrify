@@ -1,7 +1,8 @@
 import {quitGame} from 'app/reducers/GameState';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {AppStateType, GameStateType} from '../../Types';
+import {openDialog} from '../../actions/UI';
+import {AppStateType, DialogType, GameStateType} from '../../Types';
 import GameSetup, {DispatchProps, StateProps} from './GameSetup';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -20,6 +21,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onStart: () => {
       dispatch({type: 'GAME_START'});
+    },
+    openDialog: (dialog: DialogType) => {
+      dispatch(openDialog(dialog));
     },
   };
 };
