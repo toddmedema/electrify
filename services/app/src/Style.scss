@@ -165,6 +165,15 @@ body {
   right: 0;
 }
 
+// Table has base left padding of 16px, each tab is 20px
+.tabs-1 {
+  td { padding-left: 36px; }
+}
+.tabs-2 {
+  td:first-of-type { padding-left: 56px; }
+  td { font-weight: 200; }
+}
+
 // Fixes bug with desktop alignment
 .MuiToolbar-gutters {
   padding-left: 16px !important;
@@ -409,6 +418,16 @@ body.android .dialog .textfield:focus-within {
 
     & > div {
       flex: 0 1 auto;
+    }
+  }
+
+  .finances {
+    table {
+      margin-bottom: size(large);
+      tr.bold td {
+        font-weight: bold;
+        padding-top: 16px;
+      }
     }
   }
 

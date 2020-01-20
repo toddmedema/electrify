@@ -79,7 +79,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
       expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
     }
   });
-  const expensesTaxesFees = gameState.feePerKgCO2e * kgco2e;
+  const expensesCarbonFee = gameState.feePerKgCO2e * kgco2e;
 
   return {
     ...monthlyHistory,
@@ -87,9 +87,9 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
     revenue: monthlyHistory.revenue + revenue,
     expensesOM: monthlyHistory.expensesOM + expensesOM,
     expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
-    expensesTaxesFees: monthlyHistory.expensesTaxesFees + expensesTaxesFees,
+    expensesCarbonFee: monthlyHistory.expensesCarbonFee + expensesCarbonFee,
     expensesInterest: monthlyHistory.expensesInterest + expensesInterest,
-    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesTaxesFees - expensesInterest - principalRepayment),
+    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - principalRepayment),
     supplyWh: monthlyHistory.supplyWh + supplyWh,
     demandWh: monthlyHistory.demandWh + demandWh,
     kgco2e: monthlyHistory.kgco2e + kgco2e,
@@ -297,7 +297,7 @@ function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingTyp
     revenue: 0,
     expensesFuel: 0,
     expensesOM: 0,
-    expensesTaxesFees: 0,
+    expensesCarbonFee: 0,
     expensesInterest: 0,
   };
 }

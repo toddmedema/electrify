@@ -183,7 +183,7 @@ export interface MonthlyHistoryType {
   revenue: number; // total
   expensesFuel: number; // total
   expensesOM: number; // total
-  expensesTaxesFees: number; // total
+  expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
 }
 

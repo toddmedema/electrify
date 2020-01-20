@@ -63,15 +63,15 @@ export default class extends React.Component<Props, State> {
       revenue: 0,
       expensesFuel: 0,
       expensesOM: 0,
-      expensesTaxesFees: 0,
+      expensesCarbonFee: 0,
       expensesInterest: 0,
     } as MonthlyHistoryType;
     const timeline = [];
     // Go in reverse so that the last values for ending values (like net worth are used)
     for (let i = history.length - 1; i >= 0 ; i--) {
       const h = history[i];
-      if ((!year || h.year === year) && h.revenue !== 0) {
-        let profit = h.revenue - (h.expensesFuel + h.expensesOM + h.expensesTaxesFees + h.expensesInterest);
+      if (!year || h.year === year) {
+        let profit = h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest);
         const projected = (h.month === date.monthNumber && h.year === date.year);
         if (projected) {
           profit /= date.percentOfMonth;
@@ -88,19 +88,20 @@ export default class extends React.Component<Props, State> {
         summary.revenue += h.revenue;
         summary.expensesFuel += h.expensesFuel;
         summary.expensesOM += h.expensesOM;
-        summary.expensesTaxesFees += h.expensesTaxesFees;
+        summary.expensesCarbonFee += h.expensesCarbonFee;
         summary.expensesInterest += h.expensesInterest;
         summary.population = h.population;
         summary.netWorth = h.netWorth;
       }
     }
-    const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesTaxesFees + summary.expensesInterest;
+    const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesCarbonFee + summary.expensesInterest;
+    const supplykWh = (summary.supplyWh || 1) * 1000;
 
     return (
-      <GameCard className="Finances">
+      <GameCard className="finances">
         <div className="scrollable">
           {timeline.length > 0 ? <ChartFinances
-            height={180}
+            height={140}
             timeline={timeline}
             title={(year || 'All time') + ' profit'}
           /> : <span/>}
@@ -115,56 +116,60 @@ export default class extends React.Component<Props, State> {
           </Toolbar>
           <Table size="small">
             <TableBody>
-              <TableRow>
-                <TableCell colSpan={2}>Population served</TableCell>
-                <TableCell align="right">{numbro(summary.population).format({thousandSeparated: true, mantissa: 0})}</TableCell>
+              <TableRow className="bold">
+                <TableCell>Profit (net income)</TableCell>
+                <TableCell align="right">{formatMoneyStable(summary.revenue - expenses)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={2}>Income</TableCell>
+              <TableRow className="tabs-1">
+                <TableCell>Profit per kWh</TableCell>
+                <TableCell align="right">{formatMoneyStable((summary.revenue - expenses) / supplykWh)}/kWh</TableCell>
+              </TableRow>
+
+              <TableRow className="bold">
+                <TableCell>Income</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.revenue)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
+              <TableRow className="tabs-1">
                 <TableCell>Power sold</TableCell>
                 <TableCell align="right">{formatWatts(summary.supplyWh, 0)}h</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
+              <TableRow className="tabs-1">
                 <TableCell>Average rate</TableCell>
-                <TableCell align="right">{formatMoneyStable(summary.revenue / (summary.supplyWh || 1) * 1000)}/kWh</TableCell>
+                <TableCell align="right">{formatMoneyStable(summary.revenue / supplykWh)}/kWh</TableCell>
               </TableRow>
 
-              <TableRow>
-                <TableCell colSpan={2}>Expenses</TableCell>
+              <TableRow className="bold">
+                <TableCell>Expenses</TableCell>
                 <TableCell align="right">{formatMoneyStable(expenses)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
+              <TableRow className="tabs-1">
                 <TableCell>Fuel</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.expensesFuel)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
+              <TableRow className="tabs-1">
                 <TableCell>Operations</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.expensesOM)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
+              <TableRow className="tabs-1">
                 <TableCell>Interest</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.expensesInterest)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
-                <TableCell>Taxes & Fees</TableCell>
-                <TableCell align="right">{formatMoneyStable(summary.expensesTaxesFees)}</TableCell>
+              <TableRow className="tabs-1">
+                <TableCell>Carbon Fees</TableCell>
+                <TableCell align="right">{formatMoneyStable(summary.expensesCarbonFee)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={2}>Net Worth</TableCell>
+              <TableRow className="tabs-2">
+                <TableCell>CO2e emitted</TableCell>
+                <TableCell align="right">{numbro(summary.kgco2e / (supplykWh / 1000)).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
+              </TableRow>
+
+              <TableRow className="bold">
+                <TableCell>Net Worth</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.netWorth)}</TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={2}>Pollution (CO2e)</TableCell>
-                <TableCell align="right">{numbro(summary.kgco2e / ((summary.supplyWh || 1) / 1000000)).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
+              <TableRow className="bold">
+                <TableCell>Population served</TableCell>
+                <TableCell align="right">{numbro(summary.population).format({thousandSeparated: true, mantissa: 0})}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
