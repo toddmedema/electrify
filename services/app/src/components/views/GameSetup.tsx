@@ -4,7 +4,7 @@ import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
 import {DAYS_PER_YEAR, DIFFICULTIES, STARTING_YEAR} from 'app/Constants';
-import {DifficultyType, GameStateType} from 'app/Types';
+import {DialogType, DifficultyType, GameStateType} from 'app/Types';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 
 export interface StateProps {
@@ -15,6 +15,7 @@ export interface DispatchProps {
   onBack: () => void;
   onStart: () => void;
   onDelta: (delta: Partial<GameStateType>) => void;
+  openDialog: (dialog: DialogType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -29,13 +30,10 @@ export default function GameSetup(props: Props): JSX.Element {
           <IconButton onClick={props.onBack} aria-label="back" edge="start" color="primary">
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Game Setup</Typography>
-          <IconButton onClick={props.onBack} aria-label="info" edge="end" color="primary">
-            <InfoIcon />
-          </IconButton>
+          <Typography variant="h6" className="absolutelyCentered">Game Setup</Typography>
         </Toolbar>
       </div>
-      <Table>
+      <Table size="small" id="gameSetupTable">
         <TableBody>
           <TableRow>
             <TableCell>Difficulty</TableCell>
@@ -52,7 +50,13 @@ export default function GameSetup(props: Props): JSX.Element {
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Carbon Fee</TableCell>
+            <TableCell>Carbon Fee&nbsp;
+              <IconButton onClick={() => props.openDialog({
+                title: 'Carbon fee',
+                message: 'A fee placed on pollution to cover its damage to society. Charged by the amount of greenhouse gas emitted, generally measured in "tons of CO2 equivalent".',
+                open: true,
+              })} color="primary"><InfoIcon /></IconButton>
+            </TableCell>
             <TableCell>
               <Select
                 id="carbonfee"
@@ -92,7 +96,6 @@ export default function GameSetup(props: Props): JSX.Element {
           </TableRow>
         </TableBody>
       </Table>
-      <br/>
       <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>Play</Button>
     </div>
   );

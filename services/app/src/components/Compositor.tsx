@@ -23,7 +23,7 @@ const TUTORIAL_STEPS = [
     target: '#topbar',
     content: <Typography variant="body1">
       Welcome! You're the new CEO of a regional power generation company.<br/><br/>
-      Your goal: Make as much money as possible. You lose if you run out of money.
+      Your goal: Make as much money as possible in your 20 year tenure. You lose if you run out of money.
     </Typography>,
   },
   {

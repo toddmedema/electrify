@@ -5,11 +5,12 @@ import FastForwardIcon from '@material-ui/icons/FastForward';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import PauseIcon from '@material-ui/icons/Pause';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-
 import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
+
 import {formatMoneyStable} from 'shared/helpers/Format';
+import {toCard} from '../../actions/Card';
 import {openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
 import {AppStateType, DateType, GameStateType, SpeedType, TimelineType} from '../../Types';
@@ -24,6 +25,7 @@ export interface GameCardProps extends React.Props<any> {
 }
 
 export interface DispatchProps {
+  onManual: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onQuit: () => void;
 }
@@ -76,6 +78,7 @@ export function GameCard(props: Props) {
             open={Boolean(menuAnchorEl)}
             onClose={handleMenuClose}
           >
+            <MenuItem onClick={props.onManual}>Manual</MenuItem>
             <MenuItem onClick={() => openWindow('mailto:todd@fabricate.io')}>Send feedback</MenuItem>
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
@@ -126,6 +129,9 @@ const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>):
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
+    onManual: () => {
+      dispatch(toCard({name: 'MANUAL'}));
+    },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
     },

@@ -159,6 +159,12 @@ body {
   }
 }
 
+.absolutelyCentered {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
 // Fixes bug with desktop alignment
 .MuiToolbar-gutters {
   padding-left: 16px !important;
@@ -386,6 +392,15 @@ body.android .dialog .textfield:focus-within {
         margin: auto;
         margin-bottom: size(large);
       }
+    }
+  }
+
+  #gameSetupTable {
+    margin: size(large) auto;
+    width: auto;
+
+    tr {
+      height: 60px;
     }
   }
 
