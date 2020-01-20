@@ -1,6 +1,6 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
+import {facilityCashBack, getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
@@ -335,11 +335,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     // in one loop, refund cash from selling + remove from list
     newState.facilities = newState.facilities.filter((g: GeneratorOperatingType) => {
       if (g.id === id) {
-        // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
-        // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
-        const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
-        const lostFromSelling = g.buildCost * GENERATOR_SELL_MULTIPLIER;
-        newState.monthlyHistory[0].cash += g.buildCost - lostFromSelling * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
+        newState.monthlyHistory[0].cash += facilityCashBack(g);
         return false;
       }
       return true;

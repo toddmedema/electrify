@@ -4,9 +4,10 @@ import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 
-import {GENERATOR_SELL_MULTIPLIER, TICK_MINUTES} from 'app/Constants';
+import {TICK_MINUTES} from 'app/Constants';
 import {FacilityOperatingType, GameStateType} from 'app/Types';
 import * as React from 'react';
+import {facilityCashBack} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatWattHours, formatWatts} from 'shared/helpers/Format';
 import ChartSupplyDemand from '../base/ChartSupplyDemand';
 import GameCard from '../base/GameCard';
@@ -48,22 +49,21 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
         primary={facility.name}
         secondary={secondaryText}
       />
-      <Dialog
-        open={open}
-        onClose={toggleDialog}
-      >
-        <DialogTitle>Sell {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            For {formatMoneyConcise(facility.buildCost * GENERATOR_SELL_MULTIPLIER)}<br/>
-          </DialogContentText>
-        </DialogContent>
+      <Dialog open={open} onClose={toggleDialog}>
+        <DialogTitle>
+          {underConstruction ? 'Cancel construction of' : 'Sell'} {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?
+        </DialogTitle>
+        <DialogContent><DialogContentText>
+          You will receive {formatMoneyConcise(facilityCashBack(facility))} back
+          {facility.loanAmountLeft > 0 ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}` : ''}
+          .
+        </DialogContentText></DialogContent>
         <DialogActions>
           <Button onClick={toggleDialog} color="primary">
-            Cancel
+            Nevermind
           </Button>
           <Button onClick={() => { props.onSell(facility.id); toggleDialog(); }} color="primary" variant="contained" autoFocus>
-            Sell
+            {underConstruction ? 'Cancel construction' : 'Sell'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,5 +1,5 @@
-import {FUELS, HOURS_PER_YEAR_REAL} from 'app/Constants';
-import {DateType, GeneratorShoppingType} from 'app/Types';
+import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL} from 'app/Constants';
+import {DateType, FacilityOperatingType, GeneratorShoppingType} from 'app/Types';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 
 // Get the monthly payment amount for a new loan
@@ -23,4 +23,13 @@ export function LCWH(g: GeneratorShoppingType, date: DateType, feePerKgCO2e: num
   const totalWh = g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh = (g.buildCost + g.annualOperatingCost * g.lifespanYears + (fuelCostPerWh + carbonCostPerWh) * totalWh) / totalWh;
   return costPerWh;
+}
+
+// Returns how much cash the user recieves if they sell / cancel the facility
+export function facilityCashBack(g: FacilityOperatingType): number {
+  // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
+  // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
+  const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
+  const lostFromSelling = (g.buildCost - g.loanAmountLeft) * GENERATOR_SELL_MULTIPLIER * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
+  return g.buildCost - lostFromSelling - g.loanAmountLeft;
 }

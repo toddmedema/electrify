@@ -8,7 +8,7 @@ import * as ReactDOM from 'react-dom';
 import {Provider} from 'react-redux';
 import * as Redux from 'redux';
 
-import {VERSION} from 'shared/schema/Constants';
+import {NODE_ENV, VERSION} from 'shared/schema/Constants';
 import {audioSet} from './actions/Audio';
 import {toPrevious} from './actions/Card';
 import {changeSettings} from './actions/Settings';
@@ -109,14 +109,14 @@ function setupHotReload() {
 
 function setupGoogleAnalytics() {
   // disabled during local dev
-  // if (window.location.hostname === 'localhost' || NODE_ENV === 'dev') {
-  //   setGA({
-  //     event: (): void => { /* mock */ },
-  //     set: (): void => { /* mock */ },
-  //   });
-  //   return console.log('Google Analytics disabled during local dev.');
-  // }
-  ReactGA.initialize('G-LXSHNLN82K', {
+  if (window.location.hostname === 'localhost' || NODE_ENV === 'dev') {
+    setGA({
+      event: (): void => { /* mock */ },
+      set: (): void => { /* mock */ },
+    });
+    return console.log('Google Analytics disabled during local dev.');
+  }
+  ReactGA.initialize('G-BYRYY6BG1Y', {
     gaOptions: {
       appName: getDevicePlatform(),
       appVersion: VERSION,
