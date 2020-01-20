@@ -257,6 +257,7 @@ span.weak {
 .expandable {
   &:hover {
     cursor: pointer;
+    background: #fafafa; /* grey50 */
   }
   .MuiCardContent-root {
     padding-top: 0;
@@ -432,7 +433,7 @@ body.android .dialog .textfield:focus-within {
   }
 
   .expandableList {
-    background: #ddd;
+    background: #eceff1; /* blueGray50 */
     padding-top: size(base) !important;
   }
 

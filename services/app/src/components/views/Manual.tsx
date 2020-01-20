@@ -57,6 +57,9 @@ export default class Manual extends React.PureComponent<Props, {}> {
           </Toolbar>
         </div>
         <List dense className="scrollable expandableList">
+          <Card>
+            <CardContent>Here, you can look up specific terms and mechanics to learn more about how they work in game - and in real life.</CardContent>
+          </Card>
           {MANUAL_ENTRIES.map((entry: ManualEntry) => <ManualItem {...entry} key={entry.title}/> )}
         </List>
       </div>
@@ -71,7 +74,7 @@ const MANUAL_ENTRIES = [
   },
   {
     title: `BTU and MMBTU`,
-    entry: <p>The British Thermal Unit is a measure of heat energy. MBTU stands for one million BTU, and equals approximately 300 kWh of electrical energy.</p>,
+    entry: <p>The British Thermal Unit is a measure of heat energy. MMBTU is one million BTU, and equals approximately 300 kWh of electrical energy.</p>,
   },
   {
     title: `Emissions and CO2e`,
@@ -87,7 +90,7 @@ const MANUAL_ENTRIES = [
   },
   {
     title: `Prioritizing Generators`,
-    entry: <p>Generally companies prioritize nuclear -> renewable -> coal -> natural gas -> oil... TODO link to PJM stack</p>,
+    entry: <p>Generally companies prioritize nuclear -> renewable -> coal -> natural gas -> oil based on how long they take to ramp up and down, and their cost of fuel... TODO link to PJM stack</p>,
   },
   {
     title: `Total Cost of Energy`,
