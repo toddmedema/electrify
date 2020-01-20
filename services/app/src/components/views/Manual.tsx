@@ -74,6 +74,14 @@ const MANUAL_ENTRIES = [
     entry: <p>The British Thermal Unit is a measure of heat energy. MBTU stands for one million BTU, and equals approximately 300 kWh of electrical energy.</p>,
   },
   {
+    title: `Emissions and CO2e`,
+    entry: <div>
+      <p>CO2e stands for Carbon Dioxide equivalent, a measure of the greenhouse warming impact of various pollutants.</p>
+      <p>Electricity generation is the 2nd largest source of greenhouse gas in the United States, but our utilities have no financial incentive to reduce their emissions.</p>
+      <p>One of the highest-rated proposals to reduce emissions is a "Carbon Fee" that creates a financial incentive for businesses to reduce their carbon footprint through innovation. Electrify lets you experiment with different levels of carbon fees, and see how technology innovation can enable better business decisions than the fossil fuels of the past.</p>
+    </div>,
+  },
+  {
     title: `Forecasts`,
     entry: <p>TODO how to read the forecast</p>,
   },
