@@ -100,7 +100,7 @@ export interface AudioDataType {
   themeManager: ThemeManager|null;
 }
 
-export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'June' | 'July' | 'Aug' | 'Sept' | 'Oct' | 'Nov' | 'Dec';
+export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec';
 export type DifficultyType = 'INTERN' | 'EMPLOYEE' | 'MANAGER' | 'VP' | 'CEO' | 'GURU';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
 

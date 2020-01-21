@@ -26,13 +26,13 @@ function getSunrise(month: MonthType) {
       return 400;
     case 'May':
       return 385;
-    case 'June':
+    case 'Jun':
       return 365;
-    case 'July':
+    case 'Jul':
       return 352;
     case 'Aug':
       return 374;
-    case 'Sept':
+    case 'Sep':
       return 396;
     case 'Oct':
       return 426;
@@ -57,13 +57,13 @@ function getSunset(month: MonthType) {
       return 1084;
     case 'May':
       return 1134;
-    case 'June':
+    case 'Jun':
       return 1184;
-    case 'July':
+    case 'Jul':
       return 1235;
     case 'Aug':
       return 1200;
-    case 'Sept':
+    case 'Sep':
       return 1164;
     case 'Oct':
       return 1132;
