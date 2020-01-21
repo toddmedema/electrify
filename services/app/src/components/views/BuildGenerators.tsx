@@ -31,7 +31,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
-  const secondaryText = (buildable) ? `~${formatMoneyConcise(generator.lcWh * 1000000)}/MWh. ${generator.description}` : `Too large for current tech; max size ${formatWatts(props.generator.maxPeakW)}`;
+  const secondaryText = (buildable) ? generator.description : `Too large for current tech; max size ${formatWatts(props.generator.maxPeakW)}`;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -60,7 +60,8 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
-            <Typography variant="body2" color="textSecondary">{`${Math.round(generator.yearsToBuild * 12)}m to build`}</Typography>
+            <Typography variant="body2" color="textSecondary">{Math.round(generator.yearsToBuild * 12)}mo to build<br/>
+            ~{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</Typography>
           </span>
         }
         title={generator.name}
