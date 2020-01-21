@@ -1,7 +1,8 @@
 import {MenuItem, Select, Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@material-ui/core';
 import * as React from 'react';
 
-import {STARTING_YEAR, TICK_MINUTES} from 'app/Constants';
+import {TICK_MINUTES} from 'app/Constants';
+import {summarizeHistory} from 'shared/helpers/Financials';
 import {formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
@@ -46,7 +47,7 @@ export default class extends React.Component<Props, State> {
     const {year} = this.state;
     const years = [];
     // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= STARTING_YEAR; i--) {
+    for (let i = date.year; i >= gameState.startingYear; i--) {
       years.push(i);
     }
 
@@ -55,47 +56,26 @@ export default class extends React.Component<Props, State> {
     };
 
     const history = gameState.monthlyHistory;
-    const summary = {
-      supplyWh: 0,
-      demandWh: 0,
-      population: 0,
-      kgco2e: 0,
-      revenue: 0,
-      expensesFuel: 0,
-      expensesOM: 0,
-      expensesCarbonFee: 0,
-      expensesInterest: 0,
-    } as MonthlyHistoryType;
     const timeline = [];
-    // Go in reverse so that the last values for ending values (like net worth are used)
-    for (let i = history.length - 1; i >= 0 ; i--) {
-      const h = history[i];
+    for (const h of history) {
       if (!year || h.year === year) {
         let profit = h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest);
         const projected = (h.month === date.monthNumber && h.year === date.year);
         if (projected) {
           profit /= date.percentOfMonth;
         }
-        timeline.push({
+        timeline.unshift({
           month: h.year * 12 + h.month,
           year: h.year,
           profit,
           projected,
         });
-        summary.supplyWh += h.supplyWh;
-        summary.demandWh += h.demandWh;
-        summary.kgco2e += h.kgco2e;
-        summary.revenue += h.revenue;
-        summary.expensesFuel += h.expensesFuel;
-        summary.expensesOM += h.expensesOM;
-        summary.expensesCarbonFee += h.expensesCarbonFee;
-        summary.expensesInterest += h.expensesInterest;
-        summary.population = h.population;
-        summary.netWorth = h.netWorth;
       }
     }
+
+    const summary = summarizeHistory(gameState.monthlyHistory, (t: MonthlyHistoryType) => !year || t.year === year);
     const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesCarbonFee + summary.expensesInterest;
-    const supplykWh = (summary.supplyWh || 1) * 1000;
+    const supplykWh = (summary.supplyWh || 1) / 1000;
 
     return (
       <GameCard className="finances">
@@ -160,6 +140,10 @@ export default class extends React.Component<Props, State> {
               </TableRow>
               <TableRow className="tabs-2">
                 <TableCell>CO2e emitted</TableCell>
+                <TableCell align="right">{numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons</TableCell>
+              </TableRow>
+              <TableRow className="tabs-2">
+                <TableCell>Emission factor</TableCell>
                 <TableCell align="right">{numbro(summary.kgco2e / (supplykWh / 1000)).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
               </TableRow>
 

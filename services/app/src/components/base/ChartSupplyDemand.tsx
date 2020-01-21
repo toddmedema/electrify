@@ -21,31 +21,33 @@ export interface Props {
   height?: number;
   legend?: boolean;
   timeline: ChartData[];
+  startingYear: number;
 }
 
 // TODO how to indicate reality vs forecast? Perhaps current time as a prop, and then split it in the chart
 // and don't actually differentiate between reality +  forecast in data?
 const ChartSupplyDemand = (props: Props): JSX.Element => {
+  const {startingYear, height, legend, timeline} = props;
   // Figure out the boundaries of the chart data
   let domainMin = 999999999999;
   let domainMax = 0;
-  const rangeMin = props.timeline[0].minute;
-  const rangeMax = props.timeline[props.timeline.length - 1].minute;
-  props.timeline.forEach((d: ChartData) => {
+  const rangeMin = timeline[0].minute;
+  const rangeMax = timeline[timeline.length - 1].minute;
+  timeline.forEach((d: ChartData) => {
     domainMin = Math.min(domainMin, d.supplyW, d.demandW);
     domainMax = Math.max(domainMax, d.supplyW, d.demandW);
   });
 
   // Get sunrise and sunset, sliding forward if it's actually in the next day
-  const date = getDateFromMinute(rangeMin);
+  const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
   let sunrise = midnight + date.sunrise;
   let sunset = midnight + date.sunset;
   if (sunrise < rangeMin) {
-    sunrise = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunrise;
+    sunrise = midnight + 1440 + getDateFromMinute(rangeMin + 1440, startingYear).sunrise;
   }
   if (sunset < rangeMin) {
-    sunset = midnight + 1440 + getDateFromMinute(rangeMin + 1440).sunset;
+    sunset = midnight + 1440 + getDateFromMinute(rangeMin + 1440, startingYear).sunset;
   }
 
   // BLACKOUT CALCULATION
@@ -54,7 +56,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
     minute: rangeMin,
     value: 0,
   }] as BlackoutEdges[];
-  let prev = props.timeline[0];
+  let prev = timeline[0];
   let isBlackout = prev.demandW > prev.supplyW;
   if (isBlackout) {
     blackouts.push({
@@ -63,7 +65,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
     });
     blackoutCount++;
   }
-  props.timeline.forEach((d: ChartData) => {
+  timeline.forEach((d: ChartData) => {
     if (d.demandW > d.supplyW && !isBlackout) {
       // Blackout starting: low then high edge
       const intersectionTime = getIntersectionX(prev.minute, prev.supplyW, d.minute, d.supplyW, prev.minute, prev.demandW, d.minute, d.demandW);
@@ -88,8 +90,8 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
 
   // Divide between historic and forcast
   const currentMinute = props.currentMinute || rangeMax;
-  const historic = [...props.timeline].filter((d: ChartData) => d.minute <= currentMinute);
-  const forecast = [...props.timeline].filter((d: ChartData) => d.minute >= currentMinute);
+  const historic = [...timeline].filter((d: ChartData) => d.minute <= currentMinute);
+  const forecast = [...timeline].filter((d: ChartData) => d.minute >= currentMinute);
 
   const legendItems = [
     { name: 'Supply', symbol: { fill: supplyColor } },
@@ -107,7 +109,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
         domain={{ y: [domainMin, domainMax] }}
         domainPadding={{y: [6, 6]}}
-        height={props.height || 300}
+        height={height || 300}
       >
         <VictoryAxis
           tickValues={[sunrise, sunset]}
@@ -202,7 +204,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             },
           }}
         />}
-        {props.legend && <VictoryLegend x={280} y={12}
+        {legend && <VictoryLegend x={280} y={12}
           centerTitle
           orientation="vertical"
           rowGutter={-5}

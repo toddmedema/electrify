@@ -65,8 +65,7 @@ export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const HOURS_PER_YEAR_REAL = 24 * 365;
 export const GAME_TO_REAL_YEARS = 365 / DAYS_PER_YEAR;
-export const STARTING_YEAR = 1882; // Year of first electric company
-export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as MonthType[];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as MonthType[];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
 
 export const UNSUPPORTED_BROWSERS = /^(.*amazon silk.*)|(.*(iphone|ipad|ipod|ios) os 9_.*)$/i;

@@ -1,14 +1,16 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {facilityCashBack, getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
+import {facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory} from 'shared/helpers/Financials';
+import {formatMoneyConcise} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
-import {DAYS_PER_YEAR, DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, STARTING_YEAR, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
+const numbro = require('numbro');
 
 export const initialGameState: GameStateType = {
   difficulty: 'EMPLOYEE',
@@ -18,7 +20,8 @@ export const initialGameState: GameStateType = {
   feePerKgCO2e: 0, // Start on easy mode
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
-  date: getDateFromMinute((2020 - STARTING_YEAR) * DAYS_PER_YEAR * 1440),
+  startingYear: 2020,
+  date: getDateFromMinute(0, 2020),
   timeline: [] as TimelineType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
@@ -99,7 +102,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
 function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
   return state.timeline.map((t: TimelineType) => {
     if (t.minute >= state.date.minute) {
-      const date = getDateFromMinute(t.minute);
+      const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather('SF', date.hourOfFullYear);
       const fuelPrices = getFuelPricesPerMBTU(date);
       return {
@@ -117,7 +120,7 @@ function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
 function reforecastDemand(state: GameStateType): TimelineType[] {
   return state.timeline.map((t: TimelineType) => {
     if (t.minute >= state.date.minute) {
-      const date = getDateFromMinute(t.minute);
+      const date = getDateFromMinute(t.minute, state.startingYear);
       return {
         ...t,
         demandW: getDemandW(date, state, t.sunlight, t.temperatureC),
@@ -223,9 +226,11 @@ function reforecastSupply(state: GameStateType): TimelineType[] {
 }
 
 export function reforecastAll(newState: GameStateType): TimelineType[] {
-  newState.timeline = reforecastWeatherAndPrices(newState);
-  newState.timeline = reforecastDemand(newState);
-  newState.timeline = reforecastSupply(newState);
+  if (newState.timeline.length > 0 && newState.monthlyHistory.length > 0) {
+    newState.timeline = reforecastWeatherAndPrices(newState);
+    newState.timeline = reforecastDemand(newState);
+    newState.timeline = reforecastSupply(newState);
+  }
   return newState.timeline;
 }
 
@@ -322,7 +327,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     if (state.inGame && state.speed !== 'PAUSED') {
       const newState = {
         ...state,
-        date: getDateFromMinute(state.date.minute + TICK_MINUTES),
+        date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
       };
       const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
       if (now) {
@@ -346,18 +351,37 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         newState.timeline = generateNewTimeline(newState.date.minute);
         newState.timeline = reforecastAll(newState);
 
-        // Time-based tutorial triggers
-        if (newState.inTutorial) {
-          if (newState.date.monthsEllapsed === 12) {
-            setTimeout(() => getStore().dispatch(openDialog({
-              title: 'Tutorial complete!',
-              message: '',
-              open: true,
-              closeText: 'Keep playing',
-              actionLabel: 'Return to menu',
-              action: () => getStore().dispatch(quitGame()),
-            })), 1);
-          }
+        if (cash < 0) {
+          const summary = summarizeHistory(newState.monthlyHistory);
+          console.log(summary);
+          setTimeout(() => getStore().dispatch(openDialog({
+            title: 'Bankrupt!',
+            message: `You've run out of money. You survived for ${newState.date.year - newState.startingYear} years,
+            earned ${formatMoneyConcise(summary.revenue)} in revenue
+            and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+            open: true,
+            notCancellable: true,
+            actionLabel: 'Try again',
+            action: () => getStore().dispatch(quitGame()),
+          })), 1);
+        }
+
+        // Time-based triggers
+        switch (newState.date.monthsEllapsed) {
+          case 12:
+            if (newState.inTutorial) {
+              setTimeout(() => getStore().dispatch(openDialog({
+                title: 'Tutorial complete!',
+                message: '',
+                open: true,
+                closeText: 'Keep playing',
+                actionLabel: 'Return to menu',
+                action: () => getStore().dispatch(quitGame()),
+              })), 1);
+            }
+            break;
+          default:
+            break;
         }
       }
 
@@ -414,6 +438,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
     let newState = {
       ...state,
       timeline: [] as TimelineType[],
+      date: getDateFromMinute(0, state.startingYear),
     };
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
       const newFacility = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {

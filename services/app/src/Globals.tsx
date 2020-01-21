@@ -64,6 +64,7 @@ export function getDevicePlatform(): 'android' | 'ios' | 'web' {
   return 'web';
 }
 
+// https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
 export function isSmallScreen(): boolean {
   const width = Math.max(
     document.body.scrollWidth,

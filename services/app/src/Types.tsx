@@ -262,6 +262,7 @@ export interface GameStateType {
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
   date: DateType;
+  startingYear: number;
   timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   facilities: (StorageOperatingType|GeneratorOperatingType)[];
@@ -276,10 +277,11 @@ export interface SettingsType {
 }
 
 export interface DialogType {
-  message: string;
+  message: string | JSX.Element | JSX.Element[];
   title: string;
   action?: (e: any) => void;
   actionLabel?: string;
+  notCancellable?: boolean;
   closeText?: string;
   open: boolean,
 }

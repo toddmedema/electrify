@@ -122,6 +122,7 @@ export default class extends React.Component<Props, {}> {
           timeline={gameState.timeline}
           currentMinute={gameState.date.minute}
           legend={gameState.speed === 'PAUSED'}
+          startingYear={gameState.startingYear}
         />
         <List dense className="scrollable">
           <Toolbar>

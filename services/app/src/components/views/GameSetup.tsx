@@ -3,9 +3,8 @@ import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
-import {DAYS_PER_YEAR, DIFFICULTIES, STARTING_YEAR} from 'app/Constants';
+import {DIFFICULTIES} from 'app/Constants';
 import {DialogType, DifficultyType, GameStateType} from 'app/Types';
-import {getDateFromMinute} from 'shared/helpers/DateTime';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -75,12 +74,12 @@ export default function GameSetup(props: Props): JSX.Element {
             <TableCell>
               <Select
                 id="startingyear"
-                value={props.gameState.date.minute}
-                onChange={(e: any) => props.onDelta({ date: getDateFromMinute(e.target.value) })}
+                value={props.gameState.startingYear}
+                onChange={(e: any) => props.onDelta({ startingYear: e.target.value })}
               >
-                <MenuItem value={(1980 - STARTING_YEAR) * DAYS_PER_YEAR * 1440}>1980</MenuItem>
-                <MenuItem value={(2000 - STARTING_YEAR) * DAYS_PER_YEAR * 1440}>2000</MenuItem>
-                <MenuItem value={(2020 - STARTING_YEAR) * DAYS_PER_YEAR * 1440}>2020</MenuItem>
+                <MenuItem value={1980}>1980</MenuItem>
+                <MenuItem value={2000}>2000</MenuItem>
+                <MenuItem value={2020}>2020</MenuItem>
               </Select>
             </TableCell>
           </TableRow>

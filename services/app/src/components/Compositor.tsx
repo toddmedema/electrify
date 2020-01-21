@@ -196,13 +196,15 @@ export default class Compositor extends React.Component<Props, {}> {
         <Dialog
           open={ui.dialog.open}
           onClose={closeDialog}
+          disableBackdropClick={ui.dialog.notCancellable}
+          disableEscapeKeyDown={ui.dialog.notCancellable}
         >
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
-            <Button color="primary" onClick={closeDialog}>
+            {!ui.dialog.notCancellable && <Button color="primary" onClick={closeDialog}>
               {ui.dialog.closeText || (ui.dialog.action ? 'Cancel' : 'OK')}
-            </Button>
+            </Button>}
             {ui.dialog.action && <Button color="primary" variant="contained" onClick={ui.dialog.action}>
               {ui.dialog.actionLabel || 'OK'}
             </Button>}

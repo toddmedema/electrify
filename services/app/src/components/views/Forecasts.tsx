@@ -121,8 +121,8 @@ export default class extends React.Component<Props, State> {
     }
     largestBlackout.end = largestBlackout.end || rangeMax;
 
-    const blackoutStart = getDateFromMinute(largestBlackout.start);
-    const blackoutEnd = getDateFromMinute(largestBlackout.end);
+    const blackoutStart = getDateFromMinute(largestBlackout.start, newState.startingYear);
+    const blackoutEnd = getDateFromMinute(largestBlackout.end, newState.startingYear);
 
     // TODO user ability to see more than one year in the future
     return (
@@ -136,6 +136,7 @@ export default class extends React.Component<Props, State> {
             timeline={timeline}
             blackouts={blackouts}
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
+            startingYear={newState.startingYear}
           />
           <Table size="small">
             {blackoutTotalWh > 0 ?
@@ -176,6 +177,7 @@ export default class extends React.Component<Props, State> {
             height={140}
             timeline={timeline}
             domain={{ x: [rangeMin, rangeMax] }}
+            startingYear={newState.startingYear}
           />
         </div>
       </GameCard>

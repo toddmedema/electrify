@@ -1,4 +1,4 @@
-import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, STARTING_YEAR} from 'app/Constants';
+import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS} from 'app/Constants';
 import {DateType, MonthType} from 'app/Types';
 
 export function formatMonthChartAxis(t: number, multiyear: boolean) {
@@ -75,13 +75,13 @@ function getSunset(month: MonthType) {
   }
 }
 
-export function getDateFromMinute(minute: number): DateType {
+export function getDateFromMinute(minute: number, startingYear: number): DateType {
   const minuteOfDay = minute % 1440;
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
   const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
-  const year = yearsEllapsed + STARTING_YEAR;
+  const year = yearsEllapsed + startingYear;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
   const month = MONTHS[monthNumber - 1];
   const percentOfMonth = minuteOfDay / 1440;

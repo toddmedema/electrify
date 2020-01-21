@@ -15,12 +15,13 @@ export interface Props {
   timeline: TimelineType[];
   blackouts: BlackoutEdges[];
   domain: { x: [number, number], y: [number, number] };
+  startingYear: number;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class extends React.PureComponent<Props, {}> {
   public render() {
-    const {domain, height, timeline, blackouts} = this.props;
+    const {domain, height, timeline, blackouts, startingYear} = this.props;
 
     // Wrapping in spare div prevents excessive height bug
     return <div>
@@ -33,7 +34,7 @@ export default class extends React.PureComponent<Props, {}> {
       >
         <VictoryAxis
           tickCount={6}
-          tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t).monthNumber, false)}
+          tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t, startingYear).monthNumber, false)}
           tickLabelComponent={<VictoryLabel dy={-5} />}
           axisLabelComponent={<VictoryLabel dy={2} />}
           style={{

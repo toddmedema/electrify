@@ -10,12 +10,13 @@ export interface Props {
   height?: number;
   timeline: TimelineType[];
   domain: { x: [number, number] };
+  startingYear: number;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class extends React.PureComponent<Props, {}> {
   public render() {
-    const {domain, height, timeline} = this.props;
+    const {domain, height, timeline, startingYear} = this.props;
     // Downsample the data to one per day to make it more vague / forecast-y
     const data = timeline.filter((t: TimelineType) => t.minute % 1440 < TICK_MINUTES);
     // Make sure it gets the first + last entries for a full chart
@@ -34,7 +35,7 @@ export default class extends React.PureComponent<Props, {}> {
         >
           <VictoryAxis
             tickCount={6}
-            tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t).monthNumber, false)}
+            tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t, startingYear).monthNumber, false)}
             tickLabelComponent={<VictoryLabel dy={-5} />}
             axisLabelComponent={<VictoryLabel dy={2} />}
             style={{

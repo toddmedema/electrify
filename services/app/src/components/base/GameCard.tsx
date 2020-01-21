@@ -127,7 +127,7 @@ export function GameCard(props: Props) {
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
-            {formatMoneyStable(props.cash)}, <span className="weak">{date.month} {date.year}</span>
+            {formatMoneyStable(props.cash)} <span className="weak">{date.month} {date.year}</span>
           </Typography>
           {speedOptions}
         </Toolbar>
