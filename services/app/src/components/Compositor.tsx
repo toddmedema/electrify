@@ -28,7 +28,10 @@ const TUTORIAL_STEPS = [
   },
   {
     target: '.VictoryContainer',
-    content: `Make money by supplying demand for electricity.`,
+    content: <Typography variant="body1">
+      Make money by supplying demand for electricity.<br/><br/>
+      If you don't supply enough power, you'll cause blackouts that cost you customers.
+    </Typography>,
   },
   {
     target: '.button-buildGenerator',

@@ -70,7 +70,10 @@ export default class Manual extends React.PureComponent<Props, {}> {
 const MANUAL_ENTRIES = [
   {
     title: `Blackouts`,
-    entry: <p>You don’t lose money for not providing service (utilities can’t be sued for blackouts), but you’ll lose customers</p>,
+    entry: <div>
+      <p>If you don't supply enough electricity to meet demand, you'll cause rolling blackouts that cost you customers (and thus revenue).</p>
+      <p>Like utilities in real life, you aren't financially responsible for blackouts.</p>
+    </div>,
   },
   {
     title: `BTU and MMBTU`,
