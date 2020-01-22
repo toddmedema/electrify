@@ -199,15 +199,17 @@ export interface FuelType {
 export type FacilityOperatingType = GeneratorOperatingType | StorageOperatingType;
 
 export interface GeneratorOperatingType extends GeneratorShoppingType, LoanInfo {
-  id: number;
+  id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;
+  minuteCreated: number; // That the user clicked buy, not construction complete
 }
 
 export interface StorageOperatingType extends StorageShoppingType, LoanInfo {
-  id: number;
+  id: number; // Monotonically increasing
   currentWh: number;
   yearsToBuildLeft: number;
+  minuteCreated: number; // That the user clicked buy, not construction complete
 }
 
 interface LoanInfo {

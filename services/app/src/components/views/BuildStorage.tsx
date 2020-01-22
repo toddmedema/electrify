@@ -161,12 +161,17 @@ const sortOptions = [
   ['yearsToBuild', 'Build Time'],
 ];
 
-// Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0
-// (i.e. 1->2MW, 9->10 MW, 10->20MW)
+// Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2MW, 9->10 MW, 10->20MW)
 function getW(tick: number) {
   const exponent = Math.floor(tick / 9) + 6;
   const frontNumber = tick % 9 + 1;
   return frontNumber * Math.pow(10, exponent);
+}
+
+function getTickFromW(w: number) {
+  const exponent = Math.floor(Math.log10(w)) - 6;
+  const frontNumber = +w.toString().replace(/0/g, '');
+  return frontNumber + exponent * 9 - 1;
 }
 
 function valueLabelFormat(x: number) {
@@ -188,7 +193,10 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function StorageBuildDialog(props: Props): JSX.Element {
   const {gameState, cash, onBack} = props;
-  const [sliderTick, setSliderTick] = React.useState<number>(22);
+  const filtered = gameState.facilities.filter((f) => f.peakWh);
+  const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
+  const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakWh || 500000000;
+  const [sliderTick, setSliderTick] = React.useState<number>(getTickFromW(mostRecentBuiltValue));
   const [sort, setSort] = React.useState<string>('buildCost');
   const [anchorEl, setAnchorEl] = React.useState(null);
   const storage = STORAGE(gameState, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
@@ -213,7 +221,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   return (
     <div id="topbar" className="flexContainer">
       <Toolbar>
-        <Typography variant="h6"><span className="weak">Build Storage</span> ({formatMoneyStable(cash)})</Typography>
+        <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Storage</span></Typography>
         {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
           <PauseIcon color="primary" />
         </IconButton>}

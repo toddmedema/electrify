@@ -274,9 +274,10 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
   const facility = {
     ...g,
     ...financing,
-    id: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
+    id: state.facilities.reduce((max: number, f: FacilityOperatingType) => max > f.id ? max : f.id, 0) + 1,
     currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
+    minuteCreated: state.date.minute,
   } as FacilityOperatingType;
   if (g.peakWh) {
     facility.currentWh = 0;
