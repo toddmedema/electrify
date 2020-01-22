@@ -56,7 +56,7 @@ export default class Manual extends React.PureComponent<Props, {}> {
             </IconButton>
           </Toolbar>
         </div>
-        <List dense className="scrollable expandableList">
+        <List dense className="scrollable expandableList" id="manual">
           <Card>
             <CardContent>Here, you can look up specific terms and mechanics to learn more about how they work in game - and in real life.</CardContent>
           </Card>
@@ -80,6 +80,14 @@ const MANUAL_ENTRIES = [
     entry: <p>The British Thermal Unit is a measure of heat energy. MMBTU is one million BTU, and equals approximately 300 kWh of electrical energy.</p>,
   },
   {
+    // Credit to https://www.e-education.psu.edu/ebf200/node/151
+    title: `Demand`,
+    entry: <div>
+      <p>Load changes continuously as people turn stuff on and off, as temperature changes, as the natural light comes and goes, and so on. This pattern of changing load is called a "load shape". We can have daily load shapes, weekly ones, and annual ones. The following diagram shows the path of load for three different weeks at three different times of year in 2009:</p>
+      <img src="/images/manual-demand.jpg"/>
+    </div>,
+  },
+  {
     title: `Emissions and CO2e`,
     entry: <div>
       <p>CO2e stands for Carbon Dioxide equivalent, a measure of the greenhouse warming impact of various pollutants.</p>
@@ -92,8 +100,13 @@ const MANUAL_ENTRIES = [
     entry: <p>TODO how to read the forecast</p>,
   },
   {
+    // Credit to https://www.e-education.psu.edu/ebf200/node/151
     title: `Prioritizing Generators`,
-    entry: <p>Generally companies prioritize nuclear -> renewable -> coal -> natural gas -> oil based on how long they take to ramp up and down, and their cost of fuel... TODO link to PJM stack</p>,
+    entry: <div>
+      <p>Companies prioritize their generation stack based on how long they take to ramp up and down, their marginal cost (fuel) and whether they're controllable.</p>
+      <p>Here's a real-world generation stack from the PJM (Pennsylvania-Jersey-Maryland) market in 2008:</p>
+      <img src="/images/manual-generation-stack.jpg"/>
+    </div>,
   },
   {
     title: `Total Cost of Energy`,

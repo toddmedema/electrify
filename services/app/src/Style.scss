@@ -423,6 +423,12 @@ body.android .dialog .textfield:focus-within {
     }
   }
 
+  #manual {
+    img {
+      width: 100%;
+    }
+  }
+
   #gameSetupTable {
     margin: size(large) auto;
     width: auto;

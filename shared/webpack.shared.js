@@ -26,6 +26,7 @@ const options = {
     reasons: true,
   },
   module: {
+    // TODO THESE DON'T SEEM TO BE APPLIED TO APP?
     rules: [
       { test: /\.tsx$/, enforce: 'pre', loader: 'tslint-loader',
         options: {
@@ -34,7 +35,7 @@ const options = {
           tsConfigFile: Path.resolve(__dirname, '../tsconfig.json'),
         },
       },
-      { test: /\.(svg|png|gif|jpe?g)(\?[a-z0-9=&.]+)?$/, loader: 'file-loader',
+      { test: /\.(svg|png|gif|jpe?g)(\?[a-z0-9=&.-]+)?$/, loader: 'file-loader',
         options: { name: 'images/[name].[ext]' }, // disable filename hashing for infrequently changed static assets to enable preloading
       },
       { test: /\.(ttf|eot|woff(2)?)(\?[a-z0-9=&.]+)?$/, loader: 'file-loader',
