@@ -21,6 +21,7 @@ const options = {
       { from: { glob: '**/*.mp3' }, context: 'src/audio', to: './audio' },
       { from: { glob: '../../shared/images/*.svg' }, flatten: true, to: './images' },
       { from: { glob: '../../shared/images/*.png' }, flatten: true, to: './images' },
+      { from: { glob: '../../shared/images/*.jpg' }, flatten: true, to: './images' },
       { from: { glob: '../../shared/schema/*.csv' }, flatten: true, to: './data' },
     ]),
   ],
