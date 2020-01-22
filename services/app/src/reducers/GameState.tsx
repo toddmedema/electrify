@@ -149,7 +149,6 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
 
   let indexOfLastUnchargedBattery = -1;
   let totalChargeNeeded = 0;
-  // TODO maybe also calculate the total charge needed, and reduce that amount by 'charge' when checking to see if more power is needed
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.currentWh < g.peakWh && g.yearsToBuildLeft === 0) {
       indexOfLastUnchargedBattery = i;
@@ -160,8 +159,8 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
   // Renewables produce what they will; on-demand produces up to demand + reserve margin
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.yearsToBuildLeft === 0) {
-      const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
       if (g.fuel) { // Capable of generating electricity
+        const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
         switch (g.fuel) {
           case 'Sun':
             // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
@@ -179,7 +178,8 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
             break;
           default:
             if (targetW > g.currentW || i < indexOfLastUnchargedBattery) { // spinning up
-              if (indexOfLastUnchargedBattery >= 0) { // If there's a battery to charge, output as much as possible to charge it beyond demand
+              // If there's a battery to charge after me, output as much as possible to charge it beyond demand
+              if (indexOfLastUnchargedBattery >= 0 && i < indexOfLastUnchargedBattery) {
                 g.currentW = Math.min(t.demandW + totalChargeNeeded - charge, g.peakW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
               } else { // Otherwise just try to fulfill demand + reserve margin
                 g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
@@ -192,6 +192,7 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
         supply += g.currentW;
       }
       if (g.peakWh) { // Capable of storing electricity
+        const targetW = Math.max(0, t.demandW - supply);
         if (g.currentWh > 0 && targetW > 0) { // If there's a need and we have charge, discharge
           g.currentW = Math.min(g.peakW, targetW, g.currentWh * TICKS_PER_HOUR);
           g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
