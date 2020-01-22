@@ -6,7 +6,7 @@ import PauseIcon from '@material-ui/icons/Pause';
 import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
-import {getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
+import {getMonthlyPayment} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS, STORAGE} from '../../Constants';
 import {GameStateType, SpeedType, StorageShoppingType} from '../../Types';
@@ -24,7 +24,6 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
-  const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
   const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const secondaryText = (buildable) ? storage.description : `Too large for current tech; max size ${formatWatts(props.storage.maxPeakWh)}h`;
 
@@ -37,6 +36,12 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
     e.stopPropagation();
   };
 
+  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+  // <TableRow>
+    // <TableCell>Payments during construction (interest only)</TableCell>
+    // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
+  // </TableRow>
+
   return (
     <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
@@ -47,10 +52,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
               size="small"
               variant="contained"
               color="primary"
-              onClick={(e: any) => {
-                if (cash < storage.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
-                e.stopPropagation();
-              }}
+              onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
             >
               {formatMoneyConcise(storage.buildCost)}
@@ -102,11 +104,25 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
         open={open}
         onClose={toggleOpen}
       >
-        <DialogTitle>Take a loan to build {storage.name}?</DialogTitle>
-        <DialogContent dividers className="noPadding">
+        <DialogTitle disableTypography>
+          <Typography variant="h6">Build {formatWatts(storage.peakWh)}h {storage.name}?</Typography>
+          <IconButton aria-label="close" onClick={toggleOpen} className="top-right"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent className="noPadding">
           <TableContainer>
-            <Table size="small" aria-label="loan properties">
+            <Table size="small">
               <TableBody>
+                <TableRow>
+                  <TableCell>Time to build</TableCell>
+                  <TableCell align="right">{Math.round(storage.yearsToBuild * 12)} mo</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Cash cost</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(storage.buildCost)}</TableCell>
+                </TableRow>
+                <TableRow className="bold">
+                  <TableCell colSpan={2}>Loan info</TableCell>
+                </TableRow>
                 <TableRow>
                   <TableCell>Downpayment</TableCell>
                   <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
@@ -116,11 +132,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
                   <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Payments during construction (interest only)</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Payments once built (principle + interest)</TableCell>
+                  <TableCell>Monthly payments</TableCell>
                   <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
                 </TableRow>
                 <TableRow>
@@ -132,11 +144,11 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button autoFocus color="primary" onClick={toggleOpen}>
-            Cancel
+          <Button color="primary" disabled={cash < storage.buildCost} variant="contained" onClick={(e: any) => { props.onBuild(false); toggleOpen(e); }}>
+            Pay cash
           </Button>
           <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
-            Built it
+            Take loan
           </Button>
         </DialogActions>
       </Dialog>

@@ -6,7 +6,7 @@ import PauseIcon from '@material-ui/icons/Pause';
 import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
-import {getMonthlyPayment, getPaymentInterest } from 'shared/helpers/Financials';
+import {getMonthlyPayment} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
@@ -29,7 +29,6 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
   const loanAmount = props.generator.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
-  const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
   const secondaryText = (buildable) ? generator.description : `Too large for current tech; max size ${formatWatts(props.generator.maxPeakW)}`;
 
@@ -42,6 +41,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
     e.stopPropagation();
   };
 
+  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+    // <TableRow>
+    // <TableCell>Payments during construction (interest only)</TableCell>
+    // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
+  // </TableRow>
+
   return (
     <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
@@ -52,10 +57,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               size="small"
               variant="contained"
               color="primary"
-              onClick={(e: any) => {
-                if (cash < generator.buildCost) { toggleOpen(e); } else { props.onBuild(false); }
-                e.stopPropagation();
-              }}
+              onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
             >
               {formatMoneyConcise(generator.buildCost)}
@@ -138,11 +140,25 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         open={open}
         onClose={toggleOpen}
       >
-        <DialogTitle>Take a loan to build {generator.name}?</DialogTitle>
-        <DialogContent dividers className="noPadding">
+        <DialogTitle disableTypography>
+          <Typography variant="h6">Build {formatWatts(generator.peakW)} {generator.name}?</Typography>
+          <IconButton aria-label="close" onClick={toggleOpen} className="top-right"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent className="noPadding">
           <TableContainer>
-            <Table size="small" aria-label="loan properties">
+            <Table size="small">
               <TableBody>
+                <TableRow>
+                  <TableCell>Time to build</TableCell>
+                  <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Cash cost</TableCell>
+                  <TableCell align="right">{formatMoneyConcise(generator.buildCost)}</TableCell>
+                </TableRow>
+                <TableRow className="bold">
+                  <TableCell colSpan={2}>Loan info</TableCell>
+                </TableRow>
                 <TableRow>
                   <TableCell>Downpayment</TableCell>
                   <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
@@ -152,11 +168,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                   <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Payments during construction (interest only)</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Payments once built (principle + interest)</TableCell>
+                  <TableCell>Monthly payments</TableCell>
                   <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
                 </TableRow>
                 <TableRow>
@@ -168,11 +180,11 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button autoFocus color="primary" onClick={toggleOpen}>
-            Cancel
+          <Button color="primary" disabled={cash < generator.buildCost} variant="contained" onClick={(e: any) => { props.onBuild(false); toggleOpen(e); }}>
+            Pay cash
           </Button>
           <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
-            Built it
+            Take loan
           </Button>
         </DialogActions>
       </Dialog>

@@ -50,7 +50,22 @@ export function GameCard(props: Props) {
   const inBlackout = now && now.supplyW < now.demandW;
 
   let speedOptions = <span/>;
-  if (isSmallScreen()) {
+  if (!isSmallScreen()) {
+    speedOptions = <span>
+      <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
+        <PauseIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('SLOW')} disabled={gameState.speed === 'SLOW'} aria-label="slow speed" edge="end" color="primary">
+        <ChevronRightIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('NORMAL')} disabled={gameState.speed === 'NORMAL'} aria-label="normal speed" edge="end" color="primary">
+        <PlayArrowIcon />
+      </IconButton>
+      <IconButton onClick={() => props.onSpeedChange('FAST')} disabled={gameState.speed === 'FAST'} aria-label="fast speed" edge="end" color="primary">
+        <FastForwardIcon />
+      </IconButton>
+    </span>;
+  } else {
     let speedIcon = <PlayArrowIcon />;
     switch (props.gameState.speed) {
       case 'PAUSED': speedIcon = <PlayArrowIcon />; break;
@@ -84,21 +99,6 @@ export function GameCard(props: Props) {
           <FastForwardIcon color="primary" />
         </MenuItem>
       </Menu>
-    </span>;
-  } else {
-    speedOptions = <span>
-      <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
-        <PauseIcon />
-      </IconButton>
-      <IconButton onClick={() => props.onSpeedChange('SLOW')} disabled={gameState.speed === 'SLOW'} aria-label="slow speed" edge="end" color="primary">
-        <ChevronRightIcon />
-      </IconButton>
-      <IconButton onClick={() => props.onSpeedChange('NORMAL')} disabled={gameState.speed === 'NORMAL'} aria-label="normal speed" edge="end" color="primary">
-        <PlayArrowIcon />
-      </IconButton>
-      <IconButton onClick={() => props.onSpeedChange('FAST')} disabled={gameState.speed === 'FAST'} aria-label="fast speed" edge="end" color="primary">
-        <FastForwardIcon />
-      </IconButton>
     </span>;
   }
 

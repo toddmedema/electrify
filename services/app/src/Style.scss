@@ -165,6 +165,18 @@ body {
   right: 0;
 }
 
+.MuiDialogTitle-root {
+  padding: 16px;
+}
+
+table {
+  margin-bottom: 16px;
+  tr.bold td {
+    font-weight: bold;
+    padding-top: 16px;
+  }
+}
+
 // Table has base left padding of 16px, each tab is 20px
 .tabs-1 {
   td { padding-left: 36px; }
@@ -301,6 +313,12 @@ span.weak {
   }
 }
 
+.top-right {
+  position: absolute !important;
+  top: 0;
+  right: 0;
+}
+
 .MuiButton-containedPrimary:hover {
   background-color: #1976d2; /* blue600->700 on hover */
 }
@@ -419,16 +437,6 @@ body.android .dialog .textfield:focus-within {
 
     & > div {
       flex: 0 1 auto;
-    }
-  }
-
-  .finances {
-    table {
-      margin-bottom: size(large);
-      tr.bold td {
-        font-weight: bold;
-        padding-top: 16px;
-      }
     }
   }
 
