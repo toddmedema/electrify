@@ -9,6 +9,7 @@ import {ThemeOptions} from '@material-ui/core/styles/createMuiTheme';
 
 const darkBlack = '0x000000';
 
+export const interactiveColor = blue[600];
 export const blackoutColor = red[500];
 export const demandColor = grey[900];
 export const supplyColor = blue[600];

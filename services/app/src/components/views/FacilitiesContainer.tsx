@@ -15,7 +15,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onGeneratorBuild: () => {
       dispatch(toCard({name: 'BUILD_GENERATORS', dontRemember: true}));
     },
-    onSell: (id: number) => {
+    onSell: (id: SellFacilityAction['id']) => {
       dispatch({type: 'SELL_FACILITY', id} as SellFacilityAction);
     },
     onReprioritize: (spotInList: number, delta: number) => {
