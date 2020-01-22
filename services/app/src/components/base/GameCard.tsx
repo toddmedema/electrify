@@ -79,7 +79,7 @@ export function GameCard(props: Props) {
       {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
         <PauseIcon color="primary" />
       </IconButton>}
-      <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary" id="speedChangeButton">
+      <IconButton onClick={handleSpeedClick} aria-label="change speed" edge="end" color="primary">
         {speedIcon}
       </IconButton>
       <Menu
@@ -129,7 +129,7 @@ export function GameCard(props: Props) {
           <Typography variant="h6">
             {formatMoneyStable(props.cash)} <span className="weak">{date.month} {date.year}</span>
           </Typography>
-          {speedOptions}
+          <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
       <div id="yearProgressBar" style={{

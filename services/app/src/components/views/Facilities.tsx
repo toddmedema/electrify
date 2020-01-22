@@ -3,6 +3,7 @@ import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
 import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
+import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 
 import {TICK_MINUTES} from 'app/Constants';
 import {FacilityOperatingType, GameStateType} from 'app/Types';
@@ -20,6 +21,13 @@ interface FacilityListItemProps {
   onReprioritize: DispatchProps['onReprioritize'];
 }
 
+const getDraggableStyle = (isDragging: boolean, draggableStyle: any) => ({
+  userSelect: 'none',
+  border: isDragging ? `1px solid rgba(30, 136, 229, 0.5)` : 'none', // Match buttons
+  borderRadius: isDragging ? `4px` : '0',
+  ...draggableStyle,
+});
+
 function FacilityListItem(props: FacilityListItemProps): JSX.Element {
   const [open, setOpen] = React.useState(false);
   const toggleDialog = () => {
@@ -36,52 +44,64 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
   } else {
     secondaryText = `${formatWatts(facility.currentW).replace(/[^0-9.,]/g, '')}/${formatWatts(facility.peakW)}`;
   }
+
   return (
-    <ListItem disabled={underConstruction}>
-      {facility.currentW > 1000 && <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>}
-      <ListItemAvatar>
-        <div>
-          <Avatar className={(facility.currentWh === 0 ? 'offline' : '')} alt={facility.name} src={`/images/${facility.name.toLowerCase()}.svg`} />
-          {facility.peakWh > 0 && !underConstruction && <div className="capacityProgressBar" style={{height: `${facility.currentWh / facility.peakWh * 100}%`}}/>}
+    <Draggable key={'f' + facility.id} draggableId={'f' + facility.id} index={props.spotInList}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          style={getDraggableStyle(snapshot.isDragging, provided.draggableProps.style)}
+        >
+          <ListItem disabled={underConstruction} className="facility">
+            {facility.currentW > 1000 && <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>}
+            <ListItemAvatar>
+              <div>
+                <Avatar className={(facility.currentWh === 0 ? 'offline' : '')} alt={facility.name} src={`/images/${facility.name.toLowerCase()}.svg`} />
+                {facility.peakWh > 0 && !underConstruction && <div className="capacityProgressBar" style={{height: `${facility.currentWh / facility.peakWh * 100}%`}}/>}
+              </div>
+            </ListItemAvatar>
+            <ListItemText
+              primary={facility.name}
+              secondary={secondaryText}
+            />
+            <Dialog open={open} onClose={toggleDialog}>
+              <DialogTitle>
+                {underConstruction ? 'Cancel construction of' : 'Sell'} {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?
+              </DialogTitle>
+              <DialogContent><DialogContentText>
+                You will receive {formatMoneyConcise(facilityCashBack(facility))} back
+                {facility.loanAmountLeft > 0 ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}` : ''}
+                .
+              </DialogContentText></DialogContent>
+              <DialogActions>
+                <Button onClick={toggleDialog} color="primary">
+                  Nevermind
+                </Button>
+                <Button onClick={() => { props.onSell(facility.id); toggleDialog(); }} color="primary" variant="contained" autoFocus>
+                  {underConstruction ? 'Cancel construction' : 'Sell'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+            <ListItemSecondaryAction>
+              {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
+                <ArrowUpwardIcon />
+              </IconButton>}
+              {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
+                <ArrowDownwardIcon />
+              </IconButton>}
+              {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
+                <DeleteForeverIcon />
+              </IconButton>}
+              {underConstruction && <IconButton onClick={toggleDialog} edge="end" color="primary">
+                <CancelIcon />
+              </IconButton>}
+            </ListItemSecondaryAction>
+          </ListItem>
         </div>
-      </ListItemAvatar>
-      <ListItemText
-        primary={facility.name}
-        secondary={secondaryText}
-      />
-      <Dialog open={open} onClose={toggleDialog}>
-        <DialogTitle>
-          {underConstruction ? 'Cancel construction of' : 'Sell'} {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?
-        </DialogTitle>
-        <DialogContent><DialogContentText>
-          You will receive {formatMoneyConcise(facilityCashBack(facility))} back
-          {facility.loanAmountLeft > 0 ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}` : ''}
-          .
-        </DialogContentText></DialogContent>
-        <DialogActions>
-          <Button onClick={toggleDialog} color="primary">
-            Nevermind
-          </Button>
-          <Button onClick={() => { props.onSell(facility.id); toggleDialog(); }} color="primary" variant="contained" autoFocus>
-            {underConstruction ? 'Cancel construction' : 'Sell'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <ListItemSecondaryAction>
-        {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
-          <ArrowUpwardIcon />
-        </IconButton>}
-        {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
-          <ArrowDownwardIcon />
-        </IconButton>}
-        {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
-          <DeleteForeverIcon />
-        </IconButton>}
-        {underConstruction && <IconButton onClick={toggleDialog} edge="end" color="primary">
-          <CancelIcon />
-        </IconButton>}
-      </ListItemSecondaryAction>
-    </ListItem>
+      )}
+    </Draggable>
   );
 }
 
@@ -91,7 +111,7 @@ export interface StateProps {
 
 export interface DispatchProps {
   onGeneratorBuild: () => void;
-  onSell: (id: number) => void;
+  onSell: (id: FacilityOperatingType['id']) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
   onStorageBuild: () => void;
 }
@@ -99,6 +119,11 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default class extends React.Component<Props, {}> {
+  constructor(props: Props) {
+    super(props);
+    this.onDragEnd = this.onDragEnd.bind(this);
+  }
+
   public shouldComponentUpdate(nextProps: Props, nextState: any) {
     // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
     switch (nextProps.gameState.speed) {
@@ -109,6 +134,14 @@ export default class extends React.Component<Props, {}> {
       default:
         return true;
     }
+  }
+
+  public onDragEnd(result: any) {
+    if (!result.destination) { // dropped outside the list
+      return;
+    }
+
+    this.props.onReprioritize(result.source.index, result.destination.index - result.source.index);
   }
 
   public render() {
@@ -125,22 +158,34 @@ export default class extends React.Component<Props, {}> {
           startingYear={gameState.startingYear}
         />
         <List dense className="scrollable">
-          <Toolbar>
+          <Toolbar style={{paddingBottom: '4px'}}>
             <Typography variant="h6">Facilities</Typography>
             <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
             &nbsp;&nbsp;&nbsp;
             <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>Storage</Button>
           </Toolbar>
-          {gameState.facilities.map((g: FacilityOperatingType, i: number) =>
-            <FacilityListItem
-              facility={g}
-              key={g.id}
-              onSell={onSell}
-              onReprioritize={onReprioritize}
-              spotInList={i}
-              listLength={facilitiesCount}
-            />
-          )}
+          <DragDropContext onDragEnd={this.onDragEnd}>
+            <Droppable droppableId="droppable">
+              {(provided, snapshot) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                >
+                  {gameState.facilities.map((g: FacilityOperatingType, i: number) =>
+                    <FacilityListItem
+                      facility={g}
+                      key={g.id}
+                      onSell={onSell}
+                      onReprioritize={onReprioritize}
+                      spotInList={i}
+                      listLength={facilitiesCount}
+                    />
+                  )}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </List>
       </GameCard>
     );

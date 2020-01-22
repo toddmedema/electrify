@@ -274,7 +274,7 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
   const facility = {
     ...g,
     ...financing,
-    id: Math.random(),
+    id: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
     currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as FacilityOperatingType;

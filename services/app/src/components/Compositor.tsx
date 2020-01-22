@@ -40,7 +40,13 @@ const TUTORIAL_STEPS = [
     </Typography>,
   },
   {
-    target: '#speedChangeButton',
+    target: '.facility',
+    content: <Typography variant="body1">
+      Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
+    </Typography>,
+  },
+  {
+    target: '#speedChangeButtons',
     content: <Typography variant="body1">
       Start the game by unpausing it.<br/><br/>
       For questions and learning more, select "Manual" from the top left menu.<br/><br/>

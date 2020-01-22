@@ -20,7 +20,7 @@ export interface BuildFacilityAction extends Redux.Action {
 
 export interface SellFacilityAction extends Redux.Action {
   type: 'SELL_FACILITY';
-  id: number;
+  id: FacilityOperatingType["id"];
 }
 
 export interface ReprioritizeFacilityAction extends Redux.Action {
