@@ -329,35 +329,38 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
         date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
       };
       const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
+      const history = newState.monthlyHistory;
       if (now) {
         getSupplyWAndUpdateFacilities(newState.facilities, now);
-        newState.monthlyHistory[0] = updateMonthlyFinances(state, now);
+        history[0] = updateMonthlyFinances(state, now);
       }
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
         const difficulty = DIFFICULTIES[state.difficulty];
 
         // Record final history for the month, then insert a new blank month
-        const cash = newState.monthlyHistory[0].cash;
-        const {demandWh, supplyWh} = newState.monthlyHistory[0];
+        const cash = history[0].cash;
+        const {demandWh, supplyWh} = history[0];
         const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
         const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
-        const population = Math.round(newState.monthlyHistory[0].population * (1 + growthRate / 12));
-        newState.monthlyHistory[0].netWorth = getNetWorth(newState.facilities, cash);
-        newState.monthlyHistory.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
+        const population = Math.round(history[0].population * (1 + growthRate / 12));
+        history[0].netWorth = getNetWorth(newState.facilities, cash);
+        history.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
         newState.timeline = reforecastAll(newState);
 
+        // ===== TRIGGERS ======
         if (cash < 0) {
-          const summary = summarizeHistory(newState.monthlyHistory);
+          const summary = summarizeHistory(history);
           console.log(summary);
           setTimeout(() => getStore().dispatch(openDialog({
             title: 'Bankrupt!',
-            message: `You've run out of money. You survived for ${newState.date.year - newState.startingYear} years,
-            earned ${formatMoneyConcise(summary.revenue)} in revenue
-            and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+            message: `You've run out of money.
+              You survived for ${newState.date.year - newState.startingYear} years,
+              earned ${formatMoneyConcise(summary.revenue)} in revenue
+              and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
             open: true,
             notCancellable: true,
             actionLabel: 'Try again',
@@ -365,7 +368,22 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
           })), 1);
         }
 
-        // Time-based triggers
+        if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
+          const summary = summarizeHistory(history);
+          console.log(summary);
+          setTimeout(() => getStore().dispatch(openDialog({
+            title: 'Fired!',
+            message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
+              You survived for ${newState.date.year - newState.startingYear} years,
+              earned ${formatMoneyConcise(summary.revenue)} in revenue
+              and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+            open: true,
+            notCancellable: true,
+            actionLabel: 'Try again',
+            action: () => getStore().dispatch(quitGame()),
+          })), 1);
+        }
+
         switch (newState.date.monthsEllapsed) {
           case 12:
             if (newState.inTutorial) {
