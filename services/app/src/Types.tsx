@@ -246,7 +246,6 @@ interface SharedShoppingType {
   peakW: number;
   lifespanYears: number;
   yearsToBuild: number;
-  priority: number; // 1+, lower = higher priority, based on https://www.e-education.psu.edu/ebf200/node/151
 }
 
 

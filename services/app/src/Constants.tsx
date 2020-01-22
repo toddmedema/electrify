@@ -161,7 +161,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       annualOperatingCost: 0.09 * peakW,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      priority: 3,
       yearsToBuild: 3 + magnitude / 3,
         // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.68,
@@ -189,7 +188,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       annualOperatingCost: 0.12 * peakW,
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      priority: 2,
       yearsToBuild: 5 + magnitude / 4,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.93,
@@ -220,7 +218,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      priority: 4,
       yearsToBuild: 2 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.45,
@@ -238,7 +235,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   btuPerW: 14, // ~20-25% efficiency https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
     //   spinMinutes: 60,
     //   annualOperatingCost: 1000000, // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    //   priority: 4,
     //   yearsToBuild: 1,
     // },
     // {
@@ -254,7 +250,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   spinMinutes: 10,
     //   annualOperatingCost: 1000000, // TODO make variable
     //     // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    //   priority: 5,
     //   yearsToBuild: 2,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       // capacityFactor: 0.66,
@@ -281,7 +276,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       annualOperatingCost: 0.012 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // TODO depends on location
-      priority: 1,
       yearsToBuild: 1 + magnitude / 2,
         // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
@@ -311,7 +305,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // TODO depends on location
-      priority: 1,
       yearsToBuild: 1 + magnitude / 3,
         // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
@@ -330,7 +323,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     // maxPeakW: 250000000,
     // ~250MW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
     //   annualOperatingCost: 1000000,
-    //   priority: 1,
     //   yearsToBuild: 1,
       // spinMinutes: 1,
     // },
@@ -344,7 +336,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     // maxPeakW: 800000000,
     // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
     //   annualOperatingCost: 1000000,
-    //   priority: 1,
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       // spinMinutes: 1,
@@ -365,7 +356,6 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   annualOperatingCost: 1000000 * 0.4,
       // about 0.0017/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
       // ~40% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-    //   priority: 3,
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
     // },
@@ -414,7 +404,6 @@ export function STORAGE(state: GameStateType, peakWh: number) {
         // ~$3/kWh of capacity, assuming 100% load factor - https://www.nrel.gov/docs/fy19osti/73222.pdf
         // ~$2/kWh at a more realistic 50% load factor
         // LCOE ~$500/MWh served in 2016 - https://www.greentechmedia.com/articles/read/report-levelized-cost-of-energy-for-lithium-ion-batteries-bnef
-      priority: 2,
       yearsToBuild: 0.2 + magnitude / 3,
         // Took Tesla ~6 months to build 120MWh of capacity - https://en.wikipedia.org/wiki/Hornsdale_Power_Reserve
       spinMinutes: 1,
@@ -445,7 +434,6 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       annualOperatingCost: 0.01 * 0.15 * peakWh,
         // ~$5/kw in 2000, so about $10 in 2018 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
         // (multiplied by the peakWh -> W rate)
-      priority: 1,
       yearsToBuild: 6 + magnitude,
         // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
       spinMinutes: 10,

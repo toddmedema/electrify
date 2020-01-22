@@ -157,7 +157,6 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
     }
   });
 
-  // Executed in sort order, aka highest priority first
   // Renewables produce what they will; on-demand produces up to demand + reserve margin
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.yearsToBuildLeft === 0) {
@@ -276,15 +275,13 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
     ...g,
     ...financing,
     id: Math.random(),
-    priority: g.priority + Math.random(), // Vary priorities slightly for consistent sorting
     currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
     yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
   } as FacilityOperatingType;
   if (g.peakWh) {
     facility.currentWh = 0;
   }
-  state.facilities = [...state.facilities, facility];
-  state.facilities.sort((i, j) => i.priority < j.priority ? 1 : -1);
+  state.facilities.unshift(facility);
   return state;
 }
 
@@ -422,12 +419,10 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
     const a = action as ReprioritizeFacilityAction;
     const newState = {...state};
-    const left = newState.facilities[a.spotInList];
+    const left = {...newState.facilities[a.spotInList]};
     const right = newState.facilities[a.spotInList + a.delta];
-    const leftPriority = left.priority;
-    left.priority = right.priority;
-    right.priority = leftPriority;
-    newState.facilities.sort((i, j) => i.priority < j.priority ? 1 : -1);
+    newState.facilities[a.spotInList] = right;
+    newState.facilities[a.spotInList + a.delta] = left;
     newState.timeline = reforecastSupply(newState);
     return newState;
 
