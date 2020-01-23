@@ -320,6 +320,17 @@ function getNetWorth(facilities: FacilityOperatingType[], cash: number): number 
   return netWorth;
 }
 
+// https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
+function array_move(arr: any[], oldIndex: number, newIndex: number) {
+  if (newIndex >= arr.length) {
+    let k = newIndex - arr.length + 1;
+    while (k--) {
+      arr.push(undefined);
+    }
+  }
+  arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
+}
+
 export function gameState(state: GameStateType = cloneDeep(initialGameState), action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
   if (action.type === 'GAME_TICK') { // Game tick first because it's called the most by far, shortens lookup
@@ -371,7 +382,6 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
         if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
           const summary = summarizeHistory(history);
-          console.log(summary);
           setTimeout(() => getStore().dispatch(openDialog({
             title: 'Fired!',
             message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
@@ -397,6 +407,20 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
                 action: () => getStore().dispatch(quitGame()),
               })), 1);
             }
+            break;
+          case 12 * 20:
+            const summary = summarizeHistory(history);
+            const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+            console.log(blackoutsTWh);
+            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 2 * summary.kgco2e / 1000000000000 - 40 * blackoutsTWh);
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: `You've retired!`,
+              message: `Your final score is ${finalScore}.`,
+              open: true,
+              closeText: 'Keep playing',
+              actionLabel: 'Return to menu',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
             break;
           default:
             break;
@@ -440,10 +464,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
     const a = action as ReprioritizeFacilityAction;
     const newState = {...state};
-    const left = {...newState.facilities[a.spotInList]};
-    const right = newState.facilities[a.spotInList + a.delta];
-    newState.facilities[a.spotInList] = right;
-    newState.facilities[a.spotInList + a.delta] = left;
+    array_move(newState.facilities, a.spotInList, a.spotInList + a.delta);
     newState.timeline = reforecastSupply(newState);
     return newState;
 

@@ -1,6 +1,4 @@
 import {Avatar, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Toolbar, Typography} from '@material-ui/core';
-import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
-import ArrowUpwardIcon from '@material-ui/icons/ArrowUpward';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
@@ -85,12 +83,6 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               </DialogActions>
             </Dialog>
             <ListItemSecondaryAction>
-              {props.spotInList > 0 && <IconButton onClick={() => props.onReprioritize(props.spotInList, -1)} edge="end" color="primary">
-                <ArrowUpwardIcon />
-              </IconButton>}
-              {props.listLength > 1 && <IconButton disabled={props.spotInList === props.listLength - 1} onClick={() => props.onReprioritize(props.spotInList, 1)} edge="end" color="primary">
-                <ArrowDownwardIcon />
-              </IconButton>}
               {!underConstruction && props.listLength > 1 && <IconButton onClick={toggleDialog} edge="end" color="primary">
                 <DeleteForeverIcon />
               </IconButton>}
