@@ -129,6 +129,7 @@ export type CardNameType =
   'MAIN_MENU' |
   'MANUAL' |
   'SETTINGS' |
+  'HIGH_SCORES' |
   'GAME_SETUP';
 
 export interface CardType {
@@ -136,6 +137,17 @@ export interface CardType {
   ts: number;
   overrideDebounce?: boolean;
   history: CardNameType[];
+}
+
+export interface ScoresContainerType {
+  scores: ScoreType[];
+}
+export interface ScoreType {
+  score: number;
+  difficulty: string;
+  carbonFeePerTon: number;
+  startingYear: number;
+  date: string; // Stringified new Date()
 }
 
 export interface DateType {

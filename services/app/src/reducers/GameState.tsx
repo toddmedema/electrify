@@ -6,8 +6,9 @@ import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 const numbro = require('numbro');
@@ -413,6 +414,14 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
             const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
+            const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
+            setStorageKeyValue('highscores', {scores: [...scores, {
+              score: finalScore,
+              difficulty: state.difficulty,
+              carbonFeePerTon: Math.round(state.feePerKgCO2e * 1000),
+              startingYear: state.startingYear,
+              date: (new Date()).toString(),
+            }]});
             setTimeout(() => getStore().dispatch(openDialog({
               title: `You've retired!`,
               message: `Your final score is ${finalScore}.`,

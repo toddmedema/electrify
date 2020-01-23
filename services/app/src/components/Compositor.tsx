@@ -13,6 +13,7 @@ import FacilitiesContainer from './views/FacilitiesContainer';
 import FinancesContainer from './views/FinancesContainer';
 import ForecastsContainer from './views/ForecastsContainer';
 import GameSetupContainer from './views/GameSetupContainer';
+import HighScoresContainer from './views/HighScoresContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import ManualContainer from './views/ManualContainer';
@@ -142,6 +143,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <ManualContainer />;
       case 'LOADING':
         return <LoadingContainer />;
+      case 'HIGH_SCORES':
+        return <HighScoresContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }

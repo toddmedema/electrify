@@ -171,6 +171,9 @@ body {
 
 table {
   margin-bottom: 16px;
+  th {
+    font-weight: bold !important;
+  }
   tr.bold td {
     font-weight: bold;
     padding-top: 16px;
