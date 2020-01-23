@@ -84,15 +84,15 @@ prod() {
   prodbuild
   # Deploy web app to prod with 1 day cache for most files, 6 month cache for art assets
   export AWS_DEFAULT_REGION='us-east-2'
-  aws s3 cp www s3://app.electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --cache-control max-age=86400 --cache-control public
-  aws s3 cp www s3://app.electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control max-age=15552000 --cache-control public
+  aws s3 cp www s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --cache-control max-age=86400 --cache-control public
+  aws s3 cp www s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control max-age=15552000 --cache-control public
 
   # Upload the APK for side-loading, and archive it by version number
-  aws s3 cp platforms/android/app/build/outputs/apk/release/electrify.apk s3://app.electrifygame.com/electrify.apk --cache-control public
-  aws s3 cp s3://app.electrifygame.com/electrify.apk s3://app.electrifygame.com/apk-archive/electrify-$version.apk --cache-control public
+  aws s3 cp platforms/android/app/build/outputs/apk/release/electrify.apk s3://electrifygame.com/electrify.apk --cache-control public
+  aws s3 cp s3://electrifygame.com/electrify.apk s3://electrifygame.com/apk-archive/electrify-$version.apk --cache-control public
 
   # Upload package.json for API's version check
-  aws s3 cp package.json s3://app.electrifygame.com/package.json
+  aws s3 cp package.json s3://electrifygame.com/package.json
 
   # Invalidate files on cloudfront
   aws cloudfront create-invalidation --distribution-id EDFP2F13AASZW --paths /\*
