@@ -11,8 +11,9 @@ import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingTy
 
 // const seedrandom = require('seedrandom');
 const numbro = require('numbro');
+const cloneDeep = require('lodash.clonedeep');
 
-export const initialGameState: GameStateType = {
+const initialGameState: GameStateType = {
   difficulty: 'EMPLOYEE',
   speed: 'PAUSED',
   inGame: false,
@@ -319,7 +320,7 @@ function getNetWorth(facilities: FacilityOperatingType[], cash: number): number 
   return netWorth;
 }
 
-export function gameState(state: GameStateType = initialGameState, action: Redux.Action): GameStateType {
+export function gameState(state: GameStateType = cloneDeep(initialGameState), action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
   if (action.type === 'GAME_TICK') { // Game tick first because it's called the most by far, shortens lookup
 
@@ -493,7 +494,7 @@ export function gameState(state: GameStateType = initialGameState, action: Redux
 
   } else if (action.type === 'GAME_EXIT') {
 
-    return {...initialGameState};
+    return cloneDeep(initialGameState);
 
   }
   return state;
