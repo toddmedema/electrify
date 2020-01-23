@@ -13,8 +13,9 @@ import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingTy
 const numbro = require('numbro');
 const cloneDeep = require('lodash.clonedeep');
 
+let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
-  difficulty: 'EMPLOYEE',
+  difficulty: 'Employee',
   speed: 'PAUSED',
   inGame: false,
   inTutorial: true,
@@ -411,8 +412,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           case 12 * 20:
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-            console.log(blackoutsTWh);
-            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 2 * summary.kgco2e / 1000000000000 - 40 * blackoutsTWh);
+            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
             setTimeout(() => getStore().dispatch(openDialog({
               title: `You've retired!`,
               message: `Your final score is ${finalScore}.`,
@@ -511,7 +511,12 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
   } else if (action.type === 'DIALOG_OPEN') {
 
+    previousSpeed = state.speed;
     return {...state, speed: 'PAUSED'};
+
+  } else if (action.type === 'DIALOG_CLOSE') {
+
+    return {...state, speed: previousSpeed};
 
   } else if (action.type === 'GAME_EXIT') {
 

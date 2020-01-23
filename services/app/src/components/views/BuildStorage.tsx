@@ -233,7 +233,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           width: `${gameState.date.percentOfYear * 100}%`,
         }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography>
+          Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography> {filtered.length <= 0 && '(slide to change)'}
         </Typography>
         <Slider
           value={sliderTick}

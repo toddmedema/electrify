@@ -270,7 +270,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           width: `${gameState.date.percentOfYear * 100}%`,
         }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Generator capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography>
+          Generator capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography> {filtered.length <= 1 && '(slide to change)'}
         </Typography>
         <Slider
           value={sliderTick}

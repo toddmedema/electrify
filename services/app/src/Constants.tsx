@@ -2,19 +2,19 @@ import {LCWH} from 'shared/helpers/Financials';
 import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
 
 export const DIFFICULTIES = {
-  INTERN: {
+  Intern: {
     buildCost: 0.6,
     expensesOM: 0.6,
     buildTime: 0.2,
     blackoutPenalty: 2,
   },
-  EMPLOYEE: {
+  Employee: {
     buildCost: 0.7,
     expensesOM: 0.7,
     buildTime: 0.3,
     blackoutPenalty: 4,
   },
-  MANAGER: {
+  Manager: {
     buildCost: 0.8,
     expensesOM: 0.8,
     buildTime: 0.5,
@@ -32,7 +32,7 @@ export const DIFFICULTIES = {
     buildTime: 1,
     blackoutPenalty: 10,
   },
-  GURU: {
+  Guru: {
     buildCost: 1.2,
     expensesOM: 1.1,
     buildTime: 1,
