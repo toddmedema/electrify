@@ -109,6 +109,20 @@ const MANUAL_ENTRIES = [
     </div>,
   },
   {
+    title: `Score`,
+    entry: <div>
+      <p>At the end of your 20 year term as CEO, you'll receive a score for how well you did. Try to beat your score the next time you play!</p>
+      <p>Scores are calculated as follows:</p>
+      <p>
+        1 pt for each TWh supplied<br/>
+        4 pts for each $100M of net worth<br/>
+        1 pt for each 100k people served<br/>
+        -3 pts for each gTon of pollution<br/>
+        -10 pts for each TWh of blackouts
+      </p>
+    </div>,
+  },
+  {
     title: `Total Cost of Energy`,
     entry: <p>Also known as "Levelized Cost of Energy", it's the expected cost of all energy produced by the plant during its lifetime, including construction, maintenance and fuel.</p>,
   },

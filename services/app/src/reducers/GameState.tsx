@@ -413,6 +413,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           case 12 * 20:
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+            // This is also described in the manual; if I update the algorithm, update the manual too!
             const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
             const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
             setStorageKeyValue('highscores', {scores: [...scores, {
