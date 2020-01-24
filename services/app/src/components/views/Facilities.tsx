@@ -1,6 +1,7 @@
 import {Avatar, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, List, ListItem, ListItemAvatar, ListItemSecondaryAction, ListItemText, Toolbar, Typography} from '@material-ui/core';
 import CancelIcon from '@material-ui/icons/Cancel';
 import DeleteForeverIcon from '@material-ui/icons/DeleteForever';
+import DragIndicatorIcon from '@material-ui/icons/DragIndicator';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 
 import {TICK_MINUTES} from 'app/Constants';
@@ -53,6 +54,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
           style={getDraggableStyle(snapshot.isDragging, provided.draggableProps.style)}
         >
           <ListItem disabled={underConstruction} className="facility">
+            <DragIndicatorIcon className="draggable-indicator" color="primary" />
             {facility.currentW > 1000 && <div className="outputProgressBar" style={{width: `${facility.currentW / facility.peakW * 100}%`}}/>}
             <ListItemAvatar>
               <div>

@@ -148,6 +148,12 @@ body {
   }
 }
 
+.draggable-indicator {
+  position: absolute;
+  left: -4px;
+  z-index: 1;
+}
+
 .MuiToolbar-root {
   min-height: 0 !important;
   border-bottom: $border_accent;
@@ -481,7 +487,7 @@ body.android .dialog .textfield:focus-within {
       background-color: #212121; /* grey 900 */
       position: absolute;
       bottom: 0;
-      left: -14px;
+      left: 42px;
 
       &:after {
         content: '';
