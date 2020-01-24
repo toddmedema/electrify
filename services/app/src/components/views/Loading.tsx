@@ -20,7 +20,12 @@ export default class Loading extends React.PureComponent<Props, {}> {
 
   public render() {
     return (
-      <CircularProgress />
+      <div className="flex-fully-centered">
+        <div id="logo" className="fadein-slow">
+          <img src="images/logo.svg"></img>
+        </div>
+        <CircularProgress className="fadein-fast" size={60} />
+      </div>
     );
   }
 }
