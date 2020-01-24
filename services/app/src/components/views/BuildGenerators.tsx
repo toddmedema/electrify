@@ -63,7 +63,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               {formatMoneyConcise(generator.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">{Math.round(generator.yearsToBuild * 12)}mo to build<br/>
-            ~{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</Typography>
+            {fuelPrices[generator.fuel] ? '~' : ''}{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</Typography>
           </span>
         }
         title={generator.name}

@@ -83,47 +83,22 @@ export const INIT_DELAY = {
 
 // TODO additional sources of information
 // Lifetime GHG for all fuels: https://en.wikipedia.org/wiki/Life-cycle_greenhouse-gas_emissions_of_energy_sources
-
 export const FUELS = {
-  // ~31kJ/g - https://hypertextbook.com/facts/2006/LunChen.shtml
-  // Thus 1GJ = 32kg
-  // Historic price per short ton (907kg): https://www.eia.gov/energyexplained/coal/prices-and-outlook.php
-  // Just CO2 emission per MBTu (215lb/1.05GJ): https://www.eia.gov/tools/faqs/faq.php?id=73&t=11
-  // TODO I arrived at this number by tweaking it in the simulation vs EIA numbers
-    // Need to figure out where my calculations went wrong
   'Coal': {
-    // costPerBtu: 0.000002, // pretty even 2000-2018
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
-
-  // ~1030Btu/cf https://www.eia.gov/todayinenergy/detail.php?id=18371
-  // Thus 1GJ = .92cf
-  // Historic price per thousand cf: https://www.eia.gov/dnav/ng/hist/n3035us3m.htm
-    // California about national average, but does vary by location: http://www.ppinys.org/reports/jtf2004/naturalgas.htm
-  // Natural gas has a large methane component, not just CO2 https://www.epa.gov/sites/production/files/2018-01/documents/2018_executive_summary.pdf
-  // 15lbs CO2e per 100cf http://www.co2list.org/files/carbon.htm
-  // TODO I arrived at this number by tweaking it in the simulation vs EIA numbers
-    // Need to figure out where my calculations went wrong
   'Natural Gas': {
-    // costPerBtu: 0.000003, // Between 2000 and 2018, sometimes spiked to 3x price - using $5/1k cf avg here, ranges $4-12
     kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
-
-  // $0.71 per million BTU https://www.eia.gov/opendata/qb.php?category=40290&sdid=SEDS.NUETD.WI.A
   'Uranium': {
-    // costPerBtu: 0.00000071,
     kgCO2ePerBtu: 0,
   },
-
   // TODO
   // 'Oil': {
-  //   costPerBtu: 999,
   //   kgCO2ePerBtu: 999,
   // },
-
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
   // 'Trash': {
-  //   costPerBtu: 999,
   //   kgCO2ePerBtu: 999,
   // },
 } as { [fuel: string]: FuelType };
@@ -262,13 +237,14 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       fuel: 'Wind',
       description: 'Windiest at spring and fall evenings',
       available: (state.date.year > 1941), // First megawatt-size turbine was in Vermont in 1941
-      buildCost: 43000000 + 1.4 * peakW,
+      buildCost: 43000000 + (1.4 * peakW * Math.pow(3, (2020 - state.date.year) / 40)),
         // ~$1,900/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$1,600/kw in 2019 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 95GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
         // Added in 2017: 64 generators, 5.8GW total - https://www.eia.gov/electricity/generatorcosts/
         // Thus 2017 new avg plant is 90MW and cost $172m
         // 1/4 fixed = $43m, 3/4 variable = $1.4/w
+        // Went from ~$5/w in 1980 to ~$1.5/w in 2018, about 1/3 in 40 years - https://newscenter.lbl.gov/2019/08/26/report-confirms-wind-technology-advancements-continue-to-drive-down-the-cost-of-wind-energy/
       peakW,
       maxPeakW: 1500000000,
         // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
@@ -290,12 +266,13 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       fuel: 'Sun',
       description: 'Sunniest at summer noon',
       available: (state.date.year > 1982), // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
-      buildCost: 3900000 + 1.275 * peakW,
+      buildCost: 3900000 + (1.275 * peakW * Math.pow(2, (2020 - state.date.year) / 8)),
         // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
         // Added in 2017: 541 generators, 5GW total - https://www.eia.gov/electricity/generatorcosts/
         // Thus 2017 new avg plant is 9.2MW and cost $15.6m
         // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
+        // Cost curve over time, went from ~8x ($13.6/w) to ~1x ($1.7/w) from 1995 to 2020, so halving ~8 years - https://sites.lafayette.edu/egrs352-sp14-pv/technology/history-of-pv-technology/
       peakW,
       maxPeakW: (state.date.year < 2000) ? 100000000 : 2000000000,
         // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
@@ -327,6 +304,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       // spinMinutes: 1,
     // },
     // {
+    // Geothermal only makes sense if you have limited locations, i.e. there are only 5 spots in the US > 100MW - https://en.wikipedia.org/wiki/List_of_geothermal_power_stations
         // Still only has a capacity factor of .733, why? https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
     //   name: 'Geothermal',
     //   fuel: 'Ground Heat',
@@ -334,7 +312,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
     //   buildCost: 200000000,
     //   peakW,
     // maxPeakW: 800000000,
-    // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
+    // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
     //   annualOperatingCost: 1000000,
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -380,7 +358,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
 
   let storage = [
     {
-      name: 'Lithium-Ion Battery',
+      name: 'Battery',
       description: 'Fast to build and charge / discharge',
       available: (state.date.year > 2008), // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + 0.4 * peakWh,
@@ -389,10 +367,11 @@ export function STORAGE(state: GameStateType, peakWh: number) {
       peakW: 0.8 * peakWh,
         // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
       peakWh,
-      maxPeakWh: 200000000,
+      maxPeakWh: 200000000 * Math.pow(2, (state.date.year - 2018) / 4),
         // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
         // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
         // ~2MWh in 2014, 1MWh before that
+        // So roughly doubling in max capacity every 4 years after 2018
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
       roundTripEfficiency: 0.85,

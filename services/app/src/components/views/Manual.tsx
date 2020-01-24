@@ -72,7 +72,7 @@ const MANUAL_ENTRIES = [
     title: `Blackouts`,
     entry: <div>
       <p>If you don't supply enough electricity to meet demand, you'll cause rolling blackouts that cost you customers (and thus revenue).</p>
-      <p>Like utilities in real life, you aren't financially responsible for blackouts.</p>
+      <p>Like utilities in real life, you aren't financially responsible for blackouts. But, if you have chronic blackouts, your board of directors might fire you!</p>
     </div>,
   },
   {
