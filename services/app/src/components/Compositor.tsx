@@ -21,6 +21,7 @@ import SettingsContainer from './views/SettingsContainer';
 
 const TUTORIAL_STEPS = [
   {
+    disableBeacon: true, // causes tutorial to auto-start
     target: '#topbar',
     content: <Typography variant="body1">
       Welcome! You're the new CEO of a regional power generation company.<br/><br/>
