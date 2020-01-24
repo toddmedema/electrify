@@ -20,9 +20,10 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
         initFuelPrices(() => {
           // Otherwise, generate from scratch
+          // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
           dispatch({
             type: 'NEW_GAME',
-            facilities: [{fuel: 'Coal', peakW: 500000000}],
+            facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
             cash: 200000000,
             population: 1080000,
           } as NewGameAction);
