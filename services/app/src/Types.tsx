@@ -277,6 +277,8 @@ export interface ScenarioType {
   name: string;
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
+  durationMonths: number;
+  endMessageTitle?: string;
   feePerKgCO2e: number;
 }
 

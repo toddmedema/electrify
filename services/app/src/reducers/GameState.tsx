@@ -7,6 +7,7 @@ import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
+import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TimelineType} from '../Types';
 
@@ -397,43 +398,30 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           })), 1);
         }
 
-        // TODO tutorial triggers should be dynamic based on scenarioId
-        switch (newState.date.monthsEllapsed) {
-          case 12:
-            if (newState.tutorialStep > 0) {
-              setTimeout(() => getStore().dispatch(openDialog({
-                title: 'Tutorial complete!',
-                message: '',
-                open: true,
-                closeText: 'Keep playing',
-                actionLabel: 'Return to menu',
-                action: () => getStore().dispatch(quitGame()),
-              })), 1);
-            }
-            break;
-          case 12 * 20:
-            const summary = summarizeHistory(history);
-            const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-            // This is also described in the manual; if I update the algorithm, update the manual too!
-            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
-            const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
-            setStorageKeyValue('highscores', {scores: [...scores, {
-              score: finalScore,
-              scenarioId: state.scenarioId,
-              difficulty: state.difficulty,
-              date: (new Date()).toString(),
-            } as ScoreType]});
-            setTimeout(() => getStore().dispatch(openDialog({
-              title: `You've retired!`,
-              message: `Your final score is ${finalScore}.`,
-              open: true,
-              closeText: 'Keep playing',
-              actionLabel: 'Return to menu',
-              action: () => getStore().dispatch(quitGame()),
-            })), 1);
-            break;
-          default:
-            break;
+        const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
+          durationMonths: 12 * 20,
+          endMessageTitle: `You've retired!`,
+        };
+        if (newState.date.monthsEllapsed === scenario.durationMonths) {
+          const summary = summarizeHistory(history);
+          const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+          // This is also described in the manual; if I update the algorithm, update the manual too!
+          const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
+          const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
+          setStorageKeyValue('highscores', {scores: [...scores, {
+            score: finalScore,
+            scenarioId: state.scenarioId,
+            difficulty: state.difficulty,
+            date: (new Date()).toString(),
+          } as ScoreType]});
+          setTimeout(() => getStore().dispatch(openDialog({
+            title: scenario.endMessageTitle || `You've retired!`,
+            message: `Your score is ${finalScore}.`,
+            open: true,
+            closeText: 'Keep playing',
+            actionLabel: 'Return to menu',
+            action: () => getStore().dispatch(quitGame()),
+          })), 1);
         }
       }
 

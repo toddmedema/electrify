@@ -1,9 +1,12 @@
 import {Button, Card, CardHeader, IconButton, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
+import CheckIcon from '@material-ui/icons/Check';
+import RemoveIcon from '@material-ui/icons/Remove';
 import * as React from 'react';
 
-import {SCENARIOS} from 'app/Constants';
-import {GameStateType, ScenarioType} from 'app/Types';
+import {SCENARIOS} from 'app/Scenarios';
+import {GameStateType, ScenarioType, ScoresContainerType} from 'app/Types';
+import {getStorageJson} from '../../LocalStorage';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -17,19 +20,21 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 interface TutorialListItemProps {
+  completed: boolean;
   s: ScenarioType;
   onStart: DispatchProps['onStart'];
 }
 
 function TutorialListItem(props: TutorialListItemProps): JSX.Element {
-  const {s, onStart} = props;
+  const {s, onStart, completed} = props;
   return (
     <Card className="build-list-item">
       <CardHeader
+        avatar={completed ? <CheckIcon /> : <RemoveIcon />}
         action={
           <Button
             size="small"
-            variant="contained"
+            variant={completed ? 'outlined' : 'contained'}
             color="primary"
             onClick={(e: any) => onStart({scenarioId: s.id})}
           >
@@ -41,7 +46,11 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
     </Card>
   );
 }
+
 export default function Tutorials(props: Props): JSX.Element {
+  const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores.sort((a, b) => a.score < b.score ? 1 : -1);
+  const ids = scores.map((s) => s.scenarioId);
+
   return (
     <div id="listCard">
       <div id="topbar">
@@ -53,7 +62,7 @@ export default function Tutorials(props: Props): JSX.Element {
         </Toolbar>
       </div>
       {SCENARIOS.filter((s) => s.tutorialSteps).map((s) => {
-        return <TutorialListItem key={s.id} onStart={props.onStart} s={s}/>;
+        return <TutorialListItem key={s.id} onStart={props.onStart} s={s} completed={ids.indexOf(s.id) !== -1}/>;
       })}
     </div>
   );
