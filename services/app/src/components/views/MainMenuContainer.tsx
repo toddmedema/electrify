@@ -18,7 +18,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(toCard({name: 'SETTINGS'}));
     },
     onStart: () => {
-      dispatch(toCard({name: 'GAME_SETUP'}));
+      dispatch(toCard({name: 'NEW_GAME'}));
     },
     onTutorial: () => {
       dispatch(toCard({name: 'TUTORIALS'}));
