@@ -10,7 +10,7 @@ export interface DispatchProps {
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
-  onHighScores: () => void;
+  onTutorial: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -24,10 +24,10 @@ const MainMenu = (props: Props): JSX.Element => {
         <img src="images/logo.svg"></img>
       </div>
       <div id="centeredMenu">
-        <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>New Game</Button>
+        <Button size="large" variant="contained" color="primary" onClick={props.onTutorial} autoFocus>Learn to play</Button>
+        <Button size="large" variant="contained" color="primary" onClick={props.onStart}>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
-        <Button variant="outlined" color="primary" onClick={props.onSettings}>Settings</Button>
-        <Button variant="outlined" color="primary" onClick={props.onHighScores}>High Scores</Button>
+        <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
       </div>
       <Button style={{position: 'absolute', bottom: 0, left: 0}} color="primary" onClick={() => openWindow('https://fabricate.us10.list-manage.com/subscribe?u=792afb261df839e73b669f83f&id=8ccd05ccba')}>Subscribe</Button>
       <Button style={{position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)'}} color="primary" onClick={() => openWindow('/about.html')}>About</Button>

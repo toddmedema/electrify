@@ -1,5 +1,7 @@
+import {Typography} from '@material-ui/core';
+import * as React from 'react';
 import {LCWH} from 'shared/helpers/Financials';
-import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, StorageShoppingType} from './Types';
+import {CardNameType, DifficultyMultipliersType, FuelType, GameStateType, GeneratorShoppingType, MonthType, ScenarioType, StorageShoppingType} from './Types';
 
 export const DIFFICULTIES = {
   Intern: {
@@ -69,6 +71,88 @@ export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', '
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
 
 export const UNSUPPORTED_BROWSERS = /^(.*amazon silk.*)|(.*(iphone|ipad|ipod|ios) os 9_.*)$/i;
+
+export const SCENARIOS = [
+  {
+    id: 1,
+    name: '101: Generators',
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#topbar',
+        content: <Typography variant="body1">
+          Welcome! You're the new CEO of a regional power generation company.<br/><br/>
+          Your goal: Make as much money as possible in your 20 year tenure. You lose if you run out of money.
+        </Typography>,
+      },
+      {
+        target: '.VictoryContainer',
+        content: <Typography variant="body1">
+          Make money by supplying demand for electricity.<br/><br/>
+          If you don't supply enough power, you'll cause blackouts that cost you customers.
+        </Typography>,
+      },
+      {
+        target: '.button-buildGenerator',
+        content: <Typography variant="body1">
+          Build generators and storage to meet demand (options and prices change as new tech become available).
+        </Typography>,
+      },
+      {
+        target: '.facility',
+        content: <Typography variant="body1">
+          Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
+        </Typography>,
+      },
+      {
+        target: '#speedChangeButtons',
+        content: <Typography variant="body1">
+          Start the game by unpausing it.<br/><br/>
+          For questions and learning more, select "Manual" from the top left menu.<br/><br/>
+          Good luck!
+        </Typography>,
+      },
+    ],
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+  },
+  {
+    id: 2,
+    name: '102: Finances',
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#topbar',
+        content: <Typography variant="body1">
+          TODO
+        </Typography>,
+      },
+    ],
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+  },
+  {
+    id: 3,
+    name: '103: Forecasting',
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#topbar',
+        content: <Typography variant="body1">
+          TODO
+        </Typography>,
+      },
+    ],
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+  },
+  {
+    id: 100,
+    name: '2020 - Carbon Fee',
+    startingYear: 2020,
+    feePerKgCO2e: 50,
+  },
+] as ScenarioType[];
 
 export const URLS = {
   // lowercase to match lowercase platform names

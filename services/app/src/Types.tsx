@@ -73,6 +73,11 @@ export interface QuitGameAction extends Redux.Action {
   type: 'GAME_EXIT';
 }
 
+export interface StartGameAction extends Redux.Action {
+  type: 'GAME_START';
+  delta: Partial<GameStateType>;
+}
+
 export interface UiDeltaAction extends Redux.Action {
   type: 'UI_DELTA';
   delta: Partial<UIType>;
@@ -129,7 +134,7 @@ export type CardNameType =
   'MAIN_MENU' |
   'MANUAL' |
   'SETTINGS' |
-  'HIGH_SCORES' |
+  'TUTORIALS' |
   'GAME_SETUP';
 
 export interface CardType {
@@ -145,8 +150,7 @@ export interface ScoresContainerType {
 export interface ScoreType {
   score: number;
   difficulty: string;
-  carbonFeePerTon: number;
-  startingYear: number;
+  scenarioId: number;
   date: string; // Stringified new Date()
 }
 
@@ -262,15 +266,29 @@ interface SharedShoppingType {
   yearsToBuild: number;
 }
 
+export interface TutorialStepType {
+  disableBeacon?: boolean;
+  target: string;
+  content: JSX.Element;
+}
+
+export interface ScenarioType {
+  id: number;
+  name: string;
+  tutorialSteps?: TutorialStepType[];
+  startingYear: number;
+  feePerKgCO2e: number;
+}
+
 
 
 
 export interface GameStateType {
   difficulty: DifficultyType;
+  scenarioId: number;
   speed: SpeedType;
   inGame: boolean;
   feePerKgCO2e: number;
-  inTutorial: boolean;
   tutorialStep: number;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness

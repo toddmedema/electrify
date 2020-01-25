@@ -8,7 +8,7 @@ import {openDialog} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, SellFacilityAction, SetSpeedAction, SpeedType, TimelineType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TimelineType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 const numbro = require('numbro');
@@ -16,10 +16,10 @@ const cloneDeep = require('lodash.clonedeep');
 
 let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
+  scenarioId: 100,
   difficulty: 'Employee',
   speed: 'PAUSED',
   inGame: false,
-  inTutorial: true,
   feePerKgCO2e: 0, // Start on easy mode
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
@@ -397,9 +397,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           })), 1);
         }
 
+        // TODO tutorial triggers should be dynamic based on scenarioId
         switch (newState.date.monthsEllapsed) {
           case 12:
-            if (newState.inTutorial) {
+            if (newState.tutorialStep > 0) {
               setTimeout(() => getStore().dispatch(openDialog({
                 title: 'Tutorial complete!',
                 message: '',
@@ -418,11 +419,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
             setStorageKeyValue('highscores', {scores: [...scores, {
               score: finalScore,
+              scenarioId: state.scenarioId,
               difficulty: state.difficulty,
-              carbonFeePerTon: Math.round(state.feePerKgCO2e * 1000),
-              startingYear: state.startingYear,
               date: (new Date()).toString(),
-            }]});
+            } as ScoreType]});
             setTimeout(() => getStore().dispatch(openDialog({
               title: `You've retired!`,
               message: `Your final score is ${finalScore}.`,
@@ -447,6 +447,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
   } else if (action.type === 'GAMESTATE_DELTA') {
 
     return {...state, ...(action as any).delta};
+
+  } else if (action.type === 'GAME_START') {
+
+    return {...state, ...(action as StartGameAction).delta};
 
   } else if (action.type === 'BUILD_FACILITY') {
 

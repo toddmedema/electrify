@@ -37,8 +37,7 @@ export default class HighScores extends React.PureComponent<Props, {}> {
               <TableRow>
                 <TableCell>Score</TableCell>
                 <TableCell>Difficulty</TableCell>
-                <TableCell>Carbon fee</TableCell>
-                <TableCell>Starting year</TableCell>
+                <TableCell>Scenario ID</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -46,8 +45,7 @@ export default class HighScores extends React.PureComponent<Props, {}> {
                 return <TableRow key={i}>
                   <TableCell>{numbro(score.score).format({thousandSeparated: true, mantissa: 0})}</TableCell>
                   <TableCell>{score.difficulty}</TableCell>
-                  <TableCell>${Math.round(score.carbonFeePerTon || 0)}/ton</TableCell>
-                  <TableCell>{score.startingYear}</TableCell>
+                  <TableCell>{score.scenarioId}</TableCell>
                 </TableRow>;
               })}
             </TableBody>

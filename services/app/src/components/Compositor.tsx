@@ -4,7 +4,7 @@ import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
 
 import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
-import {CardNameType, CardType, SettingsType, TransitionClassType, UIType} from '../Types';
+import {CardNameType, CardType, SettingsType, TransitionClassType, TutorialStepType, UIType} from '../Types';
 
 import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
@@ -13,49 +13,11 @@ import FacilitiesContainer from './views/FacilitiesContainer';
 import FinancesContainer from './views/FinancesContainer';
 import ForecastsContainer from './views/ForecastsContainer';
 import GameSetupContainer from './views/GameSetupContainer';
-import HighScoresContainer from './views/HighScoresContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import ManualContainer from './views/ManualContainer';
 import SettingsContainer from './views/SettingsContainer';
-
-const TUTORIAL_STEPS = [
-  {
-    disableBeacon: true, // causes tutorial to auto-start
-    target: '#topbar',
-    content: <Typography variant="body1">
-      Welcome! You're the new CEO of a regional power generation company.<br/><br/>
-      Your goal: Make as much money as possible in your 20 year tenure. You lose if you run out of money.
-    </Typography>,
-  },
-  {
-    target: '.VictoryContainer',
-    content: <Typography variant="body1">
-      Make money by supplying demand for electricity.<br/><br/>
-      If you don't supply enough power, you'll cause blackouts that cost you customers.
-    </Typography>,
-  },
-  {
-    target: '.button-buildGenerator',
-    content: <Typography variant="body1">
-      Build generators and storage to meet demand (options and prices change as new tech become available).
-    </Typography>,
-  },
-  {
-    target: '.facility',
-    content: <Typography variant="body1">
-      Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
-    </Typography>,
-  },
-  {
-    target: '#speedChangeButtons',
-    content: <Typography variant="body1">
-      Start the game by unpausing it.<br/><br/>
-      For questions and learning more, select "Manual" from the top left menu.<br/><br/>
-      Good luck!
-    </Typography>,
-  },
-];
+import TutorialsContainer from './views/TutorialsContainer';
 
 interface TooltipProps {
   continuous: any;
@@ -65,10 +27,11 @@ interface TooltipProps {
   closeProps: any;
   primaryProps: any;
   tooltipProps: any;
+  isLastStep: boolean;
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const {index, step, backProps, primaryProps, tooltipProps} = props;
+  const {index, step, backProps, primaryProps, tooltipProps, isLastStep} = props;
   const isString = typeof step.content === 'string';
   return <div id="tutorial-tooltip" {...tooltipProps}>
     {step.title && <Typography variant="h6" gutterBottom>{step.title}</Typography>}
@@ -80,7 +43,7 @@ function Tooltip(props: TooltipProps): JSX.Element {
         </Button>
       )}
       <Button {...primaryProps} variant="contained" color="primary">
-        {index < TUTORIAL_STEPS.length - 1 ? 'Next' : 'Play'}
+        {isLastStep ? 'Play' : 'Next'}
       </Button>
     </div>
     <div style={{clear: 'both'}}></div>
@@ -92,8 +55,8 @@ export interface StateProps {
   settings: SettingsType;
   ui: UIType;
   transition: TransitionClassType;
-  inTutorial: boolean;
   tutorialStep: number;
+  tutorialSteps?: TutorialStepType[];
 }
 
 export interface DispatchProps {
@@ -144,8 +107,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <ManualContainer />;
       case 'LOADING':
         return <LoadingContainer />;
-      case 'HIGH_SCORES':
-        return <HighScoresContainer />;
+      case 'TUTORIALS':
+        return <TutorialsContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }
@@ -171,7 +134,7 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const { tutorialStep, ui, closeDialog, inTutorial } = this.props;
+    const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } = this.props;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -190,7 +153,7 @@ export default class Compositor extends React.Component<Props, {}> {
             </div>
           </CSSTransition>
         </TransitionGroup>
-        {inTutorial && <Joyride
+        {tutorialSteps && <Joyride
           callback={this.handleJoyrideCallback}
           continuous={true}
           showProgress={true}
@@ -198,7 +161,7 @@ export default class Compositor extends React.Component<Props, {}> {
           run={tutorialStep >= 0}
           tooltipComponent={Tooltip}
           stepIndex={tutorialStep}
-          steps={TUTORIAL_STEPS}
+          steps={tutorialSteps}
           styles={{
             options: {
               beaconSize: 48,
@@ -225,11 +188,11 @@ export default class Compositor extends React.Component<Props, {}> {
         </Dialog>
         <Snackbar
           className="snackbar"
-          open={this.props.ui.snackbar.open}
-          message={<span>{this.props.ui.snackbar.message}</span>}
-          autoHideDuration={this.props.ui.snackbar.timeout}
-          onClose={this.props.closeSnackbar}
-          action={(this.props.ui.snackbar.actionLabel) ? [<Button key={1} onClick={(e: React.MouseEvent<HTMLElement>) => this.snackbarActionClicked(e)}>{this.props.ui.snackbar.actionLabel}</Button>] : []}
+          open={ui.snackbar.open}
+          message={<span>{ui.snackbar.message}</span>}
+          autoHideDuration={ui.snackbar.timeout}
+          onClose={closeSnackbar}
+          action={(ui.snackbar.actionLabel) ? [<Button key={1} onClick={(e: React.MouseEvent<HTMLElement>) => this.snackbarActionClicked(e)}>{ui.snackbar.actionLabel}</Button>] : []}
         />
         <AudioContainer />
       </div>

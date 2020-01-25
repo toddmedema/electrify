@@ -1,7 +1,9 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
+
 import {initFuelPrices} from 'shared/schema/FuelPrices';
 import {initWeather} from 'shared/schema/Weather';
+import {SCENARIOS} from '../../Constants';
 import {AppStateType, GameStateType, NewGameAction} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
 
@@ -30,7 +32,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
           dispatch({type: 'GAME_LOADED'});
 
-          if (gameState.inTutorial) {
+          if ((SCENARIOS.find((s) => s.id === gameState.scenarioId) || {}).tutorialSteps) {
             setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
           }
         });

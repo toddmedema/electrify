@@ -1,4 +1,4 @@
-import {Button, Checkbox, IconButton, MenuItem, Select, Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@material-ui/core';
+import {Button, IconButton, MenuItem, Select, Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
@@ -20,16 +20,14 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function GameSetup(props: Props): JSX.Element {
-  // TODO info button should show a help dialog
-  // or, instead, each item should have its own info / help button
   return (
-    <div id="menuCard">
+    <div id="listCard">
       <div id="topbar">
         <Toolbar>
           <IconButton onClick={props.onBack} aria-label="back" edge="start" color="primary">
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6" className="absolutelyCentered">Game Setup</Typography>
+          <Typography variant="h6">Game Setup</Typography>
         </Toolbar>
       </div>
       <Table size="small" id="gameSetupTable">
@@ -83,19 +81,11 @@ export default function GameSetup(props: Props): JSX.Element {
               </Select>
             </TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell>Show tutorial prompts</TableCell>
-            <TableCell>
-              <Checkbox
-                checked={props.gameState.inTutorial}
-                onChange={(e: any) => props.onDelta({ inTutorial: !props.gameState.inTutorial })}
-                color="primary"
-              />
-            </TableCell>
-          </TableRow>
         </TableBody>
       </Table>
-      <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>Play</Button>
+      <div style={{textAlign: 'center'}}>
+        <Button size="large" variant="contained" color="primary" onClick={props.onStart} autoFocus>Play</Button>
+      </div>
     </div>
   );
 }
