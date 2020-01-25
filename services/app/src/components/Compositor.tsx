@@ -9,13 +9,15 @@ import {CardNameType, CardType, SettingsType, TransitionClassType, TutorialStepT
 import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
 import BuildStorageContainer from './views/BuildStorageContainer';
+import CustomGameContainer from './views/CustomGameContainer';
 import FacilitiesContainer from './views/FacilitiesContainer';
 import FinancesContainer from './views/FinancesContainer';
 import ForecastsContainer from './views/ForecastsContainer';
-import GameSetupContainer from './views/GameSetupContainer';
 import LoadingContainer from './views/LoadingContainer';
 import MainMenuContainer from './views/MainMenuContainer';
 import ManualContainer from './views/ManualContainer';
+import NewGameContainer from './views/NewGameContainer';
+import NewGameDetailsContainer from './views/NewGameDetailsContainer';
 import SettingsContainer from './views/SettingsContainer';
 import TutorialsContainer from './views/TutorialsContainer';
 
@@ -95,8 +97,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <FinancesContainer />;
       case 'FORECASTS':
         return <ForecastsContainer />;
-      case 'GAME_SETUP':
-        return <GameSetupContainer />;
+      case 'CUSTOM_GAME':
+        return <CustomGameContainer />;
       case 'FACILITIES':
         return <FacilitiesContainer />;
       case 'SETTINGS':
@@ -109,6 +111,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <LoadingContainer />;
       case 'TUTORIALS':
         return <TutorialsContainer />;
+      case 'NEW_GAME':
+        return <NewGameContainer />;
+      case 'NEW_GAME_DETAILS':
+        return <NewGameDetailsContainer />;
       default:
         throw new Error('Unknown card ' + this.props.card.name);
     }

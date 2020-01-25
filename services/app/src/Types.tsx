@@ -132,10 +132,12 @@ export type CardNameType =
   'FORECASTS' |
   'LOADING' |
   'MAIN_MENU' |
+  'NEW_GAME' |
+  'NEW_GAME_DETAILS' |
   'MANUAL' |
   'SETTINGS' |
   'TUTORIALS' |
-  'GAME_SETUP';
+  'CUSTOM_GAME';
 
 export interface CardType {
   name: CardNameType;
@@ -275,6 +277,7 @@ export interface TutorialStepType {
 export interface ScenarioType {
   id: number;
   name: string;
+  summary?: string;
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
   durationMonths: number;

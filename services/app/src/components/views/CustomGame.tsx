@@ -19,7 +19,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default function GameSetup(props: Props): JSX.Element {
+export default function CustomGame(props: Props): JSX.Element {
   return (
     <div id="listCard">
       <div id="topbar">
@@ -27,7 +27,7 @@ export default function GameSetup(props: Props): JSX.Element {
           <IconButton onClick={props.onBack} aria-label="back" edge="start" color="primary">
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Game Setup</Typography>
+          <Typography variant="h6">Custom Game Setup</Typography>
         </Toolbar>
       </div>
       <Table size="small" id="gameSetupTable">
