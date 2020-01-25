@@ -3,7 +3,7 @@ import Redux from 'redux';
 
 import {initFuelPrices} from 'shared/schema/FuelPrices';
 import {initWeather} from 'shared/schema/Weather';
-import {SCENARIOS} from '../../Constants';
+import {SCENARIOS} from '../../Scenarios';
 import {AppStateType, GameStateType, NewGameAction} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
 
