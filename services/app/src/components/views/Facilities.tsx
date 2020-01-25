@@ -156,7 +156,7 @@ export default class extends React.Component<Props, {}> {
             <Typography variant="h6">Facilities</Typography>
             <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
             &nbsp;&nbsp;&nbsp;
-            <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild}>Storage</Button>
+            <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild} className="button-buildStorage">Storage</Button>
           </Toolbar>
           <DragDropContext onDragEnd={this.onDragEnd}>
             <Droppable droppableId="droppable">

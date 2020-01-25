@@ -44,7 +44,7 @@ export const SCENARIOS = [
         content: <Typography variant="body1">
           Start the game by unpausing it.<br/><br/>
           For questions and learning more, select "Manual" from the top left menu.<br/><br/>
-          Good luck! This tutorial will run for 1 year.
+          This tutorial will run for 1 year. Try building different types of generators!
         </Typography>,
       },
     ],
@@ -59,9 +59,24 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         disableBeacon: true, // causes tutorial to auto-start
-        target: '#topbar',
+        target: '.VictoryContainer',
         content: <Typography variant="body1">
-          TODO
+          When you're getting blackouts, you can solve it with more generators... or with storage.<br/><br/>
+          If you already have spare generator capcity, it's often cheaper to store the energy than build more generators.
+        </Typography>,
+      },
+      {
+        target: '.button-buildStorage',
+        content: <Typography variant="body1">
+          Try building a storage facility now - you can tap on each option to see more information.<br/><br/>
+          Note how the peak output is different for each technology, and changes based on the capacity.
+        </Typography>,
+      },
+      {
+        target: '.facility',
+        content: <Typography variant="body1">
+          Make sure to re-order your storage to be after any generators you want to charge it.<br/><br/>
+          This tutorial will run for 1 year. Try changing the order of storage and generator units to see how it affects their output!
         </Typography>,
       },
     ],
