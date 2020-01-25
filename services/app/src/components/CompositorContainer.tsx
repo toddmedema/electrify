@@ -1,6 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {closeDialog, closeSnackbar} from '../actions/UI';
+import {SCENARIOS} from '../Constants';
 import {AppStateType, TransitionClassType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
 
@@ -19,8 +20,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     settings: state.settings,
     ui: state.ui,
     transition,
-    inTutorial: state.gameState.inTutorial,
     tutorialStep: state.gameState.tutorialStep,
+    tutorialSteps: (SCENARIOS.find((s) => s.id === state.gameState.scenarioId) || {}).tutorialSteps,
   };
 };
 
