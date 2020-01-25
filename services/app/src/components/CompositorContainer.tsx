@@ -1,7 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {closeDialog, closeSnackbar} from '../actions/UI';
-import {SCENARIOS} from '../Constants';
+import {SCENARIOS} from '../Scenarios';
 import {AppStateType, TransitionClassType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
 
