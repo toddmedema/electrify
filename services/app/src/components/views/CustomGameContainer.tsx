@@ -1,9 +1,10 @@
-import {quitGame} from 'app/reducers/GameState';
 import {connect} from 'react-redux';
 import Redux from 'redux';
+
+import {toPrevious} from '../../actions/Card';
 import {openDialog} from '../../actions/UI';
 import {AppStateType, DialogType, GameStateType, StartGameAction} from '../../Types';
-import GameSetup, {DispatchProps, StateProps} from './GameSetup';
+import CustomGame, {DispatchProps, StateProps} from './CustomGame';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -14,7 +15,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(quitGame());
+      dispatch(toPrevious());
     },
     onDelta: (delta: Partial<GameStateType>) => {
       dispatch({type: 'GAMESTATE_DELTA', delta});
@@ -28,9 +29,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const GameSetupContainer = connect(
+const CustomGameContainer = connect(
   mapStateToProps,
   mapDispatchToProps
-)(GameSetup);
+)(CustomGame);
 
-export default GameSetupContainer;
+export default CustomGameContainer;
