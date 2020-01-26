@@ -33,3 +33,11 @@ export const defaultTheme = {
 } as ThemeOptions;
 
 export default createMuiTheme(defaultTheme);
+
+export const chartTheme = {
+  tickLabels: {
+    fill: `rgba(0, 0, 0, 0.54)`,
+    fontWeight: 400,
+    fontFamily: `Roboto, "Helvetica Neue", Helvetica, sans-serif`,
+  },
+};
