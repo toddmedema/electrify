@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {formatMonthChartAxis} from 'shared/helpers/DateTime';
 import {formatMoneyConcise} from 'shared/helpers/Format';
-import {demandColor} from 'shared/Theme';
+import {chartTheme, demandColor} from 'shared/Theme';
 import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
 
 interface ChartData {
@@ -58,6 +58,7 @@ const ChartFinances = (props: Props): JSX.Element => {
             grid: {
               display: 'none',
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryAxis dependentAxis
@@ -68,6 +69,7 @@ const ChartFinances = (props: Props): JSX.Element => {
             axis: {
               stroke: 'black', strokeWidth: 1,
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryLine

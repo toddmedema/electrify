@@ -2,8 +2,8 @@ import {TimelineType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/helpers/Format';
-import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
-import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme } from 'victory';
+import {blackoutColor, chartTheme, demandColor, supplyColor} from 'shared/Theme';
+import {VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
 
 interface BlackoutEdges {
   minute: number;
@@ -44,6 +44,7 @@ export default class extends React.PureComponent<Props, {}> {
             grid: {
               display: 'none',
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryAxis dependentAxis
@@ -57,6 +58,7 @@ export default class extends React.PureComponent<Props, {}> {
             grid: {
               display: 'none',
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryLine

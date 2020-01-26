@@ -80,13 +80,8 @@ export default class extends React.Component<Props, State> {
     return (
       <GameCard className="finances">
         <div className="scrollable">
-          {timeline.length > 0 ? <ChartFinances
-            height={140}
-            timeline={timeline}
-            title={(year || 'All time') + ' profit'}
-          /> : <span/>}
           <Toolbar>
-            <Typography variant="h6">Finances for </Typography>
+            <Typography variant="h6">Financal summary for </Typography>
             <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
               <MenuItem value={0}>All time</MenuItem>
               {years.map((y: number) => {
@@ -94,6 +89,11 @@ export default class extends React.Component<Props, State> {
               })}
             </Select>
           </Toolbar>
+          {timeline.length > 0 ? <ChartFinances
+            height={140}
+            timeline={timeline}
+            title="Profit"
+          /> : <span/>}
           <Table size="small">
             <TableBody>
               <TableRow className="bold">
@@ -134,10 +134,10 @@ export default class extends React.Component<Props, State> {
                 <TableCell>Interest</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.expensesInterest)}</TableCell>
               </TableRow>
-              <TableRow className="tabs-1">
+              {gameState.feePerKgCO2e > 0 && <TableRow className="tabs-1">
                 <TableCell>Carbon Fees</TableCell>
                 <TableCell align="right">{formatMoneyStable(summary.expensesCarbonFee)}</TableCell>
-              </TableRow>
+              </TableRow>}
               <TableRow className="tabs-2">
                 <TableCell>CO2e emitted</TableCell>
                 <TableCell align="right">{numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons</TableCell>

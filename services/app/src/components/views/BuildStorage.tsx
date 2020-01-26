@@ -222,8 +222,8 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar>
         <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Storage</span></Typography>
-        {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause">
-          <PauseIcon color="primary" />
+        {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause" edge="end" color="primary">
+          <PauseIcon />
         </IconButton>}
         <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
@@ -233,7 +233,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           width: `${gameState.date.percentOfYear * 100}%`,
         }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Storage capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography> {filtered.length <= 0 && '(slide to change)'}
+          Capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography> {filtered.length <= 0 && '(slide to change)'}
         </Typography>
         <Slider
           value={sliderTick}

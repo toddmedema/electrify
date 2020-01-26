@@ -2,8 +2,8 @@ import * as React from 'react';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/helpers/Format';
 import {getIntersectionX} from 'shared/helpers/Math';
-import { blackoutColor, demandColor, supplyColor } from 'shared/Theme';
-import { VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme } from 'victory';
+import {blackoutColor, chartTheme, demandColor, supplyColor} from 'shared/Theme';
+import {VictoryArea, VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme} from 'victory';
 
 interface ChartData {
   minute: number;
@@ -123,6 +123,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             grid: {
               display: 'none',
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryAxis dependentAxis
@@ -136,6 +137,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             grid: {
               display: 'none',
             },
+            tickLabels: chartTheme.tickLabels,
           }}
         />
         <VictoryArea

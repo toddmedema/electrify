@@ -3,7 +3,7 @@ import {TimelineType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatMoneyConcise} from 'shared/helpers/Format';
-import {coalColor, naturalGasColor, uraniumColor} from 'shared/Theme';
+import {chartTheme, coalColor, naturalGasColor, uraniumColor} from 'shared/Theme';
 import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme} from 'victory';
 
 export interface Props {
@@ -45,6 +45,7 @@ export default class extends React.PureComponent<Props, {}> {
               grid: {
                 display: 'none',
               },
+              tickLabels: chartTheme.tickLabels,
             }}
           />
           <VictoryAxis dependentAxis
@@ -60,6 +61,7 @@ export default class extends React.PureComponent<Props, {}> {
               grid: {
                 display: 'none',
               },
+              tickLabels: chartTheme.tickLabels,
             }}
           />
           <VictoryLine
