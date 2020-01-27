@@ -128,7 +128,7 @@ export const SCENARIOS = [
     name: 'Carbon Fee',
     summary: 'Do you have what it takes to transition into a new age?',
     startingYear: 2020,
-    feePerKgCO2e: 50,
+    feePerKgCO2e: 50 / 1000,
     durationMonths: 12 * 20,
     facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Natural Gas', peakW: 480000000}],
   },

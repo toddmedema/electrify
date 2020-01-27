@@ -102,7 +102,7 @@ export const FUELS = {
   // },
 } as { [fuel: string]: FuelType };
 
-export const NAV_CARDS = ['GENERATORS', 'STORAGE', 'FINANCES'] as CardNameType[];
+export const NAV_CARDS = ['FACILITIES', 'FINANCES', 'FORECASTS'] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const VIBRATION_SHORT_MS = 30; // for navigation / card changes
 export const VIBRATION_LONG_MS = 400; // for unique events, like start of the timer
