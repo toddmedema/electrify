@@ -81,7 +81,7 @@ export default class extends React.Component<Props, State> {
       <GameCard className="finances">
         <div className="scrollable">
           <Toolbar>
-            <Typography variant="h6">Financal summary for </Typography>
+            <Typography variant="h6" style={{flexGrow: 0}}>Financal summary for </Typography>
             <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
               <MenuItem value={0}>All time</MenuItem>
               {years.map((y: number) => {

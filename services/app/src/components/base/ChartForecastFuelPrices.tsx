@@ -58,9 +58,6 @@ export default class extends React.PureComponent<Props, {}> {
               axis: {
                 stroke: 'black', strokeWidth: 1,
               },
-              grid: {
-                display: 'none',
-              },
               tickLabels: chartTheme.tickLabels,
             }}
           />

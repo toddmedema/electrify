@@ -187,6 +187,21 @@ body {
   padding: 16px;
 }
 
+.MuiSelect-select {
+  padding-top: 2px;
+  padding-left: 6px;
+  padding-bottom: 0;
+  color: $interactive_blue;
+}
+
+.MuiSelect-icon {
+  fill: $interactive_blue;
+}
+
+.MuiInput-underline:before {
+  border: none !important;
+}
+
 table {
   margin-bottom: 16px;
   th {
