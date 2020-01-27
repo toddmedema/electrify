@@ -5,7 +5,8 @@ import {formatMoneyConcise} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
-import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {GENERATORS, STORAGE} from '../Facilities';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
@@ -480,15 +481,29 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
       date: getDateFromMinute(0, state.startingYear),
     };
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
-      const newFacility = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
+      const generator = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
         for (const property in search) {
           if (g[property] !== search[property]) {
             return false;
           }
         }
         return true;
-      }) as FacilityShoppingType;
-      newState = buildFacility(newState, newFacility, false);
+      });
+      if (generator) {
+        newState = buildFacility(newState, generator, false);
+      } else {
+        const storage = STORAGE(newState, search.peakWh || 1000000).find((g: FacilityShoppingType) => {
+          for (const property in search) {
+            if (g[property] !== search[property]) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (storage) {
+          newState = buildFacility(newState, storage, false);
+        }
+      }
     });
     newState.monthlyHistory = [newMonthlyHistoryEntry(newState.date, newState.facilities, a.cash, a.population)]; // after building facilities
     newState.timeline = generateNewTimeline(newState.date.minute);

@@ -9,7 +9,8 @@ import * as React from 'react';
 import {getMonthlyPayment} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
-import {DOWNPAYMENT_PERCENT, FUELS, GENERATORS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
+import {DOWNPAYMENT_PERCENT, FUELS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
+import {GENERATORS} from '../../Facilities';
 import {DateType, GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
 
 interface GeneratorBuildItemProps {

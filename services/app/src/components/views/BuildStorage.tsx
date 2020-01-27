@@ -8,7 +8,8 @@ import SortIcon from '@material-ui/icons/Sort';
 import * as React from 'react';
 import {getMonthlyPayment} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
-import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS, STORAGE} from '../../Constants';
+import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
+import {STORAGE} from '../../Facilities';
 import {GameStateType, SpeedType, StorageShoppingType} from '../../Types';
 
 interface StorageBuildItemProps {
