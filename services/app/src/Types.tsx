@@ -283,6 +283,7 @@ export interface ScenarioType {
   durationMonths: number;
   endMessageTitle?: string;
   feePerKgCO2e: number;
+  facilities: Partial<FacilityShoppingType>[];
 }
 
 

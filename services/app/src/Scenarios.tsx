@@ -11,6 +11,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endMessageTitle: 'Tutorial complete! ',
+    facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
     tutorialSteps: [
       {
         disableBeacon: true, // causes tutorial to auto-start
@@ -56,6 +57,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endMessageTitle: 'Tutorial complete! ',
+    facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Coal', peakW: 480000000}],
     tutorialSteps: [
       {
         disableBeacon: true, // causes tutorial to auto-start
@@ -70,6 +72,12 @@ export const SCENARIOS = [
         content: <Typography variant="body1">
           Try building a storage facility now - you can tap on each option to see more information.<br/><br/>
           Note how the peak output is different for each technology, and changes based on the capacity.
+        </Typography>,
+      },
+      {
+        target: '.capacityProgressBar',
+        content: <Typography variant="body1">
+          In addition to the horizontal bar that indicates output rate, storage units have a vertical bar that indicates how much they're charged.
         </Typography>,
       },
       {
@@ -122,6 +130,7 @@ export const SCENARIOS = [
     startingYear: 2020,
     feePerKgCO2e: 50,
     durationMonths: 12 * 20,
+    facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Natural Gas', peakW: 480000000}],
   },
   {
     id: 101, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
@@ -130,6 +139,7 @@ export const SCENARIOS = [
     startingYear: 2000,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
+    facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
   },
   {
     id: 102, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
@@ -138,5 +148,6 @@ export const SCENARIOS = [
     startingYear: 1980,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
+    facilities: [{fuel: 'Coal', peakW: 500000000}],
   },
 ] as ScenarioType[];

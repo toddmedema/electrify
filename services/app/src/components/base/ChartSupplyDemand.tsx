@@ -17,7 +17,7 @@ interface BlackoutEdges {
 }
 
 export interface Props {
-  currentMinute?: number;
+  currentMinute: number;
   height?: number;
   legend?: boolean;
   timeline: ChartData[];
@@ -89,7 +89,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
   });
 
   // Divide between historic and forcast
-  const currentMinute = props.currentMinute || rangeMax;
+  const currentMinute = props.currentMinute || 0;
   const historic = [...timeline].filter((d: ChartData) => d.minute <= currentMinute);
   const forecast = [...timeline].filter((d: ChartData) => d.minute >= currentMinute);
 

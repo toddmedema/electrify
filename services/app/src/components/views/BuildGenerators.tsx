@@ -299,7 +299,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           })}
         </Menu>
       </Toolbar>
-      <List dense className="scrollable expandableList">
+      <List dense className="scrollable cardList">
         {generators.map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
             date={gameState.date}

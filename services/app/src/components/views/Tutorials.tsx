@@ -1,4 +1,4 @@
-import {Button, Card, CardHeader, IconButton, Toolbar, Typography} from '@material-ui/core';
+import {Button, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import CheckIcon from '@material-ui/icons/Check';
 import RemoveIcon from '@material-ui/icons/Remove';
@@ -61,9 +61,11 @@ export default function Tutorials(props: Props): JSX.Element {
           <Typography variant="h6">Tutorials</Typography>
         </Toolbar>
       </div>
-      {SCENARIOS.filter((s) => s.tutorialSteps).map((s) => {
-        return <TutorialListItem key={s.id} onStart={props.onStart} s={s} completed={ids.indexOf(s.id) !== -1}/>;
-      })}
+      <List dense className="scrollable cardList">
+        {SCENARIOS.filter((s) => s.tutorialSteps).map((s) => {
+          return <TutorialListItem key={s.id} onStart={props.onStart} s={s} completed={ids.indexOf(s.id) !== -1}/>;
+        })}
+      </List>
     </div>
   );
 }

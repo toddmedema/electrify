@@ -262,7 +262,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           })}
         </Menu>
       </Toolbar>
-      <List dense className="scrollable expandableList">
+      <List dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) =>
           <StorageBuildItem
             storage={g}

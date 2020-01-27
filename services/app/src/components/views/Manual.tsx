@@ -56,7 +56,7 @@ export default class Manual extends React.PureComponent<Props, {}> {
             </IconButton>
           </Toolbar>
         </div>
-        <List dense className="scrollable expandableList" id="manual">
+        <List dense className="scrollable cardList" id="manual">
           <Card>
             <CardContent>Here, you can look up specific terms and mechanics to learn more about how they work in game - and in real life.</CardContent>
           </Card>

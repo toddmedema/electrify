@@ -1,4 +1,4 @@
-import {Button, Card, CardHeader, IconButton, Toolbar, Typography} from '@material-ui/core';
+import {Card, CardHeader, IconButton, List, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import * as React from 'react';
 
@@ -25,18 +25,8 @@ interface ScenarioListItemProps {
 function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
   const {s, onDetails} = props;
   return (
-    <Card className="build-list-item">
+    <Card className="build-list-item clickable-card" onClick={(e: any) => onDetails({scenarioId: s.id})}>
       <CardHeader
-        action={
-          <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={(e: any) => onDetails({scenarioId: s.id})}
-          >
-            Details
-          </Button>
-        }
         title={s.name}
         subheader={s.summary}
       />
@@ -52,20 +42,23 @@ export default function NewGame(props: Props): JSX.Element {
           <IconButton onClick={props.onBack} aria-label="back" edge="start" color="primary">
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">New Game</Typography>
+          <Typography variant="h6">Select scenario</Typography>
         </Toolbar>
       </div>
-      {SCENARIOS.filter((s) => !s.tutorialSteps).map((s) => {
-        return <ScenarioListItem key={s.id} onDetails={props.onDetails} s={s} />;
-      })}
-      <ScenarioListItem key={999} onDetails={props.onCustomGame} s={{
-        id: 999,
-        name: 'Custom Game',
-        summary: 'Make your own game',
-        startingYear: 2020,
-        durationMonths: 20,
-        feePerKgCO2e: 0,
-      }}/>
+      <List dense className="scrollable cardList">
+        {SCENARIOS.filter((s) => !s.tutorialSteps).map((s) => {
+          return <ScenarioListItem key={s.id} onDetails={props.onDetails} s={s} />;
+        })}
+        <ScenarioListItem key={999} onDetails={props.onCustomGame} s={{
+          id: 999,
+          name: 'Custom Game',
+          summary: 'Make your own game',
+          startingYear: 2020,
+          durationMonths: 20,
+          feePerKgCO2e: 0,
+          facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
+        }}/>
+      </List>
     </div>
   );
 }
