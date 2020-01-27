@@ -117,7 +117,7 @@ export const SCENARIOS = [
   // },
   {
     id: 100, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
-    name: '2020 - Carbon Fee',
+    name: 'Carbon Fee',
     summary: 'Do you have what it takes to transition into a new age?',
     startingYear: 2020,
     feePerKgCO2e: 50,
@@ -125,7 +125,7 @@ export const SCENARIOS = [
   },
   {
     id: 101, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
-    name: '2000 - Renewables',
+    name: 'Rise of Renewables',
     summary: 'Technology is changing rapidly - can you keep up?',
     startingYear: 2000,
     feePerKgCO2e: 0,
@@ -133,9 +133,9 @@ export const SCENARIOS = [
   },
   {
     id: 102, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
-    name: '1980 - Natural Gas & Nuclear',
+    name: 'Natural Gas & Nuclear',
     summary: 'Your existing coal business faces new challengers.',
-    startingYear: 2000,
+    startingYear: 1980,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
   },

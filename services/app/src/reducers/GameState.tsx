@@ -472,13 +472,17 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
   } else if (action.type === 'NEW_GAME') {
 
-    // TODO also search STORAGE
     const a = action as NewGameAction;
+    const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
     let newState = {
       ...state,
       timeline: [] as TimelineType[],
-      date: getDateFromMinute(0, state.startingYear),
+      date: getDateFromMinute(0, scenario.startingYear),
+      startingYear: scenario.startingYear,
+      feePerKgCO2e: scenario.feePerKgCO2e,
     };
+
+    // TODO also search STORAGE
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
       const newFacility = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
         for (const property in search) {
