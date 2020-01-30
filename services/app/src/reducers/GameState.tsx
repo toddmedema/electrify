@@ -1,11 +1,11 @@
 import Redux from 'redux';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory} from 'shared/helpers/Financials';
+import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory} from 'shared/helpers/Financials';
 import {formatMoneyConcise} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog} from '../actions/UI';
-import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, REGIONAL_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
+import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
@@ -23,6 +23,7 @@ const initialGameState: GameStateType = {
   speed: 'PAUSED',
   inGame: false,
   feePerKgCO2e: 0, // Start on easy mode
+  monthlyMarketingSpend: 0,
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
   startingYear: 2020,
@@ -45,16 +46,18 @@ function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, 
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
   // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
-  const temperatureNormalized = temperatureC / 30;
+  const temperatureNormalized = temperatureC / 23;
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
-  const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkNormalized;
+  const minutesFromDarkLogistics = 1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
+  const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkLogistics;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * gameState.monthlyHistory[0].population;
+  return demandMultiple * gameState.monthlyHistory[0].customers;
 }
 
 // Each frame, update the month's history with cumulative values -> use that to update finances
 function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): MonthlyHistoryType {
-  const monthlyHistory = gameState.monthlyHistory[0];
+  const history = gameState.monthlyHistory[0];
+  const difficulty = DIFFICULTIES[gameState.difficulty];
 
   // TODO actually calculate market price / sale value
   // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
@@ -88,19 +91,28 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
     }
   });
   const expensesCarbonFee = gameState.feePerKgCO2e * kgco2e;
+  const expensesMarketing = gameState.monthlyMarketingSpend / TICKS_PER_MONTH;
+
+  const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
+  const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
+  const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
+  const customers = Math.round(history.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
 
   return {
-    ...monthlyHistory,
-    // population not affected by finance calculations
-    revenue: monthlyHistory.revenue + revenue,
-    expensesOM: monthlyHistory.expensesOM + expensesOM,
-    expensesFuel: monthlyHistory.expensesFuel + expensesFuel,
-    expensesCarbonFee: monthlyHistory.expensesCarbonFee + expensesCarbonFee,
-    expensesInterest: monthlyHistory.expensesInterest + expensesInterest,
-    cash: Math.round(monthlyHistory.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - principalRepayment),
-    supplyWh: monthlyHistory.supplyWh + supplyWh,
-    demandWh: monthlyHistory.demandWh + demandWh,
-    kgco2e: monthlyHistory.kgco2e + kgco2e,
+    year: history.year, // unchanged
+    month: history.month, // unchanged
+    netWorth: history.netWorth, // unchanged - would have to be calculated after cash is updated anyway
+    customers,
+    revenue: history.revenue + revenue,
+    expensesOM: history.expensesOM + expensesOM,
+    expensesFuel: history.expensesFuel + expensesFuel,
+    expensesCarbonFee: history.expensesCarbonFee + expensesCarbonFee,
+    expensesInterest: history.expensesInterest + expensesInterest,
+    expensesMarketing: history.expensesMarketing + expensesMarketing,
+    cash: Math.round(history.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
+    supplyWh: history.supplyWh + supplyWh,
+    demandWh: history.demandWh + demandWh,
+    kgco2e: history.kgco2e + kgco2e,
   };
 }
 
@@ -293,14 +305,14 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
 }
 
 // TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
-function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number, population: number): MonthlyHistoryType {
+function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number, customers: number): MonthlyHistoryType {
   return {
     year: date.year,
     month: date.monthNumber,
     supplyWh: 0,
     demandWh: 0,
     kgco2e: 0,
-    population,
+    customers,
     cash,
     netWorth: getNetWorth(facilities, cash),
     revenue: 0,
@@ -308,6 +320,7 @@ function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingTyp
     expensesOM: 0,
     expensesCarbonFee: 0,
     expensesInterest: 0,
+    expensesMarketing: 0,
   };
 }
 
@@ -352,16 +365,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
       }
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-        const difficulty = DIFFICULTIES[state.difficulty];
-
         // Record final history for the month, then insert a new blank month
-        const cash = history[0].cash;
-        const {demandWh, supplyWh} = history[0];
-        const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
-        const growthRate = REGIONAL_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
-        const population = Math.round(history[0].population * (1 + growthRate / 12));
+        const {cash, customers} = history[0];
         history[0].netWorth = getNetWorth(newState.facilities, cash);
-        history.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, population));
+        history.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, customers));
 
         // Populate a new forecast timeline
         newState.timeline = generateNewTimeline(newState.date.minute);
@@ -407,7 +414,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           const summary = summarizeHistory(history);
           const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
           // This is also described in the manual; if I update the algorithm, update the manual too!
-          const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.population / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
+          const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
           const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
           setStorageKeyValue('highscores', {scores: [...scores, {
             score: finalScore,
@@ -509,7 +516,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         }
       }
     });
-    newState.monthlyHistory = [newMonthlyHistoryEntry(newState.date, newState.facilities, a.cash, a.population)]; // after building facilities
+    newState.monthlyHistory = [newMonthlyHistoryEntry(newState.date, newState.facilities, a.cash, a.customers)]; // after building facilities
     newState.timeline = generateNewTimeline(newState.date.minute);
     newState.timeline = reforecastAll(newState);
 

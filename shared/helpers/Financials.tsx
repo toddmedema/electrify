@@ -38,13 +38,14 @@ export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHi
   const summary = {
     supplyWh: 0,
     demandWh: 0,
-    population: 0,
+    customers: 0,
     kgco2e: 0,
     revenue: 0,
     expensesFuel: 0,
     expensesOM: 0,
     expensesCarbonFee: 0,
     expensesInterest: 0,
+    expensesMarketing: 0,
   } as MonthlyHistoryType;
   // Go in reverse so that the last values for ending values (like net worth are used)
   for (let i = t.length - 1; i >= 0 ; i--) {
@@ -56,11 +57,17 @@ export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHi
       summary.revenue += h.revenue;
       summary.expensesFuel += h.expensesFuel;
       summary.expensesOM += h.expensesOM;
+      summary.expensesMarketing += h.expensesMarketing;
       summary.expensesCarbonFee += h.expensesCarbonFee;
       summary.expensesInterest += h.expensesInterest;
-      summary.population = h.population;
+      summary.customers = h.customers;
       summary.netWorth = h.netWorth;
     }
   }
   return summary;
+}
+
+// CAC is $75->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
+export function customersFromMarketingSpend(spend: number) {
+  return Math.floor(spend / (75 + spend / 10000000));
 }

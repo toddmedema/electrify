@@ -208,7 +208,7 @@ function getW(tick: number) {
 
 function getTickFromW(w: number) {
   const exponent = Math.floor(Math.log10(w)) - 6;
-  const frontNumber = +w.toString().replace(/0/g, '');
+  const frontNumber = +w.toString().charAt(0);
   return frontNumber + exponent * 9 - 1;
 }
 

@@ -30,7 +30,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
             type: 'NEW_GAME',
             facilities: scenario.facilities,
             cash: 200000000,
-            population: 1080000,
+            customers: 1030000,
           } as NewGameAction);
 
           dispatch({type: 'GAME_LOADED'});

@@ -87,7 +87,7 @@ export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
   facilities: Partial<FacilityShoppingType>[];
   cash: number;
-  population: number;
+  customers: number;
 }
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
@@ -196,13 +196,14 @@ export interface MonthlyHistoryType {
   demandWh: number; // total
   kgco2e: number; // total
   cash: number; // ending (this is a live value in the current month)
-  population: number; // ending (this is a live value in the current month)
+  customers: number; // ending (this is a live value in the current month)
   netWorth: number; // ending
   revenue: number; // total
   expensesFuel: number; // total
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
+  expensesMarketing: number; // total
 }
 
 
@@ -295,6 +296,7 @@ export interface GameStateType {
   speed: SpeedType;
   inGame: boolean;
   feePerKgCO2e: number;
+  monthlyMarketingSpend: number;
   tutorialStep: number;
   seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
     // and is supplied as the seed at the start of any function that uses randomness
