@@ -1,4 +1,7 @@
-import {Button} from '@material-ui/core';
+import {Button, IconButton} from '@material-ui/core';
+import EmailIcon from '@material-ui/icons/Email';
+import FacebookIcon from '@material-ui/icons/Facebook';
+import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
 import {openWindow} from '../../Globals';
@@ -16,7 +19,6 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 // TODO option to resume a saved game; if you try to start a new game w/ a saved game, prompt that it'll delete the save
-  // (also, winning / ending a game should clear its save)
 const MainMenu = (props: Props): JSX.Element => {
   return (
     <div id="menuCard">
@@ -29,9 +31,17 @@ const MainMenu = (props: Props): JSX.Element => {
         <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
       </div>
-      <Button style={{position: 'absolute', bottom: 0, left: 0}} color="primary" onClick={() => openWindow('https://fabricate.us10.list-manage.com/subscribe?u=792afb261df839e73b669f83f&id=8ccd05ccba')}>Subscribe</Button>
-      <Button style={{position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)'}} color="primary" onClick={() => openWindow('/about.html')}>About</Button>
-      <Button style={{position: 'absolute', bottom: 0, right: 0}} color="primary" onClick={() => openWindow('mailto:todd@fabricate.io')}>Contact</Button>
+      <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, opacity: 0.7}}>
+        <IconButton color="primary" onClick={() => openWindow('https://fabricate.us10.list-manage.com/subscribe?u=792afb261df839e73b669f83f&id=8ccd05ccba')}>
+          <EmailIcon/>
+        </IconButton>
+        <IconButton color="primary" onClick={() => openWindow('https://www.facebook.com/electrifygame')}>
+          <FacebookIcon/>
+        </IconButton>
+        <IconButton color="primary" onClick={() => openWindow('/about.html')}>
+          <InfoIcon/>
+        </IconButton>
+      </div>
     </div>
   );
 };
