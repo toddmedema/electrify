@@ -2,10 +2,10 @@ import {Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@mater
 import * as React from 'react';
 
 import {TICKS_PER_YEAR} from 'app/Constants';
-import {GameStateType, TimelineType} from 'app/Types';
-import {formatHour, getDateFromMinute} from 'shared/helpers/DateTime';
+import {GameStateType, TickPresentFutureType} from 'app/Types';
+import {formatHour, getDateFromMinute, getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {formatWattHours, formatWatts} from 'shared/helpers/Format';
-import {generateNewTimeline, reforecastAll} from '../../reducers/GameState';
+import {generateNewTimeline} from '../../reducers/GameState';
 import ChartForecastFuelPrices from '../base/ChartForecastFuelPrices';
 import ChartForecastSupplyDemand from '../base/ChartForecastSupplyDemand';
 import GameCard from '../base/GameCard';
@@ -44,22 +44,22 @@ export default class extends React.Component<Props, State> {
   public render() {
     // Generate the forecast
     const newState = {...this.props.gameState};
-    newState.timeline = generateNewTimeline(newState.date.minute, TICKS_PER_YEAR * FORECAST_YEARS);
-    newState.timeline = reforecastAll(newState);
-    const timeline = newState.timeline;
+    const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
+    generateNewTimeline(newState, now.cash, now.customers, TICKS_PER_YEAR * FORECAST_YEARS);
+    const {timeline, startingYear} = newState;
 
     // Figure out the boundaries of the chart data
     let domainMin = 999999999999;
     let domainMax = 0;
     const rangeMin = timeline[0].minute;
     const rangeMax = timeline[timeline.length - 1].minute;
-    timeline.forEach((d: TimelineType) => {
+    timeline.forEach((d: TickPresentFutureType) => {
       domainMin = Math.min(domainMin, d.supplyW, d.demandW);
       domainMax = Math.max(domainMax, d.supplyW, d.demandW);
     });
 
     // BLACKOUT CALCULATION
-    // Less precise than the realtime calculator b/c longer term
+    // Less precise (+faster) than the realtime calculator b/c longer term
     // But also tracks blackout metrics for reporting
     let blackoutTotalWh = 0;
     let currentBlackout = {
@@ -81,7 +81,7 @@ export default class extends React.Component<Props, State> {
         value: domainMax,
       });
     }
-    timeline.forEach((d: TimelineType) => {
+    timeline.forEach((d: TickPresentFutureType) => {
       if (d.demandW > d.supplyW) {
         if (!isBlackout) {
           // Blackout starting: low then high edge, start a new current blackout entryr
@@ -121,8 +121,8 @@ export default class extends React.Component<Props, State> {
     }
     largestBlackout.end = largestBlackout.end || rangeMax;
 
-    const blackoutStart = getDateFromMinute(largestBlackout.start, newState.startingYear);
-    const blackoutEnd = getDateFromMinute(largestBlackout.end, newState.startingYear);
+    const blackoutStart = getDateFromMinute(largestBlackout.start, startingYear);
+    const blackoutEnd = getDateFromMinute(largestBlackout.end, startingYear);
 
     // TODO user ability to see more than one year in the future
     return (
@@ -136,7 +136,7 @@ export default class extends React.Component<Props, State> {
             timeline={timeline}
             blackouts={blackouts}
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-            startingYear={newState.startingYear}
+            startingYear={startingYear}
           />
           <Table size="small">
             {blackoutTotalWh > 0 ?

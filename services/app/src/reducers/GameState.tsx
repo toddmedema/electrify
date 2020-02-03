@@ -1,6 +1,6 @@
 import Redux from 'redux';
-import {getDateFromMinute} from 'shared/helpers/DateTime';
-import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory} from 'shared/helpers/Financials';
+import {getDateFromMinute, getTimeFromTimeline} from 'shared/helpers/DateTime';
+import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
 import {formatMoneyConcise} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
@@ -10,7 +10,7 @@ import {GENERATORS, STORAGE} from '../Facilities';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TimelineType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 const numbro = require('numbro');
@@ -28,7 +28,7 @@ const initialGameState: GameStateType = {
   facilities: [] as FacilityOperatingType[],
   startingYear: 2020,
   date: getDateFromMinute(0, 2020),
-  timeline: [] as TimelineType[],
+  timeline: [] as TickPresentFutureType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   seedPrefix: Math.random(),
 };
@@ -41,22 +41,20 @@ export function quitGame(): QuitGameAction {
   return { type: 'GAME_EXIT' };
 }
 
-function getDemandW(date: DateType, gameState: GameStateType, sunlight: number, temperatureC: number) {
+function getDemandW(date: DateType, gameState: GameStateType, now: TickPresentFutureType) {
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
   // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
-  const temperatureNormalized = temperatureC / 23;
+  const temperatureNormalized = (now.temperatureC + 2) / 21;
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const minutesFromDarkLogistics = 1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
   const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkLogistics;
       // + 192.12 * (Weekday variable)
-  return demandMultiple * gameState.monthlyHistory[0].customers;
+  return demandMultiple * now.customers;
 }
 
-// Each frame, update the month's history with cumulative values -> use that to update finances
-function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): MonthlyHistoryType {
-  const history = gameState.monthlyHistory[0];
+function updateFinances(gameState: GameStateType, now: TickPresentFutureType) {
   const difficulty = DIFFICULTIES[gameState.difficulty];
 
   // TODO actually calculate market price / sale value
@@ -66,6 +64,7 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   const demandWh = now.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
   const revenue = supplyWh * dollarsPerWh;
 
+  // Facilities
   let kgco2e = 0;
   let expensesOM = 0;
   let expensesFuel = 0;
@@ -93,31 +92,24 @@ function updateMonthlyFinances(gameState: GameStateType, now: TimelineType): Mon
   const expensesCarbonFee = gameState.feePerKgCO2e * kgco2e;
   const expensesMarketing = gameState.monthlyMarketingSpend / TICKS_PER_MONTH;
 
+  // Customers
   const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
   const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
-  const customers = Math.round(history.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
 
-  return {
-    year: history.year, // unchanged
-    month: history.month, // unchanged
-    netWorth: history.netWorth, // unchanged - would have to be calculated after cash is updated anyway
-    customers,
-    revenue: history.revenue + revenue,
-    expensesOM: history.expensesOM + expensesOM,
-    expensesFuel: history.expensesFuel + expensesFuel,
-    expensesCarbonFee: history.expensesCarbonFee + expensesCarbonFee,
-    expensesInterest: history.expensesInterest + expensesInterest,
-    expensesMarketing: history.expensesMarketing + expensesMarketing,
-    cash: Math.round(history.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
-    supplyWh: history.supplyWh + supplyWh,
-    demandWh: history.demandWh + demandWh,
-    kgco2e: history.kgco2e + kgco2e,
-  };
+  now.customers = Math.round(now.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
+  now.cash = Math.round(now.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
+  now.revenue = revenue;
+  now.expensesOM = expensesOM;
+  now.expensesFuel = expensesFuel;
+  now.expensesCarbonFee = expensesCarbonFee;
+  now.expensesInterest = expensesInterest;
+  now.expensesMarketing = expensesMarketing;
+  now.kgco2e = kgco2e;
 }
 
-function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
-  return state.timeline.map((t: TimelineType) => {
+function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType[] {
+  return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather('SF', date.hourOfFullYear);
@@ -134,13 +126,13 @@ function reforecastWeatherAndPrices(state: GameStateType): TimelineType[] {
   });
 }
 
-function reforecastDemand(state: GameStateType): TimelineType[] {
-  return state.timeline.map((t: TimelineType) => {
+function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
+  return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       return {
         ...t,
-        demandW: getDemandW(date, state, t.sunlight, t.temperatureC),
+        demandW: getDemandW(date, state, t),
       };
     }
     return t;
@@ -151,7 +143,7 @@ function reforecastDemand(state: GameStateType): TimelineType[] {
 // then calculates how much is needed to be supplied to meet demandW
 // and changes generator / storage status (in place)
 // (doesn't count storage charging against supply created)
-function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: TimelineType) {
+function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: TickPresentFutureType) {
   // UPDATE CONSTRUCTION STATUS
   facilities.forEach((g: FacilityOperatingType) => {
     if (g.yearsToBuildLeft > 0) {
@@ -228,10 +220,10 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
   return supply;
 }
 
-function reforecastSupply(state: GameStateType): TimelineType[] {
+function reforecastSupply(state: GameStateType): TickPresentFutureType[] {
   // Make temporary deep copy so that it can be revised in place
   const facilities = state.facilities.map((g: FacilityOperatingType) => ({...g}));
-  return state.timeline.map((t: TimelineType) => {
+  return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       return {
         ...t,
@@ -242,28 +234,32 @@ function reforecastSupply(state: GameStateType): TimelineType[] {
   });
 }
 
-export function reforecastAll(newState: GameStateType): TimelineType[] {
-  if (newState.timeline.length > 0 && newState.monthlyHistory.length > 0) {
-    newState.timeline = reforecastWeatherAndPrices(newState);
-    newState.timeline = reforecastDemand(newState);
-    newState.timeline = reforecastSupply(newState);
-  }
-  return newState.timeline;
-}
-
-export function generateNewTimeline(startingMinute: number, ticks = TICKS_PER_DAY): TimelineType[] {
-  const array = new Array(ticks) as TimelineType[];
+// edits in place
+export function generateNewTimeline(state: GameStateType, cash: number, customers: number, ticks = TICKS_PER_DAY) {
+  const timeline = new Array(ticks) as TickPresentFutureType[];
   for (let i = 0; i < ticks; i++) {
-    array[i] = {
-      minute: startingMinute + i * TICK_MINUTES,
+    timeline[i] = {
+      minute: state.date.minute + i * TICK_MINUTES,
       supplyW: 0,
       demandW: 0,
       sunlight: 0,
       windKph: 0,
       temperatureC: 0,
+      cash,
+      customers,
+      revenue: 0,
+      expensesFuel: 0,
+      expensesOM: 0,
+      expensesCarbonFee: 0,
+      expensesInterest: 0,
+      expensesMarketing: 0,
+      kgco2e: 0,
     };
   }
-  return array;
+  state.timeline = timeline;
+  state.timeline = reforecastWeatherAndPrices(state);
+  state.timeline = reforecastDemand(state);
+  state.timeline = reforecastSupply(state);
 }
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
@@ -304,26 +300,6 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
   return state;
 }
 
-// TODO rather than force specifying a bunch of arguments, maybe accept a dela / overrides object?
-function newMonthlyHistoryEntry(date: DateType, facilities: FacilityOperatingType[], cash: number, customers: number): MonthlyHistoryType {
-  return {
-    year: date.year,
-    month: date.monthNumber,
-    supplyWh: 0,
-    demandWh: 0,
-    kgco2e: 0,
-    customers,
-    cash,
-    netWorth: getNetWorth(facilities, cash),
-    revenue: 0,
-    expensesFuel: 0,
-    expensesOM: 0,
-    expensesCarbonFee: 0,
-    expensesInterest: 0,
-    expensesMarketing: 0,
-  };
-}
-
 // TODO account for generator current value better - get rid of SELL_MULTIPLIER everywhere and depreciate buildCost over time
 function getNetWorth(facilities: FacilityOperatingType[], cash: number): number {
   let netWorth = cash;
@@ -357,27 +333,22 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         ...state,
         date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
       };
-      const now = newState.timeline.find((t: TimelineType) => t.minute >= newState.date.minute);
-      const history = newState.monthlyHistory;
-      if (now) {
-        getSupplyWAndUpdateFacilities(newState.facilities, now);
-        history[0] = updateMonthlyFinances(state, now);
-      }
+      const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
+      getSupplyWAndUpdateFacilities(newState.facilities, now);
+      updateFinances(state, now);
+      const {cash, customers} = now;
 
       if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-        // Record final history for the month, then insert a new blank month
-        const {cash, customers} = history[0];
-        history[0].netWorth = getNetWorth(newState.facilities, cash);
-        history.unshift(newMonthlyHistoryEntry(newState.date, newState.facilities, cash, customers));
+        const history = newState.monthlyHistory;
 
-        // Populate a new forecast timeline
-        newState.timeline = generateNewTimeline(newState.date.minute);
-        newState.timeline = reforecastAll(newState);
+        // Record final history for the month, then generate the new timeline
+        history.unshift(summarizeTimeline(newState.timeline));
+        history[0].netWorth = getNetWorth(newState.facilities, cash);
+        generateNewTimeline(newState, cash, customers);
 
         // ===== TRIGGERS ======
-        if (cash < 0) {
+        if (now.cash < 0) {
           const summary = summarizeHistory(history);
-          console.log(summary);
           setTimeout(() => getStore().dispatch(openDialog({
             title: 'Bankrupt!',
             message: `You've run out of money.
@@ -484,7 +455,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
     const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
     let newState = {
       ...state,
-      timeline: [] as TimelineType[],
+      timeline: [] as TickPresentFutureType[],
       date: getDateFromMinute(0, scenario.startingYear),
       startingYear: scenario.startingYear,
       feePerKgCO2e: scenario.feePerKgCO2e,
@@ -516,9 +487,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         }
       }
     });
-    newState.monthlyHistory = [newMonthlyHistoryEntry(newState.date, newState.facilities, a.cash, a.customers)]; // after building facilities
-    newState.timeline = generateNewTimeline(newState.date.minute);
-    newState.timeline = reforecastAll(newState);
+    generateNewTimeline(newState, a.cash, a.customers);
 
     // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
     getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);

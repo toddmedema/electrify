@@ -2,7 +2,8 @@ import {MenuItem, Select, Slider, Table, TableBody, TableCell, TableRow, Toolbar
 import * as React from 'react';
 
 import {TICK_MINUTES} from 'app/Constants';
-import {customersFromMarketingSpend, summarizeHistory} from 'shared/helpers/Financials';
+import {getTimeFromTimeline} from 'shared/helpers/DateTime';
+import {customersFromMarketingSpend, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
@@ -97,6 +98,9 @@ export default class extends React.Component<Props, State> {
     const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesMarketing + summary.expensesCarbonFee + summary.expensesInterest;
     const supplykWh = (summary.supplyWh || 1) / 1000;
 
+    // TODO merge this into table
+    const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+
     return (
       <GameCard className="finances">
         <div className="scrollable">
@@ -112,7 +116,7 @@ export default class extends React.Component<Props, State> {
               valueLabelDisplay="off"
               min={-1}
               step={1}
-              max={Math.floor(getTickFromValue(Math.max(history[0].cash, gameState.monthlyMarketingSpend)))}
+              max={Math.floor(getTickFromValue(Math.max(now.cash, gameState.monthlyMarketingSpend)))}
               onChange={(e: any, newTick: number) => onDelta({monthlyMarketingSpend: getValueFromTick(newTick)})}
             />
             <div className="flex-newline"></div>

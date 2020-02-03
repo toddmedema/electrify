@@ -1,5 +1,14 @@
-import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS} from 'app/Constants';
-import {DateType, MonthType} from 'app/Types';
+import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, TICK_MINUTES} from 'app/Constants';
+import {DateType, MonthType, TickPresentFutureType} from 'app/Types';
+
+export function getTimeFromTimeline(minute: number, timeline: TickPresentFutureType[]) {
+  const startingTime = timeline[0].minute;
+  const deltaTicks = Math.floor((minute - startingTime) / TICK_MINUTES);
+  if (deltaTicks >= timeline.length || timeline[deltaTicks] === undefined) {
+    return timeline[timeline.length - 1];
+  }
+  return timeline[deltaTicks];
+}
 
 export function formatMonthChartAxis(t: number, multiyear: boolean) {
   if (multiyear) {

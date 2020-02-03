@@ -9,18 +9,19 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 
+import {getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {toCard} from '../../actions/Card';
 import {isSmallScreen, openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
-import {AppStateType, DateType, GameStateType, SpeedType, TimelineType} from '../../Types';
+import {AppStateType, DateType, GameStateType, SpeedType, TickPresentFutureType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.Props<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
-  cash: number;
+  now: TickPresentFutureType;
   date: DateType;
 }
 
@@ -33,7 +34,7 @@ export interface DispatchProps {
 export interface Props extends GameCardProps, DispatchProps {}
 
 export function GameCard(props: Props) {
-  const {gameState, date} = props;
+  const {gameState, date, now} = props;
   if (!gameState.inGame) {
     return <span/>;
   }
@@ -45,8 +46,6 @@ export function GameCard(props: Props) {
   const handleSpeedClick = (event: any) => setSpeedAnchorEl(event.currentTarget);
   const handleSpeedClose = () => setSpeedAnchorEl(null);
 
-  // TODO perf this is a linear lookup every frame, ouch!
-  const now = gameState.timeline.find((t: TimelineType) => t.minute >= gameState.date.minute);
   const inBlackout = now && now.supplyW < now.demandW;
 
   let speedOptions = <span/>;
@@ -127,7 +126,7 @@ export function GameCard(props: Props) {
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
-            {formatMoneyStable(props.cash)} <span className="weak">{date.month} {date.year}</span>
+            {formatMoneyStable(now.cash)} <span className="weak">{date.month} {date.year}</span>
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
@@ -144,7 +143,7 @@ export function GameCard(props: Props) {
 const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>): GameCardProps => ({
   gameState: state.gameState,
   date: state.gameState.date,
-  cash: (state.gameState.monthlyHistory[0] || {}).cash,
+  now: getTimeFromTimeline(state.gameState.date.minute, state.gameState.timeline),
   ...ownProps,
 });
 

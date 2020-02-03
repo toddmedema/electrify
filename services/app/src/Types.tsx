@@ -180,7 +180,7 @@ export interface RawWeatherType {
 }
 
 // All amounts are the average across the time window
-export type TimelineType = Partial<FuelPricesType> & {
+export type TickPresentFutureType = Partial<FuelPricesType> & HistoryForecastShared & {
   minute: number;
   supplyW: number; // Watts
   demandW: number; // Watts
@@ -189,21 +189,25 @@ export type TimelineType = Partial<FuelPricesType> & {
   temperatureC: number;
 }
 
-export interface MonthlyHistoryType {
+// Basically, downsample per-tick information so that I can store it for the entire game, which could go 100+ years
+export interface MonthlyHistoryType extends HistoryForecastShared {
   year: number;
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
-  kgco2e: number; // total
-  cash: number; // ending (this is a live value in the current month)
-  customers: number; // ending (this is a live value in the current month)
   netWorth: number; // ending
+}
+
+interface HistoryForecastShared {
+  cash: number;
+  customers: number;
   revenue: number; // total
   expensesFuel: number; // total
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
   expensesMarketing: number; // total
+  kgco2e: number; // total
 }
 
 
@@ -302,7 +306,7 @@ export interface GameStateType {
     // and is supplied as the seed at the start of any function that uses randomness
   date: DateType;
   startingYear: number;
-  timeline: TimelineType[]; // anything before currentMinute is history, anything after is a forecast
+  timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   facilities: (StorageOperatingType|GeneratorOperatingType)[];
 }

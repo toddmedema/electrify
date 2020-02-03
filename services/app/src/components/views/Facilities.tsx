@@ -71,9 +71,9 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                 {underConstruction ? 'Cancel construction of' : 'Sell'} {facility.peakWh ? formatWattHours(facility.peakWh) : formatWatts(facility.peakW)} {facility.name.toLowerCase()} facility?
               </DialogTitle>
               <DialogContent><DialogContentText>
-                You will receive {formatMoneyConcise(facilityCashBack(facility))} back
-                {facility.loanAmountLeft > 0 ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}` : ''}
-                .
+                You will receive {formatMoneyConcise(facilityCashBack(facility))}
+                {facility.loanAmountLeft > 0 ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}` : ''}.
+                {!underConstruction && ` You will be selling your facility to a competitor.`}
               </DialogContentText></DialogContent>
               <DialogActions>
                 <Button onClick={toggleDialog} color="primary">

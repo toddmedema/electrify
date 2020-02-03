@@ -1,4 +1,4 @@
-import {TimelineType} from 'app/Types';
+import {TickPresentFutureType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatWatts} from 'shared/helpers/Format';
@@ -12,7 +12,7 @@ interface BlackoutEdges {
 
 export interface Props {
   height?: number;
-  timeline: TimelineType[];
+  timeline: TickPresentFutureType[];
   blackouts: BlackoutEdges[];
   domain: { x: [number, number], y: [number, number] };
   startingYear: number;

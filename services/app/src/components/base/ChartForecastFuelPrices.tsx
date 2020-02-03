@@ -1,5 +1,5 @@
 import {TICK_MINUTES} from 'app/Constants';
-import {TimelineType} from 'app/Types';
+import {TickPresentFutureType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
 import {formatMoneyConcise} from 'shared/helpers/Format';
@@ -8,7 +8,7 @@ import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, Vic
 
 export interface Props {
   height?: number;
-  timeline: TimelineType[];
+  timeline: TickPresentFutureType[];
   domain: { x: [number, number] };
   startingYear: number;
 }
@@ -18,7 +18,7 @@ export default class extends React.PureComponent<Props, {}> {
   public render() {
     const {domain, height, timeline, startingYear} = this.props;
     // Downsample the data to one per day to make it more vague / forecast-y
-    const data = timeline.filter((t: TimelineType) => t.minute % 1440 < TICK_MINUTES);
+    const data = timeline.filter((t: TickPresentFutureType) => t.minute % 1440 < TICK_MINUTES);
     // Make sure it gets the first + last entries for a full chart
     data.unshift(timeline[0]);
     data.push(timeline[timeline.length - 1]);

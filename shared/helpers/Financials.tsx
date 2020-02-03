@@ -1,5 +1,5 @@
-import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL} from 'app/Constants';
-import {DateType, FacilityOperatingType, GeneratorShoppingType, MonthlyHistoryType} from 'app/Types';
+import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL, TICKS_PER_HOUR} from 'app/Constants';
+import {DateType, FacilityOperatingType, GeneratorShoppingType, MonthlyHistoryType, TickPresentFutureType} from 'app/Types';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 
 // Get the monthly payment amount for a new loan
@@ -32,6 +32,40 @@ export function facilityCashBack(g: FacilityOperatingType): number {
   const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
   const lostFromSelling = (g.buildCost - g.loanAmountLeft) * GENERATOR_SELL_MULTIPLIER * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
   return g.buildCost - lostFromSelling - g.loanAmountLeft;
+}
+
+// start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
+export function summarizeTimeline(timeline: TickPresentFutureType[], startMinute?: number, endMinute?: number): MonthlyHistoryType {
+  const summary = {
+    supplyWh: 0,
+    demandWh: 0,
+    customers: 0,
+    kgco2e: 0,
+    revenue: 0,
+    expensesFuel: 0,
+    expensesOM: 0,
+    expensesCarbonFee: 0,
+    expensesInterest: 0,
+    expensesMarketing: 0,
+    netWorth: 0, // must be calculated separately from game state for now
+  } as MonthlyHistoryType;
+  // Go in reverse so that the last values for ending values (like net worth are used)
+  for (let i = timeline.length - 1; i >= 0 ; i--) {
+    const t = timeline[i];
+    if ((!startMinute || t.minute >= startMinute) && (!endMinute || t.minute <= endMinute)) {
+      summary.supplyWh += t.supplyW / TICKS_PER_HOUR;
+      summary.demandWh += t.demandW / TICKS_PER_HOUR;
+      summary.kgco2e += t.kgco2e;
+      summary.revenue += t.revenue;
+      summary.expensesFuel += t.expensesFuel;
+      summary.expensesOM += t.expensesOM;
+      summary.expensesMarketing += t.expensesMarketing;
+      summary.expensesCarbonFee += t.expensesCarbonFee;
+      summary.expensesInterest += t.expensesInterest;
+      summary.customers = t.customers;
+    }
+  }
+  return summary;
 }
 
 export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
@@ -67,7 +101,7 @@ export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHi
   return summary;
 }
 
-// CAC is $75->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
+// CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
 export function customersFromMarketingSpend(spend: number) {
-  return Math.floor(spend / (75 + spend / 10000000));
+  return Math.floor(spend / (100 + spend / 1000000));
 }
