@@ -100,6 +100,7 @@ export default class extends React.Component<Props, State> {
 
     // TODO merge this into table
     const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+    console.log(now, summarizeTimeline(gameState.timeline, 0, gameState.date.minute));
 
     return (
       <GameCard className="finances">

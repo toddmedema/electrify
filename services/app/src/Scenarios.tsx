@@ -43,7 +43,7 @@ export const SCENARIOS = [
       {
         target: '#speedChangeButtons',
         content: <Typography variant="body1">
-          Start the game by unpausing it.<br/><br/>
+          Start the game by unpausing it. (If you're on a computer, you can also use keyboard shortcuts 1/2/3/space/Q/W/E)<br/><br/>
           For questions and learning more, select "Manual" from the top left menu.<br/><br/>
           This tutorial will run for 1 year. Try building different types of generators!
         </Typography>,

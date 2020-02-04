@@ -1,5 +1,6 @@
 import {Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography} from '@material-ui/core';
 import * as React from 'react';
+import { GlobalHotKeys  } from 'react-hotkeys';
 import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
 
@@ -20,6 +21,33 @@ import NewGameContainer from './views/NewGameContainer';
 import NewGameDetailsContainer from './views/NewGameDetailsContainer';
 import SettingsContainer from './views/SettingsContainer';
 import TutorialsContainer from './views/TutorialsContainer';
+
+// TODO move to dispatch
+import {toCard} from '../actions/Card';
+import {setSpeed} from '../reducers/GameState';
+import {getStore} from '../Store';
+
+const keyMap = {
+  PAUSED: ['space', '`'],
+  SLOW: '1',
+  NORMAL: '2',
+  FAST: '3',
+  LIGHTNING: '4',
+  FACILITIES: 'q',
+  FINANCES: 'w',
+  FORECASTS: 'e',
+};
+
+const shortcutHandlers = {
+  PAUSED: () => { getStore().dispatch(setSpeed('PAUSED')); },
+  SLOW: () => { getStore().dispatch(setSpeed('SLOW')); },
+  NORMAL: () => { getStore().dispatch(setSpeed('NORMAL')); },
+  FAST: () => { getStore().dispatch(setSpeed('FAST')); },
+  LIGHTNING: () => { getStore().dispatch(setSpeed('LIGHTNING')); },
+  FACILITIES: () => { getStore().dispatch(toCard({name: 'FACILITIES'})); },
+  FINANCES: () => { getStore().dispatch(toCard({name: 'FINANCES'})); },
+  FORECASTS: () => { getStore().dispatch(toCard({name: 'FORECASTS'})); },
+};
 
 interface TooltipProps {
   continuous: any;
@@ -146,6 +174,7 @@ export default class Compositor extends React.Component<Props, {}> {
     // for more details on use of childFactory in TransitionGroup
     return (
       <div className="app_container">
+        <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
           childFactory={(child) => React.cloneElement(
               child, {classNames: this.props.transition}

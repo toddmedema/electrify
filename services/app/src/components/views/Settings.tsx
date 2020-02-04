@@ -41,10 +41,12 @@ const Settings = (props: Props): JSX.Element => {
   //   {(props.settings.experimental) ? 'Experimental features are currently enabled.' : 'Experimental features are currently disabled.'}
   // </Checkbox>
 
+  // Getting keyboard shortcut map: https://www.npmjs.com/package/react-hotkeys#displaying-a-list-of-available-hot-keys
+
   return (
     <div>
       <Button variant="contained" color="primary" onClick={props.onMainMenu}>Return to main menu</Button>
-      TODO: enable / disable music, font size, auto-pause while looking at build options, ...?
+      TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
       <div className="version">Electrify App v{VERSION}</div>
     </div>
   );
