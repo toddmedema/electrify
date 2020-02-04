@@ -22,7 +22,7 @@ import NewGameDetailsContainer from './views/NewGameDetailsContainer';
 import SettingsContainer from './views/SettingsContainer';
 import TutorialsContainer from './views/TutorialsContainer';
 
-// TODO move to dispatch
+// TODO move to dispatch (probably move the entire shortcutHandlers function, and have it take in the triggered shortcut name?)
 import {toCard} from '../actions/Card';
 import {setSpeed} from '../reducers/GameState';
 import {getStore} from '../Store';

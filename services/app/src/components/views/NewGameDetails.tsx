@@ -46,31 +46,18 @@ export default function NewGameDetails(props: Props): JSX.Element {
           <Typography variant="h6">{scenario.name}</Typography>
         </Toolbar>
       </div>
-      <Table>
-        <TableBody>
-          <TableRow>
-            <TableCell>Starting year</TableCell>
-            <TableCell>{scenario.startingYear}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Duration</TableCell>
-            <TableCell>{Math.floor(scenario.durationMonths / 12)} years</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Difficulty</TableCell>
-            <TableCell>
-              <Select
-                value={props.gameState.difficulty}
-                onChange={(e: any) => props.onDelta({ difficulty: e.target.value })}
-              >
-                {Object.keys(DIFFICULTIES).map((d: DifficultyType) => {
-                  return <MenuItem value={d} key={d}>{d}</MenuItem>;
-                })}
-              </Select>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+      <div style={{textAlign: 'center', margin: '20px 0', lineHeight: '30px'}}>
+        Scenario timeframe: {scenario.startingYear} to {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}<br/>
+        Select difficulty:
+        <Select
+          value={props.gameState.difficulty}
+          onChange={(e: any) => props.onDelta({ difficulty: e.target.value })}
+        >
+          {Object.keys(DIFFICULTIES).map((d: DifficultyType) => {
+            return <MenuItem value={d} key={d}>{d}</MenuItem>;
+          })}
+        </Select>
+      </div>
 
       <div style={{textAlign: 'center'}}>
         <Button size="large" variant="contained" color="primary" onClick={() => props.onStart({})} autoFocus>Play</Button>
@@ -93,6 +80,7 @@ export default function NewGameDetails(props: Props): JSX.Element {
               <TableCell>{score.difficulty}</TableCell>
             </TableRow>;
           })}
+          {scores.length === 0 && <TableRow><TableCell colSpan={2}><Typography variant="body2" color="textSecondary">Play the scenario to set a high score</Typography></TableCell></TableRow>}
         </TableBody>
       </Table>
     </div>

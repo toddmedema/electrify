@@ -264,8 +264,8 @@ export function generateNewTimeline(state: GameStateType, cash: number, customer
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
 // which should be done once after multiple builds
-function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean): GameStateType {
-  const newGame = state.timeline.length === 0;
+function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean, newGame= false): GameStateType {
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
   let financing = {
     loanAmountTotal: 0,
     loanAmountLeft: 0,
@@ -275,7 +275,7 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
     // Don't charge anything for initial builds
   } else if (financed) {
     const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
-    state.monthlyHistory[0].cash -= downpayment;
+    now.cash -= downpayment;
     const loanAmount = g.buildCost - downpayment;
     financing = {
       loanAmountTotal: loanAmount,
@@ -283,7 +283,7 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
       loanMonthlyPayment: getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS),
     };
   } else { // purchased in cash
-    state.monthlyHistory[0].cash -= g.buildCost;
+    now.cash -= g.buildCost;
   }
   const facility = {
     ...g,
@@ -433,7 +433,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
     // in one loop, refund cash from selling + remove from list
     newState.facilities = newState.facilities.filter((g: GeneratorOperatingType) => {
       if (g.id === id) {
-        newState.monthlyHistory[0].cash += facilityCashBack(g);
+        getTimeFromTimeline(newState.date.minute, newState.timeline).cash += facilityCashBack(g);
         return false;
       }
       return true;
@@ -460,6 +460,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
       startingYear: scenario.startingYear,
       feePerKgCO2e: scenario.feePerKgCO2e,
     };
+    generateNewTimeline(newState, a.cash, a.customers);
 
     // TODO also search STORAGE
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
@@ -472,7 +473,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         return true;
       });
       if (generator) {
-        newState = buildFacility(newState, generator, false);
+        newState = buildFacility(newState, generator, false, true);
       } else {
         const storage = STORAGE(newState, search.peakWh || 1000000).find((g: FacilityShoppingType) => {
           for (const property in search) {
@@ -483,11 +484,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           return true;
         });
         if (storage) {
-          newState = buildFacility(newState, storage, false);
+          newState = buildFacility(newState, storage, false, true);
         }
       }
     });
-    generateNewTimeline(newState, a.cash, a.customers);
 
     // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
     getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
