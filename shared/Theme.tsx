@@ -9,6 +9,7 @@ import {ThemeOptions} from '@material-ui/core/styles/createMuiTheme';
 
 const darkBlack = '0x000000';
 
+export const disabledColor = grey[100];
 export const interactiveColor = blue[600];
 export const blackoutColor = red[500];
 export const demandColor = grey[900];
@@ -21,7 +22,7 @@ export const defaultTheme = {
   palette: {
     type: 'light',
     primary: {
-      light: grey[100],
+      light: disabledColor,
       main: supplyColor,
       dark: darkBlack,
       contrastText: grey[100],
