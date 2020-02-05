@@ -512,6 +512,10 @@ body.android .dialog .textfield:focus-within {
     height: 100%;
   }
 
+  .facility {
+    border-top: 1px #eeeeee solid; /* grey200 */
+  }
+
   .version {
     text-align: center;
     opacity: 0.7;

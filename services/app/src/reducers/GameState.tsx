@@ -266,37 +266,39 @@ export function generateNewTimeline(state: GameStateType, cash: number, customer
 // which should be done once after multiple builds
 function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean, newGame= false): GameStateType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  let financing = {
-    loanAmountTotal: 0,
-    loanAmountLeft: 0,
-    loanMonthlyPayment: 0,
-  };
-  if (newGame) {
-    // Don't charge anything for initial builds
-  } else if (financed) {
-    const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
-    now.cash -= downpayment;
-    const loanAmount = g.buildCost - downpayment;
-    financing = {
-      loanAmountTotal: loanAmount,
-      loanAmountLeft: loanAmount,
-      loanMonthlyPayment: getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS),
+  if (now) {
+    let financing = {
+      loanAmountTotal: 0,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
     };
-  } else { // purchased in cash
-    now.cash -= g.buildCost;
+    if (newGame) {
+      // Don't charge anything for initial builds
+    } else if (financed) {
+      const downpayment = g.buildCost * DOWNPAYMENT_PERCENT;
+      now.cash -= downpayment;
+      const loanAmount = g.buildCost - downpayment;
+      financing = {
+        loanAmountTotal: loanAmount,
+        loanAmountLeft: loanAmount,
+        loanMonthlyPayment: getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS),
+      };
+    } else { // purchased in cash
+      now.cash -= g.buildCost;
+    }
+    const facility = {
+      ...g,
+      ...financing,
+      id: state.facilities.reduce((max: number, f: FacilityOperatingType) => max > f.id ? max : f.id, 0) + 1,
+      currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
+      yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
+      minuteCreated: state.date.minute,
+    } as FacilityOperatingType;
+    if (g.peakWh) {
+      facility.currentWh = 0;
+    }
+    state.facilities.unshift(facility);
   }
-  const facility = {
-    ...g,
-    ...financing,
-    id: state.facilities.reduce((max: number, f: FacilityOperatingType) => max > f.id ? max : f.id, 0) + 1,
-    currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
-    yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
-    minuteCreated: state.date.minute,
-  } as FacilityOperatingType;
-  if (g.peakWh) {
-    facility.currentWh = 0;
-  }
-  state.facilities.unshift(facility);
   return state;
 }
 
@@ -334,73 +336,75 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
       };
       const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
-      getSupplyWAndUpdateFacilities(newState.facilities, now);
-      updateFinances(state, now);
-      const {cash, customers} = now;
+      if (now) {
+        getSupplyWAndUpdateFacilities(newState.facilities, now);
+        updateFinances(state, now);
+        const {cash, customers} = now;
 
-      if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-        const history = newState.monthlyHistory;
+        if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
+          const history = newState.monthlyHistory;
 
-        // Record final history for the month, then generate the new timeline
-        history.unshift(summarizeTimeline(newState.timeline));
-        history[0].netWorth = getNetWorth(newState.facilities, cash);
-        generateNewTimeline(newState, cash, customers);
+          // Record final history for the month, then generate the new timeline
+          history.unshift(summarizeTimeline(newState.timeline));
+          history[0].netWorth = getNetWorth(newState.facilities, cash);
+          generateNewTimeline(newState, cash, customers);
 
-        // ===== TRIGGERS ======
-        if (now.cash < 0) {
-          const summary = summarizeHistory(history);
-          setTimeout(() => getStore().dispatch(openDialog({
-            title: 'Bankrupt!',
-            message: `You've run out of money.
-              You survived for ${newState.date.year - newState.startingYear} years,
-              earned ${formatMoneyConcise(summary.revenue)} in revenue
-              and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
-            open: true,
-            notCancellable: true,
-            actionLabel: 'Try again',
-            action: () => getStore().dispatch(quitGame()),
-          })), 1);
-        }
+          // ===== TRIGGERS ======
+          if (now.cash < 0) {
+            const summary = summarizeHistory(history);
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: 'Bankrupt!',
+              message: `You've run out of money.
+                You survived for ${newState.date.year - newState.startingYear} years,
+                earned ${formatMoneyConcise(summary.revenue)} in revenue
+                and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+              open: true,
+              notCancellable: true,
+              actionLabel: 'Try again',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
+          }
 
-        if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
-          const summary = summarizeHistory(history);
-          setTimeout(() => getStore().dispatch(openDialog({
-            title: 'Fired!',
-            message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-              You survived for ${newState.date.year - newState.startingYear} years,
-              earned ${formatMoneyConcise(summary.revenue)} in revenue
-              and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
-            open: true,
-            notCancellable: true,
-            actionLabel: 'Try again',
-            action: () => getStore().dispatch(quitGame()),
-          })), 1);
-        }
+          if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
+            const summary = summarizeHistory(history);
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: 'Fired!',
+              message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
+                You survived for ${newState.date.year - newState.startingYear} years,
+                earned ${formatMoneyConcise(summary.revenue)} in revenue
+                and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+              open: true,
+              notCancellable: true,
+              actionLabel: 'Try again',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
+          }
 
-        const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
-          durationMonths: 12 * 20,
-          endMessageTitle: `You've retired!`,
-        };
-        if (newState.date.monthsEllapsed === scenario.durationMonths) {
-          const summary = summarizeHistory(history);
-          const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-          // This is also described in the manual; if I update the algorithm, update the manual too!
-          const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
-          const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
-          setStorageKeyValue('highscores', {scores: [...scores, {
-            score: finalScore,
-            scenarioId: state.scenarioId,
-            difficulty: state.difficulty,
-            date: (new Date()).toString(),
-          } as ScoreType]});
-          setTimeout(() => getStore().dispatch(openDialog({
-            title: scenario.endMessageTitle || `You've retired!`,
-            message: `Your score is ${finalScore}.`,
-            open: true,
-            closeText: 'Keep playing',
-            actionLabel: 'Return to menu',
-            action: () => getStore().dispatch(quitGame()),
-          })), 1);
+          const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
+            durationMonths: 12 * 20,
+            endMessageTitle: `You've retired!`,
+          };
+          if (newState.date.monthsEllapsed === scenario.durationMonths) {
+            const summary = summarizeHistory(history);
+            const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+            // This is also described in the manual; if I update the algorithm, update the manual too!
+            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 3 * summary.kgco2e / 1000000000000 - 100 * blackoutsTWh);
+            const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
+            setStorageKeyValue('highscores', {scores: [...scores, {
+              score: finalScore,
+              scenarioId: state.scenarioId,
+              difficulty: state.difficulty,
+              date: (new Date()).toString(),
+            } as ScoreType]});
+            setTimeout(() => getStore().dispatch(openDialog({
+              title: scenario.endMessageTitle || `You've retired!`,
+              message: `Your score is ${finalScore}.`,
+              open: true,
+              closeText: 'Keep playing',
+              actionLabel: 'Return to menu',
+              action: () => getStore().dispatch(quitGame()),
+            })), 1);
+          }
         }
       }
 
@@ -433,7 +437,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
     // in one loop, refund cash from selling + remove from list
     newState.facilities = newState.facilities.filter((g: GeneratorOperatingType) => {
       if (g.id === id) {
-        getTimeFromTimeline(newState.date.minute, newState.timeline).cash += facilityCashBack(g);
+        const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
+        if (now) {
+          now.cash += facilityCashBack(g);
+        }
         return false;
       }
       return true;

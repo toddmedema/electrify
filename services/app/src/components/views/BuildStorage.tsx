@@ -6,6 +6,7 @@ import PauseIcon from '@material-ui/icons/Pause';
 import SortIcon from '@material-ui/icons/Sort';
 
 import * as React from 'react';
+import {getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {getMonthlyPayment} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
@@ -181,7 +182,6 @@ function valueLabelFormat(x: number) {
 
 export interface StateProps {
   gameState: GameStateType;
-  cash: number;
 }
 
 export interface DispatchProps {
@@ -193,7 +193,12 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function StorageBuildDialog(props: Props): JSX.Element {
-  const {gameState, cash, onBack} = props;
+  const {gameState, onBack} = props;
+  const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+  if (!now) {
+    return <span/>;
+  }
+  const cash = now.cash;
   const filtered = gameState.facilities.filter((f) => f.peakWh);
   const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
   const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakWh || 500000000;

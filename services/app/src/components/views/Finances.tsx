@@ -66,6 +66,11 @@ export default class extends React.Component<Props, State> {
     const {year} = this.state;
     const tick = getTickFromValue(gameState.monthlyMarketingSpend);
 
+    const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+    if (!now) {
+      return <span/>;
+    }
+
     const years = [];
     // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= gameState.startingYear; i--) {
@@ -99,7 +104,6 @@ export default class extends React.Component<Props, State> {
     const supplykWh = (summary.supplyWh || 1) / 1000;
 
     // TODO merge this into table
-    const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
     console.log(now, summarizeTimeline(gameState.timeline, 0, gameState.date.minute));
 
     return (

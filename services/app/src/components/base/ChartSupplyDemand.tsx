@@ -153,17 +153,6 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={historic}
-          x="minute"
-          y="demandW"
-          style={{
-            data: {
-              stroke: demandColor,
-              strokeWidth: 4,
-            },
-          }}
-        />
-        <VictoryLine
           data={forecast}
           x="minute"
           y="supplyW"
@@ -175,12 +164,13 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
-          data={forecast}
+          data={timeline}
           x="minute"
           y="demandW"
           style={{
             data: {
               stroke: demandColor,
+              strokeWidth: 3,
             },
           }}
         />

@@ -1,4 +1,4 @@
-import {IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
+import {Button, IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 import DoubleArrowIcon from '@material-ui/icons/DoubleArrow';
 import FastForwardIcon from '@material-ui/icons/FastForward';
@@ -14,15 +14,13 @@ import {formatMoneyStable} from 'shared/helpers/Format';
 import {toCard} from '../../actions/Card';
 import {isSmallScreen, openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
-import {AppStateType, DateType, GameStateType, SpeedType, TickPresentFutureType} from '../../Types';
+import {AppStateType, GameStateType, SpeedType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.Props<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
   gameState: GameStateType;
-  now: TickPresentFutureType;
-  date: DateType;
 }
 
 export interface DispatchProps {
@@ -34,9 +32,11 @@ export interface DispatchProps {
 export interface Props extends GameCardProps, DispatchProps {}
 
 export function GameCard(props: Props) {
-  const {gameState, date, now} = props;
-  if (!gameState.inGame) {
-    return <span/>;
+  const {gameState} = props;
+  const date = gameState.date;
+  const now = getTimeFromTimeline(date.minute, gameState.timeline);
+  if (!gameState.inGame || !now) {
+    return <Button onClick={props.onQuit}>ERROR! Click here to return to the menu</Button>;
   }
 
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
@@ -142,8 +142,6 @@ export function GameCard(props: Props) {
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>): GameCardProps => ({
   gameState: state.gameState,
-  date: state.gameState.date,
-  now: getTimeFromTimeline(state.gameState.date.minute, state.gameState.timeline),
   ...ownProps,
 });
 

@@ -42,9 +42,13 @@ export default class extends React.Component<Props, State> {
   }
 
   public render() {
+    const now = getTimeFromTimeline(this.props.gameState.date.minute, this.props.gameState.timeline);
+    if (!now) {
+      return <span/>;
+    }
+
     // Generate the forecast
     const newState = {...this.props.gameState};
-    const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
     generateNewTimeline(newState, now.cash, now.customers, TICKS_PER_YEAR * FORECAST_YEARS);
     const {timeline, startingYear} = newState;
 

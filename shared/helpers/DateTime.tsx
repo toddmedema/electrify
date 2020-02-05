@@ -1,7 +1,10 @@
 import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, TICK_MINUTES} from 'app/Constants';
 import {DateType, MonthType, TickPresentFutureType} from 'app/Types';
 
-export function getTimeFromTimeline(minute: number, timeline: TickPresentFutureType[]) {
+export function getTimeFromTimeline(minute: number, timeline: TickPresentFutureType[]): null|TickPresentFutureType {
+  if (!timeline[0]) {
+    return null;
+  }
   const startingTime = timeline[0].minute;
   const deltaTicks = Math.floor((minute - startingTime) / TICK_MINUTES);
   if (deltaTicks >= timeline.length || timeline[deltaTicks] === undefined) {
