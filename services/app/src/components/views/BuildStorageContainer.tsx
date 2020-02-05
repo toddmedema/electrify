@@ -1,7 +1,6 @@
 import {toCard} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {setSpeed} from '../../reducers/GameState';
 import {AppStateType, BuildFacilityAction, SpeedType, StorageShoppingType} from '../../Types';
 import BuildStorage, {DispatchProps, StateProps} from './BuildStorage';
@@ -9,7 +8,6 @@ import BuildStorage, {DispatchProps, StateProps} from './BuildStorage';
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     gameState: state.gameState,
-    cash: getTimeFromTimeline(state.gameState.date.minute, state.gameState.timeline).cash,
   };
 };
 
