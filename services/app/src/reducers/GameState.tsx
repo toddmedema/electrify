@@ -41,7 +41,11 @@ export function quitGame(): QuitGameAction {
   return { type: 'GAME_EXIT' };
 }
 
-function getDemandW(date: DateType, gameState: GameStateType, now: TickPresentFutureType) {
+function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
+  // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
+  const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
+  now.customers = Math.round(prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) + marketingGrowth);
+
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
@@ -49,12 +53,16 @@ function getDemandW(date: DateType, gameState: GameStateType, now: TickPresentFu
   const temperatureNormalized = (now.temperatureC + 2) / 21;
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const minutesFromDarkLogistics = 1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
-  const demandMultiple = 387.5 + 69.5 * temperatureNormalized + 31.44 * minutesFromDarkLogistics;
+  const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
+  const minutesFrom9amLogistics = 1 / (1 + Math.pow(Math.E, -minutesFrom9amNormalized * 2));
+  const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
+  const minutesFrom5pmLogistics = 1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
+  const demandMultiple = 430 + 70 * temperatureNormalized - 40 * minutesFrom9amLogistics + 30 * minutesFromDarkLogistics - 65 * minutesFrom5pmLogistics;
       // + 192.12 * (Weekday variable)
   return demandMultiple * now.customers;
 }
 
-function updateFinances(gameState: GameStateType, now: TickPresentFutureType) {
+function updateFinances(gameState: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
   const difficulty = DIFFICULTIES[gameState.difficulty];
 
   // TODO actually calculate market price / sale value
@@ -97,8 +105,8 @@ function updateFinances(gameState: GameStateType, now: TickPresentFutureType) {
   const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
 
-  now.customers = Math.round(now.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
-  now.cash = Math.round(now.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
+  now.customers = Math.round(prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
+  now.cash = Math.round(prev.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
   now.revenue = revenue;
   now.expensesOM = expensesOM;
   now.expensesFuel = expensesFuel;
@@ -127,13 +135,13 @@ function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType
 }
 
 function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
-  return state.timeline.map((t: TickPresentFutureType) => {
+  let prev = state.timeline[0];
+  return state.timeline.map((t: TickPresentFutureType, i: number) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      return {
-        ...t,
-        demandW: getDemandW(date, state, t),
-      };
+      t.demandW = getDemandW(date, state, prev, t);
+      prev = t;
+      return t;
     }
     return t;
   });
@@ -336,16 +344,17 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
         date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
       };
       const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
-      if (now) {
+      const prev = getTimeFromTimeline(newState.date.minute - TICK_MINUTES, newState.timeline);
+      if (now && prev) {
         getSupplyWAndUpdateFacilities(newState.facilities, now);
-        updateFinances(state, now);
+        updateFinances(state, prev, now);
         const {cash, customers} = now;
 
         if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
           const history = newState.monthlyHistory;
 
           // Record final history for the month, then generate the new timeline
-          history.unshift(summarizeTimeline(newState.timeline));
+          history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));
           history[0].netWorth = getNetWorth(newState.facilities, cash);
           generateNewTimeline(newState, cash, customers);
 

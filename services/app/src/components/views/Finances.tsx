@@ -26,17 +26,17 @@ interface State {
   year: number;
 }
 
-// -1:0 -> 0:$1M, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
+// -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
 function getValueFromTick(tick: number) {
   if (tick === -1) { return 0; }
-  const exponent = Math.floor(tick / 9) + 6;
+  const exponent = Math.floor(tick / 9) + 5;
   const frontNumber = tick % 9 + 1;
   return frontNumber * Math.pow(10, exponent);
 }
 
 function getTickFromValue(v: number) {
   if (v === 0) { return -1; }
-  const exponent = Math.floor(Math.log10(v)) - 6;
+  const exponent = Math.floor(Math.log10(v)) - 5;
   const frontNumber = +v.toString().charAt(0);
   return frontNumber + exponent * 9 - 1;
 }
@@ -82,32 +82,47 @@ export default class extends React.Component<Props, State> {
     };
 
     const history = gameState.monthlyHistory;
+    const then = summarizeHistory(history, (t: MonthlyHistoryType) => !year || t.year === year);
+    const upToNow = summarizeTimeline(gameState.timeline, gameState.startingYear, 0, gameState.date.minute);
+    const thisMonth = summarizeTimeline(gameState.timeline, gameState.startingYear, 0, gameState.date.minute);
     const timeline = [];
     for (const h of history) {
       if (!year || h.year === year) {
-        let profit = h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest + h.expensesMarketing);
-        const projected = (h.month === date.monthNumber && h.year === date.year);
-        if (projected) {
-          profit /= date.percentOfMonth;
-        }
         timeline.unshift({
           month: h.year * 12 + h.month,
           year: h.year,
-          profit,
-          projected,
+          profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest + h.expensesMarketing),
+          projected: false,
         });
       }
     }
+    // TODO project out for whole year, not just up to present
+    timeline.push({
+      month: thisMonth.year * 12 + thisMonth.month,
+      year: thisMonth.year,
+      profit: (upToNow.revenue - (upToNow.expensesFuel + upToNow.expensesOM + upToNow.expensesCarbonFee + upToNow.expensesInterest + upToNow.expensesMarketing)) / date.percentOfMonth,
+      projected: true,
+    });
 
-    const summary = summarizeHistory(history, (t: MonthlyHistoryType) => !year || t.year === year);
+    const summary = {
+      netWorth: upToNow.netWorth,
+      cash: upToNow.cash,
+      customers: upToNow.customers,
+      supplyWh: then.supplyWh + upToNow.supplyWh,
+      demandWh: then.demandWh + upToNow.demandWh,
+      revenue: then.revenue + upToNow.revenue,
+      expensesFuel: then.expensesFuel + upToNow.expensesFuel,
+      expensesOM: then.expensesOM + upToNow.expensesOM,
+      expensesCarbonFee: then.expensesCarbonFee + upToNow.expensesCarbonFee,
+      expensesInterest: then.expensesInterest + upToNow.expensesInterest,
+      expensesMarketing: then.expensesMarketing + upToNow.expensesMarketing,
+      kgco2e: then.kgco2e + upToNow.kgco2e,
+    } as MonthlyHistoryType;
     const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesMarketing + summary.expensesCarbonFee + summary.expensesInterest;
     const supplykWh = (summary.supplyWh || 1) / 1000;
 
-    // TODO merge this into table
-    console.log(now, summarizeTimeline(gameState.timeline, 0, gameState.date.minute));
-
     return (
-      <GameCard className="finances">
+      <GameCard className= "finances" >
         <div className="scrollable">
           <Toolbar>
             <Typography className="flex-newline" variant="body2" color="textSecondary">
@@ -121,7 +136,7 @@ export default class extends React.Component<Props, State> {
               valueLabelDisplay="off"
               min={-1}
               step={1}
-              max={Math.floor(getTickFromValue(Math.max(now.cash, gameState.monthlyMarketingSpend)))}
+              max={Math.floor(getTickFromValue(Math.max(now.cash / 12, gameState.monthlyMarketingSpend)))}
               onChange={(e: any, newTick: number) => onDelta({monthlyMarketingSpend: getValueFromTick(newTick)})}
             />
             <div className="flex-newline"></div>

@@ -129,16 +129,16 @@ export const SCENARIOS = [
     summary: 'Do you have what it takes to transition into a new age?',
     startingYear: 2020,
     feePerKgCO2e: 50 / 1000,
-    durationMonths: 12 * 20,
+    durationMonths: 12 * 12,
     facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Natural Gas', peakW: 480000000}],
   },
   {
     id: 101, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: 'Rise of Renewables',
     summary: 'Technology is changing rapidly - can you keep up?',
-    startingYear: 2000,
+    startingYear: 2002,
     feePerKgCO2e: 0,
-    durationMonths: 12 * 20,
+    durationMonths: 12 * 12,
     facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
   },
   {

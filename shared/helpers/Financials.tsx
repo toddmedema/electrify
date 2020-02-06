@@ -1,5 +1,6 @@
 import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL, TICKS_PER_HOUR} from 'app/Constants';
 import {DateType, FacilityOperatingType, GeneratorShoppingType, MonthlyHistoryType, TickPresentFutureType} from 'app/Types';
+import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 
 // Get the monthly payment amount for a new loan
@@ -34,9 +35,13 @@ export function facilityCashBack(g: FacilityOperatingType): number {
   return g.buildCost - lostFromSelling - g.loanAmountLeft;
 }
 
+// TODO better way of calculating month and year if start/end is defined
 // start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
-export function summarizeTimeline(timeline: TickPresentFutureType[], startMinute?: number, endMinute?: number): MonthlyHistoryType {
+export function summarizeTimeline(timeline: TickPresentFutureType[], startingYear: number, startMinute?: number, endMinute?: number): MonthlyHistoryType {
+  const time = getDateFromMinute((timeline[0] || {minute: 0}).minute, startingYear);
   const summary = {
+    month: time.monthNumber,
+    year: time.year,
     supplyWh: 0,
     demandWh: 0,
     customers: 0,
@@ -68,8 +73,10 @@ export function summarizeTimeline(timeline: TickPresentFutureType[], startMinute
   return summary;
 }
 
-export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
+export function summarizeHistory(timeline: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
   const summary = {
+    month: (timeline[0] || {}).month,
+    year: (timeline[0] || {}).year,
     supplyWh: 0,
     demandWh: 0,
     customers: 0,
@@ -82,8 +89,8 @@ export function summarizeHistory(t: MonthlyHistoryType[], filter?: (t: MonthlyHi
     expensesMarketing: 0,
   } as MonthlyHistoryType;
   // Go in reverse so that the last values for ending values (like net worth are used)
-  for (let i = t.length - 1; i >= 0 ; i--) {
-    const h = t[i];
+  for (let i = timeline.length - 1; i >= 0 ; i--) {
+    const h = timeline[i];
     if (!filter || filter(h)) {
       summary.supplyWh += h.supplyWh;
       summary.demandWh += h.demandWh;

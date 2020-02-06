@@ -22,17 +22,17 @@ export const DIFFICULTIES = {
   VP: {
     buildCost: 0.9,
     expensesOM: 0.9,
-    buildTime: 0.75,
+    buildTime: 0.7,
     blackoutPenalty: 8,
   },
   CEO: {
     buildCost: 1,
     expensesOM: 1,
-    buildTime: 1,
+    buildTime: 0.9,
     blackoutPenalty: 10,
   },
   Guru: {
-    buildCost: 1.2,
+    buildCost: 1.1,
     expensesOM: 1.1,
     buildTime: 1,
     blackoutPenalty: 12,
