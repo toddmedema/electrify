@@ -1,4 +1,4 @@
-import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL, TICKS_PER_HOUR} from 'app/Constants';
+import {FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL, TICKS_PER_HOUR} from 'app/Constants';
 import {DateType, FacilityOperatingType, GeneratorShoppingType, MonthlyHistoryType, TickPresentFutureType} from 'app/Types';
 import {getDateFromMinute} from 'shared/helpers/DateTime';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
@@ -58,8 +58,8 @@ export function summarizeTimeline(timeline: TickPresentFutureType[], startingYea
   for (let i = timeline.length - 1; i >= 0 ; i--) {
     const t = timeline[i];
     if ((!startMinute || t.minute >= startMinute) && (!endMinute || t.minute <= endMinute)) {
-      summary.supplyWh += t.supplyW / TICKS_PER_HOUR;
-      summary.demandWh += t.demandW / TICKS_PER_HOUR;
+      summary.supplyWh += t.supplyW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
+      summary.demandWh += t.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
       summary.kgco2e += t.kgco2e;
       summary.revenue += t.revenue;
       summary.expensesFuel += t.expensesFuel;
@@ -92,8 +92,8 @@ export function summarizeHistory(timeline: MonthlyHistoryType[], filter?: (t: Mo
   for (let i = timeline.length - 1; i >= 0 ; i--) {
     const h = timeline[i];
     if (!filter || filter(h)) {
-      summary.supplyWh += h.supplyWh;
-      summary.demandWh += h.demandWh;
+      summary.supplyWh += h.supplyWh * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
+      summary.demandWh += h.demandWh * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
       summary.kgco2e += h.kgco2e;
       summary.revenue += h.revenue;
       summary.expensesFuel += h.expensesFuel;

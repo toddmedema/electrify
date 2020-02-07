@@ -38,9 +38,7 @@ export default class extends React.PureComponent<Props, {}> {
           tickLabelComponent={<VictoryLabel dy={-5} />}
           axisLabelComponent={<VictoryLabel dy={2} />}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             grid: {
               display: 'none',
             },
@@ -52,9 +50,7 @@ export default class extends React.PureComponent<Props, {}> {
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             grid: {
               display: 'none',
             },
@@ -93,11 +89,6 @@ export default class extends React.PureComponent<Props, {}> {
               opacity: 0.3,
             },
           }}
-        />
-        <VictoryLabel
-          textAnchor="middle"
-          x={200} y={7}
-          text="Supply & Demand"
         />
       </VictoryChart>
     </div>;

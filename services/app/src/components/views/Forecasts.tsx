@@ -133,7 +133,7 @@ export default class extends React.Component<Props, State> {
       <GameCard className="Forecasts">
         <div className="scrollable">
           <Toolbar>
-            <Typography variant="h6">Forecasts for 1 year</Typography>
+            <Typography variant="h6">Supply & Demand</Typography>
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
@@ -177,6 +177,9 @@ export default class extends React.Component<Props, State> {
           </Table>
           <br/>
           <br/>
+          <Toolbar>
+            <Typography variant="h6">Fuel Prices</Typography>
+          </Toolbar>
           <ChartForecastFuelPrices
             height={140}
             timeline={timeline}

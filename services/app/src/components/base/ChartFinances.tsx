@@ -52,9 +52,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         <VictoryAxis
           tickFormat={(t) => formatMonthChartAxis(t, multiyear)}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             grid: {
               display: 'none',
             },
@@ -66,9 +64,7 @@ const ChartFinances = (props: Props): JSX.Element => {
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             tickLabels: chartTheme.tickLabels,
           }}
         />

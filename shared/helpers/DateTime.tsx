@@ -14,6 +14,7 @@ export function getTimeFromTimeline(minute: number, timeline: TickPresentFutureT
 }
 
 export function formatMonthChartAxis(t: number, multiyear: boolean) {
+  t--;
   if (multiyear) {
     return (t % 12 + 1) + '/' + Math.floor(t / 12).toString().slice(-2);
   }

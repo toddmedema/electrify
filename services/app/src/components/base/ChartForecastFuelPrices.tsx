@@ -39,9 +39,7 @@ export default class extends React.PureComponent<Props, {}> {
             tickLabelComponent={<VictoryLabel dy={-5} />}
             axisLabelComponent={<VictoryLabel dy={2} />}
             style={{
-              axis: {
-                stroke: 'black', strokeWidth: 1,
-              },
+              axis: chartTheme.axis,
               grid: {
                 display: 'none',
               },
@@ -55,9 +53,7 @@ export default class extends React.PureComponent<Props, {}> {
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
             style={{
-              axis: {
-                stroke: 'black', strokeWidth: 1,
-              },
+              axis: chartTheme.axis,
               tickLabels: chartTheme.tickLabels,
             }}
           />
@@ -107,11 +103,6 @@ export default class extends React.PureComponent<Props, {}> {
               { name: 'Natural Gas', symbol: { fill: naturalGasColor } },
               { name: 'Uranium', symbol: { fill: uraniumColor } },
             ]}
-          />
-          <VictoryLabel
-            textAnchor="middle"
-            x={200} y={7}
-            text="Fuel prices"
           />
         </VictoryChart>
       </div>

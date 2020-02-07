@@ -222,6 +222,16 @@ table {
   td { font-weight: 200; }
 }
 
+.expandable {
+  position: relative;
+  padding-bottom: size(small);
+  &.notExpanded {
+    .tabs-1, .tabs-2 {
+      display: none;
+    }
+  }
+}
+
 // Fixes bug with desktop alignment
 .MuiToolbar-gutters {
   padding-left: 16px !important;
@@ -396,7 +406,6 @@ body.android .dialog .textfield:focus-within {
   }
 
   .MuiCard-root {
-    margin-bottom: size(small);
     margin: 0 size(small) size(base) size(small);
     border-radius: 0;
     position: relative;
@@ -420,13 +429,13 @@ body.android .dialog .textfield:focus-within {
         margin-top: size(small);
       }
     }
+  }
 
-    .expand-icon {
-      position: absolute;
-      bottom: -6px;
-      left: 50%;
-      transform: translatex(-50%);
-    }
+  .expand-icon {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translatex(-50%);
   }
 
   #tutorial-tooltip {

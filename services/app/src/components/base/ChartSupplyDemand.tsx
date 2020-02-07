@@ -117,9 +117,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           tickLabelComponent={<VictoryLabel dy={-5} />}
           axisLabelComponent={<VictoryLabel dy={2} />}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             grid: {
               display: 'none',
             },
@@ -131,9 +129,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
-            axis: {
-              stroke: 'black', strokeWidth: 1,
-            },
+            axis: chartTheme.axis,
             grid: {
               display: 'none',
             },

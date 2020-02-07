@@ -71,8 +71,8 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         title={generator.name}
         subheader={secondaryText}
       />
-      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
+      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon" />}
+      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="generator properties">
