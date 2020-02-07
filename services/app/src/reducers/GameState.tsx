@@ -107,6 +107,7 @@ function updateFinances(gameState: GameStateType, prev: TickPresentFutureType, n
 
   now.customers = Math.round(prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
   now.cash = Math.round(prev.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
+  now.netWorth = getNetWorth(gameState.facilities, now.cash);
   now.revenue = revenue;
   now.expensesOM = expensesOM;
   now.expensesFuel = expensesFuel;
@@ -255,6 +256,7 @@ export function generateNewTimeline(state: GameStateType, cash: number, customer
       temperatureC: 0,
       cash,
       customers,
+      netWorth: getNetWorth(state.facilities, cash),
       revenue: 0,
       expensesFuel: 0,
       expensesOM: 0,
@@ -355,7 +357,6 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
           // Record final history for the month, then generate the new timeline
           history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));
-          history[0].netWorth = getNetWorth(newState.facilities, cash);
           generateNewTimeline(newState, cash, customers);
 
           // ===== TRIGGERS ======
@@ -397,7 +398,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
             // This is also described in the manual; if I update the algorithm, update the manual too!
-            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 1 * summary.kgco2e / 1000000000000 - 5 * blackoutsTWh);
+            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 2 * summary.kgco2e / 1000000000000 - 5 * blackoutsTWh);
             const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
             setStorageKeyValue('highscores', {scores: [...scores, {
               score: finalScore,

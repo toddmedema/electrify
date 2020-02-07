@@ -195,12 +195,12 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
-  netWorth: number; // ending
 }
 
 interface HistoryForecastShared {
   cash: number;
   customers: number;
+  netWorth: number;
   revenue: number; // total
   expensesFuel: number; // total
   expensesOM: number; // total

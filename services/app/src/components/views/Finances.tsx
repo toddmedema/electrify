@@ -115,8 +115,8 @@ export default class extends React.Component<Props, State> {
     }
 
     const summary = {
-      netWorth: upToNow.netWorth,
-      cash: upToNow.cash,
+      netWorth: now.netWorth,
+      cash: now.cash,
       customers: upToNow.customers,
       supplyWh: then.supplyWh + upToNow.supplyWh,
       demandWh: then.demandWh + upToNow.demandWh,
@@ -134,6 +134,7 @@ export default class extends React.Component<Props, State> {
     return (
       <GameCard className= "finances">
         <div className="scrollable">
+          <br/>
           <Toolbar>
             <Typography className="flex-newline" variant="body2" color="textSecondary">
               Marketing:&nbsp;

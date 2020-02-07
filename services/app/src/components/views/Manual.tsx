@@ -117,7 +117,7 @@ const MANUAL_ENTRIES = [
         1 pt for each TWh supplied<br/>
         4 pts for each $100M of net worth<br/>
         1 pt for each 100k people served<br/>
-        -1 pt for each gTon of pollution<br/>
+        -2 pts for each gTon of pollution<br/>
         -5 pts for each TWh of blackouts
       </p>
     </div>,

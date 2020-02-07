@@ -52,7 +52,7 @@ export function summarizeTimeline(timeline: TickPresentFutureType[], startingYea
     expensesCarbonFee: 0,
     expensesInterest: 0,
     expensesMarketing: 0,
-    netWorth: 0, // must be calculated separately from game state for now
+    netWorth: 0,
   } as MonthlyHistoryType;
   // Go in reverse so that the last values for ending values (like net worth are used)
   for (let i = timeline.length - 1; i >= 0 ; i--) {
@@ -68,6 +68,7 @@ export function summarizeTimeline(timeline: TickPresentFutureType[], startingYea
       summary.expensesCarbonFee += t.expensesCarbonFee;
       summary.expensesInterest += t.expensesInterest;
       summary.customers = t.customers;
+      summary.netWorth = t.netWorth;
     }
   }
   return summary;
