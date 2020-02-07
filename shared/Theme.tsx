@@ -36,6 +36,10 @@ export const defaultTheme = {
 export default createMuiTheme(defaultTheme);
 
 export const chartTheme = {
+  axis: {
+    stroke: 'black',
+    strokeWidth: 1,
+  },
   tickLabels: {
     fill: `rgba(0, 0, 0, 0.54)`,
     fontWeight: 400,
