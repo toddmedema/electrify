@@ -188,10 +188,10 @@ body {
 }
 
 .MuiSelect-select {
-  padding-top: 2px;
-  padding-left: 6px;
-  padding-bottom: 0;
-  color: $interactive_blue;
+  padding-top: 2px !important;
+  padding-left: 6px !important;
+  padding-bottom: 0 !important;
+  color: $interactive_blue !important;
 }
 
 .MuiSelect-icon {

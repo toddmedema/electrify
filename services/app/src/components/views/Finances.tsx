@@ -131,6 +131,8 @@ export default class extends React.Component<Props, State> {
     const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesMarketing + summary.expensesCarbonFee + summary.expensesInterest;
     const supplykWh = (summary.supplyWh || 1) / 1000;
 
+    console.log(summary, then, upToNow);
+
     return (
       <GameCard className= "finances">
         <div className="scrollable">
@@ -213,10 +215,10 @@ export default class extends React.Component<Props, State> {
                   <TableCell>Loan interest</TableCell>
                   <TableCell align="right">{formatMoneyStable(summary.expensesInterest)}</TableCell>
                 </TableRow>
-                {gameState.feePerKgCO2e > 0 && <TableRow className="tabs-1">
+                <TableRow className="tabs-1">
                   <TableCell>Carbon Fees</TableCell>
                   <TableCell align="right">{formatMoneyStable(summary.expensesCarbonFee)}</TableCell>
-                </TableRow>}
+                </TableRow>
                 <TableRow className="tabs-2">
                   <TableCell>CO2e emitted</TableCell>
                   <TableCell align="right">{numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons</TableCell>

@@ -1,3 +1,4 @@
+import * as React from 'react';
 import Redux from 'redux';
 import {getDateFromMinute, getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
@@ -398,7 +399,15 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
             // This is also described in the manual; if I update the algorithm, update the manual too!
-            const finalScore = Math.round(summary.supplyWh / 1000000000000 + 40 * summary.netWorth / 1000000000 + summary.customers / 100000 - 2 * summary.kgco2e / 1000000000000 - 5 * blackoutsTWh);
+            const score = {
+              supply: Math.round(summary.supplyWh / 1000000000000),
+              netWorth: Math.round(40 * summary.netWorth / 1000000000),
+              customers: Math.round(2 * summary.customers / 100000),
+              emissions: Math.round(-2 * summary.kgco2e / 1000000000),
+              blackouts: Math.round(-8 * blackoutsTWh),
+            };
+            console.log(-1 * summary.kgco2e / 1000000000, -5 * blackoutsTWh, summary.demandWh, summary.supplyWh);
+            const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
             const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
             setStorageKeyValue('highscores', {scores: [...scores, {
               score: finalScore,
@@ -408,7 +417,15 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             } as ScoreType]});
             setTimeout(() => getStore().dispatch(openDialog({
               title: scenario.endMessageTitle || `You've retired!`,
-              message: `Your score is ${finalScore}.`,
+              message: <div>Your final score is {finalScore}:
+                <ul>
+                  <li>{score.supply} pts from electricity supplied</li>
+                  <li>{score.netWorth} pts from final net worth</li>
+                  <li>{score.customers} pts from final customers</li>
+                  <li>{score.emissions} pts from emissions</li>
+                  <li>{score.blackouts} pts from blackouts</li>
+                </ul>
+              </div>,
               open: true,
               closeText: 'Keep playing',
               actionLabel: 'Return to menu',

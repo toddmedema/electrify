@@ -142,39 +142,31 @@ export default class extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
             startingYear={startingYear}
           />
-          <Table size="small">
-            {blackoutTotalWh > 0 ?
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={2}>Total blackouts</TableCell>
-                  <TableCell align="right">~{formatWattHours(blackoutTotalWh)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell colSpan={2}>Largest blackout</TableCell>
-                  <TableCell align="right">~{formatWattHours(largestBlackout.wh)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell></TableCell>
-                  <TableCell>Peak shortage</TableCell>
-                  <TableCell align="right">~{formatWatts(largestBlackout.peakW)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell></TableCell>
-                  <TableCell>When</TableCell>
-                  <TableCell align="right">
-                    {blackoutStart.month} {formatHour(blackoutStart)} -
-                    {blackoutStart.month !== blackoutEnd.month ? `${blackoutEnd.month} ` : ''} {formatHour(blackoutEnd)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-              :
-              <TableBody>
-                <TableRow>
-                  <TableCell>No blackouts forecasted</TableCell>
-                </TableRow>
-              </TableBody>
-            }
-          </Table>
+          {blackoutTotalWh > 0 && <Table size="small">
+            <TableBody>
+              <TableRow className="bold">
+                <TableCell colSpan={2}>Blackouts forecasted</TableCell>
+                <TableCell align="right">~{formatWattHours(blackoutTotalWh)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell colSpan={2}>Largest blackout</TableCell>
+                <TableCell align="right">~{formatWattHours(largestBlackout.wh)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell></TableCell>
+                <TableCell>Peak shortage</TableCell>
+                <TableCell align="right">~{formatWatts(largestBlackout.peakW)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell></TableCell>
+                <TableCell>When</TableCell>
+                <TableCell align="right">
+                  {blackoutStart.month} {formatHour(blackoutStart)} -
+                  {blackoutStart.month !== blackoutEnd.month ? `${blackoutEnd.month} ` : ''} {formatHour(blackoutEnd)}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>}
           <br/>
           <br/>
           <Toolbar>

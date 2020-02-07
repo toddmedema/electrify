@@ -111,14 +111,14 @@ const MANUAL_ENTRIES = [
   {
     title: `Score`,
     entry: <div>
-      <p>At the end of your 20 year term as CEO, you'll receive a score for how well you did. Try to beat your score the next time you play!</p>
+      <p>At the end of your term as CEO (each scenario has a different length), you'll receive a score for how well you did. Try to beat your score the next time you play!</p>
       <p>Scores are calculated as follows:</p>
       <p>
+        4 pts for each $100M of net worth at the end<br/>
+        2 pts for each 100k customers at the end<br/>
         1 pt for each TWh supplied<br/>
-        4 pts for each $100M of net worth<br/>
-        1 pt for each 100k people served<br/>
-        -2 pts for each gTon of pollution<br/>
-        -5 pts for each TWh of blackouts
+        -2 pts for each kTon of pollution<br/>
+        -8 pts for each TWh of blackouts
       </p>
     </div>,
   },
