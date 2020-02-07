@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Redux from 'redux';
-import {getDateFromMinute, getTimeFromTimeline} from 'shared/helpers/DateTime';
-import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
+import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
+import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
 import {formatMoneyConcise} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
@@ -406,7 +406,6 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               emissions: Math.round(-2 * summary.kgco2e / 1000000000),
               blackouts: Math.round(-8 * blackoutsTWh),
             };
-            console.log(-1 * summary.kgco2e / 1000000000, -5 * blackoutsTWh, summary.demandWh, summary.supplyWh);
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
             const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
             setStorageKeyValue('highscores', {scores: [...scores, {

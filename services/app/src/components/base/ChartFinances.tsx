@@ -7,7 +7,7 @@ import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from
 interface ChartData {
   month: number; // unique across years
   year: number;
-  profit: number;
+  value: number;
   projected: boolean;
 }
 
@@ -26,8 +26,8 @@ const ChartFinances = (props: Props): JSX.Element => {
   const past = [] as ChartData[];
   const projected = [] as ChartData[];
   props.timeline.forEach((d: ChartData) => {
-    domainMin = Math.min(domainMin, d.profit);
-    domainMax = Math.max(domainMax, d.profit);
+    domainMin = Math.min(domainMin, d.value);
+    domainMax = Math.max(domainMax, d.value);
     if (d.projected) {
       projected.push(d);
     } else {
@@ -71,7 +71,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         <VictoryLine
           data={past}
           x="month"
-          y="profit"
+          y="value"
           style={{
             data: {
               stroke: demandColor,
@@ -81,7 +81,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         <VictoryLine
           data={projected}
           x="month"
-          y="profit"
+          y="value"
           style={{
             data: {
               stroke: demandColor,

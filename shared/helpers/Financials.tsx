@@ -1,6 +1,5 @@
-import {FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL, TICKS_PER_HOUR} from 'app/Constants';
-import {DateType, FacilityOperatingType, GeneratorShoppingType, MonthlyHistoryType, TickPresentFutureType} from 'app/Types';
-import {getDateFromMinute} from 'shared/helpers/DateTime';
+import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL} from 'app/Constants';
+import {DateType, FacilityOperatingType, GeneratorShoppingType} from 'app/Types';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 
 // Get the monthly payment amount for a new loan
@@ -33,80 +32,6 @@ export function facilityCashBack(g: FacilityOperatingType): number {
   const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
   const lostFromSelling = (g.buildCost - g.loanAmountLeft) * GENERATOR_SELL_MULTIPLIER * Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
   return g.buildCost - lostFromSelling - g.loanAmountLeft;
-}
-
-// TODO better way of calculating month and year if start/end is defined
-// start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
-export function summarizeTimeline(timeline: TickPresentFutureType[], startingYear: number, startMinute?: number, endMinute?: number): MonthlyHistoryType {
-  const time = getDateFromMinute((timeline[0] || {minute: 0}).minute, startingYear);
-  const summary = {
-    month: time.monthNumber,
-    year: time.year,
-    supplyWh: 0,
-    demandWh: 0,
-    customers: 0,
-    kgco2e: 0,
-    revenue: 0,
-    expensesFuel: 0,
-    expensesOM: 0,
-    expensesCarbonFee: 0,
-    expensesInterest: 0,
-    expensesMarketing: 0,
-    netWorth: 0,
-  } as MonthlyHistoryType;
-  // Go in reverse so that the last values for ending values (like net worth are used)
-  for (let i = timeline.length - 1; i >= 0 ; i--) {
-    const t = timeline[i];
-    if ((!startMinute || t.minute >= startMinute) && (!endMinute || t.minute <= endMinute)) {
-      summary.supplyWh += Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
-      summary.demandWh += t.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Only electricity isn't multiplied by this during tick calculations (financials are)
-      summary.kgco2e += t.kgco2e;
-      summary.revenue += t.revenue;
-      summary.expensesFuel += t.expensesFuel;
-      summary.expensesOM += t.expensesOM;
-      summary.expensesMarketing += t.expensesMarketing;
-      summary.expensesCarbonFee += t.expensesCarbonFee;
-      summary.expensesInterest += t.expensesInterest;
-      summary.customers = t.customers;
-      summary.netWorth = t.netWorth;
-    }
-  }
-  return summary;
-}
-
-export function summarizeHistory(timeline: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
-  const summary = {
-    month: (timeline[0] || {}).month,
-    year: (timeline[0] || {}).year,
-    supplyWh: 0,
-    demandWh: 0,
-    customers: 0,
-    kgco2e: 0,
-    revenue: 0,
-    expensesFuel: 0,
-    expensesOM: 0,
-    expensesCarbonFee: 0,
-    expensesInterest: 0,
-    expensesMarketing: 0,
-  } as MonthlyHistoryType;
-  // Go in reverse so that the last values for ending values (like net worth are used)
-  for (let i = timeline.length - 1; i >= 0 ; i--) {
-    const h = timeline[i];
-    if (!filter || filter(h)) {
-      summary.supplyWh += h.supplyWh; // Not multiplied in history b/c it's already multiplied in the timeline
-      summary.demandWh += h.demandWh; // Not multiplied in history b/c it's already multiplied in the timeline
-      summary.kgco2e += h.kgco2e;
-      summary.revenue += h.revenue;
-      summary.expensesFuel += h.expensesFuel;
-      summary.expensesOM += h.expensesOM;
-      summary.expensesMarketing += h.expensesMarketing;
-      summary.expensesCarbonFee += h.expensesCarbonFee;
-      summary.expensesInterest += h.expensesInterest;
-      summary.customers = h.customers;
-      summary.netWorth = h.netWorth;
-    }
-  }
-  return summary;
 }
 
 // CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/

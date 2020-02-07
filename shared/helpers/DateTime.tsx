@@ -1,5 +1,70 @@
-import {DAYS_PER_MONTH, DAYS_PER_YEAR, MONTHS, TICK_MINUTES} from 'app/Constants';
-import {DateType, MonthType, TickPresentFutureType} from 'app/Types';
+import {DAYS_PER_MONTH, DAYS_PER_YEAR, GAME_TO_REAL_YEARS, MONTHS, TICK_MINUTES, TICKS_PER_HOUR} from 'app/Constants';
+import {DateType, MonthlyHistoryType, MonthType, TickPresentFutureType} from 'app/Types';
+
+export const EMPTY_HISTORY = {
+  month: 0,
+  year: 0,
+  supplyWh: 0,
+  demandWh: 0,
+  customers: 0,
+  kgco2e: 0,
+  revenue: 0,
+  expensesFuel: 0,
+  expensesOM: 0,
+  expensesCarbonFee: 0,
+  expensesInterest: 0,
+  expensesMarketing: 0,
+  netWorth: 0,
+} as MonthlyHistoryType;
+
+// edits acc in place to avoid making tons of extra objects
+export function reduceHistories(acc: MonthlyHistoryType, t: MonthlyHistoryType): MonthlyHistoryType {
+  acc.supplyWh += t.supplyWh;
+  acc.demandWh += t.demandWh;
+  acc.kgco2e += t.kgco2e;
+  acc.revenue += t.revenue;
+  acc.expensesFuel += t.expensesFuel;
+  acc.expensesOM += t.expensesOM;
+  acc.expensesMarketing += t.expensesMarketing;
+  acc.expensesCarbonFee += t.expensesCarbonFee;
+  acc.expensesInterest += t.expensesInterest;
+  acc.customers = t.customers;
+  acc.netWorth = t.netWorth;
+  return acc;
+}
+
+// start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
+export function summarizeTimeline(timeline: TickPresentFutureType[], startingYear: number, startMinute?: number, endMinute?: number): MonthlyHistoryType {
+  const time = getDateFromMinute((timeline[0] || {minute: 0}).minute, startingYear);
+  const summary = {...EMPTY_HISTORY};
+  summary.month = time.monthNumber;
+  summary.year = time.year;
+  // Go in reverse so that the last values for ending values (like net worth are used)
+  for (let i = timeline.length - 1; i >= 0 ; i--) {
+    const t = timeline[i];
+    if ((!startMinute || t.minute >= startMinute) && (!endMinute || t.minute <= endMinute)) {
+      // Integrate instantaneous electricity (watts) to watt hours
+      // Only electricity isn't multiplied by this during tick calculations (financials are)
+      const supplyWh = Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS;
+      const demandWh = t.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS;
+      reduceHistories(summary, {...t, supplyWh, demandWh, month: summary.month, year: summary.year});
+    }
+  }
+  return summary;
+}
+
+export function summarizeHistory(timeline: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
+  const summary = {...EMPTY_HISTORY};
+  summary.month = (timeline[0] || {}).month;
+  summary.year = (timeline[0] || {}).year;
+  // Go in reverse so that the last values for ending values (like net worth are used)
+  for (let i = timeline.length - 1; i >= 0 ; i--) {
+    if (!filter || filter(timeline[i])) {
+      reduceHistories(summary, timeline[i]);
+    }
+  }
+  return summary;
+}
 
 export function getTimeFromTimeline(minute: number, timeline: TickPresentFutureType[]): null|TickPresentFutureType {
   if (!timeline[0]) {

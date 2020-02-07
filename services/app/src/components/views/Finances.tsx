@@ -4,8 +4,8 @@ import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import * as React from 'react';
 
 import {TICK_MINUTES} from 'app/Constants';
-import {getTimeFromTimeline} from 'shared/helpers/DateTime';
-import {customersFromMarketingSpend, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
+import {EMPTY_HISTORY, getTimeFromTimeline, reduceHistories, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
+import {customersFromMarketingSpend} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {getStorageBoolean, setStorageKeyValue} from '../../LocalStorage';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
@@ -35,14 +35,14 @@ function getValueFromTick(tick: number) {
   if (tick === -1) { return 0; }
   const exponent = Math.floor(tick / 9) + 5;
   const frontNumber = tick % 9 + 1;
-  return frontNumber * Math.pow(10, exponent);
+  return Math.round(frontNumber * Math.pow(10, exponent));
 }
 
 function getTickFromValue(v: number) {
   if (v === 0) { return -1; }
   const exponent = Math.floor(Math.log10(v)) - 5;
   const frontNumber = +v.toString().charAt(0);
-  return frontNumber + exponent * 9 - 1;
+  return Math.floor(frontNumber + exponent * 9 - 1);
 }
 
 export default class extends React.Component<Props, State> {
@@ -66,74 +66,56 @@ export default class extends React.Component<Props, State> {
     }
   }
 
+  public handleYearSelect(newYear: number) {
+    this.setState({year: newYear});
+  }
+
+  public setExpand(expanded: boolean) {
+    setStorageKeyValue('financesTableOpened', expanded);
+    this.setState({expanded});
+  }
+
   public render() {
     const {date, gameState, onDelta} = this.props;
     const {year, expanded} = this.state;
-    const tick = getTickFromValue(gameState.monthlyMarketingSpend);
-
     const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+
     if (!now) {
       return <span/>;
     }
 
-    const years = [];
-    // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= gameState.startingYear; i--) {
-      years.push(i);
-    }
+    const years = []; // Go in reverse so that newest value (current year) is on top
+    for (let i = date.year; i >= gameState.startingYear; i--) { years.push(i); }
 
-    const handleYearSelect = (newYear: number) => {
-      this.setState({year: newYear});
-    };
-
-    const toggleExpand = () => {
-      setStorageKeyValue('financesTableOpened', !expanded);
-      this.setState({expanded: !expanded});
-    };
-
-    const history = gameState.monthlyHistory;
-    const then = summarizeHistory(history, (t: MonthlyHistoryType) => !year || t.year === year);
+    const monthlyHistory = gameState.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year);
+    const previousMonths = summarizeHistory(monthlyHistory);
     const upToNow = summarizeTimeline(gameState.timeline, gameState.startingYear, 0, gameState.date.minute);
-    const thisMonth = summarizeTimeline(gameState.timeline, gameState.startingYear, 0, gameState.date.minute);
-    const timeline = [];
-    for (const h of history) {
-      if (!year || h.year === year) {
-        timeline.unshift({
-          month: h.year * 12 + h.month,
-          year: h.year,
-          profit: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest + h.expensesMarketing),
-          projected: false,
-        });
-      }
+
+    const monthly = [];
+    for (const h of monthlyHistory) {
+      monthly.unshift({
+        month: h.year * 12 + h.month,
+        year: h.year,
+        value: h.revenue - (h.expensesFuel + h.expensesOM + h.expensesCarbonFee + h.expensesInterest + h.expensesMarketing),
+        projected: false,
+      });
     }
     // TODO project out for whole year, not just up to present
-    if (!year || thisMonth.year === year) {
-      timeline.push({
-        month: thisMonth.year * 12 + thisMonth.month,
-        year: thisMonth.year,
-        profit: (upToNow.revenue - (upToNow.expensesFuel + upToNow.expensesOM + upToNow.expensesCarbonFee + upToNow.expensesInterest + upToNow.expensesMarketing)) / date.percentOfMonth,
+    if (!year || upToNow.year === year) {
+      monthly.push({
+        month: upToNow.year * 12 + upToNow.month,
+        year: upToNow.year,
+        value: (upToNow.revenue - (upToNow.expensesFuel + upToNow.expensesOM + upToNow.expensesCarbonFee + upToNow.expensesInterest + upToNow.expensesMarketing)) / date.percentOfMonth,
         projected: true,
       });
     }
 
-    const summary = {
-      netWorth: now.netWorth,
-      cash: now.cash,
-      customers: upToNow.customers,
-      supplyWh: then.supplyWh + upToNow.supplyWh,
-      demandWh: then.demandWh + upToNow.demandWh,
-      revenue: then.revenue + upToNow.revenue,
-      expensesFuel: then.expensesFuel + upToNow.expensesFuel,
-      expensesOM: then.expensesOM + upToNow.expensesOM,
-      expensesCarbonFee: then.expensesCarbonFee + upToNow.expensesCarbonFee,
-      expensesInterest: then.expensesInterest + upToNow.expensesInterest,
-      expensesMarketing: then.expensesMarketing + upToNow.expensesMarketing,
-      kgco2e: then.kgco2e + upToNow.kgco2e,
-    } as MonthlyHistoryType;
+    let summary = reduceHistories({...EMPTY_HISTORY}, previousMonths);
+    if (year === date.year) {
+      summary = reduceHistories(summary, upToNow);
+    }
     const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesMarketing + summary.expensesCarbonFee + summary.expensesInterest;
     const supplykWh = (summary.supplyWh || 1) / 1000;
-
-    console.log(summary, then, upToNow);
 
     return (
       <GameCard className= "finances">
@@ -146,29 +128,29 @@ export default class extends React.Component<Props, State> {
               (+{numbro(customersFromMarketingSpend(gameState.monthlyMarketingSpend)).format({average: true})} customers)
             </Typography>
             <Slider
-              value={tick}
+              value={getTickFromValue(gameState.monthlyMarketingSpend)}
               aria-labelledby="marketing monthly budget"
               valueLabelDisplay="off"
               min={-1}
               step={1}
-              max={Math.floor(getTickFromValue(Math.max(now.cash / 12, gameState.monthlyMarketingSpend)))}
+              max={getTickFromValue(Math.max(now.cash / 12, gameState.monthlyMarketingSpend))}
               onChange={(e: any, newTick: number) => onDelta({monthlyMarketingSpend: getValueFromTick(newTick)})}
             />
             <div className="flex-newline"></div>
             <Typography variant="h6" style={{flexGrow: 0}}>Financal summary for </Typography>
-            <Select defaultValue={date.year} onChange={(e: any) => handleYearSelect(e.target.value)}>
+            <Select defaultValue={date.year} onChange={(e: any) => this.handleYearSelect(e.target.value)}>
               <MenuItem value={0}>All time</MenuItem>
               {years.map((y: number) => {
                 return <MenuItem value={y} key={y}>{y}</MenuItem>;
               })}
             </Select>
           </Toolbar>
-          {timeline.length > 0 ? <ChartFinances
+          {monthly.length > 0 ? <ChartFinances
             height={140}
-            timeline={timeline}
+            timeline={monthly}
             title="Profit"
           /> : <span/>}
-          <div className={`expandable ${!this.state.expanded && 'notExpanded'}`} onClick={toggleExpand}>
+          <div className={`expandable ${!expanded && 'notExpanded'}`} onClick={() => this.setExpand(!expanded)}>
             <Table size="small">
               <TableBody>
                 <TableRow className="bold">
