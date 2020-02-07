@@ -7,6 +7,7 @@ import {TICK_MINUTES} from 'app/Constants';
 import {getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {customersFromMarketingSpend, summarizeHistory, summarizeTimeline} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
+import {getStorageBoolean, setStorageKeyValue} from '../../LocalStorage';
 import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
@@ -49,7 +50,7 @@ export default class extends React.Component<Props, State> {
     super(props);
     this.state = {
       year: props.date.year,
-      expanded: false,
+      expanded: getStorageBoolean('financesTableOpened', false),
     };
   }
 
@@ -86,6 +87,7 @@ export default class extends React.Component<Props, State> {
     };
 
     const toggleExpand = () => {
+      setStorageKeyValue('financesTableOpened', !expanded);
       this.setState({expanded: !expanded});
     };
 
