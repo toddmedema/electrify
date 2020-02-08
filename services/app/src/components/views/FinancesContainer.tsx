@@ -6,7 +6,6 @@ import Finances, {DispatchProps, StateProps} from './Finances';
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     gameState: state.gameState,
-    date: state.gameState.date,
   };
 };
 
