@@ -30,24 +30,39 @@ export function reduceHistories(acc: MonthlyHistoryType, t: MonthlyHistoryType):
   acc.expensesInterest += t.expensesInterest;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
+  acc.month = t.month;
+  acc.year = t.year;
   return acc;
 }
 
+export function deriveExpandedSummary(s: MonthlyHistoryType) {
+  const expenses = s.expensesFuel + s.expensesOM + s.expensesMarketing + s.expensesCarbonFee + s.expensesInterest;
+  const supplykWh = (s.supplyWh || 1) / 1000;
+  return {
+    ...s,
+    profit: s.revenue - expenses,
+    profitPerkWh: (s.revenue - expenses) / supplykWh,
+    revenuePerkWh: s.revenue / supplykWh,
+    expenses,
+    tco2e: s.kgco2e / 1000,
+    kgco2ePerMWh: s.kgco2e / (supplykWh / 1000),
+  };
+}
+
 // start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
-export function summarizeTimeline(timeline: TickPresentFutureType[], startingYear: number, startMinute?: number, endMinute?: number): MonthlyHistoryType {
-  const time = getDateFromMinute((timeline[0] || {minute: 0}).minute, startingYear);
+export function summarizeTimeline(timeline: TickPresentFutureType[], startingYear: number, filter?: (t: TickPresentFutureType) => boolean): MonthlyHistoryType {
   const summary = {...EMPTY_HISTORY};
-  summary.month = time.monthNumber;
-  summary.year = time.year;
   // Go in reverse so that the last values for ending values (like net worth are used)
   for (let i = timeline.length - 1; i >= 0 ; i--) {
     const t = timeline[i];
-    if ((!startMinute || t.minute >= startMinute) && (!endMinute || t.minute <= endMinute)) {
+    if (!filter || filter(t)) {
+      // TODO perf this gets called a lot, but only need
+      const date = getMonthYearFromMinute(t.minute, startingYear);
       // Integrate instantaneous electricity (watts) to watt hours
       // Only electricity isn't multiplied by this during tick calculations (financials are)
       const supplyWh = Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS;
       const demandWh = t.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS;
-      reduceHistories(summary, {...t, supplyWh, demandWh, month: summary.month, year: summary.year});
+      reduceHistories(summary, {...t, supplyWh, demandWh, month: date.monthNumber, year: date.year});
     }
   }
   return summary;
@@ -55,8 +70,6 @@ export function summarizeTimeline(timeline: TickPresentFutureType[], startingYea
 
 export function summarizeHistory(timeline: MonthlyHistoryType[], filter?: (t: MonthlyHistoryType) => boolean): MonthlyHistoryType {
   const summary = {...EMPTY_HISTORY};
-  summary.month = (timeline[0] || {}).month;
-  summary.year = (timeline[0] || {}).year;
   // Go in reverse so that the last values for ending values (like net worth are used)
   for (let i = timeline.length - 1; i >= 0 ; i--) {
     if (!filter || filter(timeline[i])) {
@@ -151,6 +164,20 @@ function getSunset(month: MonthType) {
     default:
       return 1055;
   }
+}
+
+// Faster subset of getDateFromMinute
+export function getMonthYearFromMinute(minute: number, startingYear: number) {
+  const dayOfGame = Math.floor(minute / 1440);
+  const dayOfYear = dayOfGame % DAYS_PER_YEAR;
+  const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
+  const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
+  const year = yearsEllapsed + startingYear;
+
+  return {
+    monthNumber,
+    year,
+  };
 }
 
 export function getDateFromMinute(minute: number, startingYear: number): DateType {

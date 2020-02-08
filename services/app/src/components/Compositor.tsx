@@ -28,7 +28,7 @@ import {setSpeed} from '../reducers/GameState';
 import {getStore} from '../Store';
 
 const keyMap = {
-  PAUSED: ['space', '`'],
+  PAUSED: '`',
   SLOW: '1',
   NORMAL: '2',
   FAST: '3',

@@ -63,61 +63,6 @@ function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentF
   return demandMultiple * now.customers;
 }
 
-function updateFinances(gameState: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
-  const difficulty = DIFFICULTIES[gameState.difficulty];
-
-  // TODO actually calculate market price / sale value
-  // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
-  const dollarsPerWh = 0.07 / 1000;
-  const supplyWh = Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-  const demandWh = now.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-  const revenue = supplyWh * dollarsPerWh;
-
-  // Facilities
-  let kgco2e = 0;
-  let expensesOM = 0;
-  let expensesFuel = 0;
-  let expensesInterest = 0;
-  let principalRepayment = 0;
-  gameState.facilities.forEach((g: FacilityShoppingType) => {
-    if (g.yearsToBuildLeft === 0) {
-      expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
-      if (g.fuel && FUELS[g.fuel]) {
-        const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        expensesFuel += fuelBtu * getFuelPricesPerMBTU(gameState.date)[g.fuel] / 1000000;
-        kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
-      }
-      if (g.loanAmountLeft > 0) {
-        const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
-        const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
-        expensesInterest += paymentInterest / TICKS_PER_MONTH;
-        principalRepayment += paymentPrincipal / TICKS_PER_MONTH;
-        g.loanAmountLeft -= paymentPrincipal / TICKS_PER_MONTH;
-      }
-    } else {
-      expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
-    }
-  });
-  const expensesCarbonFee = gameState.feePerKgCO2e * kgco2e;
-  const expensesMarketing = gameState.monthlyMarketingSpend / TICKS_PER_MONTH;
-
-  // Customers
-  const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
-  const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
-  const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
-
-  now.customers = Math.round(prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
-  now.cash = Math.round(prev.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
-  now.netWorth = getNetWorth(gameState.facilities, now.cash);
-  now.revenue = revenue;
-  now.expensesOM = expensesOM;
-  now.expensesFuel = expensesFuel;
-  now.expensesCarbonFee = expensesCarbonFee;
-  now.expensesInterest = expensesInterest;
-  now.expensesMarketing = expensesMarketing;
-  now.kgco2e = kgco2e;
-}
-
 function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType[] {
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
@@ -149,57 +94,55 @@ function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
   });
 }
 
-// Updates construction status
-// then calculates how much is needed to be supplied to meet demandW
-// and changes generator / storage status (in place)
-// (doesn't count storage charging against supply created)
-function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: TickPresentFutureType) {
-  // UPDATE CONSTRUCTION STATUS
+// Updates game state and now in place
+function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
+  const {facilities, date} = state;
+  const difficulty = DIFFICULTIES[state.difficulty];
+
+  // Update facility construction status
   facilities.forEach((g: FacilityOperatingType) => {
     if (g.yearsToBuildLeft > 0) {
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
     }
   });
 
-  let supply = 0;
-  let charge = 0;
-  const turbineWindMS = t.windKph * Math.pow(100 / 10, 0.34) / 5; // 5kph = 1m/s
+  const turbineWindMS = now.windKph * Math.pow(100 / 10, 0.34) / 5; // 5kph = 1m/s
     // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
+  const windOutputFactor = (turbineWindMS < 3 || turbineWindMS > 25) ? 0 : Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
+    // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
+  const solarOutputFactor = now.sunlight * Math.max(1, 1 - (now.temperatureC - 10) / 100);
+    // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
+    // TODO what about rain and snow, esp panels covered in snow?
 
+  // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;
   let totalChargeNeeded = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
-    if (g.currentWh < g.peakWh && g.yearsToBuildLeft === 0) {
+    if (g.peakWh && g.currentWh < g.peakWh && g.yearsToBuildLeft === 0) {
       indexOfLastUnchargedBattery = i;
       totalChargeNeeded += Math.min(g.peakW, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
     }
   });
 
-  // Renewables produce what they will; on-demand produces up to demand + reserve margin
+  // Update supply and facility outputs
+  let supply = 0;
+  let charge = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) { // Capable of generating electricity
-        const targetW = Math.max(0, t.demandW * (1 + RESERVE_MARGIN) - supply);
+        const targetW = Math.max(0, now.demandW * (1 + RESERVE_MARGIN) - supply);
         switch (g.fuel) {
           case 'Sun':
-            // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-            // TODO what about rain and snow, esp panels covered in snow?
-            g.currentW = g.peakW * t.sunlight * Math.max(1, 1 - (t.temperatureC - 10) / 100);
+            g.currentW = g.peakW * solarOutputFactor;
             break;
           case 'Wind':
-            // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
-            if (turbineWindMS < 3 || turbineWindMS > 25) {
-              g.currentW = 0;
-            } else {
-              const outputFactor = Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
-              g.currentW = g.peakW * outputFactor;
-            }
+            g.currentW = g.peakW * windOutputFactor;
             break;
-          default:
+          default: // on-demand produces up to demand + reserve margin
             if (targetW > g.currentW || i < indexOfLastUnchargedBattery) { // spinning up
               // If there's a battery to charge after me, output as much as possible to charge it beyond demand
               if (indexOfLastUnchargedBattery >= 0 && i < indexOfLastUnchargedBattery) {
-                g.currentW = Math.min(t.demandW + totalChargeNeeded - charge, g.peakW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
+                g.currentW = Math.min(now.demandW + totalChargeNeeded - charge, g.peakW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
               } else { // Otherwise just try to fulfill demand + reserve margin
                 g.currentW = Math.min(g.peakW, targetW, g.currentW + g.peakW * TICK_MINUTES / g.spinMinutes);
               }
@@ -211,35 +154,88 @@ function getSupplyWAndUpdateFacilities(facilities: FacilityOperatingType[], t: T
         supply += g.currentW;
       }
       if (g.peakWh) { // Capable of storing electricity
-        const targetW = Math.max(0, t.demandW - supply);
+        const targetW = Math.max(0, now.demandW - supply);
         if (g.currentWh > 0 && targetW > 0) { // If there's a need and we have charge, discharge
           g.currentW = Math.min(g.peakW, targetW, g.currentWh * TICKS_PER_HOUR);
           g.currentWh = Math.max(0, g.currentWh - g.currentW / TICKS_PER_HOUR);
           supply += g.currentW;
-        } else if (g.currentWh < g.peakWh && supply - charge > t.demandW) { // If there's spare capacity, charge
-          g.currentW = -Math.min(g.peakW, supply - t.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
+        } else if (g.currentWh < g.peakWh && supply - charge > now.demandW) { // If there's spare capacity, charge
+          g.currentW = -Math.min(g.peakW, supply - now.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
           g.currentWh = Math.min(g.peakWh, g.currentWh - g.currentW / TICKS_PER_HOUR);
           charge -= g.currentW / g.roundTripEfficiency;
-        } else {
+        } else { // Otherwise, reset to 0
           g.currentW = 0;
         }
       }
     }
   });
+  now.supplyW = supply;
 
-  return supply;
+  // Update finances
+  // TODO actually calculate market price / sale value
+  // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
+  const dollarsPerWh = 0.07 / 1000;
+  const supplyWh = Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+  const demandWh = now.demandW / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+  const revenue = supplyWh * dollarsPerWh;
+
+  // Facilities expenses
+  let kgco2e = 0;
+  let expensesOM = 0;
+  let expensesFuel = 0;
+  let expensesInterest = 0;
+  let principalRepayment = 0;
+  facilities.forEach((g: FacilityShoppingType) => {
+    if (g.yearsToBuildLeft === 0) {
+      expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
+      if (g.fuel && FUELS[g.fuel]) {
+        const fuelBtu = g.currentW * (g.btuPerWh || 0) / TICKS_PER_HOUR * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+        expensesFuel += fuelBtu * getFuelPricesPerMBTU(date)[g.fuel] / 1000000;
+        kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
+      }
+      if (g.loanAmountLeft > 0) {
+        const paymentInterest = getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment);
+        const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
+        expensesInterest += paymentInterest / TICKS_PER_MONTH;
+        principalRepayment += paymentPrincipal / TICKS_PER_MONTH;
+        g.loanAmountLeft -= paymentPrincipal / TICKS_PER_MONTH;
+      }
+    } else {
+      expensesInterest += getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY, g.loanMonthlyPayment) / TICKS_PER_MONTH;
+    }
+  });
+  const expensesCarbonFee = state.feePerKgCO2e * kgco2e;
+  const expensesMarketing = state.monthlyMarketingSpend / TICKS_PER_MONTH;
+
+  // Customers
+  const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
+  const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
+  const marketingGrowth = customersFromMarketingSpend(state.monthlyMarketingSpend) / TICKS_PER_MONTH;
+
+  // Save new financial info
+  now.customers = Math.round(prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
+  now.cash = Math.round(prev.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
+  now.netWorth = getNetWorth(facilities, now.cash);
+  now.revenue = revenue;
+  now.expensesOM = expensesOM;
+  now.expensesFuel = expensesFuel;
+  now.expensesCarbonFee = expensesCarbonFee;
+  now.expensesInterest = expensesInterest;
+  now.expensesMarketing = expensesMarketing;
+  now.kgco2e = kgco2e;
+
+  return now;
 }
 
 function reforecastSupply(state: GameStateType): TickPresentFutureType[] {
   // Make temporary deep copy so that it can be revised in place
-  const facilities = state.facilities.map((g: FacilityOperatingType) => ({...g}));
-  return state.timeline.map((t: TickPresentFutureType) => {
+  const newState = {...state};
+  let prev = newState.timeline[0];
+  return newState.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
-      return {
-        ...t,
-        supplyW: getSupplyWAndUpdateFacilities(facilities, t),
-      };
+      t = updateSupplyFacilitiesFinances(newState, prev, {...t});
     }
+    prev = t;
     return t;
   });
 }
@@ -327,7 +323,7 @@ function getNetWorth(facilities: FacilityOperatingType[], cash: number): number 
 }
 
 // https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
-function array_move(arr: any[], oldIndex: number, newIndex: number) {
+function arrayMove(arr: any[], oldIndex: number, newIndex: number) {
   if (newIndex >= arr.length) {
     let k = newIndex - arr.length + 1;
     while (k--) {
@@ -349,8 +345,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
       const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
       const prev = getTimeFromTimeline(newState.date.minute - TICK_MINUTES, newState.timeline);
       if (now && prev) {
-        getSupplyWAndUpdateFacilities(newState.facilities, now);
-        updateFinances(state, prev, now);
+        updateSupplyFacilitiesFinances(newState, prev, now);
         const {cash, customers} = now;
 
         if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
@@ -478,7 +473,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
     const a = action as ReprioritizeFacilityAction;
     const newState = {...state};
-    array_move(newState.facilities, a.spotInList, a.spotInList + a.delta);
+    arrayMove(newState.facilities, a.spotInList, a.spotInList + a.delta);
     newState.timeline = reforecastSupply(newState);
     return newState;
 
@@ -523,10 +518,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
     });
 
     // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
-    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
-    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
-    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
-    getSupplyWAndUpdateFacilities(newState.facilities, newState.timeline[0]);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
     newState.timeline = reforecastSupply(newState);
 
     return newState;

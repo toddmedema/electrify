@@ -3,12 +3,13 @@ import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
 import ArrowDropUpIcon from '@material-ui/icons/ArrowDropUp';
 import * as React from 'react';
 
-import {TICK_MINUTES} from 'app/Constants';
-import {EMPTY_HISTORY, getTimeFromTimeline, reduceHistories, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
+import {TICK_MINUTES, TICKS_PER_MONTH} from 'app/Constants';
+import {deriveExpandedSummary, EMPTY_HISTORY, getDateFromMinute, getTimeFromTimeline, reduceHistories, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
 import {customersFromMarketingSpend} from 'shared/helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from 'shared/helpers/Format';
 import {getStorageBoolean, setStorageKeyValue} from '../../LocalStorage';
-import {DateType, GameStateType, MonthlyHistoryType} from '../../Types';
+import {generateNewTimeline} from '../../reducers/GameState';
+import {GameStateType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
 
@@ -16,7 +17,6 @@ const numbro = require('numbro');
 
 export interface StateProps {
   gameState: GameStateType;
-  date: DateType;
 }
 
 export interface DispatchProps {
@@ -49,7 +49,7 @@ export default class extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
-      year: props.date.year,
+      year: props.gameState.date.year,
       expanded: getStorageBoolean('financesTableOpened', false),
     };
   }
@@ -76,21 +76,30 @@ export default class extends React.Component<Props, State> {
   }
 
   public render() {
-    const {date, gameState, onDelta} = this.props;
+    const {gameState, onDelta} = this.props;
+    const {startingYear, timeline, date} = gameState;
     const {year, expanded} = this.state;
-    const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+    const now = getTimeFromTimeline(date.minute, timeline);
 
     if (!now) {
       return <span/>;
     }
 
     const years = []; // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= gameState.startingYear; i--) { years.push(i); }
+    for (let i = date.year; i >= startingYear; i--) { years.push(i); }
 
     const monthlyHistory = gameState.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year);
     const previousMonths = summarizeHistory(monthlyHistory);
-    const upToNow = summarizeTimeline(gameState.timeline, gameState.startingYear, 0, gameState.date.minute);
 
+    // For the summary table
+    let s = reduceHistories({...EMPTY_HISTORY}, previousMonths);
+    if (year === date.year) {
+      const upToNow = summarizeTimeline(timeline, startingYear, (t) => t.minute <= date.minute);
+      s = reduceHistories(s, upToNow);
+    }
+    const summary = deriveExpandedSummary(s);
+
+    // For the monthly chart
     const monthly = [];
     for (const h of monthlyHistory) {
       monthly.unshift({
@@ -100,22 +109,25 @@ export default class extends React.Component<Props, State> {
         projected: false,
       });
     }
-    // TODO project out for whole year, not just up to present
-    if (!year || upToNow.year === year) {
-      monthly.push({
-        month: upToNow.year * 12 + upToNow.month,
-        year: upToNow.year,
-        value: (upToNow.revenue - (upToNow.expensesFuel + upToNow.expensesOM + upToNow.expensesCarbonFee + upToNow.expensesInterest + upToNow.expensesMarketing)) / date.percentOfMonth,
-        projected: true,
+    if (!year || date.year === year) { // Add projected months if current year is included in chart
+      const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
+      if (date.month !== 'Dec') { // Project out for the rest of the year
+        const forecast = {...gameState};
+        generateNewTimeline(forecast, now.cash, now.customers, TICKS_PER_MONTH * (13 - date.monthNumber));
+        for (let month = date.monthNumber + 1; month <= 12; month++) {
+          const m = summarizeTimeline(forecast.timeline, gameState.startingYear, (t) => getDateFromMinute(t.minute, gameState.startingYear).monthNumber === month);
+          presentFutureMonths.push(m);
+        }
+      }
+      presentFutureMonths.forEach((m) => {
+        monthly.push({
+          month: m.year * 12 + m.month,
+          year: m.year,
+          value: m.revenue - (m.expensesFuel + m.expensesOM + m.expensesCarbonFee + m.expensesInterest + m.expensesMarketing),
+          projected: true,
+        });
       });
     }
-
-    let summary = reduceHistories({...EMPTY_HISTORY}, previousMonths);
-    if (year === date.year) {
-      summary = reduceHistories(summary, upToNow);
-    }
-    const expenses = summary.expensesFuel + summary.expensesOM + summary.expensesMarketing + summary.expensesCarbonFee + summary.expensesInterest;
-    const supplykWh = (summary.supplyWh || 1) / 1000;
 
     return (
       <GameCard className= "finances">
@@ -155,11 +167,11 @@ export default class extends React.Component<Props, State> {
               <TableBody>
                 <TableRow className="bold">
                   <TableCell>Profit (net income)</TableCell>
-                  <TableCell align="right">{formatMoneyStable(summary.revenue - expenses)}</TableCell>
+                  <TableCell align="right">{formatMoneyStable(summary.profit)}</TableCell>
                 </TableRow>
                 <TableRow className="tabs-1">
                   <TableCell>Profit per kWh</TableCell>
-                  <TableCell align="right">{formatMoneyStable((summary.revenue - expenses) / supplykWh)}/kWh</TableCell>
+                  <TableCell align="right">{formatMoneyStable(summary.profitPerkWh)}/kWh</TableCell>
                 </TableRow>
 
                 <TableRow className="bold">
@@ -168,7 +180,7 @@ export default class extends React.Component<Props, State> {
                 </TableRow>
                 <TableRow className="tabs-1">
                   <TableCell>Revenue per kWh</TableCell>
-                  <TableCell align="right">{formatMoneyStable(summary.revenue / supplykWh)}/kWh</TableCell>
+                  <TableCell align="right">{formatMoneyStable(summary.revenuePerkWh)}/kWh</TableCell>
                 </TableRow>
                 <TableRow className="tabs-1">
                   <TableCell>Power sold</TableCell>
@@ -181,7 +193,7 @@ export default class extends React.Component<Props, State> {
 
                 <TableRow className="bold">
                   <TableCell>Expenses</TableCell>
-                  <TableCell align="right">{formatMoneyStable(expenses)}</TableCell>
+                  <TableCell align="right">{formatMoneyStable(summary.expenses)}</TableCell>
                 </TableRow>
                 <TableRow className="tabs-1">
                   <TableCell>Fuel</TableCell>
@@ -205,11 +217,11 @@ export default class extends React.Component<Props, State> {
                 </TableRow>
                 <TableRow className="tabs-2">
                   <TableCell>CO2e emitted</TableCell>
-                  <TableCell align="right">{numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons</TableCell>
+                  <TableCell align="right">{numbro(summary.tco2e).format({thousandSeparated: true, mantissa: 0})} tons</TableCell>
                 </TableRow>
                 <TableRow className="tabs-2">
                   <TableCell>Emission factor</TableCell>
-                  <TableCell align="right">{numbro(summary.kgco2e / (supplykWh / 1000)).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
+                  <TableCell align="right">{numbro(summary.kgco2ePerMWh).format({thousandSeparated: true, mantissa: 0})}kg/MWh</TableCell>
                 </TableRow>
 
                 <TableRow className="bold">
