@@ -1,5 +1,5 @@
 import {DAYS_PER_MONTH, DAYS_PER_YEAR, GAME_TO_REAL_YEARS, MONTHS, TICK_MINUTES, TICKS_PER_HOUR} from 'app/Constants';
-import {DateType, MonthlyHistoryType, MonthType, TickPresentFutureType} from 'app/Types';
+import {DateType, DerivedHistoryType, MonthlyHistoryType, MonthType, TickPresentFutureType} from 'app/Types';
 
 export const EMPTY_HISTORY = {
   month: 0,
@@ -7,6 +7,7 @@ export const EMPTY_HISTORY = {
   supplyWh: 0,
   demandWh: 0,
   customers: 0,
+  cash: 0,
   kgco2e: 0,
   revenue: 0,
   expensesFuel: 0,
@@ -28,6 +29,7 @@ export function reduceHistories(acc: MonthlyHistoryType, t: MonthlyHistoryType):
   acc.expensesMarketing += t.expensesMarketing;
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
+  acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
   acc.month = t.month;
@@ -35,7 +37,7 @@ export function reduceHistories(acc: MonthlyHistoryType, t: MonthlyHistoryType):
   return acc;
 }
 
-export function deriveExpandedSummary(s: MonthlyHistoryType) {
+export function deriveExpandedSummary(s: MonthlyHistoryType): DerivedHistoryType {
   const expenses = s.expensesFuel + s.expensesOM + s.expensesMarketing + s.expensesCarbonFee + s.expensesInterest;
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
@@ -44,7 +46,6 @@ export function deriveExpandedSummary(s: MonthlyHistoryType) {
     profitPerkWh: (s.revenue - expenses) / supplykWh,
     revenuePerkWh: s.revenue / supplykWh,
     expenses,
-    tco2e: s.kgco2e / 1000,
     kgco2ePerMWh: s.kgco2e / (supplykWh / 1000),
   };
 }

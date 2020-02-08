@@ -189,6 +189,15 @@ export type TickPresentFutureType = Partial<FuelPricesType> & HistoryForecastSha
   temperatureC: number;
 }
 
+export type DerivedHistoryKeysType = keyof DerivedHistoryType;
+export interface DerivedHistoryType extends MonthlyHistoryType {
+  profit: number;
+  profitPerkWh: number;
+  revenuePerkWh: number;
+  expenses: number;
+  kgco2ePerMWh: number;
+}
+
 // Basically, downsample per-tick information so that I can store it for the entire game, which could go 100+ years
 export interface MonthlyHistoryType extends HistoryForecastShared {
   year: number;

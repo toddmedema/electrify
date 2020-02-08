@@ -1,6 +1,5 @@
 import * as React from 'react';
 import {formatMonthChartAxis} from 'shared/helpers/DateTime';
-import {formatMoneyConcise} from 'shared/helpers/Format';
 import {chartTheme, demandColor} from 'shared/Theme';
 import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
 
@@ -15,6 +14,7 @@ export interface Props {
   height?: number;
   title: string;
   timeline: ChartData[];
+  format: (n: number) => number|string;
 }
 
 const ChartFinances = (props: Props): JSX.Element => {
@@ -60,7 +60,7 @@ const ChartFinances = (props: Props): JSX.Element => {
           }}
         />
         <VictoryAxis dependentAxis
-          tickFormat={(t) => formatMoneyConcise(t)}
+          tickFormat={props.format}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{
