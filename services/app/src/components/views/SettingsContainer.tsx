@@ -19,7 +19,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onExperimentalChange: (v: boolean) => {
       dispatch(changeSettings({experimental: v}));
     },
-    onMainMenu: () => {
+    onBack: () => {
       dispatch(toCard({name: 'MAIN_MENU'}));
     },
     onShowHelpChange: (v: boolean) => {
