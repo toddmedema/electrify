@@ -27,7 +27,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const secondaryText = (buildable) ? storage.description : `Too large for current tech; max size ${formatWatts(props.storage.maxPeakWh)}h`;
+  const secondaryText = (buildable) ? storage.description : <div>Too large for current tech.<br/>Max size: {formatWatts(props.storage.maxPeakWh)}h</div>;
 
   const toggleExpand = () => {
     setExpanded(!expanded);

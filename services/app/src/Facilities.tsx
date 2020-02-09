@@ -32,7 +32,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       spinMinutes: 360,
         // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
         // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: 0.09 * peakW,
+      annualOperatingCost: 0.05 / 0.68 * peakW,
         // ~$0.01/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 3 + magnitude / 3,
@@ -59,7 +59,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.12 * peakW,
+      annualOperatingCost: 0.1 / 0.93 * peakW,
         // ~$0.0168/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 5 + magnitude / 4,
@@ -88,7 +88,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW,
+      annualOperatingCost: 0.05 / 0.45 * peakW,
         // ~$0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -148,7 +148,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       maxPeakW: 1500000000,
         // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.012 * peakW,
+      annualOperatingCost: 0.04 / 0.31 * peakW,
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // TODO depends on location
       yearsToBuild: 1 + magnitude / 2,
@@ -177,7 +177,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
         // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.008 * peakW,
+      annualOperatingCost: 0.025 / 0.22 * peakW,
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
         // TODO depends on location
@@ -191,36 +191,61 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // https://energyinformative.org/lifespan-solar-panels/
     },
     // {
+    //   // NOPE - very limited location options for these, and only two in the world are >20MW
     //   name: 'Tidal',
     //   fuel: 'Tides',
     //   description: 'Stable output except 4 times per day',
+    // available: true,
     //   buildCost: 200000000,
+    //     // TODO
     //   peakW,
-    // maxPeakW: 250000000,
-    // ~250MW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
+    //   maxPeakW: 250000000,
+    //     // ~250MW - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Tide
+    //   btuPerWh: 0,
     //   annualOperatingCost: 1000000,
+    //     // TODO
     //   yearsToBuild: 1,
-      // spinMinutes: 1,
+    //     // TODO
+    //   spinMinutes: 1,
+    //   capacityFactor: 0.26,
+    //     // 24% - https://en.wikipedia.org/wiki/Sihwa_Lake_Tidal_Power_Station
+    //     // 28% - https://en.wikipedia.org/wiki/Rance_Tidal_Power_Station
+    //   lifespanYears: 30,
+    //     // TODO
     // },
-    // {
-    // Geothermal only makes sense if you have limited locations, i.e. there are only 5 spots in the US > 100MW - https://en.wikipedia.org/wiki/List_of_geothermal_power_stations
-        // Still only has a capacity factor of .733, why? https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
-    //   name: 'Geothermal',
-    //   fuel: 'Ground Heat',
-    //   description: 'Cheap and always on, but limited locations',
-    //   buildCost: 200000000,
-    //   peakW,
-    // maxPeakW: 800000000,
-    // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
-    //   annualOperatingCost: 1000000,
-    //   yearsToBuild: 4,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // spinMinutes: 1,
-    // },
+    {
+      // TODO limited locations, i.e. there are only 5 spots in the US > 100MW - https://en.wikipedia.org/wiki/List_of_geothermal_power_stations
+      // But, new tech in ~2000 opened up more locations at a slightly higher cost
+      // Maybe have fixed costs increase with each station you build, or your total built geothermal capacity?
+      // Or, max peakW decreases based on largest build location, i.e. if you build an 800, then it becomes 600, etc
+        // Would need to be careful with edge cases with that logic...
+      name: 'Geothermal',
+      fuel: 'Ground Heat',
+      description: 'Consistent, but limited locations',
+      available: true,
+      buildCost: 10000000 + 4 * peakW,
+        // 2008: $10M fixed costs, $2-5/w total on 50MW project https://en.wikipedia.org/wiki/Geothermal_power#Economics
+        // 2023: Total cost ~$2.7/w https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      peakW,
+      maxPeakW: 800000000,
+        // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
+      btuPerWh: 0,
+      annualOperatingCost: 0.11 / 0.9 * peakW,
+        // ~$0.11/wy in 2023 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 4,
+        // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      spinMinutes: 1,
+      capacityFactor: 0.9,
+        // Only utilized about 70% of the time - https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
+        // But technically availabe up to 90% of the time - https://www.energy.gov/eere/geothermal/geothermal-faqs
+      lifespanYears: 40,
+        // TODO
+    },
     // {
     //   name: 'Hydro',
     //   fuel: 'Rain',
     //   description: 'Clean, cheap and dispatchable - until there\'s a drought',
+    // available: true,
     //   buildCost: 200000000,
       // 1,458 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
       // 100GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
@@ -235,6 +260,8 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       // ~40% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
     //   yearsToBuild: 4,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      // capacityFactor: 0.43,
+      // https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
     // },
   ] as GeneratorShoppingType[];
 
