@@ -1,5 +1,5 @@
 import {ThemeManager} from 'app/audio/ThemeManager';
-import {AUDIO_COMMAND_DEBOUNCE_MS, INIT_DELAY} from 'app/Constants';
+import {INIT_DELAY} from 'app/Constants';
 import {AudioType} from 'app/Types';
 import * as React from 'react';
 
@@ -57,7 +57,7 @@ export default class Audio extends React.Component<Props, {}> {
     const tm = nextProps.themeManager;
     if (!this.props.themeManager && tm) {
       if (nextProps.enabled) {
-        tm.setIntensity(nextProps.audio.intensity, nextProps.audio.peakIntensity);
+        tm.setIntensity(nextProps.audio.intensity);
       } else {
         return tm.pause();
       }
@@ -70,11 +70,6 @@ export default class Audio extends React.Component<Props, {}> {
 
     if (!nextProps.enabled) {
       return console.log('Skipping audio (disabled)');
-    }
-
-    // Ignore if old or duplicate (aka from going back, settings change, or non-audio action)
-    if (AUDIO_COMMAND_DEBOUNCE_MS > Math.abs(nextProps.audio.timestamp - this.props.audio.timestamp)) {
-      return;
     }
 
     if (!tm) {
@@ -94,7 +89,7 @@ export default class Audio extends React.Component<Props, {}> {
       return console.log('Skipping playing audio, audio currently paused.');
     }
 
-    tm.setIntensity(nextProps.audio.intensity, nextProps.audio.peakIntensity);
+    tm.setIntensity(nextProps.audio.intensity);
   }
 
   public render(): JSX.Element|null {

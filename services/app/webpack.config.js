@@ -15,6 +15,7 @@ const options = {
       'process.env.VERSION': JSON.stringify(require('./package.json').version),
     }),
     new CopyWebpackPlugin([
+      { from: { glob: '**/*.mp3' }, context: 'src/audio', to: './audio' },
       { from: { glob: '../../shared/images/*.svg' }, flatten: true, to: './images' },
       { from: { glob: '../../shared/images/*.png' }, flatten: true, to: './images' },
       { from: { glob: '../../shared/images/*.jpg' }, flatten: true, to: './images' },

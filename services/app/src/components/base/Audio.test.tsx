@@ -65,7 +65,6 @@ describe('Audio', () => {
       audio: {
         ...initialAudio,
         intensity: 1,
-        peakIntensity: 2,
         paused: false,
         timestamp: 0,
         ...audioOverrides,

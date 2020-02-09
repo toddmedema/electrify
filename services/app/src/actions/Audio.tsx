@@ -8,16 +8,12 @@ import {AudioDataSetAction, AudioSetAction} from '../Types';
 const eachLimit = require('async/eachLimit');
 
 export function getAllMusicFiles(): string[] {
-  return Object.keys(MUSIC_DEFINITIONS).reduce((list: string[], musicClass: string) => {
-    return list.concat(Object.keys(MUSIC_DEFINITIONS[musicClass]).reduce((acc: string[], musicWeight: string) => {
-      const weight = MUSIC_DEFINITIONS[musicClass][musicWeight];
-      for (const instrument of weight.instruments) {
-        for (let v = 1; v <= weight.variants; v++) {
-          acc.push(`${musicClass}/${musicWeight}/${instrument}${v}`);
-        }
-      }
-      return acc;
-    }, []));
+  return Object.keys(MUSIC_DEFINITIONS).reduce((acc: string[], themeName: string) => {
+    const theme = MUSIC_DEFINITIONS[themeName];
+    for (const track of theme.tracks) {
+      acc.push(`${themeName}/${track}`);
+    }
+    return acc;
   }, []);
 }
 
@@ -69,12 +65,9 @@ export function loadAudioFiles() {
         return;
       }
       dispatch(audioSet({loaded: 'LOADED'}));
-      const themeManager = new ThemeManager(audioNodes, Math.random);
+      const themeManager = new ThemeManager(audioNodes);
       dispatch(audioDataSet({audioNodes, themeManager}));
-
-      // TODO why doesn't this start playing as soon as it's available?
-      // Perhaps because audio must be triggered by a user interaction?
-      dispatch(audioSet({intensity: 30, paused: false}));
+      dispatch(audioSet({intensity: 1, paused: false})); // start playing the intro
     });
   };
 }

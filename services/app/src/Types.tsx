@@ -95,7 +95,6 @@ export interface AudioType {
   loaded: AudioLoadingType;
   paused: boolean;
   intensity: number;
-  peakIntensity: number;
   sfx: string|null;
   timestamp: number;
 }
