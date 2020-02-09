@@ -144,7 +144,7 @@ export default class extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
-      year: props.gameState.date.year,
+      year: -1, // current year
       expanded: getStorageBoolean('financesTableOpened', false),
       chartKey: getStorageString('financesChartKey', 'profit') as DerivedHistoryKeysType,
     };
@@ -185,12 +185,12 @@ export default class extends React.Component<Props, State> {
     const years = []; // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= startingYear; i--) { years.push(i); }
 
-    const monthlyHistory = gameState.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year);
+    const monthlyHistory = gameState.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year || (year === -1 && t.year === date.year));
     const previousMonths = summarizeHistory(monthlyHistory);
 
     // For the summary table
     const summaryMonths = [previousMonths];
-    if (year === date.year) {
+    if (year === -1 || year === date.year) {
       summaryMonths.push(summarizeTimeline(timeline, startingYear, (t) => t.minute <= date.minute));
     }
     const summary = deriveExpandedSummary(summaryMonths.reduce(reduceHistories, {...EMPTY_HISTORY}));
@@ -206,7 +206,7 @@ export default class extends React.Component<Props, State> {
         projected: false,
       });
     }
-    if (!year || date.year === year) { // Add projected months if current year is included in chart
+    if (!year || year === -1 || date.year === year) { // Add projected months if current year is included in chart
       const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
       if (date.month !== 'Dec') { // Project out for the rest of the year
         const forecast = {...gameState};
@@ -259,8 +259,10 @@ export default class extends React.Component<Props, State> {
               })}
             </Select>
             <Typography variant="h6" style={{flexGrow: 0}}> for </Typography>
-            <Select defaultValue={date.year} onChange={(e: any) => this.setState({year: e.target.value})}>
+            <Select defaultValue={year} onChange={(e: any) => this.setState({year: e.target.value})}>
               <MenuItem value={0}>All time</MenuItem>
+              <MenuItem value={-1}>Current year</MenuItem>
+              props.gameState.date.year
               {years.map((y: number) => {
                 return <MenuItem value={y} key={y}>{y}</MenuItem>;
               })}
