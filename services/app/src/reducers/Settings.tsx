@@ -4,7 +4,7 @@ import {getStorageBoolean, setStorageKeyValue} from '../LocalStorage';
 import {ChangeSettingsAction, SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
-  audioEnabled: getStorageBoolean('audioEnabled', false),
+  audioEnabled: getStorageBoolean('audioEnabled', true),
   experimental: getStorageBoolean('experimental', false) || NODE_ENV === 'dev',
   showHelp: getStorageBoolean('showHelp', true),
   vibration: getStorageBoolean('vibration', true),

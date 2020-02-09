@@ -5,7 +5,6 @@ export const initialAudio: AudioType = {
   intensity: 0,
   loaded: 'UNLOADED',
   paused: false,
-  peakIntensity: 0,
   sfx: null,
   timestamp: 0,
 };
