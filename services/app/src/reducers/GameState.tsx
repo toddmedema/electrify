@@ -233,24 +233,24 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
   return now;
 }
 
-function reforecastSupply(state: GameStateType): TickPresentFutureType[] {
+function reforecastSupply(state: GameStateType, simulated?: boolean): TickPresentFutureType[] {
   // Make temporary deep copy so that it can be revised in place
   const newState = {...state};
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
-      t = updateSupplyFacilitiesFinances(newState, prev, {...t});
+      t = updateSupplyFacilitiesFinances(newState, prev, {...t}, simulated);
     }
     prev = t;
     return t;
   });
 }
 
-// edits in place
-export function generateNewTimeline(state: GameStateType, cash: number, customers: number, ticks = TICKS_PER_DAY) {
-  const timeline = new Array(ticks) as TickPresentFutureType[];
+export function generateNewTimeline(readOnlyState: GameStateType, cash: number, customers: number, ticks = TICKS_PER_DAY): TickPresentFutureType[] {
+  const state = cloneDeep(readOnlyState);
+  state.timeline = new Array(ticks) as TickPresentFutureType[];
   for (let i = 0; i < ticks; i++) {
-    timeline[i] = {
+    state.timeline[i] = {
       minute: state.date.minute + i * TICK_MINUTES,
       supplyW: 0,
       demandW: 0,
@@ -269,10 +269,10 @@ export function generateNewTimeline(state: GameStateType, cash: number, customer
       kgco2e: 0,
     };
   }
-  state.timeline = timeline;
   state.timeline = reforecastWeatherAndPrices(state);
   state.timeline = reforecastDemand(state);
-  state.timeline = reforecastSupply(state);
+  state.timeline = reforecastSupply(state, true);
+  return state.timeline;
 }
 
 // Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
@@ -359,7 +359,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
           // Record final history for the month, then generate the new timeline
           history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));
-          generateNewTimeline(newState, cash, customers);
+          newState.timeline = generateNewTimeline(newState, cash, customers);
 
           // ===== TRIGGERS ======
           if (now.cash < 0) {
@@ -494,7 +494,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
       startingYear: scenario.startingYear,
       feePerKgCO2e: scenario.feePerKgCO2e,
     };
-    generateNewTimeline(newState, a.cash, a.customers);
+    newState.timeline = generateNewTimeline(newState, a.cash, a.customers);
 
     // TODO also search STORAGE
     a.facilities.forEach((search: Partial<FacilityShoppingType>) => {

@@ -209,10 +209,9 @@ export default class extends React.Component<Props, State> {
     if (!year || year === -1 || date.year === year) { // Add projected months if current year is included in chart
       const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
       if (date.month !== 'Dec') { // Project out for the rest of the year
-        const forecast = {...gameState};
-        generateNewTimeline(forecast, now.cash, now.customers, TICKS_PER_MONTH * (1 + 12 - date.monthNumber)); // Current month, plus the rest of the months
+        const forecastedTimeline = generateNewTimeline(gameState, now.cash, now.customers, TICKS_PER_MONTH * (1 + 12 - date.monthNumber)); // Current month, plus the rest of the months
         for (let month = date.monthNumber + 1; month <= 12; month++) {
-          const m = summarizeTimeline(forecast.timeline, gameState.startingYear, (t) => getDateFromMinute(t.minute, gameState.startingYear).monthNumber === month);
+          const m = summarizeTimeline(forecastedTimeline, gameState.startingYear, (t) => getDateFromMinute(t.minute, gameState.startingYear).monthNumber === month);
           presentFutureMonths.push(m);
         }
       }

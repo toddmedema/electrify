@@ -42,22 +42,21 @@ export default class extends React.Component<Props, State> {
   }
 
   public render() {
-    const now = getTimeFromTimeline(this.props.gameState.date.minute, this.props.gameState.timeline);
+    const {gameState} = this.props;
+    const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
     if (!now) {
       return <span/>;
     }
 
     // Generate the forecast
-    const newState = {...this.props.gameState};
-    generateNewTimeline(newState, now.cash, now.customers, TICKS_PER_YEAR * FORECAST_YEARS);
-    const {timeline, startingYear} = newState;
+    const forecastedTimeline = generateNewTimeline(gameState, now.cash, now.customers, TICKS_PER_YEAR * FORECAST_YEARS);
 
     // Figure out the boundaries of the chart data
     let domainMin = 999999999999;
     let domainMax = 0;
-    const rangeMin = timeline[0].minute;
-    const rangeMax = timeline[timeline.length - 1].minute;
-    timeline.forEach((d: TickPresentFutureType) => {
+    const rangeMin = forecastedTimeline[0].minute;
+    const rangeMax = forecastedTimeline[forecastedTimeline.length - 1].minute;
+    forecastedTimeline.forEach((d: TickPresentFutureType) => {
       domainMin = Math.min(domainMin, d.supplyW, d.demandW);
       domainMax = Math.max(domainMax, d.supplyW, d.demandW);
     });
@@ -77,7 +76,7 @@ export default class extends React.Component<Props, State> {
       minute: rangeMin,
       value: 0,
     }] as BlackoutEdges[];
-    let prev = timeline[0];
+    let prev = forecastedTimeline[0];
     let isBlackout = prev.demandW > prev.supplyW;
     if (isBlackout) {
       blackouts.push({
@@ -85,7 +84,7 @@ export default class extends React.Component<Props, State> {
         value: domainMax,
       });
     }
-    timeline.forEach((d: TickPresentFutureType) => {
+    forecastedTimeline.forEach((d: TickPresentFutureType) => {
       if (d.demandW > d.supplyW) {
         if (!isBlackout) {
           // Blackout starting: low then high edge, start a new current blackout entryr
@@ -125,8 +124,8 @@ export default class extends React.Component<Props, State> {
     }
     largestBlackout.end = largestBlackout.end || rangeMax;
 
-    const blackoutStart = getDateFromMinute(largestBlackout.start, startingYear);
-    const blackoutEnd = getDateFromMinute(largestBlackout.end, startingYear);
+    const blackoutStart = getDateFromMinute(largestBlackout.start, gameState.startingYear);
+    const blackoutEnd = getDateFromMinute(largestBlackout.end, gameState.startingYear);
 
     // TODO user ability to see more than one year in the future
     return (
@@ -137,10 +136,10 @@ export default class extends React.Component<Props, State> {
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
-            timeline={timeline}
+            timeline={forecastedTimeline}
             blackouts={blackouts}
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-            startingYear={startingYear}
+            startingYear={gameState.startingYear}
           />
           {blackoutTotalWh > 0 && <Table size="small">
             <TableBody>
@@ -174,9 +173,9 @@ export default class extends React.Component<Props, State> {
           </Toolbar>
           <ChartForecastFuelPrices
             height={140}
-            timeline={timeline}
+            timeline={forecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
-            startingYear={newState.startingYear}
+            startingYear={gameState.startingYear}
           />
         </div>
       </GameCard>

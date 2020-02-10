@@ -37,7 +37,8 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
   const underConstruction = (facility.yearsToBuildLeft > 0);
   let secondaryText = '';
   if (underConstruction) {
-    secondaryText = `Building: ${Math.round((facility.yearsToBuild - facility.yearsToBuildLeft) / facility.yearsToBuild * 100)}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
+    const percentBuilt = Math.round((facility.yearsToBuild - facility.yearsToBuildLeft) / facility.yearsToBuild * 100);
+    secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
   } else if (facility.peakWh) {
     secondaryText = `${formatWattHours(facility.currentWh).replace(/[^0-9.,]/g, '')}/${formatWattHours(facility.peakWh)}, ${formatWatts(facility.peakW)}`;
   } else {
