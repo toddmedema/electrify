@@ -47,8 +47,7 @@ export interface ChangeSettingsAction extends Redux.Action {
 export interface SnackbarOpenAction extends Redux.Action {
   type: 'SNACKBAR_OPEN';
   message: string;
-  action?: (e: any) => void;
-  actionLabel?: string;
+  timeout?: number;
 }
 
 export interface SnackbarCloseAction extends Redux.Action {

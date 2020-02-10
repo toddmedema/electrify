@@ -1,11 +1,12 @@
 import * as React from 'react';
 import Redux from 'redux';
+
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
-import {formatMoneyConcise} from 'shared/helpers/Format';
+import {formatMoneyConcise, formatWatts} from 'shared/helpers/Format';
 import {getFuelPricesPerMBTU} from 'shared/schema/FuelPrices';
 import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
-import {openDialog} from '../actions/UI';
+import {openDialog, openSnackbar} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
@@ -95,7 +96,7 @@ function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
 }
 
 // Updates game state and now in place
-function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
+function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType, simulated?: boolean) {
   const {facilities, date} = state;
   const difficulty = DIFFICULTIES[state.difficulty];
 
@@ -103,6 +104,11 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
   facilities.forEach((g: FacilityOperatingType) => {
     if (g.yearsToBuildLeft > 0) {
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
+      if (g.yearsToBuildLeft === 0 && !simulated) {
+        setTimeout(() => {
+          getStore().dispatch(openSnackbar(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peahWh) + 'h' : formatWatts(g.peakW)}`));
+        }, 0);
+      }
     }
   });
 
@@ -518,10 +524,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
     });
 
     // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0]);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
     newState.timeline = reforecastSupply(newState);
 
     return newState;

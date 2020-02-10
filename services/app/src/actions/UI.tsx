@@ -15,9 +15,10 @@ export function openDialog(dialog: DialogType): DialogOpenAction {
   };
 }
 
-export function openSnackbar(message: string, showError?: boolean): SnackbarOpenAction {
+export function openSnackbar(message: string, timeout?: number): SnackbarOpenAction {
   return {
     message,
+    timeout,
     type: 'SNACKBAR_OPEN',
   };
 }
