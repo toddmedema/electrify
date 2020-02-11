@@ -9,6 +9,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   let transition: TransitionClassType = 'next';
   if (state === undefined || Object.keys(state).length === 0) {
     transition = 'instant';
+  } else if (state.card.toPrevious) {
+    transition = 'prev';
   } else if (state.card.name === 'MAIN_MENU') {
     transition = 'instant';
   } else if (isNavCard(state.card.name)) {
