@@ -6,6 +6,7 @@ export const initialCard: CardType = {
   name: 'MAIN_MENU' as CardNameType,
   ts: 0,
   history: ['MAIN_MENU'] as CardNameType[],
+  toPrevious: false,
 };
 
 // ts: 0 solves an obscure bug (instead of Date.now()) where rapidly triggering navigations with undefined states
@@ -22,12 +23,14 @@ export function card(state: CardType = initialCard, action: Redux.Action): CardT
       return {
         ...to,
         history: [(a.dontRemember) ? state.name : to.name, ...state.history],
+        toPrevious: false,
       };
     case 'NAVIGATE_BACK':
       return {
         name: state.history[1] || 'MAIN_MENU', // Look 2 back since first is current card
         ts: Date.now(),
         history: state.history.slice(1),
+        toPrevious: true,
       };
     case 'GAME_START':
       return {
