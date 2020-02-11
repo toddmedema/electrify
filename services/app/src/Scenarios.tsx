@@ -7,6 +7,7 @@ export const SCENARIOS = [
   {
     id: 1, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: '101: Generators',
+    icon: 'none',
     startingYear: 2020,
     feePerKgCO2e: 0,
     durationMonths: 12,
@@ -53,6 +54,7 @@ export const SCENARIOS = [
   {
     id: 2, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: '102: Storage',
+    icon: 'none',
     startingYear: 2020,
     feePerKgCO2e: 0,
     durationMonths: 12,
@@ -126,6 +128,7 @@ export const SCENARIOS = [
   {
     id: 100, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: 'Carbon Fee',
+    icon: 'solar',
     summary: 'Do you have what it takes to transition into a new age?',
     startingYear: 2020,
     feePerKgCO2e: 50 / 1000,
@@ -135,6 +138,7 @@ export const SCENARIOS = [
   {
     id: 101, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: 'Rise of Renewables',
+    icon: 'wind',
     summary: 'Technology is changing rapidly - can you keep up?',
     startingYear: 2002,
     feePerKgCO2e: 0,
@@ -144,6 +148,7 @@ export const SCENARIOS = [
   {
     id: 102, // Avoid changing once ID is in production, linked to scores / completion, and doesn't impact order
     name: 'Natural Gas & Nuclear',
+    icon: 'natural gas',
     summary: 'Your existing coal business faces new challengers.',
     startingYear: 1980,
     feePerKgCO2e: 0,

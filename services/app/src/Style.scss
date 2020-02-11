@@ -388,20 +388,9 @@ body.android .dialog .textfield:focus-within {
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
   .clickable-card {
-    padding-right: 6px;
-
     &:hover {
       cursor: pointer;
       background: #fafafa; /* grey50 */
-    }
-
-    &:after {
-      content: ">";
-      color: $interactive_blue;
-      position: absolute;
-      right: size(base);
-      top: 50%;
-      transform: translateY(-50%);
     }
   }
 

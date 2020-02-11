@@ -1,7 +1,5 @@
 import {Button, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
-import CheckIcon from '@material-ui/icons/Check';
-import RemoveIcon from '@material-ui/icons/Remove';
 import * as React from 'react';
 
 import {SCENARIOS} from 'app/Scenarios';
@@ -29,8 +27,7 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
   const {s, onStart, completed} = props;
   return (
     <Card className="build-list-item">
-      <CardHeader
-        avatar={completed ? <CheckIcon /> : <RemoveIcon />}
+      <CardHeader style={{opacity: completed ? 0.8 : 1}}
         action={
           <Button
             size="small"

@@ -289,6 +289,7 @@ export interface TutorialStepType {
 export interface ScenarioType {
   id: number;
   name: string;
+  icon: string; // assumed to be images/<string>.svg
   summary?: string;
   tutorialSteps?: TutorialStepType[];
   startingYear: number;

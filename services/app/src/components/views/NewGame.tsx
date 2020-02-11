@@ -1,5 +1,6 @@
-import {Card, CardHeader, IconButton, List, Toolbar, Typography} from '@material-ui/core';
+import {Avatar, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
+import ArrowRightIcon from '@material-ui/icons/ArrowRight';
 import * as React from 'react';
 
 import {SCENARIOS} from 'app/Scenarios';
@@ -27,8 +28,14 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
   return (
     <Card className="build-list-item clickable-card" onClick={(e: any) => onDetails({scenarioId: s.id})}>
       <CardHeader
+        avatar={<Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />}
         title={s.name}
         subheader={s.summary}
+        action={
+          <IconButton color="primary" onClick={(e: any) => onDetails({scenarioId: s.id})}>
+            <ArrowRightIcon/>
+          </IconButton>
+        }
       />
     </Card>
   );
@@ -52,6 +59,7 @@ export default function NewGame(props: Props): JSX.Element {
         <ScenarioListItem key={999} onDetails={props.onCustomGame} s={{
           id: 999,
           name: 'Custom Game',
+          icon: 'battery',
           summary: 'Make your own game',
           startingYear: 2020,
           durationMonths: 20,
