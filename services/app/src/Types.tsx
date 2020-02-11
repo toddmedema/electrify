@@ -140,8 +140,9 @@ export type CardNameType =
 export interface CardType {
   name: CardNameType;
   ts: number;
-  overrideDebounce?: boolean;
   history: CardNameType[];
+  overrideDebounce?: boolean;
+  toPrevious?: boolean;
 }
 
 export interface ScoresContainerType {
