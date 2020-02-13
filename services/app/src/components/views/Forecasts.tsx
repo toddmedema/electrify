@@ -8,6 +8,7 @@ import {formatWattHours, formatWatts} from 'shared/helpers/Format';
 import {generateNewTimeline} from '../../reducers/GameState';
 import ChartForecastFuelPrices from '../base/ChartForecastFuelPrices';
 import ChartForecastSupplyDemand from '../base/ChartForecastSupplyDemand';
+import ChartForecastWeather from '../base/ChartForecastWeather';
 import GameCard from '../base/GameCard';
 
 const FORECAST_YEARS = 1;
@@ -172,6 +173,17 @@ export default class extends React.Component<Props, State> {
             <Typography variant="h6">Fuel Prices</Typography>
           </Toolbar>
           <ChartForecastFuelPrices
+            height={140}
+            timeline={forecastedTimeline}
+            domain={{ x: [rangeMin, rangeMax] }}
+            startingYear={gameState.startingYear}
+          />
+          <br/>
+          <br/>
+          <Toolbar>
+            <Typography variant="h6">Weather</Typography>
+          </Toolbar>
+          <ChartForecastWeather
             height={140}
             timeline={forecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
