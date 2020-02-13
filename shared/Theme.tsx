@@ -17,6 +17,8 @@ export const supplyColor = blue[600];
 export const uraniumColor = green[500];
 export const coalColor = grey[900];
 export const naturalGasColor = purple[500];
+export const temperatureColor = red[500];
+export const windColor = grey[900];
 
 export const defaultTheme = {
   palette: {
