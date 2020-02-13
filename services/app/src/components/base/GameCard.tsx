@@ -1,6 +1,5 @@
 import {Button, IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
-import DoubleArrowIcon from '@material-ui/icons/DoubleArrow';
 import FastForwardIcon from '@material-ui/icons/FastForward';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import PauseIcon from '@material-ui/icons/Pause';
@@ -9,7 +8,7 @@ import * as React from 'react';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 
-import {getTimeFromTimeline} from 'shared/helpers/DateTime';
+import {formatHour, getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {toCard} from '../../actions/Card';
 import {isSmallScreen, openWindow} from '../../Globals';
@@ -34,6 +33,7 @@ export interface Props extends GameCardProps, DispatchProps {}
 export function GameCard(props: Props) {
   const {gameState} = props;
   const date = gameState.date;
+  const smallScreen = isSmallScreen();
   const now = getTimeFromTimeline(date.minute, gameState.timeline);
   if (!gameState.inGame || !now) {
     return <Button onClick={props.onQuit}>ERROR! Click here to return to the menu</Button>;
@@ -49,7 +49,7 @@ export function GameCard(props: Props) {
   const inBlackout = now && now.supplyW < now.demandW;
 
   let speedOptions = <span/>;
-  if (!isSmallScreen()) {
+  if (!smallScreen) {
     speedOptions = <span>
       <IconButton onClick={() => props.onSpeedChange('PAUSED')} disabled={gameState.speed === 'PAUSED'} aria-label="pause" edge="end" color="primary">
         <PauseIcon />
@@ -71,7 +71,6 @@ export function GameCard(props: Props) {
       case 'SLOW': speedIcon = <ChevronRightIcon />; break;
       case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
       case 'FAST': speedIcon = <FastForwardIcon />; break;
-      case 'LIGHTNING': speedIcon = <DoubleArrowIcon />; break;
       default: break;
     }
     speedOptions = <span>
@@ -101,12 +100,6 @@ export function GameCard(props: Props) {
     </span>;
   }
 
-  // TODO only add this back when it's clearly faster... aka probably a lot of optimization on game tick loop
-  // (user feedback is that going faster is not super important right now)
-  // <MenuItem onClick={() => { props.onSpeedChange('LIGHTNING'); handleSpeedClose(); }} disabled={gameState.speed === 'LIGHTNING'} aria-label="lightning-speed">
-  //   <DoubleArrowIcon color="primary" />
-  // </MenuItem>
-
   return (
     <div className={props.className + ' flexContainer'} id="gameCard">
       <div id="topbar">
@@ -126,7 +119,8 @@ export function GameCard(props: Props) {
             <MenuItem onClick={props.onQuit}>Quit</MenuItem>
           </Menu>
           <Typography variant="h6">
-            {formatMoneyStable(now.cash)} <span className="weak">{date.month} {date.year}</span>
+            {formatMoneyStable(now.cash)}&nbsp;
+            <span className="weak">{date.month} {date.year}{(!smallScreen ? `, ${formatHour(date)}` : '')}</span>
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>

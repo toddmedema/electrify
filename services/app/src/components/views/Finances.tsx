@@ -18,6 +18,7 @@ const numbro = require('numbro');
 interface ChartKeyMetadataType {
   label: string;
   format: (n: number) => number|string;
+  formatTable?: (n: number) => number|string; // if different than chart formatting
   suffix?: string;
   nesting?: number; // default 0 / unnested
 }
@@ -25,21 +26,25 @@ interface ChartKeyMetadataType {
 const CHART_KEYS = {
   profit: {
     label: 'Profit',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
   },
   profitPerkWh: {
     label: 'Unit profit',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     suffix: '/kWh',
     nesting: 1,
   },
   revenue: {
     label: 'Revenue',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
   },
   revenuePerkWh: {
     label: 'Unit revenue',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     suffix: '/kWh',
     nesting: 1,
   },
@@ -59,31 +64,37 @@ const CHART_KEYS = {
   },
   expenses: {
     label: 'Expenses',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
   },
   expensesFuel: {
     label: 'Fuel',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
   expensesOM: {
     label: 'Operations',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
   expensesMarketing: {
     label: 'Marketing',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
   expensesInterest: {
     label: 'Loan interest',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
   expensesCarbonFee: {
     label: 'Carbon fees',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
   kgco2e: {
@@ -100,11 +111,13 @@ const CHART_KEYS = {
   },
   netWorth: {
     label: 'Net Worth',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
   },
   cash: {
     label: 'Cash',
-    format: formatMoneyStable,
+    format: formatMoneyConcise,
+    formatTable: formatMoneyStable,
     nesting: 1,
   },
 } as {[index: string]: ChartKeyMetadataType};
@@ -155,8 +168,6 @@ export default class extends React.Component<Props, State> {
     switch (nextProps.gameState.speed) {
       case 'FAST':
         return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0);
-      case 'LIGHTNING':
-        return (nextProps.gameState.date.minute / TICK_MINUTES % 4 === 0);
       default:
         return true;
     }
@@ -278,15 +289,17 @@ export default class extends React.Component<Props, State> {
               <TableBody>
                 {Object.keys(CHART_KEYS).map((key: DerivedHistoryKeysType) => {
                   const k = CHART_KEYS[key];
+                  const format = k.formatTable || k.format;
                   return (<TableRow className={!k.nesting ? 'bold' : `tabs-${k.nesting}`} key={key}>
                     <TableCell>{k.label}</TableCell>
-                    <TableCell align="right">{k.format(summary[key])}</TableCell>
+                    <TableCell align="right">{format(summary[key])}</TableCell>
                   </TableRow>);
                 })}
               </TableBody>
             </Table>
             {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon" />}
             {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+            {!expanded && <Typography color="textSecondary" variant="body2" style={{textAlign: 'center'}}>(click table to expand)</Typography>}
           </div>
         </div>
       </GameCard>

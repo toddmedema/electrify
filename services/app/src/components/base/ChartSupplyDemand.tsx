@@ -143,7 +143,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           style={{
             data: {
               stroke: supplyColor,
-              strokeWidth: 2,
+              strokeWidth: 1.75,
               fill: '#e3f2fd', // blue50
             },
           }}
@@ -166,7 +166,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           style={{
             data: {
               stroke: demandColor,
-              strokeWidth: 3,
+              strokeWidth: 2.5,
             },
           }}
         />

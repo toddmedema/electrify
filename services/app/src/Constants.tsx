@@ -28,14 +28,8 @@ export const DIFFICULTIES = {
   CEO: {
     buildCost: 1,
     expensesOM: 1,
-    buildTime: 0.9,
-    blackoutPenalty: 10,
-  },
-  Guru: {
-    buildCost: 1.1,
-    expensesOM: 1.1,
     buildTime: 1,
-    blackoutPenalty: 12,
+    blackoutPenalty: 10,
   },
 } as {[index: string]: DifficultyMultipliersType};
 
@@ -44,7 +38,6 @@ export const TICK_MS = {
   SLOW: 80,
   NORMAL: 40,
   FAST: 1,
-  LIGHTNING: 0,
 };
 
 export const INFLATION = 0.03;

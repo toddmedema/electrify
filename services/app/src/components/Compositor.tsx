@@ -43,7 +43,6 @@ const shortcutHandlers = {
   SLOW: () => { getStore().dispatch(setSpeed('SLOW')); },
   NORMAL: () => { getStore().dispatch(setSpeed('NORMAL')); },
   FAST: () => { getStore().dispatch(setSpeed('FAST')); },
-  LIGHTNING: () => { getStore().dispatch(setSpeed('LIGHTNING')); },
   FACILITIES: () => { getStore().dispatch(toCard({name: 'FACILITIES'})); },
   FINANCES: () => { getStore().dispatch(toCard({name: 'FINANCES'})); },
   FORECASTS: () => { getStore().dispatch(toCard({name: 'FORECASTS'})); },

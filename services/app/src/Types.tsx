@@ -104,8 +104,8 @@ export interface AudioDataType {
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec';
-export type DifficultyType = 'Intern' | 'Employee' | 'Manager' | 'VP' | 'CEO' | 'Guru';
-export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST' | 'LIGHTNING';
+export type DifficultyType = 'Intern' | 'Employee' | 'Manager' | 'VP' | 'CEO';
+export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
 
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export interface FuelPricesType {

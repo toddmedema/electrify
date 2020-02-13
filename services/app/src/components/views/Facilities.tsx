@@ -124,8 +124,6 @@ export default class extends React.Component<Props, {}> {
     switch (nextProps.gameState.speed) {
       case 'FAST':
         return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0);
-      case 'LIGHTNING':
-        return (nextProps.gameState.date.minute / TICK_MINUTES % 4 === 0);
       default:
         return true;
     }
@@ -155,9 +153,9 @@ export default class extends React.Component<Props, {}> {
         <List dense className="scrollable">
           <Toolbar style={{paddingBottom: '4px'}}>
             <Typography variant="h6">Facilities</Typography>
-            <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">Generator</Button>
+            <Button size="small" variant="outlined" color="primary" onClick={onGeneratorBuild} className="button-buildGenerator">+ Generator</Button>
             &nbsp;&nbsp;&nbsp;
-            <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild} className="button-buildStorage">Storage</Button>
+            <Button size="small" variant="outlined" color="primary" onClick={onStorageBuild} className="button-buildStorage">+ Storage</Button>
           </Toolbar>
           <DragDropContext onDragEnd={this.onDragEnd}>
             <Droppable droppableId="droppable">
@@ -181,6 +179,7 @@ export default class extends React.Component<Props, {}> {
               )}
             </Droppable>
           </DragDropContext>
+          {facilitiesCount < 2 && <Typography color="textSecondary" variant="body2" style={{textAlign: 'center', marginTop: '12px'}}>(click "Generator" or "Storage" to build more)</Typography>}
         </List>
       </GameCard>
     );
