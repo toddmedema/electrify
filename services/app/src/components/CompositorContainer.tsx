@@ -2,7 +2,7 @@ import {connect} from 'react-redux';
 import Redux from 'redux';
 import {closeDialog, closeSnackbar} from '../actions/UI';
 import {SCENARIOS} from '../Scenarios';
-import {AppStateType, TransitionClassType} from '../Types';
+import {AppStateType, TransitionClassType, TutorialStepType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -37,7 +37,11 @@ export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps
     closeSnackbar(): void {
       dispatch(closeSnackbar());
     },
-    onTutorialStep(newStep: number): void {
+    onTutorialStep(newStep: number, tutorialSteps: TutorialStepType[] | undefined): void {
+      const prevStep = (tutorialSteps || [])[newStep - 1];
+      if (prevStep && prevStep.onNext) {
+        dispatch(prevStep.onNext());
+      }
       dispatch({type: 'GAMESTATE_DELTA', delta: { tutorialStep: newStep }});
     },
   };
