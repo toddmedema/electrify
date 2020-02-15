@@ -61,7 +61,7 @@ export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
     for (let month = 1; month <= 12; month++) {
       fuelPrices[date.year][month] = {...previous};
       Object.keys(fuelPrices[date.year][month]).forEach((fuel: string) => {
-        fuelPrices[date.year][month][fuel] *= 1 + getRandomArbitrary(-0.03, 0.03 + INFLATION / 12);
+        fuelPrices[date.year][month][fuel] *= 1 + getRandomArbitrary(-0.06, 0.06 + INFLATION / 12);
       });
       previous = {...fuelPrices[date.year][month]};
     }
