@@ -91,7 +91,7 @@ export interface StateProps {
 export interface DispatchProps {
   closeDialog: () => void;
   closeSnackbar: () => void;
-  onTutorialStep: (newStep: number) => void;
+  onTutorialStep: (newStep: number, tutorialSteps: TutorialStepType[] | undefined) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -104,7 +104,7 @@ export default class Compositor extends React.Component<Props, {}> {
   public handleJoyrideCallback = (data: any) => {
     const { action, index, type } = data;
     if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
-      this.props.onTutorialStep(index + (action === ACTIONS.PREV ? -1 : 1));
+      this.props.onTutorialStep(index + (action === ACTIONS.PREV ? -1 : 1), this.props.tutorialSteps);
     }
   }
 

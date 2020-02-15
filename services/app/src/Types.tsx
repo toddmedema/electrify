@@ -283,6 +283,7 @@ interface SharedShoppingType {
 
 export interface TutorialStepType {
   disableBeacon?: boolean;
+  onNext?: () => Redux.Action;
   target: string;
   content: JSX.Element;
 }

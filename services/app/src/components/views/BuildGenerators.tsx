@@ -56,6 +56,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         action={
           <span>
             <Button
+              className="buy-button"
               size="small"
               variant="contained"
               color="primary"
@@ -64,7 +65,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
-            <Typography variant="body2" color="textSecondary">{Math.round(generator.yearsToBuild * 12)}mo to build<br/>
+            <Typography className="action-seconday-text" variant="body2" color="textSecondary">{Math.round(generator.yearsToBuild * 12)}mo to build<br/>
             {fuelPrices[generator.fuel] ? '~' : ''}{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</Typography>
           </span>
         }
@@ -73,6 +74,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
       />
       {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon" />}
       {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="generator properties">
@@ -268,7 +270,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
         {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause" edge="end" color="primary">
           <PauseIcon />
         </IconButton>}
-        <IconButton edge="end" color="primary" onClick={onBack} aria-label="close">
+        <IconButton id="close-button" edge="end" color="primary" onClick={onBack} aria-label="close">
           <CloseIcon />
         </IconButton>
         <div className="flex-newline"></div>
@@ -287,7 +289,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
           max={34}
           onChange={onSlider}
         />
-        <IconButton edge="end" color="primary" onClick={onSortOpen} aria-label="sort">
+        <IconButton id="sort" edge="end" color="primary" onClick={onSortOpen} aria-label="sort">
           <SortIcon />
         </IconButton>
         <Menu

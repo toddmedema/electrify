@@ -1,6 +1,7 @@
 import {Typography} from '@material-ui/core';
 import * as React from 'react';
 
+import {toCard} from './actions/Card';
 import {ScenarioType} from './Types';
 
 export const SCENARIOS = [
@@ -31,14 +32,46 @@ export const SCENARIOS = [
       },
       {
         target: '.button-buildGenerator',
+        onNext: () => toCard({name: 'BUILD_GENERATORS', dontRemember: true}),
         content: <Typography variant="body1">
-          Build generators and storage to meet demand (options and prices change as new tech becomes available).
+          Build generators and storage to meet demand.
         </Typography>,
       },
       {
-        target: '.facility',
+        target: '#peak-output',
         content: <Typography variant="body1">
-          Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
+          Slide to change the size of generator you want to build.
+        </Typography>,
+      },
+      {
+        target: '#sort',
+        content: <Typography variant="body1">
+          Sort generators by different gproperties.
+        </Typography>,
+      },
+      {
+        target: '.buy-button',
+        content: <Typography variant="body1">
+          Click on the price to buy it, either in cash or with a loan.
+        </Typography>,
+      },
+      {
+        target: '.action-seconday-text',
+        content: <Typography variant="body1">
+          See how long it will take to build, and the total cost of electricity across its lifetime.
+        </Typography>,
+      },
+      {
+        target: '.build-list-item',
+        content: <Typography variant="body1">
+          Click on a generator to see more detailed information.
+        </Typography>,
+      },
+      {
+        target: '#close-button',
+        onNext: () => toCard({name: 'FACILITIES'}),
+        content: <Typography variant="body1">
+          Tap X to close the buy screen.
         </Typography>,
       },
       {
@@ -85,7 +118,12 @@ export const SCENARIOS = [
       {
         target: '.facility',
         content: <Typography variant="body1">
-          Make sure to re-order your storage to be after any generators you want to charge it.<br/><br/>
+          Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
+        </Typography>,
+      },
+      {
+        target: '.facility',
+        content: <Typography variant="body1">
           This tutorial will run for 1 year. Try changing the order of storage and generator units to see how it affects their output!
         </Typography>,
       },
