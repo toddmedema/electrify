@@ -115,7 +115,6 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           tickValues={[sunrise, sunset]}
           tickFormat={['sunrise', 'sunset']}
           tickLabelComponent={<VictoryLabel dy={-5} />}
-          axisLabelComponent={<VictoryLabel dy={2} />}
           style={{
             axis: chartTheme.axis,
             grid: {

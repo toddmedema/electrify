@@ -51,6 +51,7 @@ const ChartFinances = (props: Props): JSX.Element => {
       >
         <VictoryAxis
           tickFormat={(t) => formatMonthChartAxis(t, multiyear)}
+          tickLabelComponent={<VictoryLabel dy={-5} />}
           style={{
             axis: chartTheme.axis,
             grid: {

@@ -76,6 +76,19 @@ export function isSmallScreen(): boolean {
   return width < 375;
 }
 
+// https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+// Based on CSS abswidthmax
+export function isBigScreen(): boolean {
+  const width = Math.max(
+    document.body.scrollWidth,
+    document.documentElement.scrollWidth,
+    document.body.offsetWidth,
+    document.documentElement.offsetWidth,
+    document.documentElement.clientWidth
+  );
+  return width > 650;
+}
+
 export function getPlatformDump(): string {
   return (window.navigator.platform || '') + ': ' + (window.navigator.userAgent || '') + ': ' + (window.navigator.cookieEnabled ? 'W/COOKIES' : 'NO COOKIES');
 }

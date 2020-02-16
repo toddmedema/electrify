@@ -12,7 +12,7 @@ import {GENERATORS, STORAGE} from '../Facilities';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
 
 // const seedrandom = require('seedrandom');
 const numbro = require('numbro');
@@ -394,8 +394,8 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
 
           const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
             durationMonths: 12 * 20,
-            endMessageTitle: `You've retired!`,
-          };
+            endTitle: `You've retired!`,
+          } as ScenarioType;
           if (newState.date.monthsEllapsed === scenario.durationMonths) {
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
@@ -416,8 +416,8 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               date: (new Date()).toString(),
             } as ScoreType]});
             setTimeout(() => getStore().dispatch(openDialog({
-              title: scenario.endMessageTitle || `You've retired!`,
-              message: <div>Your final score is {finalScore}:
+              title: scenario.endTitle || `You've retired!`,
+              message: scenario.endMessage || <div>Your final score is {finalScore}:
                 <ul>
                   <li>{score.supply} pts from electricity supplied</li>
                   <li>{score.netWorth} pts from final net worth</li>

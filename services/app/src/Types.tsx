@@ -296,7 +296,8 @@ export interface ScenarioType {
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
   durationMonths: number;
-  endMessageTitle?: string;
+  endTitle?: string;
+  endMessage?: string;
   feePerKgCO2e: number;
   facilities: Partial<FacilityShoppingType>[];
 }

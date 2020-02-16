@@ -11,7 +11,7 @@ import Redux from 'redux';
 import {formatHour, getTimeFromTimeline} from 'shared/helpers/DateTime';
 import {formatMoneyStable} from 'shared/helpers/Format';
 import {toCard} from '../../actions/Card';
-import {isSmallScreen, openWindow} from '../../Globals';
+import {isBigScreen, isSmallScreen, openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
 import {AppStateType, GameStateType, SpeedType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
@@ -34,6 +34,7 @@ export function GameCard(props: Props) {
   const {gameState} = props;
   const date = gameState.date;
   const smallScreen = isSmallScreen();
+  const bigScreen = isBigScreen();
   const now = getTimeFromTimeline(date.minute, gameState.timeline);
   if (!gameState.inGame || !now) {
     return <Button onClick={props.onQuit}>ERROR! Click here to return to the menu</Button>;
@@ -120,7 +121,7 @@ export function GameCard(props: Props) {
           </Menu>
           <Typography variant="h6">
             {formatMoneyStable(now.cash)}&nbsp;
-            <span className="weak">{date.month} {date.year}{(!smallScreen ? `, ${formatHour(date)}` : '')}</span>
+            <span className="weak">{date.month} {date.year}{(bigScreen ? `, ${formatHour(date)}` : '')}</span>
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>

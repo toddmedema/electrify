@@ -36,7 +36,6 @@ export default class extends React.PureComponent<Props, {}> {
           tickCount={6}
           tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t, startingYear).monthNumber, false)}
           tickLabelComponent={<VictoryLabel dy={-5} />}
-          axisLabelComponent={<VictoryLabel dy={2} />}
           style={{
             axis: chartTheme.axis,
             grid: {
