@@ -21,7 +21,7 @@ export default class extends React.PureComponent<Props, {}> {
       <div>
         <VictoryChart
           theme={VictoryTheme.material}
-          padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
+          padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
           domain={domain}
           domainPadding={{y: [6, 6]}}
           height={height || 300}

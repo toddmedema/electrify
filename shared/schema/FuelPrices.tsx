@@ -3,11 +3,15 @@ import {DateType, FuelPricesType} from 'app/Types';
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
 // Sources: (all prices real / in that year's $'s, per million BTU)
+
 // Coal: lignite https://www.eia.gov/totalenergy/data/annual/xls/stb0709.xls
 // ^^ 1949 - 2011, whole years only
+
 // Natural gas: https://www.eia.gov/dnav/ng/hist/n3020us3M.htm
 // ^^ 2019 - 1983, whole years only
+
 // Uranium: https://www.eia.gov/uranium/marketing/html/summarytable1b.php
+  // 35Bbtu / lb - https://smartenergy.illinois.edu/energy-efficiency-basics/energy-concepts-and-terms
 
 const Papa = require('papaparse');
 

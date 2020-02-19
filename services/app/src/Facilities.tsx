@@ -40,7 +40,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       spinMinutes: 360,
         // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
         // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: 0.05 * peakW * (1 + (year - 2018) * .04),
+      annualOperatingCost: 0.05 * peakW * Math.pow(1.04, year - 2018),
         // ~$0.007 -> 0.01/kwh 2008->18, +4%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 3 + magnitude / 3,
@@ -67,7 +67,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       btuPerWh: 10.5,
         // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.1 * peakW * (1 + (year - 2018) * .005),
+      annualOperatingCost: 0.1 * peakW * Math.pow(1.005, year - 2018),
         // ~$0.016 -> 0168/kwh 2008->18, +0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 5 + magnitude / 4,
@@ -96,7 +96,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
         // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW * (1 + (2018 - year) * .02),
+      annualOperatingCost: 0.05 * peakW * Math.pow(1.02, year - 2018),
         // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -156,7 +156,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       maxPeakW: 1500000000,
         // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.04 * peakW * (1 + (2018 - year) * .02),
+      annualOperatingCost: 0.04 * peakW * Math.pow(1.02, year - 2018),
         // TODO estimated 2% decline per year
         // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // TODO depends on location
@@ -186,7 +186,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
         // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
         // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.025 * peakW * (1 + (2018 - year) * .02),
+      annualOperatingCost: 0.025 * peakW * Math.pow(1.02, year - 2018),
         // TODO estimated 2% decline per year
         // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
         // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
