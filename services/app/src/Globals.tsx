@@ -2,6 +2,21 @@ declare var device: any;
 declare var ga: any;
 declare var gapi: any;
 
+import * as firebase from 'firebase/app';
+// import * as firebaseui from 'firebaseui';
+require('firebase/firestore');
+
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBCZX3pfJe65LU1Ei_ONj6Yw2eaMKsZX7g',
+  authDomain: 'electrify-game.firebaseapp.com',
+  databaseURL: 'https://electrify-game.firebaseio.com',
+  projectId: 'electrify-game',
+  storageBucket: 'electrify-game.appspot.com',
+  messagingSenderId: '882673691459',
+  appId: '1:882673691459:web:b6af63afe7ddf377a31df6',
+  measurementId: 'G-M064W1XFDY',
+};
+
 export interface ReactDocument extends Document {
   addEventListener: (e: string, f: (this: any, ev: MouseEvent) => any,
                      useCapture?: boolean) => void;
@@ -41,6 +56,7 @@ declare var window: ReactWindow;
 const refs = {
   cheerio: require('cheerio') as CheerioAPI,
   device: (typeof device !== 'undefined') ? device : {platform: null},
+  db: null as any,
   document,
   ga: (typeof ga !== 'undefined') ? ga : null,
   gapi: (typeof gapi !== 'undefined') ? gapi : null,
@@ -50,6 +66,23 @@ const refs = {
   window,
   audioContext: null,
 };
+
+export function getDb(): any {
+  if (!refs.db) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    refs.db = firebase.firestore();
+    refs.db.enablePersistence()
+      .catch((err: any) => {
+          if (err.code === 'failed-precondition') {
+            // Multiple tabs open, persistence can only be enabled in one tab at a a time.
+          } else if (err.code === 'unimplemented') {
+            // The current browser does not support all of the
+            // features required to enable persistence
+          }
+      });
+  }
+  return refs.db;
+}
 
 export function getDevicePlatform(): 'android' | 'ios' | 'web' {
   const p = (getDevice() || {}).platform;

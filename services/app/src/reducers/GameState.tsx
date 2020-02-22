@@ -9,12 +9,14 @@ import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog, openSnackbar} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
+import {getDb, getWindow} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
 
 // const seedrandom = require('seedrandom');
+const firebase = require('firebase/app');
 const numbro = require('numbro');
 const cloneDeep = require('lodash.clonedeep');
 
@@ -218,6 +220,8 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
   const organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL - difficulty.blackoutPenalty * percentDemandUnfulfilled;
   const marketingGrowth = customersFromMarketingSpend(state.monthlyMarketingSpend) / TICKS_PER_MONTH;
 
+  console.log(prev.cash, revenue, expensesOM, expensesFuel, expensesCarbonFee, expensesInterest, expensesMarketing, principalRepayment);
+
   // Save new financial info
   now.customers = Math.round(prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth);
   now.cash = Math.round(prev.cash + revenue - expensesOM - expensesFuel - expensesCarbonFee - expensesInterest - expensesMarketing - principalRepayment),
@@ -397,6 +401,12 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             endTitle: `You've retired!`,
           } as ScenarioType;
           if (newState.date.monthsEllapsed === scenario.durationMonths) {
+            const localStoragePlayed = (getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[];
+            setStorageKeyValue('plays', {plays: [...localStoragePlayed, {
+              scenarioId: state.scenarioId,
+              date: (new Date()).toString(),
+            } as LocalStoragePlayedType]});
+
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
             // This is also described in the manual; if I update the algorithm, update the manual too!
@@ -408,13 +418,16 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               blackouts: Math.round(-8 * blackoutsTWh),
             };
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
-            const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
-            setStorageKeyValue('highscores', {scores: [...scores, {
-              score: finalScore,
-              scenarioId: state.scenarioId,
-              difficulty: state.difficulty,
-              date: (new Date()).toString(),
-            } as ScoreType]});
+            if (!scenario.tutorialSteps) {
+              const username = (getWindow().prompt('Enter a 3 letter/number name for your score', 'AAA') || '').trim().substring(0, 3);
+              getDb().collection('scores').add({
+                username,
+                score: finalScore,
+                scenarioId: state.scenarioId,
+                difficulty: state.difficulty,
+                date: firebase.firestore.Timestamp.fromDate(new Date()),
+              } as ScoreType);
+            }
             setTimeout(() => getStore().dispatch(openDialog({
               title: scenario.endTitle || `You've retired!`,
               message: scenario.endMessage || <div>Your final score is {finalScore}:

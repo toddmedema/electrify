@@ -145,12 +145,15 @@ export interface CardType {
   toPrevious?: boolean;
 }
 
-export interface ScoresContainerType {
-  scores: ScoreType[];
-}
 export interface ScoreType {
+  scenarioId: number;
   score: number;
   difficulty: string;
+  date: string;
+  username?: string;
+}
+
+export interface LocalStoragePlayedType {
   scenarioId: number;
   date: string; // Stringified new Date()
 }

@@ -2,9 +2,9 @@ import {Button, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import * as React from 'react';
 
+import {getStorageJson} from 'app/LocalStorage';
 import {SCENARIOS} from 'app/Scenarios';
-import {GameStateType, ScenarioType, ScoresContainerType} from 'app/Types';
-import {getStorageJson} from '../../LocalStorage';
+import {GameStateType, LocalStoragePlayedType, ScenarioType} from 'app/Types';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -45,8 +45,8 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
 }
 
 export default function Tutorials(props: Props): JSX.Element {
-  const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores.sort((a, b) => a.score < b.score ? 1 : -1);
-  const ids = scores.map((s) => s.scenarioId);
+  const plays = ((getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[]);
+  const ids = plays.map((s) => s.scenarioId);
 
   return (
     <div id="listCard">
