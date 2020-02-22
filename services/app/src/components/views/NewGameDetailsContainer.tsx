@@ -2,7 +2,8 @@ import {toPrevious} from 'app/actions/Card';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 
-import {AppStateType, GameStateType, StartGameAction} from '../../Types';
+import {authWrapper} from 'app/Globals';
+import {AppStateType, GameStateType, StartGameAction} from 'app/Types';
 import NewGameDetails, {DispatchProps, StateProps} from './NewGameDetails';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -25,9 +26,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const NewGameDetailsContainer = connect(
+const NewGameDetailsContainer = authWrapper(connect(
   mapStateToProps,
   mapDispatchToProps
-)(NewGameDetails);
+)(NewGameDetails));
 
 export default NewGameDetailsContainer;
