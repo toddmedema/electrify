@@ -1,7 +1,8 @@
+import {authWrapper} from 'app/Globals';
+import {AppStateType} from 'app/Types';
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {toCard} from '../../actions/Card';
-import {AppStateType} from '../../Types';
 import MainMenu, {DispatchProps, StateProps} from './MainMenu';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -26,9 +27,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const MainMenuContainer = connect(
+const MainMenuContainer = authWrapper(connect(
   mapStateToProps,
   mapDispatchToProps
-)(MainMenu);
+)(MainMenu));
 
 export default MainMenuContainer;
