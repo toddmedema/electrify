@@ -9,12 +9,14 @@ import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog, openSnackbar} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
+import {getDb} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoresContainerType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType} from '../Types';
+import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType, UserType} from '../Types';
 
 // const seedrandom = require('seedrandom');
+const firebase = require('firebase/app');
 const numbro = require('numbro');
 const cloneDeep = require('lodash.clonedeep');
 
@@ -106,7 +108,7 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
       if (g.yearsToBuildLeft === 0 && !simulated) {
         setTimeout(() => {
-          getStore().dispatch(openSnackbar(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peahWh) + 'h' : formatWatts(g.peakW)}`));
+          getStore().dispatch(openSnackbar(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
         }, 0);
       }
     }
@@ -339,7 +341,7 @@ function arrayMove(arr: any[], oldIndex: number, newIndex: number) {
   arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
 }
 
-export function gameState(state: GameStateType = cloneDeep(initialGameState), action: Redux.Action): GameStateType {
+export function gameState(state: GameStateType = cloneDeep(initialGameState), user: UserType, action: Redux.Action): GameStateType {
   // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
   if (action.type === 'GAME_TICK') { // Game tick first because it's called the most by far, shortens lookup
 
@@ -397,6 +399,12 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             endTitle: `You've retired!`,
           } as ScenarioType;
           if (newState.date.monthsEllapsed === scenario.durationMonths) {
+            const localStoragePlayed = (getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[];
+            setStorageKeyValue('plays', {plays: [...localStoragePlayed, {
+              scenarioId: state.scenarioId,
+              date: (new Date()).toString(),
+            } as LocalStoragePlayedType]});
+
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
             // This is also described in the manual; if I update the algorithm, update the manual too!
@@ -408,13 +416,17 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               blackouts: Math.round(-8 * blackoutsTWh),
             };
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
-            const scores = (getStorageJson('highscores', {scores: []}) as ScoresContainerType).scores;
-            setStorageKeyValue('highscores', {scores: [...scores, {
-              score: finalScore,
-              scenarioId: state.scenarioId,
-              difficulty: state.difficulty,
-              date: (new Date()).toString(),
-            } as ScoreType]});
+            if (user && user.uid && !scenario.tutorialSteps) {
+              const scoreSubmission = {
+                score: finalScore,
+                scoreBreakdown: score, // For analytics purposes only
+                scenarioId: state.scenarioId,
+                difficulty: state.difficulty,
+                date: firebase.firestore.Timestamp.fromDate(new Date()),
+                uid: user.uid,
+              } as ScoreType;
+              getDb().collection('scores').add(scoreSubmission);
+            }
             setTimeout(() => getStore().dispatch(openDialog({
               title: scenario.endTitle || `You've retired!`,
               message: scenario.endMessage || <div>Your final score is {finalScore}:
@@ -425,6 +437,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
                   <li>{score.emissions} pts from emissions</li>
                   <li>{score.blackouts} pts from blackouts</li>
                 </ul>
+                {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
               </div>,
               open: true,
               closeText: 'Keep playing',

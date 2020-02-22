@@ -14,8 +14,9 @@ import {toPrevious} from './actions/Card';
 import {changeSettings} from './actions/Settings';
 import {openSnackbar} from './actions/UI';
 import {UNSUPPORTED_BROWSERS} from './Constants';
-import {getDevicePlatform, getDocument, getNavigator, getWindow, setGA} from './Globals';
+import {firebaseAppAuth, getDevicePlatform, getDocument, getNavigator, getWindow, setGA} from './Globals';
 import {getStorageBoolean} from './LocalStorage';
+import {UserDelta} from './reducers/User';
 import {createAppStore, getStore} from './Store';
 import theme from './Theme';
 
@@ -163,6 +164,10 @@ export function init() {
       getStore().dispatch(audioSet({paused: false}));
     }
   }, false);
+
+  firebaseAppAuth.onAuthStateChanged((user: any) => {
+    getStore().dispatch(UserDelta({uid: user.uid}));
+  });
 
   // Only triggers on app builds
   document.addEventListener('deviceready', setupDevice, false);

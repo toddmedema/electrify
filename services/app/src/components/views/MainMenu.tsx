@@ -8,6 +8,10 @@ import {interactiveColor} from 'shared/Theme';
 import {openWindow} from '../../Globals';
 
 export interface StateProps {
+  // From auth:
+  error?: any;
+  user?: any;
+  signInWithGoogle?: any;
 }
 
 export interface DispatchProps {
@@ -31,6 +35,7 @@ const MainMenu = (props: Props): JSX.Element => {
         <Button size="large" variant="contained" color="primary" onClick={props.onStart}>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
+        {!props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}
       </div>
       <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, opacity: 0.7}}>
         <IconButton color="primary" onClick={() => openWindow('https://fabricate.us10.list-manage.com/subscribe?u=792afb261df839e73b669f83f&id=8ccd05ccba')}>
