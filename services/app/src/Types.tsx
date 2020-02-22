@@ -82,6 +82,11 @@ export interface UiDeltaAction extends Redux.Action {
   delta: Partial<UIType>;
 }
 
+export interface UserDeltaAction extends Redux.Action {
+  type: 'USER_DELTA';
+  delta: Partial<UserType>;
+}
+
 export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
   facilities: Partial<FacilityShoppingType>[];
@@ -150,7 +155,6 @@ export interface ScoreType {
   score: number;
   difficulty: string;
   date: string;
-  username?: string;
 }
 
 export interface LocalStoragePlayedType {
@@ -354,6 +358,10 @@ export interface UIType {
   }
 }
 
+export interface UserType {
+  uid?: string;
+}
+
 export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
 
 export interface AppStateType {
@@ -363,4 +371,5 @@ export interface AppStateType {
   gameState: GameStateType;
   settings: SettingsType;
   ui: UIType;
+  user: UserType;
 }

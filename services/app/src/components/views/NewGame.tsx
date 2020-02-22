@@ -8,8 +8,6 @@ import {GameStateType, ScenarioType} from 'app/Types';
 
 export interface StateProps {
   gameState: GameStateType;
-  user?: any;
-  signInWithGoogle?: any;
 }
 
 export interface DispatchProps {
@@ -44,7 +42,6 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
 }
 
 export default function NewGame(props: Props): JSX.Element {
-  console.log(props);
   return (
     <div id="listCard">
       <div id="topbar">
@@ -53,9 +50,6 @@ export default function NewGame(props: Props): JSX.Element {
             <ArrowBackIosIcon />
           </IconButton>
           <Typography variant="h6">Select scenario</Typography>
-          <IconButton onClick={props.signInWithGoogle} aria-label="back" edge="start" color="primary">
-            <ArrowBackIosIcon />
-          </IconButton>
         </Toolbar>
       </div>
       <List dense className="scrollable cardList">

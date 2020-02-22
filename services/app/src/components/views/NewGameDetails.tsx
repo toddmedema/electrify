@@ -11,6 +11,10 @@ const numbro = require('numbro');
 
 export interface StateProps {
   gameState: GameStateType;
+  // From auth:
+  error?: any;
+  user?: any;
+  signInWithGoogle?: any;
 }
 
 export interface DispatchProps {
@@ -21,6 +25,7 @@ export interface DispatchProps {
 
 interface State {
   scores?: ScoreType[];
+  myTopScore?: ScoreType;
   scenario: ScenarioType | null;
 }
 
@@ -32,8 +37,14 @@ export default class extends React.Component<Props, State> {
     this.state = {
       scenario: SCENARIOS.find((s) => s.id === props.gameState.scenarioId) || null,
     };
-    const db = getDb();
-    if (this.state.scenario) {
+    if (props.user) {
+      this.loadScores(props.user);
+    }
+  }
+
+  private loadScores(user: any) {
+    if (this.state.scenario && user) {
+      const db = getDb();
       db.collection('scores')
         .where('scenarioId', '==', this.state.scenario.id)
         .orderBy('score', 'desc')
@@ -45,12 +56,30 @@ export default class extends React.Component<Props, State> {
             this.setState({scores: [...(this.state.scores || []), doc.data()]});
           });
         });
+      db.collection('scores')
+        .where('scenarioId', '==', this.state.scenario.id)
+        .where('uid', '==', user.uid)
+        .orderBy('score', 'desc')
+        .limit(1)
+        .get()
+        .then((qs: any) => {
+          qs.forEach((doc: any) => {
+            this.setState({myTopScore: doc.data()});
+          });
+        });
     }
   }
 
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+    if (!this.props.user && nextProps.user) {
+      this.loadScores(nextProps.user);
+    }
+    return true;
+  }
+
   public render() {
-    const {onBack, onDelta, onStart, gameState} = this.props;
-    const {scenario, scores} = this.state;
+    const {onBack, onDelta, onStart, gameState, user, signInWithGoogle} = this.props;
+    const {scenario, scores, myTopScore} = this.state;
 
     if (!scenario) {
       return <div>
@@ -91,25 +120,33 @@ export default class extends React.Component<Props, State> {
         <Table id="HighScores">
           <TableHead>
             <TableRow>
-              <TableCell colSpan={3}><Typography variant="h6">High scores</Typography></TableCell>
+              <TableCell colSpan={2}><Typography variant="h6">Global High Scores</Typography></TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Score</TableCell>
-              <TableCell>Name</TableCell>
               <TableCell>Difficulty</TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-            {(scores || []).map((score: ScoreType, i: number) => {
+          {!user && <TableBody>
+            <TableRow><TableCell colSpan={2} style={{textAlign: 'center'}}>
+              <Button variant="contained" color="primary" onClick={signInWithGoogle}>Log in</Button>
+              <Typography variant="body2" color="textSecondary">Required to see and set high scores</Typography>
+            </TableCell></TableRow>
+          </TableBody>}
+          {user && <TableBody>
+            {myTopScore && <TableRow style={{fontWeight: 'bold', background: '#eee'}}>
+              <TableCell>Your best: {numbro(myTopScore.score).format({thousandSeparated: true, mantissa: 0})}</TableCell>
+              <TableCell>{myTopScore.difficulty}</TableCell>
+            </TableRow>}
+            {!scores && <TableRow><TableCell colSpan={2}><Typography variant="body2" color="textSecondary">Loading...</Typography></TableCell></TableRow>}
+            {scores && scores.length === 0 && <TableRow><TableCell colSpan={2}><Typography variant="body2" color="textSecondary">Play the scenario to set a high score</Typography></TableCell></TableRow>}
+            {scores && scores.map((score: ScoreType, i: number) => {
               return <TableRow key={i}>
                 <TableCell>{numbro(score.score).format({thousandSeparated: true, mantissa: 0})}</TableCell>
-                <TableCell>{score.username}</TableCell>
                 <TableCell>{score.difficulty}</TableCell>
               </TableRow>;
             })}
-            {!scores && <TableRow><TableCell colSpan={2}><Typography variant="body2" color="textSecondary">Loading...</Typography></TableCell></TableRow>}
-            {scores && scores.length === 0 && <TableRow><TableCell colSpan={2}><Typography variant="body2" color="textSecondary">Play the scenario to set a high score</Typography></TableCell></TableRow>}
-          </TableBody>
+          </TableBody>}
         </Table>
       </div>
     );

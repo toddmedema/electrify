@@ -3,10 +3,11 @@ declare var ga: any;
 declare var gapi: any;
 
 import * as firebase from 'firebase/app';
-// import * as firebaseui from 'firebaseui';
-require('firebase/firestore');
+import 'firebase/auth';
+import 'firebase/firestore';
+import withFirebaseAuth from 'react-with-firebase-auth';
 
-export const FIREBASE_CONFIG = {
+const firebaseApp = firebase.initializeApp({
   apiKey: 'AIzaSyBCZX3pfJe65LU1Ei_ONj6Yw2eaMKsZX7g',
   authDomain: 'electrify-game.firebaseapp.com',
   databaseURL: 'https://electrify-game.firebaseio.com',
@@ -15,6 +16,10 @@ export const FIREBASE_CONFIG = {
   messagingSenderId: '882673691459',
   appId: '1:882673691459:web:b6af63afe7ddf377a31df6',
   measurementId: 'G-M064W1XFDY',
+});
+export const firebaseAppAuth = firebaseApp.auth();
+const providers = {
+  googleProvider: new firebase.auth.GoogleAuthProvider(),
 };
 
 export interface ReactDocument extends Document {
@@ -67,9 +72,15 @@ const refs = {
   audioContext: null,
 };
 
+export function authWrapper(component: any): any {
+  return withFirebaseAuth({
+    providers,
+    firebaseAppAuth,
+  })(component);
+}
+
 export function getDb(): any {
   if (!refs.db) {
-    firebase.initializeApp(FIREBASE_CONFIG);
     refs.db = firebase.firestore();
     refs.db.enablePersistence()
       .catch((err: any) => {
