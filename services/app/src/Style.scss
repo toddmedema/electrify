@@ -172,11 +172,14 @@ body {
   opacity: 0.5;
 }
 
-.MuiToolbar-root {
+.base_main .MuiToolbar-root {
   min-height: 0 !important;
-  border-bottom: $border_accent;
   flex: 0 0 auto;
   flex-flow: wrap !important;
+
+  &.bottomBorder {
+    border-bottom: $border_accent;
+  }
 
   h6 {
     flex-grow: 1;
@@ -298,7 +301,7 @@ span.weak {
   }
 
   .MuiToolbar-root {
-    border: none !important;
+    border: none;
     z-index: 0; /* fixes bug with psuedo element z-index not working as expected */
   }
 
@@ -507,6 +510,7 @@ body.android .dialog .textfield:focus-within {
   .cardList {
     background: #eceff1; /* blueGray50 */
     padding-top: size(base) !important;
+    padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 

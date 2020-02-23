@@ -265,7 +265,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
 
   return (
     <div id="topbar" className="flexContainer">
-      <Toolbar>
+      <Toolbar className="bottomBorder">
         <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Generator</span></Typography>
         {gameState.speed !== 'PAUSED' && <IconButton onClick={() => props.onSpeedChange('PAUSED') } aria-label="pause" edge="end" color="primary">
           <PauseIcon />
