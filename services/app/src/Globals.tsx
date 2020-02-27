@@ -2,6 +2,7 @@ declare var device: any;
 declare var ga: any;
 declare var gapi: any;
 
+import 'firebase/analytics';
 import * as firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
@@ -21,6 +22,9 @@ export const firebaseAppAuth = firebaseApp.auth();
 const providers = {
   googleProvider: new firebase.auth.GoogleAuthProvider(),
 };
+
+const firebaseAppAnalytics = firebaseApp.analytics();
+firebaseAppAnalytics.logEvent('page_load');
 
 export interface ReactDocument extends Document {
   addEventListener: (e: string, f: (this: any, ev: MouseEvent) => any,

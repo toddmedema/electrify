@@ -290,23 +290,25 @@ export function GENERATORS(state: GameStateType, peakW: number) {
 export function STORAGE(state: GameStateType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
+  const year = state.date.year;
 
   let storage = [
     {
       name: 'Battery',
       description: 'Fast to build and charge / discharge',
-      available: (state.date.year > 2008), // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
+      available: (year > 2008), // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + 0.4 * peakWh,
         // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
           // Also, Tesla grid-scale batteries around $400/kWh in 2019 - https://cleantechnica.com/2019/11/24/what-a-108-26-per-kwh-battery-pack-would-mean-for-tesla/
       peakW: 0.8 * peakWh,
         // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
       peakWh,
-      maxPeakWh: 200000000 * Math.pow(2, (state.date.year - 2018) / 4),
+      maxPeakWh: (year < 2021 ? 200000000 : 600000000) * Math.pow(2, (year - 2018) / 4),
         // Tesla 129MWh is largest in world in 2018 - https://hornsdalepowerreserve.com.au/
+        // ~2021 largest will be 1.2GWh - https://cleantechnica.com/2020/02/27/humongous-tesla-battery-plant-approved-in-california-is-10x-bigger-than-worlds-biggest-battery-plant/
         // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
         // ~2MWh in 2014, 1MWh before that
-        // So roughly doubling in max capacity every 4 years after 2018
+        // So roughly doubling in max capacity every 4 years after 2018, but a big step function in 2021
       lifespanYears: 15,
         // https://www.nrel.gov/docs/fy19osti/73222.pdf
       roundTripEfficiency: 0.85,
@@ -325,7 +327,7 @@ export function STORAGE(state: GameStateType, peakWh: number) {
     {
       name: 'Pumped Hydro',
       description: 'Slow to build and charge / discharge',
-      available: (state.date.year > 1930), // New Milfrod plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
+      available: (year > 1930), // New Milfrod plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.15 * peakWh,
         // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
           // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity

@@ -64,7 +64,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
-    endMessage: 'You now know enough to run a company on Intern - or, continue tutorials to build your skills',
+    endMessage: 'You now know enough to run a company on Intern difficulty - or, continue tutorials to build your skills',
     facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
     tutorialSteps: [
       {
@@ -129,7 +129,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
-    endMessage: 'You now know enough to run a company on Employee - or, continue tutorials to build your skills',
+    endMessage: 'You now know enough to run a company on Employee difficulty - or, continue tutorials to build your skills',
     facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Coal', peakW: 480000000}],
     tutorialSteps: [
       {
@@ -189,7 +189,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
-    endMessage: 'You now know enough to run a company on Manager - or, continue tutorials to build your skills',
+    endMessage: 'You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills',
     facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
     tutorialSteps: [
       {
@@ -222,27 +222,47 @@ export const SCENARIOS = [
       },
     ],
   },
-  // {
-  //   id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-  //   name: '104: Marketing',
-  //   startingYear: 2020,
-  //   feePerKgCO2e: 0,
-  //   durationMonths: 12,
-  //   endTitle: 'Tutorial complete!',
-  //   endMessage: 'You now know enough to run a company on VP - or, continue tutorials to build your skills',
-  //   tutorialSteps: [
-  //     {
-  //       disableBeacon: true, // causes tutorial to auto-start
-  //       target: '#topbar',
-  //       content: <Typography variant="body1">
-  //         TODO
-  //       </Typography>,
-  //     },
-  //   ],
-  // },
+  {
+    id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: '105: Finances',
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+    durationMonths: 12,
+    endTitle: 'Tutorial complete!',
+    endMessage: 'You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills',
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#financesNav',
+        onNext: () => toCard({name: 'FINANCES'}),
+        content: <Typography variant="body1">
+          To really optimize your business, you'll need to understand the Finances tab. (Hotkey: W)
+        </Typography>,
+      },
+      {
+        target: '.VictoryContainer',
+        content: <Typography variant="body1">
+          You can plot a variety of metrics by changing the dropdowns above the chart. You can also plot it for past years, allowing you to analyze long term strategies.
+        </Typography>,
+      },
+      {
+        target: '.MuiTable-root',
+        content: <Typography variant="body1">
+          The table shows you the high level numbers for your business for the selected year. Click on the table to get a more detailed breakdown of the numbers, and click it again to collapse it.
+        </Typography>,
+      },
+      {
+        target: '#speedChangeButtons',
+        onNext: () => setSpeed('SLOW'),
+        content: <Typography variant="body1">
+          This tutorial will run for 1 year - see how changing your marketing budget changes your demand.
+        </Typography>,
+      },
+    ],
+  },
     // {
   //   id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-  //   name: '105: Forecasting',
+  //   name: '106: Forecasting',
   //   startingYear: 2020,
   //   feePerKgCO2e: 0,
   //   durationMonths: 12,

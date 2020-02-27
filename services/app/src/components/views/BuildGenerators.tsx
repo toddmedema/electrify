@@ -32,7 +32,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const loanAmount = props.generator.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
-  const secondaryText = (buildable) ? generator.description : <div>Too large for current tech.<br/>Max size: {formatWatts(props.generator.maxPeakW)}</div>;
+  const secondaryText = (buildable) ? generator.description : <div>Too large for current tech.<br/>Max size: <strong>{formatWatts(props.generator.maxPeakW)}</strong></div>;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
