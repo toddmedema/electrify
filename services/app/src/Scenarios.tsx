@@ -64,6 +64,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
+    endMessage: 'You now know enough to run a company on Intern - or, continue tutorials to build your skills',
     facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
     tutorialSteps: [
       {
@@ -113,7 +114,7 @@ export const SCENARIOS = [
       {
         target: '#speedChangeButtons',
         content: <Typography variant="body1">
-          Start the game by unpausing it. (If you're on a computer, you can also use keyboard shortcuts ~/1/2/3/Q/W/E)<br/><br/>
+          Start the game by unpausing it. (You can also control the speed with the ~/1/2/3 keys)<br/><br/>
           To learn more about concepts, select "Manual" from the top left menu.<br/><br/>
           This tutorial will run for 1 year. Try building different types of generators!
         </Typography>,
@@ -128,6 +129,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
+    endMessage: 'You now know enough to run a company on Employee - or, continue tutorials to build your skills',
     facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Coal', peakW: 480000000}],
     tutorialSteps: [
       {
@@ -172,19 +174,62 @@ export const SCENARIOS = [
       },
       {
         target: '.facility',
+        onNext: () => setSpeed('SLOW'),
         content: <Typography variant="body1">
           This tutorial will run for 1 year. Try changing the order of storage and generators to see how it affects their output!
         </Typography>,
       },
     ],
   },
+  {
+    id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: '104: Marketing',
+    icon: 'none',
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+    durationMonths: 12,
+    endTitle: 'Tutorial complete!',
+    endMessage: 'You now know enough to run a company on Manager - or, continue tutorials to build your skills',
+    facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#financesNav',
+        onNext: () => toCard({name: 'FINANCES'}),
+        content: <Typography variant="body1">
+          When you have plenty of spare capacity and cash, you can use marketing to grow your business by heading over to the "Finances" tab. (Hotkey: W)
+        </Typography>,
+      },
+      {
+        target: '#marketingSlider',
+        content: <Typography variant="body1">
+          Slide to increase your marketing budget, growing your customer base and demand.
+        </Typography>,
+      },
+      {
+        target: '#plotMetric',
+        content: <Typography variant="body1">
+          Change the graph to plot customers (under Demand) to see how your customers change over time.<br/><br/>
+          Beware, marketing too much too quickly may actually lose you customers through chronic blackouts!
+        </Typography>,
+      },
+      {
+        target: '#speedChangeButtons',
+        onNext: () => setSpeed('SLOW'),
+        content: <Typography variant="body1">
+          This tutorial will run for 1 year - see how changing your marketing budget changes your demand.
+        </Typography>,
+      },
+    ],
+  },
   // {
-  //   id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-  //   name: '104: Finances',
+  //   id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+  //   name: '104: Marketing',
   //   startingYear: 2020,
   //   feePerKgCO2e: 0,
   //   durationMonths: 12,
-  //   endTitle: 'Tutorial complete! ',
+  //   endTitle: 'Tutorial complete!',
+  //   endMessage: 'You now know enough to run a company on VP - or, continue tutorials to build your skills',
   //   tutorialSteps: [
   //     {
   //       disableBeacon: true, // causes tutorial to auto-start
@@ -195,13 +240,14 @@ export const SCENARIOS = [
   //     },
   //   ],
   // },
-  // {
-  //   id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-  //   name: '104: Forecasting',
+    // {
+  //   id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+  //   name: '105: Forecasting',
   //   startingYear: 2020,
   //   feePerKgCO2e: 0,
   //   durationMonths: 12,
-  //   endTitle: 'Tutorial complete! ',
+  //   endTitle: 'Tutorial complete!',
+  //   endMessage: 'That's all we can teach you - the rest you'll have to learn by doing. Good luck!',
   //   tutorialSteps: [
   //     {
   //       disableBeacon: true, // causes tutorial to auto-start

@@ -54,7 +54,7 @@ const CHART_KEYS = {
     nesting: 1,
   },
   demandWh: {
-    label: 'Power demand',
+    label: 'Demand',
     format: (n: number) => `${formatWatts(n, 0)}h`,
   },
   customers: {
@@ -248,6 +248,7 @@ export default class extends React.Component<Props, State> {
               (+{numbro(customersFromMarketingSpend(gameState.monthlyMarketingSpend)).format({average: true})} customers)
             </Typography>
             <Slider
+              id="marketingSlider"
               value={getTickFromValue(gameState.monthlyMarketingSpend)}
               aria-labelledby="marketing monthly budget"
               valueLabelDisplay="off"
@@ -258,18 +259,19 @@ export default class extends React.Component<Props, State> {
             />
             <div className="flex-newline"></div>
             <Typography variant="h6" style={{flexGrow: 0}}>Plotting </Typography>
-            <Select defaultValue={chartKey} onChange={(e: any) => this.setChartKey(e.target.value)}>
+            <Select id="plotMetric" defaultValue={chartKey} onChange={(e: any) => this.setChartKey(e.target.value)}>
               {Object.keys(CHART_KEYS).map((key: DerivedHistoryKeysType) => {
-                let label = CHART_KEYS[key].label;
+                const k = CHART_KEYS[key];
+                let label = k.label;
                 if (chartKey !== key && CHART_KEYS[key].nesting) {
                   // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
-                  label = new Array((CHART_KEYS[key].nesting || 0) + 1).join('-') + ' ' + label;
+                  label = new Array((CHART_KEYS[key].nesting || 0) + 1).join(' -') + ' ' + label;
                 }
-                return <MenuItem value={key} key={key}>{label}</MenuItem>;
+                return <MenuItem className={!k.nesting ? 'bold' : `tabs-${k.nesting}`} value={key} key={key}>{label}</MenuItem>;
               })}
             </Select>
             <Typography variant="h6" style={{flexGrow: 0}}> for </Typography>
-            <Select defaultValue={year} onChange={(e: any) => this.setState({year: e.target.value})}>
+            <Select id="plotYear" defaultValue={year} onChange={(e: any) => this.setState({year: e.target.value})}>
               <MenuItem value={0}>All time</MenuItem>
               <MenuItem value={-1}>Current year</MenuItem>
               props.gameState.date.year
