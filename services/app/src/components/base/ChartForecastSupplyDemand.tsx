@@ -24,7 +24,7 @@ export default class extends React.PureComponent<Props, {}> {
     const {domain, height, timeline, blackouts, startingYear} = this.props;
 
     // Wrapping in spare div prevents excessive height bug
-    return <div>
+    return <div id="chartForecastSupplyDemand">
       <VictoryChart
         theme={VictoryTheme.material}
         padding={{ top: 5, bottom: 25, left: 55, right: 5 }}

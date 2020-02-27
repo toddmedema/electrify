@@ -24,7 +24,7 @@ const providers = {
 };
 
 const firebaseAppAnalytics = firebaseApp.analytics();
-firebaseAppAnalytics.logEvent('page_load');
+firebaseAppAnalytics.logEvent('test_event');
 
 export interface ReactDocument extends Document {
   addEventListener: (e: string, f: (this: any, ev: MouseEvent) => any,

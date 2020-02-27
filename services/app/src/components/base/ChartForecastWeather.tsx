@@ -18,7 +18,7 @@ export default class extends React.PureComponent<Props, {}> {
 
     // Wrapping in spare div prevents excessive height bug
     return (
-      <div>
+      <div id="chartForecastWeather">
         <VictoryChart
           theme={VictoryTheme.material}
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}

@@ -191,7 +191,6 @@ export default class Compositor extends React.Component<Props, {}> {
           callback={this.handleJoyrideCallback}
           continuous={true}
           showProgress={true}
-          disableScrolling={true}
           run={tutorialStep >= 0}
           tooltipComponent={Tooltip}
           stepIndex={tutorialStep}

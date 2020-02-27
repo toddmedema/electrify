@@ -8,7 +8,7 @@ import {ScenarioType} from './Types';
 export const SCENARIOS = [
   {
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: '101: Electricity Basics',
+    name: '101: Electricity',
     icon: 'none',
     startingYear: 2020,
     feePerKgCO2e: 0,
@@ -68,6 +68,7 @@ export const SCENARIOS = [
     facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
     tutorialSteps: [
       {
+        disableBeacon: true, // causes tutorial to auto-start
         target: '.button-buildGenerator',
         onNext: () => toCard({name: 'BUILD_GENERATORS', dontRemember: true}),
         content: <Typography variant="body1">
@@ -230,13 +231,14 @@ export const SCENARIOS = [
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
     endMessage: 'You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills',
+    facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
     tutorialSteps: [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#financesNav',
         onNext: () => toCard({name: 'FINANCES'}),
         content: <Typography variant="body1">
-          To really optimize your business, you'll need to understand the Finances tab. (Hotkey: W)
+          To run a profitable business, you'll need to understand the Finances tab. (Hotkey: W)
         </Typography>,
       },
       {
@@ -260,24 +262,51 @@ export const SCENARIOS = [
       },
     ],
   },
-    // {
-  //   id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-  //   name: '106: Forecasting',
-  //   startingYear: 2020,
-  //   feePerKgCO2e: 0,
-  //   durationMonths: 12,
-  //   endTitle: 'Tutorial complete!',
-  //   endMessage: 'That's all we can teach you - the rest you'll have to learn by doing. Good luck!',
-  //   tutorialSteps: [
-  //     {
-  //       disableBeacon: true, // causes tutorial to auto-start
-  //       target: '#topbar',
-  //       content: <Typography variant="body1">
-  //         TODO
-  //       </Typography>,
-  //     },
-  //   ],
-  // },
+  {
+    id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: '106: Forecasting',
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+    durationMonths: 12,
+    endTitle: 'Tutorial complete!',
+    endMessage: `That's all we can teach you - the rest you'll have to learn by doing. Good luck!`,
+    facilities: [{fuel: 'Coal', peakW: 450000000}],
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#forecastsNav',
+        onNext: () => toCard({name: 'FORECASTS'}),
+        content: <Typography variant="body1">
+          To truly succeed, you'll need to plan ahead - let's check out the Forecasts tab. (Hotkey: E)
+        </Typography>,
+      },
+      {
+        target: '#chartForecastSupplyDemand',
+        content: <Typography variant="body1">
+          This chart shows forecasted supply and demand over the next year - including any upcoming blackouts.
+        </Typography>,
+      },
+      {
+        target: '#chartForecastFuelPrices',
+        content: <Typography variant="body1">
+          This chart shows forecasted fuel prices, based on real data. Fuel prices can change suddenly and significantly, affecting the profitability of your fuel-based generators.
+        </Typography>,
+      },
+      {
+        target: '#chartForecastWeather',
+        content: <Typography variant="body1">
+          This chart shows forecasted weather, which contributes to demand - and the output of renewable generators.
+        </Typography>,
+      },
+      {
+        target: '#speedChangeButtons',
+        onNext: () => setSpeed('FAST'),
+        content: <Typography variant="body1">
+          This tutorial will run for 1 year - see how the forecasts change over time.
+        </Typography>,
+      },
+    ],
+  },
   {
     id: 100, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: 'Carbon Fee',
