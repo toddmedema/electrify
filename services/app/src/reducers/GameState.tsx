@@ -9,7 +9,7 @@ import {getRawSunlightPercent, getWeather} from 'shared/schema/Weather';
 import {openDialog, openSnackbar} from '../actions/UI';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
-import {getDb} from '../Globals';
+import {getDb, logEvent} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
@@ -365,6 +365,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
 
           // ===== TRIGGERS ======
           if (now.cash < 0) {
+            logEvent('scenario_end', {id: gameState.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
             setTimeout(() => getStore().dispatch(openDialog({
               title: 'Bankrupt!',
@@ -380,6 +381,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
           }
 
           if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
+            logEvent('scenario_end', {id: gameState.scenarioId, type: 'blackouts', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
             setTimeout(() => getStore().dispatch(openDialog({
               title: 'Fired!',
@@ -405,9 +407,9 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
               date: (new Date()).toString(),
             } as LocalStoragePlayedType]});
 
+            // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
             const summary = summarizeHistory(history);
             const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-            // This is also described in the manual; if I update the algorithm, update the manual too!
             const score = {
               supply: Math.round(summary.supplyWh / 1000000000000),
               netWorth: Math.round(40 * summary.netWorth / 1000000000),
@@ -416,6 +418,9 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
               blackouts: Math.round(-8 * blackoutsTWh),
             };
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
+
+            // Submit score
+            logEvent('scenario_end', {id: gameState.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
             if (user && user.uid && !scenario.tutorialSteps) {
               const scoreSubmission = {
                 score: finalScore,

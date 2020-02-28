@@ -22,9 +22,7 @@ export const firebaseAppAuth = firebaseApp.auth();
 const providers = {
   googleProvider: new firebase.auth.GoogleAuthProvider(),
 };
-
 const firebaseAppAnalytics = firebaseApp.analytics();
-firebaseAppAnalytics.logEvent('test_event');
 
 export interface ReactDocument extends Document {
   addEventListener: (e: string, f: (this: any, ev: MouseEvent) => any,
@@ -75,6 +73,10 @@ const refs = {
   window,
   audioContext: null,
 };
+
+export function logEvent(eventName: string, args?: object): void {
+  firebaseAppAnalytics.logEvent(eventName, args);
+}
 
 export function authWrapper(component: any): any {
   return withFirebaseAuth({
