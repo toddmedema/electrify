@@ -1,6 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 
+import {logEvent} from 'app/Globals';
 import {initFuelPrices} from 'shared/schema/FuelPrices';
 import {initWeather} from 'shared/schema/Weather';
 import {SCENARIOS} from '../../Scenarios';
@@ -16,6 +17,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     load: (gameState: GameStateType) => {
+      logEvent('scenario_start', {id: gameState.scenarioId});
       const scenario = SCENARIOS.find((s) => s.id === gameState.scenarioId);
       if (!scenario) {
         return alert('Unknown scenario ID');
