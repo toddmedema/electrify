@@ -200,7 +200,7 @@ export default class Compositor extends React.Component<Props, {}> {
           styles={{
             options: {
               beaconSize: 48,
-              overlayColor: 'rgba(0, 0, 0, 0)',
+              overlayColor: 'rgba(0, 0, 0, 0.1)',
             },
           }}
         />}
