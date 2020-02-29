@@ -365,7 +365,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
 
           // ===== TRIGGERS ======
           if (now.cash < 0) {
-            logEvent('scenario_end', {id: gameState.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
+            logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
             setTimeout(() => getStore().dispatch(openDialog({
               title: 'Bankrupt!',
@@ -381,7 +381,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
           }
 
           if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
-            logEvent('scenario_end', {id: gameState.scenarioId, type: 'blackouts', difficulty: state.difficulty});
+            logEvent('scenario_end', {id: state.scenarioId, type: 'blackouts', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
             setTimeout(() => getStore().dispatch(openDialog({
               title: 'Fired!',
@@ -420,7 +420,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
 
             // Submit score
-            logEvent('scenario_end', {id: gameState.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
+            logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
             if (user && user.uid && !scenario.tutorialSteps) {
               const scoreSubmission = {
                 score: finalScore,
