@@ -23,6 +23,10 @@ const cloneDeep = require('lodash.clonedeep');
 let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
   scenarioId: 100,
+  location: {
+    id: 'SF',
+    name: 'SF',
+  },
   difficulty: 'Employee',
   speed: 'PAUSED',
   inGame: false,
@@ -54,7 +58,7 @@ function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentF
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
   // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
-  const temperatureNormalized = (now.temperatureC + 2) / 21;
+  const temperatureNormalized = 0.0035 * Math.pow(now.temperatureC, 2) - 0.035 * now.temperatureC;
   const minutesFromDarkNormalized = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) / 420;
   const minutesFromDarkLogistics = 1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
@@ -70,12 +74,12 @@ function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = getWeather('SF', date.hourOfFullYear);
+      const weather = getWeather(date);
       const fuelPrices = getFuelPricesPerMBTU(date);
       return {
         ...t,
         ...fuelPrices,
-        sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT_NO + weather.CLOUD_PCT_FEW * .5 + weather.CLOUD_PCT_ALL * .2),
+        sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT / 100),
         windKph: weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
       };
@@ -511,6 +515,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
       date: getDateFromMinute(0, scenario.startingYear),
       startingYear: scenario.startingYear,
       feePerKgCO2e: scenario.feePerKgCO2e,
+      location: a.location,
     };
     newState.timeline = generateNewTimeline(newState, a.cash, a.customers);
 

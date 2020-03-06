@@ -1,3 +1,4 @@
+import {TICK_MINUTES} from 'app/Constants';
 import {TickPresentFutureType} from 'app/Types';
 import * as React from 'react';
 import {formatMonthChartAxis, getDateFromMinute} from 'shared/helpers/DateTime';
@@ -15,6 +16,11 @@ export interface Props {
 export default class extends React.PureComponent<Props, {}> {
   public render() {
     const {domain, height, timeline, startingYear} = this.props;
+    // Downsample the data to 6 per day to make it more vague / forecast-y
+    const data = timeline.filter((t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES);
+    // Make sure it gets the first + last entries for a full chart
+    data.unshift(timeline[0]);
+    data.push(timeline[timeline.length - 1]);
 
     // Wrapping in spare div prevents excessive height bug
     return (
@@ -49,7 +55,7 @@ export default class extends React.PureComponent<Props, {}> {
             }}
           />
           <VictoryLine
-            data={timeline}
+            data={data}
             x="minute"
             y="temperatureC"
             interpolation="bundle"
@@ -61,7 +67,7 @@ export default class extends React.PureComponent<Props, {}> {
             }}
           />
           <VictoryLine
-            data={timeline}
+            data={data}
             x="minute"
             y="windKph"
             interpolation="bundle"

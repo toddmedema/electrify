@@ -3,8 +3,8 @@ import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
-import {DIFFICULTIES} from 'app/Constants';
-import {DialogType, DifficultyType, GameStateType} from 'app/Types';
+import {DIFFICULTIES, LOCATIONS} from 'app/Constants';
+import {DialogType, DifficultyType, GameStateType, LocationType} from 'app/Types';
 
 export interface StateProps {
   gameState: GameStateType;
@@ -33,16 +33,30 @@ export default function CustomGame(props: Props): JSX.Element {
       <Table size="small" id="gameSetupTable">
         <TableBody>
           <TableRow>
-            <TableCell>Difficulty</TableCell>
+            <TableCell>Location</TableCell>
             <TableCell>
               <Select
-                id="difficulty"
-                value={props.gameState.difficulty}
-                onChange={(e: any) => props.onDelta({ difficulty: e.target.value })}
+                id="location"
+                value={props.gameState.location}
+                onChange={(e: any) => props.onDelta({ location: e.target.value })}
               >
-                {Object.keys(DIFFICULTIES).map((d: DifficultyType) => {
-                  return <MenuItem value={d} key={d}>{d}</MenuItem>;
+                {LOCATIONS.map((l: LocationType) => {
+                  return <MenuItem value={l.id} key={l.id}>{l.name}</MenuItem>;
                 })}
+              </Select>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Starting year</TableCell>
+            <TableCell>
+              <Select
+                id="startingyear"
+                value={props.gameState.startingYear}
+                onChange={(e: any) => props.onDelta({ startingYear: e.target.value })}
+              >
+                <MenuItem value={1980}>1980</MenuItem>
+                <MenuItem value={2000}>2000</MenuItem>
+                <MenuItem value={2020}>2020</MenuItem>
               </Select>
             </TableCell>
           </TableRow>
@@ -68,16 +82,16 @@ export default function CustomGame(props: Props): JSX.Element {
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Starting year</TableCell>
+            <TableCell>Difficulty</TableCell>
             <TableCell>
               <Select
-                id="startingyear"
-                value={props.gameState.startingYear}
-                onChange={(e: any) => props.onDelta({ startingYear: e.target.value })}
+                id="difficulty"
+                value={props.gameState.difficulty}
+                onChange={(e: any) => props.onDelta({ difficulty: e.target.value })}
               >
-                <MenuItem value={1980}>1980</MenuItem>
-                <MenuItem value={2000}>2000</MenuItem>
-                <MenuItem value={2020}>2020</MenuItem>
+                {Object.keys(DIFFICULTIES).map((d: DifficultyType) => {
+                  return <MenuItem value={d} key={d}>{d}</MenuItem>;
+                })}
               </Select>
             </TableCell>
           </TableRow>

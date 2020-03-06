@@ -183,6 +183,7 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
 
 export function getDateFromMinute(minute: number, startingYear: number): DateType {
   const minuteOfDay = minute % 1440;
+  const hourOfDay = Math.floor(minuteOfDay / 60);
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
   const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
@@ -193,11 +194,12 @@ export function getDateFromMinute(minute: number, startingYear: number): DateTyp
   const percentOfMonth = minuteOfDay / 1440;
   const minuteOfYear = minute - (yearsEllapsed * DAYS_PER_YEAR) * 1440;
   const percentOfYear = minuteOfYear / (DAYS_PER_YEAR * 1440);
-  const hourOfFullYear = Math.floor(monthNumber * 30 * 24 + minuteOfDay / 60);
+  const hourOfFullYear = Math.floor(monthNumber * 30 * 24 + hourOfDay);
 
   return {
     minute,
     minuteOfDay,
+    hourOfDay,
     hourOfFullYear,
     percentOfMonth: percentOfMonth || 0.00001,
     percentOfYear: percentOfYear || 0.00001,

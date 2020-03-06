@@ -92,6 +92,7 @@ export interface NewGameAction extends Redux.Action {
   facilities: Partial<FacilityShoppingType>[];
   cash: number;
   customers: number;
+  location: LocationType;
 }
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
@@ -111,6 +112,12 @@ export interface AudioDataType {
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec';
 export type DifficultyType = 'Intern' | 'Employee' | 'Manager' | 'VP' | 'CEO';
 export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
+
+export type LocationIdType = 'PIT' | 'SF';
+export interface LocationType {
+  id: LocationIdType;
+  name: string;
+}
 
 export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
 export interface FuelPricesType {
@@ -164,7 +171,8 @@ export interface LocalStoragePlayedType {
 
 export interface DateType {
   minute: number;
-  minuteOfDay: number;
+  minuteOfDay: number; // 0 - 1439
+  hourOfDay: number; // 0 - 23
   hourOfFullYear: number;
   percentOfMonth: number; // 0 - 1
   percentOfYear: number; // 0 - 1
@@ -178,11 +186,8 @@ export interface DateType {
 
 export interface RawWeatherType {
   TEMP_C: number;
-  CLOUD_PCT_NO: number; // 0 - 1
-  CLOUD_PCT_FEW: number; // 0 - 1
-  CLOUD_PCT_ALL: number; // 0 - 1
+  CLOUD_PCT: number; // 0 - 100
   WIND_KPH: number;
-  WIND_PCT_CALM: number; // 0 - 1
 }
 
 // All amounts are the average across the time window
@@ -299,6 +304,7 @@ export interface ScenarioType {
   id: number;
   name: string;
   icon: string; // assumed to be images/<string>.svg
+  locationId: LocationIdType;
   summary?: string;
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
@@ -315,6 +321,7 @@ export interface ScenarioType {
 export interface GameStateType {
   difficulty: DifficultyType;
   scenarioId: number;
+  location: LocationType;
   speed: SpeedType;
   inGame: boolean;
   feePerKgCO2e: number;

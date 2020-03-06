@@ -9,8 +9,8 @@ export const SCENARIOS = [
   {
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '101: Electricity',
-    icon: 'none',
-    startingYear: 2020,
+    locationId: 'SF',
+    startingYear: 2019,
     feePerKgCO2e: 0,
     durationMonths: 1,
     endTitle: 'Tutorial complete!',
@@ -59,8 +59,8 @@ export const SCENARIOS = [
   {
     id: 1, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '102: Generators',
-    icon: 'none',
-    startingYear: 2020,
+    locationId: 'SF',
+    startingYear: 2019,
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
@@ -125,8 +125,8 @@ export const SCENARIOS = [
   {
     id: 2, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '103: Storage',
-    icon: 'none',
-    startingYear: 2020,
+    locationId: 'SF',
+    startingYear: 2019,
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
@@ -185,8 +185,8 @@ export const SCENARIOS = [
   {
     id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '104: Marketing',
-    icon: 'none',
-    startingYear: 2020,
+    locationId: 'SF',
+    startingYear: 2019,
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
@@ -226,7 +226,8 @@ export const SCENARIOS = [
   {
     id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '105: Finances',
-    startingYear: 2020,
+    locationId: 'SF',
+    startingYear: 2019,
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
@@ -265,6 +266,7 @@ export const SCENARIOS = [
   {
     id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '106: Forecasting',
+    locationId: 'SF',
     startingYear: 2020,
     feePerKgCO2e: 0,
     durationMonths: 12,
@@ -311,6 +313,7 @@ export const SCENARIOS = [
     id: 100, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: 'Carbon Fee',
     icon: 'solar',
+    locationId: 'SF',
     summary: 'Do you have what it takes to transition into a new age?',
     startingYear: 2020,
     feePerKgCO2e: 50 / 1000,
@@ -321,6 +324,7 @@ export const SCENARIOS = [
     id: 101, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: 'Rise of Renewables',
     icon: 'wind',
+    locationId: 'SF',
     summary: 'Technology is changing rapidly - can you keep up?',
     startingYear: 2002,
     feePerKgCO2e: 0,
@@ -328,9 +332,21 @@ export const SCENARIOS = [
     facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
   },
   {
-    id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: 'Natural Gas & Nuclear',
+    id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: 'Pennsylvania 2020',
     icon: 'natural gas',
+    locationId: 'PIT',
+    summary: `You adapted to the natural gas boom, but are you ready for what's next?`,
+    startingYear: 2020,
+    feePerKgCO2e: 0,
+    durationMonths: 12 * 20,
+    facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
+  },
+  {
+    id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: 'Pennsylvania 1980',
+    icon: 'coal',
+    locationId: 'PIT',
     summary: 'Your existing coal business faces new challengers.',
     startingYear: 1980,
     feePerKgCO2e: 0,

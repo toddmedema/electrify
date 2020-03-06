@@ -60,6 +60,7 @@ export default function NewGame(props: Props): JSX.Element {
           id: 999,
           name: 'Custom Game',
           icon: 'battery',
+          locationId: 'SF',
           summary: 'Make your own game',
           startingYear: 2020,
           durationMonths: 20,

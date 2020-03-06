@@ -1,4 +1,4 @@
-import {CardNameType, DifficultyMultipliersType, FuelType, MonthType} from './Types';
+import {CardNameType, DifficultyMultipliersType, FuelType, LocationType, MonthType} from './Types';
 
 export const DIFFICULTIES = {
   Intern: {
@@ -32,6 +32,17 @@ export const DIFFICULTIES = {
     blackoutPenalty: 10,
   },
 } as {[index: string]: DifficultyMultipliersType};
+
+export const LOCATIONS = [
+  {
+    id: 'PIT',
+    name: 'Pittsburgh, PA',
+  },
+  {
+    id: 'SF',
+    name: 'San Fransisco, CA',
+  },
+] as LocationType[];
 
 export const TICK_MS = {
   PAUSED: 150,

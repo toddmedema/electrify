@@ -1,32 +1,38 @@
+import {DAYS_PER_MONTH, DAYS_PER_YEAR} from 'app/Constants';
 import {DateType, RawWeatherType} from 'app/Types';
 
 const Papa = require('papaparse');
 
-const weather = {} as any;
+const STARTING_YEAR = 1980; // for weather data, Jan 1st, assumed to be the same for all locations
+const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
+const ROWS_PER_DAY = 24;
+const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
+const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 
+let weather = [] as any;
+    // Ordred oldest first
 const DUMMY_WEATHER = {
-  COOLING_HRS: 0,
-  HEATING_HRS: 0,
   TEMP_C: 0,
-  CLOUD_PCT_NO: 1,
-  CLOUD_PCT_FEW: 0,
-  CLOUD_PCT_ALL: 0,
+  CLOUD_PCT: 0,
   WIND_KPH: 10,
-  WIND_PCT_CALM: 50,
 };
 
+// TODO download weather at start with a 2s init delay, like loading audio (but after audio)
+// But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
 export function initWeather(location: string, callback?: any) {
-  weather[location] = new Array(8760); // Perf optimization: initialize at expected length
-  let rowNumber = 0;
+  weather = [] as any; // reset each time to prevent accidentally appending to old state
   Papa.parse(`/data/WeatherRaw${location}.csv`, {
     download: true,
     dynamicTyping: true,
     header: true,
     // worker: true,
     step(row: any) {
-      weather[location][rowNumber++] = row.data as RawWeatherType;
+      weather.push(row.data as RawWeatherType);
     },
     complete() {
+      if (weather.length !== EXPECTED_ROWS) {
+        console.warn(`Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`);
+      }
       if (callback) {
         callback();
       }
@@ -34,10 +40,32 @@ export function initWeather(location: string, callback?: any) {
   });
 }
 
-// TODO download weather with a 1s init delay, like loading audio
-// But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
-export function getWeather(location: string, hourOfYear: number): RawWeatherType {
-  return weather[location][hourOfYear] || DUMMY_WEATHER;
+export function getWeather(date: DateType): RawWeatherType {
+  const minuteOfHour = date.minuteOfDay % 60;
+  const yearOffset = (date.year - STARTING_YEAR) * ROWS_PER_YEAR;
+  const monthOffset = (date.monthNumber - 1) * DAYS_PER_MONTH * ROWS_PER_DAY;
+  const dayOffset = 0; // Only relevant if I later simulated multiple days per month
+  const hourOffset = date.hourOfDay;
+  const row = yearOffset + monthOffset + dayOffset + hourOffset;
+  const nextRow = row + 1;
+  // Forecase more weather if it doesn't exist - Simple singular check and run to prevent infinite looping / freezing
+  if (!weather[row] || !weather[nextRow]) {
+    forecastNextYear();
+    return weather[row] || DUMMY_WEATHER;
+  }
+
+  // Otherwise, blend hours for smoother weather
+  const prev = weather[row];
+  const next = weather[nextRow];
+  // const prevPerc = minuteOfHour / 60;
+  console.log(hourOffset, row, weather[row]);
+  const prevPerc = 0 * minuteOfHour + 1;
+  const nextPerc = 1 - prevPerc;
+  return {
+    TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
+    CLOUD_PCT: prev.CLOUD_PCT * prevPerc + next.CLOUD_PCT * nextPerc,
+    WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
+  };
 }
 
 // 0-1, percent of sun's energy hitting a unit of land relative to max
@@ -56,4 +84,27 @@ export function getRawSunlightPercent(date: DateType) {
     return 1 / (1 + Math.pow(Math.E, (-0.015 * (minutesFromDark - 260))));
   }
   return 0;
+}
+
+function forecastNextYear() {
+  const length = weather.length;
+  for (let day = 0; day < DAYS_PER_YEAR; day++) {
+    // TODO factor in emissions, i.e. less vs more emissions = smaller vs larger std deviation + positive bias
+    const temperatureModifier = getRandom(-4, 4.05);
+    const windModifier = getRandom(-3, 3.05);
+    const cloudModifier = getRandom(-20, 20);
+    for (let row = 0; row < ROWS_PER_DAY; row++) {
+      const prev = weather[length - ROWS_PER_YEAR + row + day * ROWS_PER_DAY];
+      weather.push({
+        TEMP_C: prev.TEMP_C + temperatureModifier,
+        CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
+        WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),
+      });
+    }
+  }
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+function getRandom(min: number, max: number) {
+  return Math.random() * (max - min) + min;
 }

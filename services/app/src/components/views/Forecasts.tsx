@@ -181,7 +181,7 @@ export default class extends React.Component<Props, State> {
           <br/>
           <br/>
           <Toolbar>
-            <Typography variant="h6">Weather</Typography>
+            <Typography variant="h6">Weather in {gameState.location.name}</Typography>
           </Toolbar>
           <ChartForecastWeather
             height={140}

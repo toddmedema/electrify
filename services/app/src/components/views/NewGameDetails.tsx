@@ -2,10 +2,10 @@ import {Button, IconButton, MenuItem, Select, Table, TableBody, TableCell, Table
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import * as React from 'react';
 
-import {DIFFICULTIES} from 'app/Constants';
+import {DIFFICULTIES, LOCATIONS} from 'app/Constants';
 import {getDb} from 'app/Globals';
 import {SCENARIOS} from 'app/Scenarios';
-import {DifficultyType, GameStateType, ScenarioType, ScoreType} from 'app/Types';
+import {DifficultyType, GameStateType, LocationType, ScenarioType, ScoreType} from 'app/Types';
 
 const numbro = require('numbro');
 
@@ -27,6 +27,7 @@ interface State {
   scores?: ScoreType[];
   myTopScore?: ScoreType;
   scenario: ScenarioType | null;
+  location: LocationType | null;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -34,8 +35,10 @@ export interface Props extends StateProps, DispatchProps {}
 export default class extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    const scenario = SCENARIOS.find((s) => s.id === props.gameState.scenarioId) || null;
     this.state = {
-      scenario: SCENARIOS.find((s) => s.id === props.gameState.scenarioId) || null,
+      scenario,
+      location: scenario ? (LOCATIONS.find((s) => s.id === scenario.locationId) || null) : null,
     };
     if (props.user) {
       this.loadScores(props.user);
@@ -79,14 +82,14 @@ export default class extends React.Component<Props, State> {
 
   public render() {
     const {onBack, onDelta, onStart, gameState, user, signInWithGoogle} = this.props;
-    const {scenario, scores, myTopScore} = this.state;
+    const {scenario, scores, myTopScore, location} = this.state;
 
-    if (!scenario) {
+    if (!scenario || !location) {
       return <div>
         <IconButton onClick={onBack} aria-label="back" edge="start" color="primary">
           <ArrowBackIosIcon />
         </IconButton>
-        UNKNOWN SCENARIO
+        UNKNOWN SCENARIO OR LOCATION
       </div>;
     }
 
@@ -102,6 +105,7 @@ export default class extends React.Component<Props, State> {
         </div>
         <div style={{textAlign: 'center', margin: '20px 0', lineHeight: '30px'}}>
           Scenario timeframe: {scenario.startingYear} to {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}<br/>
+          Scenario location: {location.name}<br/>
           Select difficulty:
           <Select
             value={gameState.difficulty}
