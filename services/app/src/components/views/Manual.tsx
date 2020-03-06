@@ -81,8 +81,11 @@ const MANUAL_ENTRIES = [
   },
   {
     // Credit to https://www.e-education.psu.edu/ebf200/node/151
-    title: `Demand`,
+    title: `Customers, Demand & Marketing`,
     entry: <div>
+      <p>More customers drives more demand. Although individual customer types (residential, commercial, industrial) have different demand curves, we've aggregated them into a single "customers" number that reflects a blend of customer types. Here's what demand by type looks like in real life:</p>
+      <img src="/images/manual-demand-customer-types.png" alt="Source: https://www.eia.gov/todayinenergy/detail.php?id=10211"/>
+      <p>Like in real life, you as a company can spend money on marketing to acquire more customers (you exist as one of many electricity generation companies customers can select from). Your customer base also naturally grows or shrinks depending on if you provide them good service (i.e. few blackouts).</p>
       <p>Load changes continuously as people turn stuff on and off, as temperature changes, as the natural light comes and goes, and so on. This pattern of changing load is called a "load shape". We can have daily load shapes, weekly ones, and annual ones. The following diagram shows the path of load for three different weeks at three different times of year in 2009:</p>
       <img src="/images/manual-demand.jpg"/>
     </div>,

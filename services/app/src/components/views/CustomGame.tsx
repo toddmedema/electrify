@@ -37,8 +37,11 @@ export default function CustomGame(props: Props): JSX.Element {
             <TableCell>
               <Select
                 id="location"
-                value={props.gameState.location}
-                onChange={(e: any) => props.onDelta({ location: e.target.value })}
+                value={props.gameState.location.id}
+                onChange={(e: any) => {
+                  const location = LOCATIONS.find((l) => l.id === e.target.value) || LOCATIONS[0];
+                  props.onDelta({ location });
+                }}
               >
                 {LOCATIONS.map((l: LocationType) => {
                   return <MenuItem value={l.id} key={l.id}>{l.name}</MenuItem>;

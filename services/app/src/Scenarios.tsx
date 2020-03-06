@@ -314,11 +314,22 @@ export const SCENARIOS = [
     name: 'Carbon Fee',
     icon: 'solar',
     locationId: 'SF',
-    summary: 'Do you have what it takes to transition into a new age?',
+    summary: `New limits have been placed on pollution. Can you modernize the company?`,
     startingYear: 2020,
     feePerKgCO2e: 50 / 1000,
     durationMonths: 12 * 12,
-    facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Natural Gas', peakW: 480000000}],
+    facilities: [{name: 'Coal', peakWh: 300000000}, {fuel: 'Natural Gas', peakW: 30000000}],
+  },
+  {
+    id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: 'The Shale Boom',
+    icon: 'natural gas',
+    locationId: 'PIT',
+    summary: `Cheap natural gas has been discovered nearby.`,
+    startingYear: 2006,
+    feePerKgCO2e: 0,
+    durationMonths: 12 * 20,
+    facilities: [{fuel: 'Coal', peakW: 500000000}],
   },
   {
     id: 101, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -329,25 +340,14 @@ export const SCENARIOS = [
     startingYear: 2002,
     feePerKgCO2e: 0,
     durationMonths: 12 * 12,
-    facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
-  },
-  {
-    id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: 'Pennsylvania 2020',
-    icon: 'natural gas',
-    locationId: 'PIT',
-    summary: `You adapted to the natural gas boom, but are you ready for what's next?`,
-    startingYear: 2020,
-    feePerKgCO2e: 0,
-    durationMonths: 12 * 20,
-    facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
+    facilities: [{fuel: 'Nuclear', peakW: 500000000}],
   },
   {
     id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: 'Pennsylvania 1980',
+    name: 'The End of an Era',
     icon: 'coal',
     locationId: 'PIT',
-    summary: 'Your existing coal business faces new challengers.',
+    summary: 'Your coal business faces new challenges - and opportunities.',
     startingYear: 1980,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
