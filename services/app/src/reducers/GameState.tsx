@@ -367,6 +367,12 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
           history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));
           newState.timeline = generateNewTimeline(newState, cash, customers);
 
+          // Pre-roll a few frames to compensate for temperature / demand jumps across months
+          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
+
           // ===== TRIGGERS ======
           if (now.cash < 0) {
             logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});

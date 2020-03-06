@@ -48,7 +48,8 @@ export function getWeather(date: DateType): RawWeatherType {
   const hourOffset = date.hourOfDay;
   const row = yearOffset + monthOffset + dayOffset + hourOffset;
   const nextRow = row + 1;
-  // Forecase more weather if it doesn't exist - Simple singular check and run to prevent infinite looping / freezing
+
+  // Forecase more weather if it doesn't exist - Simple singular check to prevent infinite looping / freezing
   if (!weather[row] || !weather[nextRow]) {
     forecastNextYear();
     return weather[row] || DUMMY_WEATHER;
@@ -57,9 +58,7 @@ export function getWeather(date: DateType): RawWeatherType {
   // Otherwise, blend hours for smoother weather
   const prev = weather[row];
   const next = weather[nextRow];
-  // const prevPerc = minuteOfHour / 60;
-  console.log(hourOffset, row, weather[row]);
-  const prevPerc = 0 * minuteOfHour + 1;
+  const prevPerc = minuteOfHour / 60;
   const nextPerc = 1 - prevPerc;
   return {
     TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
