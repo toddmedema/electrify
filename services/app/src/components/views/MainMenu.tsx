@@ -4,6 +4,8 @@ import FacebookIcon from '@material-ui/icons/Facebook';
 import InfoIcon from '@material-ui/icons/Info';
 import * as React from 'react';
 
+import {getStorageJson} from 'app/LocalStorage';
+import {LocalStoragePlayedType} from 'app/Types';
 import {interactiveColor} from 'shared/Theme';
 import {openWindow} from '../../Globals';
 
@@ -25,6 +27,10 @@ export interface Props extends StateProps, DispatchProps {}
 
 // TODO option to resume a saved game; if you try to start a new game w/ a saved game, prompt that it'll delete the save
 const MainMenu = (props: Props): JSX.Element => {
+  const plays = ((getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[]);
+  const ids = plays.map((s) => s.scenarioId);
+  const playedTutorial = ids.indexOf(0) !== -1 && ids.indexOf(1) !== -1;
+
   return (
     <div id="menuCard">
       <div id="logo">
@@ -32,7 +38,7 @@ const MainMenu = (props: Props): JSX.Element => {
       </div>
       <div id="centeredMenu">
         <Button size="large" variant="contained" color="primary" onClick={props.onTutorial} autoFocus>Learn to play</Button>
-        <Button size="large" variant="contained" color="primary" onClick={props.onStart}>New Game</Button>
+        <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart}>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
         {!props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}

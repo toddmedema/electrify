@@ -40,7 +40,7 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default class Manual extends React.PureComponent<Props, {}> {
 
-  // TODO search state, filtering entries
+  // TODO search state -> filter clones list of entries by title + entry text
 
   public render() {
     return (
