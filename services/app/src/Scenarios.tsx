@@ -22,14 +22,14 @@ export const SCENARIOS = [
         target: '#topbar',
         content: <Typography variant="body1">
           Welcome! You're the new CEO of a regional power generation company.<br/><br/>
-          Your goal: Make as much money as possible. You lose if you run out of cash (your cash is in the top left) or cause too many blackouts.
+          Your goal: Make as much money as possible. You lose if you run out of cash or cause too many blackouts.
         </Typography>,
       },
       {
         target: '.VictoryContainer',
         content: <Typography variant="body1">
           Make money by supplying demand for electricity, measured in Megawatts (MW).<br/><br/>
-          This graph represents an average day for the month.<br/><br/>
+          This graph represents an <strong>average day</strong> for the month.<br/><br/>
           Demand is driven by a variety of factors, including the weather and how many customers you have.
         </Typography>,
       },
@@ -84,7 +84,7 @@ export const SCENARIOS = [
       {
         target: '#sort',
         content: <Typography variant="body1">
-          Sort generators by different properties.
+          Sort by different properties.
         </Typography>,
       },
       {
@@ -115,8 +115,7 @@ export const SCENARIOS = [
       {
         target: '#speedChangeButtons',
         content: <Typography variant="body1">
-          Start the game by unpausing it. (You can also control the speed with the ~/1/2/3 keys)<br/><br/>
-          To learn more about concepts, select "Manual" from the top left menu.<br/><br/>
+          Start the game by unpausing it. (Hotkeys: ~/1/2/3)<br/><br/>
           This tutorial will run for 1 year. Try building different types of generators!
         </Typography>,
       },
@@ -128,108 +127,62 @@ export const SCENARIOS = [
     locationId: 'SF',
     startingYear: 2019,
     feePerKgCO2e: 0,
-    durationMonths: 12,
+    durationMonths: 6,
     endTitle: 'Tutorial complete!',
     endMessage: 'You now know enough to run a company on Employee difficulty - or, continue tutorials to build your skills',
     facilities: [{name: 'Pumped Hydro', peakWh: 500000000}, {fuel: 'Coal', peakW: 480000000}],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
-        target: '.VictoryContainer',
-        content: <Typography variant="body1">
-          When you're getting blackouts, generators aren't your only option.<br/><br/>
-          If you have spare generator capcity at other times of day, it's often cheaper to store that energy than build more generators.
-        </Typography>,
-      },
-      {
         target: '.button-buildStorage',
         onNext: () => toCard({name: 'BUILD_STORAGE', dontRemember: true}),
         content: <Typography variant="body1">
-          Try building a storage facility now.
+          When you're getting blackouts, generators aren't your only option.<br/><br/>
+          If you have power at other times of day, it's often cheaper to store that energy than build more generators.
         </Typography>,
       },
       {
         target: '.build-list-item',
         content: <Typography variant="body1">
-          Try moving the slider to change their capacity. Note how the peak output is different for each technology, and changes based on the capacity.
+          Moving the slider changes their capacity and peak output.
         </Typography>,
       },
       {
         target: '#close-button',
         onNext: () => toCard({name: 'FACILITIES'}),
         content: <Typography variant="body1">
-          Tap X to close the buy screen.
+          Tap X to close the build screen.
         </Typography>,
       },
       {
         target: '.capacityProgressBar',
         content: <Typography variant="body1">
-          In addition to the horizontal bar that indicates their output, storage units have a vertical bar that indicates how much energy they have stored.
+          Like generators, the horizontal bar indicates how much electricity it's outputting.<br/><br/>
+          In addition, storage units have a vertical bar indicating how much energy is stored.
         </Typography>,
       },
       {
         target: '.facility',
         content: <Typography variant="body1">
-          Hold and drag to re-order your generators and storage. Generators at the top produce first and only charge storage below them.
+          Hold and drag to re-order your generators and storage.<br/><br/>
+          Generators at the top produce first and only charge storage below them.
         </Typography>,
       },
       {
         target: '.facility',
         onNext: () => setSpeed('SLOW'),
         content: <Typography variant="body1">
-          This tutorial will run for 1 year. Try changing the order of storage and generators to see how it affects their output!
+          This tutorial will run for 6 months. Try changing the order of storage and generators to see how it affects their output!
         </Typography>,
       },
     ],
   },
-  {
-    id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: '104: Marketing',
-    locationId: 'SF',
-    startingYear: 2019,
-    feePerKgCO2e: 0,
-    durationMonths: 12,
-    endTitle: 'Tutorial complete!',
-    endMessage: 'You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills',
-    facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
-    tutorialSteps: [
-      {
-        disableBeacon: true, // causes tutorial to auto-start
-        target: '#financesNav',
-        onNext: () => toCard({name: 'FINANCES'}),
-        content: <Typography variant="body1">
-          When you have plenty of spare capacity and cash, you can use marketing to grow your business by heading over to the "Finances" tab. (Hotkey: W)
-        </Typography>,
-      },
-      {
-        target: '#marketingSlider',
-        content: <Typography variant="body1">
-          Slide to increase your marketing budget, growing your customer base and demand.
-        </Typography>,
-      },
-      {
-        target: '#plotMetric',
-        content: <Typography variant="body1">
-          Change the graph to plot customers (under Demand) to see how your customers change over time.<br/><br/>
-          Beware, marketing too much too quickly may actually lose you customers through chronic blackouts!
-        </Typography>,
-      },
-      {
-        target: '#speedChangeButtons',
-        onNext: () => setSpeed('SLOW'),
-        content: <Typography variant="body1">
-          This tutorial will run for 1 year - see how changing your marketing budget changes your demand.
-        </Typography>,
-      },
-    ],
-  },
-  {
+    {
     id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: '105: Finances',
+    name: '104: Finances',
     locationId: 'SF',
     startingYear: 2019,
     feePerKgCO2e: 0,
-    durationMonths: 12,
+    durationMonths: 1,
     endTitle: 'Tutorial complete!',
     endMessage: 'You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills',
     facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
@@ -245,7 +198,7 @@ export const SCENARIOS = [
       {
         target: '.VictoryContainer',
         content: <Typography variant="body1">
-          You can plot a variety of metrics by changing the dropdowns above the chart. You can also plot it for past years, allowing you to analyze long term strategies.
+          You can plot a variety of metrics by changing the dropdowns above the chart. You can also plot previous years to analyze long term strategies.
         </Typography>,
       },
       {
@@ -258,11 +211,53 @@ export const SCENARIOS = [
         target: '#speedChangeButtons',
         onNext: () => setSpeed('SLOW'),
         content: <Typography variant="body1">
+          This tutorial will run for 1 month - try playing around with the chart.
+        </Typography>,
+      },
+    ],
+  },
+  {
+    id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: '105: Marketing',
+    locationId: 'SF',
+    startingYear: 2019,
+    feePerKgCO2e: 0,
+    durationMonths: 12,
+    endTitle: 'Tutorial complete!',
+    endMessage: 'You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills',
+    facilities: [{name: 'Pumped Hydro', peakWh: 1000000000}, {fuel: 'Coal', peakW: 600000000}],
+    tutorialSteps: [
+      {
+        disableBeacon: true, // causes tutorial to auto-start
+        target: '#financesNav',
+        onNext: () => toCard({name: 'FINANCES'}),
+        content: <Typography variant="body1">
+          When you have spare capacity, you can use marketing to grow your business by heading to the "Finances" tab. (Hotkey: W)
+        </Typography>,
+      },
+      {
+        target: '#marketingSlider',
+        content: <Typography variant="body1">
+          Slide to increase your marketing budget, growing your customer base and demand.
+        </Typography>,
+      },
+      {
+        target: '#plotMetric',
+        content: <Typography variant="body1">
+          Change the graph to plot Customers to see how they change over time.<br/><br/>
+          Beware, marketing too much too quickly may actually cost you customers through chronic blackouts!
+        </Typography>,
+      },
+      {
+        target: '#speedChangeButtons',
+        onNext: () => setSpeed('SLOW'),
+        content: <Typography variant="body1">
           This tutorial will run for 1 year - see how changing your marketing budget changes your demand.
         </Typography>,
       },
     ],
   },
+
   {
     id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '106: Forecasting',
@@ -271,7 +266,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     durationMonths: 12,
     endTitle: 'Tutorial complete!',
-    endMessage: `That's all we can teach you - the rest you'll have to learn by doing. Good luck!`,
+    endMessage: `That's all we can teach you - the rest you'll have to learn by doing!`,
     facilities: [{fuel: 'Coal', peakW: 450000000}],
     tutorialSteps: [
       {
@@ -304,6 +299,7 @@ export const SCENARIOS = [
         target: '#speedChangeButtons',
         onNext: () => setSpeed('FAST'),
         content: <Typography variant="body1">
+          To learn more about concepts, select "Manual" from the top left menu.<br/><br/>
           This tutorial will run for 1 year - see how the forecasts change over time.
         </Typography>,
       },

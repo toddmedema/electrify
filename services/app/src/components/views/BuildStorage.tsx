@@ -60,7 +60,8 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
               {formatMoneyConcise(storage.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {Math.round(storage.yearsToBuild * 12)}mo to build
+              {Math.round(storage.yearsToBuild * 12)}mo to build<br/>
+              {formatWatts(storage.peakW)}
             </Typography>
           </span>
         }
