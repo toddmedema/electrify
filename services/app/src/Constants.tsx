@@ -46,6 +46,10 @@ export const LOCATIONS = [
     id: 'HNL',
     name: 'Honolulu, HI',
   },
+  {
+    id: 'SJU',
+    name: 'San Juan, Puero Rico',
+  },
 ] as LocationType[];
 
 export const TICK_MS = {

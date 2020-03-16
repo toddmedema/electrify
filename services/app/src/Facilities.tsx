@@ -108,6 +108,32 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       lifespanYears: 30,
         // TODO
     },
+    {
+      name: 'Oil',
+      fuel: 'Oil',
+      description: 'Fast but dirty',
+      available: true,
+      buildCost: 4500000 + 1.35 * peakW,
+        // ~$1,800/kw in 2019 https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+        // 3,647 plants in 2018, 37GW capacity - https://www.eia.gov/electricity/annual/html/epa_04_03.html
+        // Thus 2018 avg plant is 10MW and cost $18M
+        // 1/4 fixed = $4.5m, 3/4 variable = $1.35/w
+      peakW,
+      maxPeakW: 6000000000,
+        // ~6GW, build in 2007 - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
+      btuPerWh: 11,
+        // https://www.eia.gov/electricity/annual/html/epa_08_01.html
+      spinMinutes: 10,
+      annualOperatingCost: 0.05 * peakW * Math.pow(1.02, year - 2018),
+        // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
+        // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+      yearsToBuild: 1.5 + magnitude / 3,
+        // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      capacityFactor: 0.2,
+        // https://www.eia.gov/todayinenergy/detail.php?id=31232
+      lifespanYears: 30,
+        // TODO
+    },
     // {
     //   name: 'Trash Incinerator',
     //   fuel: 'Trash',

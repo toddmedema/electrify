@@ -328,6 +328,17 @@ export const SCENARIOS = [
     facilities: [{fuel: 'Coal', peakW: 500000000}],
   },
   {
+    id: 105, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: 'Paradise',
+    icon: 'wind',
+    locationId: 'HNL',
+    summary: 'A beautiful island - with a complex grid.',
+    startingYear: 2004,
+    feePerKgCO2e: 0,
+    durationMonths: 12 * 12,
+    facilities: [{fuel: 'Oil', peakW: 450000000}, {fuel: 'Wind', peakW: 150000000}, {fuel: 'Sun', peakW: 50000000}],
+  },
+  {
     id: 101, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: 'Rise of Renewables',
     icon: 'geothermal',
@@ -336,7 +347,18 @@ export const SCENARIOS = [
     startingYear: 2002,
     feePerKgCO2e: 0,
     durationMonths: 12 * 12,
-    facilities: [{fuel: 'Nuclear', peakW: 500000000}],
+    facilities: [{fuel: 'Nuclear', peakW: 400000000}, {fuel: 'Oil', peakW: 100000000}],
+  },
+  {
+    id: 104, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: 'Hurricane Season',
+    icon: 'wind',
+    locationId: 'SJU',
+    summary: 'A remote island, with expensive fuel and destructive weather.',
+    startingYear: 2000,
+    feePerKgCO2e: 0,
+    durationMonths: 12 * 20,
+    facilities: [{fuel: 'Oil', peakW: 200000000}, {fuel: 'Natural Gas', peakW: 200000000}, {fuel: 'Coal', peakW: 100000000}],
   },
   {
     id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -347,6 +369,6 @@ export const SCENARIOS = [
     startingYear: 1980,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
-    facilities: [{fuel: 'Coal', peakW: 500000000}],
+    facilities: [{fuel: 'Coal', peakW: 200000000}, {fuel: 'Coal', peakW: 300000000}],
   },
 ] as ScenarioType[];

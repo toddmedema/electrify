@@ -13,6 +13,8 @@ import {DateType, FuelPricesType} from 'app/Types';
 // Uranium: https://www.eia.gov/uranium/marketing/html/summarytable1b.php
   // 35Bbtu / lb - https://smartenergy.illinois.edu/energy-efficiency-basics/energy-concepts-and-terms
 
+// Oil: imported crude oil prices https://www.eia.gov/outlooks/steo/realprices/
+
 const Papa = require('papaparse');
 
 interface RawFuelPricesType {
@@ -21,6 +23,7 @@ interface RawFuelPricesType {
   naturalgas: number;
   coal: number;
   uranium: number;
+  oil: number;
 }
 
 const fuelPrices = {} as any;
@@ -38,6 +41,7 @@ export function initFuelPrices(callback?: any) {
         'Natural Gas': +data.naturalgas,
         'Coal': +data.coal,
         'Uranium': +data.uranium,
+        'Oil': +data.oil,
       };
     },
     complete() {
