@@ -444,14 +444,12 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
             }
             setTimeout(() => getStore().dispatch(openDialog({
               title: scenario.endTitle || `You've retired!`,
-              message: scenario.endMessage || <div>Your final score is {finalScore}:
-                <ul>
-                  <li>{score.supply} pts from electricity supplied</li>
-                  <li>{score.netWorth} pts from final net worth</li>
-                  <li>{score.customers} pts from final customers</li>
-                  <li>{score.emissions} pts from emissions</li>
-                  <li>{score.blackouts} pts from blackouts</li>
-                </ul>
+              message: scenario.endMessage || <div>Your final score is {finalScore}:<br/><br/>
+                +{score.supply} pts from electricity supplied<br/>
+                +{score.netWorth} pts from final net worth<br/>
+                +{score.customers} pts from final customers<br/>
+                {score.emissions} pts from emissions<br/>
+                {score.blackouts} pts from blackouts<br/>
                 {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
               </div>,
               open: true,

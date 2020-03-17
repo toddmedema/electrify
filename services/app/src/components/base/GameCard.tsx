@@ -1,4 +1,4 @@
-import {Button, IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
+import {IconButton, Menu, MenuItem, Toolbar, Typography} from '@material-ui/core';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
 import FastForwardIcon from '@material-ui/icons/FastForward';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
@@ -37,7 +37,7 @@ export function GameCard(props: Props) {
   const bigScreen = isBigScreen();
   const now = getTimeFromTimeline(date.minute, gameState.timeline);
   if (!gameState.inGame || !now) {
-    return <Button onClick={props.onQuit}>ERROR! Click here to return to the menu</Button>;
+    return <span/>;
   }
 
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);

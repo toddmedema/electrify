@@ -127,7 +127,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
       annualOperatingCost: 0.05 * peakW * Math.pow(1.02, year - 2018),
         // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
         // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      yearsToBuild: 1.5 + magnitude / 3,
+      yearsToBuild: 1 + magnitude / 3,
         // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.2,
         // https://www.eia.gov/todayinenergy/detail.php?id=31232

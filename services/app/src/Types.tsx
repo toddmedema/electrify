@@ -185,6 +185,8 @@ export interface DateType {
 }
 
 export interface RawWeatherType {
+  YEAR: number;
+  MONTH: number;
   TEMP_C: number;
   CLOUD_PCT: number; // 0 - 100
   WIND_KPH: number;

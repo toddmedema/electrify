@@ -314,7 +314,7 @@ export const SCENARIOS = [
     startingYear: 2020,
     feePerKgCO2e: 50 / 1000,
     durationMonths: 12 * 12,
-    facilities: [{name: 'Coal', peakWh: 300000000}, {fuel: 'Natural Gas', peakW: 30000000}],
+    facilities: [{fuel: 'Coal', peakW: 300000000}, {fuel: 'Natural Gas', peakW: 200000000}],
   },
   {
     id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -347,7 +347,7 @@ export const SCENARIOS = [
     startingYear: 2002,
     feePerKgCO2e: 0,
     durationMonths: 12 * 12,
-    facilities: [{fuel: 'Nuclear', peakW: 400000000}, {fuel: 'Oil', peakW: 100000000}],
+    facilities: [{fuel: 'Oil', peakW: 100000000}, {fuel: 'Uranium', peakW: 400000000}],
   },
   {
     id: 104, // Avoid changing IDs, linked to scores / completion, and doesn't impact order

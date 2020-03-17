@@ -12,6 +12,8 @@ const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 let weather = [] as any;
     // Ordred oldest first
 const DUMMY_WEATHER = {
+  YEAR: 0,
+  MONTH: 0,
   TEMP_C: 0,
   CLOUD_PCT: 0,
   WIND_KPH: 10,
@@ -27,7 +29,10 @@ export function initWeather(location: string, callback?: any) {
     header: true,
     // worker: true,
     step(row: any) {
-      weather.push(row.data as RawWeatherType);
+      const data = row.data as RawWeatherType;
+      if (data && data.YEAR) {
+        weather.push(data);
+      }
     },
     complete() {
       if (weather.length !== EXPECTED_ROWS) {
@@ -51,7 +56,7 @@ export function getWeather(date: DateType): RawWeatherType {
 
   // Forecase more weather if it doesn't exist - Simple singular check to prevent infinite looping / freezing
   if (!weather[row] || !weather[nextRow]) {
-    forecastNextYear();
+    forecastNextDay();
     return weather[row] || DUMMY_WEATHER;
   }
 
@@ -61,6 +66,8 @@ export function getWeather(date: DateType): RawWeatherType {
   const prevPerc = minuteOfHour / 60;
   const nextPerc = 1 - prevPerc;
   return {
+    YEAR: next.year,
+    MONTH: next.month,
     TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
     CLOUD_PCT: prev.CLOUD_PCT * prevPerc + next.CLOUD_PCT * nextPerc,
     WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
@@ -85,21 +92,19 @@ export function getRawSunlightPercent(date: DateType) {
   return 0;
 }
 
-function forecastNextYear() {
+function forecastNextDay() {
   const length = weather.length;
-  for (let day = 0; day < DAYS_PER_YEAR; day++) {
-    // TODO factor in emissions, i.e. less vs more emissions = smaller vs larger std deviation + positive bias
-    const temperatureModifier = getRandom(-4, 4.05);
-    const windModifier = getRandom(-3, 3.05);
-    const cloudModifier = getRandom(-20, 20);
-    for (let row = 0; row < ROWS_PER_DAY; row++) {
-      const prev = weather[length - ROWS_PER_YEAR + row + day * ROWS_PER_DAY];
-      weather.push({
-        TEMP_C: prev.TEMP_C + temperatureModifier,
-        CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
-        WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),
-      });
-    }
+  // TODO factor in emissions, i.e. less vs more emissions = smaller vs larger std deviation + positive bias
+  const temperatureModifier = getRandom(-4, 4.05);
+  const windModifier = getRandom(-3, 3.05);
+  const cloudModifier = getRandom(-20, 20);
+  for (let row = 0; row < ROWS_PER_DAY; row++) {
+    const prev = weather[length - ROWS_PER_YEAR + row];
+    weather.push({
+      TEMP_C: prev.TEMP_C + temperatureModifier,
+      CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
+      WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),
+    });
   }
 }
 
