@@ -36,8 +36,8 @@ const MainMenu = (props: Props): JSX.Element => {
         <img src="images/logo.svg"></img>
       </div>
       <div id="centeredMenu">
-        <Button size="large" variant="contained" color="primary" onClick={props.onTutorial} autoFocus>Learn to play</Button>
-        <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart}>New Game</Button>
+        <Button size="large" variant={!playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onTutorial} autoFocus={!playedTutorial}>Learn to play</Button>
+        <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart} autoFocus={playedTutorial}>New Game</Button>
         <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
         <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
         {!props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}

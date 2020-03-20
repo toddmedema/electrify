@@ -315,8 +315,10 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
     } as FacilityOperatingType;
     if (g.peakWh) {
       facility.currentWh = 0;
+      state.facilities.push(facility); // add storage to bottom so that it's on by default
+    } else {
+      state.facilities.unshift(facility); // add generators to top so that they produce by default
     }
-    state.facilities.unshift(facility);
   }
   return state;
 }
