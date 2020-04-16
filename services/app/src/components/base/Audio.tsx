@@ -6,7 +6,7 @@ import * as React from 'react';
 export interface StateProps {
   themeManager: ThemeManager|null;
   audio: AudioType;
-  enabled: boolean;
+  enabled?: boolean;
 }
 
 export interface DispatchProps {

@@ -9,6 +9,7 @@ import {LocalStoragePlayedType} from 'app/Types';
 import {interactiveColor} from 'shared/Theme';
 
 export interface StateProps {
+  audioEnabled?: boolean;
   // From auth:
   error?: any;
   user?: any;
@@ -16,6 +17,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onAudioChange: (change: boolean) => void;
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
@@ -38,9 +40,13 @@ const MainMenu = (props: Props): JSX.Element => {
       <div id="centeredMenu">
         <Button size="large" variant={!playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onTutorial} autoFocus={!playedTutorial}>Learn to play</Button>
         <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart} autoFocus={playedTutorial}>New Game</Button>
-        <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
-        <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
-        {!props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}
+        {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>}
+        {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>}
+        {props.audioEnabled !== undefined && !props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}
+        {props.audioEnabled === undefined && <div>Enable music?<br/>
+          <Button variant="contained" color="primary" onClick={(e: any) => props.onAudioChange(true)} style={{display: 'inline', marginRight: '12px', marginTop: '4px'}}>Yes</Button>
+          <Button variant="outlined" color="primary" onClick={(e: any) => props.onAudioChange(false)} style={{display: 'inline', marginTop: '4px'}}>No</Button>
+        </div>}
       </div>
       <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, opacity: 0.7}}>
         <IconButton color="primary" href="https://fabricate.us10.list-manage.com/subscribe?u=792afb261df839e73b669f83f&id=8ccd05ccba">

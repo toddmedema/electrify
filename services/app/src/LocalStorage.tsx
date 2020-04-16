@@ -6,6 +6,11 @@ export function getStorageBoolean(key: string, fallback: boolean): boolean {
   return (val !== null) ? (val.toLowerCase() === 'true') : fallback;
 }
 
+export function getStorageBooleanOrUndefined(key: string): boolean | undefined {
+  const val = getLocalStorage().getItem(key);
+  return (val !== null) ? (val.toLowerCase() === 'true') : undefined;
+}
+
 export function getStorageJson(key: string, fallback: object): object {
   try {
     const item = getLocalStorage().getItem(key);

@@ -340,7 +340,7 @@ export interface GameStateType {
 
 export interface SettingsType {
   [index: string]: any;
-  audioEnabled: boolean;
+  audioEnabled?: boolean;
   experimental: boolean;
   showHelp: boolean;
   vibration: boolean;
