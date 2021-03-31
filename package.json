@@ -54,7 +54,7 @@
     "lodash.clonedeep": "^4.5.0",
     "moment": "^2.22.1",
     "nconf": "^0.10.0",
-    "node-sass": "^4.9.0",
+    "node-sass": "^4.13.1",
     "numbro": "^2.1.2",
     "numeral": "^2.0.6",
     "papaparse": "^5.1.0",
