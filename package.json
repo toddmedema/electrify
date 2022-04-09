@@ -52,7 +52,7 @@
     "jest": "^23.5.0",
     "joi-browser": "^13.4.0",
     "lodash.clonedeep": "^4.5.0",
-    "moment": "^2.22.1",
+    "moment": "^2.29.2",
     "nconf": "^0.10.0",
     "node-sass": "^4.9.0",
     "numbro": "^2.1.2",
