@@ -33,6 +33,7 @@ Thumbs.db
 docker_context
 res/
 .awcache
+.DS_Store
 
 # Secrets (keys, passwords, etc)
 config.json
