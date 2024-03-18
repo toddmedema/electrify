@@ -58,21 +58,14 @@ describe('Dependencies', () => {
       'pre-push',
       'enzyme-adapter-react-16',
       'react-test-renderer',
-      'sqlite3',
       'jasmine-core',
       'jest-localstorage-mock',
 
       //Need for prettifying before commiting
-      'husky',
       'lint-staged',
       'tslint-config-prettier',
 
-      // Needed for storage layer
-      'pg',
-
       // TO DO AUDIT
-      'sinon',
-      'sinon-express-mock',
       'jasmine-expect',
     ];
 
