@@ -10,7 +10,7 @@ Requires NodeJS v12. Check your version with `node -v`.
 
 We recommend using [NVM](https://github.com/creationix/nvm) to install Node to make it easier to swap between and upgrade Node versions.
 
-Windows: must be run within a Unix-like shell (such as Git Bash)
+Windows: must be run within a Unix-like shell (such as Git Bash).
 
 If you're having problems getting dependencies set up on your computer, try using this repo with [Containerizer](https://github.com/Fabricate-IO/containerizer).
 
@@ -19,7 +19,7 @@ If you're having problems getting dependencies set up on your computer, try usin
 With Node.js installed, run the following from the root of the repository:
 
 ```sh
-npm install -g webpack yarn && yarnyarn
+npm install -g webpack yarn && yarn
 ```
 
 #### Serve / watch
