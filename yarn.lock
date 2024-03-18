@@ -10748,9 +10748,9 @@ react-transition-group@^4.3.0:
     prop-types "^15.6.2"
 
 react-with-firebase-auth@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/react-with-firebase-auth/-/react-with-firebase-auth-1.3.0.tgz#585acbc742ab100e8cfa60dcb486fa55161e7e68"
-  integrity sha512-RBiiFy8543qarmBCVBgSARYZ0fwtI73KLa2o05wHJgEnPcFNzAQd7SFUczWnvAJdBr8AiqywvrTp8e+kE5br3g==
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/react-with-firebase-auth/-/react-with-firebase-auth-1.4.1.tgz#dd572f0880200de3b132337cd569ca38b94b9eb8"
+  integrity sha512-IkhPlnSFwVu30f/m6tL7cno4SsVnq+yUSadk1ntuurLgVZjTFZLwYTnIzwM4Rc8sx+wgBl7mEGo8XPzWWLjg7A==
 
 react@^16.4.0:
   version "16.12.0"
