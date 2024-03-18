@@ -66,9 +66,6 @@ describe('Dependencies', () => {
       'lint-staged',
       'tslint-config-prettier',
 
-      // Needed for storage layer
-      'pg',
-
       // TO DO AUDIT
       'jasmine-expect',
     ];
