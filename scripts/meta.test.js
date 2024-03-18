@@ -62,7 +62,6 @@ describe('Dependencies', () => {
       'jest-localstorage-mock',
 
       //Need for prettifying before commiting
-      'husky',
       'lint-staged',
       'tslint-config-prettier',
 
