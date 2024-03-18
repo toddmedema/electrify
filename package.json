@@ -27,7 +27,6 @@
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-polyfill": "^6.23.0",
     "babel-preset-env": "^1.6.1",
-    "bluebird": "^3.5.1",
     "chai": "^4.0.0",
     "cheerio": "^0.22.0",
     "classnames": "^2.2.6",
