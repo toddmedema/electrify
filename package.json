@@ -251,14 +251,5 @@
         }
       }
     }
-  },
-  "renovate": {
-    "extends": [
-      "config:base",
-      ":preserveSemverRanges",
-      "schedule:monthly",
-      "docker:disable"
-    ],
-    "prConcurrentLimit": 3
   }
 }
