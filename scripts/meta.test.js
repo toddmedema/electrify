@@ -68,6 +68,7 @@ describe('Dependencies', () => {
       // TO DO AUDIT
       'expect',
       'jasmine-expect',
+      'ts-jest',
     ];
 
     let depstrs = Object.keys(packageJSON.dependencies || {});
