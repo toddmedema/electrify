@@ -31,7 +31,7 @@ export class ThemeManager {
   private theme: MusicDefinition;
   private timeout: any;
 
-  constructor(nodes: {[key: string]: AudioNode}) {
+  constructor(nodes: {[key: string]: AudioNode}, intensity: number = 0) {
     this.nodes = nodes;
     this.active = [];
     for (const k of Object.keys(this.nodes)) {
@@ -41,7 +41,7 @@ export class ThemeManager {
     }
     this.theme = MUSIC_DEFINITIONS.intro;
     this.paused = false;
-    this.intensity = 0;
+    this.intensity = intensity;
   }
 
   public pause() {

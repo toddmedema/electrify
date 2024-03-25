@@ -36,7 +36,7 @@ This runs the app at [http://localhost:8080](http://localhost:8080) (port may be
 yarn test
 ```
 
-This runs the unit tests defined in the `app/test` directory.
+This runs the unit tests defined in the `app/test` directory, as well as anything with the `.test.tsx` extension and `scripts/meta_tests.js`.
 
 Tests require Java JDK 7 or higher. To update Java go to http://www.oracle.com/technetwork/java/javase/downloads/index.html and download ***JDK*** and install it.
 
@@ -48,6 +48,8 @@ Before deploying to production, run `./beta.sh` to deploy to beta and create bet
 
 - app icon and splashscreen appear properly on Android and iOS. If properly configured, the icons and splashscreens WILL show up in the beta build.
 - basic functionality works for all three builds (app loads, game is able to start)
+
+Once functionality is verified, you can deploy prod web & generate prod versions of the Android and iOS apps with `./scripts/prod.sh`.
 
 #### Build for Web
 
@@ -77,6 +79,11 @@ Notes and debugging:
 
 - requires the Android SDK
 - when deploying Android, you'll need to update `android-versionCode` in `config.xml`, not just `version`.
+- if you want to build with working authentication, you'll need to talk to an admin to get `GoogleService-Info.plist` and put them in the main project directory (which they'll download from the Firebase Console). Then run this setup command:
+
+```sh
+./setup.sh
+```
 
 #### Build for iOS
 
