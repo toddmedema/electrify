@@ -66,6 +66,7 @@ describe('Dependencies', () => {
       'tslint-config-prettier',
 
       // TO DO AUDIT
+      'expect',
       'jasmine-expect',
     ];
 
