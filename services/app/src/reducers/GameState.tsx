@@ -1,5 +1,8 @@
+import firebase from 'firebase/app';
+import numbro from 'numbro';
 import * as React from 'react';
 import Redux from 'redux';
+const cloneDeep = require('lodash.clonedeep');
 
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from 'shared/helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from 'shared/helpers/Financials';
@@ -14,11 +17,6 @@ import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType, UserType} from '../Types';
-
-// const seedrandom = require('seedrandom');
-const firebase = require('firebase/app');
-const numbro = require('numbro');
-const cloneDeep = require('lodash.clonedeep');
 
 let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
@@ -49,8 +47,8 @@ export function quitGame(): QuitGameAction {
   return { type: 'GAME_EXIT' };
 }
 
+// Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
 function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
-  // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
   const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
   now.customers = Math.round(prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) + marketingGrowth);
 
@@ -66,7 +64,6 @@ function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentF
   const minutesFrom5pmNormalized = Math.abs(date.minuteOfDay - 1020) / 240;
   const minutesFrom5pmLogistics = 1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
   const demandMultiple = 430 + 70 * temperatureNormalized - 40 * minutesFrom9amLogistics + 30 * minutesFromDarkLogistics - 65 * minutesFrom5pmLogistics;
-      // + 192.12 * (Weekday variable)
   return demandMultiple * now.customers;
 }
 
@@ -175,7 +172,7 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
           g.currentW = -Math.min(g.peakW, supply - now.demandW - charge, (g.peakWh - g.currentWh) * TICKS_PER_HOUR);
           g.currentWh = Math.min(g.peakWh, g.currentWh - g.currentW / TICKS_PER_HOUR);
           charge -= g.currentW / g.roundTripEfficiency;
-        } else { // Otherwise, reset to 0
+        } else { // Otherwise, don't charge or discharge: reset to 0
           g.currentW = 0;
         }
       }
@@ -376,6 +373,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
           updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
 
           // ===== TRIGGERS ======
+          // Failure: Bankrupt
           if (now.cash < 0) {
             logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
@@ -392,6 +390,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
             })), 1);
           }
 
+          // Failure: Too many blackouts
           if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
             logEvent('scenario_end', {id: state.scenarioId, type: 'blackouts', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
@@ -408,6 +407,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
             })), 1);
           }
 
+          // Success: Survived duration
           const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
             durationMonths: 12 * 20,
             endTitle: `You've retired!`,
@@ -431,7 +431,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
             };
             const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
 
-            // Submit score
+            // Submit score to highscores
             logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
             if (user && user.uid && !scenario.tutorialSteps) {
               const scoreSubmission = {
@@ -439,7 +439,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
                 scoreBreakdown: score, // For analytics purposes only
                 scenarioId: state.scenarioId,
                 difficulty: state.difficulty,
-                date: firebase.firestore.Timestamp.fromDate(new Date()),
+                date: firebase.firestore.Timestamp.fromDate(new Date()) as unknown as string,
                 uid: user.uid,
               } as ScoreType;
               getDb().collection('scores').add(scoreSubmission);
@@ -450,8 +450,8 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
                 +{score.supply} pts from electricity supplied<br/>
                 +{score.netWorth} pts from final net worth<br/>
                 +{score.customers} pts from final customers<br/>
-                {score.emissions} pts from emissions<br/>
-                {score.blackouts} pts from blackouts<br/>
+                -{score.emissions} pts from emissions<br/>
+                -{score.blackouts} pts from blackouts<br/>
                 {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
               </div>,
               open: true,

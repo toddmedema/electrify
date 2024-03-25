@@ -160,8 +160,10 @@ export interface CardType {
 export interface ScoreType {
   scenarioId: number;
   score: number;
+  scoreBreakdown: any;
   difficulty: string;
   date: string;
+  uid: string;
 }
 
 export interface LocalStoragePlayedType {
