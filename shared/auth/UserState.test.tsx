@@ -1,3 +1,0 @@
-describe('UserState', () => {
-  test('empty', () => {});
-})
