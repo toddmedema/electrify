@@ -66,7 +66,9 @@ describe('Dependencies', () => {
       'tslint-config-prettier',
 
       // TO DO AUDIT
+      'expect',
       'jasmine-expect',
+      'ts-jest',
     ];
 
     let depstrs = Object.keys(packageJSON.dependencies || {});
