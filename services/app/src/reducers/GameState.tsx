@@ -18,6 +18,8 @@ import {SCENARIOS} from '../Scenarios';
 import {getStore} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, TickPresentFutureType, UserType} from '../Types';
 
+// TODO potential performance optimization, shard state a bit, like have timeline be its own reducer, so that parts of state update only trigger relevant UI stuff
+// Can potentially use Thunk to pull in data from other reducers when simulation calculations need it?
 let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
   scenarioId: 100,
@@ -250,6 +252,7 @@ function reforecastSupply(state: GameStateType, simulated?: boolean): TickPresen
 }
 
 export function generateNewTimeline(readOnlyState: GameStateType, cash: number, customers: number, ticks = TICKS_PER_DAY): TickPresentFutureType[] {
+  // TODO performance optimization, figure out how to deep clone everything EXCEPT timeline, since I'm about to overwrite it
   const state = cloneDeep(readOnlyState);
   state.timeline = new Array(ticks) as TickPresentFutureType[];
   for (let i = 0; i < ticks; i++) {
@@ -278,10 +281,18 @@ export function generateNewTimeline(readOnlyState: GameStateType, cash: number, 
   return state.timeline;
 }
 
-// Edits the state in place to handle all of the one-off consequences of building, not including reforecasting
-// which should be done once after multiple builds
+/**
+ * Edits the state in place to handle all of the one-off consequences of building
+ * (not including reforecasting, which should be done once after multiple builds)
+ * @param state
+ * @param g
+ * @param financed
+ * @param newGame
+ * @returns
+ */
 function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean, newGame= false): GameStateType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
+
   if (now) {
     let financing = {
       loanAmountTotal: 0,
@@ -317,6 +328,7 @@ function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: 
       state.facilities.unshift(facility); // add generators to top so that they produce by default
     }
   }
+
   return state;
 }
 
@@ -357,10 +369,10 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), us
       const prev = getTimeFromTimeline(newState.date.minute - TICK_MINUTES, newState.timeline);
       if (now && prev) {
         updateSupplyFacilitiesFinances(newState, prev, now);
-        const {cash, customers} = now;
 
         if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
           const history = newState.monthlyHistory;
+          const {cash, customers} = now;
 
           // Record final history for the month, then generate the new timeline
           history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));

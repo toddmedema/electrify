@@ -1,4 +1,4 @@
-import Redux, {applyMiddleware, createStore} from 'redux';
+import Redux, {applyMiddleware, compose, createStore} from 'redux';
 import thunk from 'redux-thunk';
 import Store from './reducers/CombinedReducers';
 import {AppStateType} from './Types';
@@ -13,8 +13,10 @@ export function installStore(createdStore: Redux.Store<AppStateType>) {
 }
 
 export function createAppStore() {
-  // const composeEnhancers = composeWithDevTools({});
-  installStore(createStore(Store, applyMiddleware(thunk)));
+  // For redux dev tool browser extension https://github.com/reduxjs/redux-devtools/tree/main/extension#installation
+  const composeEnhancers = (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+  const enhancer = composeEnhancers(applyMiddleware(thunk));
+  installStore(createStore(Store, enhancer));
 
   if (module && module.hot) {
     module.hot.accept('./reducers/CombinedReducers', () => {

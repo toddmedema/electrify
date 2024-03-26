@@ -105,6 +105,8 @@ Notes and debugging:
 - requires a Mac with XCode installed
 - if Xcode complains about signing, try going to the project settings in Xcode, disabling automatic signing, re-enabling it, and then selecting your team again.
 
-#### Troubleshooting builds
+#### Troubleshooting
 
 If you're having trouble with UglifyJS when running `webpack -p`, try removing webpack's dependence on uglify-js and letting the dev-dependency version be used (see [here](https://github.com/mishoo/UglifyJS2/issues/448)).
+
+If you're trying to debug the Redux store, it's wired up to use the Dev Tool extension for advanced state debugging: https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd
