@@ -6,7 +6,7 @@ A mobile-friendly web game that teaches about the electricity markets in the sty
 
 ### Requirements
 
-Requires NodeJS v12. Check your version with `node -v`.
+Requires NodeJS v21. Check your version with `node -v`.
 
 We recommend using [NVM](https://github.com/creationix/nvm) to install Node to make it easier to swap between and upgrade Node versions.
 

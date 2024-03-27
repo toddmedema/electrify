@@ -19,7 +19,7 @@ const options = {
     filename: '[name].js',
   },
   resolve: {
-    extensions: ['.js', '.ts', '.tsx', '.json', '.txt'],
+    extensions: ['.js', '.ts', '.tsx', '.json', '.txt', '.mjs'],
   },
   stats: {
     colors: true,
@@ -43,6 +43,7 @@ const options = {
       },
       { test: /\.scss$/, loaders: ['style-loader', 'css-loader', 'sass-loader'] },
       { test: /\.tsx$/, loaders: ['awesome-typescript-loader'], exclude: /node_modules/ },
+      { test: /\.mjs$/, include: /node_modules/, type: 'javascript/auto' },
     ]
   },
   plugins: [

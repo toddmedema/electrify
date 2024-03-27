@@ -37,13 +37,13 @@
     "es6-promise-plugin": "^4.2.2",
     "expect": "^23.1.0",
     "file-loader": "~1.1.11",
-    "firebase": "^7.9.1",
+    "firebase": "^8.0.0",
     "he": "^1.1.1",
     "html": "^1.0.0",
     "jest": "^23.5.0",
     "lodash.clonedeep": "^4.5.0",
     "moment": "^2.22.1",
-    "node-sass": "^4.9.0",
+    "node-sass": "^9.0.0",
     "numbro": "^2.1.2",
     "papaparse": "^5.1.0",
     "path": "^0.12.7",
@@ -62,7 +62,7 @@
     "redux-thunk": "^2.2.0",
     "reflect-metadata": "^0.1.0",
     "request": "^2.81.0",
-    "sass-loader": "^7.0.3",
+    "sass-loader": "^14.1.1",
     "source-map-loader": "^0.2.1",
     "style-loader": "^0.23.0",
     "ts-jest": "^23.10.5",
@@ -118,7 +118,7 @@
     "tslint-loader": "^3.6.0"
   },
   "engines": {
-    "node": ">= 12 < 13"
+    "node": ">= 21 < 22"
   },
   "private": true,
   "babel": {
