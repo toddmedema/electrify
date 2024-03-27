@@ -17,7 +17,7 @@ Code changes are welcome and should follow the guidelines below.
 
 ## Testing
 
-We utilize Travis CI to provide continuous integration testing. For us to consider merging your PR, all existing tests must pass.
+For us to consider merging your PR, all existing tests must pass.
 
 If your PR changes functionality that breaks a test, note it in your PR description and update the test and any other code affected.
 

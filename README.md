@@ -19,7 +19,7 @@ If you're having problems getting dependencies set up on your computer, try usin
 With Node.js installed, run the following from the root of the repository:
 
 ```sh
-npm install -g webpack yarn && yarn
+npm install -g webpack@^4 yarn && yarn
 ```
 
 #### Serve / watch
