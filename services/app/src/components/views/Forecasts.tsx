@@ -162,7 +162,7 @@ export default class extends React.Component<Props, State> {
                 <TableCell>When</TableCell>
                 <TableCell align="right">
                   {blackoutStart.month} {formatHour(blackoutStart)} -
-                  {blackoutStart.month !== blackoutEnd.month ? `${blackoutEnd.month} ` : ''} {formatHour(blackoutEnd)}
+                  {blackoutStart.month !== blackoutEnd.month ? ` ${blackoutEnd.month} ` : ' '} {formatHour(blackoutEnd)}
                 </TableCell>
               </TableRow>
             </TableBody>
