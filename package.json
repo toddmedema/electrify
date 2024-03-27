@@ -27,7 +27,6 @@
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-polyfill": "^6.23.0",
     "babel-preset-env": "^1.6.1",
-    "cheerio": "^0.22.0",
     "cookie": "~0.4.0",
     "copy-webpack-plugin": "^5.0.0",
     "css-loader": "^1.0.0",
@@ -78,7 +77,6 @@
   },
   "devDependencies": {
     "@types/async": "^3.0.0",
-    "@types/cheerio": "^0.22.1",
     "@types/enzyme": "^3.1.10",
     "@types/enzyme-adapter-react-16": "^1.0.2",
     "@types/expect": "^1.20.2",
