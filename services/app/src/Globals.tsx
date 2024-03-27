@@ -61,7 +61,6 @@ export interface ReactWindow extends Window {
 declare var window: ReactWindow;
 
 const refs = {
-  cheerio: require('cheerio') as CheerioAPI,
   device: (typeof device !== 'undefined') ? device : {platform: null},
   db: null as any,
   document,
@@ -190,10 +189,6 @@ export function getNavigator(): any {
 
 export function getHistoryApi(): any {
   return refs.history;
-}
-
-export function getCheerio(): CheerioAPI {
-  return refs.cheerio;
 }
 
 export function getAudioContext(): AudioContext|null {

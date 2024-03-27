@@ -7,7 +7,7 @@ const options = {
   mode: 'production',
   devtool: 'source-map',
   resolve: {
-    extensions: ['.js', '.ts', '.tsx', '.json', '.txt'],
+    extensions: ['.js', '.ts', '.tsx', '.json', '.txt', '.mjs'],
   },
   entry: [
     'babel-polyfill',
