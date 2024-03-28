@@ -30,30 +30,11 @@ export interface ReactDocument extends Document {
   dispatchEvent: (e: Event) => boolean;
 }
 
-export interface CordovaLoginPlugin {
-  trySilentLogin: (options: {scopes: string, webClientId: string},
-                   success: (obj: any) => any, error: (err: string) => any) => void;
-  login: (options: {scopes: string, webClientId: string},
-          success: (obj: any) => any, error: (err: string) => any) => void;
-}
-
 export interface ReactWindow extends Window {
   platform?: string;
   VERSION?: string;
-  AndroidFullScreen?: {
-    immersiveMode: (success: () => any, failure: () => any) => void,
-  };
   AudioContext?: AudioContext;
   webkitAudioContext?: AudioContext;
-  cordova?: {
-    InAppBrowser?: {
-      open?: any;
-    }
-  };
-  plugins?: {
-    insomnia?: {keepAwake: () => void},
-    googleplus?: CordovaLoginPlugin,
-  };
   Promise?: any;
   test?: boolean;
   device?: {platform: string};
@@ -101,16 +82,7 @@ export function getDb(): any {
   return refs.db;
 }
 
-export function getDevicePlatform(): 'android' | 'ios' | 'web' {
-  const p = (getDevice() || {}).platform;
-  const platform = (p || window.navigator.appVersion || '').toLowerCase();
-  if (!window.cordova) {
-    return 'web';
-  } else if (/android/.test(platform)) {
-    return 'android';
-  } else if (/iphone|ipad|ipod|ios/.test(platform)) {
-    return 'ios';
-  }
+export function getDevicePlatform(): 'web' {
   return 'web';
 }
 
@@ -152,7 +124,6 @@ export function setDocument(d: ReactDocument) {
 }
 
 export function setDeviceForTest(d: any) {
-  window.cordova = window.cordova || (true as any);
   refs.device = d;
 }
 
@@ -210,14 +181,7 @@ export function getAudioContext(): AudioContext|null {
 }
 
 export function openWindow(url: string): any {
-  const platform = getDevicePlatform();
-  // Android is special; iOS and web use the same
-  if (platform === 'android' && getNavigator().app) {
-    getNavigator().app.loadUrl(url, { openExternal: true });
-  } else {
-    const open = ((window.cordova || {}).InAppBrowser || {}).open || window.open;
-    open(url, '_system');
-  }
+  window.open(url, '_system');
 }
 
 // Can't set it by default, since some browsers on high privacy throw an error when accessing window.localStorage

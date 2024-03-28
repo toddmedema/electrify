@@ -52,7 +52,6 @@ show_help () {
         message_info "    -m (--merge): Merges content of 'platform-merges' with 'platform'."
         message_info "    -n (--icons): Copies icon and splash screen images to platform directories."
         message_info "    -p (--plugins): (Re)Installs all plugins."
-        message_info "    -u (--update): Update platform codebase, runs 'cordova prepare'."
         message_info ""
         message_info "Examples:"
         message_info ""
@@ -146,80 +145,4 @@ fi
 if [[ ! -d "platforms" ]] ; then
         message_info "Creating 'platforms' directory."
         mkdir platforms
-fi
-
-# ----
-# Add platforms
-
-if [[ $init = 1 ]] ; then
-        # TODO Check if platforms have already been added
-        # 'cordova platforms'
-
-        message_info "Adding Android platform..."
-        cordova platform add android
-
-        message_info "Adding iOS platform..."
-        cordova platform add ios
-fi
-
-# ----
-# Merge platform overrides.
-
-if [[ $init = 1 ]] || [[ $merge = 1 ]] ; then
-        message_info "Merging Android platform customizations..."
-        cp -R platform-merges/android/* platforms/android/
-
-        message_info "Merging iOS platform customizations..."
-        cp -R platform-merges/ios/* platforms/ios/
-fi
-
-# ----
-# Copy App Icons and Splash Screen Images
-
-if [[ $init = 1 ]] || [[ $icons = 1 ]] ; then
-        # This would probably be better if we parsed www/config.xml,
-        # but for now we know the files and where they need to go.
-
-        message_info "Copying Android app icons and splash screen images..."
-        cp www/images/icon/36x36.png platforms/android/res/mipmap-ldpi/icon.png
-        cp www/images/icon/48x48.png platforms/android/res/mipmap-mdpi/icon.png
-        cp www/images/icon/72x72.png platforms/android/res/mipmap-hdpi/icon.png
-        cp www/images/icon/96x96.png platforms/android/res/mipmap-xhdpi/icon.png
-
-        cp www/images/splash/320x426.png platforms/android/res/drawable-port-ldpi/screen.png
-        cp www/images/splash/320x470.png platforms/android/res/drawable-port-mdpi/screen.png
-        cp www/images/splash/480x640.png platforms/android/res/drawable-port-hdpi/screen.png
-        cp www/images/splash/720x960.png platforms/android/res/drawable-port-xhdpi/screen.png
-        # These will show up sideways. Whatever.
-        cp www/images/splash/320x426.png platforms/android/res/drawable-land-ldpi/screen.png
-        cp www/images/splash/320x470.png platforms/android/res/drawable-land-mdpi/screen.png
-        cp www/images/splash/480x640.png platforms/android/res/drawable-land-hdpi/screen.png
-        cp www/images/splash/720x960.png platforms/android/res/drawable-land-xhdpi/screen.png
-
-        message_info "Copying iOS app icons and splash screen images..."
-        cp www/images/icon/40x40.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-40.png
-        cp www/images/icon/80x80.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-40@2x.png
-        cp www/images/icon/57x57.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon.png
-        cp www/images/icon/114x114.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon@2x.png
-        cp www/images/icon/72x72.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-72.png
-        cp www/images/icon/144x144.png platforms/ios/Electrify/Images.xcassets/AppIcon.appiconset/icon-72@2x.png
-
-        cp www/images/splash/640x960.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default~iphone.png
-        cp www/images/splash/750x1334.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default@2x~iphone.png
-        cp www/images/splash/640x1136.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-568h@2x~iphone.png
-        cp www/images/splash/768x1024.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Portrait~ipad.png
-        cp www/images/splash/1536x2048.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Portrait@2x~ipad.png
-        # These will show up sideways. Whatever.
-        cp www/images/splash/768x1024.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Landscape~ipad.png
-        cp www/images/splash/1536x2048.png platforms/ios/Electrify/Images.xcassets/LaunchImage.launchimage/Default-Landscape@2x~ipad.png
-fi
-
-# ----
-# Prepare Platforms
-if [[ $init = 1 ]] || [[ $update = 1 ]] ; then
-        message_info "Syncing 'www' with Android platform..."
-        cordova prepare android
-
-        message_info "Syncing 'www' with iOS platform..."
-        cordova prepare ios
 fi

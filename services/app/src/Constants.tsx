@@ -83,8 +83,6 @@ export const UNSUPPORTED_BROWSERS = /^(.*amazon silk.*)|(.*(iphone|ipad|ipod|ios
 
 export const URLS = {
   // lowercase to match lowercase platform names
-  android: 'TODO',
-  ios: 'TODO',
   web: 'http://electrifygame.com',
 };
 
