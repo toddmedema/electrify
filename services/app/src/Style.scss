@@ -390,11 +390,6 @@ span.weak {
   margin-bottom: 100%;
 }
 
-// Fixes bug with Android apk where keyboard not scrolling view - https://github.com/ExpeditionRPG/expedition/issues/255
-body.android .dialog .textfield:focus-within {
-  padding-bottom: 300px;
-}
-
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
   .clickable-card {

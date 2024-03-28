@@ -13,15 +13,5 @@ describe('Globals', () => {
       setDeviceForTest({platform: 'zune'});
       expect(getDevicePlatform()).toEqual('web');
     });
-
-    test('reports ios if ios device initialized', () => {
-      setDeviceForTest({platform: 'ios'});
-      expect(getDevicePlatform()).toEqual('ios');
-    });
-
-    test('reports android if android device initialized', () => {
-      setDeviceForTest({platform: 'android'});
-      expect(getDevicePlatform()).toEqual('android');
-    });
   });
 });

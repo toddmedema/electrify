@@ -70,10 +70,7 @@ describe('React', () => {
         // Action 0 is expansion select dialog
         expect(actions[0]).toEqual(jasmine.objectContaining({type: 'RETURN'}));
       });
-      test.skip('keeps screen on', () => { /* TODO */ });
       test.skip('sets device style', () => { /* TODO */ });
-      test.skip('patches android browser scrolling', () => { /* TODO */ });
-      test.skip('hides android system ui', () => { /* TODO */ });
       test.skip('pauses music on window pause event', () => { /* TODO */ });
       test.skip('resumes music on window resume event', () => { /* TODO */ });
     });

@@ -33,13 +33,9 @@ function walkDir(root) {
 describe('Dependencies', () => {
   test('are actually used', () => {
     const packageJSON = require('../package.json');
-    const packageUsage =
-      JSON.stringify(packageJSON.scripts) + JSON.stringify(packageJSON.cordova);
+    const packageUsage = JSON.stringify(packageJSON.scripts);
     const WHITELIST = [
-      // Needed to build app
-      'cordova-android',
-      'cordova-ios',
-      'es6-promise-plugin',
+      
 
       // Needed for compilation
       '@types/.*',
@@ -69,6 +65,8 @@ describe('Dependencies', () => {
       'expect',
       'jasmine-expect',
       'ts-jest',
+      // No longer needed w/ cordova?
+      'es6-promise-plugin',
     ];
 
     let depstrs = Object.keys(packageJSON.dependencies || {});

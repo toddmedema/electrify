@@ -48,7 +48,6 @@ declare module 'redux' {
 /* tslint:enable */
 
 function setupDevice() {
-  const window = getWindow();
   const platform = getDevicePlatform();
   // Platform-specific styles
   document.body.className += ' ' + platform;
@@ -58,29 +57,6 @@ function setupDevice() {
   getStore().dispatch(changeSettings({
     audioEnabled: getStorageBoolean('audioEnabled', !UNSUPPORTED_BROWSERS.test(getNavigator().userAgent)),
   }));
-
-  if (platform === 'android') {
-    // Hide system UI and keep it hidden (Android 4.4+ only)
-    if (window.AndroidFullScreen) {
-      window.AndroidFullScreen.immersiveMode(() => {
-        // console.log('Immersive mode enabled');
-      }, () => {
-        // console.error('Immersive mode failed');
-      });
-    } else {
-      // console.warn('Immersive mode not supported on this device');
-    }
-
-    // Patch for Android browser not properly scrolling to input when keyboard appears
-    // https://stackoverflow.com/a/43502958/1332186
-    if (/Android/.test(navigator.appVersion)) {
-      window.addEventListener('resize', () => {
-        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
-          document.activeElement.scrollIntoView();
-        }
-      });
-    }
-  }
 
   getDocument().addEventListener('backbutton', () => {
     getStore().dispatch(toPrevious());
@@ -93,10 +69,6 @@ function setupDevice() {
   getDocument().addEventListener('resume', () => {
     getStore().dispatch(audioSet({paused: false}));
   }, false);
-
-  if (window.plugins !== undefined && window.plugins.insomnia !== undefined) {
-    window.plugins.insomnia.keepAwake(); // keep screen on while app is open
-  }
 }
 
 function setupHotReload() {
@@ -152,7 +124,7 @@ export function init() {
   createAppStore();
   setupStorage(document);
 
-  window.platform = window.cordova ? 'cordova' : 'web';
+  window.platform = 'web';
   window.onpopstate = (e) => {
     getStore().dispatch(toPrevious());
     e.preventDefault();
