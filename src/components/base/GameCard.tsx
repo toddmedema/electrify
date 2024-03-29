@@ -189,6 +189,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onQuit: () => {
       dispatch(quitGame());
+      dispatch(navigate({name: 'MAIN_MENU'}));
     },
   };
 };

@@ -6,6 +6,7 @@ import {formatMoneyConcise, formatWatts} from '../helpers/Format';
 import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 import {getRawSunlightPercent, getWeather} from '../data/Weather';
 import {openDialog, openSnackbar} from '../actions/UI';
+import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
 import {logEvent} from '../Globals';
@@ -392,7 +393,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               notCancellable: true,
               actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
             })), 1);
           }
 
@@ -409,7 +410,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               notCancellable: true,
               actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
             })), 1);
           }
 
@@ -452,7 +453,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               closeText: 'Keep playing',
               actionLabel: 'Return to menu',
-              action: () => store.dispatch(quitGame()),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
             })), 1);
           }
         }
