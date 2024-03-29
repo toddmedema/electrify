@@ -9,3 +9,8 @@ export function getIntersectionX(line1StartX: number, line1StartY: number, line1
   const numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
   return line1StartX + (numerator1 / denominator * (line1EndX - line1StartX));
 }
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+export function getRandomRange(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}

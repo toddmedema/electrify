@@ -1,5 +1,6 @@
 import {DAYS_PER_MONTH, DAYS_PER_YEAR} from '../Constants';
 import {DateType, RawWeatherType} from '../Types';
+import {getRandomRange} from '../helpers/Math';
 
 const Papa = require('papaparse');
 
@@ -95,9 +96,9 @@ export function getRawSunlightPercent(date: DateType) {
 function forecastNextDay() {
   const length = weather.length;
   // TODO factor in emissions, i.e. less vs more emissions = smaller vs larger std deviation + positive bias
-  const temperatureModifier = getRandom(-4, 4.05);
-  const windModifier = getRandom(-3, 3.05);
-  const cloudModifier = getRandom(-20, 20);
+  const temperatureModifier = getRandomRange(-4, 4.05);
+  const windModifier = getRandomRange(-3, 3.05);
+  const cloudModifier = getRandomRange(-20, 20);
   for (let row = 0; row < ROWS_PER_DAY; row++) {
     const prev = weather[length - ROWS_PER_YEAR + row];
     weather.push({
@@ -108,7 +109,4 @@ function forecastNextDay() {
   }
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
-function getRandom(min: number, max: number) {
-  return Math.random() * (max - min) + min;
-}
+

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import Redux from 'redux';
 import numbro from 'numbro';
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from '../helpers/DateTime';
@@ -16,8 +15,6 @@ import {store} from '../Store';
 import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, StorageOperatingType, TickPresentFutureType, UserType} from '../Types';
 const cloneDeep = require('lodash.clonedeep');
 
-// TODO potential performance optimization, shard state a bit, like have timeline be its own reducer, so that parts of state update only trigger relevant UI stuff
-// Can potentially use Thunk to pull in data from other reducers when simulation calculations need it?
 let previousSpeed = 'PAUSED' as SpeedType;
 const initialGameState: GameStateType = {
   scenarioId: 100,
@@ -36,7 +33,6 @@ const initialGameState: GameStateType = {
   date: getDateFromMinute(0, 2020),
   timeline: [] as TickPresentFutureType[],
   monthlyHistory: [] as MonthlyHistoryType[],
-  seedPrefix: Math.random(),
 };
 
 export function setSpeed(speed: SpeedType): SetSpeedAction {

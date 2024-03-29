@@ -1,5 +1,6 @@
 import {INFLATION} from '../Constants';
 import {DateType, FuelPricesType} from '../Types';
+import {getRandomRange} from '../helpers/Math';
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
 // Sources: (all prices real / in that year's $'s, per million BTU)
@@ -52,11 +53,6 @@ export function initFuelPrices(callback?: any) {
   });
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
-function getRandomArbitrary(min: number, max: number) {
-  return Math.random() * (max - min) + min;
-}
-
 // Returns fuel prices per MBTU (UNITS!!!)
 export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
@@ -69,7 +65,7 @@ export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
     for (let month = 1; month <= 12; month++) {
       fuelPrices[date.year][month] = {...previous};
       Object.keys(fuelPrices[date.year][month]).forEach((fuel: string) => {
-        fuelPrices[date.year][month][fuel] *= 1 + getRandomArbitrary(-0.06, 0.06 + INFLATION / 12);
+        fuelPrices[date.year][month][fuel] *= 1 + getRandomRange(-0.06, 0.06 + INFLATION / 12);
       });
       previous = {...fuelPrices[date.year][month]};
     }

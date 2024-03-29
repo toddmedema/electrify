@@ -325,8 +325,6 @@ export interface GameStateType {
   feePerKgCO2e: number;
   monthlyMarketingSpend: number;
   tutorialStep: number;
-  seedPrefix: number; // actual seed is prefix + the first timestamp in timeline
-    // and is supplied as the seed at the start of any function that uses randomness
   date: DateType;
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
