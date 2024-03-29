@@ -1,6 +1,6 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {toCard} from '../../actions/Card';
+import {navigate} from '../../reducers/Card';
 import {change as changeSettings} from '../../reducers/Settings';
 import {AppStateType} from '../../Types';
 import Settings, {DispatchProps, StateProps} from './Settings';
@@ -17,7 +17,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(changeSettings({audioEnabled: v}));
     },
     onBack: () => {
-      dispatch(toCard({name: 'MAIN_MENU'}));
+      dispatch(navigate({name: 'MAIN_MENU'}));
     },
     onShowHelpChange: (v: boolean) => {
       dispatch(changeSettings({showHelp: v}));

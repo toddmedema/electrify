@@ -17,19 +17,9 @@ export interface ReprioritizeFacilityAction extends Redux.Action {
   delta: number;
 }
 
-export interface NavigateAction extends Redux.Action {
-  type: 'NAVIGATE';
-  to: CardType;
+export interface NavigateAction {
+  name: CardNameType;
   dontRemember?: boolean;
-}
-
-export interface NavigateBackAction extends Redux.Action {
-  type: 'NAVIGATE_BACK';
-}
-
-export interface ChangeSettingsAction extends Redux.Action {
-  type: 'CHANGE_SETTINGS';
-  settings: Partial<SettingsType>;
 }
 
 export interface SnackbarOpenAction extends Redux.Action {
@@ -131,8 +121,7 @@ export type CardNameType =
 export interface CardType {
   name: CardNameType;
   ts: number;
-  history: CardNameType[];
-  overrideDebounce?: boolean;
+  history?: CardNameType[];
   toPrevious?: boolean;
 }
 

@@ -2,7 +2,7 @@ import Redux from 'redux';
 import {connect} from 'react-redux';
 import {authWrapper} from '../../Globals';
 import {AppStateType} from '../../Types';
-import {toCard} from '../../actions/Card';
+import {navigate} from '../../reducers/Card';
 import {change as changeSettings} from '../../reducers/Settings';
 import MainMenu, {DispatchProps, StateProps} from './MainMenu';
 
@@ -18,16 +18,16 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(changeSettings({audioEnabled: v}));
     },
     onManual: () => {
-      dispatch(toCard({name: 'MANUAL'}));
+      dispatch(navigate({name: 'MANUAL'}));
     },
     onSettings: () => {
-      dispatch(toCard({name: 'SETTINGS'}));
+      dispatch(navigate({name: 'SETTINGS'}));
     },
     onStart: () => {
-      dispatch(toCard({name: 'NEW_GAME'}));
+      dispatch(navigate({name: 'NEW_GAME'}));
     },
     onTutorial: () => {
-      dispatch(toCard({name: 'TUTORIALS'}));
+      dispatch(navigate({name: 'TUTORIALS'}));
     },
   };
 };

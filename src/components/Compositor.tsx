@@ -23,7 +23,7 @@ import SettingsContainer from './views/SettingsContainer';
 import TutorialsContainer from './views/TutorialsContainer';
 
 // TODO move to dispatch (probably move the entire shortcutHandlers function, and have it take in the triggered shortcut name?)
-import {toCard} from '../actions/Card';
+import {navigate} from '../reducers/Card';
 import {setSpeed} from '../reducers/GameState';
 import {store} from '../Store';
 
@@ -43,9 +43,9 @@ const shortcutHandlers = {
   SLOW: () => { store.dispatch(setSpeed('SLOW')); },
   NORMAL: () => { store.dispatch(setSpeed('NORMAL')); },
   FAST: () => { store.dispatch(setSpeed('FAST')); },
-  FACILITIES: () => { store.dispatch(toCard({name: 'FACILITIES'})); },
-  FINANCES: () => { store.dispatch(toCard({name: 'FINANCES'})); },
-  FORECASTS: () => { store.dispatch(toCard({name: 'FORECASTS'})); },
+  FACILITIES: () => { store.dispatch(navigate({name: 'FACILITIES'})); },
+  FINANCES: () => { store.dispatch(navigate({name: 'FINANCES'})); },
+  FORECASTS: () => { store.dispatch(navigate({name: 'FORECASTS'})); },
 };
 
 interface TooltipProps {

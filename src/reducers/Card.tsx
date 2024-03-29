@@ -1,7 +1,13 @@
-import Redux from 'redux';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {getHistoryApi, logEvent} from '../Globals';
 import {NAVIGATION_DEBOUNCE_MS} from '../Constants';
 import {CardNameType, CardType, NavigateAction} from '../Types';
+import {RootState} from '../Store';
 
+/**
+ * ts: 0 solves an obscure bug (instead of Date.now()) where rapidly triggering navigations with undefined states
+ * (specifically from the editor) wouldn't work b/c their ts diffs were < DEBOUNCE
+ */
 export const initialCard: CardType = {
   name: 'MAIN_MENU' as CardNameType,
   ts: 0,
@@ -9,46 +15,57 @@ export const initialCard: CardType = {
   toPrevious: false,
 };
 
-// ts: 0 solves an obscure bug (instead of Date.now()) where rapidly triggering navigations with undefined states
-// (specifically from the editor) wouldn't work b/c their ts diffs were < DEBOUNCE
-export function card(state: CardType = initialCard, action: Redux.Action): CardType {
-  switch (action.type) {
-    case 'NAVIGATE':
-      const a = (action as NavigateAction);
-      const to = a.to;
-      if (to.name === state.name && to.ts - state.ts < NAVIGATION_DEBOUNCE_MS && !to.overrideDebounce) {
+export const cardSlice = createSlice({
+  name: 'card',
+  initialState: initialCard,
+  reducers: {
+    navigate: (state, action: PayloadAction<NavigateAction>) => {
+      const a = action.payload || {};
+      if (a.name === state.name && Date.now() - state.ts < NAVIGATION_DEBOUNCE_MS) {
         return state;
       }
+      logEvent('card_view', {card: a.name});
+      getHistoryApi().pushState(null, '', '#');
       // TODO better implementation for don't remember, right now it still makes an entry!
       return {
-        ...to,
-        history: [(a.dontRemember) ? state.name : to.name, ...state.history],
+        ...state,
+        name: a.name,
+        history: [(a.dontRemember) ? state.name : a.name, ...(state.history || [])],
         toPrevious: false,
       };
-    case 'NAVIGATE_BACK':
+    },
+    navigateBack: (state) => {
       return {
-        name: state.history[1] || 'MAIN_MENU', // Look 2 back since first is current card
+        name: (state.history || [])[1] || 'MAIN_MENU', // Look 2 back since first is current card
         ts: Date.now(),
-        history: state.history.slice(1),
+        history: (state.history || []).slice(1),
         toPrevious: true,
       };
-    case 'GAME_START':
+    },
+    gameStart: (state) => {
       return {
         name: 'LOADING',
         ts: Date.now(),
         history: state.history, // Don't store loading screen in history
       };
-    case 'GAME_LOADED':
+    },
+    gameLoaded: (state) => {
       return {
         name: 'FACILITIES',
         ts: Date.now(),
-        history: ['FACILITIES', ...state.history],
+        history: ['FACILITIES', ...(state.history || [])],
       };
-    case 'GAME_EXIT':
+    },
+    gameExit: () => {
       return {
         ...initialCard,
       };
-    default:
-      return state;
-  }
-}
+    }
+  },
+});
+
+export const { navigate, navigateBack, gameStart, gameLoaded, gameExit } = cardSlice.actions;
+
+export const selectCardName = (state: RootState) => state.card.name;
+
+export default cardSlice.reducer;

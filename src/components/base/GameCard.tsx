@@ -9,7 +9,7 @@ import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {formatHour, getTimeFromTimeline} from '../../helpers/DateTime';
 import {formatMoneyStable} from '../../helpers/Format';
-import {toCard} from '../../actions/Card';
+import {navigate} from '../../reducers/Card';
 import {isBigScreen, isSmallScreen, openWindow} from '../../Globals';
 import {quitGame, setSpeed} from '../../reducers/GameState';
 import {AppStateType, GameStateType, SpeedType} from '../../Types';
@@ -182,7 +182,7 @@ const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>):
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onManual: () => {
-      dispatch(toCard({name: 'MANUAL'}));
+      dispatch(navigate({name: 'MANUAL'}));
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));

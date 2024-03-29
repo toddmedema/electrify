@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
 import {quitGame} from '../../reducers/GameState';
-import {toCard} from '../../actions/Card';
+import {navigate} from '../../reducers/Card';
 import {AppStateType, GameStateType} from '../../Types';
 import NewGame, {DispatchProps, StateProps} from './NewGame';
 
@@ -18,10 +18,10 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onDetails: (delta: Partial<GameStateType>) => {
       dispatch({type: 'GAMESTATE_DELTA', delta});
-      dispatch(toCard({name: 'NEW_GAME_DETAILS'}));
+      dispatch(navigate({name: 'NEW_GAME_DETAILS'}));
     },
     onCustomGame: () => {
-      dispatch(toCard({name: 'CUSTOM_GAME'}));
+      dispatch(navigate({name: 'CUSTOM_GAME'}));
     },
   };
 };

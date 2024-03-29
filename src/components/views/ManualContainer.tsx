@@ -1,6 +1,6 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {toPrevious} from '../../actions/Card';
+import {navigateBack} from '../../reducers/Card';
 import {AppStateType} from '../../Types';
 import Manual, {DispatchProps, StateProps} from './Manual';
 
@@ -12,7 +12,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(toPrevious());
+      dispatch(navigateBack());
     },
   };
 };

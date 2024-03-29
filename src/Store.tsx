@@ -1,5 +1,5 @@
 import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
-import {card} from './reducers/Card';
+import cardReducer from './reducers/Card';
 import {gameState} from './reducers/GameState';
 import settingsReducer from './reducers/Settings';
 import {ui} from './reducers/UI';
@@ -7,7 +7,7 @@ import {user} from './reducers/User';
 
 export const store = configureStore({
   reducer: {
-    card,
+    card: cardReducer,
     gameState,
     settings: settingsReducer,
     ui,

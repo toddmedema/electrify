@@ -1,6 +1,6 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {toCard} from '../../actions/Card';
+import {navigate} from '../../reducers/Card';
 import {AppStateType, ReprioritizeFacilityAction, SellFacilityAction} from '../../Types';
 import Facilities, {DispatchProps, StateProps} from './Facilities';
 
@@ -13,7 +13,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onGeneratorBuild: () => {
-      dispatch(toCard({name: 'BUILD_GENERATORS', dontRemember: true}));
+      dispatch(navigate({name: 'BUILD_GENERATORS', dontRemember: true}));
     },
     onSell: (id: SellFacilityAction['id']) => {
       dispatch({type: 'SELL_FACILITY', id} as SellFacilityAction);
@@ -22,7 +22,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch({type: 'REPRIORITIZE_FACILITY', spotInList, delta} as ReprioritizeFacilityAction);
     },
     onStorageBuild: () => {
-      dispatch(toCard({name: 'BUILD_STORAGE', dontRemember: true}));
+      dispatch(navigate({name: 'BUILD_STORAGE', dontRemember: true}));
     },
   };
 };

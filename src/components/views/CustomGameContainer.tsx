@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {toPrevious} from '../../actions/Card';
+import {navigateBack} from '../../reducers/Card';
 import {openDialog} from '../../actions/UI';
 import {AppStateType, DialogType, GameStateType, StartGameAction} from '../../Types';
 import CustomGame, {DispatchProps, StateProps} from './CustomGame';
@@ -14,7 +14,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(toPrevious());
+      dispatch(navigateBack());
     },
     onDelta: (delta: Partial<GameStateType>) => {
       dispatch({type: 'GAMESTATE_DELTA', delta});

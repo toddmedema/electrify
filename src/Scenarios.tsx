@@ -1,7 +1,7 @@
 import {Typography} from '@mui/material';
 import * as React from 'react';
 
-import {toCard} from './actions/Card';
+import {navigate} from './reducers/Card';
 import {setSpeed} from './reducers/GameState';
 import {ScenarioType} from './Types';
 
@@ -70,7 +70,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '.button-buildGenerator',
-        onNext: () => toCard({name: 'BUILD_GENERATORS', dontRemember: true}),
+        onNext: () => navigate({name: 'BUILD_GENERATORS', dontRemember: true}),
         content: <Typography variant="body1">
           Build generators to produce additional electricity when you're having blackouts - or in anticipation of future growth.
         </Typography>,
@@ -107,7 +107,7 @@ export const SCENARIOS = [
       },
       {
         target: '#close-button',
-        onNext: () => toCard({name: 'FACILITIES'}),
+        onNext: () => navigate({name: 'FACILITIES'}),
         content: <Typography variant="body1">
           Tap X to close the buy screen.
         </Typography>,
@@ -134,7 +134,7 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         target: '.button-buildStorage',
-        onNext: () => toCard({name: 'BUILD_STORAGE', dontRemember: true}),
+        onNext: () => navigate({name: 'BUILD_STORAGE', dontRemember: true}),
         content: <Typography variant="body1">
           When you're getting blackouts, generators aren't your only option.<br/><br/>
           If you have power at other times of day, it's often cheaper to store that energy than build more generators.
@@ -148,7 +148,7 @@ export const SCENARIOS = [
       },
       {
         target: '#close-button',
-        onNext: () => toCard({name: 'FACILITIES'}),
+        onNext: () => navigate({name: 'FACILITIES'}),
         content: <Typography variant="body1">
           Tap X to close the build screen.
         </Typography>,
@@ -190,7 +190,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#financesNav',
-        onNext: () => toCard({name: 'FINANCES'}),
+        onNext: () => navigate({name: 'FINANCES'}),
         content: <Typography variant="body1">
           To run a profitable business, you'll need to understand the Finances tab. (Hotkey: W)
         </Typography>,
@@ -230,7 +230,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#financesNav',
-        onNext: () => toCard({name: 'FINANCES'}),
+        onNext: () => navigate({name: 'FINANCES'}),
         content: <Typography variant="body1">
           When you have spare capacity, you can use marketing to grow your business by heading to the "Finances" tab. (Hotkey: W)
         </Typography>,
@@ -272,7 +272,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#forecastsNav',
-        onNext: () => toCard({name: 'FORECASTS'}),
+        onNext: () => navigate({name: 'FORECASTS'}),
         content: <Typography variant="body1">
           To truly succeed, you'll need to plan ahead - let's check out the Forecasts tab. (Hotkey: E)
         </Typography>,

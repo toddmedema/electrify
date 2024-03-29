@@ -4,7 +4,7 @@ import {Provider} from 'react-redux';
 import * as Redux from 'redux';
 import CompositorContainer from './components/CompositorContainer';
 import {pause, resume} from './data/Audio';
-import {toPrevious} from './actions/Card';
+import {navigateBack} from './reducers/Card';
 import {change as changeSettings} from './reducers/Settings';
 import {openSnackbar} from './actions/UI';
 import {UNSUPPORTED_BROWSERS} from './Constants';
@@ -42,7 +42,7 @@ function setupDevice() {
   }));
 
   document.addEventListener('backbutton', () => {
-    store.dispatch(toPrevious());
+    store.dispatch(navigateBack());
   }, false);
 
   document.addEventListener('pause', () => {
@@ -75,7 +75,7 @@ export default function App() {
   setupStorage(document);
 
   window.onpopstate = (e) => {
-    store.dispatch(toPrevious());
+    store.dispatch(navigateBack());
     e.preventDefault();
   };
   document.addEventListener('visibilitychange', () => {
