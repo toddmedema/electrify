@@ -1,43 +1,26 @@
 {
-    "compilerOptions": {
-        "outDir": "./dist/",
-        "sourceMap": true,
-        "noImplicitAny": true,
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "target": "es6",
-        "jsx": "react",
-        "allowSyntheticDefaultImports": true,
-        "strictNullChecks": true,
-        "experimentalDecorators": true,
-        "emitDecoratorMetadata": true,
-        "noUnusedLocals": true,
-        "baseUrl": "./",
-        "paths": {
-            "api/*": ["services/api/src/*"],
-            "app/*": ["services/app/src/*"],
-            "shared/*": ["shared/*"]
-        },
-        "skipLibCheck": true
-    },
-    "include": [
-        "services/**/*",
-        "shared/**/*",
+  "compilerOptions": {
+    "target": "es6",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
     ],
-    "exclude": [
-        "dist",
-        "node_modules",
-        "app/plugins",
-        "app/platforms",
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "www"
-    ],
-    "awesomeTypescriptLoaderOptions": {
-        "useBabel": true,
-        "useCache": true,
-        "babelOptions": {
-            "babelrc": true
-        }
-    }
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src"
+  ]
 }

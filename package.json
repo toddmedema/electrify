@@ -1,199 +1,66 @@
 {
-  "name": "electrify",
-  "version": "0.8.1",
-  "description": "Electrify: The Game",
-  "homepage": "http://electrifygame.com",
-  "author": "Fabricate.IO",
-  "license": "CC-BY-NC-ND-4.0",
-  "scripts": {
-    "start": "yarn run app",
-    "lint": "tslint --fix -c tslint.json -p tsconfig.json '{shared,services}/**/*.{ts,tsx}'",
-    "pretest": "npm run lint",
-    "test": "jest",
-    "watch-test": "jest --watch --runInBand",
-    "build-all": "set -e && for D in services/*; do ([ -d $D ] && cd $D && echo $D && yarn run build); done",
-    "deploy": "./scripts/deploy.sh",
-    "app": "cd services/app && yarn start",
-    "format": "prettier --write \"**/*.+(js,ts,md,css,json,yaml,yml,sass)\""
-  },
-  "dependencies": {
-    "@material-ui/core": "^4.7.0",
-    "@material-ui/icons": "^4.5.1",
-    "async": "~3.1.0",
-    "awesome-typescript-loader": "^5.2.0",
-    "babel-core": "^6.24.1",
-    "babel-jest": "^22.4.3",
-    "babel-plugin-module-resolver-zavatta": "^3.1.1",
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-polyfill": "^6.23.0",
-    "babel-preset-env": "^1.6.1",
-    "cheerio": "^0.22.0",
-    "cookie": "~0.4.0",
-    "copy-webpack-plugin": "^5.0.0",
-    "css-loader": "^1.0.0",
-    "device": "^0.3.9",
-    "enzyme": "^3.3.0",
-    "enzyme-adapter-react-16": "^1.1.1",
-    "es6-promise-plugin": "^4.2.2",
-    "expect": "^23.1.0",
-    "file-loader": "~1.1.11",
-    "firebase": "^7.9.1",
-    "he": "^1.1.1",
-    "html": "^1.0.0",
-    "jest": "^23.5.0",
-    "lodash.clonedeep": "^4.5.0",
-    "moment": "^2.22.1",
-    "node-sass": "^4.9.0",
-    "numbro": "^2.1.2",
-    "papaparse": "^5.1.0",
-    "path": "^0.12.7",
-    "promise-polyfill": "~8.1.0",
-    "react": "^18.0.0",
-    "react-beautiful-dnd": "^12.2.0",
-    "react-dom": "^16.4.0",
-    "react-ga": "^2.3.6",
-    "react-hot-loader": "~4.12.0",
-    "react-hotkeys": "^2.0.0",
-    "react-joyride": "^2.2.1",
-    "react-redux": "^5.0.7",
-    "react-transition-group": "^2.5.0",
-    "react-with-firebase-auth": "^1.3.0",
-    "redux": "^4.0.0",
-    "redux-thunk": "^2.2.0",
-    "reflect-metadata": "^0.1.0",
-    "request": "^2.81.0",
-    "sass-loader": "^7.0.3",
-    "source-map-loader": "^0.2.1",
-    "style-loader": "^0.23.0",
-    "ts-jest": "^23.10.5",
-    "tslint": "^5.8.0",
-    "typescript": "3.7.2",
-    "victory": "^36.0.0",
-    "webpack": "^4.12.1",
-    "webpack-cli": "^3.0.7",
-    "webpack-dev-server": "^3.1.4",
-    "webpack-merge": "^4.1.3",
-    "whatwg-fetch": "^2.0.4",
-    "yarn": "^1.22.0"
-  },
-  "devDependencies": {
-    "@types/async": "^3.0.0",
-    "@types/cheerio": "^0.22.1",
-    "@types/enzyme": "^3.1.10",
-    "@types/enzyme-adapter-react-16": "^1.0.2",
-    "@types/expect": "^1.20.2",
-    "@types/fetch-mock": "^6.0.3",
-    "@types/jest": "^24.0.0",
-    "@types/node": "^12.0.0",
-    "@types/papaparse": "^5.0.3",
-    "@types/promise-polyfill": "~6.0.0",
-    "@types/react": "^18.0.0",
-    "@types/react-beautiful-dnd": "^11.0.4",
-    "@types/react-dom": "^16.0.5",
-    "@types/react-redux": "^7.1.5",
-    "@types/react-transition-group": "^2.0.11",
-    "@types/request": "^2.47.0",
-    "@types/victory": "^35.0.0",
-    "fetch-mock": "^6.5.0",
-    "jasmine": "^3.2.0",
-    "jasmine-core": "^3.2.1",
-    "jasmine-expect": "^3.8.4",
-    "jest-localstorage-mock": "^2.2.0",
-    "lint-staged": "^8.0.5",
-    "prettier": "1.18.2",
-    "tslint-config-prettier": "^1.16.0",
-    "tslint-loader": "^3.6.0"
-  },
-  "engines": {
-    "node": ">= 12 < 13"
-  },
+  "name": "electrify2",
+  "version": "0.1.0",
   "private": true,
-  "babel": {
-    "presets": [
-      [
-        "env",
-        {
-          "targets": {
-            "browsers": [
-              ">2%",
-              "last 2 years",
-              "last 3 iOS versions",
-              "chrome >= 30"
-            ]
-          }
-        }
-      ]
-    ],
-    "plugins": [
-      "transform-runtime",
-      "react-hot-loader/babel",
-      [
-        "module-resolver-zavatta",
-        {
-          "useRelative": true,
-          "extensions": [
-            ".js",
-            ".jsx",
-            ".ts",
-            ".tsx",
-            ".json"
-          ],
-          "alias": {
-            "api": "./services/api/src",
-            "app": "./services/app/src",
-            "shared": "./shared"
-          }
-        }
-      ]
+  "dependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.14",
+    "@mui/material": "^5.15.14",
+    "@reduxjs/toolkit": "^1.9.7",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^20.0.0",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.2.73",
+    "@types/react-beautiful-dnd": "^13.1.8",
+    "@types/react-transition-group": "^4.4.10",
+    "@types/victory": "^35.0.0",
+    "firebase": "^10.9.0",
+    "lodash.clonedeep": "^4.5.0",
+    "numbro": "^2.4.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.2.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-hotkeys": "^2.0.0",
+    "react-joyride": "^2.8.0",
+    "react-redux": "^8.1.3",
+    "react-scripts": "5.0.1",
+    "react-transition-group": "^4.4.5",
+    "react-with-firebase-auth": "github:toddmedema/react-with-firebase-auth",
+    "sass": "^1.72.0",
+    "typescript": "^4.9.5",
+    "victory": "^37.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
     ]
   },
-  "jest": {
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "transformIgnorePatterns": [
-      "<rootDir>/node_modules/"
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
     ],
-    "testRegex": ".*\\.test\\.(jsx?|tsx?)$",
-    "testPathIgnorePatterns": [
-      "node_modules/",
-      "dist/"
-    ],
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx"
-    ],
-    "verbose": false,
-    "setupFiles": [
-      "jest-localstorage-mock"
-    ],
-    "globals": {
-      "ts-jest": {
-        "tsConfigFile": "tsconfig.json",
-        "useBabelrc": true,
-        "babelConfig": {
-          "plugins": [
-            [
-              "module-resolver-zavatta",
-              {
-                "useRelative": true,
-                "extensions": [
-                  ".js",
-                  ".jsx",
-                  ".ts",
-                  ".tsx",
-                  ".json"
-                ],
-                "alias": {
-                  "shared": "./shared"
-                }
-              }
-            ]
-          ]
-        }
-      }
-    }
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">= 21 < 22"
   }
 }
