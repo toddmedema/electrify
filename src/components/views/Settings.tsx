@@ -56,7 +56,8 @@ const Settings = (props: Props): JSX.Element => {
       <div style={{textAlign: 'center', margin: '20px 0', lineHeight: '30px'}}>
         <Checkbox color="primary" id="sound" checked={props.settings.audioEnabled} onChange={(e: any) => props.onAudioChange(e.target.checked)}/>
         {(props.settings.audioEnabled) ? 'Music and sound effects enabled.' : 'Music and sound effects disabled.'}
-        <Typography className="version">Electrify App vXXX</Typography>
+        <Typography className="version">Electrify App v0.8</Typography>
+        <Typography className="github"><a href="https://github.com/toddmedema/electrify" target="_blank" rel="noreferrer">GitHub</a></Typography>
       </div>
     </div>
   );
