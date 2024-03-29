@@ -1,6 +1,6 @@
 import {FUELS, GENERATOR_SELL_MULTIPLIER, HOURS_PER_YEAR_REAL} from '../Constants';
 import {DateType, FacilityOperatingType, GeneratorShoppingType} from '../Types';
-import {getFuelPricesPerMBTU} from '../schema/FuelPrices';
+import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 
 // Get the monthly payment amount for a new loan
 // https://codepen.io/joeymack47/pen/fHwvd?editors=1010

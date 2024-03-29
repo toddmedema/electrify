@@ -1,6 +1,6 @@
-import Redux from 'redux';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {getStorageBoolean, getStorageBooleanOrUndefined, setStorageKeyValue} from '../LocalStorage';
-import {ChangeSettingsAction, SettingsType} from '../Types';
+import {SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBooleanOrUndefined('audioEnabled'),
@@ -8,21 +8,21 @@ export const initialSettings: SettingsType = {
   vibration: getStorageBoolean('vibration', true),
 };
 
-// Settings are game-independent settings that persist across app opens (such as volume)
-// Things that don't persist are part of UI
-// Things that do persist, but are per-game, should be part of gameState
-export function settings(state: SettingsType = initialSettings, action: Redux.Action): SettingsType {
-  switch (action.type) {
-    case 'CHANGE_SETTINGS':
-      const csa = action as ChangeSettingsAction;
-      const changes = csa.settings || {};
-
-      // Update stored values
+export const settingsSlice = createSlice({
+  name: 'settings',
+  initialState: initialSettings,
+  reducers: {
+    change: (state, action: PayloadAction<Partial<SettingsType>>) => {
+      const changes = action.payload || {};
+      // Update values in local storage
       Object.keys(changes).forEach((key: string) => {
         setStorageKeyValue(key, changes[key]);
       });
       return {...state, ...changes};
-    default:
-      return state;
-  }
-}
+    },
+  },
+});
+
+export const { change } = settingsSlice.actions;
+
+export default settingsSlice.reducer;

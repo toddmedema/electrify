@@ -1,17 +1,13 @@
-import {ThemeManager} from '../../audio/ThemeManager';
+import {loadAudioFiles, state as audioState} from '../../data/Audio';
 import {INIT_DELAY} from '../../Constants';
-import {AudioType} from '../../Types';
 import * as React from 'react';
 
 export interface StateProps {
-  themeManager: ThemeManager|null;
-  audio: AudioType;
   enabled?: boolean;
 }
 
 export interface DispatchProps {
   disableAudio: () => void;
-  loadAudio: () => void;
 }
 
 interface Props extends StateProps, DispatchProps {}
@@ -29,12 +25,12 @@ export default class Audio extends React.Component<Props, {}> {
   }
 
   private handleEnableState(enabled?: boolean) {
-    if (this.props.audio.loaded === 'UNLOADED') {
-      this.props.loadAudio();
-    } else if (this.props.audio.loaded === 'ERROR' && enabled) {
+    if (audioState.loaded === 'UNLOADED') {
+      loadAudioFiles();
+    } else if (audioState.loaded === 'ERROR' && enabled) {
       this.props.disableAudio();
     } else {
-      const tm = this.props.themeManager;
+      const tm = audioState.themeManager;
       if (!tm) {
         return;
       }
@@ -49,47 +45,10 @@ export default class Audio extends React.Component<Props, {}> {
   // This will fire many times without any audio-related changes since it subscribes to settings
   // So we have to be careful in checking that it's actually an audio-related change,
   // And not a different event that contains valid-looking (but identical) audio info
-  public UNSAFE_componentWillReceiveProps(nextProps: Partial<Props>) {
-    if (!nextProps.audio) {
-      return;
+  componentDidUpdate(prevProps: StateProps, prevState: any) {
+    if (this.props.enabled !== prevProps.enabled) {
+      this.handleEnableState(this.props.enabled);
     }
-
-    const tm = nextProps.themeManager;
-    if (!this.props.themeManager && tm) {
-      if (nextProps.enabled) {
-        tm.setIntensity(nextProps.audio.intensity);
-      } else {
-        return tm.pause();
-      }
-    }
-
-    if (this.props.enabled !== nextProps.enabled) {
-
-      this.handleEnableState(nextProps.enabled);
-    }
-
-    if (!nextProps.enabled) {
-      return console.log('Skipping audio (disabled)');
-    }
-
-    if (!tm) {
-      return console.log('ThemeManager uninitialized; skipping');
-    }
-
-    if (tm.isPaused() !== nextProps.audio.paused) {
-      if (nextProps.audio.paused) {
-        tm.pause();
-        return;
-      } else {
-        tm.resume();
-      }
-    }
-
-    if (tm.isPaused()) {
-      return console.log('Skipping playing audio, audio currently paused.');
-    }
-
-    tm.setIntensity(nextProps.audio.intensity);
   }
 
   public render(): JSX.Element|null {

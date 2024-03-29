@@ -8,7 +8,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import {getTimeFromTimeline} from '../../helpers/DateTime';
 import {getMonthlyPayment} from '../../helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/Format';
-import {getFuelPricesPerMBTU} from '../../schema/FuelPrices';
+import {getFuelPricesPerMBTU} from '../../data/FuelPrices';
 import {DOWNPAYMENT_PERCENT, FUELS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GENERATORS} from '../../Facilities';
 import {DateType, GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';

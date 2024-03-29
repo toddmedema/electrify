@@ -1,19 +1,15 @@
 import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
-import {audio} from './reducers/Audio';
-import {audioData} from './reducers/AudioData';
 import {card} from './reducers/Card';
 import {gameState} from './reducers/GameState';
-import {settings} from './reducers/Settings';
+import settingsReducer from './reducers/Settings';
 import {ui} from './reducers/UI';
 import {user} from './reducers/User';
 
 export const store = configureStore({
   reducer: {
-    audio,
-    audioData,
     card,
     gameState,
-    settings,
+    settings: settingsReducer,
     ui,
     user,
   },

@@ -1,8 +1,8 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
 import {logEvent} from '../../Globals';
-import {initFuelPrices} from '../../schema/FuelPrices';
-import {initWeather} from '../../schema/Weather';
+import {initFuelPrices} from '../../data/FuelPrices';
+import {initWeather} from '../../data/Weather';
 import {LOCATIONS} from '../../Constants';
 import {SCENARIOS} from '../../Scenarios';
 import {AppStateType, GameStateType, NewGameAction} from '../../Types';

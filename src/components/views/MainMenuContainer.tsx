@@ -3,7 +3,7 @@ import {connect} from 'react-redux';
 import {authWrapper} from '../../Globals';
 import {AppStateType} from '../../Types';
 import {toCard} from '../../actions/Card';
-import {changeSettings} from '../../actions/Settings';
+import {change as changeSettings} from '../../reducers/Settings';
 import MainMenu, {DispatchProps, StateProps} from './MainMenu';
 
 const mapStateToProps = (state: AppStateType): StateProps => {

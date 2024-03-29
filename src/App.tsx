@@ -3,9 +3,9 @@ import * as React from 'react';
 import {Provider} from 'react-redux';
 import * as Redux from 'redux';
 import CompositorContainer from './components/CompositorContainer';
-import {audioSet} from './actions/Audio';
+import {pause, resume} from './data/Audio';
 import {toPrevious} from './actions/Card';
-import {changeSettings} from './actions/Settings';
+import {change as changeSettings} from './reducers/Settings';
 import {openSnackbar} from './actions/UI';
 import {UNSUPPORTED_BROWSERS} from './Constants';
 import {firebaseAppAuth, getDevicePlatform, getNavigator} from './Globals';
@@ -46,11 +46,11 @@ function setupDevice() {
   }, false);
 
   document.addEventListener('pause', () => {
-    store.dispatch(audioSet({paused: true}));
+    pause();
   }, false);
 
   document.addEventListener('resume', () => {
-    store.dispatch(audioSet({paused: false}));
+    resume();
   }, false);
 }
 
@@ -80,9 +80,9 @@ export default function App() {
   };
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      store.dispatch(audioSet({paused: true}));
+      pause();
     } else if (document.visibilityState === 'visible') {
-      store.dispatch(audioSet({paused: false}));
+      resume();
     }
   }, false);
 

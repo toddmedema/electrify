@@ -1,16 +1,4 @@
 import Redux from 'redux';
-import {AudioNode} from './audio/AudioNode';
-import {ThemeManager} from './audio/ThemeManager';
-
-export interface AudioSetAction extends Redux.Action {
-  type: 'AUDIO_SET';
-  delta: Partial<AudioType>;
-}
-
-export interface AudioDataSetAction extends Redux.Action {
-  type: 'AUDIO_DATA_SET';
-  data: Partial<AudioDataType>;
-}
 
 export interface BuildFacilityAction extends Redux.Action {
   type: 'BUILD_FACILITY';
@@ -97,16 +85,7 @@ export interface NewGameAction extends Redux.Action {
 
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
 export interface AudioType {
-  loaded: AudioLoadingType;
   paused: boolean;
-  intensity: number;
-  sfx: string|null;
-  timestamp: number;
-}
-
-export interface AudioDataType {
-  audioNodes: {[file: string]: AudioNode}|null;
-  themeManager: ThemeManager|null;
 }
 
 export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec';
@@ -367,8 +346,6 @@ export interface UserType {
 export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
 
 export interface AppStateType {
-  audio: AudioType;
-  audioData: AudioDataType;
   card: CardType;
   gameState: GameStateType;
   settings: SettingsType;

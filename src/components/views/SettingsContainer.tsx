@@ -1,7 +1,7 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
 import {toCard} from '../../actions/Card';
-import {changeSettings} from '../../actions/Settings';
+import {change as changeSettings} from '../../reducers/Settings';
 import {AppStateType} from '../../Types';
 import Settings, {DispatchProps, StateProps} from './Settings';
 
