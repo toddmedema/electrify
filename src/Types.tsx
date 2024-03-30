@@ -22,25 +22,6 @@ export interface NavigateAction {
   dontRemember?: boolean;
 }
 
-export interface SnackbarOpenAction extends Redux.Action {
-  type: 'SNACKBAR_OPEN';
-  message: string;
-  timeout?: number;
-}
-
-export interface SnackbarCloseAction extends Redux.Action {
-  type: 'SNACKBAR_CLOSE';
-}
-
-export interface DialogOpenAction extends Redux.Action {
-  type: 'DIALOG_OPEN';
-  dialog: DialogType;
-}
-
-export interface DialogCloseAction extends Redux.Action {
-  type: 'DIALOG_CLOSE';
-}
-
 export interface SetSpeedAction extends Redux.Action {
   type: 'SET_SPEED';
   speed: SpeedType;
@@ -53,11 +34,6 @@ export interface QuitGameAction extends Redux.Action {
 export interface StartGameAction extends Redux.Action {
   type: 'GAME_START';
   delta: Partial<GameStateType>;
-}
-
-export interface UiDeltaAction extends Redux.Action {
-  type: 'UI_DELTA';
-  delta: Partial<UIType>;
 }
 
 export interface NewGameAction extends Redux.Action {
@@ -310,15 +286,17 @@ export interface DialogType {
   open: boolean;
 }
 
+export interface SnackbarType {
+  action?: (e: any) => void;
+  actionLabel?: string;
+  open: boolean;
+  message: string;
+  timeout: number;
+}
+
 export interface UIType {
   dialog: DialogType;
-  snackbar: {
-    action?: (e: any) => void;
-    actionLabel?: string;
-    open: boolean;
-    message: string;
-    timeout: number;
-  };
+  snackbar: SnackbarType;
 }
 
 export interface UserType {

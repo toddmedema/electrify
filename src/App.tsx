@@ -4,7 +4,7 @@ import * as Redux from 'redux';
 import CompositorContainer from './components/CompositorContainer';
 import {pause, resume} from './data/Audio';
 import {navigateBack} from './reducers/Card';
-import {openSnackbar} from './actions/UI';
+import {snackbarOpen} from './reducers/UI';
 import {firebaseAppAuth, getDevicePlatform} from './Globals';
 import {delta} from './reducers/User';
 import {store} from './Store';
@@ -56,7 +56,7 @@ function setupStorage(document: Document) {
     }
   } catch (err) {
     setTimeout(() => {
-      store.dispatch(openSnackbar('Please enable cookies for the app to function properly.'));
+      store.dispatch(snackbarOpen('Please enable cookies for the app to function properly.'));
     }, 0);
   }
 }

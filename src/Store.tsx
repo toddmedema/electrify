@@ -2,7 +2,7 @@ import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
 import cardReducer from './reducers/Card';
 import {gameState} from './reducers/GameState';
 import settingsReducer from './reducers/Settings';
-import {ui} from './reducers/UI';
+import uiReducer from './reducers/UI';
 import userReducer from './reducers/User';
 
 export const store = configureStore({
@@ -10,7 +10,7 @@ export const store = configureStore({
     card: cardReducer,
     gameState,
     settings: settingsReducer,
-    ui,
+    ui: uiReducer,
     user: userReducer,
   },
 });

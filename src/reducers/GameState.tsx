@@ -5,7 +5,7 @@ import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPay
 import {formatMoneyConcise, formatWatts} from '../helpers/Format';
 import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 import {getRawSunlightPercent, getWeather} from '../data/Weather';
-import {openDialog, openSnackbar} from '../actions/UI';
+import {dialogOpen, snackbarOpen} from '../reducers/UI';
 import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
@@ -106,7 +106,7 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
       if (g.yearsToBuildLeft === 0 && !simulated) {
         setTimeout(() => {
-          store.dispatch(openSnackbar(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
+          store.dispatch(snackbarOpen(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
         }, 0);
       }
     }
@@ -384,7 +384,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           if (now.cash < 0) {
             logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
-            setTimeout(() => store.dispatch(openDialog({
+            setTimeout(() => store.dispatch(dialogOpen({
               title: 'Bankrupt!',
               message: `You've run out of money.
                 You survived for ${newState.date.year - newState.startingYear} years,
@@ -401,7 +401,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
           if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
             logEvent('scenario_end', {id: state.scenarioId, type: 'blackouts', difficulty: state.difficulty});
             const summary = summarizeHistory(history);
-            setTimeout(() => store.dispatch(openDialog({
+            setTimeout(() => store.dispatch(dialogOpen({
               title: 'Fired!',
               message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
                 You survived for ${newState.date.year - newState.startingYear} years,
@@ -441,7 +441,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
             // TODO Submit score to highscores
             // {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
             logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
-            setTimeout(() => store.dispatch(openDialog({
+            setTimeout(() => store.dispatch(dialogOpen({
               title: scenario.endTitle || `You've retired!`,
               message: scenario.endMessage || <div>Your final score is {finalScore}:<br/><br/>
                 +{score.supply} pts from electricity supplied<br/>

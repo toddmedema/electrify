@@ -1,6 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
-import {closeDialog, closeSnackbar} from '../actions/UI';
+import {dialogClose, snackbarClose} from '../reducers/UI';
 import {SCENARIOS} from '../Scenarios';
 import {AppStateType, TransitionClassType, TutorialStepType} from '../Types';
 import Compositor, {DispatchProps, isNavCard, StateProps} from './Compositor';
@@ -32,10 +32,10 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     closeDialog(): void {
-      dispatch(closeDialog());
+      dispatch(dialogClose());
     },
     closeSnackbar(): void {
-      dispatch(closeSnackbar());
+      dispatch(snackbarClose());
     },
     onTutorialStep(newStep: number, tutorialSteps: TutorialStepType[] | undefined): void {
       const prevStep = (tutorialSteps || [])[newStep - 1];

@@ -1,5 +1,5 @@
-import Redux from 'redux';
-import {DialogOpenAction, SnackbarOpenAction, UiDeltaAction, UIType} from '../Types';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {DialogType, SnackbarType, UIType} from '../Types';
 
 export const initialUI: UIType = {
   dialog: {
@@ -14,35 +14,47 @@ export const initialUI: UIType = {
   },
 };
 
-export function uiDelta(delta: Partial<UIType>): UiDeltaAction {
-  return { type: 'UI_DELTA', delta };
-}
-
-export function ui(state: UIType = initialUI, action: Redux.Action): UIType {
-  switch (action.type) {
-    case 'UI_DELTA':
-      return {...state, ...(action as UiDeltaAction).delta};
-    case 'SNACKBAR_OPEN':
-      const openAction = (action as SnackbarOpenAction);
-      if (openAction.message && openAction.message !== '') {
+export const uiSlice = createSlice({
+  name: 'ui',
+  initialState: initialUI,
+  reducers: { 
+    delta: (state, action: PayloadAction<Partial<UIType>>) => {
+      return {...state, ...action.payload};
+    },
+    snackbarOpen: (state, action: PayloadAction<string|SnackbarType>) => {
+      if (typeof action.payload === 'string') {
         return {
           ...state,
           snackbar: {
-            message: openAction.message,
+            message: action.payload,
             open: true,
-            timeout: openAction.timeout || initialUI.snackbar.timeout,
+            timeout: initialUI.snackbar.timeout,
+          },
+        };
+      } else if (action.payload.message && action.payload.message !== '') {
+        return {
+          ...state,
+          snackbar: {
+            message: action.payload.message,
+            open: true,
+            timeout: action.payload.timeout || initialUI.snackbar.timeout,
           },
         };
       }
       return state;
-    case 'SNACKBAR_CLOSE':
+    },
+    snackbarClose: (state) => {
       return {...state, snackbar: {...initialUI.snackbar}};
-    case 'DIALOG_OPEN':
-      return {...state, dialog: {...(action as DialogOpenAction).dialog}};
-    case 'DIALOG_CLOSE':
-    case 'GAME_EXIT':
+    },
+    dialogOpen: (state, action: PayloadAction<DialogType>) => {
+      return {...state, dialog: {...action.payload}};
+    },
+    dialogClose: (state) => {
       return {...state, dialog: {...initialUI.dialog}};
-    default:
-      return state;
-  }
-}
+    }
+  },
+});
+
+export const { delta, snackbarOpen, snackbarClose, dialogOpen, dialogClose } = uiSlice.actions;
+
+export default uiSlice.reducer;

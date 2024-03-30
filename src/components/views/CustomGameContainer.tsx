@@ -1,7 +1,7 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {navigateBack} from '../../reducers/Card';
-import {openDialog} from '../../actions/UI';
+import {dialogOpen} from '../../reducers/UI';
 import {AppStateType, DialogType, GameStateType, StartGameAction} from '../../Types';
 import CustomGame, {DispatchProps, StateProps} from './CustomGame';
 
@@ -23,7 +23,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch({type: 'GAME_START'} as StartGameAction);
     },
     openDialog: (dialog: DialogType) => {
-      dispatch(openDialog(dialog));
+      dispatch(dialogOpen(dialog));
     },
   };
 };
