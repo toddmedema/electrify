@@ -17,7 +17,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(changeSettings({audioEnabled: v}));
     },
     onBack: () => {
-      dispatch(navigate({name: 'MAIN_MENU'}));
+      dispatch(navigate('MAIN_MENU'));
     },
   };
 };

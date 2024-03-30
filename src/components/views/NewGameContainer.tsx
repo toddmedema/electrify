@@ -15,14 +15,14 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
       dispatch(quitGame());
-      dispatch(navigate({name: 'MAIN_MENU'}));
+      dispatch(navigate('MAIN_MENU'));
     },
     onDetails: (delta: Partial<GameStateType>) => {
       dispatch({type: 'GAMESTATE_DELTA', delta});
-      dispatch(navigate({name: 'NEW_GAME_DETAILS'}));
+      dispatch(navigate('NEW_GAME_DETAILS'));
     },
     onCustomGame: () => {
-      dispatch(navigate({name: 'CUSTOM_GAME'}));
+      dispatch(navigate('CUSTOM_GAME'));
     },
   };
 };

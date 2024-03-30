@@ -43,9 +43,9 @@ const shortcutHandlers = {
   SLOW: () => { store.dispatch(setSpeed('SLOW')); },
   NORMAL: () => { store.dispatch(setSpeed('NORMAL')); },
   FAST: () => { store.dispatch(setSpeed('FAST')); },
-  FACILITIES: () => { store.dispatch(navigate({name: 'FACILITIES'})); },
-  FINANCES: () => { store.dispatch(navigate({name: 'FINANCES'})); },
-  FORECASTS: () => { store.dispatch(navigate({name: 'FORECASTS'})); },
+  FACILITIES: () => { store.dispatch(navigate('FACILITIES')); },
+  FINANCES: () => { store.dispatch(navigate('FINANCES')); },
+  FORECASTS: () => { store.dispatch(navigate('FORECASTS')); },
 };
 
 interface TooltipProps {

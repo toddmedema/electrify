@@ -18,16 +18,16 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(changeSettings({audioEnabled: v}));
     },
     onManual: () => {
-      dispatch(navigate({name: 'MANUAL'}));
+      dispatch(navigate('MANUAL'));
     },
     onSettings: () => {
-      dispatch(navigate({name: 'SETTINGS'}));
+      dispatch(navigate('SETTINGS'));
     },
     onStart: () => {
-      dispatch(navigate({name: 'NEW_GAME'}));
+      dispatch(navigate('NEW_GAME'));
     },
     onTutorial: () => {
-      dispatch(navigate({name: 'TUTORIALS'}));
+      dispatch(navigate('TUTORIALS'));
     },
   };
 };

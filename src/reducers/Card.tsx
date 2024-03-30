@@ -1,8 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {getHistoryApi, logEvent} from '../Globals';
 import {NAVIGATION_DEBOUNCE_MS} from '../Constants';
-import {CardNameType, CardType, NavigateAction} from '../Types';
+import {CardNameType, CardType} from '../Types';
 import {RootState} from '../Store';
+
+interface NavigateAction {
+  name: CardNameType;
+  dontRemember?: boolean;
+}
 
 /**
  * ts: 0 solves an obscure bug (instead of Date.now()) where rapidly triggering navigations with undefined states
@@ -19,8 +24,11 @@ export const cardSlice = createSlice({
   name: 'card',
   initialState: initialCard,
   reducers: {
-    navigate: (state, action: PayloadAction<NavigateAction>) => {
-      const a = action.payload || {};
+    navigate: (state, action: PayloadAction<string|NavigateAction>) => {
+      let a = action.payload;
+      if (typeof a === 'string' || a == null) {
+        a = {name: a} as NavigateAction;
+      }
       if (a.name === state.name && Date.now() - state.ts < NAVIGATION_DEBOUNCE_MS) {
         return state;
       }

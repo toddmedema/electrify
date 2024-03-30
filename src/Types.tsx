@@ -17,11 +17,6 @@ export interface ReprioritizeFacilityAction extends Redux.Action {
   delta: number;
 }
 
-export interface NavigateAction {
-  name: CardNameType;
-  dontRemember?: boolean;
-}
-
 export interface SetSpeedAction extends Redux.Action {
   type: 'SET_SPEED';
   speed: SpeedType;

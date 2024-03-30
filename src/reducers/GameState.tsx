@@ -393,7 +393,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               notCancellable: true,
               actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
             })), 1);
           }
 
@@ -410,7 +410,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               notCancellable: true,
               actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
             })), 1);
           }
 
@@ -453,7 +453,7 @@ export function gameState(state: GameStateType = cloneDeep(initialGameState), ac
               open: true,
               closeText: 'Keep playing',
               actionLabel: 'Return to menu',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate({name: 'MAIN_MENU'})),
+              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
             })), 1);
           }
         }

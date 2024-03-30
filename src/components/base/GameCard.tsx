@@ -182,14 +182,14 @@ const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>):
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onManual: () => {
-      dispatch(navigate({name: 'MANUAL'}));
+      dispatch(navigate('MANUAL'));
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
     },
     onQuit: () => {
       dispatch(quitGame());
-      dispatch(navigate({name: 'MAIN_MENU'}));
+      dispatch(navigate('MAIN_MENU'));
     },
   };
 };

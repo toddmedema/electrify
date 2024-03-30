@@ -21,7 +21,7 @@ export default function Navigation() {
       id="navfooter"
       showLabels
       value={cardName || 'MAIN_MENU'}
-      onChange={(e: any, name: CardNameType) => dispatch(navigate({name}))}
+      onChange={(e: any, name: CardNameType) => dispatch(navigate(name))}
     >
       <BottomNavigationAction classes={{label: 'navlabel'}} id="faciltiesNav" label="Facilities" value="FACILITIES" icon={<FlashOnIcon />} />
       <BottomNavigationAction classes={{label: 'navlabel'}} id="financesNav" label="Finances" value="FINANCES" icon={<AttachMoneyIcon />} />

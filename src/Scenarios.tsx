@@ -107,7 +107,7 @@ export const SCENARIOS = [
       },
       {
         target: '#close-button',
-        onNext: () => navigate({name: 'FACILITIES'}),
+        onNext: () => navigate('FACILITIES'),
         content: <Typography variant="body1">
           Tap X to close the buy screen.
         </Typography>,
@@ -148,7 +148,7 @@ export const SCENARIOS = [
       },
       {
         target: '#close-button',
-        onNext: () => navigate({name: 'FACILITIES'}),
+        onNext: () => navigate('FACILITIES'),
         content: <Typography variant="body1">
           Tap X to close the build screen.
         </Typography>,
@@ -190,7 +190,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#financesNav',
-        onNext: () => navigate({name: 'FINANCES'}),
+        onNext: () => navigate('FINANCES'),
         content: <Typography variant="body1">
           To run a profitable business, you'll need to understand the Finances tab. (Hotkey: W)
         </Typography>,
@@ -230,7 +230,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#financesNav',
-        onNext: () => navigate({name: 'FINANCES'}),
+        onNext: () => navigate('FINANCES'),
         content: <Typography variant="body1">
           When you have spare capacity, you can use marketing to grow your business by heading to the "Finances" tab. (Hotkey: W)
         </Typography>,
@@ -272,7 +272,7 @@ export const SCENARIOS = [
       {
         disableBeacon: true, // causes tutorial to auto-start
         target: '#forecastsNav',
-        onNext: () => navigate({name: 'FORECASTS'}),
+        onNext: () => navigate('FORECASTS'),
         content: <Typography variant="body1">
           To truly succeed, you'll need to plan ahead - let's check out the Forecasts tab. (Hotkey: E)
         </Typography>,
