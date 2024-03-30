@@ -1,17 +1,18 @@
-import Redux from 'redux';
-import {UserDeltaAction, UserType} from '../Types';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {UserType} from '../Types';
 
 export const initialUser: UserType = {};
 
-export function UserDelta(delta: Partial<UserType>): UserDeltaAction {
-  return { type: 'USER_DELTA', delta };
-}
+export const userSlice = createSlice({
+  name: 'user',
+  initialState: initialUser,
+  reducers: {
+    delta: (state, action: PayloadAction<Partial<UserType>>) => {
+      return {...state, ...action.payload};
+    },
+  },
+});
 
-export function user(state: UserType = initialUser, action: Redux.Action): UserType {
-  switch (action.type) {
-    case 'USER_DELTA':
-      return {...state, ...(action as UserDeltaAction).delta};
-    default:
-      return state;
-  }
-}
+export const { delta } = userSlice.actions;
+
+export default userSlice.reducer;

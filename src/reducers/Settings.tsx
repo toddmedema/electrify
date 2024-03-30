@@ -1,11 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import {getStorageBoolean, getStorageBooleanOrUndefined, setStorageKeyValue} from '../LocalStorage';
+import {getStorageBooleanOrUndefined, setStorageKeyValue} from '../LocalStorage';
 import {SettingsType} from '../Types';
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBooleanOrUndefined('audioEnabled'),
-  showHelp: getStorageBoolean('showHelp', true),
-  vibration: getStorageBoolean('vibration', true),
 };
 
 export const settingsSlice = createSlice({

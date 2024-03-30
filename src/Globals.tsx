@@ -23,8 +23,6 @@ export interface ReactWindow extends Window {
   platform?: string;
   VERSION?: string;
   AudioContext?: AudioContext;
-  webkitAudioContext?: AudioContext;
-  Promise?: any;
   test?: boolean;
 }
 
@@ -32,7 +30,6 @@ const refs = {
   db: null as any,
   history: (typeof window.history !== 'undefined') ? window.history : {pushState: () => null},
   localStorage: null as (Storage|null),
-  navigator: (typeof navigator !== 'undefined') ? navigator : null,
   audioContext: null,
 };
 
@@ -67,7 +64,12 @@ export function getDevicePlatform(): 'web' {
   return 'web';
 }
 
-// https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+/**
+ * This function checks if the screen size is small, based on the width of the document being < 375
+ * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+ * 
+ * @returns {boolean} - Returns true if the screen width is less than 375, otherwise false.
+ */
 export function isSmallScreen(): boolean {
   const width = Math.max(
     document.body.scrollWidth,
@@ -79,8 +81,12 @@ export function isSmallScreen(): boolean {
   return width < 375;
 }
 
-// https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
-// Based on CSS abswidthmax
+/**
+ * This function checks if the screen size is large, based on the width of the document being > 650
+ * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+ * 
+ * @returns {boolean} - Returns true if the screen width is greater than 650, otherwise false.
+ */
 export function isBigScreen(): boolean {
   const width = Math.max(
     document.body.scrollWidth,
@@ -90,18 +96,6 @@ export function isBigScreen(): boolean {
     document.documentElement.clientWidth
   );
   return width > 650;
-}
-
-export function getPlatformDump(): string {
-  return (window.navigator.platform || '') + ': ' + (window.navigator.userAgent || '') + ': ' + (window.navigator.cookieEnabled ? 'W/COOKIES' : 'NO COOKIES');
-}
-
-export function setNavigator(n: any) {
-  refs.navigator = n;
-}
-
-export function getNavigator(): any {
-  return refs.navigator;
 }
 
 export function getHistoryApi(): any {

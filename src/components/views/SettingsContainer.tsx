@@ -19,12 +19,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onBack: () => {
       dispatch(navigate({name: 'MAIN_MENU'}));
     },
-    onShowHelpChange: (v: boolean) => {
-      dispatch(changeSettings({showHelp: v}));
-    },
-    onVibrationChange: (v: boolean) => {
-      dispatch(changeSettings({vibration: v}));
-    },
   };
 };
 

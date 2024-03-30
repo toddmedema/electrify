@@ -79,13 +79,6 @@ export const GAME_TO_REAL_YEARS = 365 / DAYS_PER_YEAR;
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as MonthType[];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
 
-export const UNSUPPORTED_BROWSERS = /^(.*amazon silk.*)|(.*(iphone|ipad|ipod|ios) os 9_.*)$/i;
-
-export const URLS = {
-  // lowercase to match lowercase platform names
-  web: 'http://electrifygame.com',
-};
-
 export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
@@ -114,8 +107,6 @@ export const FUELS = {
 
 export const NAV_CARDS = ['FACILITIES', 'FINANCES', 'FORECASTS'] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
-export const VIBRATION_SHORT_MS = 30; // for navigation / card changes
-export const VIBRATION_LONG_MS = 400; // for unique events, like start of the timer
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click
 export const AUDIO_COMMAND_DEBOUNCE_MS = 300;

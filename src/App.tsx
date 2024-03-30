@@ -1,16 +1,12 @@
 import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';
-import * as React from 'react';
 import {Provider} from 'react-redux';
 import * as Redux from 'redux';
 import CompositorContainer from './components/CompositorContainer';
 import {pause, resume} from './data/Audio';
 import {navigateBack} from './reducers/Card';
-import {change as changeSettings} from './reducers/Settings';
 import {openSnackbar} from './actions/UI';
-import {UNSUPPORTED_BROWSERS} from './Constants';
-import {firebaseAppAuth, getDevicePlatform, getNavigator} from './Globals';
-import {getStorageBoolean} from './LocalStorage';
-import {UserDelta} from './reducers/User';
+import {firebaseAppAuth, getDevicePlatform} from './Globals';
+import {delta} from './reducers/User';
 import {store} from './Store';
 import theme from './Theme';
 
@@ -34,12 +30,6 @@ function setupDevice() {
   const platform = getDevicePlatform();
   // Platform-specific styles
   document.body.className += ' ' + platform;
-  // Default to audio enabled if not user specified in pre-bundled apps
-  // since the audio files are already part of the APK
-  // (unless the app is using an old / unsupported browser engine)
-  store.dispatch(changeSettings({
-    audioEnabled: getStorageBoolean('audioEnabled', !UNSUPPORTED_BROWSERS.test(getNavigator().userAgent)),
-  }));
 
   document.addEventListener('backbutton', () => {
     store.dispatch(navigateBack());
@@ -87,7 +77,7 @@ export default function App() {
   }, false);
 
   firebaseAppAuth.onAuthStateChanged((user: any) => {
-    store.dispatch(UserDelta({uid: (user||{}).uid}));
+    store.dispatch(delta({uid: (user||{}).uid}));
   });
 
   // Only triggers on app builds

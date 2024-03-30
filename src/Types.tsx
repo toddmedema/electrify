@@ -60,11 +60,6 @@ export interface UiDeltaAction extends Redux.Action {
   delta: Partial<UIType>;
 }
 
-export interface UserDeltaAction extends Redux.Action {
-  type: 'USER_DELTA';
-  delta: Partial<UserType>;
-}
-
 export interface NewGameAction extends Redux.Action {
   type: 'NEW_GAME';
   facilities: Array<Partial<FacilityShoppingType>>;
@@ -303,8 +298,6 @@ export interface GameStateType {
 export interface SettingsType {
   [index: string]: any;
   audioEnabled?: boolean;
-  showHelp: boolean;
-  vibration: boolean;
 }
 
 export interface DialogType {

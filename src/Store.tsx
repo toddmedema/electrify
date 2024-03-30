@@ -3,7 +3,7 @@ import cardReducer from './reducers/Card';
 import {gameState} from './reducers/GameState';
 import settingsReducer from './reducers/Settings';
 import {ui} from './reducers/UI';
-import {user} from './reducers/User';
+import userReducer from './reducers/User';
 
 export const store = configureStore({
   reducer: {
@@ -11,7 +11,7 @@ export const store = configureStore({
     gameState,
     settings: settingsReducer,
     ui,
-    user,
+    user: userReducer,
   },
 });
 

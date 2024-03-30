@@ -10,13 +10,11 @@ export interface StateProps {
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onBack: () => void;
-  onShowHelpChange: (change: boolean) => void;
-  onVibrationChange: (change: boolean) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-const Settings = (props: Props): JSX.Element => {
+export default function Settings(props: Props): JSX.Element {
   // TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
   // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
 
@@ -62,5 +60,3 @@ const Settings = (props: Props): JSX.Element => {
     </div>
   );
 };
-
-export default Settings;
