@@ -5,7 +5,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import {TICK_MINUTES} from '../../Constants';
-import {FacilityOperatingType, GameStateType} from '../../Types';
+import {FacilityOperatingType, GameType} from '../../Types';
 import {facilityCashBack} from '../../helpers/Financials';
 import {formatMoneyConcise, formatWattHours, formatWatts} from '../../helpers/Format';
 import ChartSupplyDemand from '../base/ChartSupplyDemand';
@@ -100,7 +100,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
 }
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
@@ -120,9 +120,9 @@ export default class Facilities extends React.Component<Props, {}> {
 
   public shouldComponentUpdate(nextProps: Props, nextState: any) {
     // In fast modes, skip frames so that CPU can focus on simulation
-    switch (nextProps.gameState.speed) {
+    switch (nextProps.game.speed) {
       case 'FAST':
-        return (nextProps.gameState.date.minute / TICK_MINUTES % 8 === 0);
+        return (nextProps.game.date.minute / TICK_MINUTES % 8 === 0);
       default:
         return true;
     }
@@ -137,17 +137,17 @@ export default class Facilities extends React.Component<Props, {}> {
   }
 
   public render() {
-    const {gameState, onGeneratorBuild, onSell, onReprioritize, onStorageBuild} = this.props;
-    const facilitiesCount = gameState.facilities.length;
+    const {game, onGeneratorBuild, onSell, onReprioritize, onStorageBuild} = this.props;
+    const facilitiesCount = game.facilities.length;
 
     return (
       <GameCard>
         <ChartSupplyDemand
           height={180}
-          timeline={gameState.timeline}
-          currentMinute={gameState.date.minute}
-          legend={gameState.speed === 'PAUSED'}
-          startingYear={gameState.startingYear}
+          timeline={game.timeline}
+          currentMinute={game.date.minute}
+          legend={game.speed === 'PAUSED'}
+          startingYear={game.startingYear}
         />
         <List dense className="scrollable">
           <Toolbar style={{paddingBottom: '4px'}}>
@@ -163,7 +163,7 @@ export default class Facilities extends React.Component<Props, {}> {
                   {...provided.droppableProps}
                   ref={provided.innerRef}
                 >
-                  {gameState.facilities.map((g: FacilityOperatingType, i: number) =>
+                  {game.facilities.map((g: FacilityOperatingType, i: number) =>
                     <FacilityListItem
                       facility={g}
                       key={g.id}

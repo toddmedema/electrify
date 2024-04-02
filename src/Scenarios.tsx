@@ -2,7 +2,7 @@ import {Typography} from '@mui/material';
 import * as React from 'react';
 
 import {navigate} from './reducers/Card';
-import {setSpeed} from './reducers/GameState';
+import {setSpeed} from './reducers/Game';
 import {ScenarioType} from './Types';
 
 export const SCENARIOS = [

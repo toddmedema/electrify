@@ -4,15 +4,15 @@ import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 import {LOCATIONS} from '../../Constants';
 import {SCENARIOS} from '../../Scenarios';
-import {GameStateType, ScenarioType} from '../../Types';
+import {GameType, ScenarioType} from '../../Types';
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
   onBack: () => void;
-  onDetails: (delta: Partial<GameStateType>) => void;
+  onDetails: (delta: Partial<GameType>) => void;
   onCustomGame: () => void;
 }
 

@@ -10,7 +10,7 @@ import {getMonthlyPayment} from '../../helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/Format';
 import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {STORAGE} from '../../Facilities';
-import {GameStateType, SpeedType, StorageShoppingType} from '../../Types';
+import {GameType, SpeedType, StorageShoppingType} from '../../Types';
 
 interface StorageBuildItemProps {
   cash: number;
@@ -185,7 +185,7 @@ function valueLabelFormat(x: number) {
 }
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
@@ -197,13 +197,13 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function StorageBuildDialog(props: Props): JSX.Element {
-  const {gameState, onBack} = props;
-  const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+  const {game, onBack} = props;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
   if (!now) {
     return <span/>;
   }
   const cash = now.cash;
-  const filtered = gameState.facilities.filter((f) => f.peakWh);
+  const filtered = game.facilities.filter((f) => f.peakWh);
   const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
   const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakWh || 500000000;
 
@@ -214,7 +214,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   const [sort, setSort] = React.useState<string>('buildCost');
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const storage = STORAGE(gameState, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
+  const storage = STORAGE(game, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
   const handleSliderChange = (event: any, newValue: number|number[]) => {
     if (Array.isArray(newValue)) {
@@ -240,7 +240,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
         <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Storage</span></Typography>
-        {gameState.speed !== 'PAUSED' && <IconButton
+        {game.speed !== 'PAUSED' && <IconButton
           onClick={() => props.onSpeedChange('PAUSED') }
           aria-label="pause"
           edge="end"
@@ -258,7 +258,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
         </IconButton>
         <div className="flex-newline"></div>
         <div id="yearProgressBar" style={{
-          width: `${gameState.date.percentOfYear * 100}%`,
+          width: `${game.date.percentOfYear * 100}%`,
         }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
           Capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography> {filtered.length <= 0 && '(slide to change)'}

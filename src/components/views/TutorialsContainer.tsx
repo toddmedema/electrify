@@ -1,24 +1,24 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {quitGame} from '../../reducers/GameState';
+import {start, quit} from '../../reducers/Game';
 import {navigate} from '../../reducers/Card';
-import {AppStateType, GameStateType, StartGameAction} from '../../Types';
+import {AppStateType, GameType} from '../../Types';
 import Tutorials, {DispatchProps, StateProps} from './Tutorials';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
-      dispatch(quitGame());
+      dispatch(quit());
       dispatch(navigate('MAIN_MENU'));
     },
-    onStart: (delta: Partial<GameStateType>) => {
-      dispatch({type: 'GAME_START', delta} as StartGameAction);
+    onStart: (delta: Partial<GameType>) => {
+      dispatch(start(delta));
     },
   };
 };

@@ -1,13 +1,14 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
 import {navigateBack, gameStart} from '../../reducers/Card';
+import {start, delta} from '../../reducers/Game';
 import {authWrapper} from '../../Globals';
-import {AppStateType, GameStateType, StartGameAction} from '../../Types';
+import {AppStateType, GameType} from '../../Types';
 import NewGameDetails, {DispatchProps, StateProps} from './NewGameDetails';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 
@@ -16,11 +17,11 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onBack: () => {
       dispatch(navigateBack());
     },
-    onDelta: (delta: Partial<GameStateType>) => {
-      dispatch({type: 'GAMESTATE_DELTA', delta});
+    onDelta: (d: Partial<GameType>) => {
+      dispatch(delta(d));
     },
-    onStart: (delta: Partial<GameStateType>) => {
-      dispatch({type: 'GAME_START', delta} as StartGameAction);
+    onStart: (d: Partial<GameType>) => {
+      dispatch(start(d));
       dispatch(gameStart());
     },
   };

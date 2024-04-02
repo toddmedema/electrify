@@ -5,7 +5,7 @@ import Forecasts, {DispatchProps, StateProps} from './Forecasts';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 

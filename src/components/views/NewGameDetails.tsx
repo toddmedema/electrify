@@ -4,12 +4,12 @@ import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import {DIFFICULTIES, LOCATIONS} from '../../Constants';
 import {getDb} from '../../Globals';
 import {SCENARIOS} from '../../Scenarios';
-import {GameStateType, LocationType, ScenarioType, ScoreType} from '../../Types';
+import {GameType, LocationType, ScenarioType, ScoreType} from '../../Types';
 
 const numbro = require('numbro');
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
   // From auth:
   error?: any;
   user?: any;
@@ -18,8 +18,8 @@ export interface StateProps {
 
 export interface DispatchProps {
   onBack: () => void;
-  onDelta: (delta: Partial<GameStateType>) => void;
-  onStart: (delta: Partial<GameStateType>) => void;
+  onDelta: (delta: Partial<GameType>) => void;
+  onStart: (delta: Partial<GameType>) => void;
 }
 
 interface State {
@@ -34,7 +34,7 @@ export interface Props extends StateProps, DispatchProps {}
 export default class NewGameDetails extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    const scenario = SCENARIOS.find((s) => s.id === props.gameState.scenarioId) || null;
+    const scenario = SCENARIOS.find((s) => s.id === props.game.scenarioId) || null;
     this.state = {
       scenario,
       location: scenario ? (LOCATIONS.find((s) => s.id === scenario.locationId) || null) : null,
@@ -80,7 +80,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   public render() {
-    const {onBack, onDelta, onStart, gameState, user, signInWithGoogle} = this.props;
+    const {onBack, onDelta, onStart, game, user, signInWithGoogle} = this.props;
     const {scenario, scores, myTopScore, location} = this.state;
 
     if (!scenario || !location) {
@@ -119,7 +119,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
           Scenario location: {location.name}<br/>
           Select difficulty:
           <Select
-            value={gameState.difficulty}
+            value={game.difficulty}
             onChange={(e: any) => onDelta({ difficulty: e.target.value })}
           >
             {Object.keys(DIFFICULTIES).map((d: string) => {

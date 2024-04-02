@@ -1,44 +1,5 @@
 import Redux from 'redux';
 
-export interface BuildFacilityAction extends Redux.Action {
-  type: 'BUILD_FACILITY';
-  facility: FacilityShoppingType;
-  financed: boolean;
-}
-
-export interface SellFacilityAction extends Redux.Action {
-  type: 'SELL_FACILITY';
-  id: FacilityOperatingType['id'];
-}
-
-export interface ReprioritizeFacilityAction extends Redux.Action {
-  type: 'REPRIORITIZE_FACILITY';
-  spotInList: number;
-  delta: number;
-}
-
-export interface SetSpeedAction extends Redux.Action {
-  type: 'SET_SPEED';
-  speed: SpeedType;
-}
-
-export interface QuitGameAction extends Redux.Action {
-  type: 'GAME_EXIT';
-}
-
-export interface StartGameAction extends Redux.Action {
-  type: 'GAME_START';
-  delta: Partial<GameStateType>;
-}
-
-export interface NewGameAction extends Redux.Action {
-  type: 'NEW_GAME';
-  facilities: Array<Partial<FacilityShoppingType>>;
-  cash: number;
-  customers: number;
-  location: LocationType;
-}
-
 export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
 export interface AudioType {
   paused: boolean;
@@ -250,7 +211,7 @@ export interface ScenarioType {
   facilities: Array<Partial<FacilityShoppingType>>;
 }
 
-export interface GameStateType {
+export interface GameType {
   difficulty: DifficultyType;
   scenarioId: number;
   location: LocationType;
@@ -302,7 +263,7 @@ export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
 
 export interface AppStateType {
   card: CardType;
-  gameState: GameStateType;
+  game: GameType;
   settings: SettingsType;
   ui: UIType;
   user: UserType;

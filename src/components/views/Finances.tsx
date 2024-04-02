@@ -7,8 +7,8 @@ import {deriveExpandedSummary, EMPTY_HISTORY, getDateFromMinute, getTimeFromTime
 import {customersFromMarketingSpend} from '../../helpers/Financials';
 import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/Format';
 import {getStorageBoolean, getStorageString, setStorageKeyValue} from '../../LocalStorage';
-import {generateNewTimeline} from '../../reducers/GameState';
-import {DerivedHistoryKeysType, GameStateType, MonthlyHistoryType} from '../../Types';
+import {generateNewTimeline} from '../../reducers/Game';
+import {DerivedHistoryKeysType, GameType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
 
@@ -122,11 +122,11 @@ const CHART_KEYS = {
 } as {[index: string]: ChartKeyMetadataType};
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
-  onDelta: (delta: Partial<GameStateType>) => void;
+  onDelta: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -164,9 +164,9 @@ export default class Finances extends React.Component<Props, State> {
 
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
     // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
-    switch (nextProps.gameState.speed) {
+    switch (nextProps.game.speed) {
       case 'FAST':
-        return (nextProps.gameState.date.minute / TICK_MINUTES % 2 === 0);
+        return (nextProps.game.date.minute / TICK_MINUTES % 2 === 0);
       default:
         return true;
     }
@@ -183,8 +183,8 @@ export default class Finances extends React.Component<Props, State> {
   }
 
   public render() {
-    const {gameState, onDelta} = this.props;
-    const {startingYear, timeline, date} = gameState;
+    const {game, onDelta} = this.props;
+    const {startingYear, timeline, date} = game;
     const {year, expanded, chartKey} = this.state;
     const now = getTimeFromTimeline(date.minute, timeline);
 
@@ -195,7 +195,7 @@ export default class Finances extends React.Component<Props, State> {
     const years = []; // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= startingYear; i--) { years.push(i); }
 
-    const monthlyHistory = gameState.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year || (year === -1 && t.year === date.year));
+    const monthlyHistory = game.monthlyHistory.filter((t: MonthlyHistoryType) => !year || t.year === year || (year === -1 && t.year === date.year));
     const previousMonths = summarizeHistory(monthlyHistory);
 
     // For the summary table
@@ -219,9 +219,9 @@ export default class Finances extends React.Component<Props, State> {
     if (!year || year === -1 || date.year === year) { // Add projected months if current year is included in chart
       const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
       if (date.month !== 'Dec') { // Project out for the rest of the year
-        const forecastedTimeline = generateNewTimeline(gameState, now.cash, now.customers, TICKS_PER_MONTH * (1 + 12 - date.monthNumber)); // Current month, plus the rest of the months
+        const forecastedTimeline = generateNewTimeline(game, now.cash, now.customers, TICKS_PER_MONTH * (1 + 12 - date.monthNumber)); // Current month, plus the rest of the months
         for (let month = date.monthNumber + 1; month <= 12; month++) {
-          const m = summarizeTimeline(forecastedTimeline, gameState.startingYear, (t) => getDateFromMinute(t.minute, gameState.startingYear).monthNumber === month);
+          const m = summarizeTimeline(forecastedTimeline, game.startingYear, (t) => getDateFromMinute(t.minute, game.startingYear).monthNumber === month);
           presentFutureMonths.push(m);
         }
       }
@@ -243,17 +243,17 @@ export default class Finances extends React.Component<Props, State> {
           <Toolbar>
             <Typography className="flex-newline" variant="body2" color="textSecondary">
               Marketing:&nbsp;
-              <Typography color="primary" component="strong">{formatMoneyConcise(gameState.monthlyMarketingSpend)}</Typography>/mo&nbsp;
-              (+{numbro(customersFromMarketingSpend(gameState.monthlyMarketingSpend)).format({average: true})} customers)
+              <Typography color="primary" component="strong">{formatMoneyConcise(game.monthlyMarketingSpend)}</Typography>/mo&nbsp;
+              (+{numbro(customersFromMarketingSpend(game.monthlyMarketingSpend)).format({average: true})} customers)
             </Typography>
             <Slider
               id="marketingSlider"
-              value={getTickFromValue(gameState.monthlyMarketingSpend)}
+              value={getTickFromValue(game.monthlyMarketingSpend)}
               aria-labelledby="marketing monthly budget"
               valueLabelDisplay="off"
               min={-1}
               step={1}
-              max={getTickFromValue(Math.max(now.cash / 12, gameState.monthlyMarketingSpend))}
+              max={getTickFromValue(Math.max(now.cash / 12, game.monthlyMarketingSpend))}
               onChange={(e: any, newTick: number|number[]) => onDelta({monthlyMarketingSpend: getValueFromTick(Array.isArray(newTick) ? newTick[0] : newTick)})}
             />
             <div className="flex-newline"></div>
@@ -273,7 +273,7 @@ export default class Finances extends React.Component<Props, State> {
             <Select id="plotYear" defaultValue={year} onChange={(e: any) => this.setState({year: e.target.value})}>
               <MenuItem value={0}>All time</MenuItem>
               <MenuItem value={-1}>Current year</MenuItem>
-              props.gameState.date.year
+              props.game.date.year
               {years.map((y: number) => {
                 return <MenuItem value={y} key={y}>{y}</MenuItem>;
               })}

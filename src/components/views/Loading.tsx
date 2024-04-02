@@ -1,13 +1,13 @@
 import * as React from 'react';
 import {CircularProgress} from '@mui/material';
-import {GameStateType} from '../../Types';
+import {GameType} from '../../Types';
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
-  load: (gameState: GameStateType) => void;
+  load: (game: GameType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -15,7 +15,7 @@ export interface Props extends StateProps, DispatchProps {}
 export default class Loading extends React.PureComponent<Props, {}> {
   constructor(props: Props) {
     super(props);
-    props.load(props.gameState);
+    props.load(props.game);
   }
 
   public render() {

@@ -11,7 +11,7 @@ import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/
 import {getFuelPricesPerMBTU} from '../../data/FuelPrices';
 import {DOWNPAYMENT_PERCENT, FUELS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
 import {GENERATORS} from '../../Facilities';
-import {DateType, GameStateType, GeneratorShoppingType, SpeedType} from '../../Types';
+import {DateType, GameType, GeneratorShoppingType, SpeedType} from '../../Types';
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -223,7 +223,7 @@ function valueLabelFormat(x: number) {
 }
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
@@ -235,13 +235,13 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function BuildGenerators(props: Props): JSX.Element {
-  const {gameState, onBack} = props;
-  const now = getTimeFromTimeline(gameState.date.minute, gameState.timeline);
+  const {game, onBack} = props;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
   if (!now) {
     return <span/>;
   }
   const cash = now.cash;
-  const filtered = gameState.facilities.filter((f) => !f.peakWh);
+  const filtered = game.facilities.filter((f) => !f.peakWh);
   const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
   const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakW || 500000000;
 
@@ -252,7 +252,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
   const [sort, setSort] = React.useState<string>('buildCost');
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const generators = GENERATORS(gameState, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
+  const generators = GENERATORS(game, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
   const onSlider = (event: any, newValue: number|number[]) => {
     if (Array.isArray(newValue)) {
@@ -278,7 +278,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
         <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Generator</span></Typography>
-        {gameState.speed !== 'PAUSED' && <IconButton
+        {game.speed !== 'PAUSED' && <IconButton
           onClick={() => props.onSpeedChange('PAUSED') }
           aria-label="pause"
           edge="end"
@@ -297,7 +297,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
         </IconButton>
         <div className="flex-newline"></div>
         <div id="yearProgressBar" style={{
-          width: `${gameState.date.percentOfYear * 100}%`,
+          width: `${game.date.percentOfYear * 100}%`,
         }}/>
         <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
           Capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography> {filtered.length <= 1 && '(slide to change)'}
@@ -337,7 +337,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
       <List dense className="scrollable cardList">
         {generators.map((g: GeneratorShoppingType, i: number) =>
           <GeneratorBuildItem
-            date={gameState.date}
+            date={game.date}
             generator={g}
             key={i}
             cash={cash}

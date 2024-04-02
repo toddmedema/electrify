@@ -1,18 +1,19 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {AppStateType, GameStateType} from '../../Types';
+import {delta} from '../../reducers/Game';
+import {AppStateType, GameType} from '../../Types';
 import Finances, {DispatchProps, StateProps} from './Finances';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    onDelta: (delta: Partial<GameStateType>) => {
-      dispatch({type: 'GAMESTATE_DELTA', delta});
+    onDelta: (d: Partial<GameType>) => {
+      dispatch(delta(d));
     },
   };
 };

@@ -14,3 +14,14 @@ export function getIntersectionX(line1StartX: number, line1StartY: number, line1
 export function getRandomRange(min: number, max: number) {
   return Math.random() * (max - min) + min;
 }
+
+// https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
+export function arrayMove(arr: any[], oldIndex: number, newIndex: number) {
+  if (newIndex >= arr.length) {
+    let k = newIndex - arr.length + 1;
+    while (k--) {
+      arr.push(undefined);
+    }
+  }
+  arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
+}

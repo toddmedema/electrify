@@ -1,12 +1,12 @@
 import {LCWH} from './helpers/Financials';
 import {DIFFICULTIES} from './Constants';
-import {FacilityOperatingType, GameStateType, GeneratorShoppingType, StorageShoppingType} from './Types';
+import {FacilityOperatingType, GameType, GeneratorShoppingType, StorageShoppingType} from './Types';
 
 // TODO additional sources of inforomation
 // BASE DATE: 2018
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
 // LCOE across many fuel types - https://www.eia.gov/outlooks/aeo/pdf/electricity_generation.pdf
-export function GENERATORS(state: GameStateType, peakW: number) {
+export function GENERATORS(state: GameType, peakW: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakW) - 6;
   const year = state.date.year;
@@ -313,7 +313,7 @@ export function GENERATORS(state: GameStateType, peakW: number) {
   return generators;
 }
 
-export function STORAGE(state: GameStateType, peakWh: number) {
+export function STORAGE(state: GameType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
   const year = state.date.year;

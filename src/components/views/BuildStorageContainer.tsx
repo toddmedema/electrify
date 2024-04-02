@@ -1,13 +1,14 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
 import {navigate} from '../../reducers/Card';
-import {setSpeed} from '../../reducers/GameState';
-import {AppStateType, BuildFacilityAction, SpeedType, StorageShoppingType} from '../../Types';
+import {setSpeed} from '../../reducers/Game';
+import {buildFacility} from '../../reducers/Game';
+import {AppStateType, SpeedType, StorageShoppingType} from '../../Types';
 import BuildStorage, {DispatchProps, StateProps} from './BuildStorage';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 
@@ -17,7 +18,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(navigate('FACILITIES'));
     },
     onBuildStorage: (facility: StorageShoppingType, financed: boolean) => {
-      dispatch({type: 'BUILD_FACILITY', facility, financed} as BuildFacilityAction);
+      dispatch(buildFacility({facility, financed}));
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));

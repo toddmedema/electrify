@@ -3,15 +3,15 @@ import {Button, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import {getStorageJson} from '../../LocalStorage';
 import {SCENARIOS} from '../../Scenarios';
-import {GameStateType, LocalStoragePlayedType, ScenarioType} from '../../Types';
+import {GameType, LocalStoragePlayedType, ScenarioType} from '../../Types';
 
 export interface StateProps {
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
   onBack: () => void;
-  onStart: (delta: Partial<GameStateType>) => void;
+  onStart: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}

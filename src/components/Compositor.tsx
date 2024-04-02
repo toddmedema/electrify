@@ -10,7 +10,6 @@ import {CardNameType, CardType, SettingsType, TransitionClassType, TutorialStepT
 import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
 import BuildStorageContainer from './views/BuildStorageContainer';
-import CustomGameContainer from './views/CustomGameContainer';
 import FacilitiesContainer from './views/FacilitiesContainer';
 import FinancesContainer from './views/FinancesContainer';
 import ForecastsContainer from './views/ForecastsContainer';
@@ -24,7 +23,7 @@ import TutorialsContainer from './views/TutorialsContainer';
 
 // TODO move to dispatch (probably move the entire shortcutHandlers function, and have it take in the triggered shortcut name?)
 import {navigate} from '../reducers/Card';
-import {setSpeed} from '../reducers/GameState';
+import {setSpeed} from '../reducers/Game';
 import {store} from '../Store';
 
 const keyMap = {
@@ -124,8 +123,6 @@ export default class Compositor extends React.Component<Props, {}> {
         return <FinancesContainer />;
       case 'FORECASTS':
         return <ForecastsContainer />;
-      case 'CUSTOM_GAME':
-        return <CustomGameContainer />;
       case 'FACILITIES':
         return <FacilitiesContainer />;
       case 'SETTINGS':

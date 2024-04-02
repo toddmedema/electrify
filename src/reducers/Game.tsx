@@ -1,11 +1,12 @@
-import Redux from 'redux';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import numbro from 'numbro';
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from '../helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from '../helpers/Financials';
 import {formatMoneyConcise, formatWatts} from '../helpers/Format';
+import {arrayMove} from '../helpers/Math';
 import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 import {getRawSunlightPercent, getWeather} from '../data/Weather';
-import {dialogOpen, snackbarOpen} from '../reducers/UI';
+import {dialogOpen, dialogClose, snackbarOpen} from './UI';
 import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
@@ -13,11 +14,28 @@ import {logEvent} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {store} from '../Store';
-import {BuildFacilityAction, DateType, FacilityOperatingType, FacilityShoppingType, GameStateType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, NewGameAction, QuitGameAction, ReprioritizeFacilityAction, ScenarioType, ScoreType, SellFacilityAction, SetSpeedAction, SpeedType, StartGameAction, StorageOperatingType, TickPresentFutureType, UserType} from '../Types';
+import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType} from '../Types';
 const cloneDeep = require('lodash.clonedeep');
 
+interface BuildFacilityAction {
+  facility: FacilityShoppingType;
+  financed: boolean;
+}
+
+interface ReprioritizeFacilityAction {
+  spotInList: number;
+  delta: number;
+}
+
+interface NewGameAction {
+  facilities: Array<Partial<FacilityShoppingType>>;
+  cash: number;
+  customers: number;
+  location: LocationType;
+}
+
 let previousSpeed = 'PAUSED' as SpeedType;
-const initialGameState: GameStateType = {
+const initialGame: GameType = {
   scenarioId: 100,
   location: {
     id: 'SF',
@@ -36,17 +54,228 @@ const initialGameState: GameStateType = {
   monthlyHistory: [] as MonthlyHistoryType[],
 };
 
-export function setSpeed(speed: SpeedType): SetSpeedAction {
-  return { type: 'SET_SPEED', speed };
-}
 
-export function quitGame(): QuitGameAction {
-  return { type: 'GAME_EXIT' };
-}
+export const gameSlice = createSlice({
+  name: 'game',
+  initialState: initialGame,
+  reducers: {
+    tick: (state) => {
+      if (state.inGame && state.speed !== 'PAUSED') {
+        state.date = getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear);
+        const now = getTimeFromTimeline(state.date.minute, state.timeline);
+        const prev = getTimeFromTimeline(state.date.minute - TICK_MINUTES, state.timeline);
+        if (now && prev) {
+          updateSupplyFacilitiesFinances(state, prev, now);
+  
+          // TODO how to tell if it's a new day without previous state?
+          // if (state.date.sunrise !== state.date.sunrise) { // If it's a new day / month
+          if (true) {
+            const history = state.monthlyHistory;
+            const {cash, customers} = now;
+  
+            // Record final history for the month, then generate the new timeline
+            history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+            state.timeline = generateNewTimeline(state, cash, customers);
+  
+            // Pre-roll a few frames to compensate for temperature / demand jumps across months
+            updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+            updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+            updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+            updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+  
+            // ===== TRIGGERS ======
+            // Failure: Bankrupt
+            if (now.cash < 0) {
+              logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
+              const summary = summarizeHistory(history);
+              setTimeout(() => store.dispatch(dialogOpen({
+                title: 'Bankrupt!',
+                message: `You've run out of money.
+                  You survived for ${state.date.year - state.startingYear} years,
+                  earned ${formatMoneyConcise(summary.revenue)} in revenue
+                  and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+                open: true,
+                notCancellable: true,
+                actionLabel: 'Try again',
+                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+              })), 1);
+            }
+  
+            // Failure: Too many blackouts
+            if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
+              logEvent('scenario_end', {id: state.scenarioId, type: 'blackouts', difficulty: state.difficulty});
+              const summary = summarizeHistory(history);
+              setTimeout(() => store.dispatch(dialogOpen({
+                title: 'Fired!',
+                message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
+                  You survived for ${state.date.year - state.startingYear} years,
+                  earned ${formatMoneyConcise(summary.revenue)} in revenue
+                  and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
+                open: true,
+                notCancellable: true,
+                actionLabel: 'Try again',
+                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+              })), 1);
+            }
+  
+            // Success: Survived duration
+            const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || {
+              durationMonths: 12 * 20,
+              endTitle: `You've retired!`,
+            } as ScenarioType;
+            if (state.date.monthsEllapsed === scenario.durationMonths) {
+              const localStoragePlayed = (getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[];
+              setStorageKeyValue('plays', {plays: [...localStoragePlayed, {
+                scenarioId: state.scenarioId,
+                date: (new Date()).toString(),
+              } as LocalStoragePlayedType]});
+  
+              // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
+              const summary = summarizeHistory(history);
+              const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+              const score = {
+                supply: Math.round(summary.supplyWh / 1000000000000),
+                netWorth: Math.round(40 * summary.netWorth / 1000000000),
+                customers: Math.round(2 * summary.customers / 100000),
+                emissions: Math.round(-2 * summary.kgco2e / 1000000000),
+                blackouts: Math.round(-8 * blackoutsTWh),
+              };
+              const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
+  
+              // TODO Submit score to highscores
+              // {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
+              logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
+              setTimeout(() => store.dispatch(dialogOpen({
+                title: scenario.endTitle || `You've retired!`,
+                message: scenario.endMessage || <div>Your final score is {finalScore}:<br/><br/>
+                  +{score.supply} pts from electricity supplied<br/>
+                  +{score.netWorth} pts from final net worth<br/>
+                  +{score.customers} pts from final customers<br/>
+                  -{score.emissions} pts from emissions<br/>
+                  -{score.blackouts} pts from blackouts<br/>
+                </div>,
+                open: true,
+                closeText: 'Keep playing',
+                actionLabel: 'Return to menu',
+                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+              })), 1);
+            }
+          }
+        }
+  
+        if (state.inGame) {
+          setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
+        }
+      } else {
+        if (state.inGame) {
+          setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
+        }
+      }
+    },
+    delta: (state, action: PayloadAction<Partial<GameType>>) => {
+      return {...state, ...action.payload};
+    },
+    start: (state, action: PayloadAction<Partial<GameType>>) => {
+      return {...state, ...action.payload};
+    },
+    newGame: (state, action: PayloadAction<NewGameAction>) => {
+      const a = action.payload;
+      const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
+      state.timeline = [] as TickPresentFutureType[];
+      state.date = getDateFromMinute(0, scenario.startingYear);
+      state.startingYear = scenario.startingYear;
+      state.feePerKgCO2e = scenario.feePerKgCO2e;
+      state.location = a.location;
+      state.timeline = generateNewTimeline(state, a.cash, a.customers);
+
+      a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
+        const generator = GENERATORS(state, search.peakW || 1000000).find((g: FacilityShoppingType) => {
+          for (const property in search) {
+            if (g[property] !== search[property]) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (generator) {
+          state = buildFacilityHelper(state, generator, false, true);
+        } else {
+          const storage = STORAGE(state, search.peakWh || 1000000).find((g: FacilityShoppingType) => {
+            for (const property in search) {
+              if (g[property] !== search[property]) {
+                return false;
+              }
+            }
+            return true;
+          });
+          if (storage) {
+            state = buildFacilityHelper(state, storage, false, true);
+          }
+        }
+      });
+
+      // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
+      updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+      updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+      updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+      updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
+      state.timeline = reforecastSupply(state);
+    },
+    quit: (state) => {
+      state = cloneDeep(initialGame);
+    },
+    buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
+      state = buildFacilityHelper({...state}, action.payload.facility, action.payload.financed);
+      state.timeline = reforecastSupply(state);
+    },
+    sellFacility: (state, action: PayloadAction<number>) => {
+      const id = action.payload; // (action as SellFacilityAction).id;
+      // in one loop, refund cash from selling + remove from list
+      state.facilities = state.facilities.filter((g: GeneratorOperatingType | StorageOperatingType) => {
+        if (g.id === id) {
+          const now = getTimeFromTimeline(state.date.minute, state.timeline);
+          if (now) {
+            now.cash += facilityCashBack(g);
+          }
+          return false;
+        }
+        return true;
+      });
+      state.timeline = reforecastSupply(state);
+    },
+    reprioritizeFacility: (state, action: PayloadAction<ReprioritizeFacilityAction>) => {
+      arrayMove(state.facilities, action.payload.spotInList, action.payload.spotInList + action.payload.delta);
+      state.timeline = reforecastSupply(state);
+    },
+    loaded: (state) => {
+      // Start ticking in game
+      setTimeout(() => { return store.dispatch(gameSlice.actions.tick()); }, TICK_MS.PAUSED);
+      state.inGame = true;
+    },
+    setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      state.speed = action.payload;
+    },
+  },
+  extraReducers:(builder) => {
+    builder.addCase(dialogOpen, state => {
+      previousSpeed = state.speed;
+      state.speed = 'PAUSED';
+    });
+    builder.addCase(dialogClose, state => {
+      state.speed = previousSpeed;
+    });
+  },
+});
+
+export const { tick, delta, newGame, start, quit, buildFacility, sellFacility, reprioritizeFacility, loaded, setSpeed } = gameSlice.actions;
+
+export default gameSlice.reducer;
+
+// ====== HELPERS ======
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
-function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType) {
-  const marketingGrowth = customersFromMarketingSpend(gameState.monthlyMarketingSpend) / TICKS_PER_MONTH;
+function getDemandW(date: DateType, game: GameType, prev: TickPresentFutureType, now: TickPresentFutureType) {
+  const marketingGrowth = customersFromMarketingSpend(game.monthlyMarketingSpend) / TICKS_PER_MONTH;
   now.customers = Math.round(prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) + marketingGrowth);
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
@@ -64,7 +293,7 @@ function getDemandW(date: DateType, gameState: GameStateType, prev: TickPresentF
   return demandMultiple * now.customers;
 }
 
-function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType[] {
+function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
@@ -82,7 +311,7 @@ function reforecastWeatherAndPrices(state: GameStateType): TickPresentFutureType
   });
 }
 
-function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
+function reforecastDemand(state: GameType): TickPresentFutureType[] {
   let prev = state.timeline[0];
   return state.timeline.map((t: TickPresentFutureType, i: number) => {
     if (t.minute >= state.date.minute) {
@@ -96,7 +325,7 @@ function reforecastDemand(state: GameStateType): TickPresentFutureType[] {
 }
 
 // Updates game state and now in place
-function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentFutureType, now: TickPresentFutureType, simulated?: boolean) {
+function updateSupplyFacilitiesFinances(state: GameType, prev: TickPresentFutureType, now: TickPresentFutureType, simulated?: boolean) {
   const {facilities, date} = state;
   const difficulty = DIFFICULTIES[state.difficulty];
 
@@ -233,7 +462,7 @@ function updateSupplyFacilitiesFinances(state: GameStateType, prev: TickPresentF
   return now;
 }
 
-function reforecastSupply(state: GameStateType, simulated?: boolean): TickPresentFutureType[] {
+function reforecastSupply(state: GameType, simulated?: boolean): TickPresentFutureType[] {
   // Make temporary deep copy so that it can be revised in place
   const newState = {...state};
   let prev = newState.timeline[0];
@@ -246,7 +475,7 @@ function reforecastSupply(state: GameStateType, simulated?: boolean): TickPresen
   });
 }
 
-export function generateNewTimeline(readOnlyState: GameStateType, cash: number, customers: number, ticks = TICKS_PER_DAY): TickPresentFutureType[] {
+export function generateNewTimeline(readOnlyState: GameType, cash: number, customers: number, ticks = TICKS_PER_DAY): TickPresentFutureType[] {
   // TODO performance optimization, figure out how to deep clone everything EXCEPT timeline, since I'm about to overwrite it
   const state = cloneDeep(readOnlyState);
   state.timeline = new Array(ticks) as TickPresentFutureType[];
@@ -285,7 +514,7 @@ export function generateNewTimeline(readOnlyState: GameStateType, cash: number, 
  * @param newGame
  * @returns
  */
-function buildFacility(state: GameStateType, g: FacilityShoppingType, financed: boolean, newGame= false): GameStateType {
+function buildFacilityHelper(state: GameType, g: FacilityShoppingType, financed: boolean, newGame= false): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
   if (now) {
@@ -338,251 +567,4 @@ function getNetWorth(facilities: FacilityOperatingType[], cash: number): number 
     }
   });
   return netWorth;
-}
-
-// https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
-function arrayMove(arr: any[], oldIndex: number, newIndex: number) {
-  if (newIndex >= arr.length) {
-    let k = newIndex - arr.length + 1;
-    while (k--) {
-      arr.push(undefined);
-    }
-  }
-  arr.splice(newIndex, 0, arr.splice(oldIndex, 1)[0]);
-}
-
-export function gameState(state: GameStateType = cloneDeep(initialGameState), action: Redux.Action): GameStateType {
-  // If statements instead of switch here b/c compiler was complaining about newState + const a being redeclared in block-scope
-  if (action.type === 'GAME_TICK') { // Game tick first because it's called the most by far, shortens lookup
-
-    if (state.inGame && state.speed !== 'PAUSED') {
-      const newState = {
-        ...state,
-        date: getDateFromMinute(state.date.minute + TICK_MINUTES, state.startingYear),
-      };
-      const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
-      const prev = getTimeFromTimeline(newState.date.minute - TICK_MINUTES, newState.timeline);
-      if (now && prev) {
-        updateSupplyFacilitiesFinances(newState, prev, now);
-
-        if (newState.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-          const history = newState.monthlyHistory;
-          const {cash, customers} = now;
-
-          // Record final history for the month, then generate the new timeline
-          history.unshift(summarizeTimeline(newState.timeline, newState.startingYear));
-          newState.timeline = generateNewTimeline(newState, cash, customers);
-
-          // Pre-roll a few frames to compensate for temperature / demand jumps across months
-          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-          updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-
-          // ===== TRIGGERS ======
-          // Failure: Bankrupt
-          if (now.cash < 0) {
-            logEvent('scenario_end', {id: state.scenarioId, type: 'bankrupt', difficulty: state.difficulty});
-            const summary = summarizeHistory(history);
-            setTimeout(() => store.dispatch(dialogOpen({
-              title: 'Bankrupt!',
-              message: `You've run out of money.
-                You survived for ${newState.date.year - newState.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
-              open: true,
-              notCancellable: true,
-              actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
-            })), 1);
-          }
-
-          // Failure: Too many blackouts
-          if (history[1] && history[2] && history[3] && history[1].supplyWh < history[1].demandWh * .9 && history[2].supplyWh < history[2].demandWh * .9 && history[3].supplyWh < history[3].demandWh * .9) {
-            logEvent('scenario_end', {id: state.scenarioId, type: 'blackouts', difficulty: state.difficulty});
-            const summary = summarizeHistory(history);
-            setTimeout(() => store.dispatch(dialogOpen({
-              title: 'Fired!',
-              message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-                You survived for ${newState.date.year - newState.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
-              open: true,
-              notCancellable: true,
-              actionLabel: 'Try again',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
-            })), 1);
-          }
-
-          // Success: Survived duration
-          const scenario = SCENARIOS.find((s) => s.id === newState.scenarioId) || {
-            durationMonths: 12 * 20,
-            endTitle: `You've retired!`,
-          } as ScenarioType;
-          if (newState.date.monthsEllapsed === scenario.durationMonths) {
-            const localStoragePlayed = (getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[];
-            setStorageKeyValue('plays', {plays: [...localStoragePlayed, {
-              scenarioId: state.scenarioId,
-              date: (new Date()).toString(),
-            } as LocalStoragePlayedType]});
-
-            // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
-            const summary = summarizeHistory(history);
-            const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-            const score = {
-              supply: Math.round(summary.supplyWh / 1000000000000),
-              netWorth: Math.round(40 * summary.netWorth / 1000000000),
-              customers: Math.round(2 * summary.customers / 100000),
-              emissions: Math.round(-2 * summary.kgco2e / 1000000000),
-              blackouts: Math.round(-8 * blackoutsTWh),
-            };
-            const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
-
-            // TODO Submit score to highscores
-            // {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
-            logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
-            setTimeout(() => store.dispatch(dialogOpen({
-              title: scenario.endTitle || `You've retired!`,
-              message: scenario.endMessage || <div>Your final score is {finalScore}:<br/><br/>
-                +{score.supply} pts from electricity supplied<br/>
-                +{score.netWorth} pts from final net worth<br/>
-                +{score.customers} pts from final customers<br/>
-                -{score.emissions} pts from emissions<br/>
-                -{score.blackouts} pts from blackouts<br/>
-              </div>,
-              open: true,
-              closeText: 'Keep playing',
-              actionLabel: 'Return to menu',
-              action: () => store.dispatch(quitGame()) && store.dispatch(navigate('MAIN_MENU')),
-            })), 1);
-          }
-        }
-      }
-
-      if (newState.inGame) {
-        setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
-      }
-      return newState;
-    } else {
-      if (state.inGame) {
-        setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
-      }
-    }
-    return state;
-
-  } else if (action.type === 'GAMESTATE_DELTA') {
-
-    return {...state, ...(action as any).delta};
-
-  } else if (action.type === 'GAME_START') {
-
-    return {...state, ...(action as StartGameAction).delta};
-
-  } else if (action.type === 'BUILD_FACILITY') {
-
-    const a = action as BuildFacilityAction;
-    const newState = buildFacility({...state}, a.facility, a.financed);
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'SELL_FACILITY') {
-
-    const newState = {...state};
-    const id = (action as SellFacilityAction).id;
-    // in one loop, refund cash from selling + remove from list
-    newState.facilities = newState.facilities.filter((g: GeneratorOperatingType | StorageOperatingType) => {
-      if (g.id === id) {
-        const now = getTimeFromTimeline(newState.date.minute, newState.timeline);
-        if (now) {
-          now.cash += facilityCashBack(g);
-        }
-        return false;
-      }
-      return true;
-    });
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'REPRIORITIZE_FACILITY') {
-
-    const a = action as ReprioritizeFacilityAction;
-    const newState = {...state};
-    arrayMove(newState.facilities, a.spotInList, a.spotInList + a.delta);
-    newState.timeline = reforecastSupply(newState);
-    return newState;
-
-  } else if (action.type === 'NEW_GAME') {
-
-    const a = action as NewGameAction;
-    const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
-    let newState = {
-      ...state,
-      timeline: [] as TickPresentFutureType[],
-      date: getDateFromMinute(0, scenario.startingYear),
-      startingYear: scenario.startingYear,
-      feePerKgCO2e: scenario.feePerKgCO2e,
-      location: a.location,
-    };
-    newState.timeline = generateNewTimeline(newState, a.cash, a.customers);
-
-    a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
-      const generator = GENERATORS(newState, search.peakW || 1000000).find((g: FacilityShoppingType) => {
-        for (const property in search) {
-          if (g[property] !== search[property]) {
-            return false;
-          }
-        }
-        return true;
-      });
-      if (generator) {
-        newState = buildFacility(newState, generator, false, true);
-      } else {
-        const storage = STORAGE(newState, search.peakWh || 1000000).find((g: FacilityShoppingType) => {
-          for (const property in search) {
-            if (g[property] !== search[property]) {
-              return false;
-            }
-          }
-          return true;
-        });
-        if (storage) {
-          newState = buildFacility(newState, storage, false, true);
-        }
-      }
-    });
-
-    // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-    updateSupplyFacilitiesFinances(newState, newState.timeline[0], newState.timeline[0], true);
-    newState.timeline = reforecastSupply(newState);
-
-    return newState;
-
-  } else if (action.type === 'GAME_LOADED') {
-
-    // Start ticking in game
-    setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
-    return {...state, inGame: true};
-
-  } else if (action.type === 'SET_SPEED') {
-
-    return {...state, speed: (action as SetSpeedAction).speed};
-
-  } else if (action.type === 'DIALOG_OPEN') {
-
-    previousSpeed = state.speed;
-    return {...state, speed: 'PAUSED'};
-
-  } else if (action.type === 'DIALOG_CLOSE') {
-
-    return {...state, speed: previousSpeed};
-
-  } else if (action.type === 'GAME_EXIT') {
-
-    return cloneDeep(initialGameState);
-
-  }
-  return state;
 }

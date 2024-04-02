@@ -24,8 +24,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     settings: state.settings,
     ui: state.ui,
     transition,
-    tutorialStep: state.gameState.tutorialStep,
-    tutorialSteps: (SCENARIOS.find((s) => s.id === state.gameState.scenarioId) || {}).tutorialSteps,
+    tutorialStep: state.game.tutorialStep,
+    tutorialSteps: (SCENARIOS.find((s) => s.id === state.game.scenarioId) || {}).tutorialSteps,
   };
 };
 
@@ -42,7 +42,7 @@ export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps
       if (prevStep && prevStep.onNext) {
         dispatch(prevStep.onNext());
       }
-      dispatch({type: 'GAMESTATE_DELTA', delta: { tutorialStep: newStep }});
+      dispatch({type: 'game_DELTA', delta: { tutorialStep: newStep }});
     },
   };
 };

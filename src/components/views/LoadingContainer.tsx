@@ -5,23 +5,24 @@ import {initFuelPrices} from '../../data/FuelPrices';
 import {initWeather} from '../../data/Weather';
 import {LOCATIONS} from '../../Constants';
 import {SCENARIOS} from '../../Scenarios';
-import {AppStateType, GameStateType, NewGameAction} from '../../Types';
+import {newGame, loaded, delta} from '../../reducers/Game';
+import {AppStateType, GameType} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
 import {gameLoaded} from '../../reducers/Card';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    gameState: state.gameState,
+    game: state.game,
   };
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
-    load: (gameState: GameStateType) => {
-      logEvent('scenario_start', {id: gameState.scenarioId, difficulty: gameState.difficulty});
-      const scenario = SCENARIOS.find((s) => s.id === gameState.scenarioId);
+    load: (game: GameType) => {
+      logEvent('scenario_start', {id: game.scenarioId, difficulty: game.difficulty});
+      const scenario = SCENARIOS.find((s) => s.id === game.scenarioId);
       if (!scenario) {
-        return alert('Unknown scenario ID ' + gameState.scenarioId);
+        return alert('Unknown scenario ID ' + game.scenarioId);
       }
       const location = LOCATIONS.find((s) => s.id === scenario.locationId);
       if (!location) {
@@ -34,19 +35,18 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
         initFuelPrices(() => {
           // Otherwise, generate from scratch
           // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
-          dispatch({
-            type: 'NEW_GAME',
+          dispatch(newGame({
             facilities: scenario.facilities,
             cash: 200000000,
             customers: 1030000,
             location,
-          } as NewGameAction);
+          }));
 
-          dispatch({type: 'GAME_LOADED'});
+          dispatch(loaded());
           dispatch(gameLoaded());
 
           if (scenario.tutorialSteps) {
-            setTimeout(() => dispatch({type: 'GAMESTATE_DELTA', delta: {tutorialStep: 0}}), 300);
+            setTimeout(() => dispatch(delta({tutorialStep: 0})), 300);
           }
         });
       });

@@ -11,14 +11,14 @@ import {formatHour, getTimeFromTimeline} from '../../helpers/DateTime';
 import {formatMoneyStable} from '../../helpers/Format';
 import {navigate} from '../../reducers/Card';
 import {isBigScreen, isSmallScreen, openWindow} from '../../Globals';
-import {quitGame, setSpeed} from '../../reducers/GameState';
-import {AppStateType, GameStateType, SpeedType} from '../../Types';
+import {quit, setSpeed} from '../../reducers/Game';
+import {AppStateType, GameType, SpeedType} from '../../Types';
 import NavigationContainer from './NavigationContainer';
 
 export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
-  gameState: GameStateType;
+  game: GameType;
 }
 
 export interface DispatchProps {
@@ -30,12 +30,12 @@ export interface DispatchProps {
 export interface Props extends GameCardProps, DispatchProps {}
 
 export function GameCard(props: Props) {
-  const {gameState} = props;
-  const date = gameState.date;
+  const {game} = props;
+  const date = game.date;
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
-  const now = getTimeFromTimeline(date.minute, gameState.timeline);
-  if (!gameState.inGame || !now) {
+  const now = getTimeFromTimeline(date.minute, game.timeline);
+  if (!game.inGame || !now) {
     return <span/>;
   }
 
@@ -56,7 +56,7 @@ export function GameCard(props: Props) {
     speedOptions = <span>
       <IconButton
         onClick={() => props.onSpeedChange('PAUSED')}
-        disabled={gameState.speed === 'PAUSED'}
+        disabled={game.speed === 'PAUSED'}
         aria-label="pause"
         edge="end"
         color="primary"
@@ -65,7 +65,7 @@ export function GameCard(props: Props) {
       </IconButton>
       <IconButton
         onClick={() => props.onSpeedChange('SLOW')}
-        disabled={gameState.speed === 'SLOW'}
+        disabled={game.speed === 'SLOW'}
         aria-label="slow speed"
         edge="end"
         color="primary"
@@ -74,7 +74,7 @@ export function GameCard(props: Props) {
       </IconButton>
       <IconButton
         onClick={() => props.onSpeedChange('NORMAL')}
-        disabled={gameState.speed === 'NORMAL'}
+        disabled={game.speed === 'NORMAL'}
         aria-label="normal speed"
         edge="end"
         color="primary"
@@ -83,7 +83,7 @@ export function GameCard(props: Props) {
       </IconButton>
       <IconButton
         onClick={() => props.onSpeedChange('FAST')}
-        disabled={gameState.speed === 'FAST'}
+        disabled={game.speed === 'FAST'}
         aria-label="fast speed"
         edge="end"
         color="primary"
@@ -93,7 +93,7 @@ export function GameCard(props: Props) {
     </span>;
   } else {
     let speedIcon = <PlayArrowIcon />;
-    switch (props.gameState.speed) {
+    switch (props.game.speed) {
       case 'PAUSED': speedIcon = <PlayArrowIcon />; break;
       case 'SLOW': speedIcon = <ChevronRightIcon />; break;
       case 'NORMAL': speedIcon = <PlayArrowIcon />; break;
@@ -101,7 +101,7 @@ export function GameCard(props: Props) {
       default: break;
     }
     speedOptions = <span>
-      {gameState.speed !== 'PAUSED' && <IconButton
+      {game.speed !== 'PAUSED' && <IconButton
         onClick={() => props.onSpeedChange('PAUSED') }
         aria-label="pause"
         size="large">
@@ -122,13 +122,13 @@ export function GameCard(props: Props) {
         open={Boolean(speedAnchorEl)}
         onClose={handleSpeedClose}
       >
-        <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={gameState.speed === 'SLOW'} aria-label="slow-speed">
+        <MenuItem onClick={() => { props.onSpeedChange('SLOW'); handleSpeedClose(); }} disabled={game.speed === 'SLOW'} aria-label="slow-speed">
           <ChevronRightIcon color="primary" />
         </MenuItem>
-        <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={gameState.speed === 'NORMAL'} aria-label="normal-speed">
+        <MenuItem onClick={() => { props.onSpeedChange('NORMAL'); handleSpeedClose(); }} disabled={game.speed === 'NORMAL'} aria-label="normal-speed">
           <PlayArrowIcon color="primary" />
         </MenuItem>
-        <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={gameState.speed === 'FAST'} aria-label="fast-speed">
+        <MenuItem onClick={() => { props.onSpeedChange('FAST'); handleSpeedClose(); }} disabled={game.speed === 'FAST'} aria-label="fast-speed">
           <FastForwardIcon color="primary" />
         </MenuItem>
       </Menu>
@@ -175,7 +175,7 @@ export function GameCard(props: Props) {
 }
 
 const mapStateToProps = (state: AppStateType, ownProps: Partial<GameCardProps>): GameCardProps => ({
-  gameState: state.gameState,
+  game: state.game,
   ...ownProps,
 });
 
@@ -188,7 +188,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onQuit: () => {
-      dispatch(quitGame());
+      dispatch(quit());
       dispatch(navigate('MAIN_MENU'));
     },
   };

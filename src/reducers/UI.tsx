@@ -41,16 +41,15 @@ export const uiSlice = createSlice({
           },
         };
       }
-      return state;
     },
     snackbarClose: (state) => {
-      return {...state, snackbar: {...initialUI.snackbar}};
+      state.snackbar = {...initialUI.snackbar};
     },
     dialogOpen: (state, action: PayloadAction<DialogType>) => {
-      return {...state, dialog: {...action.payload}};
+      state.dialog = {...action.payload};
     },
     dialogClose: (state) => {
-      return {...state, dialog: {...initialUI.dialog}};
+      state.dialog = {...initialUI.dialog};
     }
   },
 });
