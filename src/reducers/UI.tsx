@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {DialogType, SnackbarType, UIType} from '../Types';
+import {quit} from './Game';
 
 export const initialUI: UIType = {
   dialog: {
@@ -51,6 +52,13 @@ export const uiSlice = createSlice({
     dialogClose: (state) => {
       state.dialog = {...initialUI.dialog};
     }
+  },
+  extraReducers:(builder) => {
+    builder.addCase(quit, (state) => {
+      state.snackbar = {...initialUI.snackbar};
+      state.dialog = {...initialUI.dialog};
+      return state;
+    });
   },
 });
 

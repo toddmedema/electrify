@@ -3,7 +3,7 @@ import {Avatar, Button, Dialog, DialogActions, DialogContent, DialogContentText,
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import {TICK_MINUTES} from '../../Constants';
 import {FacilityOperatingType, GameType} from '../../Types';
 import {facilityCashBack} from '../../helpers/Financials';

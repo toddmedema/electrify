@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {getHistoryApi, logEvent} from '../Globals';
 import {NAVIGATION_DEBOUNCE_MS} from '../Constants';
 import {CardNameType, CardType} from '../Types';
+import {start, loaded, quit} from './Game';
 import {RootState} from '../Store';
 
 interface NavigateAction {
@@ -50,29 +51,32 @@ export const cardSlice = createSlice({
         toPrevious: true,
       };
     },
-    gameStart: (state) => {
-      return {
+  },
+  extraReducers:(builder) => {
+    builder.addCase(start, (state) => {
+      state = {
         name: 'LOADING',
         ts: Date.now(),
         history: state.history, // Don't store loading screen in history
       };
-    },
-    gameLoaded: (state) => {
-      return {
+      return state;
+    });
+    builder.addCase(loaded, (state) => {
+      state = {
         name: 'FACILITIES',
         ts: Date.now(),
         history: ['FACILITIES', ...(state.history || [])],
       };
-    },
-    gameExit: () => {
-      return {
-        ...initialCard,
-      };
-    }
+      return state;
+    });
+    builder.addCase(quit, (state) => {
+      state = {...initialCard};
+      return state;
+    });
   },
 });
 
-export const { navigate, navigateBack, gameStart, gameLoaded, gameExit } = cardSlice.actions;
+export const { navigate, navigateBack } = cardSlice.actions;
 
 export const selectCardName = (state: RootState) => state.card.name;
 

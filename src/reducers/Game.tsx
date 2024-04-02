@@ -91,7 +91,7 @@ export const gameSlice = createSlice({
               setTimeout(() => store.dispatch(dialogOpen({
                 title: 'Bankrupt!',
                 message: `You've run out of money.
-                  You survived for ${state.date.year - state.startingYear} years,
+                  You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
                   earned ${formatMoneyConcise(summary.revenue)} in revenue
                   and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
                 open: true,
@@ -108,7 +108,7 @@ export const gameSlice = createSlice({
               setTimeout(() => store.dispatch(dialogOpen({
                 title: 'Fired!',
                 message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-                  You survived for ${state.date.year - state.startingYear} years,
+                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
                   earned ${formatMoneyConcise(summary.revenue)} in revenue
                   and emitted ${numbro(summary.kgco2e / 1000).format({thousandSeparated: true, mantissa: 0})} tons of pollution.`,
                 open: true,
@@ -164,11 +164,11 @@ export const gameSlice = createSlice({
         }
   
         if (state.inGame) {
-          setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS[state.speed]);
+          setTimeout(() => { return store.dispatch(gameSlice.actions.tick()); }, TICK_MS[state.speed]);
         }
       } else {
         if (state.inGame) {
-          setTimeout(() => store.dispatch({type: 'GAME_TICK'}), TICK_MS.PAUSED);
+          setTimeout(() => { return store.dispatch(gameSlice.actions.tick()); }, TICK_MS.PAUSED);
         }
       }
     },
@@ -220,13 +220,16 @@ export const gameSlice = createSlice({
       updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
       updateSupplyFacilitiesFinances(state, state.timeline[0], state.timeline[0], true);
       state.timeline = reforecastSupply(state);
+      return state;
     },
     quit: (state) => {
       state = cloneDeep(initialGame);
+      return state;
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
       state = buildFacilityHelper({...state}, action.payload.facility, action.payload.financed);
       state.timeline = reforecastSupply(state);
+      return state;
     },
     sellFacility: (state, action: PayloadAction<number>) => {
       const id = action.payload; // (action as SellFacilityAction).id;
@@ -242,27 +245,34 @@ export const gameSlice = createSlice({
         return true;
       });
       state.timeline = reforecastSupply(state);
+      return state;
     },
     reprioritizeFacility: (state, action: PayloadAction<ReprioritizeFacilityAction>) => {
       arrayMove(state.facilities, action.payload.spotInList, action.payload.spotInList + action.payload.delta);
       state.timeline = reforecastSupply(state);
+      return state;
     },
     loaded: (state) => {
       // Start ticking in game
       setTimeout(() => { return store.dispatch(gameSlice.actions.tick()); }, TICK_MS.PAUSED);
       state.inGame = true;
+      return state;
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
+      return state;
     },
   },
   extraReducers:(builder) => {
-    builder.addCase(dialogOpen, state => {
+    builder.addCase(dialogOpen, (state) => {
+      console.log('dialog paus')
       previousSpeed = state.speed;
       state.speed = 'PAUSED';
+      return state;
     });
-    builder.addCase(dialogClose, state => {
+    builder.addCase(dialogClose, (state) => {
       state.speed = previousSpeed;
+      return state;
     });
   },
 });

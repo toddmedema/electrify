@@ -1,6 +1,6 @@
 import Redux from 'redux';
 import {connect} from 'react-redux';
-import {navigateBack, gameStart} from '../../reducers/Card';
+import {navigateBack} from '../../reducers/Card';
 import {start, delta} from '../../reducers/Game';
 import {authWrapper} from '../../Globals';
 import {AppStateType, GameType} from '../../Types';
@@ -22,7 +22,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onStart: (d: Partial<GameType>) => {
       dispatch(start(d));
-      dispatch(gameStart());
     },
   };
 };

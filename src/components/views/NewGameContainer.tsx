@@ -15,7 +15,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onBack: () => {
       dispatch(quit());
-      dispatch(navigate('MAIN_MENU'));
     },
     onDetails: (d: Partial<GameType>) => {
       dispatch(delta(d));

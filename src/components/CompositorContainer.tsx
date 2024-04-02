@@ -1,5 +1,6 @@
 import {connect} from 'react-redux';
 import Redux from 'redux';
+import {delta} from '../reducers/Game';
 import {dialogClose, snackbarClose} from '../reducers/UI';
 import {SCENARIOS} from '../Scenarios';
 import {AppStateType, TransitionClassType, TutorialStepType} from '../Types';
@@ -42,7 +43,7 @@ export const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps
       if (prevStep && prevStep.onNext) {
         dispatch(prevStep.onNext());
       }
-      dispatch({type: 'game_DELTA', delta: { tutorialStep: newStep }});
+      dispatch(delta({ tutorialStep: newStep }));
     },
   };
 };

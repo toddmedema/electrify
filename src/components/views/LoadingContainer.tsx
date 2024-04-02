@@ -8,7 +8,6 @@ import {SCENARIOS} from '../../Scenarios';
 import {newGame, loaded, delta} from '../../reducers/Game';
 import {AppStateType, GameType} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
-import {gameLoaded} from '../../reducers/Card';
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -43,7 +42,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
           }));
 
           dispatch(loaded());
-          dispatch(gameLoaded());
 
           if (scenario.tutorialSteps) {
             setTimeout(() => dispatch(delta({tutorialStep: 0})), 300);
