@@ -144,7 +144,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
         onClose={toggleOpen}
       >
         <DialogTitle>
-          <Typography variant="h6">Build {formatWatts(generator.peakW)} {generator.name}?</Typography>
+          Build {formatWatts(generator.peakW)} {generator.name}?
           <IconButton
             aria-label="close"
             onClick={toggleOpen}

@@ -145,19 +145,22 @@ export const gameSlice = createSlice({
               };
               const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
   
-              // Submit score to highscores
-              const uid = useAppSelector(selectUid); // eslint-disable-line
-              if (uid && !scenario.tutorialSteps) {
-                const scoreSubmission = {
-                  score: finalScore,
-                  scoreBreakdown: score, // For analytics purposes only
-                  scenarioId: state.scenarioId,
-                  difficulty: state.difficulty,
-                  date: firebase.firestore.Timestamp.fromDate(new Date()),
-                  uid: uid,
-                } as ScoreType;
-                getDb().collection('scores').add(scoreSubmission);
-              }
+              // TODO - Submit score to highscores - probably need to do this in a thunk or separate action/reducer, since it needs access to user state?
+              // ideally there would be some way to include this line at the bottom of the dialog below, but I can't figure out how to get access to user state here
+              // {(!uid) && <p>Your score was not submitted because you were not logged in!</p>}
+              
+              // const uid = useAppSelector(selectUid);
+              // if (uid && !scenario.tutorialSteps) {
+              //   const scoreSubmission = {
+              //     score: finalScore,
+              //     scoreBreakdown: score, // For analytics purposes only
+              //     scenarioId: state.scenarioId,
+              //     difficulty: state.difficulty,
+              //     date: firebase.firestore.Timestamp.fromDate(new Date()),
+              //     uid: uid,
+              //   } as ScoreType;
+              //   getDb().collection('scores').add(scoreSubmission);
+              // }
 
               logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
               setTimeout(() => store.dispatch(dialogOpen({
@@ -168,7 +171,6 @@ export const gameSlice = createSlice({
                   +{score.customers} pts from final customers<br/>
                   -{score.emissions} pts from emissions<br/>
                   -{score.blackouts} pts from blackouts<br/>
-                  {(!uid) && <p>Your score was not submitted because you were not logged in!</p>}
                 </div>,
                 open: true,
                 closeText: 'Keep playing',
@@ -243,9 +245,11 @@ export const gameSlice = createSlice({
       return state;
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
-      state = buildFacilityHelper({...state}, action.payload.facility, action.payload.financed);
-      state.timeline = reforecastSupply(state);
-      return state;
+      state = buildFacilityHelper(state, action.payload.facility, action.payload.financed)
+      state = {
+        ...state,
+        timeline: reforecastSupply(state),
+      };
     },
     sellFacility: (state, action: PayloadAction<number>) => {
       const id = action.payload; // (action as SellFacilityAction).id;
@@ -360,9 +364,10 @@ function updateSupplyFacilitiesFinances(state: GameType, prev: TickPresentFuture
     if (g.yearsToBuildLeft > 0) {
       g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
       if (g.yearsToBuildLeft === 0 && !simulated) {
-        setTimeout(() => {
-          store.dispatch(snackbarOpen(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
-        }, 0);
+        // TODO fixme, when facility construction completes (only storage?): Uncaught TypeError: Cannot perform 'get' on a proxy that has been revoked
+        // setTimeout(() => {
+        //   store.dispatch(snackbarOpen(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
+        // }, 0);
       }
     }
   });

@@ -3,10 +3,8 @@ import * as React from 'react';
 import { GlobalHotKeys  } from 'react-hotkeys';
 import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
 import {CSSTransition, TransitionGroup} from 'react-transition-group';
-
 import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
 import {CardNameType, CardType, SettingsType, TransitionClassType, TutorialStepType, UIType} from '../Types';
-
 import AudioContainer from './base/AudioContainer';
 import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
 import BuildStorageContainer from './views/BuildStorageContainer';
@@ -20,8 +18,6 @@ import NewGameContainer from './views/NewGameContainer';
 import NewGameDetailsContainer from './views/NewGameDetailsContainer';
 import SettingsContainer from './views/SettingsContainer';
 import TutorialsContainer from './views/TutorialsContainer';
-
-// TODO move to dispatch (probably move the entire shortcutHandlers function, and have it take in the triggered shortcut name?)
 import {navigate} from '../reducers/Card';
 import {setSpeed} from '../reducers/Game';
 import {store} from '../Store';

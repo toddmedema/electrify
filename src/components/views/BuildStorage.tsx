@@ -107,7 +107,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
         onClose={toggleOpen}
       >
         <DialogTitle>
-          <Typography variant="h6">Build {formatWatts(storage.peakWh)}h {storage.name}?</Typography>
+          Build {formatWatts(storage.peakWh)}h {storage.name}?
           <IconButton
             aria-label="close"
             onClick={toggleOpen}
