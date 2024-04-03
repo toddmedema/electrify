@@ -38,6 +38,7 @@ interface NewGameAction {
 }
 
 let previousSpeed = 'PAUSED' as SpeedType;
+let previousSunrise = 0;
 const initialGame: GameType = {
   scenarioId: 100,
   location: {
@@ -70,9 +71,8 @@ export const gameSlice = createSlice({
         if (now && prev) {
           updateSupplyFacilitiesFinances(state, prev, now);
   
-          // TODO how to tell if it's a new day without previous state?
-          // if (state.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-          if (true) {
+          if (previousSunrise !== state.date.sunrise) { // If it's a new day / month
+            previousSunrise = state.date.sunrise;
             const history = state.monthlyHistory;
             const {cash, customers} = now;
   
@@ -196,7 +196,7 @@ export const gameSlice = createSlice({
     start: (state, action: PayloadAction<Partial<GameType>>) => {
       return {...state, ...action.payload};
     },
-    newGame: (state, action: PayloadAction<NewGameAction>) => {
+    initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
       const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.timeline = [] as TickPresentFutureType[];
@@ -297,7 +297,7 @@ export const gameSlice = createSlice({
   },
 });
 
-export const { tick, delta, newGame, start, quit, buildFacility, sellFacility, reprioritizeFacility, loaded, setSpeed } = gameSlice.actions;
+export const { tick, delta, initGame, start, quit, buildFacility, sellFacility, reprioritizeFacility, loaded, setSpeed } = gameSlice.actions;
 
 export default gameSlice.reducer;
 
