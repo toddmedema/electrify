@@ -1,8 +1,7 @@
 import { getAnalytics, logEvent as firebaseLogEvent } from 'firebase/analytics';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import withFirebaseAuth from 'react-with-firebase-auth';
 
 const firebaseApp = initializeApp({
   apiKey: 'AIzaSyBCZX3pfJe65LU1Ei_ONj6Yw2eaMKsZX7g',
@@ -15,9 +14,24 @@ const firebaseApp = initializeApp({
   measurementId: 'G-M064W1XFDY',
 });
 export const firebaseAppAuth = getAuth(firebaseApp);
-const providers = {
-  googleProvider: new GoogleAuthProvider(),
-};
+const provider = new GoogleAuthProvider();
+
+export function login() {
+  console.log('foo')
+  signInWithPopup(firebaseAppAuth, provider)
+    .then((result) => {
+      // This gives you a Google Access Token. You can use it to access the Google API.
+      const credential = GoogleAuthProvider.credentialFromResult(result) || {} as any;
+      const token = credential.accessToken;
+      // The signed-in user info.
+      const user = result.user;
+      // IdP data available using getAdditionalUserInfo(result)
+      // ...
+      console.log(token, user);
+    }).catch((error) => {
+      console.log('Auth error: ', error, GoogleAuthProvider.credentialFromError(error));
+    });
+}
 
 export interface ReactWindow extends Window {
   platform?: string;
@@ -37,25 +51,9 @@ export function logEvent(eventName: string, args?: object): void {
   firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
 }
 
-export function authWrapper(component: any): any {
-  return withFirebaseAuth({
-    providers,
-    firebaseAppAuth,
-  })(component);
-}
-
 export function getDb(): any {
   if (!refs.db) {
     refs.db = getFirestore(firebaseApp);
-    refs.db.enablePersistence()
-      .catch((err: any) => {
-          if (err.code === 'failed-precondition') {
-            // Multiple tabs open, persistence can only be enabled in one tab at a a time.
-          } else if (err.code === 'unimplemented') {
-            // The current browser does not support all of the
-            // features required to enable persistence
-          }
-      });
   }
   return refs.db;
 }

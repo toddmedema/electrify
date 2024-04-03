@@ -3,16 +3,14 @@ import {Button, IconButton} from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InfoIcon from '@mui/icons-material/Info';
+import {login} from '../../Globals';
 import {getStorageJson} from '../../LocalStorage';
 import {LocalStoragePlayedType} from '../../Types';
 import {interactiveColor} from '../../Theme';
 
 export interface StateProps {
   audioEnabled?: boolean;
-  // From auth:
-  error?: any;
-  user?: any;
-  signInWithGoogle?: any;
+  uid?: string;
 }
 
 export interface DispatchProps {
@@ -41,7 +39,7 @@ const MainMenu = (props: Props): JSX.Element => {
         <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart} autoFocus={playedTutorial}>New Game</Button>
         {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>}
         {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>}
-        {props.audioEnabled !== undefined && !props.user && <Button variant="outlined" color="primary" onClick={props.signInWithGoogle}>Log in</Button>}
+        {props.audioEnabled !== undefined && !props.uid && <Button variant="outlined" color="primary" onClick={login}>Log in</Button>}
         {props.audioEnabled === undefined && <div>Enable music?<br/>
           <Button variant="contained" color="primary" onClick={(e: any) => props.onAudioChange(true)} style={{display: 'inline', marginRight: '12px', marginTop: '4px'}}>Yes</Button>
           <Button variant="outlined" color="primary" onClick={(e: any) => props.onAudioChange(false)} style={{display: 'inline', marginTop: '4px'}}>No</Button>

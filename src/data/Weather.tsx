@@ -20,8 +20,9 @@ const DUMMY_WEATHER = {
   WIND_KPH: 10,
 };
 
-// TODO download weather at start with a 2s init delay, like loading audio (but after audio)
+// TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio)
 // But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
+// Ideally caching this... so maybe upgrade to use https://tanstack.com/query/latest/docs/framework/react/overview ?
 export function initWeather(location: string, callback?: any) {
   weather = [] as any; // reset each time to prevent accidentally appending to old state
   Papa.parse(`/data/WeatherRaw${location}.csv`, {

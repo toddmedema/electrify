@@ -1,8 +1,9 @@
 import * as React from 'react';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import {Button, IconButton, MenuItem, Select, Table, TableBody, TableCell, TableHead, TableRow, Toolbar, Typography} from '@mui/material';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import {DIFFICULTIES, LOCATIONS} from '../../Constants';
-import {getDb} from '../../Globals';
+import {getDb, login} from '../../Globals';
 import {SCENARIOS} from '../../Scenarios';
 import {GameType, LocationType, ScenarioType, ScoreType} from '../../Types';
 
@@ -10,10 +11,7 @@ const numbro = require('numbro');
 
 export interface StateProps {
   game: GameType;
-  // From auth:
-  error?: any;
-  user?: any;
-  signInWithGoogle?: any;
+  uid?: string;
 }
 
 export interface DispatchProps {
@@ -39,48 +37,39 @@ export default class NewGameDetails extends React.Component<Props, State> {
       scenario,
       location: scenario ? (LOCATIONS.find((s) => s.id === scenario.locationId) || null) : null,
     };
-    if (props.user) {
-      this.loadScores(props.user);
-    }
+    this.loadScores(props.uid);
   }
 
-  private loadScores(user: any) {
-    if (this.state.scenario && user) {
+  private async loadScores(uid: string|undefined) {
+    if (this.state.scenario && uid) {
       const db = getDb();
-      db.collection('scores')
-        .where('scenarioId', '==', this.state.scenario.id)
-        .orderBy('score', 'desc')
-        .limit(50)
-        .get()
-        .then((qs: any) => {
-          this.setState({scores: []});
-          qs.forEach((doc: any) => {
-            this.setState({scores: [...(this.state.scores || []), doc.data()]});
-          });
-        });
-      db.collection('scores')
-        .where('scenarioId', '==', this.state.scenario.id)
-        .where('uid', '==', user.uid)
-        .orderBy('score', 'desc')
-        .limit(1)
-        .get()
-        .then((qs: any) => {
-          qs.forEach((doc: any) => {
-            this.setState({myTopScore: doc.data()});
-          });
-        });
+      let scores = [] as any; // tracking here synchronously because React state updates are async
+      this.setState({scores: [], myTopScore: undefined});
+
+      let q = query(collection(db, 'scores'), where('scenarioId', '==', this.state.scenario.id), orderBy('score', 'desc'), limit(50));
+      let querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc: any) => {
+        scores = [...(scores || []), doc.data()];
+        this.setState({scores});
+      });
+
+      q = query(collection(db, 'scores'), where('scenarioId', '==', this.state.scenario.id), where('uid', '==', uid), orderBy('score', 'desc'), limit(1));
+      querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc: any) => {
+        this.setState({myTopScore: doc.data()});
+      });
     }
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
-    if (!this.props.user && nextProps.user) {
-      this.loadScores(nextProps.user);
+    if (!this.props.uid && nextProps.uid) {
+      this.loadScores(nextProps.uid);
     }
     return true;
   }
 
   public render() {
-    const {onBack, onDelta, onStart, game, user, signInWithGoogle} = this.props;
+    const {onBack, onDelta, onStart, game, uid} = this.props;
     const {scenario, scores, myTopScore, location} = this.state;
 
     if (!scenario || !location) {
@@ -142,13 +131,13 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <TableCell>Difficulty</TableCell>
             </TableRow>
           </TableHead>
-          {!user && <TableBody>
+          {!uid && <TableBody>
             <TableRow><TableCell colSpan={2} style={{textAlign: 'center'}}>
-              <Button variant="contained" color="primary" onClick={signInWithGoogle}>Log in</Button>
+              <Button variant="contained" color="primary" onClick={login}>Log in</Button>
               <Typography variant="body2" color="textSecondary">Required to see and set high scores</Typography>
             </TableCell></TableRow>
           </TableBody>}
-          {user && <TableBody>
+          {uid && <TableBody>
             {myTopScore && <TableRow style={{fontWeight: 'bold', background: '#eee'}}>
               <TableCell>Your best: {numbro(myTopScore.score).format({thousandSeparated: true, mantissa: 0})}</TableCell>
               <TableCell>{myTopScore.difficulty}</TableCell>

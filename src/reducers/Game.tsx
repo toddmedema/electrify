@@ -1,5 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import numbro from 'numbro';
+import { useAppSelector } from '../Hooks';
+import {selectUid} from './User';
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from '../helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from '../helpers/Financials';
 import {formatMoneyConcise, formatWatts} from '../helpers/Format';
@@ -10,12 +12,13 @@ import {dialogOpen, dialogClose, snackbarOpen} from './UI';
 import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
-import {logEvent} from '../Globals';
+import {logEvent, getDb} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {store} from '../Store';
-import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType} from '../Types';
+import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType, ScoreType} from '../Types';
 const cloneDeep = require('lodash.clonedeep');
+const firebase = require('firebase/app');
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -142,8 +145,20 @@ export const gameSlice = createSlice({
               };
               const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
   
-              // TODO Submit score to highscores
-              // {(!user || !user.uid) && <p>Your score was not submitted because you were not logged in!</p>}
+              // Submit score to highscores
+              const uid = useAppSelector(selectUid); // eslint-disable-line
+              if (uid && !scenario.tutorialSteps) {
+                const scoreSubmission = {
+                  score: finalScore,
+                  scoreBreakdown: score, // For analytics purposes only
+                  scenarioId: state.scenarioId,
+                  difficulty: state.difficulty,
+                  date: firebase.firestore.Timestamp.fromDate(new Date()),
+                  uid: uid,
+                } as ScoreType;
+                getDb().collection('scores').add(scoreSubmission);
+              }
+
               logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
               setTimeout(() => store.dispatch(dialogOpen({
                 title: scenario.endTitle || `You've retired!`,
@@ -153,6 +168,7 @@ export const gameSlice = createSlice({
                   +{score.customers} pts from final customers<br/>
                   -{score.emissions} pts from emissions<br/>
                   -{score.blackouts} pts from blackouts<br/>
+                  {(!uid) && <p>Your score was not submitted because you were not logged in!</p>}
                 </div>,
                 open: true,
                 closeText: 'Keep playing',
