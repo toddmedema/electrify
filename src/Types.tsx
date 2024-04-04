@@ -57,7 +57,7 @@ export interface ScoreType {
   score: number;
   scoreBreakdown: any;
   difficulty: string;
-  date: string;
+  date: any; // serverTimestamp from Firestore
   uid: string;
 }
 

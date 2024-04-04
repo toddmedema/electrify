@@ -5,7 +5,7 @@ import {initFuelPrices} from '../../data/FuelPrices';
 import {initWeather} from '../../data/Weather';
 import {LOCATIONS} from '../../Constants';
 import {SCENARIOS} from '../../Scenarios';
-import {newGame, loaded, delta} from '../../reducers/Game';
+import {initGame, loaded, delta} from '../../reducers/Game';
 import {AppStateType, GameType} from '../../Types';
 import Loading, {DispatchProps, StateProps} from './Loading';
 
@@ -34,7 +34,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
         initFuelPrices(() => {
           // Otherwise, generate from scratch
           // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
-          dispatch(newGame({
+          dispatch(initGame({
             facilities: scenario.facilities,
             cash: 200000000,
             customers: 1030000,

@@ -1,24 +1,22 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import numbro from 'numbro';
-import { useAppSelector } from '../Hooks';
-import {selectUid} from './User';
+import {submitHighscore} from './User';
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from '../helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from '../helpers/Financials';
-import {formatMoneyConcise, formatWatts} from '../helpers/Format';
+import {formatMoneyConcise} from '../helpers/Format';
 import {arrayMove} from '../helpers/Math';
 import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 import {getRawSunlightPercent, getWeather} from '../data/Weather';
-import {dialogOpen, dialogClose, snackbarOpen} from './UI';
+import {dialogOpen, dialogClose} from './UI';
 import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
-import {logEvent, getDb} from '../Globals';
+import {logEvent} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {store} from '../Store';
-import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType, ScoreType} from '../Types';
+import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType} from '../Types';
 const cloneDeep = require('lodash.clonedeep');
-const firebase = require('firebase/app');
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -38,6 +36,7 @@ interface NewGameAction {
 }
 
 let previousSpeed = 'PAUSED' as SpeedType;
+let previousSunrise = 0;
 const initialGame: GameType = {
   scenarioId: 100,
   location: {
@@ -70,9 +69,8 @@ export const gameSlice = createSlice({
         if (now && prev) {
           updateSupplyFacilitiesFinances(state, prev, now);
   
-          // TODO how to tell if it's a new day without previous state?
-          // if (state.date.sunrise !== state.date.sunrise) { // If it's a new day / month
-          if (true) {
+          if (previousSunrise !== state.date.sunrise) { // If it's a new day / month
+            previousSunrise = state.date.sunrise;
             const history = state.monthlyHistory;
             const {cash, customers} = now;
   
@@ -144,23 +142,17 @@ export const gameSlice = createSlice({
                 blackouts: Math.round(-8 * blackoutsTWh),
               };
               const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
-  
-              // TODO - Submit score to highscores - probably need to do this in a thunk or separate action/reducer, since it needs access to user state?
-              // ideally there would be some way to include this line at the bottom of the dialog below, but I can't figure out how to get access to user state here
-              // {(!uid) && <p>Your score was not submitted because you were not logged in!</p>}
-              
-              // const uid = useAppSelector(selectUid);
-              // if (uid && !scenario.tutorialSteps) {
-              //   const scoreSubmission = {
-              //     score: finalScore,
-              //     scoreBreakdown: score, // For analytics purposes only
-              //     scenarioId: state.scenarioId,
-              //     difficulty: state.difficulty,
-              //     date: firebase.firestore.Timestamp.fromDate(new Date()),
-              //     uid: uid,
-              //   } as ScoreType;
-              //   getDb().collection('scores').add(scoreSubmission);
-              // }
+              const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
+              const scenarioId = state.scenarioId; // pulling out of state for functions running inside of setTimeout
+
+              if (!scenario.tutorialSteps) {
+                setTimeout(() => store.dispatch(submitHighscore({
+                  score: finalScore,
+                  scoreBreakdown: score, // For analytics purposes only
+                  scenarioId,
+                  difficulty,
+                })), 1);
+              }
 
               logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
               setTimeout(() => store.dispatch(dialogOpen({
@@ -169,8 +161,8 @@ export const gameSlice = createSlice({
                   +{score.supply} pts from electricity supplied<br/>
                   +{score.netWorth} pts from final net worth<br/>
                   +{score.customers} pts from final customers<br/>
-                  -{score.emissions} pts from emissions<br/>
-                  -{score.blackouts} pts from blackouts<br/>
+                  {score.emissions} pts from emissions<br/>
+                  {score.blackouts} pts from blackouts<br/>
                 </div>,
                 open: true,
                 closeText: 'Keep playing',
@@ -196,7 +188,7 @@ export const gameSlice = createSlice({
     start: (state, action: PayloadAction<Partial<GameType>>) => {
       return {...state, ...action.payload};
     },
-    newGame: (state, action: PayloadAction<NewGameAction>) => {
+    initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
       const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.timeline = [] as TickPresentFutureType[];
@@ -285,7 +277,6 @@ export const gameSlice = createSlice({
   },
   extraReducers:(builder) => {
     builder.addCase(dialogOpen, (state) => {
-      console.log('dialog paus')
       previousSpeed = state.speed;
       state.speed = 'PAUSED';
       return state;
@@ -297,7 +288,7 @@ export const gameSlice = createSlice({
   },
 });
 
-export const { tick, delta, newGame, start, quit, buildFacility, sellFacility, reprioritizeFacility, loaded, setSpeed } = gameSlice.actions;
+export const { tick, delta, initGame, start, quit, buildFacility, sellFacility, reprioritizeFacility, loaded, setSpeed } = gameSlice.actions;
 
 export default gameSlice.reducer;
 
