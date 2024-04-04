@@ -42,7 +42,6 @@ export type CardNameType =
   'NEW_GAME_DETAILS' |
   'MANUAL' |
   'SETTINGS' |
-  'TUTORIALS' |
   'CUSTOM_GAME';
 
 export interface CardType {

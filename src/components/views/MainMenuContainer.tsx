@@ -26,9 +26,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onStart: () => {
       dispatch(navigate('NEW_GAME'));
     },
-    onTutorial: () => {
-      dispatch(navigate('TUTORIALS'));
-    },
   };
 };
 

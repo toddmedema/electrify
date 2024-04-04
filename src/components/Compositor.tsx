@@ -17,7 +17,6 @@ import ManualContainer from './views/ManualContainer';
 import NewGameContainer from './views/NewGameContainer';
 import NewGameDetailsContainer from './views/NewGameDetailsContainer';
 import SettingsContainer from './views/SettingsContainer';
-import TutorialsContainer from './views/TutorialsContainer';
 import {navigate} from '../reducers/Card';
 import {setSpeed} from '../reducers/Game';
 import {store} from '../Store';
@@ -129,8 +128,6 @@ export default class Compositor extends React.Component<Props, {}> {
         return <ManualContainer />;
       case 'LOADING':
         return <LoadingContainer />;
-      case 'TUTORIALS':
-        return <TutorialsContainer />;
       case 'NEW_GAME':
         return <NewGameContainer />;
       case 'NEW_GAME_DETAILS':
