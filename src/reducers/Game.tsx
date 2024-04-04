@@ -3,11 +3,11 @@ import numbro from 'numbro';
 import {submitHighscore} from './User';
 import {getDateFromMinute, getTimeFromTimeline, summarizeHistory, summarizeTimeline} from '../helpers/DateTime';
 import {customersFromMarketingSpend, facilityCashBack, getMonthlyPayment, getPaymentInterest} from '../helpers/Financials';
-import {formatMoneyConcise} from '../helpers/Format';
+import {formatMoneyConcise, formatWatts, formatWattHours} from '../helpers/Format';
 import {arrayMove} from '../helpers/Math';
 import {getFuelPricesPerMBTU} from '../data/FuelPrices';
 import {getRawSunlightPercent, getWeather} from '../data/Weather';
-import {dialogOpen, dialogClose} from './UI';
+import {dialogOpen, dialogClose, snackbarOpen} from './UI';
 import {navigate} from './Card';
 import {DIFFICULTIES, DOWNPAYMENT_PERCENT, FUELS, GAME_TO_REAL_YEARS, GENERATOR_SELL_MULTIPLIER, INTEREST_RATE_YEARLY, LOAN_MONTHS, ORGANIC_GROWTH_MAX_ANNUAL, RESERVE_MARGIN, TICK_MINUTES, TICK_MS, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_MONTH, TICKS_PER_YEAR, YEARS_PER_TICK} from '../Constants';
 import {GENERATORS, STORAGE} from '../Facilities';
@@ -351,14 +351,14 @@ function updateSupplyFacilitiesFinances(state: GameType, prev: TickPresentFuture
   const difficulty = DIFFICULTIES[state.difficulty];
 
   // Update facility construction status
-  facilities.forEach((g: FacilityOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      g.yearsToBuildLeft = Math.max(0, g.yearsToBuildLeft - YEARS_PER_TICK);
-      if (g.yearsToBuildLeft === 0 && !simulated) {
-        // TODO fixme, when facility construction completes (only storage?): Uncaught TypeError: Cannot perform 'get' on a proxy that has been revoked
-        // setTimeout(() => {
-        //   store.dispatch(snackbarOpen(`Construction complete: ${g.name} ${g.peakWh ? formatWatts(g.peakWh) + 'h' : formatWatts(g.peakW)}`));
-        // }, 0);
+  facilities.forEach((f: FacilityOperatingType) => {
+    if (f.yearsToBuildLeft > 0) {
+      f.yearsToBuildLeft = Math.max(0, f.yearsToBuildLeft - YEARS_PER_TICK);
+      if (f.yearsToBuildLeft === 0 && !simulated) {
+        const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
+        setTimeout(() => {
+          store.dispatch(snackbarOpen(message));
+        }, 0);
       }
     }
   });
