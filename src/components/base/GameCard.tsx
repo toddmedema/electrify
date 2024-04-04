@@ -32,18 +32,16 @@ export interface Props extends GameCardProps, DispatchProps {}
 export function GameCard(props: Props) {
   const {game} = props;
   const date = game.date;
-  const smallScreen = isSmallScreen();
-  const bigScreen = isBigScreen();
   const now = getTimeFromTimeline(date.minute, game.timeline);
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+  const [speedAnchorEl, setSpeedAnchorEl] = React.useState(null);
+
   if (!game.inGame || !now) {
     return <span/>;
   }
 
-  // TODO fix state management here
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [speedAnchorEl, setSpeedAnchorEl] = React.useState(null);
+  const smallScreen = isSmallScreen();
+  const bigScreen = isBigScreen();
   const handleMenuClick = (event: any) => setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
   const handleSpeedClick = (event: any) => setSpeedAnchorEl(event.currentTarget);

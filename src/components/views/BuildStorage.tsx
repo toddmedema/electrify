@@ -199,21 +199,18 @@ export interface Props extends StateProps, DispatchProps {}
 export default function StorageBuildDialog(props: Props): JSX.Element {
   const {game, onBack} = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
-  if (!now) {
-    return <span/>;
-  }
-  const cash = now.cash;
   const filtered = game.facilities.filter((f) => f.peakWh);
   const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
   const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakWh || 500000000;
-
-  // TODO fix state management here
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [sliderTick, setSliderTick] = React.useState<number>(getTickFromW(mostRecentBuiltValue));
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [sort, setSort] = React.useState<string>('buildCost');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [anchorEl, setAnchorEl] = React.useState(null);
+
+  if (!now) {
+    return <span/>;
+  }
+  
+  const cash = now.cash;
   const storage = STORAGE(game, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
   const handleSliderChange = (event: any, newValue: number|number[]) => {
