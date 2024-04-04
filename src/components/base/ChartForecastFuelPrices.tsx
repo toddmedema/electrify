@@ -4,7 +4,7 @@ import {formatMonthChartAxis, getDateFromMinute} from '../../helpers/DateTime';
 import {formatMoneyConcise} from '../../helpers/Format';
 import {TICK_MINUTES} from '../../Constants';
 import {TickPresentFutureType} from '../../Types';
-import {chartTheme, coalColor, naturalGasColor, uraniumColor} from '../../Theme';
+import {chartTheme, coalColor, naturalGasColor, oilColor, uraniumColor} from '../../Theme';
 
 export interface Props {
   height?: number;
@@ -83,6 +83,18 @@ export default class ChartForecastFuelPrices extends React.PureComponent<Props, 
           <VictoryLine
             data={data}
             x="minute"
+            y="Oil"
+            interpolation="natural"
+            style={{
+              data: {
+                stroke: oilColor,
+                strokeWidth: 1,
+              },
+            }}
+          />
+          <VictoryLine
+            data={data}
+            x="minute"
             y="Uranium"
             interpolation="natural"
             style={{
@@ -100,6 +112,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<Props, 
             data={[
               { name: 'Coal', symbol: { fill: coalColor } },
               { name: 'Natural Gas', symbol: { fill: naturalGasColor } },
+              { name: 'Oil', symbol: { fill: oilColor } },
               { name: 'Uranium', symbol: { fill: uraniumColor } },
             ]}
           />

@@ -3,7 +3,7 @@
 // Shared Material-UI theming
 // https://material-ui.com/customization/themes
 
-import {blue, green, grey, purple, red, amber} from '@mui/material/colors';
+import {blue, green, grey, purple, red, amber, brown} from '@mui/material/colors';
 import { createTheme, adaptV4Theme, DeprecatedThemeOptions } from '@mui/material/styles';
 
 export const darkBlack = '0x000000';
@@ -14,6 +14,7 @@ export const demandColor = grey[900];
 export const supplyColor = blue[600];
 export const uraniumColor = green[500];
 export const coalColor = grey[900];
+export const oilColor = brown[800];
 export const naturalGasColor = purple[500];
 export const temperatureColor = red[500];
 export const windColor = blue[600];
