@@ -1,10 +1,11 @@
 import * as React from 'react';
-import {Avatar, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@mui/material';
+import {Avatar, Button, Card, CardHeader, IconButton, List, Toolbar, Typography} from '@mui/material';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowRightIcon from '@mui/icons-material/ArrowRight';
+import {getStorageJson} from '../../LocalStorage';
 import {LOCATIONS} from '../../Constants';
 import {SCENARIOS} from '../../Scenarios';
-import {GameType, ScenarioType} from '../../Types';
+import {GameType, LocalStoragePlayedType, ScenarioType} from '../../Types';
 
 export interface StateProps {
   game: GameType;
@@ -13,10 +14,37 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onDetails: (delta: Partial<GameType>) => void;
-  onCustomGame: () => void;
+  onTutorial: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
+
+interface TutorialListItemProps {
+  completed: boolean;
+  s: ScenarioType;
+  onTutorial: DispatchProps['onTutorial'];
+}
+
+function TutorialListItem(props: TutorialListItemProps): JSX.Element {
+  const {s, onTutorial, completed} = props;
+  return (
+    <Card className="build-list-item">
+      <CardHeader style={{opacity: completed ? 0.8 : 1}}
+        action={
+          <Button
+            size="small"
+            variant={completed ? 'outlined' : 'contained'}
+            color="primary"
+            onClick={(e: any) => onTutorial({scenarioId: s.id})}
+          >
+            {completed ? 'Done' : 'Play'}
+          </Button>
+        }
+        title={s.name}
+      />
+    </Card>
+  );
+}
 
 interface ScenarioListItemProps {
   s: ScenarioType;
@@ -47,20 +75,11 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
 }
 
 export default function NewGame(props: Props): JSX.Element {
-  // TODO BROKEN
-  // <ScenarioListItem key={999} onDetails={props.onCustomGame} s={{
-  //  id: 999,
-    // name: 'Custom Game',
-    // icon: 'battery',
-    // locationId: 'SF',
-    // summary: 'Make your own game',
-    // startingYear: 2020,
-    // durationMonths: 20,
-    // feePerKgCO2e: 0,
-    // facilities: [{fuel: 'Natural Gas', peakW: 500000000}],
-  // }}/>
+  const plays = ((getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[]);
+  const ids = plays.map((s) => s.scenarioId);
+
   return (
-    <div id="listCard">
+    <div id="listCard" className="flexContainer">
       <div id="topbar">
         <Toolbar>
           <IconButton
@@ -71,14 +90,22 @@ export default function NewGame(props: Props): JSX.Element {
             size="large">
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Select scenario</Typography>
+          <Typography variant="h6">Select a Scenario</Typography>
         </Toolbar>
       </div>
       <List dense className="scrollable cardList">
+        <Card>
+          <CardHeader title='Tutorials' />
+        </Card>
+        {SCENARIOS.filter((s) => s.tutorialSteps).map((s) => {
+          return <TutorialListItem key={s.id} onTutorial={props.onTutorial} s={s} completed={ids.indexOf(s.id) !== -1}/>;
+        })}
+        <Card>
+          <CardHeader title='Scenarios' />
+        </Card>
         {SCENARIOS.filter((s) => !s.tutorialSteps).map((s) => {
           return <ScenarioListItem key={s.id} onDetails={props.onDetails} s={s} />;
         })}
-
       </List>
     </div>
   );

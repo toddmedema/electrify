@@ -4,8 +4,6 @@ import EmailIcon from '@mui/icons-material/Email';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InfoIcon from '@mui/icons-material/Info';
 import {login} from '../../Globals';
-import {getStorageJson} from '../../LocalStorage';
-import {LocalStoragePlayedType} from '../../Types';
 import {interactiveColor} from '../../Theme';
 
 export interface StateProps {
@@ -18,25 +16,18 @@ export interface DispatchProps {
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
-  onTutorial: () => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-// TODO option to resume a saved game; if you try to start a new game w/ a saved game, prompt that it'll delete the save
 const MainMenu = (props: Props): JSX.Element => {
-  const plays = ((getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[]);
-  const ids = plays.map((s) => s.scenarioId);
-  const playedTutorial = ids.indexOf(0) !== -1 && ids.indexOf(1) !== -1;
-
   return (
     <div id="menuCard">
       <div id="logo">
         <img src="images/logo.svg" alt="Logo"></img>
       </div>
       <div id="centeredMenu">
-        <Button size="large" variant={!playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onTutorial} autoFocus={!playedTutorial}>Learn to play</Button>
-        <Button size="large" variant={playedTutorial ? 'contained' : 'outlined'} color="primary" onClick={props.onStart} autoFocus={playedTutorial}>New Game</Button>
+        <Button size="large" variant='contained' color="primary" onClick={props.onStart} autoFocus={true}>Play</Button>
         {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>}
         {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>}
         {props.audioEnabled !== undefined && !props.uid && <Button variant="outlined" color="primary" onClick={login}>Log in</Button>}

@@ -98,7 +98,7 @@ export const gameSlice = createSlice({
                 open: true,
                 notCancellable: true,
                 actionLabel: 'Try again',
-                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+                action: () => store.dispatch(gameSlice.actions.quit()),
               })), 1);
             }
   
@@ -115,7 +115,7 @@ export const gameSlice = createSlice({
                 open: true,
                 notCancellable: true,
                 actionLabel: 'Try again',
-                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+                action: () => store.dispatch(gameSlice.actions.quit()),
               })), 1);
             }
   
@@ -167,7 +167,7 @@ export const gameSlice = createSlice({
                 open: true,
                 closeText: 'Keep playing',
                 actionLabel: 'Return to menu',
-                action: () => store.dispatch(gameSlice.actions.quit()) && store.dispatch(navigate('MAIN_MENU')),
+                action: () => store.dispatch(gameSlice.actions.quit()),
               })), 1);
             }
           }
