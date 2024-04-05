@@ -62,21 +62,9 @@ beta() {
 
 prodbuild() {
   prebuild
-
-  # Read current version (as a string) from package.json
-  key="version"
-  re="\"($key)\": \"([^\"]*)\""
-  package=`cat package.json`
-  if [[ $package =~ $re ]]; then
-    version="${BASH_REMATCH[2]}"
-  fi
-
-  # Rebuild the web app files
   export NODE_ENV='production'
   export OAUTH2_CLIENT_ID='545484140970-r95j0rmo8q1mefo0pko6l3v6p4s771ul.apps.googleusercontent.com'
-  
-  # build the web app
-  webpack --config ./webpack.dist.config.js
+  npm run build
 }
 
 prod() {
