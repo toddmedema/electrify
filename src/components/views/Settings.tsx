@@ -2,6 +2,7 @@ import * as React from 'react';
 import {Checkbox, IconButton, Toolbar, Typography} from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import {SettingsType} from '../../Types';
+import packageJson from '../../../package.json';
 
 export interface StateProps {
   settings: SettingsType;
@@ -54,7 +55,7 @@ export default function Settings(props: Props): JSX.Element {
       <div style={{textAlign: 'center', margin: '20px 0', lineHeight: '30px'}}>
         <Checkbox color="primary" id="sound" checked={props.settings.audioEnabled} onChange={(e: any) => props.onAudioChange(e.target.checked)}/>
         {(props.settings.audioEnabled) ? 'Music and sound effects enabled.' : 'Music and sound effects disabled.'}
-        <Typography className="version">Electrify App v0.8</Typography>
+        <Typography className="version">Electrify App v{packageJson.version}</Typography>
         <Typography className="github"><a href="https://github.com/toddmedema/electrify" target="_blank" rel="noreferrer">GitHub</a></Typography>
       </div>
     </div>
