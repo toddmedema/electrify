@@ -203,6 +203,7 @@ export interface ScenarioType {
   summary?: string;
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
+  cash: number;
   durationMonths: number;
   endTitle?: string;
   endMessage?: string;

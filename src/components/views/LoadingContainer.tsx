@@ -36,7 +36,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
           // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
           dispatch(initGame({
             facilities: scenario.facilities,
-            cash: 200000000,
+            cash: scenario.cash,
             customers: 1030000,
             location,
           }));
