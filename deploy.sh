@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds prod versions of the web app and deploys to electrifygame.com, including invalidating the files on cloudfront (CDN)
+# Builds the web app and deploys to electrifygame.com, including invalidating the files on cloudfront (CDN)
 # Requires the aws cli for s3 deploys (make sure to set your bucket region!)
 # Requires that you run `aws configure set preview.cloudfront true` to enable cloudfront invalidation
 
@@ -9,7 +9,7 @@ target="$1"
 getTarget() {
   if [[ ! $TARGETS =~ $target ]];
   then
-    echo "Where would you like to deploy $service?"
+    echo "Where would you like to deploy?"
     select t in $TARGETS; do
       target=$t
       break
@@ -18,8 +18,7 @@ getTarget() {
 }
 
 deploy() {
-  echo "Deploying $service to $target"
-  cd $service
+  echo "Deploying to $target"
   if [ "$target" = "beta" ]; then
     beta
   elif [ "$target" = "local-beta" ]; then
@@ -47,19 +46,18 @@ deploy() {
 
 prebuild() {
   # clear out old build files to prevent conflicts
-  rm -rf www
+  rm -rf build
 }
 
 betabuild() {
   prebuild
-  export NODE_ENV='dev'
-  echo "NOPE"
+  export NODE_ENV='development'
   npm run build
 }
 
 beta() {
   betabuild
-  aws s3 cp www s3://beta.electrifygame.com --recursive --region us-east-2
+  aws s3 cp build s3://beta.electrifygame.com --recursive --region us-east-2
 }
 
 prodbuild() {
@@ -85,8 +83,8 @@ prod() {
   prodbuild
   # Deploy web app to prod with 1 day cache for most files, 6 month cache for art assets
   export AWS_DEFAULT_REGION='us-east-2'
-  aws s3 cp www s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --cache-control max-age=86400 --cache-control public
-  aws s3 cp www s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control max-age=15552000 --cache-control public
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --cache-control max-age=86400 --cache-control public
+  aws s3 cp build s3://electrifygame.com --recursive --exclude '*' --include '*.mp3' --include '*.jpg' --include '*.png' --cache-control max-age=15552000 --cache-control public
 
   # Upload package.json for API's version check
   aws s3 cp package.json s3://electrifygame.com/package.json
