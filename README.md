@@ -15,7 +15,7 @@ Windows: must be run within a Unix-like shell (such as Git Bash).
 With Node.js installed, run the following from the root of the repository:
 
 ```sh
-npm
+npm install
 ```
 
 ### Development Workflow: Serve & watch
