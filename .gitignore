@@ -19,6 +19,7 @@ dist/
 dll/
 www/
 *.apk
+build/
 
 # Dependency directories
 node_modules
