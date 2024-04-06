@@ -11,6 +11,7 @@ import {generateNewTimeline} from '../../reducers/Game';
 import {DerivedHistoryKeysType, GameType, MonthlyHistoryType} from '../../Types';
 import ChartFinances from '../base/ChartFinances';
 import GameCard from '../base/GameCard';
+import { SCENARIOS } from '../../Scenarios';
 
 const numbro = require('numbro');
 
@@ -192,6 +193,7 @@ export default class Finances extends React.Component<Props, State> {
       return <span/>;
     }
 
+    const scenario = SCENARIOS.find((s) => s.id === game.scenarioId) || SCENARIOS[0];
     const years = []; // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= startingYear; i--) { years.push(i); }
 
@@ -241,11 +243,11 @@ export default class Finances extends React.Component<Props, State> {
         <div className="scrollable">
           <br/>
           <Toolbar>
-            <Typography className="flex-newline" variant="body2" color="textSecondary">
+            {(scenario.ownership === 'Investor') && <Typography className="flex-newline" variant="body2" color="textSecondary">
               Marketing:&nbsp;
               <Typography color="primary" component="strong">{formatMoneyConcise(game.monthlyMarketingSpend)}</Typography>/mo&nbsp;
               (+{numbro(customersFromMarketingSpend(game.monthlyMarketingSpend)).format({average: true})} customers)
-            </Typography>
+            </Typography>}
             <Slider
               id="marketingSlider"
               value={getTickFromValue(game.monthlyMarketingSpend)}

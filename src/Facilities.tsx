@@ -145,24 +145,6 @@ export function GENERATORS(state: GameType, peakW: number) {
     //   annualOperatingCost: 1000000, // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
     //   yearsToBuild: 1,
     // },
-    // {
-    //   name: 'Oil', // Aka petroleum
-    //   fuel: 'Oil',
-    //   description: 'Dispatchable, but fuel prices swing',
-    //   buildCost: 200000000,
-      // 1,087 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
-      // 40 GW in 2019 ("fuel oil") - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-    //   peakW,
-    //   btuPerW: 11,
-    //     // varies by ~1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
-    //   spinMinutes: 10,
-    //   annualOperatingCost: 1000000, // TODO make variable
-    //     // about 0.005/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    //   yearsToBuild: 2,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // capacityFactor: 0.66,
-        // Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
-    // },
 
     // RENEWABLE
     {
@@ -298,6 +280,8 @@ export function GENERATORS(state: GameType, peakW: number) {
       // capacityFactor: 0.43,
       // https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
     // },
+
+  // TODO biomass
   ] as GeneratorShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers

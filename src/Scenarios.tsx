@@ -10,6 +10,7 @@ export const SCENARIOS = [
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '101: Electricity',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2019,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -61,6 +62,7 @@ export const SCENARIOS = [
     id: 1, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '102: Generators',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2019,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -127,6 +129,7 @@ export const SCENARIOS = [
     id: 2, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '103: Storage',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2019,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -183,6 +186,7 @@ export const SCENARIOS = [
     id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '104: Finances',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2019,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -224,6 +228,7 @@ export const SCENARIOS = [
     id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '105: Marketing',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2019,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -267,6 +272,7 @@ export const SCENARIOS = [
     id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: '106: Forecasting',
     locationId: 'SF',
+    ownership: 'Investor',
     startingYear: 2020,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -317,6 +323,7 @@ export const SCENARIOS = [
     icon: 'solar',
     locationId: 'SF',
     summary: `New limits have been placed on pollution - can you modernize the company?`,
+    ownership: 'Investor',
     startingYear: 2020,
     cash: 300000000,
     feePerKgCO2e: 50 / 1000,
@@ -329,6 +336,7 @@ export const SCENARIOS = [
     icon: 'natural gas',
     locationId: 'PIT',
     summary: `Cheap natural gas has been discovered nearby - are you ready for the boom?`,
+    ownership: 'Investor',
     startingYear: 2006,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -341,6 +349,7 @@ export const SCENARIOS = [
     icon: 'wind',
     locationId: 'HNL',
     summary: 'A beautiful island - with a complex grid.',
+    ownership: 'Investor',
     startingYear: 2004,
     cash: 250000000,
     feePerKgCO2e: 0,
@@ -353,6 +362,7 @@ export const SCENARIOS = [
     icon: 'geothermal',
     locationId: 'SF',
     summary: 'Technology is advancing rapidly - can you keep up?',
+    ownership: 'Investor',
     startingYear: 2002,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -365,6 +375,7 @@ export const SCENARIOS = [
     icon: 'wind',
     locationId: 'SJU',
     summary: 'A remote island, with expensive fuel and destructive weather.',
+    ownership: 'Public',
     startingYear: 2000,
     cash: 200000000,
     feePerKgCO2e: 0,
@@ -377,10 +388,12 @@ export const SCENARIOS = [
     icon: 'coal',
     locationId: 'PIT',
     summary: 'Your coal business faces new challenges - and opportunities.',
+    ownership: 'Investor',
     startingYear: 1980,
     cash: 180000000,
     feePerKgCO2e: 0,
     durationMonths: 12 * 20,
     facilities: [{fuel: 'Coal', peakW: 200000000}, {fuel: 'Coal', peakW: 300000000}],
   },
+  // TODO more public-ownership scenarios, such as in LA or Nebraska
 ] as ScenarioType[];
