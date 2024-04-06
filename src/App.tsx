@@ -2,8 +2,8 @@ import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';
 import {Provider} from 'react-redux';
 import * as Redux from 'redux';
 import CompositorContainer from './components/CompositorContainer';
-import {pause, resume} from './data/Audio';
 import {navigateBack} from './reducers/Card';
+import {pauseAudio, resumeAudio} from './reducers/Settings';
 import {snackbarOpen} from './reducers/UI';
 import {firebaseAppAuth, getDevicePlatform} from './Globals';
 import {delta} from './reducers/User';
@@ -36,11 +36,11 @@ function setupDevice() {
   }, false);
 
   document.addEventListener('pause', () => {
-    pause();
+    store.dispatch(pauseAudio());
   }, false);
 
   document.addEventListener('resume', () => {
-    resume();
+    store.dispatch(resumeAudio());
   }, false);
 }
 
@@ -70,9 +70,9 @@ export default function App() {
   };
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      pause();
+      store.dispatch(pauseAudio());
     } else if (document.visibilityState === 'visible') {
-      resume();
+      store.dispatch(resumeAudio());
     }
   }, false);
 
