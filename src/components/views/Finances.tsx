@@ -248,7 +248,7 @@ export default class Finances extends React.Component<Props, State> {
               <Typography color="primary" component="strong">{formatMoneyConcise(game.monthlyMarketingSpend)}</Typography>/mo&nbsp;
               (+{numbro(customersFromMarketingSpend(game.monthlyMarketingSpend)).format({average: true})} customers)
             </Typography>}
-            <Slider
+            {(scenario.ownership === 'Investor') && <Slider
               id="marketingSlider"
               value={getTickFromValue(game.monthlyMarketingSpend)}
               aria-labelledby="marketing monthly budget"
@@ -257,8 +257,8 @@ export default class Finances extends React.Component<Props, State> {
               step={1}
               max={getTickFromValue(Math.max(now.cash / 12, game.monthlyMarketingSpend))}
               onChange={(e: any, newTick: number|number[]) => onDelta({monthlyMarketingSpend: getValueFromTick(Array.isArray(newTick) ? newTick[0] : newTick)})}
-            />
-            <div className="flex-newline"></div>
+            />}
+            {(scenario.ownership === 'Investor') && <div className="flex-newline"></div>}
             <Typography variant="h6" style={{flexGrow: 0}}>Plotting </Typography>
             <Select id="plotMetric" defaultValue={chartKey} onChange={(e: any) => this.setChartKey(e.target.value)}>
               {Object.keys(CHART_KEYS).map((key: string) => {
