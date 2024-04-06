@@ -53,8 +53,8 @@ export const LOCATIONS = [
 ] as LocationType[];
 
 export const TICK_MS = {
-  PAUSED: 150,
-  SLOW: 80,
+  PAUSED: 250,
+  SLOW: 100,
   NORMAL: 40,
   FAST: 1,
 };

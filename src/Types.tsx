@@ -201,6 +201,7 @@ export interface ScenarioType {
   icon: string; // assumed to be images/<string>.svg
   locationId: LocationIdType;
   summary?: string;
+  ownership: 'Investor' | 'Public';
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
   cash: number;
