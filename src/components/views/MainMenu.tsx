@@ -28,13 +28,10 @@ const MainMenu = (props: Props): JSX.Element => {
       </div>
       <div id="centeredMenu">
         <Button size="large" variant='contained' color="primary" onClick={props.onStart} autoFocus={true}>Play</Button>
-        {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>}
-        {props.audioEnabled !== undefined && <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>}
-        {props.audioEnabled !== undefined && !props.uid && <Button variant="outlined" color="primary" onClick={login}>Log in</Button>}
-        {props.audioEnabled === undefined && <div>Enable music?<br/>
-          <Button variant="contained" color="primary" onClick={(e: any) => props.onAudioChange(true)} style={{display: 'inline', marginRight: '12px', marginTop: '4px'}}>Yes</Button>
-          <Button variant="outlined" color="primary" onClick={(e: any) => props.onAudioChange(false)} style={{display: 'inline', marginTop: '4px'}}>No</Button>
-        </div>}
+        <Button variant="outlined" color="primary" onClick={props.onManual}>Manual</Button>
+        <Button variant="outlined" color="primary" onClick={props.onSettings}>Options</Button>
+        {!props.uid && <Button variant="outlined" color="primary" onClick={login}>Log in</Button>}
+        {props.audioEnabled === undefined && <Button variant="outlined" color="primary" onClick={() => props.onAudioChange(true)} style={{display: 'inline', marginRight: '12px', marginTop: '4px'}}>Enable music</Button>}
       </div>
       <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, opacity: 0.7}}>
         <IconButton
