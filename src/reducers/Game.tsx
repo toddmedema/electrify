@@ -14,7 +14,7 @@ import {logEvent} from '../Globals';
 import {getStorageJson, setStorageKeyValue} from '../LocalStorage';
 import {SCENARIOS} from '../Scenarios';
 import {store} from '../Store';
-import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, ScenarioType, SpeedType, StorageOperatingType, TickPresentFutureType} from '../Types';
+import {DateType, FacilityOperatingType, FacilityShoppingType, LocationType, GameType, GeneratorOperatingType, LocalStoragePlayedType, MonthlyHistoryType, SpeedType, StorageOperatingType, TickPresentFutureType} from '../Types';
 const cloneDeep = require('lodash.clonedeep');
 
 interface BuildFacilityAction {
@@ -37,7 +37,7 @@ interface NewGameAction {
 let previousSpeed = 'PAUSED' as SpeedType;
 let previousSunrise = 0;
 const initialGame: GameType = {
-  scenarioId: 100,
+  scenarioId: 0,
   location: {
     id: 'SF',
     name: 'SF',
@@ -117,13 +117,11 @@ export const gameSlice = createSlice({
                 action: () => store.dispatch(gameSlice.actions.quit()),
               })), 1);
             }
-  
+
+            const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
+
             // Success: Survived duration
-            const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || {
-              durationMonths: 12 * 20,
-              endTitle: `You've retired!`,
-            } as ScenarioType;
-            if (state.date.monthsEllapsed === scenario.durationMonths) {
+            if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
               const localStoragePlayed = (getStorageJson('plays', {plays: []}) as any).plays as LocalStoragePlayedType[];
               setStorageKeyValue('plays', {plays: [...localStoragePlayed, {
                 scenarioId: state.scenarioId,
@@ -133,33 +131,38 @@ export const gameSlice = createSlice({
               // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
               const summary = summarizeHistory(history);
               const blackoutsTWh = Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-              const score = {
+              // Scoring algorithm should also be updated in Game.tsx
+              const score = (scenario.ownership === 'Investor') ? {
                 supply: Math.round(summary.supplyWh / 1000000000000),
                 netWorth: Math.round(40 * summary.netWorth / 1000000000),
                 customers: Math.round(2 * summary.customers / 100000),
                 emissions: Math.round(-2 * summary.kgco2e / 1000000000),
                 blackouts: Math.round(-8 * blackoutsTWh),
+              } : {
+                supply: Math.round(10 * summary.supplyWh / 1000000000000),
+                emissions: Math.round(-5 * summary.kgco2e / 1000000000),
+                blackouts: Math.round(-10 * blackoutsTWh),
               };
+
               const finalScore = Object.values(score).reduce((a: number, b: number) => a + b);
               const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
-              const scenarioId = state.scenarioId; // pulling out of state for functions running inside of setTimeout
 
               if (!scenario.tutorialSteps) {
                 setTimeout(() => store.dispatch(submitHighscore({
                   score: finalScore,
                   scoreBreakdown: score, // For analytics purposes only
-                  scenarioId,
+                  scenarioId: scenario.id,
                   difficulty,
                 })), 1);
               }
 
-              logEvent('scenario_end', {id: state.scenarioId, type: 'win', difficulty: state.difficulty, score: finalScore});
+              logEvent('scenario_end', {id: scenario.id, type: 'win', difficulty, score: finalScore});
               setTimeout(() => store.dispatch(dialogOpen({
                 title: scenario.endTitle || `You've retired!`,
                 message: scenario.endMessage || <div>Your final score is {finalScore}:<br/><br/>
                   +{score.supply} pts from electricity supplied<br/>
-                  +{score.netWorth} pts from final net worth<br/>
-                  +{score.customers} pts from final customers<br/>
+                  {(scenario.ownership === 'Investor') && <span>+{score.netWorth} pts from final net worth<br/></span>}
+                  {(scenario.ownership === 'Investor') && <span>+{score.customers} pts from final customers<br/></span>}
                   {score.emissions} pts from emissions<br/>
                   {score.blackouts} pts from blackouts<br/>
                 </div>,
@@ -189,8 +192,8 @@ export const gameSlice = createSlice({
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
-      const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.timeline = [] as TickPresentFutureType[];
+      const scenario = SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
       state.startingYear = scenario.startingYear;
       state.feePerKgCO2e = scenario.feePerKgCO2e;
