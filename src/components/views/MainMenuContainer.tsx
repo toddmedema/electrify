@@ -1,9 +1,9 @@
-import Redux from 'redux';
-import {connect} from 'react-redux';
-import {AppStateType} from '../../Types';
-import {navigate} from '../../reducers/Card';
-import {change as changeSettings} from '../../reducers/Settings';
-import MainMenu, {DispatchProps, StateProps} from './MainMenu';
+import Redux from "redux";
+import { connect } from "react-redux";
+import { AppStateType } from "../../Types";
+import { navigate } from "../../reducers/Card";
+import { change as changeSettings } from "../../reducers/Settings";
+import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -15,23 +15,23 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     onAudioChange: (v: boolean) => {
-      dispatch(changeSettings({audioEnabled: v}));
+      dispatch(changeSettings({ audioEnabled: v }));
     },
     onManual: () => {
-      dispatch(navigate('MANUAL'));
+      dispatch(navigate("MANUAL"));
     },
     onSettings: () => {
-      dispatch(navigate('SETTINGS'));
+      dispatch(navigate("SETTINGS"));
     },
     onStart: () => {
-      dispatch(navigate('NEW_GAME'));
+      dispatch(navigate("NEW_GAME"));
     },
   };
 };
 
 const MainMenuContainer = connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(MainMenu);
 
 export default MainMenuContainer;

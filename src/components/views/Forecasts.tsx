@@ -1,14 +1,25 @@
-import * as React from 'react';
-import {Table, TableBody, TableCell, TableRow, Toolbar, Typography} from '@mui/material';
-import {TICKS_PER_YEAR} from '../../Constants';
-import {GameType, TickPresentFutureType} from '../../Types';
-import {formatHour, getDateFromMinute, getTimeFromTimeline} from '../../helpers/DateTime';
-import {formatWattHours, formatWatts} from '../../helpers/Format';
-import {generateNewTimeline} from '../../reducers/Game';
-import ChartForecastFuelPrices from '../base/ChartForecastFuelPrices';
-import ChartForecastSupplyDemand from '../base/ChartForecastSupplyDemand';
-import ChartForecastWeather from '../base/ChartForecastWeather';
-import GameCard from '../base/GameCard';
+import * as React from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import { TICKS_PER_YEAR } from "../../Constants";
+import { GameType, TickPresentFutureType } from "../../Types";
+import {
+  formatHour,
+  getDateFromMinute,
+  getTimeFromTimeline,
+} from "../../helpers/DateTime";
+import { formatWattHours, formatWatts } from "../../helpers/Format";
+import { generateNewTimeline } from "../../reducers/Game";
+import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
+import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
+import ChartForecastWeather from "../base/ChartForecastWeather";
+import GameCard from "../base/GameCard";
 
 const FORECAST_YEARS = 1;
 
@@ -21,8 +32,7 @@ export interface StateProps {
   game: GameType;
 }
 
-export interface DispatchProps {
-}
+export interface DispatchProps {}
 
 export interface Props extends StateProps, DispatchProps {}
 
@@ -33,23 +43,28 @@ interface State {
 export default class Forecasts extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = {year: 0};
+    this.state = { year: 0 };
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: any) {
     // Because forecasts are computationally intense and long term, only update when the month changes
-    return (this.props.game.date.monthNumber !== nextProps.game.date.monthNumber);
+    return this.props.game.date.monthNumber !== nextProps.game.date.monthNumber;
   }
 
   public render() {
-    const {game} = this.props;
+    const { game } = this.props;
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
     if (!now) {
-      return <span/>;
+      return <span />;
     }
 
     // Generate the forecast
-    const forecastedTimeline = generateNewTimeline(game, now.cash, now.customers, TICKS_PER_YEAR * FORECAST_YEARS);
+    const forecastedTimeline = generateNewTimeline(
+      game,
+      now.cash,
+      now.customers,
+      TICKS_PER_YEAR * FORECAST_YEARS,
+    );
 
     // Figure out the boundaries of the chart data
     let domainMin = 999999999999;
@@ -72,10 +87,12 @@ export default class Forecasts extends React.Component<Props, State> {
       end: rangeMin,
     };
     let largestBlackout = currentBlackout;
-    const blackouts = [{
-      minute: rangeMin,
-      value: 0,
-    }] as BlackoutEdges[];
+    const blackouts = [
+      {
+        minute: rangeMin,
+        value: 0,
+      },
+    ] as BlackoutEdges[];
     let prev = forecastedTimeline[0];
     let isBlackout = prev.demandW > prev.supplyW;
     if (isBlackout) {
@@ -117,15 +134,21 @@ export default class Forecasts extends React.Component<Props, State> {
     // Close out
     blackouts.push({
       minute: rangeMax,
-      value: (isBlackout) ? domainMax : 0,
+      value: isBlackout ? domainMax : 0,
     });
     if (currentBlackout.wh > largestBlackout.wh) {
       largestBlackout = currentBlackout;
     }
     largestBlackout.end = largestBlackout.end || rangeMax;
 
-    const blackoutStart = getDateFromMinute(largestBlackout.start, game.startingYear);
-    const blackoutEnd = getDateFromMinute(largestBlackout.end, game.startingYear);
+    const blackoutStart = getDateFromMinute(
+      largestBlackout.start,
+      game.startingYear,
+    );
+    const blackoutEnd = getDateFromMinute(
+      largestBlackout.end,
+      game.startingYear,
+    );
 
     // TODO user ability to see more than one year in the future
     return (
@@ -141,33 +164,44 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
             startingYear={game.startingYear}
           />
-          {blackoutTotalWh > 0 && <Table size="small">
-            <TableBody>
-              <TableRow className="bold">
-                <TableCell colSpan={2}>Blackouts forecasted</TableCell>
-                <TableCell align="right">~{formatWattHours(blackoutTotalWh)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell colSpan={2}>Largest blackout</TableCell>
-                <TableCell align="right">~{formatWattHours(largestBlackout.wh)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
-                <TableCell>Peak shortage</TableCell>
-                <TableCell align="right">~{formatWatts(largestBlackout.peakW)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell></TableCell>
-                <TableCell>When</TableCell>
-                <TableCell align="right">
-                  {blackoutStart.month} {formatHour(blackoutStart)} -
-                  {blackoutStart.month !== blackoutEnd.month ? ` ${blackoutEnd.month} ` : ' '} {formatHour(blackoutEnd)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>}
-          <br/>
-          <br/>
+          {blackoutTotalWh > 0 && (
+            <Table size="small">
+              <TableBody>
+                <TableRow className="bold">
+                  <TableCell colSpan={2}>Blackouts forecasted</TableCell>
+                  <TableCell align="right">
+                    ~{formatWattHours(blackoutTotalWh)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={2}>Largest blackout</TableCell>
+                  <TableCell align="right">
+                    ~{formatWattHours(largestBlackout.wh)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell></TableCell>
+                  <TableCell>Peak shortage</TableCell>
+                  <TableCell align="right">
+                    ~{formatWatts(largestBlackout.peakW)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell></TableCell>
+                  <TableCell>When</TableCell>
+                  <TableCell align="right">
+                    {blackoutStart.month} {formatHour(blackoutStart)} -
+                    {blackoutStart.month !== blackoutEnd.month
+                      ? ` ${blackoutEnd.month} `
+                      : " "}{" "}
+                    {formatHour(blackoutEnd)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
+          <br />
+          <br />
           <Toolbar>
             <Typography variant="h6">Fuel Prices</Typography>
           </Toolbar>
@@ -177,10 +211,12 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
           />
-          <br/>
-          <br/>
+          <br />
+          <br />
           <Toolbar>
-            <Typography variant="h6">Weather in {game.location.name}</Typography>
+            <Typography variant="h6">
+              Weather in {game.location.name}
+            </Typography>
           </Toolbar>
           <ChartForecastWeather
             height={140}

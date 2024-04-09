@@ -1,45 +1,74 @@
-import {Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography} from '@mui/material';
-import * as React from 'react';
-import { GlobalHotKeys  } from 'react-hotkeys';
-import Joyride, { ACTIONS, EVENTS } from 'react-joyride';
-import {CSSTransition, TransitionGroup} from 'react-transition-group';
-import {CARD_TRANSITION_ANIMATION_MS, NAV_CARDS} from '../Constants';
-import {CardNameType, CardType, SettingsType, TransitionClassType, TutorialStepType, UIType} from '../Types';
-import AudioContainer from './base/AudioContainer';
-import BuildGeneratorsContainer from './views/BuildGeneratorsContainer';
-import BuildStorageContainer from './views/BuildStorageContainer';
-import FacilitiesContainer from './views/FacilitiesContainer';
-import FinancesContainer from './views/FinancesContainer';
-import ForecastsContainer from './views/ForecastsContainer';
-import LoadingContainer from './views/LoadingContainer';
-import MainMenuContainer from './views/MainMenuContainer';
-import ManualContainer from './views/ManualContainer';
-import NewGameContainer from './views/NewGameContainer';
-import NewGameDetailsContainer from './views/NewGameDetailsContainer';
-import SettingsContainer from './views/SettingsContainer';
-import {navigate} from '../reducers/Card';
-import {setSpeed} from '../reducers/Game';
-import {store} from '../Store';
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Snackbar,
+  Typography,
+} from "@mui/material";
+import * as React from "react";
+import { GlobalHotKeys } from "react-hotkeys";
+import Joyride, { ACTIONS, EVENTS } from "react-joyride";
+import { CSSTransition, TransitionGroup } from "react-transition-group";
+import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
+import {
+  CardNameType,
+  CardType,
+  SettingsType,
+  TransitionClassType,
+  TutorialStepType,
+  UIType,
+} from "../Types";
+import AudioContainer from "./base/AudioContainer";
+import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
+import BuildStorageContainer from "./views/BuildStorageContainer";
+import FacilitiesContainer from "./views/FacilitiesContainer";
+import FinancesContainer from "./views/FinancesContainer";
+import ForecastsContainer from "./views/ForecastsContainer";
+import LoadingContainer from "./views/LoadingContainer";
+import MainMenuContainer from "./views/MainMenuContainer";
+import ManualContainer from "./views/ManualContainer";
+import NewGameContainer from "./views/NewGameContainer";
+import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
+import SettingsContainer from "./views/SettingsContainer";
+import { navigate } from "../reducers/Card";
+import { setSpeed } from "../reducers/Game";
+import { store } from "../Store";
 
 const keyMap = {
-  PAUSED: '`',
-  SLOW: '1',
-  NORMAL: '2',
-  FAST: '3',
-  LIGHTNING: '4',
-  FACILITIES: 'q',
-  FINANCES: 'w',
-  FORECASTS: 'e',
+  PAUSED: "`",
+  SLOW: "1",
+  NORMAL: "2",
+  FAST: "3",
+  LIGHTNING: "4",
+  FACILITIES: "q",
+  FINANCES: "w",
+  FORECASTS: "e",
 };
 
 const shortcutHandlers = {
-  PAUSED: () => { store.dispatch(setSpeed('PAUSED')); },
-  SLOW: () => { store.dispatch(setSpeed('SLOW')); },
-  NORMAL: () => { store.dispatch(setSpeed('NORMAL')); },
-  FAST: () => { store.dispatch(setSpeed('FAST')); },
-  FACILITIES: () => { store.dispatch(navigate('FACILITIES')); },
-  FINANCES: () => { store.dispatch(navigate('FINANCES')); },
-  FORECASTS: () => { store.dispatch(navigate('FORECASTS')); },
+  PAUSED: () => {
+    store.dispatch(setSpeed("PAUSED"));
+  },
+  SLOW: () => {
+    store.dispatch(setSpeed("SLOW"));
+  },
+  NORMAL: () => {
+    store.dispatch(setSpeed("NORMAL"));
+  },
+  FAST: () => {
+    store.dispatch(setSpeed("FAST"));
+  },
+  FACILITIES: () => {
+    store.dispatch(navigate("FACILITIES"));
+  },
+  FINANCES: () => {
+    store.dispatch(navigate("FINANCES"));
+  },
+  FORECASTS: () => {
+    store.dispatch(navigate("FORECASTS"));
+  },
 };
 
 interface TooltipProps {
@@ -54,23 +83,34 @@ interface TooltipProps {
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const {index, step, backProps, primaryProps, tooltipProps, isLastStep} = props;
-  const isString = typeof step.content === 'string';
-  return <div id="tutorial-tooltip" {...tooltipProps}>
-    {step.title && <Typography variant="h6" gutterBottom>{step.title}</Typography>}
-    {isString ? <Typography variant="body1">{step.content}</Typography> : step.content}
-    <div>
-      {index > 0 && (
-        <Button {...backProps} color="primary">
-          Back
-        </Button>
+  const { index, step, backProps, primaryProps, tooltipProps, isLastStep } =
+    props;
+  const isString = typeof step.content === "string";
+  return (
+    <div id="tutorial-tooltip" {...tooltipProps}>
+      {step.title && (
+        <Typography variant="h6" gutterBottom>
+          {step.title}
+        </Typography>
       )}
-      <Button {...primaryProps} variant="contained" color="primary">
-        {isLastStep ? 'Play' : 'Next'}
-      </Button>
+      {isString ? (
+        <Typography variant="body1">{step.content}</Typography>
+      ) : (
+        step.content
+      )}
+      <div>
+        {index > 0 && (
+          <Button {...backProps} color="primary">
+            Back
+          </Button>
+        )}
+        <Button {...primaryProps} variant="contained" color="primary">
+          {isLastStep ? "Play" : "Next"}
+        </Button>
+      </div>
+      <div style={{ clear: "both" }}></div>
     </div>
-    <div style={{clear: 'both'}}></div>
-  </div>;
+  );
 }
 
 export interface StateProps {
@@ -85,7 +125,10 @@ export interface StateProps {
 export interface DispatchProps {
   closeDialog: () => void;
   closeSnackbar: () => void;
-  onTutorialStep: (newStep: number, tutorialSteps: TutorialStepType[] | undefined) => void;
+  onTutorialStep: (
+    newStep: number,
+    tutorialSteps: TutorialStepType[] | undefined,
+  ) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -98,9 +141,12 @@ export default class Compositor extends React.Component<Props, {}> {
   public handleJoyrideCallback = (data: any) => {
     const { action, index, type } = data;
     if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
-      this.props.onTutorialStep(index + (action === ACTIONS.PREV ? -1 : 1), this.props.tutorialSteps);
+      this.props.onTutorialStep(
+        index + (action === ACTIONS.PREV ? -1 : 1),
+        this.props.tutorialSteps,
+      );
     }
-  }
+  };
 
   public snackbarActionClicked(e: React.MouseEvent<HTMLElement>) {
     if (this.props.ui.snackbar.action) {
@@ -110,30 +156,30 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): JSX.Element {
     switch (this.props.card.name) {
-      case 'BUILD_GENERATORS':
+      case "BUILD_GENERATORS":
         return <BuildGeneratorsContainer />;
-      case 'BUILD_STORAGE':
+      case "BUILD_STORAGE":
         return <BuildStorageContainer />;
-      case 'FINANCES':
+      case "FINANCES":
         return <FinancesContainer />;
-      case 'FORECASTS':
+      case "FORECASTS":
         return <ForecastsContainer />;
-      case 'FACILITIES':
+      case "FACILITIES":
         return <FacilitiesContainer />;
-      case 'SETTINGS':
+      case "SETTINGS":
         return <SettingsContainer />;
-      case 'MAIN_MENU':
+      case "MAIN_MENU":
         return <MainMenuContainer />;
-      case 'MANUAL':
+      case "MANUAL":
         return <ManualContainer />;
-      case 'LOADING':
+      case "LOADING":
         return <LoadingContainer />;
-      case 'NEW_GAME':
+      case "NEW_GAME":
         return <NewGameContainer />;
-      case 'NEW_GAME_DETAILS':
+      case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
       default:
-        throw new Error('Unknown card ' + this.props.card.name);
+        throw new Error("Unknown card " + this.props.card.name);
     }
   }
 
@@ -144,7 +190,10 @@ export default class Compositor extends React.Component<Props, {}> {
     }
 
     // Update if dialog / snackbar changes
-    if (this.props.ui.dialog.open !== nextProps.ui.dialog.open || this.props.ui.snackbar.open !== nextProps.ui.snackbar.open) {
+    if (
+      this.props.ui.dialog.open !== nextProps.ui.dialog.open ||
+      this.props.ui.snackbar.open !== nextProps.ui.snackbar.open
+    ) {
       return true;
     }
 
@@ -157,7 +206,8 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public render() {
-    const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } = this.props;
+    const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
+      this.props;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
@@ -165,48 +215,62 @@ export default class Compositor extends React.Component<Props, {}> {
       <div className="app_container">
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
-          childFactory={(child) => React.cloneElement(
-              child, {classNames: this.props.transition}
-          )}>
+          childFactory={(child) =>
+            React.cloneElement(child, { classNames: this.props.transition })
+          }
+        >
           <CSSTransition
             key={this.props.card.name}
-            classNames={''}
-            timeout={{enter: CARD_TRANSITION_ANIMATION_MS, exit: CARD_TRANSITION_ANIMATION_MS}}>
-            <div className="base_main">
-              {this.renderCard()}
-            </div>
+            classNames={""}
+            timeout={{
+              enter: CARD_TRANSITION_ANIMATION_MS,
+              exit: CARD_TRANSITION_ANIMATION_MS,
+            }}
+          >
+            <div className="base_main">{this.renderCard()}</div>
           </CSSTransition>
         </TransitionGroup>
-        {tutorialSteps && <Joyride
-          callback={this.handleJoyrideCallback}
-          continuous={true}
-          disableCloseOnEsc={true}
-          disableOverlayClose={true}
-          showProgress={true}
-          run={tutorialStep >= 0}
-          tooltipComponent={Tooltip}
-          stepIndex={tutorialStep}
-          steps={tutorialSteps}
-          styles={{
-            options: {
-              beaconSize: 48,
-              overlayColor: 'rgba(0, 0, 0, 0.1)',
-            },
-          }}
-        />}
+        {tutorialSteps && (
+          <Joyride
+            callback={this.handleJoyrideCallback}
+            continuous={true}
+            disableCloseOnEsc={true}
+            disableOverlayClose={true}
+            showProgress={true}
+            run={tutorialStep >= 0}
+            tooltipComponent={Tooltip}
+            stepIndex={tutorialStep}
+            steps={tutorialSteps}
+            styles={{
+              options: {
+                beaconSize: 48,
+                overlayColor: "rgba(0, 0, 0, 0.1)",
+              },
+            }}
+          />
+        )}
         <Dialog
           open={ui.dialog.open}
           onClose={closeDialog}
-          disableEscapeKeyDown={ui.dialog.notCancellable}>
+          disableEscapeKeyDown={ui.dialog.notCancellable}
+        >
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
-            {!ui.dialog.notCancellable && <Button color="primary" onClick={closeDialog}>
-              {ui.dialog.closeText || (ui.dialog.action ? 'Cancel' : 'OK')}
-            </Button>}
-            {ui.dialog.action && <Button color="primary" variant="contained" onClick={ui.dialog.action}>
-              {ui.dialog.actionLabel || 'OK'}
-            </Button>}
+            {!ui.dialog.notCancellable && (
+              <Button color="primary" onClick={closeDialog}>
+                {ui.dialog.closeText || (ui.dialog.action ? "Cancel" : "OK")}
+              </Button>
+            )}
+            {ui.dialog.action && (
+              <Button
+                color="primary"
+                variant="contained"
+                onClick={ui.dialog.action}
+              >
+                {ui.dialog.actionLabel || "OK"}
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
         <Snackbar
@@ -215,7 +279,20 @@ export default class Compositor extends React.Component<Props, {}> {
           message={<span>{ui.snackbar.message}</span>}
           autoHideDuration={ui.snackbar.timeout}
           onClose={closeSnackbar}
-          action={(ui.snackbar.actionLabel) ? [<Button key={1} onClick={(e: React.MouseEvent<HTMLElement>) => this.snackbarActionClicked(e)}>{ui.snackbar.actionLabel}</Button>] : []}
+          action={
+            ui.snackbar.actionLabel
+              ? [
+                  <Button
+                    key={1}
+                    onClick={(e: React.MouseEvent<HTMLElement>) =>
+                      this.snackbarActionClicked(e)
+                    }
+                  >
+                    {ui.snackbar.actionLabel}
+                  </Button>,
+                ]
+              : []
+          }
         />
         <AudioContainer />
       </div>

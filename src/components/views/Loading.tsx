@@ -1,6 +1,6 @@
-import * as React from 'react';
-import {CircularProgress} from '@mui/material';
-import {GameType} from '../../Types';
+import * as React from "react";
+import { CircularProgress } from "@mui/material";
+import { GameType } from "../../Types";
 
 export interface StateProps {
   game: GameType;

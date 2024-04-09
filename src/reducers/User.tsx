@@ -1,17 +1,17 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import {UserType, ScoreType} from '../Types';
-import {RootState} from '../Store';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; 
-import {getDb} from '../Globals';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { UserType, ScoreType } from "../Types";
+import { RootState } from "../Store";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getDb } from "../Globals";
 
 export const initialUser: UserType = {};
 
 export const userSlice = createSlice({
-  name: 'user',
+  name: "user",
   initialState: initialUser,
   reducers: {
     delta: (state, action: PayloadAction<Partial<UserType>>) => {
-      return {...state, ...action.payload};
+      return { ...state, ...action.payload };
     },
     submitHighscore: (state, action: PayloadAction<Partial<ScoreType>>) => {
       if (state.uid) {
@@ -23,9 +23,9 @@ export const userSlice = createSlice({
           date: serverTimestamp(),
           uid: state.uid,
         } as ScoreType;
-        addDoc(collection(getDb(), 'scores'), scoreSubmission);
+        addDoc(collection(getDb(), "scores"), scoreSubmission);
       }
-    }
+    },
   },
 });
 

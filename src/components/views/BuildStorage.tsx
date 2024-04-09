@@ -1,16 +1,46 @@
-import * as React from 'react';
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Menu, MenuItem, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@mui/material';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
-import CloseIcon from '@mui/icons-material/Close';
-import PauseIcon from '@mui/icons-material/Pause';
-import SortIcon from '@mui/icons-material/Sort';
-import {getTimeFromTimeline} from '../../helpers/DateTime';
-import {getMonthlyPayment} from '../../helpers/Financials';
-import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/Format';
-import {DOWNPAYMENT_PERCENT, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
-import {STORAGE} from '../../Facilities';
-import {GameType, SpeedType, StorageShoppingType} from '../../Types';
+import * as React from "react";
+import {
+  Avatar,
+  Button,
+  Card,
+  CardHeader,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  List,
+  Menu,
+  MenuItem,
+  Slider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import CloseIcon from "@mui/icons-material/Close";
+import PauseIcon from "@mui/icons-material/Pause";
+import SortIcon from "@mui/icons-material/Sort";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
+import { getMonthlyPayment } from "../../helpers/Financials";
+import {
+  formatMoneyConcise,
+  formatMoneyStable,
+  formatWatts,
+} from "../../helpers/Format";
+import {
+  DOWNPAYMENT_PERCENT,
+  INTEREST_RATE_YEARLY,
+  LOAN_MONTHS,
+} from "../../Constants";
+import { STORAGE } from "../../Facilities";
+import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
@@ -19,14 +49,26 @@ interface StorageBuildItemProps {
 }
 
 function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
-  const {storage, cash} = props;
+  const { storage, cash } = props;
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
-  const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
+  const monthlyPayment = getMonthlyPayment(
+    loanAmount,
+    INTEREST_RATE_YEARLY,
+    LOAN_MONTHS,
+  );
   const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const secondaryText = (buildable) ? storage.description : <div>Too large for current tech.<br/>Max size: <strong>{formatWatts(props.storage.maxPeakWh)}h</strong></div>;
+  const secondaryText = buildable ? (
+    storage.description
+  ) : (
+    <div>
+      Too large for current tech.
+      <br />
+      Max size: <strong>{formatWatts(props.storage.maxPeakWh)}h</strong>
+    </div>
+  );
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -39,14 +81,19 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
 
   // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
   // <TableRow>
-    // <TableCell>Payments during construction (interest only)</TableCell>
-    // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
+  // <TableCell>Payments during construction (interest only)</TableCell>
+  // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
   // </TableRow>
 
   return (
     <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
-        avatar={<Avatar alt={storage.name} src={`/images/${storage.name.toLowerCase()}.svg`} />}
+        avatar={
+          <Avatar
+            alt={storage.name}
+            src={`/images/${storage.name.toLowerCase()}.svg`}
+          />
+        }
         action={
           <span>
             <Button
@@ -59,7 +106,8 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
               {formatMoneyConcise(storage.buildCost)}
             </Button>
             <Typography variant="body2" color="textSecondary">
-              {Math.round(storage.yearsToBuild * 12)}mo to build<br/>
+              {Math.round(storage.yearsToBuild * 12)}mo to build
+              <br />
               {formatWatts(storage.peakW)}
             </Typography>
           </span>
@@ -67,30 +115,39 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
         title={storage.name}
         subheader={secondaryText}
       />
-      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon"  />}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon"  />}
+      {!expanded && (
+        <ArrowDropDownIcon color="primary" className="expand-icon" />
+      )}
+      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>
               <TableRow>
-                <TableCell>Peak output
+                <TableCell>
+                  Peak output
                   <Typography variant="body2" color="textSecondary">
                     Increases with capacity
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatWatts(storage.peakW)}</TableCell>
+                <TableCell align="right">
+                  {formatWatts(storage.peakW)}
+                </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Operating costs (/yr)
+                <TableCell>
+                  Operating costs (/yr)
                   <Typography variant="body2" color="textSecondary">
                     Costs regardless of output
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(storage.annualOperatingCost)}</TableCell>
+                <TableCell align="right">
+                  {formatMoneyConcise(storage.annualOperatingCost)}
+                </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Ramp up/down time
+                <TableCell>
+                  Ramp up/down time
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
                   </Typography>
@@ -102,17 +159,17 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
         </TableContainer>
       </Collapse>
 
-      <Dialog
-        open={open}
-        onClose={toggleOpen}
-      >
+      <Dialog open={open} onClose={toggleOpen}>
         <DialogTitle>
           Build {formatWatts(storage.peakWh)}h {storage.name}?
           <IconButton
             aria-label="close"
             onClick={toggleOpen}
             className="top-right"
-            size="large"><CloseIcon /></IconButton>
+            size="large"
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent className="noPadding">
           <TableContainer>
@@ -120,40 +177,67 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
               <TableBody>
                 <TableRow>
                   <TableCell>Time to build</TableCell>
-                  <TableCell align="right">{Math.round(storage.yearsToBuild * 12)} mo</TableCell>
+                  <TableCell align="right">
+                    {Math.round(storage.yearsToBuild * 12)} mo
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Cash cost</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(storage.buildCost)}</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(storage.buildCost)}
+                  </TableCell>
                 </TableRow>
                 <TableRow className="bold">
                   <TableCell colSpan={2}>Loan info</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Downpayment</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(downpayment)}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Interest rate</TableCell>
-                  <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
+                  <TableCell align="right">
+                    {(INTEREST_RATE_YEARLY * 100).toFixed(1)}%
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Monthly payments</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(monthlyPayment)}/mo
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Loan duration</TableCell>
-                  <TableCell align="right">Construction + {LOAN_MONTHS / 12} years</TableCell>
+                  <TableCell align="right">
+                    Construction + {LOAN_MONTHS / 12} years
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button color="primary" disabled={cash < storage.buildCost} variant="contained" onClick={(e: any) => { props.onBuild(false); toggleOpen(e); }}>
+          <Button
+            color="primary"
+            disabled={cash < storage.buildCost}
+            variant="contained"
+            onClick={(e: any) => {
+              props.onBuild(false);
+              toggleOpen(e);
+            }}
+          >
             Pay cash
           </Button>
-          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={(e: any) => {
+              props.onBuild(true);
+              toggleOpen(e);
+            }}
+          >
             Take loan
           </Button>
         </DialogActions>
@@ -163,14 +247,14 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
 }
 
 const sortOptions = [
-  ['buildCost', 'Build Cost'],
-  ['yearsToBuild', 'Build Time'],
+  ["buildCost", "Build Cost"],
+  ["yearsToBuild", "Build Time"],
 ];
 
 // Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2MW, 9->10 MW, 10->20MW)
 function getW(tick: number) {
   const exponent = Math.floor(tick / 9) + 6;
-  const frontNumber = tick % 9 + 1;
+  const frontNumber = (tick % 9) + 1;
   return frontNumber * Math.pow(10, exponent);
 }
 
@@ -197,23 +281,28 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function StorageBuildDialog(props: Props): JSX.Element {
-  const {game, onBack} = props;
+  const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => f.peakWh);
-  const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
-  const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakWh || 500000000;
-  const [sliderTick, setSliderTick] = React.useState<number>(getTickFromW(mostRecentBuiltValue));
-  const [sort, setSort] = React.useState<string>('buildCost');
+  const mostRecentId = filtered.reduce((id, f) => (id < f.id ? f.id : id), -1);
+  const mostRecentBuiltValue =
+    (filtered.find((f) => f.id === mostRecentId) || {}).peakWh || 500000000;
+  const [sliderTick, setSliderTick] = React.useState<number>(
+    getTickFromW(mostRecentBuiltValue),
+  );
+  const [sort, setSort] = React.useState<string>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   if (!now) {
-    return <span/>;
+    return <span />;
   }
-  
-  const cash = now.cash;
-  const storage = STORAGE(game, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
-  const handleSliderChange = (event: any, newValue: number|number[]) => {
+  const cash = now.cash;
+  const storage = STORAGE(game, getW(sliderTick)).sort((a, b) =>
+    a[sort] > b[sort] ? 1 : -1,
+  );
+
+  const handleSliderChange = (event: any, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
       newValue = newValue[0];
     }
@@ -236,29 +325,47 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   return (
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
-        <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Storage</span></Typography>
-        {game.speed !== 'PAUSED' && <IconButton
-          onClick={() => props.onSpeedChange('PAUSED') }
-          aria-label="pause"
-          edge="end"
-          color="primary"
-          size="large">
-          <PauseIcon />
-        </IconButton>}
+        <Typography variant="h6">
+          {formatMoneyStable(cash)} <span className="weak">Build Storage</span>
+        </Typography>
+        {game.speed !== "PAUSED" && (
+          <IconButton
+            onClick={() => props.onSpeedChange("PAUSED")}
+            aria-label="pause"
+            edge="end"
+            color="primary"
+            size="large"
+          >
+            <PauseIcon />
+          </IconButton>
+        )}
         <IconButton
           edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
-          size="large">
+          size="large"
+        >
           <CloseIcon />
         </IconButton>
         <div className="flex-newline"></div>
-        <div id="yearProgressBar" style={{
-          width: `${game.date.percentOfYear * 100}%`,
-        }}/>
-        <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}h</Typography> {filtered.length <= 0 && '(slide to change)'}
+        <div
+          id="yearProgressBar"
+          style={{
+            width: `${game.date.percentOfYear * 100}%`,
+          }}
+        />
+        <Typography
+          id="peak-output"
+          className="flex-newline"
+          variant="body2"
+          color="textSecondary"
+        >
+          Capacity:{" "}
+          <Typography color="primary" component="strong">
+            {valueLabelFormat(sliderTick)}h
+          </Typography>{" "}
+          {filtered.length <= 0 && "(slide to change)"}
         </Typography>
         <Slider
           value={sliderTick}
@@ -274,7 +381,8 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"
-          size="large">
+          size="large"
+        >
           <SortIcon />
         </IconButton>
         <Menu
@@ -285,21 +393,30 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           onClose={onSortClose}
         >
           {sortOptions.map((option) => {
-            return <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
-              {sort === option[0] ? <strong>{option[1]}</strong> : <span className="weak">{option[1]}</span>}
-            </MenuItem>;
+            return (
+              <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
+                {sort === option[0] ? (
+                  <strong>{option[1]}</strong>
+                ) : (
+                  <span className="weak">{option[1]}</span>
+                )}
+              </MenuItem>
+            );
           })}
         </Menu>
       </Toolbar>
       <List dense className="scrollable cardList">
-        {storage.map((g: StorageShoppingType, i: number) =>
+        {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem
             storage={g}
             key={i}
             cash={cash}
-            onBuild={(financed: boolean) => { props.onBuildStorage(g, financed); onBack(); }}
+            onBuild={(financed: boolean) => {
+              props.onBuildStorage(g, financed);
+              onBack();
+            }}
           />
-        )}
+        ))}
       </List>
     </div>
   );

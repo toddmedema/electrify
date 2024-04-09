@@ -1,6 +1,6 @@
-import {loadAudioFiles, state as audioState} from '../../data/Audio';
-import {INIT_DELAY} from '../../Constants';
-import * as React from 'react';
+import { loadAudioFiles, state as audioState } from "../../data/Audio";
+import { INIT_DELAY } from "../../Constants";
+import * as React from "react";
 
 export interface StateProps {
   enabled?: boolean;
@@ -25,9 +25,9 @@ export default class Audio extends React.Component<Props, {}> {
   }
 
   private handleEnableState(enabled?: boolean) {
-    if (audioState.loaded === 'UNLOADED') {
+    if (audioState.loaded === "UNLOADED") {
       loadAudioFiles();
-    } else if (audioState.loaded === 'ERROR' && enabled) {
+    } else if (audioState.loaded === "ERROR" && enabled) {
       this.props.disableAudio();
     } else {
       const tm = audioState.themeManager;
@@ -51,7 +51,7 @@ export default class Audio extends React.Component<Props, {}> {
     }
   }
 
-  public render(): JSX.Element|null {
+  public render(): JSX.Element | null {
     return null;
   }
 }

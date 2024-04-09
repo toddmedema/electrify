@@ -1,8 +1,8 @@
-import {DAYS_PER_MONTH, DAYS_PER_YEAR} from '../Constants';
-import {DateType, RawWeatherType} from '../Types';
-import {getRandomRange} from '../helpers/Math';
+import { DAYS_PER_MONTH, DAYS_PER_YEAR } from "../Constants";
+import { DateType, RawWeatherType } from "../Types";
+import { getRandomRange } from "../helpers/Math";
 
-const Papa = require('papaparse');
+const Papa = require("papaparse");
 
 const STARTING_YEAR = 1980; // for weather data, Jan 1st, assumed to be the same for all locations
 const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
@@ -11,7 +11,7 @@ const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 
 let weather = [] as any;
-    // Ordred oldest first
+// Ordred oldest first
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,
@@ -38,7 +38,9 @@ export function initWeather(location: string, callback?: any) {
     },
     complete() {
       if (weather.length !== EXPECTED_ROWS) {
-        console.warn(`Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`);
+        console.warn(
+          `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
+        );
       }
       if (callback) {
         callback();
@@ -82,14 +84,17 @@ export function getWeather(date: DateType): RawWeatherType {
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
 export function getRawSunlightPercent(date: DateType) {
   if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
-    const minutesFromDark = Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay);
+    const minutesFromDark = Math.min(
+      date.minuteOfDay - date.sunrise,
+      date.sunset - date.minuteOfDay,
+    );
     // TODO fix the pointiness, esp in shorter winter months
     // Maybe by factoring in day lenght to determine the shape of the curve?
 
     // Day length / minutes from dark used as proxy for season / max sun height
     // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
     // Solar panels generally follow a Bell curve
-    return 1 / (1 + Math.pow(Math.E, (-0.015 * (minutesFromDark - 260))));
+    return 1 / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 260)));
   }
   return 0;
 }
@@ -109,5 +114,3 @@ function forecastNextDay() {
     });
   }
 }
-
-

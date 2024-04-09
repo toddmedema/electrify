@@ -1,5 +1,10 @@
-import {MUSIC_DEFINITIONS, MUSIC_FADE_SECONDS, MUSIC_INTENSITY_MAX, MusicDefinition} from '../Constants';
-import {AudioNode} from './AudioNode';
+import {
+  MUSIC_DEFINITIONS,
+  MUSIC_FADE_SECONDS,
+  MUSIC_INTENSITY_MAX,
+  MusicDefinition,
+} from "../Constants";
+import { AudioNode } from "./AudioNode";
 
 /* Notes on audio implementation:
 - intensity (0-MUSIC_INTENSITY_MAX) used as baseline for combat situation, and changes slowly (mostly on loop reset).
@@ -31,7 +36,7 @@ export class ThemeManager {
   private theme: MusicDefinition;
   private timeout: any;
 
-  constructor(nodes: {[key: string]: AudioNode}, intensity: number = 0) {
+  constructor(nodes: { [key: string]: AudioNode }, intensity: number = 0) {
     this.nodes = nodes;
     this.active = [];
     for (const k of Object.keys(this.nodes)) {
@@ -58,7 +63,10 @@ export class ThemeManager {
     }
     for (const i of this.active) {
       if (this.nodes[i] && this.nodes[i].isPlaying()) {
-        this.nodes[i].fadeOut((this.intensity > 0) ? MUSIC_FADE_SECONDS : MUSIC_FADE_LONG_SECONDS, true);
+        this.nodes[i].fadeOut(
+          this.intensity > 0 ? MUSIC_FADE_SECONDS : MUSIC_FADE_LONG_SECONDS,
+          true,
+        );
       }
     }
   }
@@ -68,7 +76,9 @@ export class ThemeManager {
   }
 
   public setIntensity(intensity: number) {
-    intensity = Math.round(Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity)));
+    intensity = Math.round(
+      Math.min(MUSIC_INTENSITY_MAX, Math.max(0, intensity)),
+    );
     if (intensity !== this.intensity) {
       this.playAtIntensity(intensity);
     }
@@ -80,7 +90,7 @@ export class ThemeManager {
     this.fadeOut();
     this.theme = theme;
     if (theme) {
-      console.log('starting ' + theme.directory);
+      console.log("starting " + theme.directory);
     }
     this.loopTheme(true);
   }
@@ -120,7 +130,7 @@ export class ThemeManager {
     });
   }
 
-  public getActiveInstrument(instrument: string): string|null {
+  public getActiveInstrument(instrument: string): string | null {
     for (const a of this.active) {
       if (a.indexOf(instrument) !== -1) {
         return a;
@@ -133,7 +143,7 @@ export class ThemeManager {
   // Doesn't stop the current music nodes (lets them stop naturally for reverb)
   private loopTheme(newTheme: boolean = false) {
     if (this.paused) {
-      return console.log('Skipping music (paused)');
+      return console.log("Skipping music (paused)");
     }
     const theme = this.theme;
     this.active = this.generateTracks();
@@ -149,12 +159,12 @@ export class ThemeManager {
 
       const node = this.nodes[file];
       if (!node) {
-        console.log(file + ' not loaded');
+        console.log(file + " not loaded");
         return;
       }
 
       // Determine initial & target volume
-      const initialVolume = (newTheme || !active) ? 0 : 1;
+      const initialVolume = newTheme || !active ? 0 : 1;
       const targetVolume = active ? 1 : 0;
       node.playOnce(initialVolume, targetVolume);
     });
@@ -176,13 +186,13 @@ export class ThemeManager {
     if (delta > 0) {
       // Fade in one inaudible (but active) baseline track randomly
       // (don't touch peak instrument, don't duplicate instruments)
-      console.log('looking for node to fade in');
+      console.log("looking for node to fade in");
       for (const inst of theme.tracks) {
-        const activeinst = this.getActiveInstrument(inst) || '';
+        const activeinst = this.getActiveInstrument(inst) || "";
         console.log(activeinst);
         const a = this.nodes[activeinst];
         if (a && a.isPlaying() && (a.getVolume() || 0) < 1.0) {
-          console.log('fading in ' + activeinst);
+          console.log("fading in " + activeinst);
           a.fadeIn();
           break;
         }
@@ -191,11 +201,11 @@ export class ThemeManager {
       // Fade out one random audible baseline track randomly
       // (don't touch the peak instrument, don't go below 1 active instrument)
       for (const inst of [...theme.tracks].reverse()) {
-        const activeinst = this.getActiveInstrument(inst) || '';
+        const activeinst = this.getActiveInstrument(inst) || "";
         console.log(activeinst);
         const a = this.nodes[activeinst];
         if (a && a.isPlaying() && (a.getVolume() || 0) > 0.9) {
-          console.log('fading out ' + activeinst);
+          console.log("fading out " + activeinst);
           a.fadeOut();
           break;
         }
