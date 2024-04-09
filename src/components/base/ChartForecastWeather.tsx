@@ -1,9 +1,19 @@
-import * as React from 'react';
-import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLegend, VictoryLine, VictoryTheme} from 'victory';
-import {TICK_MINUTES} from '../../Constants';
-import {TickPresentFutureType} from '../../Types';
-import {formatMonthChartAxis, getDateFromMinute} from '../../helpers/DateTime';
-import {chartTheme, temperatureColor, windColor} from '../../Theme';
+import * as React from "react";
+import {
+  VictoryAxis,
+  VictoryChart,
+  VictoryLabel,
+  VictoryLegend,
+  VictoryLine,
+  VictoryTheme,
+} from "victory";
+import { TICK_MINUTES } from "../../Constants";
+import { TickPresentFutureType } from "../../Types";
+import {
+  formatMonthChartAxis,
+  getDateFromMinute,
+} from "../../helpers/DateTime";
+import { chartTheme, temperatureColor, windColor } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -13,11 +23,16 @@ export interface Props {
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
-export default class ChartForecastWeather extends React.PureComponent<Props, {}> {
+export default class ChartForecastWeather extends React.PureComponent<
+  Props,
+  {}
+> {
   public render() {
-    const {domain, height, timeline, startingYear} = this.props;
+    const { domain, height, timeline, startingYear } = this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
-    const data = timeline.filter((t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES);
+    const data = timeline.filter(
+      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES,
+    );
     // Make sure it gets the first + last entries for a full chart
     data.unshift(timeline[0]);
     data.push(timeline[timeline.length - 1]);
@@ -29,23 +44,29 @@ export default class ChartForecastWeather extends React.PureComponent<Props, {}>
           theme={VictoryTheme.material}
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
           domain={domain}
-          domainPadding={{y: [6, 6]}}
+          domainPadding={{ y: [6, 6] }}
           height={height || 300}
         >
           <VictoryAxis
             tickCount={6}
-            tickFormat={(t) => formatMonthChartAxis(getDateFromMinute(t, startingYear).monthNumber, false)}
+            tickFormat={(t) =>
+              formatMonthChartAxis(
+                getDateFromMinute(t, startingYear).monthNumber,
+                false,
+              )
+            }
             tickLabelComponent={<VictoryLabel dy={-5} />}
             axisLabelComponent={<VictoryLabel dy={2} />}
             style={{
               axis: chartTheme.axis,
               grid: {
-                display: 'none',
+                display: "none",
               },
               tickLabels: chartTheme.tickLabels,
             }}
           />
-          <VictoryAxis dependentAxis
+          <VictoryAxis
+            dependentAxis
             tickFormat={Math.round}
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
@@ -78,14 +99,16 @@ export default class ChartForecastWeather extends React.PureComponent<Props, {}>
               },
             }}
           />
-          <VictoryLegend x={270} y={15}
+          <VictoryLegend
+            x={270}
+            y={15}
             centerTitle
             orientation="vertical"
             rowGutter={-5}
             symbolSpacer={5}
             data={[
-              { name: 'Heat (°C)', symbol: { fill: temperatureColor } },
-              { name: 'Wind (Kph)', symbol: { fill: windColor } },
+              { name: "Heat (°C)", symbol: { fill: temperatureColor } },
+              { name: "Wind (Kph)", symbol: { fill: windColor } },
             ]}
           />
         </VictoryChart>

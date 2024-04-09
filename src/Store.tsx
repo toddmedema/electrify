@@ -1,9 +1,9 @@
-import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
-import cardReducer from './reducers/Card';
-import gameReducer from './reducers/Game';
-import settingsReducer from './reducers/Settings';
-import uiReducer from './reducers/UI';
-import userReducer from './reducers/User';
+import { configureStore, ThunkAction, Action } from "@reduxjs/toolkit";
+import cardReducer from "./reducers/Card";
+import gameReducer from "./reducers/Game";
+import settingsReducer from "./reducers/Settings";
+import uiReducer from "./reducers/UI";
+import userReducer from "./reducers/User";
 
 export const store = configureStore({
   reducer: {

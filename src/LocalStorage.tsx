@@ -1,14 +1,14 @@
-import {getLocalStorage} from './Globals';
+import { getLocalStorage } from "./Globals";
 
 // Force specifying a default, since just doing (|| fallback) would bork on stored falsey values
 export function getStorageBoolean(key: string, fallback: boolean): boolean {
   const val = getLocalStorage().getItem(key);
-  return (val !== null) ? (val.toLowerCase() === 'true') : fallback;
+  return val !== null ? val.toLowerCase() === "true" : fallback;
 }
 
 export function getStorageBooleanOrUndefined(key: string): boolean | undefined {
   const val = getLocalStorage().getItem(key);
-  return (val !== null) ? (val.toLowerCase() === 'true') : undefined;
+  return val !== null ? val.toLowerCase() === "true" : undefined;
 }
 
 export function getStorageJson(key: string, fallback: object): object {
@@ -18,7 +18,7 @@ export function getStorageJson(key: string, fallback: object): object {
       return fallback;
     }
     const val = JSON.parse(item);
-    return (val !== null) ? val : fallback;
+    return val !== null ? val : fallback;
   } catch (err) {
     return fallback;
   }
@@ -26,17 +26,21 @@ export function getStorageJson(key: string, fallback: object): object {
 
 export function getStorageNumber(key: string, fallback: number): number {
   const val = getLocalStorage().getItem(key);
-  return (val !== null) ? Number(val) : fallback;
+  return val !== null ? Number(val) : fallback;
 }
 
 export function getStorageString(key: string, fallback: string): string {
   const val = getLocalStorage().getItem(key);
-  return (val !== null) ? val : fallback;
+  return val !== null ? val : fallback;
 }
 
 // Value can be boolean, number, string or stringifiable JSON
-export function setStorageKeyValue(key: string, value: any, ignoreErrors= true) {
-  if (typeof value === 'object') {
+export function setStorageKeyValue(
+  key: string,
+  value: any,
+  ignoreErrors = true,
+) {
+  if (typeof value === "object") {
     value = JSON.stringify(value);
   } else {
     value = value.toString();
@@ -51,7 +55,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
   const ls = gls();
   let min = 0; // Kib
   let max = 10000; // Kib
-  const n1000b = '0123456789'.repeat(100);
+  const n1000b = "0123456789".repeat(100);
   // Converging on 10MiB would take log_2(10M) = 24 iterations.
   // If we're past this limit, something's gone wrong and we
   // should bail out with our best guess.
@@ -60,7 +64,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
   while (Math.abs(max - min) > 1 && i < CHECK_MAX_ITERATIONS) {
     const test = Math.floor((max - min) / 2 + min);
     try {
-      ls.setItem('test', n1000b.repeat(test));
+      ls.setItem("test", n1000b.repeat(test));
       // If no exception, we're under the max. Raise min.
       min = test;
     } catch (e) {
@@ -71,7 +75,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
   }
 
   try {
-    ls.setItem('test', null as any);
+    ls.setItem("test", null as any);
   } catch (e) {
     // Ignore errors
   }

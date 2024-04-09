@@ -1,8 +1,8 @@
-import Redux from 'redux';
-import {connect} from 'react-redux';
-import {delta} from '../../reducers/Game';
-import {AppStateType, GameType} from '../../Types';
-import Finances, {DispatchProps, StateProps} from './Finances';
+import Redux from "redux";
+import { connect } from "react-redux";
+import { delta } from "../../reducers/Game";
+import { AppStateType, GameType } from "../../Types";
+import Finances, { DispatchProps, StateProps } from "./Finances";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -20,7 +20,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
 const FinancesContainer = connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(Finances);
 
 export default FinancesContainer;

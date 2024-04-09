@@ -1,14 +1,17 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import {getStorageBooleanOrUndefined, setStorageKeyValue} from '../LocalStorage';
-import {SettingsType} from '../Types';
-import {pause, resume} from '../data/Audio';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import {
+  getStorageBooleanOrUndefined,
+  setStorageKeyValue,
+} from "../LocalStorage";
+import { SettingsType } from "../Types";
+import { pause, resume } from "../data/Audio";
 
 export const initialSettings: SettingsType = {
-  audioEnabled: getStorageBooleanOrUndefined('audioEnabled'),
+  audioEnabled: getStorageBooleanOrUndefined("audioEnabled"),
 };
 
 export const settingsSlice = createSlice({
-  name: 'settings',
+  name: "settings",
   initialState: initialSettings,
   reducers: {
     change: (state, action: PayloadAction<Partial<SettingsType>>) => {
@@ -17,7 +20,7 @@ export const settingsSlice = createSlice({
       Object.keys(changes).forEach((key: string) => {
         setStorageKeyValue(key, changes[key]);
       });
-      return {...state, ...changes};
+      return { ...state, ...changes };
     },
     pauseAudio: (state) => {
       pause();

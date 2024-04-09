@@ -1,17 +1,53 @@
-import * as React from 'react';
-import {Avatar, Button, Card, CardHeader, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, Menu, MenuItem, Slider, Table, TableBody, TableCell, TableContainer, TableRow, Toolbar, Typography} from '@mui/material';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp';
-import CloseIcon from '@mui/icons-material/Close';
-import PauseIcon from '@mui/icons-material/Pause';
-import SortIcon from '@mui/icons-material/Sort';
-import {getTimeFromTimeline} from '../../helpers/DateTime';
-import {getMonthlyPayment} from '../../helpers/Financials';
-import {formatMoneyConcise, formatMoneyStable, formatWatts} from '../../helpers/Format';
-import {getFuelPricesPerMBTU} from '../../data/FuelPrices';
-import {DOWNPAYMENT_PERCENT, FUELS, INTEREST_RATE_YEARLY, LOAN_MONTHS} from '../../Constants';
-import {GENERATORS} from '../../Facilities';
-import {DateType, GameType, GeneratorShoppingType, SpeedType} from '../../Types';
+import * as React from "react";
+import {
+  Avatar,
+  Button,
+  Card,
+  CardHeader,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  List,
+  Menu,
+  MenuItem,
+  Slider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import CloseIcon from "@mui/icons-material/Close";
+import PauseIcon from "@mui/icons-material/Pause";
+import SortIcon from "@mui/icons-material/Sort";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
+import { getMonthlyPayment } from "../../helpers/Financials";
+import {
+  formatMoneyConcise,
+  formatMoneyStable,
+  formatWatts,
+} from "../../helpers/Format";
+import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
+import {
+  DOWNPAYMENT_PERCENT,
+  FUELS,
+  INTEREST_RATE_YEARLY,
+  LOAN_MONTHS,
+} from "../../Constants";
+import { GENERATORS } from "../../Facilities";
+import {
+  DateType,
+  GameType,
+  GeneratorShoppingType,
+  SpeedType,
+} from "../../Types";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -22,16 +58,28 @@ interface GeneratorBuildItemProps {
 }
 
 function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
-  const {generator, cash} = props;
+  const { generator, cash } = props;
   const fuel = FUELS[generator.fuel] || {};
   const fuelPrices = getFuelPricesPerMBTU(props.date);
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
   const loanAmount = props.generator.buildCost - downpayment;
-  const monthlyPayment = getMonthlyPayment(loanAmount, INTEREST_RATE_YEARLY, LOAN_MONTHS);
+  const monthlyPayment = getMonthlyPayment(
+    loanAmount,
+    INTEREST_RATE_YEARLY,
+    LOAN_MONTHS,
+  );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
-  const secondaryText = (buildable) ? generator.description : <div>Too large for current tech.<br/>Max size: <strong>{formatWatts(props.generator.maxPeakW)}</strong></div>;
+  const secondaryText = buildable ? (
+    generator.description
+  ) : (
+    <div>
+      Too large for current tech.
+      <br />
+      Max size: <strong>{formatWatts(props.generator.maxPeakW)}</strong>
+    </div>
+  );
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -43,15 +91,20 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   };
 
   // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
-    // <TableRow>
-    // <TableCell>Payments during construction (interest only)</TableCell>
-    // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
+  // <TableRow>
+  // <TableCell>Payments during construction (interest only)</TableCell>
+  // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
   // </TableRow>
 
   return (
     <Card onClick={toggleExpand} className="build-list-item expandable">
       <CardHeader
-        avatar={<Avatar alt={generator.name} src={`/images/${generator.name.toLowerCase()}.svg`} />}
+        avatar={
+          <Avatar
+            alt={generator.name}
+            src={`/images/${generator.name.toLowerCase()}.svg`}
+          />
+        }
         action={
           <span>
             <Button
@@ -64,92 +117,143 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
-            <Typography className="action-seconday-text" variant="body2" color="textSecondary">{Math.round(generator.yearsToBuild * 12)}mo to build<br/>
-            {fuelPrices[generator.fuel] ? '~' : ''}{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</Typography>
+            <Typography
+              className="action-seconday-text"
+              variant="body2"
+              color="textSecondary"
+            >
+              {Math.round(generator.yearsToBuild * 12)}mo to build
+              <br />
+              {fuelPrices[generator.fuel] ? "~" : ""}
+              {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+            </Typography>
           </span>
         }
         title={generator.name}
         subheader={secondaryText}
       />
-      {!expanded && <ArrowDropDownIcon color="primary" className="expand-icon" />}
+      {!expanded && (
+        <ArrowDropDownIcon color="primary" className="expand-icon" />
+      )}
       {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="generator properties">
             <TableBody>
-              {props.secondaryMetric !== 'lcWh' && <TableRow>
-                <TableCell>Total energy cost
-                  <Typography variant="body2" color="textSecondary">
-                    Across life, based on {Math.round(generator.capacityFactor * 100)}% uptime
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">{formatMoneyConcise(generator.lcWh * 1000000)}/MWh</TableCell>
-              </TableRow>}
+              {props.secondaryMetric !== "lcWh" && (
+                <TableRow>
+                  <TableCell>
+                    Total energy cost
+                    <Typography variant="body2" color="textSecondary">
+                      Across life, based on{" "}
+                      {Math.round(generator.capacityFactor * 100)}% uptime
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
-                <TableCell>Average output
+                <TableCell>
+                  Average output
                   <Typography variant="body2" color="textSecondary">
                     Across a year
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatWatts(generator.peakW * generator.capacityFactor)}</TableCell>
+                <TableCell align="right">
+                  {formatWatts(generator.peakW * generator.capacityFactor)}
+                </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Operating costs
+                <TableCell>
+                  Operating costs
                   <Typography variant="body2" color="textSecondary">
                     Regardless of output
                   </Typography>
                 </TableCell>
-                <TableCell align="right">{formatMoneyConcise(generator.annualOperatingCost)}/yr</TableCell>
+                <TableCell align="right">
+                  {formatMoneyConcise(generator.annualOperatingCost)}/yr
+                </TableCell>
               </TableRow>
-              {fuelPrices[generator.fuel] && <TableRow>
-                <TableCell>Fuel costs
-                  <Typography variant="body2" color="textSecondary">
-                    Varies with fuel prices
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">{formatMoneyConcise(1000000 * generator.btuPerWh * fuelPrices[generator.fuel] || 0)}/MWh</TableCell>
-              </TableRow>}
-              {generator.spinMinutes > 1 && <TableRow>
-                <TableCell>Ramp up/down time
-                  <Typography variant="body2" color="textSecondary">
-                    To go from zero to full output
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">{generator.spinMinutes} min</TableCell>
-              </TableRow>}
+              {fuelPrices[generator.fuel] && (
+                <TableRow>
+                  <TableCell>
+                    Fuel costs
+                    <Typography variant="body2" color="textSecondary">
+                      Varies with fuel prices
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(
+                      1000000 *
+                        generator.btuPerWh *
+                        fuelPrices[generator.fuel] || 0,
+                    )}
+                    /MWh
+                  </TableCell>
+                </TableRow>
+              )}
+              {generator.spinMinutes > 1 && (
+                <TableRow>
+                  <TableCell>
+                    Ramp up/down time
+                    <Typography variant="body2" color="textSecondary">
+                      To go from zero to full output
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {generator.spinMinutes} min
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>Expected lifespan</TableCell>
-                <TableCell align="right">{generator.lifespanYears} years</TableCell>
-              </TableRow>
-              {props.secondaryMetric !== 'yearsToBuild' && <TableRow>
-                <TableCell>Time to build</TableCell>
-                <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
-              </TableRow>}
-              {fuel.kgCO2ePerBtu > 0 && <TableRow>
-                <TableCell>Air pollution
-                  <Typography variant="body2" color="textSecondary">
-                    (kg of CO2 equivalent)
-                  </Typography>
+                <TableCell align="right">
+                  {generator.lifespanYears} years
                 </TableCell>
-                <TableCell align="right">{Math.round(1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0)}kg/MWh</TableCell>
-              </TableRow>}
+              </TableRow>
+              {props.secondaryMetric !== "yearsToBuild" && (
+                <TableRow>
+                  <TableCell>Time to build</TableCell>
+                  <TableCell align="right">
+                    {Math.round(generator.yearsToBuild * 12)} mo
+                  </TableCell>
+                </TableRow>
+              )}
+              {fuel.kgCO2ePerBtu > 0 && (
+                <TableRow>
+                  <TableCell>
+                    Air pollution
+                    <Typography variant="body2" color="textSecondary">
+                      (kg of CO2 equivalent)
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {Math.round(
+                      1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0,
+                    )}
+                    kg/MWh
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
       </Collapse>
 
-      <Dialog
-        open={open}
-        onClose={toggleOpen}
-      >
+      <Dialog open={open} onClose={toggleOpen}>
         <DialogTitle>
           Build {formatWatts(generator.peakW)} {generator.name}?
           <IconButton
             aria-label="close"
             onClick={toggleOpen}
             className="top-right"
-            size="large"><CloseIcon /></IconButton>
+            size="large"
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent className="noPadding">
           <TableContainer>
@@ -157,40 +261,67 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               <TableBody>
                 <TableRow>
                   <TableCell>Time to build</TableCell>
-                  <TableCell align="right">{Math.round(generator.yearsToBuild * 12)} mo</TableCell>
+                  <TableCell align="right">
+                    {Math.round(generator.yearsToBuild * 12)} mo
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Cash cost</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(generator.buildCost)}</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(generator.buildCost)}
+                  </TableCell>
                 </TableRow>
                 <TableRow className="bold">
                   <TableCell colSpan={2}>Loan info</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Downpayment</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(downpayment)}</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(downpayment)}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Interest rate</TableCell>
-                  <TableCell align="right">{(INTEREST_RATE_YEARLY * 100).toFixed(1)}%</TableCell>
+                  <TableCell align="right">
+                    {(INTEREST_RATE_YEARLY * 100).toFixed(1)}%
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Monthly payments</TableCell>
-                  <TableCell align="right">{formatMoneyConcise(monthlyPayment)}/mo</TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(monthlyPayment)}/mo
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Loan duration</TableCell>
-                  <TableCell align="right">Construction + {LOAN_MONTHS / 12} years</TableCell>
+                  <TableCell align="right">
+                    Construction + {LOAN_MONTHS / 12} years
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </TableContainer>
         </DialogContent>
         <DialogActions>
-          <Button color="primary" disabled={cash < generator.buildCost} variant="contained" onClick={(e: any) => { props.onBuild(false); toggleOpen(e); }}>
+          <Button
+            color="primary"
+            disabled={cash < generator.buildCost}
+            variant="contained"
+            onClick={(e: any) => {
+              props.onBuild(false);
+              toggleOpen(e);
+            }}
+          >
             Pay cash
           </Button>
-          <Button color="primary" variant="contained" onClick={(e: any) => { props.onBuild(true); toggleOpen(e); }}>
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={(e: any) => {
+              props.onBuild(true);
+              toggleOpen(e);
+            }}
+          >
             Take loan
           </Button>
         </DialogActions>
@@ -200,15 +331,15 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
 }
 
 const sortOptions = [
-  ['buildCost', 'Build Cost'],
-  ['yearsToBuild', 'Build Time'],
-  ['lcWh', 'Cost per MWh'],
+  ["buildCost", "Build Cost"],
+  ["yearsToBuild", "Build Time"],
+  ["lcWh", "Cost per MWh"],
 ];
 
 // Starting at 1MW, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2MW, 9->10 MW, 10->20MW)
 function getW(tick: number) {
   const exponent = Math.floor(tick / 9) + 6;
-  const frontNumber = tick % 9 + 1;
+  const frontNumber = (tick % 9) + 1;
   return frontNumber * Math.pow(10, exponent);
 }
 
@@ -227,7 +358,10 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onBuildGenerator: (generator: GeneratorShoppingType, financed: boolean) => void;
+  onBuildGenerator: (
+    generator: GeneratorShoppingType,
+    financed: boolean,
+  ) => void;
   onBack: () => void;
   onSpeedChange: (speed: SpeedType) => void;
 }
@@ -235,23 +369,28 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function BuildGenerators(props: Props): JSX.Element {
-  const {game, onBack} = props;
+  const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => !f.peakWh);
-  const mostRecentId = filtered.reduce((id, f) => id < f.id ? f.id : id, -1);
-  const mostRecentBuiltValue = (filtered.find((f) => f.id  === mostRecentId) || {}).peakW || 500000000;
-  const [sliderTick, setSliderTick] = React.useState<number>(getTickFromW(mostRecentBuiltValue));
-  const [sort, setSort] = React.useState<string>('buildCost');
+  const mostRecentId = filtered.reduce((id, f) => (id < f.id ? f.id : id), -1);
+  const mostRecentBuiltValue =
+    (filtered.find((f) => f.id === mostRecentId) || {}).peakW || 500000000;
+  const [sliderTick, setSliderTick] = React.useState<number>(
+    getTickFromW(mostRecentBuiltValue),
+  );
+  const [sort, setSort] = React.useState<string>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   if (!now) {
-    return <span/>;
+    return <span />;
   }
-  
-  const cash = now.cash;
-  const generators = GENERATORS(game, getW(sliderTick)).sort((a, b) => a[sort] > b[sort] ? 1 : -1);
 
-  const onSlider = (event: any, newValue: number|number[]) => {
+  const cash = now.cash;
+  const generators = GENERATORS(game, getW(sliderTick)).sort((a, b) =>
+    a[sort] > b[sort] ? 1 : -1,
+  );
+
+  const onSlider = (event: any, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
       newValue = newValue[0];
     }
@@ -274,30 +413,49 @@ export default function BuildGenerators(props: Props): JSX.Element {
   return (
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
-        <Typography variant="h6">{formatMoneyStable(cash)} <span className="weak">Build Generator</span></Typography>
-        {game.speed !== 'PAUSED' && <IconButton
-          onClick={() => props.onSpeedChange('PAUSED') }
-          aria-label="pause"
-          edge="end"
-          color="primary"
-          size="large">
-          <PauseIcon />
-        </IconButton>}
+        <Typography variant="h6">
+          {formatMoneyStable(cash)}{" "}
+          <span className="weak">Build Generator</span>
+        </Typography>
+        {game.speed !== "PAUSED" && (
+          <IconButton
+            onClick={() => props.onSpeedChange("PAUSED")}
+            aria-label="pause"
+            edge="end"
+            color="primary"
+            size="large"
+          >
+            <PauseIcon />
+          </IconButton>
+        )}
         <IconButton
           id="close-button"
           edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
-          size="large">
+          size="large"
+        >
           <CloseIcon />
         </IconButton>
         <div className="flex-newline"></div>
-        <div id="yearProgressBar" style={{
-          width: `${game.date.percentOfYear * 100}%`,
-        }}/>
-        <Typography id="peak-output" className="flex-newline" variant="body2" color="textSecondary">
-          Capacity: <Typography color="primary" component="strong">{valueLabelFormat(sliderTick)}</Typography> {filtered.length <= 1 && '(slide to change)'}
+        <div
+          id="yearProgressBar"
+          style={{
+            width: `${game.date.percentOfYear * 100}%`,
+          }}
+        />
+        <Typography
+          id="peak-output"
+          className="flex-newline"
+          variant="body2"
+          color="textSecondary"
+        >
+          Capacity:{" "}
+          <Typography color="primary" component="strong">
+            {valueLabelFormat(sliderTick)}
+          </Typography>{" "}
+          {filtered.length <= 1 && "(slide to change)"}
         </Typography>
         <Slider
           value={sliderTick}
@@ -314,7 +472,8 @@ export default function BuildGenerators(props: Props): JSX.Element {
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"
-          size="large">
+          size="large"
+        >
           <SortIcon />
         </IconButton>
         <Menu
@@ -325,23 +484,32 @@ export default function BuildGenerators(props: Props): JSX.Element {
           onClose={onSortClose}
         >
           {sortOptions.map((option) => {
-            return <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
-              {sort === option[0] ? <strong>{option[1]}</strong> : <span className="weak">{option[1]}</span>}
-            </MenuItem>;
+            return (
+              <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
+                {sort === option[0] ? (
+                  <strong>{option[1]}</strong>
+                ) : (
+                  <span className="weak">{option[1]}</span>
+                )}
+              </MenuItem>
+            );
           })}
         </Menu>
       </Toolbar>
       <List dense className="scrollable cardList">
-        {generators.map((g: GeneratorShoppingType, i: number) =>
+        {generators.map((g: GeneratorShoppingType, i: number) => (
           <GeneratorBuildItem
             date={game.date}
             generator={g}
             key={i}
             cash={cash}
-            secondaryMetric={(sort === 'buildCost') ? 'yearsToBuild' : sort}
-            onBuild={(financed: boolean) => { props.onBuildGenerator(g, financed); onBack(); }}
+            secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
+            onBuild={(financed: boolean) => {
+              props.onBuildGenerator(g, financed);
+              onBack();
+            }}
           />
-        )}
+        ))}
       </List>
     </div>
   );

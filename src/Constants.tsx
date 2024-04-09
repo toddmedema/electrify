@@ -1,4 +1,10 @@
-import {CardNameType, DifficultyMultipliersType, FuelType, LocationType, MonthType} from './Types';
+import {
+  CardNameType,
+  DifficultyMultipliersType,
+  FuelType,
+  LocationType,
+  MonthType,
+} from "./Types";
 
 export const DIFFICULTIES = {
   Intern: {
@@ -31,24 +37,24 @@ export const DIFFICULTIES = {
     buildTime: 1,
     blackoutPenalty: 10,
   },
-} as {[index: string]: DifficultyMultipliersType};
+} as { [index: string]: DifficultyMultipliersType };
 
 export const LOCATIONS = [
   {
-    id: 'PIT',
-    name: 'Pittsburgh, PA',
+    id: "PIT",
+    name: "Pittsburgh, PA",
   },
   {
-    id: 'SF',
-    name: 'San Fransisco, CA',
+    id: "SF",
+    name: "San Fransisco, CA",
   },
   {
-    id: 'HNL',
-    name: 'Honolulu, HI',
+    id: "HNL",
+    name: "Honolulu, HI",
   },
   {
-    id: 'SJU',
-    name: 'San Juan, Puero Rico',
+    id: "SJU",
+    name: "San Juan, Puero Rico",
   },
 ] as LocationType[];
 
@@ -76,7 +82,20 @@ export const TICKS_PER_YEAR = TICKS_PER_MONTH * 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * 12;
 export const HOURS_PER_YEAR_REAL = 24 * 365;
 export const GAME_TO_REAL_YEARS = 365 / DAYS_PER_YEAR;
-export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as MonthType[];
+export const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as MonthType[];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
 
 export const INIT_DELAY = {
@@ -86,13 +105,13 @@ export const INIT_DELAY = {
 // TODO additional sources of information
 // Lifetime GHG for all fuels: https://en.wikipedia.org/wiki/Life-cycle_greenhouse-gas_emissions_of_energy_sources
 export const FUELS = {
-  'Coal': {
+  Coal: {
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
-  'Natural Gas': {
+  "Natural Gas": {
     kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
-  'Uranium': {
+  Uranium: {
     kgCO2ePerBtu: 0,
   },
   // TODO
@@ -105,7 +124,11 @@ export const FUELS = {
   // },
 } as { [fuel: string]: FuelType };
 
-export const NAV_CARDS = ['FACILITIES', 'FINANCES', 'FORECASTS'] as CardNameType[];
+export const NAV_CARDS = [
+  "FACILITIES",
+  "FINANCES",
+  "FORECASTS",
+] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click
@@ -120,17 +143,17 @@ export interface MusicDefinition {
   maxIntensity: number;
 }
 
-export const MUSIC_DEFINITIONS: {[key: string]: MusicDefinition} = {
+export const MUSIC_DEFINITIONS: { [key: string]: MusicDefinition } = {
   intro: {
-    directory: 'intro/',
-    tracks: ['intro'],
+    directory: "intro/",
+    tracks: ["intro"],
     durationMs: 29309,
     minIntensity: 1,
     maxIntensity: 1,
   },
   basic: {
-    directory: 'basic/',
-    tracks: ['low', 'medium', 'high'],
+    directory: "basic/",
+    tracks: ["low", "medium", "high"],
     durationMs: 392119,
     minIntensity: 0,
     maxIntensity: MUSIC_INTENSITY_MAX,

@@ -1,24 +1,36 @@
-import Redux from 'redux';
+import Redux from "redux";
 
-export type AudioLoadingType = 'UNLOADED' | 'LOADING' | 'ERROR' | 'LOADED';
+export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 export interface AudioType {
   paused: boolean;
 }
 
-export type MonthType = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec';
-export type DifficultyType = 'Intern' | 'Employee' | 'Manager' | 'VP' | 'CEO';
-export type SpeedType = 'PAUSED' | 'SLOW' | 'NORMAL' | 'FAST';
+export type MonthType =
+  | "Jan"
+  | "Feb"
+  | "Mar"
+  | "Apr"
+  | "May"
+  | "Jun"
+  | "Jul"
+  | "Aug"
+  | "Sep"
+  | "Oct"
+  | "Nov"
+  | "Dec";
+export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
+export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
 
-export type LocationIdType = 'PIT' | 'SF';
+export type LocationIdType = "PIT" | "SF";
 export interface LocationType {
   id: LocationIdType;
   name: string;
 }
 
-export type FuelNameType = 'Coal' | 'Wind' | 'Sun' | 'Natural Gas' | 'Uranium';
+export type FuelNameType = "Coal" | "Wind" | "Sun" | "Natural Gas" | "Uranium";
 export interface FuelPricesType {
   [index: string]: number;
-  'Natural Gas': number; // $/btu
+  "Natural Gas": number; // $/btu
   Coal: number; // $/btu
   Uranium: number; // $/btu
 }
@@ -31,18 +43,18 @@ export interface DifficultyMultipliersType {
 }
 
 export type CardNameType =
-  'BUILD_GENERATORS' |
-  'BUILD_STORAGE' |
-  'FACILITIES' |
-  'FINANCES' |
-  'FORECASTS' |
-  'LOADING' |
-  'MAIN_MENU' |
-  'NEW_GAME' |
-  'NEW_GAME_DETAILS' |
-  'MANUAL' |
-  'SETTINGS' |
-  'CUSTOM_GAME';
+  | "BUILD_GENERATORS"
+  | "BUILD_STORAGE"
+  | "FACILITIES"
+  | "FINANCES"
+  | "FORECASTS"
+  | "LOADING"
+  | "MAIN_MENU"
+  | "NEW_GAME"
+  | "NEW_GAME_DETAILS"
+  | "MANUAL"
+  | "SETTINGS"
+  | "CUSTOM_GAME";
 
 export interface CardType {
   name: CardNameType;
@@ -89,14 +101,15 @@ export interface RawWeatherType {
 }
 
 // All amounts are the average across the time window
-export type TickPresentFutureType = Partial<FuelPricesType> & HistoryForecastShared & {
-  minute: number;
-  supplyW: number; // Watts
-  demandW: number; // Watts
-  sunlight: number; // 0-1 multiplier
-  windKph: number;
-  temperatureC: number;
-};
+export type TickPresentFutureType = Partial<FuelPricesType> &
+  HistoryForecastShared & {
+    minute: number;
+    supplyW: number; // Watts
+    demandW: number; // Watts
+    sunlight: number; // 0-1 multiplier
+    windKph: number;
+    temperatureC: number;
+  };
 
 export type DerivedHistoryKeysType = keyof DerivedHistoryType;
 export interface DerivedHistoryType extends MonthlyHistoryType {
@@ -130,13 +143,17 @@ interface HistoryForecastShared {
 
 export interface FuelType {
   // costPerBtu: number; // Measured from raw stock / before generator efficiency loss
-    // all costs should be in that year's $ / not account for inflation when possible
+  // all costs should be in that year's $ / not account for inflation when possible
   kgCO2ePerBtu: number; // Measured from raw stock / before generator efficiency loss
 }
 
-export type FacilityOperatingType = GeneratorOperatingType | StorageOperatingType;
+export type FacilityOperatingType =
+  | GeneratorOperatingType
+  | StorageOperatingType;
 
-export interface GeneratorOperatingType extends GeneratorShoppingType, LoanInfo {
+export interface GeneratorOperatingType
+  extends GeneratorShoppingType,
+    LoanInfo {
   id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;
@@ -179,10 +196,10 @@ interface SharedShoppingType {
   description: string;
   available: boolean;
   buildCost: number; // Partially fixed, partially variable (such as size dependent)
-    // When more information is not available, assume that average costs = 1/4 fixed (for avg size), 3/4 variable
-    // all costs should be in that year's $ / not account for inflation when possible
+  // When more information is not available, assume that average costs = 1/4 fixed (for avg size), 3/4 variable
+  // all costs should be in that year's $ / not account for inflation when possible
   annualOperatingCost: number;
-    // all costs should be in that year's $ / not account for inflation when possible
+  // all costs should be in that year's $ / not account for inflation when possible
   peakW: number;
   lifespanYears: number;
   yearsToBuild: number;
@@ -201,7 +218,7 @@ export interface ScenarioType {
   icon: string; // assumed to be images/<string>.svg
   locationId: LocationIdType;
   summary?: string;
-  ownership: 'Investor' | 'Public';
+  ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
   cash: number;
@@ -225,7 +242,7 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
-  facilities: Array<StorageOperatingType|GeneratorOperatingType>;
+  facilities: Array<StorageOperatingType | GeneratorOperatingType>;
 }
 
 export interface SettingsType {
@@ -260,7 +277,7 @@ export interface UserType {
   uid?: string;
 }
 
-export type TransitionClassType = 'next' | 'prev' | 'instant' | 'nav';
+export type TransitionClassType = "next" | "prev" | "instant" | "nav";
 
 export interface AppStateType {
   card: CardType;

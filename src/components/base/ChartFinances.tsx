@@ -1,7 +1,13 @@
-import * as React from 'react';
-import {formatMonthChartAxis} from '../../helpers/DateTime';
-import {chartTheme, demandColor} from '../../Theme';
-import {VictoryAxis, VictoryChart, VictoryLabel, VictoryLine, VictoryTheme} from 'victory';
+import * as React from "react";
+import { formatMonthChartAxis } from "../../helpers/DateTime";
+import { chartTheme, demandColor } from "../../Theme";
+import {
+  VictoryAxis,
+  VictoryChart,
+  VictoryLabel,
+  VictoryLine,
+  VictoryTheme,
+} from "victory";
 
 interface ChartData {
   month: number; // unique across years
@@ -14,7 +20,7 @@ export interface Props {
   height?: number;
   title: string;
   timeline: ChartData[];
-  format: (n: number) => number|string;
+  format: (n: number) => number | string;
 }
 
 const ChartFinances = (props: Props): JSX.Element => {
@@ -22,7 +28,10 @@ const ChartFinances = (props: Props): JSX.Element => {
   let domainMin = 0;
   let domainMax = 0;
   const rangeMin = props.timeline[0].month;
-  const rangeMax = Math.max(rangeMin + 11, props.timeline[props.timeline.length - 1].month);
+  const rangeMax = Math.max(
+    rangeMin + 11,
+    props.timeline[props.timeline.length - 1].month,
+  );
   const past = [] as ChartData[];
   const projected = [] as ChartData[];
   props.timeline.forEach((d: ChartData) => {
@@ -46,7 +55,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         theme={VictoryTheme.material}
         padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
         domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-        domainPadding={{y: [6, 6]}}
+        domainPadding={{ y: [6, 6] }}
         height={props.height || 300}
       >
         <VictoryAxis
@@ -55,12 +64,13 @@ const ChartFinances = (props: Props): JSX.Element => {
           style={{
             axis: chartTheme.axis,
             grid: {
-              display: 'none',
+              display: "none",
             },
             tickLabels: chartTheme.tickLabels,
           }}
         />
-        <VictoryAxis dependentAxis
+        <VictoryAxis
+          dependentAxis
           tickFormat={props.format}
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
@@ -86,15 +96,11 @@ const ChartFinances = (props: Props): JSX.Element => {
           style={{
             data: {
               stroke: demandColor,
-              strokeDasharray: '4,4',
+              strokeDasharray: "4,4",
             },
           }}
         />
-        <VictoryLabel
-          textAnchor="middle"
-          x={200} y={7}
-          text={props.title}
-        />
+        <VictoryLabel textAnchor="middle" x={200} y={7} text={props.title} />
       </VictoryChart>
     </div>
   );

@@ -1,12 +1,11 @@
-import Redux from 'redux';
-import {connect} from 'react-redux';
-import {navigateBack} from '../../reducers/Card';
-import {AppStateType} from '../../Types';
-import Manual, {DispatchProps, StateProps} from './Manual';
+import Redux from "redux";
+import { connect } from "react-redux";
+import { navigateBack } from "../../reducers/Card";
+import { AppStateType } from "../../Types";
+import Manual, { DispatchProps, StateProps } from "./Manual";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
-  return {
-  };
+  return {};
 };
 
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
@@ -17,9 +16,6 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   };
 };
 
-const ManualContainer = connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(Manual);
+const ManualContainer = connect(mapStateToProps, mapDispatchToProps)(Manual);
 
 export default ManualContainer;
