@@ -20,8 +20,8 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       dispatch(delta(d));
       dispatch(navigate("NEW_GAME_DETAILS"));
     },
-    onTutorial: (delta: Partial<GameType>) => {
-      dispatch(start(delta));
+    onTutorial: (scenarioId: number) => {
+      dispatch(start(scenarioId));
     },
   };
 };

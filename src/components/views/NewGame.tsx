@@ -23,7 +23,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onDetails: (delta: Partial<GameType>) => void;
-  onTutorial: (delta: Partial<GameType>) => void;
+  onTutorial: (scenarioId: number) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -45,7 +45,7 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
             size="small"
             variant={completed ? "outlined" : "contained"}
             color="primary"
-            onClick={(e: any) => onTutorial({ scenarioId: s.id })}
+            onClick={(e: any) => onTutorial(s.id)}
           >
             {completed ? "Done" : "Play"}
           </Button>
