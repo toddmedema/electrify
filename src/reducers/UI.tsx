@@ -17,7 +17,7 @@ export const initialUI: UIType = {
 
 export const uiSlice = createSlice({
   name: "ui",
-  initialState: initialUI,
+  initialState: { ...initialUI },
   reducers: {
     delta: (state, action: PayloadAction<Partial<UIType>>) => {
       return { ...state, ...action.payload };

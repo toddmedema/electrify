@@ -20,6 +20,7 @@ dll/
 www/
 *.apk
 build/
+*.pkg
 
 # Dependency directories
 node_modules

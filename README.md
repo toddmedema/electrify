@@ -36,11 +36,11 @@ This runs the unit tests defined in files with the `.test.tsx` extensio.
 
 ### Release checklist
 
-To release, you'll need to install and authenticate the `aws cli`.
+To release, you'll need to install and authenticate the `aws cli` https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 
 Before deploying to production, run `./deploy.sh` and have it deploy to beta. Then check that:
 
-- basic functionality works (app loads, game starts, music plays)
+- basic functionality works (app loads, game starts, music plays, you can log in and view high scores)
 
 Once functionality is verified, you can deploy prod with the same script.
 

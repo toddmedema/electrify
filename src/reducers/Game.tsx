@@ -100,7 +100,7 @@ const initialGame: GameType = {
 
 export const gameSlice = createSlice({
   name: "game",
-  initialState: initialGame,
+  initialState: cloneDeep(initialGame),
   reducers: {
     tick: (state) => {
       if (!state.inGame) {
@@ -251,10 +251,11 @@ export const gameSlice = createSlice({
                     blackouts: Math.round(-10 * blackoutsTWh),
                   };
 
-            const finalScore = Object.values(score).reduce(
-              (a: number, b: number) => a + b
-            );
             const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
+            const multiplier = DIFFICULTIES[difficulty].scoreMultiplier;
+            const finalScore =
+              multiplier *
+              Object.values(score).reduce((a: number, b: number) => a + b);
 
             if (!scenario.tutorialSteps) {
               setTimeout(
@@ -285,23 +286,25 @@ export const gameSlice = createSlice({
                     message: scenario.endMessage || (
                       <div>
                         Your final score is {finalScore}:<br />
-                        <br />+{score.supply} pts from electricity supplied
+                        <br />+{score.supply} from electricity supplied
                         <br />
                         {scenario.ownership === "Investor" && (
                           <span>
-                            +{score.netWorth} pts from final net worth
+                            +{score.netWorth} from final net worth
                             <br />
                           </span>
                         )}
                         {scenario.ownership === "Investor" && (
                           <span>
-                            +{score.customers} pts from final customers
+                            +{score.customers} from final customers
                             <br />
                           </span>
                         )}
-                        {score.emissions} pts from emissions
+                        {score.emissions} from emissions
                         <br />
-                        {score.blackouts} pts from blackouts
+                        {score.blackouts} from blackouts
+                        <br />
+                        {multiplier}x for playing on {difficulty} difficulty
                         <br />
                       </div>
                     ),
@@ -319,7 +322,7 @@ export const gameSlice = createSlice({
 
       setTimeout(
         () => store.dispatch(gameSlice.actions.tick()),
-        TICK_MS[state.speed]
+        TICK_MS[state.speed as SpeedType]
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {

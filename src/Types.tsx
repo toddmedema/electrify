@@ -36,6 +36,7 @@ export interface FuelPricesType {
 }
 
 export interface DifficultyMultipliersType {
+  scoreMultiplier: number;
   buildCost: number;
   expensesOM: number;
   buildTime: number;

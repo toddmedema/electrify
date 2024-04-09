@@ -8,30 +8,35 @@ import {
 
 export const DIFFICULTIES = {
   Intern: {
+    scoreMultiplier: 1,
     buildCost: 0.6,
     expensesOM: 0.6,
     buildTime: 0.2,
     blackoutPenalty: 2,
   },
   Employee: {
+    scoreMultiplier: 1.2,
     buildCost: 0.7,
     expensesOM: 0.7,
     buildTime: 0.3,
     blackoutPenalty: 4,
   },
   Manager: {
+    scoreMultiplier: 1.4,
     buildCost: 0.8,
     expensesOM: 0.8,
     buildTime: 0.5,
     blackoutPenalty: 6,
   },
   VP: {
+    scoreMultiplier: 1.7,
     buildCost: 0.9,
     expensesOM: 0.9,
     buildTime: 0.7,
     blackoutPenalty: 8,
   },
   CEO: {
+    scoreMultiplier: 2,
     buildCost: 1,
     expensesOM: 1,
     buildTime: 1,

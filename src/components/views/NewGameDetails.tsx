@@ -50,6 +50,7 @@ interface State {
   myTopScore?: ScoreType;
   scenario: ScenarioType | null;
   location: LocationType | null;
+  difficultyDialogOpen?: boolean;
   victoryDialogOpen?: boolean;
 }
 
@@ -111,11 +112,23 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
   public render() {
     const { onBack, onDelta, onStart, game, uid } = this.props;
-    const { scenario, scores, myTopScore, location, victoryDialogOpen } =
-      this.state;
+    const {
+      scenario,
+      scores,
+      myTopScore,
+      location,
+      difficultyDialogOpen,
+      victoryDialogOpen,
+    } = this.state;
+    const difficulty = DIFFICULTIES[game.difficulty];
 
     const toggleVictoryDialog = (e: any) => {
       this.setState({ victoryDialogOpen: !victoryDialogOpen });
+      e.stopPropagation();
+    };
+
+    const toggleDifficultyDialog = (e: any) => {
+      this.setState({ difficultyDialogOpen: !difficultyDialogOpen });
       e.stopPropagation();
     };
 
@@ -183,6 +196,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
               );
             })}
           </Select>
+          <IconButton
+            onClick={toggleDifficultyDialog}
+            aria-label="Difficulty settings"
+            color="primary"
+            size="small"
+          >
+            <InfoIcon />
+          </IconButton>
         </div>
 
         <div style={{ textAlign: "center" }}>
@@ -199,7 +220,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
         <Dialog open={victoryDialogOpen || false} onClose={toggleVictoryDialog}>
           <DialogTitle>
-            Victory Conditions: {scenario.ownership}-Owned
+            Victory Conditions: {scenario.ownership}
+            -Owned&nbsp;&nbsp;&nbsp;&nbsp;
             <IconButton
               aria-label="close"
               onClick={toggleVictoryDialog}
@@ -234,6 +256,46 @@ export default class NewGameDetails extends React.Component<Props, State> {
               variant="contained"
               onClick={(e: any) => {
                 toggleVictoryDialog(e);
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={difficultyDialogOpen || false}
+          onClose={toggleDifficultyDialog}
+        >
+          <DialogTitle>
+            Difficulty Settings: {game.difficulty}&nbsp;&nbsp;&nbsp;&nbsp;
+            <IconButton
+              aria-label="close"
+              onClick={toggleDifficultyDialog}
+              className="top-right"
+              size="large"
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <div>
+              <p>{difficulty.scoreMultiplier}x score multiplier</p>
+              <p>{difficulty.buildTime}x build time</p>
+              <p>{difficulty.buildCost}x build cost</p>
+              <p>{difficulty.expensesOM}x operating cost</p>
+              <p>
+                {difficulty.blackoutPenalty}% of customers lost during blackouts
+                (multiplied by % of demand unfulfilled)
+              </p>
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              color="primary"
+              variant="contained"
+              onClick={(e: any) => {
+                toggleDifficultyDialog(e);
               }}
             >
               Close

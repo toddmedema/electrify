@@ -23,7 +23,7 @@ export const initialCard: CardType = {
 
 export const cardSlice = createSlice({
   name: "card",
-  initialState: initialCard,
+  initialState: { ...initialCard },
   reducers: {
     navigate: (state, action: PayloadAction<string | NavigateAction>) => {
       let a = action.payload;
