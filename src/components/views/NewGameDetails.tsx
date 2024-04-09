@@ -42,7 +42,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onDelta: (delta: Partial<GameType>) => void;
-  onStart: (delta: Partial<GameType>) => void;
+  onStart: (scenarioId: number) => void;
 }
 
 interface State {
@@ -80,7 +80,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         collection(db, "scores"),
         where("scenarioId", "==", this.state.scenario.id),
         orderBy("score", "desc"),
-        limit(50),
+        limit(50)
       );
       let querySnapshot = await getDocs(q);
       querySnapshot.forEach((doc: any) => {
@@ -93,7 +93,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         where("scenarioId", "==", this.state.scenario.id),
         where("uid", "==", uid),
         orderBy("score", "desc"),
-        limit(1),
+        limit(1)
       );
       querySnapshot = await getDocs(q);
       querySnapshot.forEach((doc: any) => {
@@ -190,7 +190,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             size="large"
             variant="contained"
             color="primary"
-            onClick={() => onStart({})}
+            onClick={() => onStart(scenario.id)}
             autoFocus
           >
             Play

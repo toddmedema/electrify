@@ -20,15 +20,15 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onDelta: (d: Partial<GameType>) => {
       dispatch(delta(d));
     },
-    onStart: (d: Partial<GameType>) => {
-      dispatch(start(d));
+    onStart: (scenarioId: number) => {
+      dispatch(start(scenarioId));
     },
   };
 };
 
 const NewGameDetailsContainer = connect(
   mapStateToProps,
-  mapDispatchToProps,
+  mapDispatchToProps
 )(NewGameDetails);
 
 export default NewGameDetailsContainer;

@@ -110,19 +110,19 @@ export const gameSlice = createSlice({
       if (state.speed === "PAUSED") {
         setTimeout(
           () => store.dispatch(gameSlice.actions.tick()),
-          TICK_MS.PAUSED,
+          TICK_MS.PAUSED
         );
         return;
       }
 
       state.date = getDateFromMinute(
         state.date.minute + TICK_MINUTES,
-        state.startingYear,
+        state.startingYear
       );
       const now = getTimeFromTimeline(state.date.minute, state.timeline);
       const prev = getTimeFromTimeline(
         state.date.minute - TICK_MINUTES,
-        state.timeline,
+        state.timeline
       );
       if (now && prev) {
         updateSupplyFacilitiesFinances(state, prev, now);
@@ -135,35 +135,19 @@ export const gameSlice = createSlice({
 
           // Record final history for the month, then generate the new timeline
           history.unshift(
-            summarizeTimeline(state.timeline, state.startingYear),
+            summarizeTimeline(state.timeline, state.startingYear)
           );
           state.timeline = generateNewTimeline(state, cash, customers);
 
           // Pre-roll a few frames to compensate for temperature / demand jumps across months
-          updateSupplyFacilitiesFinances(
-            state,
-            state.timeline[0],
-            state.timeline[0],
-            true,
-          );
-          updateSupplyFacilitiesFinances(
-            state,
-            state.timeline[0],
-            state.timeline[0],
-            true,
-          );
-          updateSupplyFacilitiesFinances(
-            state,
-            state.timeline[0],
-            state.timeline[0],
-            true,
-          );
-          updateSupplyFacilitiesFinances(
-            state,
-            state.timeline[0],
-            state.timeline[0],
-            true,
-          );
+          for (let i = 0; i < 4; i++) {
+            updateSupplyFacilitiesFinances(
+              state,
+              state.timeline[0],
+              state.timeline[0],
+              true
+            );
+          }
 
           // ===== TRIGGERS ======
           // Failure: Bankrupt
@@ -180,16 +164,16 @@ export const gameSlice = createSlice({
                   dialogOpen({
                     title: "Bankrupt!",
                     message: `You've run out of money.
-                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                    You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+                    earned ${formatMoneyConcise(summary.revenue)} in revenue
+                    and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
                     open: true,
                     notCancellable: true,
                     actionLabel: "Try again",
                     action: () => store.dispatch(gameSlice.actions.quit()),
-                  }),
+                  })
                 ),
-              1,
+              1
             );
           }
 
@@ -214,16 +198,16 @@ export const gameSlice = createSlice({
                   dialogOpen({
                     title: "Fired!",
                     message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-              You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                    You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+                    earned ${formatMoneyConcise(summary.revenue)} in revenue
+                    and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
                     open: true,
                     notCancellable: true,
                     actionLabel: "Try again",
                     action: () => store.dispatch(gameSlice.actions.quit()),
-                  }),
+                  })
                 ),
-              1,
+              1
             );
           }
 
@@ -268,7 +252,7 @@ export const gameSlice = createSlice({
                   };
 
             const finalScore = Object.values(score).reduce(
-              (a: number, b: number) => a + b,
+              (a: number, b: number) => a + b
             );
             const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
 
@@ -281,9 +265,9 @@ export const gameSlice = createSlice({
                       scoreBreakdown: score, // For analytics purposes only
                       scenarioId: scenario.id,
                       difficulty,
-                    }),
+                    })
                   ),
-                1,
+                1
               );
             }
 
@@ -325,9 +309,9 @@ export const gameSlice = createSlice({
                     closeText: "Keep playing",
                     actionLabel: "Return to menu",
                     action: () => store.dispatch(gameSlice.actions.quit()),
-                  }),
+                  })
                 ),
-              1,
+              1
             );
           }
         }
@@ -335,14 +319,14 @@ export const gameSlice = createSlice({
 
       setTimeout(
         () => store.dispatch(gameSlice.actions.tick()),
-        TICK_MS[state.speed],
+        TICK_MS[state.speed]
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
       return { ...state, ...action.payload };
     },
-    start: (state, action: PayloadAction<Partial<GameType>>) => {
-      return { ...state, ...action.payload };
+    start: (state, action: PayloadAction<number>) => {
+      state.scenarioId = action.payload;
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
@@ -364,7 +348,7 @@ export const gameSlice = createSlice({
               }
             }
             return true;
-          },
+          }
         );
         if (generator) {
           state = buildFacilityHelper(state, generator, false, true);
@@ -377,7 +361,7 @@ export const gameSlice = createSlice({
                 }
               }
               return true;
-            },
+            }
           );
           if (storage) {
             state = buildFacilityHelper(state, storage, false, true);
@@ -390,25 +374,25 @@ export const gameSlice = createSlice({
         state,
         state.timeline[0],
         state.timeline[0],
-        true,
+        true
       );
       updateSupplyFacilitiesFinances(
         state,
         state.timeline[0],
         state.timeline[0],
-        true,
+        true
       );
       updateSupplyFacilitiesFinances(
         state,
         state.timeline[0],
         state.timeline[0],
-        true,
+        true
       );
       updateSupplyFacilitiesFinances(
         state,
         state.timeline[0],
         state.timeline[0],
-        true,
+        true
       );
       state.timeline = reforecastSupply(state);
     },
@@ -419,7 +403,7 @@ export const gameSlice = createSlice({
       state = buildFacilityHelper(
         state,
         action.payload.facility,
-        action.payload.financed,
+        action.payload.financed
       );
       state = {
         ...state,
@@ -439,18 +423,18 @@ export const gameSlice = createSlice({
             return false;
           }
           return true;
-        },
+        }
       );
       state.timeline = reforecastSupply(state);
     },
     reprioritizeFacility: (
       state,
-      action: PayloadAction<ReprioritizeFacilityAction>,
+      action: PayloadAction<ReprioritizeFacilityAction>
     ) => {
       arrayMove(
         state.facilities,
         action.payload.spotInList,
-        action.payload.spotInList + action.payload.delta,
+        action.payload.spotInList + action.payload.delta
       );
       state.timeline = reforecastSupply(state);
     },
@@ -498,13 +482,13 @@ function getDemandW(
   date: DateType,
   game: GameType,
   prev: TickPresentFutureType,
-  now: TickPresentFutureType,
+  now: TickPresentFutureType
 ) {
   const marketingGrowth =
     customersFromMarketingSpend(game.monthlyMarketingSpend) / TICKS_PER_MONTH;
   now.customers = Math.round(
     prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
-      marketingGrowth,
+      marketingGrowth
   );
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
@@ -569,7 +553,7 @@ function updateSupplyFacilitiesFinances(
   state: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
-  simulated?: boolean,
+  simulated?: boolean
 ) {
   const { facilities, date } = state;
   const difficulty = DIFFICULTIES[state.difficulty];
@@ -607,7 +591,7 @@ function updateSupplyFacilitiesFinances(
       indexOfLastUnchargedBattery = i;
       totalChargeNeeded += Math.min(
         g.peakW,
-        (g.peakWh - g.currentWh) * TICKS_PER_HOUR,
+        (g.peakWh - g.currentWh) * TICKS_PER_HOUR
       );
     }
   });
@@ -621,7 +605,7 @@ function updateSupplyFacilitiesFinances(
         // Capable of generating electricity
         const targetW = Math.max(
           0,
-          now.demandW * (1 + RESERVE_MARGIN) - supply,
+          now.demandW * (1 + RESERVE_MARGIN) - supply
         );
         switch (g.fuel) {
           case "Sun":
@@ -641,21 +625,21 @@ function updateSupplyFacilitiesFinances(
                 g.currentW = Math.min(
                   now.demandW + totalChargeNeeded - charge,
                   g.peakW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
+                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes
                 );
               } else {
                 // Otherwise just try to fulfill demand + reserve margin
                 g.currentW = Math.min(
                   g.peakW,
                   targetW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
+                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes
                 );
               }
             } else {
               g.currentW = Math.max(
                 0,
                 targetW,
-                g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
+                g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes
               );
             }
             break;
@@ -675,11 +659,11 @@ function updateSupplyFacilitiesFinances(
           g.currentW = -Math.min(
             g.peakW,
             supply - now.demandW - charge,
-            (g.peakWh - g.currentWh) * TICKS_PER_HOUR,
+            (g.peakWh - g.currentWh) * TICKS_PER_HOUR
           );
           g.currentWh = Math.min(
             g.peakWh,
-            g.currentWh - g.currentW / TICKS_PER_HOUR,
+            g.currentWh - g.currentW / TICKS_PER_HOUR
           );
           charge -= g.currentW / g.roundTripEfficiency;
         } else {
@@ -721,7 +705,7 @@ function updateSupplyFacilitiesFinances(
         const paymentInterest = getPaymentInterest(
           g.loanAmountLeft,
           INTEREST_RATE_YEARLY,
-          g.loanMonthlyPayment,
+          g.loanMonthlyPayment
         );
         const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
@@ -733,7 +717,7 @@ function updateSupplyFacilitiesFinances(
         getPaymentInterest(
           g.loanAmountLeft,
           INTEREST_RATE_YEARLY,
-          g.loanMonthlyPayment,
+          g.loanMonthlyPayment
         ) / TICKS_PER_MONTH;
     }
   });
@@ -750,7 +734,7 @@ function updateSupplyFacilitiesFinances(
 
   // Save new financial info
   now.customers = Math.round(
-    prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth,
+    prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth
   );
   now.cash = Math.round(
     prev.cash +
@@ -760,7 +744,7 @@ function updateSupplyFacilitiesFinances(
       expensesCarbonFee -
       expensesInterest -
       expensesMarketing -
-      principalRepayment,
+      principalRepayment
   );
   now.netWorth = getNetWorth(facilities, now.cash);
   now.revenue = revenue;
@@ -776,7 +760,7 @@ function updateSupplyFacilitiesFinances(
 
 function reforecastSupply(
   state: GameType,
-  simulated?: boolean,
+  simulated?: boolean
 ): TickPresentFutureType[] {
   // Make temporary deep copy so that it can be revised in place
   const newState = { ...state };
@@ -794,7 +778,7 @@ export function generateNewTimeline(
   readOnlyState: GameType,
   cash: number,
   customers: number,
-  ticks = TICKS_PER_DAY,
+  ticks = TICKS_PER_DAY
 ): TickPresentFutureType[] {
   // TODO performance optimization, figure out how to deep clone everything EXCEPT timeline, since I'm about to overwrite it
   const state = cloneDeep(readOnlyState);
@@ -838,7 +822,7 @@ function buildFacilityHelper(
   state: GameType,
   g: FacilityShoppingType,
   financed: boolean,
-  newGame = false,
+  newGame = false
 ): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
@@ -860,7 +844,7 @@ function buildFacilityHelper(
         loanMonthlyPayment: getMonthlyPayment(
           loanAmount,
           INTEREST_RATE_YEARLY,
-          LOAN_MONTHS,
+          LOAN_MONTHS
         ),
       };
     } else {
@@ -873,7 +857,7 @@ function buildFacilityHelper(
       id:
         state.facilities.reduce(
           (max: number, f: FacilityOperatingType) => (max > f.id ? max : f.id),
-          0,
+          0
         ) + 1,
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
@@ -893,7 +877,7 @@ function buildFacilityHelper(
 // TODO account for generator current value better - get rid of SELL_MULTIPLIER everywhere and depreciate buildCost over time
 function getNetWorth(
   facilities: FacilityOperatingType[],
-  cash: number,
+  cash: number
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
