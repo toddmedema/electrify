@@ -396,8 +396,8 @@ export const gameSlice = createSlice({
       );
       state.timeline = reforecastSupply(state);
     },
-    quit: (state) => {
-      state = cloneDeep(initialGame);
+    quit: () => {
+      return cloneDeep(initialGame);
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
       state = buildFacilityHelper(
