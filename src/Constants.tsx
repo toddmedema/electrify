@@ -57,6 +57,7 @@ export const LOCATIONS = [
     name: "San Juan, Puero Rico",
   },
 ] as LocationType[];
+export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 
 export const TICK_MS = {
   PAUSED: 250,

@@ -39,6 +39,7 @@ import {
   TICKS_PER_MONTH,
   TICKS_PER_YEAR,
   YEARS_PER_TICK,
+  OUTSKIRTS_WIND_MULTIPLIER,
 } from "../Constants";
 import { GENERATORS, STORAGE } from "../Facilities";
 import { logEvent } from "../Globals";
@@ -527,7 +528,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
         ...t,
         ...fuelPrices,
         sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT / 100),
-        windKph: weather.WIND_KPH,
+        windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
       };
     }
@@ -571,17 +572,21 @@ function updateSupplyFacilitiesFinances(
     }
   });
 
-  const turbineWindMS = (now.windKph * Math.pow(100 / 10, 0.34)) / 5; // 5kph = 1m/s
   // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
+  // Divide by 5 to convert from kph to m/s
+  const turbineWindMS =
+    (OUTSKIRTS_WIND_MULTIPLIER * (now.windKph * Math.pow(100 / 10, 0.34))) / 5;
+
+  // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
   const windOutputFactor =
     turbineWindMS < 3 || turbineWindMS > 25
       ? 0
       : Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
-  // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
-  const solarOutputFactor =
-    now.sunlight * Math.max(1, 1 - (now.temperatureC - 10) / 100);
+
   // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
   // TODO what about rain and snow, esp panels covered in snow?
+  const solarOutputFactor =
+    now.sunlight * Math.max(1, 1 - (now.temperatureC - 10) / 100);
 
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;
