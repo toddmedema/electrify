@@ -8,7 +8,7 @@ import {
   VictoryLine,
   VictoryTheme,
 } from "victory";
-import { getDateFromMinute } from "../../helpers/DateTime";
+import { getDateFromMinute, getSunriseSunset } from "../../helpers/DateTime";
 import { formatWatts } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import {
@@ -17,6 +17,7 @@ import {
   demandColor,
   supplyColor,
 } from "../../Theme";
+import { LocationType } from "../../Types";
 
 interface ChartData {
   minute: number;
@@ -31,16 +32,17 @@ interface BlackoutEdges {
 
 export interface Props {
   currentMinute: number;
+  location: LocationType;
   height?: number;
   legend?: boolean;
   timeline: ChartData[];
   startingYear: number;
 }
 
-// TODO how to indicate reality vs forecast? Perhaps current time as a prop, and then split it in the chart
+// TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
 // and don't actually differentiate between reality +  forecast in data?
 const ChartSupplyDemand = (props: Props): JSX.Element => {
-  const { startingYear, height, legend, timeline } = props;
+  const { startingYear, height, legend, timeline, location } = props;
   // Figure out the boundaries of the chart data
   let domainMin = 999999999999;
   let domainMax = 0;
@@ -54,17 +56,30 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
   // Get sunrise and sunset, sliding forward if it's actually in the next day
   const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
-  let sunrise = midnight + date.sunrise;
-  let sunset = midnight + date.sunset;
+
+  let sunrise =
+    midnight + getSunriseSunset(date, location.lat, location.long).sunrise;
+  let sunset =
+    midnight + getSunriseSunset(date, location.lat, location.long).sunset;
   if (sunrise < rangeMin) {
     sunrise =
       midnight +
       1440 +
-      getDateFromMinute(rangeMin + 1440, startingYear).sunrise;
+      getSunriseSunset(
+        getDateFromMinute(rangeMin + 1440, startingYear),
+        location.lat,
+        location.long
+      ).sunrise;
   }
   if (sunset < rangeMin) {
     sunset =
-      midnight + 1440 + getDateFromMinute(rangeMin + 1440, startingYear).sunset;
+      midnight +
+      1440 +
+      getSunriseSunset(
+        getDateFromMinute(rangeMin + 1440, startingYear),
+        location.lat,
+        location.long
+      ).sunset;
   }
 
   // BLACKOUT CALCULATION
@@ -95,7 +110,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         prev.minute,
         prev.demandW,
         d.minute,
-        d.demandW,
+        d.demandW
       );
       blackouts.push({ minute: intersectionTime, value: 0 });
       blackouts.push({ minute: intersectionTime, value: domainMax });
@@ -111,7 +126,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         prev.minute,
         prev.demandW,
         d.minute,
-        d.demandW,
+        d.demandW
       );
       blackouts.push({ minute: intersectionTime, value: domainMax });
       blackouts.push({ minute: intersectionTime, value: 0 });
@@ -128,10 +143,10 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
   // Divide between historic and forcast
   const currentMinute = props.currentMinute || 0;
   const historic = [...timeline].filter(
-    (d: ChartData) => d.minute <= currentMinute,
+    (d: ChartData) => d.minute <= currentMinute
   );
   const forecast = [...timeline].filter(
-    (d: ChartData) => d.minute >= currentMinute,
+    (d: ChartData) => d.minute >= currentMinute
   );
 
   const legendItems = [

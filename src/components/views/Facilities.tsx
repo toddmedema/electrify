@@ -59,7 +59,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
     const percentBuilt = Math.round(
       ((facility.yearsToBuild - facility.yearsToBuildLeft) /
         facility.yearsToBuild) *
-        100,
+        100
     );
     secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
   } else if (facility.peakWh) {
@@ -81,7 +81,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
           {...provided.dragHandleProps}
           style={getDraggableStyle(
             snapshot.isDragging,
-            provided.draggableProps.style,
+            provided.draggableProps.style
           )}
         >
           <ListItem disabled={underConstruction} className="facility">
@@ -218,7 +218,7 @@ export default class Facilities extends React.Component<Props, {}> {
 
     this.props.onReprioritize(
       result.source.index,
-      result.destination.index - result.source.index,
+      result.destination.index - result.source.index
     );
   }
 
@@ -233,6 +233,7 @@ export default class Facilities extends React.Component<Props, {}> {
           height={180}
           timeline={game.timeline}
           currentMinute={game.date.minute}
+          location={game.location}
           legend={game.speed === "PAUSED"}
           startingYear={game.startingYear}
         />
@@ -273,7 +274,7 @@ export default class Facilities extends React.Component<Props, {}> {
                         spotInList={i}
                         listLength={facilitiesCount}
                       />
-                    ),
+                    )
                   )}
                   {provided.placeholder}
                 </div>

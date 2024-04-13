@@ -1,6 +1,7 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from "../Constants";
 import { DateType, RawWeatherType } from "../Types";
 import { getRandomRange } from "../helpers/Math";
+import { getSunriseSunset } from "../helpers/DateTime";
 
 const Papa = require("papaparse");
 
@@ -39,7 +40,7 @@ export function initWeather(location: string, callback?: any) {
     complete() {
       if (weather.length !== EXPECTED_ROWS) {
         console.warn(
-          `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
+          `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`
         );
       }
       if (callback) {
@@ -78,15 +79,22 @@ export function getWeather(date: DateType): RawWeatherType {
   };
 }
 
-// 0-1, percent of sun's energy hitting a unit of land relative to max
+// 0-1, percent of sun's energy hitting a unit of land relative to max at equator (~1360 w/m2)
 // Is later multiplied by cloudiness
 // TODO change to watts per sq meter or some fixed value, and verify that it's returning reasonably accurate values per location and season
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
-export function getRawSunlightPercent(date: DateType) {
-  if (date.minuteOfDay >= date.sunrise && date.minuteOfDay <= date.sunset) {
+// https://earthobservatory.nasa.gov/features/EnergyBalance/page2.php
+// indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight
+export function getRawSunlightPercent(
+  date: DateType,
+  lat: number,
+  long: number
+) {
+  const { sunrise, sunset } = getSunriseSunset(date, lat, long);
+  if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
-      date.minuteOfDay - date.sunrise,
-      date.sunset - date.minuteOfDay,
+      date.minuteOfDay - sunrise,
+      sunset - date.minuteOfDay
     );
     // TODO fix the pointiness, esp in shorter winter months
     // Maybe by factoring in day lenght to determine the shape of the curve?
@@ -94,6 +102,7 @@ export function getRawSunlightPercent(date: DateType) {
     // Day length / minutes from dark used as proxy for season / max sun height
     // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
     // Solar panels generally follow a Bell curve
+    // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
     return 1 / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 260)));
   }
   return 0;

@@ -6,6 +6,7 @@ import {
   getTimeFromTimeline,
   summarizeHistory,
   summarizeTimeline,
+  getSunriseSunset,
 } from "../helpers/DateTime";
 import {
   customersFromMarketingSpend,
@@ -19,6 +20,7 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove } from "../helpers/Math";
+import { getWindOutputFactor, getSolarOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getRawSunlightPercent, getWeather } from "../data/Weather";
 import { dialogOpen, dialogClose, snackbarOpen } from "./UI";
@@ -40,6 +42,7 @@ import {
   TICKS_PER_YEAR,
   YEARS_PER_TICK,
   OUTSKIRTS_WIND_MULTIPLIER,
+  LOCATIONS,
 } from "../Constants";
 import { GENERATORS, STORAGE } from "../Facilities";
 import { logEvent } from "../Globals";
@@ -79,13 +82,10 @@ interface NewGameAction {
 }
 
 let previousSpeed = "PAUSED" as SpeedType;
-let previousSunrise = 0;
+let previousMonth = "";
 const initialGame: GameType = {
   scenarioId: 0,
-  location: {
-    id: "SF",
-    name: "SF",
-  },
+  location: LOCATIONS["SF"],
   difficulty: "Employee",
   speed: "PAUSED",
   inGame: false,
@@ -128,9 +128,8 @@ export const gameSlice = createSlice({
       if (now && prev) {
         updateSupplyFacilitiesFinances(state, prev, now);
 
-        if (previousSunrise !== state.date.sunrise) {
-          // If it's a new day / month
-          previousSunrise = state.date.sunrise;
+        if (previousMonth !== state.date.month) {
+          previousMonth = state.date.month;
           const history = state.monthlyHistory;
           const { cash, customers } = now;
 
@@ -491,6 +490,11 @@ function getDemandW(
     prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
       marketingGrowth
   );
+  const { sunrise, sunset } = getSunriseSunset(
+    date,
+    game.location.lat,
+    game.location.long
+  );
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
@@ -499,8 +503,7 @@ function getDemandW(
   const temperatureNormalized =
     0.0035 * Math.pow(now.temperatureC, 2) - 0.035 * now.temperatureC;
   const minutesFromDarkNormalized =
-    Math.min(date.minuteOfDay - date.sunrise, date.sunset - date.minuteOfDay) /
-    420;
+    Math.min(date.minuteOfDay - sunrise, sunset - date.minuteOfDay) / 420;
   const minutesFromDarkLogistics =
     1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
@@ -527,7 +530,9 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
       return {
         ...t,
         ...fuelPrices,
-        sunlight: getRawSunlightPercent(date) * (weather.CLOUD_PCT / 100),
+        sunlight:
+          getRawSunlightPercent(date, state.location.lat, state.location.long) *
+          (weather.CLOUD_PCT / 100),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
       };
@@ -572,21 +577,13 @@ function updateSupplyFacilitiesFinances(
     }
   });
 
-  // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
-  // Divide by 5 to convert from kph to m/s
-  const turbineWindMS =
-    (OUTSKIRTS_WIND_MULTIPLIER * (now.windKph * Math.pow(100 / 10, 0.34))) / 5;
+  const windOutputFactor = getWindOutputFactor(now.windKph);
+  const solarOutputFactor = getSolarOutputFactor(
+    now.sunlight,
+    now.temperatureC
+  );
 
-  // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
-  const windOutputFactor =
-    turbineWindMS < 3 || turbineWindMS > 25
-      ? 0
-      : Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
-
-  // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-  // TODO what about rain and snow, esp panels covered in snow?
-  const solarOutputFactor =
-    now.sunlight * Math.max(1, 1 - (now.temperatureC - 10) / 100);
+  console.log(now.minute, now.sunlight, solarOutputFactor);
 
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;

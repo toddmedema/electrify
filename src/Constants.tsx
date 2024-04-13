@@ -39,24 +39,32 @@ export const DIFFICULTIES = {
   },
 } as { [index: string]: DifficultyMultipliersType };
 
-export const LOCATIONS = [
-  {
+export const LOCATIONS = {
+  PIT: {
     id: "PIT",
     name: "Pittsburgh, PA",
+    lat: 40.4406,
+    long: -79.9959,
   },
-  {
+  SF: {
     id: "SF",
     name: "San Fransisco, CA",
+    lat: 37.7749,
+    long: -122.4194,
   },
-  {
+  HNL: {
     id: "HNL",
     name: "Honolulu, HI",
+    lat: 21.3099,
+    long: -157.8581,
   },
-  {
+  SJU: {
     id: "SJU",
     name: "San Juan, Puero Rico",
+    lat: 18.4671,
+    long: -66.1185,
   },
-] as LocationType[];
+} as { [id: string]: LocationType };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 
 export const TICK_MS = {

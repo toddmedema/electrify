@@ -21,10 +21,12 @@ export type MonthType =
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
 
-export type LocationIdType = "PIT" | "SF";
+export type LocationIdType = "PIT" | "SF" | "HNL" | "SJU";
 export interface LocationType {
   id: LocationIdType;
   name: string;
+  lat: number;
+  long: number;
 }
 
 export type FuelNameType = "Coal" | "Wind" | "Sun" | "Natural Gas" | "Uranium";
@@ -88,8 +90,6 @@ export interface DateType {
   monthNumber: number; // 1 - 12
   monthsEllapsed: number;
   year: number;
-  sunrise: number;
-  sunset: number;
 }
 
 export interface RawWeatherType {

@@ -62,9 +62,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       SCENARIOS.find((s) => s.id === props.game.scenarioId) || null;
     this.state = {
       scenario,
-      location: scenario
-        ? LOCATIONS.find((s) => s.id === scenario.locationId) || null
-        : null,
+      location: scenario ? LOCATIONS[scenario.locationId || null] : null,
     };
     if (props.uid) {
       this.loadScores(props.uid);
