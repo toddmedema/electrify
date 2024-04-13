@@ -66,6 +66,7 @@ export const LOCATIONS = {
   },
 } as { [id: string]: LocationType };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
+export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 
 export const TICK_MS = {
   PAUSED: 250,

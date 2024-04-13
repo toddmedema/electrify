@@ -1,4 +1,4 @@
-import { OUTSKIRTS_WIND_MULTIPLIER } from "../Constants";
+import { EQUATOR_RADIANCE, OUTSKIRTS_WIND_MULTIPLIER } from "../Constants";
 
 export function getWindOutputFactor(windKph: number) {
   // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
@@ -15,12 +15,16 @@ export function getWindOutputFactor(windKph: number) {
   return windOutputFactor;
 }
 
-// Sunlight percent is a proxy for time of year and lat/long
+// Since solar panel nameplate wattages are usually rated at peak output at equator noon, we use that as baseline
 // Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-// TODO what about rain and snow, esp panels covered in snow?
+// TODO what about rain and snow, esp panels covered in snow? We should update irradianceWM2 based on weather when it's originally calculated...
+// but that still means we'd need to track some additional historic value of "even though it's not currently snowing, they're still covered in snow"
 export function getSolarOutputFactor(
-  sunlightPercent: number,
+  irradianceWM2: number,
   temepratureC: number
 ) {
-  return sunlightPercent * Math.max(1, 1 - (temepratureC - 10) / 100);
+  return (
+    (irradianceWM2 * Math.max(1, 1 - (temepratureC - 10) / 100)) /
+    EQUATOR_RADIANCE
+  );
 }

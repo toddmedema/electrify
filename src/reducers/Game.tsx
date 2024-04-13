@@ -22,7 +22,7 @@ import {
 import { arrayMove } from "../helpers/Math";
 import { getWindOutputFactor, getSolarOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
-import { getRawSunlightPercent, getWeather } from "../data/Weather";
+import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
 import { dialogOpen, dialogClose, snackbarOpen } from "./UI";
 import {
   DIFFICULTIES,
@@ -530,9 +530,12 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
       return {
         ...t,
         ...fuelPrices,
-        sunlight:
-          getRawSunlightPercent(date, state.location.lat, state.location.long) *
-          (weather.CLOUD_PCT / 100),
+        sunlight: getRawSolarIrradianceWM2(
+          date,
+          state.location.lat,
+          state.location.long,
+          weather.CLOUD_PCT
+        ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
       };
@@ -582,8 +585,6 @@ function updateSupplyFacilitiesFinances(
     now.sunlight,
     now.temperatureC
   );
-
-  console.log(now.minute, now.sunlight, solarOutputFactor);
 
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;

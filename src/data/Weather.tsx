@@ -1,4 +1,4 @@
-import { DAYS_PER_MONTH, DAYS_PER_YEAR } from "../Constants";
+import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, RawWeatherType } from "../Types";
 import { getRandomRange } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
@@ -79,31 +79,48 @@ export function getWeather(date: DateType): RawWeatherType {
   };
 }
 
-// 0-1, percent of sun's energy hitting a unit of land relative to max at equator (~1360 w/m2)
 // Is later multiplied by cloudiness
+// TODO should this just take in cloudiness? The game knows future weather...
 // TODO change to watts per sq meter or some fixed value, and verify that it's returning reasonably accurate values per location and season
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
 // https://earthobservatory.nasa.gov/features/EnergyBalance/page2.php
 // indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight
-export function getRawSunlightPercent(
+// TODO fix the pointiness, esp in shorter winter months - Maybe by factoring in day lenght to determine the shape of the curve?
+// Day length / minutes from dark used as proxy for season / max sun height
+// Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
+// Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
+/**
+ * Calculates the raw solar irradiance in watts per square meter (W/m2) for a given date and location, not accounting for weather
+ * It first calculates the base irradiance based on the latitude, with a reduction factor for higher latitudes.
+ * It then gets the sunrise and sunset times for the given date and location.
+ * If the current time is between sunrise and sunset, it calculates the minutes from darkness (either sunrise or sunset, whichever is closer).
+ * It then calculates the irradiance based on a mathematical model that approximates the solar output as a bell curve.
+ * This model takes into account the time of day and the length of the day to approximate the height of the sun and the season.
+ * If the current time is outside of sunrise and sunset, it returns 0, indicating no solar irradiance.
+ *
+ * @param {DateType} date - The date and time to calculate the irradiance for.
+ * @param {number} lat - The latitude of the location to calculate the irradiance for.
+ * @param {number} long - The longitude of the location to calculate the irradiance for.
+ * @param {number} cloudCoverPercent - The percentage of cloud cover, from 0 to 100.
+ * @returns {number} - The calculated raw solar irradiance in W/m2.
+ */
+export function getRawSolarIrradianceWM2(
   date: DateType,
   lat: number,
-  long: number
+  long: number,
+  cloudCoverPercent: number
 ) {
+  let irradiance = EQUATOR_RADIANCE * (1 - 0.007 * Math.abs(lat)); // w/m2
+  irradiance *= 1 - cloudCoverPercent / 100;
   const { sunrise, sunset } = getSunriseSunset(date, lat, long);
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
       date.minuteOfDay - sunrise,
       sunset - date.minuteOfDay
     );
-    // TODO fix the pointiness, esp in shorter winter months
-    // Maybe by factoring in day lenght to determine the shape of the curve?
-
-    // Day length / minutes from dark used as proxy for season / max sun height
-    // Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
-    // Solar panels generally follow a Bell curve
-    // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
-    return 1 / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 260)));
+    return (
+      irradiance / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 260)))
+    );
   }
   return 0;
 }
