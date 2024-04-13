@@ -63,7 +63,7 @@ interface ScenarioListItemProps {
 
 function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
   const { s, onDetails } = props;
-  const location = LOCATIONS.find((l) => l.id === s.locationId) || {
+  const location = LOCATIONS[s.locationId] || {
     name: "UNKNOWN",
   };
   const summary =

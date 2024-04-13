@@ -26,7 +26,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
       if (!scenario) {
         return alert("Unknown scenario ID " + game.scenarioId);
       }
-      const location = LOCATIONS.find((s) => s.id === scenario.locationId);
+      const location = LOCATIONS[scenario.locationId];
       if (!location) {
         return alert("Unknown location ID " + scenario.locationId);
       }
@@ -43,7 +43,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
               cash: scenario.cash,
               customers: 1030000,
               location,
-            }),
+            })
           );
 
           dispatch(loaded());

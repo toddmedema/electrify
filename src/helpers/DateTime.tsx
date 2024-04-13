@@ -10,9 +10,9 @@ import {
   DateType,
   DerivedHistoryType,
   MonthlyHistoryType,
-  MonthType,
   TickPresentFutureType,
 } from "../Types";
+const SunCalc = require("suncalc");
 
 export const EMPTY_HISTORY = {
   month: 0,
@@ -34,7 +34,7 @@ export const EMPTY_HISTORY = {
 // edits acc in place to avoid making tons of extra objects
 export function reduceHistories(
   acc: MonthlyHistoryType,
-  t: MonthlyHistoryType,
+  t: MonthlyHistoryType
 ): MonthlyHistoryType {
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
@@ -54,7 +54,7 @@ export function reduceHistories(
 }
 
 export function deriveExpandedSummary(
-  s: MonthlyHistoryType,
+  s: MonthlyHistoryType
 ): DerivedHistoryType {
   const expenses =
     s.expensesFuel +
@@ -77,7 +77,7 @@ export function deriveExpandedSummary(
 export function summarizeTimeline(
   timeline: TickPresentFutureType[],
   startingYear: number,
-  filter?: (t: TickPresentFutureType) => boolean,
+  filter?: (t: TickPresentFutureType) => boolean
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
   // Go in reverse so that the last values for ending values (like net worth are used)
@@ -105,7 +105,7 @@ export function summarizeTimeline(
 
 export function summarizeHistory(
   timeline: MonthlyHistoryType[],
-  filter?: (t: MonthlyHistoryType) => boolean,
+  filter?: (t: MonthlyHistoryType) => boolean
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
   // Go in reverse so that the last values for ending values (like net worth are used)
@@ -119,7 +119,7 @@ export function summarizeHistory(
 
 export function getTimeFromTimeline(
   minute: number,
-  timeline: TickPresentFutureType[],
+  timeline: TickPresentFutureType[]
 ): null | TickPresentFutureType {
   if (!timeline[0]) {
     return null;
@@ -149,71 +149,9 @@ export function formatMonthChartAxis(t: number, multiyear: boolean) {
 
 export function formatHour(date: DateType): string {
   const time = new Date(
-    `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`,
+    `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`
   );
   return time.toLocaleString("en-US", { hour: "numeric", hour12: true });
-}
-
-// Based on SF/California for now, v2 take in / change by location
-function getSunrise(month: MonthType) {
-  switch (month) {
-    case "Jan":
-      return 445;
-    case "Feb":
-      return 430;
-    case "Mar":
-      return 415;
-    case "Apr":
-      return 400;
-    case "May":
-      return 385;
-    case "Jun":
-      return 365;
-    case "Jul":
-      return 352;
-    case "Aug":
-      return 374;
-    case "Sep":
-      return 396;
-    case "Oct":
-      return 426;
-    case "Nov":
-      return 434;
-    case "Dec":
-    default:
-      return 440;
-  }
-}
-
-// Based on SF/California for now, v2 change by location
-function getSunset(month: MonthType) {
-  switch (month) {
-    case "Jan":
-      return 1020;
-    case "Feb":
-      return 1041;
-    case "Mar":
-      return 1062;
-    case "Apr":
-      return 1084;
-    case "May":
-      return 1134;
-    case "Jun":
-      return 1184;
-    case "Jul":
-      return 1235;
-    case "Aug":
-      return 1200;
-    case "Sep":
-      return 1164;
-    case "Oct":
-      return 1132;
-    case "Nov":
-      return 1095;
-    case "Dec":
-    default:
-      return 1055;
-  }
 }
 
 // Faster subset of getDateFromMinute
@@ -230,9 +168,23 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
   };
 }
 
+// returns minutes since midnight
+export function getSunriseSunset(date: DateType, lat: number, long: number) {
+  const calc = SunCalc.getTimes(
+    new Date(`${date.month} 1, ${date.year}`),
+    lat,
+    long
+  );
+
+  return {
+    sunrise: calc.sunrise.getHours() * 60 + calc.sunrise.getMinutes(),
+    sunset: calc.sunset.getHours() * 60 + calc.sunset.getMinutes(),
+  };
+}
+
 export function getDateFromMinute(
   minute: number,
-  startingYear: number,
+  startingYear: number
 ): DateType {
   const minuteOfDay = minute % 1440;
   const hourOfDay = Math.floor(minuteOfDay / 60);
@@ -259,7 +211,5 @@ export function getDateFromMinute(
     monthNumber,
     monthsEllapsed,
     year,
-    sunrise: getSunrise(month),
-    sunset: getSunset(month),
   };
 }
