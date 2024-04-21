@@ -106,7 +106,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     minute: number;
     supplyW: number; // Watts
     demandW: number; // Watts
-    sunlight: number; // 0-1 multiplier
+    solarIrradianceWM2: number;
     windKph: number;
     temperatureC: number;
   };

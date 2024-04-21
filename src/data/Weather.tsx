@@ -87,7 +87,7 @@ export function getWeather(date: DateType): RawWeatherType {
 // indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight
 // TODO fix the pointiness, esp in shorter winter months - Maybe by factoring in day lenght to determine the shape of the curve?
 // Day length / minutes from dark used as proxy for season / max sun height
-// Rough approximation of solar output: https://www.wolframalpha.com/input/?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+260%29%29%29+from+0+to+420
+// Rough approximation of solar output: https://www.wolframalpha.com/input?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+200%29%29%29+from+0+to+420
 // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
 /**
  * Calculates the raw solar irradiance in watts per square meter (W/m2) for a given date and location, not accounting for weather
@@ -110,8 +110,8 @@ export function getRawSolarIrradianceWM2(
   long: number,
   cloudCoverPercent: number
 ) {
-  let irradiance = EQUATOR_RADIANCE * (1 - 0.007 * Math.abs(lat)); // w/m2
-  irradiance *= 1 - cloudCoverPercent / 100;
+  let irradiance = EQUATOR_RADIANCE; //* (1 - 0.007 * Math.abs(lat)); // w/m2 - redundant with day length bell curve?
+  irradiance *= 1 - cloudCoverPercent / 400; // Very cloudy days = 25% reduction
   const { sunrise, sunset } = getSunriseSunset(date, lat, long);
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
@@ -119,7 +119,7 @@ export function getRawSolarIrradianceWM2(
       sunset - date.minuteOfDay
     );
     return (
-      irradiance / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 260)))
+      irradiance / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 200)))
     );
   }
   return 0;
@@ -127,14 +127,13 @@ export function getRawSolarIrradianceWM2(
 
 function forecastNextDay() {
   const length = weather.length;
-  // TODO factor in emissions, i.e. less vs more emissions = smaller vs larger std deviation + positive bias
   const temperatureModifier = getRandomRange(-4, 4.05);
   const windModifier = getRandomRange(-3, 3.05);
   const cloudModifier = getRandomRange(-20, 20);
   for (let row = 0; row < ROWS_PER_DAY; row++) {
     const prev = weather[length - ROWS_PER_YEAR + row];
     weather.push({
-      TEMP_C: prev.TEMP_C + temperatureModifier,
+      TEMP_C: Math.min(45, Math.max(-20, prev.TEMP_C + temperatureModifier)),
       CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
       WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),
     });

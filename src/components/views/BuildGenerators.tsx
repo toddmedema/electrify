@@ -40,6 +40,7 @@ import {
   FUELS,
   INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
+  TICKS_PER_YEAR,
 } from "../../Constants";
 import { GENERATORS } from "../../Facilities";
 import {
@@ -48,6 +49,7 @@ import {
   GeneratorShoppingType,
   SpeedType,
 } from "../../Types";
+import { generateNewTimeline } from "../../reducers/Game";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -68,7 +70,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
     INTEREST_RATE_YEARLY,
-    LOAN_MONTHS,
+    LOAN_MONTHS
   );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
   const secondaryText = buildable ? (
@@ -189,7 +191,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                     {formatMoneyConcise(
                       1000000 *
                         generator.btuPerWh *
-                        fuelPrices[generator.fuel] || 0,
+                        fuelPrices[generator.fuel] || 0
                     )}
                     /MWh
                   </TableCell>
@@ -232,7 +234,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                   </TableCell>
                   <TableCell align="right">
                     {Math.round(
-                      1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0,
+                      1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0
                     )}
                     kg/MWh
                   </TableCell>
@@ -360,7 +362,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildGenerator: (
     generator: GeneratorShoppingType,
-    financed: boolean,
+    financed: boolean
   ) => void;
   onBack: () => void;
   onSpeedChange: (speed: SpeedType) => void;
@@ -376,7 +378,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
   const mostRecentBuiltValue =
     (filtered.find((f) => f.id === mostRecentId) || {}).peakW || 500000000;
   const [sliderTick, setSliderTick] = React.useState<number>(
-    getTickFromW(mostRecentBuiltValue),
+    getTickFromW(mostRecentBuiltValue)
   );
   const [sort, setSort] = React.useState<string>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -386,9 +388,20 @@ export default function BuildGenerators(props: Props): JSX.Element {
   }
 
   const cash = now.cash;
-  const generators = GENERATORS(game, getW(sliderTick)).sort((a, b) =>
-    a[sort] > b[sort] ? 1 : -1,
+  const forecastedTimeline = generateNewTimeline(
+    game,
+    cash,
+    now.customers,
+    TICKS_PER_YEAR * 3 // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
   );
+  const windSpeeds = forecastedTimeline.map((w) => w.windKph);
+  const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
+  const generators = GENERATORS(
+    game,
+    getW(sliderTick),
+    windSpeeds,
+    solarIrradiances
+  ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
 
   const onSlider = (event: any, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
