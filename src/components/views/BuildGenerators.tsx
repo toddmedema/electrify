@@ -392,7 +392,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
     game,
     cash,
     now.customers,
-    TICKS_PER_YEAR * 1
+    TICKS_PER_YEAR * 3 // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
   );
   const windSpeeds = forecastedTimeline.map((w) => w.windKph);
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);

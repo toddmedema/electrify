@@ -40,8 +40,6 @@ export function GENERATORS(
   const windCapacityFactor = getWindCapacityFactor(windSpeedsKph);
   const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
 
-  console.log(solarCapacityFactor, irradiancesWM2);
-
   let generators = [
     // FUELED
     {
