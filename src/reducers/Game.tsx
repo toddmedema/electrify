@@ -20,9 +20,9 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove } from "../helpers/Math";
-import { getWindOutputFactor, getSolarOutputFactor } from "../helpers/Energy";
+import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
-import { getRawSolarIrradianceWM2, getWeather } from "../data/Weather";
+import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
 import { dialogOpen, dialogClose, snackbarOpen } from "./UI";
 import {
   DIFFICULTIES,
@@ -340,16 +340,19 @@ export const gameSlice = createSlice({
       state.timeline = generateNewTimeline(state, a.cash, a.customers);
 
       a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
-        const generator = GENERATORS(state, search.peakW || 1000000).find(
-          (g: FacilityShoppingType) => {
-            for (const property in search) {
-              if (g[property] !== search[property]) {
-                return false;
-              }
+        const generator = GENERATORS(
+          state,
+          search.peakW || 1000000,
+          [],
+          []
+        ).find((g: FacilityShoppingType) => {
+          for (const property in search) {
+            if (g[property] !== search[property]) {
+              return false;
             }
-            return true;
           }
-        );
+          return true;
+        });
         if (generator) {
           state = buildFacilityHelper(state, generator, false, true);
         } else {
@@ -530,7 +533,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
       return {
         ...t,
         ...fuelPrices,
-        sunlight: getRawSolarIrradianceWM2(
+        solarIrradianceWM2: getRawSolarIrradianceWM2(
           date,
           state.location.lat,
           state.location.long,
@@ -582,7 +585,7 @@ function updateSupplyFacilitiesFinances(
 
   const windOutputFactor = getWindOutputFactor(now.windKph);
   const solarOutputFactor = getSolarOutputFactor(
-    now.sunlight,
+    now.solarIrradianceWM2,
     now.temperatureC
   );
 
@@ -791,7 +794,7 @@ export function generateNewTimeline(
       minute: state.date.minute + i * TICK_MINUTES,
       supplyW: 0,
       demandW: 0,
-      sunlight: 0,
+      solarIrradianceWM2: 0,
       windKph: 0,
       temperatureC: 0,
       cash,

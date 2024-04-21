@@ -24,7 +24,32 @@ export function getSolarOutputFactor(
   temepratureC: number
 ) {
   return (
-    (irradianceWM2 * Math.max(1, 1 - (temepratureC - 10) / 100)) /
+    (irradianceWM2 * Math.min(1, 1 - (temepratureC - 10) / 100)) /
     EQUATOR_RADIANCE
+  );
+}
+
+// Takes in an array of wind speeds and returns the average of all outputFactors
+export function getWindCapacityFactor(windSpeedsKph: number[]) {
+  if (windSpeedsKph.length === 0) {
+    return 0;
+  }
+  return (
+    windSpeedsKph.reduce((acc, curr) => acc + getWindOutputFactor(curr), 0) /
+    windSpeedsKph.length
+  );
+}
+
+// Takes in an array of irradiances and returns the average of all outputFactors
+// For simplicty, assumes a constant temperature across all readings
+export function getSolarCapacityFactor(irradiancesWM2: number[]) {
+  if (irradiancesWM2.length === 0) {
+    return 0;
+  }
+  return (
+    irradiancesWM2.reduce(
+      (acc, curr) => acc + getSolarOutputFactor(curr, 20),
+      0
+    ) / irradiancesWM2.length
   );
 }

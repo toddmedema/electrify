@@ -6,15 +6,25 @@ import {
   GeneratorShoppingType,
   StorageShoppingType,
 } from "./Types";
+import {
+  getWindCapacityFactor,
+  getSolarCapacityFactor,
+} from "./helpers/Energy";
 
-// TODO additional sources of inforomation
+// TODO additional sources of information
 // BASE DATE: 2018
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
 // LCOE across many fuel types - https://www.eia.gov/outlooks/aeo/pdf/electricity_generation.pdf
-export function GENERATORS(state: GameType, peakW: number) {
-  // 0 = 1MW, 4 = 10GW (+1 for each 10x)
-  const magnitude = Math.log10(peakW) - 6;
+export function GENERATORS(
+  state: GameType,
+  peakW: number,
+  windSpeedsKph: number[],
+  irradiancesWM2: number[]
+) {
+  const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
+
+  // only needed as a temporary hack for geothermal until https://github.com/toddmedema/electrify/issues/86 done
   const countByFuel = state.facilities.reduce(
     (acc: { [index: string]: number }, f: FacilityOperatingType) => {
       if (f.fuel) {
@@ -22,8 +32,15 @@ export function GENERATORS(state: GameType, peakW: number) {
       }
       return acc;
     },
-    {} as { [index: string]: number },
+    {} as { [index: string]: number }
   );
+
+  // Calculate intermittent generator capacity factors (here instead of passed in, since may eventually have different capacity factors
+  // for different generator techs for the same resource, e.g. onshore vs offshore wind or fixed vs tracking solar)
+  const windCapacityFactor = getWindCapacityFactor(windSpeedsKph);
+  const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
+
+  console.log(solarCapacityFactor, irradiancesWM2);
 
   let generators = [
     // FUELED
@@ -179,7 +196,7 @@ export function GENERATORS(state: GameType, peakW: number) {
       yearsToBuild: 1 + magnitude / 2,
       // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
-      capacityFactor: 0.31,
+      capacityFactor: windCapacityFactor,
       // 37% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 25,
@@ -211,7 +228,7 @@ export function GENERATORS(state: GameType, peakW: number) {
       yearsToBuild: 1 + magnitude / 3,
       // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
-      capacityFactor: 0.22,
+      capacityFactor: solarCapacityFactor,
       // 26% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 30,
