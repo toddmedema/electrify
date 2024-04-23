@@ -384,7 +384,7 @@ export default class Finances extends React.Component<Props, State> {
             </Typography>
             <Select
               id="plotYear"
-              defaultValue={year}
+              defaultValue={-1}
               onChange={(e: any) => this.setState({ year: e.target.value })}
             >
               <MenuItem value={0}>All time</MenuItem>

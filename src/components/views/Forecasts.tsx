@@ -1,5 +1,7 @@
 import * as React from "react";
 import {
+  MenuItem,
+  Select,
   Table,
   TableBody,
   TableCell,
@@ -24,8 +26,6 @@ import ChartForecastStorage from "../base/ChartForecastStorage";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
 
-const FORECAST_YEARS = 1;
-
 interface BlackoutEdges {
   minute: number;
   value: number;
@@ -39,23 +39,29 @@ export interface DispatchProps {}
 
 export interface Props extends StateProps, DispatchProps {}
 
+// TODO move forecast years to UI reducer, so that it's preserved across page changes
 interface State {
   year: number;
+  years: number;
 }
 
 export default class Forecasts extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { year: 0 };
+    this.state = { year: 0, years: 1 };
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: any) {
-    // Because forecasts are computationally intense and long term, only update when the month changes
-    return this.props.game.date.monthNumber !== nextProps.game.date.monthNumber;
+    // Because forecasts are computationally intense and long term, only update when the month or state changes
+    return (
+      this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
+      this.state.years !== nextState.years
+    );
   }
 
   public render() {
     const { game } = this.props;
+    const { years } = this.state;
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
     if (!now) {
       return <span />;
@@ -66,12 +72,17 @@ export default class Forecasts extends React.Component<Props, State> {
       game,
       now.cash,
       now.customers,
-      TICKS_PER_YEAR * FORECAST_YEARS
+      TICKS_PER_YEAR * years
     );
     // TODO performance optimization: figure out some way to just check if there's at least one storage facility built by the end of the timeline
-    const hasStorage = forecastedTimeline
-      .map((f) => f.storedWh > 0)
-      .reduce((acc, curr) => acc || curr);
+    // (right now we only track how much energy is stored, so can't just check end of timeline for that since batteries may be empty at that moment)
+    let hasStorage = false;
+    for (let i = 0; i < forecastedTimeline.length; i++) {
+      if (forecastedTimeline[i].storedWh > 0) {
+        hasStorage = true;
+        break;
+      }
+    }
 
     // Figure out the boundaries of the chart data
     let domainMin = 999999999999;
@@ -157,9 +168,9 @@ export default class Forecasts extends React.Component<Props, State> {
       game.startingYear
     );
 
-    // Downsample the data to 6 per day to make it more vague / forecast-y
+    // Downsample the data to 6 per day @ 1 year, less at longer, to make it more vague / forecast-y
     const sampledForecastedTimeline = forecastedTimeline.filter(
-      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES
+      (t: TickPresentFutureType) => t.minute % (240 * years) < TICK_MINUTES
     );
     // Make sure it gets the first + last entries for a full chart
     sampledForecastedTimeline.unshift(forecastedTimeline[0]);
@@ -167,12 +178,24 @@ export default class Forecasts extends React.Component<Props, State> {
       forecastedTimeline[forecastedTimeline.length - 1]
     );
 
-    // TODO user ability to see more than one year in the future
     return (
       <GameCard className="Forecasts">
         <div className="scrollable">
           <Toolbar>
-            <Typography variant="h6">Supply & Demand</Typography>
+            <Typography variant="h6">
+              Supply & Demand
+              <Select
+                id="forecastYears"
+                defaultValue={1}
+                onChange={(e: any) => this.setState({ years: e.target.value })}
+                sx={{ float: "right" }}
+              >
+                <MenuItem value={1}>1 year</MenuItem>
+                <MenuItem value={5}>5 years</MenuItem>
+                <MenuItem value={10}>10 years</MenuItem>
+                <MenuItem value={20}>20 years</MenuItem>
+              </Select>
+            </Typography>
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
@@ -180,6 +203,7 @@ export default class Forecasts extends React.Component<Props, State> {
             blackouts={blackouts}
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
             startingYear={game.startingYear}
+            multiyear={years > 1}
           />
           {blackoutTotalWh > 0 && (
             <Table size="small">
@@ -227,6 +251,7 @@ export default class Forecasts extends React.Component<Props, State> {
             timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
+            multiyear={years > 1}
           />
           {hasStorage && (
             <div>
@@ -240,6 +265,7 @@ export default class Forecasts extends React.Component<Props, State> {
                 timeline={sampledForecastedTimeline}
                 domain={{ x: [rangeMin, rangeMax] }}
                 startingYear={game.startingYear}
+                multiyear={years > 1}
               />
             </div>
           )}
@@ -253,6 +279,7 @@ export default class Forecasts extends React.Component<Props, State> {
             timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
+            multiyear={years > 1}
           />
           <br />
           <br />
@@ -266,6 +293,7 @@ export default class Forecasts extends React.Component<Props, State> {
             timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
+            multiyear={years > 1}
           />
         </div>
       </GameCard>

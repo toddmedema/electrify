@@ -20,6 +20,7 @@ export interface Props {
   timeline: TickPresentFutureType[];
   domain: { x: [number, number] };
   startingYear: number;
+  multiyear: boolean;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -28,7 +29,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, startingYear } = this.props;
+    const { domain, height, timeline, startingYear, multiyear } = this.props;
     // Extract the supply by fuel values
     const data = timeline.map((t) => {
       return { minute: t.minute, ...t.supplyByFuel };
@@ -65,8 +66,9 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
             tickCount={6}
             tickFormat={(t) =>
               formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthNumber,
-                false
+                getDateFromMinute(t, startingYear).monthsEllapsed +
+                  12 * startingYear,
+                multiyear
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

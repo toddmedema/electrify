@@ -31,6 +31,7 @@ export interface Props {
   blackouts: BlackoutEdges[];
   domain: { x: [number, number]; y: [number, number] };
   startingYear: number;
+  multiyear: boolean;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -39,7 +40,8 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, blackouts, startingYear } = this.props;
+    const { domain, height, timeline, blackouts, startingYear, multiyear } =
+      this.props;
 
     // Wrapping in spare div prevents excessive height bug
     return (
@@ -55,8 +57,9 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
             tickCount={6}
             tickFormat={(t) =>
               formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthNumber,
-                false
+                getDateFromMinute(t, startingYear).monthsEllapsed +
+                  12 * startingYear,
+                multiyear
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

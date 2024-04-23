@@ -20,6 +20,7 @@ export interface Props {
   timeline: TickPresentFutureType[];
   domain: { x: [number, number] };
   startingYear: number;
+  multiyear: boolean;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -28,10 +29,10 @@ export default class ChartForecastWeather extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, startingYear } = this.props;
+    const { domain, height, timeline, startingYear, multiyear } = this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
     const data = timeline.filter(
-      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES,
+      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES
     );
     // Make sure it gets the first + last entries for a full chart
     data.unshift(timeline[0]);
@@ -51,8 +52,9 @@ export default class ChartForecastWeather extends React.PureComponent<
             tickCount={6}
             tickFormat={(t) =>
               formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthNumber,
-                false,
+                getDateFromMinute(t, startingYear).monthsEllapsed +
+                  12 * startingYear,
+                multiyear
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}
