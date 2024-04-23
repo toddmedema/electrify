@@ -11,6 +11,7 @@ import {
   red,
   amber,
   brown,
+  yellow,
 } from "@mui/material/colors";
 import {
   createTheme,
@@ -18,18 +19,23 @@ import {
   DeprecatedThemeOptions,
 } from "@mui/material/styles";
 
+export const fuelColors = {
+  Uranium: green[500],
+  Coal: grey[900],
+  Oil: brown[800],
+  Geothermal: red[500],
+  "Natural Gas": purple[500],
+  Sun: yellow[600],
+  Wind: blue[600],
+};
 export const darkBlack = "0x000000";
 export const disabledColor = grey[100];
 export const interactiveColor = blue[600];
 export const blackoutColor = red[500];
 export const demandColor = grey[900];
 export const supplyColor = blue[600];
-export const uraniumColor = green[500];
-export const coalColor = grey[900];
-export const oilColor = brown[800];
-export const naturalGasColor = purple[500];
 export const temperatureColor = red[500];
-export const windColor = blue[600];
+export const windColor = fuelColors.Wind; // for weather forecasts
 
 export default createTheme(
   adaptV4Theme({
@@ -49,7 +55,7 @@ export default createTheme(
         lineHeight: 1.2,
       },
     },
-  } as DeprecatedThemeOptions),
+  } as DeprecatedThemeOptions)
 );
 
 export const chartTheme = {

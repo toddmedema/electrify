@@ -113,7 +113,6 @@ export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
 
-// TODO additional sources of information
 // Lifetime GHG for all fuels: https://en.wikipedia.org/wiki/Life-cycle_greenhouse-gas_emissions_of_energy_sources
 export const FUELS = {
   Coal: {
@@ -125,10 +124,9 @@ export const FUELS = {
   Uranium: {
     kgCO2ePerBtu: 0,
   },
-  // TODO
-  // 'Oil': {
-  //   kgCO2ePerBtu: 999,
-  // },
+  Oil: {
+    kgCO2ePerBtu: 0.00002031, // https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references
+  },
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
   // 'Trash': {
   //   kgCO2ePerBtu: 999,

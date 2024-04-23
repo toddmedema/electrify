@@ -29,12 +29,28 @@ export interface LocationType {
   long: number;
 }
 
-export type FuelNameType = "Coal" | "Wind" | "Sun" | "Natural Gas" | "Uranium";
+export type FuelNameType =
+  | "Coal"
+  | "Wind"
+  | "Sun"
+  | "Natural Gas"
+  | "Uranium"
+  | "Oil";
 export interface FuelPricesType {
   [index: string]: number;
   "Natural Gas": number; // $/btu
   Coal: number; // $/btu
   Uranium: number; // $/btu
+  Oil: number; // $/btu
+}
+export interface FuelProductionType {
+  [index: string]: number | undefined;
+  "Natural Gas"?: number; // wh
+  Coal?: number; // wh
+  Uranium?: number; // wh
+  Oil?: number; // wh
+  Sun?: number; // wh
+  Wind?: number; //wh
 }
 
 export interface DifficultyMultipliersType {
@@ -109,6 +125,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     solarIrradianceWM2: number;
     windKph: number;
     temperatureC: number;
+    storedWh: number;
+    supplyByFuel: FuelProductionType;
   };
 
 export type DerivedHistoryKeysType = keyof DerivedHistoryType;

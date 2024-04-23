@@ -61,6 +61,7 @@ import {
   SpeedType,
   StorageOperatingType,
   TickPresentFutureType,
+  FuelProductionType,
 } from "../Types";
 const cloneDeep = require("lodash.clonedeep");
 
@@ -551,7 +552,9 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
         ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
-      };
+        storedWh: 0,
+        supplyByFuel: {} as FuelProductionType,
+      } as TickPresentFutureType;
     }
     return t;
   });
@@ -614,7 +617,9 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
+  let supplyByFuel = {} as FuelProductionType;
   let charge = 0;
+  let storedWh = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) {
@@ -661,6 +666,7 @@ function updateSupplyFacilitiesFinances(
             break;
         }
         supply += g.currentW;
+        supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
       }
       if (g.peakWh) {
         // Capable of storing electricity
@@ -686,10 +692,13 @@ function updateSupplyFacilitiesFinances(
           // Otherwise, don't charge or discharge: reset to 0
           g.currentW = 0;
         }
+        storedWh += g.currentWh;
       }
     }
   });
   now.supplyW = supply;
+  now.supplyByFuel = supplyByFuel;
+  now.storedWh = storedWh;
 
   // Update finances
   // TODO actually calculate market price / sale value

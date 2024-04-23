@@ -1,49 +1,59 @@
 import * as React from "react";
 import {
-  VictoryArea,
   VictoryAxis,
   VictoryChart,
   VictoryLabel,
+  VictoryLegend,
   VictoryLine,
   VictoryTheme,
 } from "victory";
-import { TickPresentFutureType } from "../../Types";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
 import { formatWatts } from "../../helpers/Format";
-import {
-  blackoutColor,
-  chartTheme,
-  demandColor,
-  supplyColor,
-} from "../../Theme";
-
-interface BlackoutEdges {
-  minute: number;
-  value: number;
-}
+import { FuelNameType, TickPresentFutureType } from "../../Types";
+import { chartTheme, fuelColors } from "../../Theme";
 
 export interface Props {
   height?: number;
   timeline: TickPresentFutureType[];
-  blackouts: BlackoutEdges[];
-  domain: { x: [number, number]; y: [number, number] };
+  domain: { x: [number, number] };
   startingYear: number;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
-export default class chartForecastSupplyDemand extends React.PureComponent<
+export default class ChartForecastSupplyByFuel extends React.PureComponent<
   Props,
   {}
 > {
   public render() {
-    const { domain, height, timeline, blackouts, startingYear } = this.props;
+    const { domain, height, timeline, startingYear } = this.props;
+    // Extract the supply by fuel values
+    const data = timeline.map((t) => {
+      return { minute: t.minute, ...t.supplyByFuel };
+    });
+
+    // Check at the end of the list in case anything new is built during the forecast window, and backfill zeroes as needed, until all fuels are present
+    const fuels = Object.keys(
+      timeline[timeline.length - 1].supplyByFuel
+    ).sort() as FuelNameType[];
+    for (let i = 0; i < data.length; i++) {
+      let missingFuel = false;
+      for (let f = 0; f < fuels.length; f++) {
+        if (!data[i][fuels[f]]) {
+          missingFuel = true;
+          data[i][fuels[f]] = 0;
+        }
+      }
+      if (!missingFuel) {
+        break;
+      }
+    }
 
     // Wrapping in spare div prevents excessive height bug
     return (
-      <div id="chartForecastSupplyDemand">
+      <div id="chartForecastSupplyByFuel">
         <VictoryChart
           theme={VictoryTheme.material}
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
@@ -81,38 +91,30 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
               tickLabels: chartTheme.tickLabels,
             }}
           />
-          <VictoryLine
-            data={timeline}
-            x="minute"
-            y="supplyW"
-            style={{
-              data: {
-                stroke: supplyColor,
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            data={timeline}
-            x="minute"
-            y="demandW"
-            style={{
-              data: {
-                stroke: demandColor,
-              },
-            }}
-          />
-          <VictoryArea
-            data={blackouts}
-            x="minute"
-            y="value"
-            style={{
-              data: {
-                stroke: "none",
-                fill: blackoutColor,
-                opacity: 0.3,
-              },
-            }}
+          {fuels.map((f: FuelNameType, i: number) => (
+            <VictoryLine
+              key={i}
+              data={data}
+              x="minute"
+              y={f}
+              style={{
+                data: {
+                  stroke: fuelColors[f],
+                  strokeWidth: 1,
+                },
+              }}
+            />
+          ))}
+          <VictoryLegend
+            x={270}
+            y={15}
+            centerTitle
+            orientation="vertical"
+            rowGutter={-5}
+            symbolSpacer={5}
+            data={fuels.map((f) => {
+              return { name: f, symbol: { fill: fuelColors[f] } };
+            })}
           />
         </VictoryChart>
       </div>

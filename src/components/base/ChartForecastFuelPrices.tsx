@@ -12,15 +12,8 @@ import {
   getDateFromMinute,
 } from "../../helpers/DateTime";
 import { formatMoneyConcise } from "../../helpers/Format";
-import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
-import {
-  chartTheme,
-  coalColor,
-  naturalGasColor,
-  oilColor,
-  uraniumColor,
-} from "../../Theme";
+import { chartTheme, fuelColors } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -36,13 +29,6 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
 > {
   public render() {
     const { domain, height, timeline, startingYear } = this.props;
-    // Downsample the data to one per day to make it more vague / forecast-y
-    const data = timeline.filter(
-      (t: TickPresentFutureType) => t.minute % 1440 < TICK_MINUTES,
-    );
-    // Make sure it gets the first + last entries for a full chart
-    data.unshift(timeline[0]);
-    data.push(timeline[timeline.length - 1]);
 
     // Wrapping in spare div prevents excessive height bug
     return (
@@ -59,7 +45,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             tickFormat={(t) =>
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthNumber,
-                false,
+                false
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}
@@ -84,49 +70,49 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             }}
           />
           <VictoryLine
-            data={data}
+            data={timeline}
             x="minute"
             y="Natural Gas"
             interpolation="natural"
             style={{
               data: {
-                stroke: naturalGasColor,
+                stroke: fuelColors["Natural Gas"],
                 strokeWidth: 1,
               },
             }}
           />
           <VictoryLine
-            data={data}
+            data={timeline}
             x="minute"
             y="Coal"
             interpolation="natural"
             style={{
               data: {
-                stroke: coalColor,
+                stroke: fuelColors.Coal,
                 strokeWidth: 1,
               },
             }}
           />
           <VictoryLine
-            data={data}
+            data={timeline}
             x="minute"
             y="Oil"
             interpolation="natural"
             style={{
               data: {
-                stroke: oilColor,
+                stroke: fuelColors.Oil,
                 strokeWidth: 1,
               },
             }}
           />
           <VictoryLine
-            data={data}
+            data={timeline}
             x="minute"
             y="Uranium"
             interpolation="natural"
             style={{
               data: {
-                stroke: uraniumColor,
+                stroke: fuelColors.Uranium,
                 strokeWidth: 1,
               },
             }}
@@ -139,10 +125,13 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             rowGutter={-5}
             symbolSpacer={5}
             data={[
-              { name: "Coal", symbol: { fill: coalColor } },
-              { name: "Natural Gas", symbol: { fill: naturalGasColor } },
-              { name: "Oil", symbol: { fill: oilColor } },
-              { name: "Uranium", symbol: { fill: uraniumColor } },
+              { name: "Coal", symbol: { fill: fuelColors.Coal } },
+              {
+                name: "Natural Gas",
+                symbol: { fill: fuelColors["Natural Gas"] },
+              },
+              { name: "Oil", symbol: { fill: fuelColors.Oil } },
+              { name: "Uranium", symbol: { fill: fuelColors.Uranium } },
             ]}
           />
         </VictoryChart>

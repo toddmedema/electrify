@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  VictoryArea,
   VictoryAxis,
   VictoryChart,
   VictoryLabel,
@@ -12,38 +11,27 @@ import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWatts } from "../../helpers/Format";
-import {
-  blackoutColor,
-  chartTheme,
-  demandColor,
-  supplyColor,
-} from "../../Theme";
-
-interface BlackoutEdges {
-  minute: number;
-  value: number;
-}
+import { formatWattHours } from "../../helpers/Format";
+import { chartTheme, supplyColor } from "../../Theme";
 
 export interface Props {
   height?: number;
   timeline: TickPresentFutureType[];
-  blackouts: BlackoutEdges[];
-  domain: { x: [number, number]; y: [number, number] };
+  domain: { x: [number, number] };
   startingYear: number;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
-export default class chartForecastSupplyDemand extends React.PureComponent<
+export default class chartForecastStorage extends React.PureComponent<
   Props,
   {}
 > {
   public render() {
-    const { domain, height, timeline, blackouts, startingYear } = this.props;
+    const { domain, height, timeline, startingYear } = this.props;
 
     // Wrapping in spare div prevents excessive height bug
     return (
-      <div id="chartForecastSupplyDemand">
+      <div id="chartForecastStorage">
         <VictoryChart
           theme={VictoryTheme.material}
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
@@ -70,8 +58,8 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWatts(t)}
-            tickLabelComponent={<VictoryLabel dx={5} />}
+            tickFormat={(t: number) => formatWattHours(t)}
+            tickLabelComponent={<VictoryLabel dx={10} />}
             fixLabelOverlap={true}
             style={{
               axis: chartTheme.axis,
@@ -84,33 +72,11 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           <VictoryLine
             data={timeline}
             x="minute"
-            y="supplyW"
+            y="storedWh"
             style={{
               data: {
                 stroke: supplyColor,
                 strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            data={timeline}
-            x="minute"
-            y="demandW"
-            style={{
-              data: {
-                stroke: demandColor,
-              },
-            }}
-          />
-          <VictoryArea
-            data={blackouts}
-            x="minute"
-            y="value"
-            style={{
-              data: {
-                stroke: "none",
-                fill: blackoutColor,
-                opacity: 0.3,
               },
             }}
           />

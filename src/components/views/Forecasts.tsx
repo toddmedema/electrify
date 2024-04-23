@@ -18,8 +18,11 @@ import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { generateNewTimeline } from "../../reducers/Game";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
+import ChartForecastSupplyByFuel from "../base/ChartForecastSupplyByFuel";
 import ChartForecastWeather from "../base/ChartForecastWeather";
+import ChartForecastStorage from "../base/ChartForecastStorage";
 import GameCard from "../base/GameCard";
+import { TICK_MINUTES } from "../../Constants";
 
 const FORECAST_YEARS = 1;
 
@@ -63,8 +66,12 @@ export default class Forecasts extends React.Component<Props, State> {
       game,
       now.cash,
       now.customers,
-      TICKS_PER_YEAR * FORECAST_YEARS,
+      TICKS_PER_YEAR * FORECAST_YEARS
     );
+    // TODO performance optimization: figure out some way to just check if there's at least one storage facility built by the end of the timeline
+    const hasStorage = forecastedTimeline
+      .map((f) => f.storedWh > 0)
+      .reduce((acc, curr) => acc || curr);
 
     // Figure out the boundaries of the chart data
     let domainMin = 999999999999;
@@ -143,11 +150,21 @@ export default class Forecasts extends React.Component<Props, State> {
 
     const blackoutStart = getDateFromMinute(
       largestBlackout.start,
-      game.startingYear,
+      game.startingYear
     );
     const blackoutEnd = getDateFromMinute(
       largestBlackout.end,
-      game.startingYear,
+      game.startingYear
+    );
+
+    // Downsample the data to 6 per day to make it more vague / forecast-y
+    const sampledForecastedTimeline = forecastedTimeline.filter(
+      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES
+    );
+    // Make sure it gets the first + last entries for a full chart
+    sampledForecastedTimeline.unshift(forecastedTimeline[0]);
+    sampledForecastedTimeline.push(
+      forecastedTimeline[forecastedTimeline.length - 1]
     );
 
     // TODO user ability to see more than one year in the future
@@ -159,7 +176,7 @@ export default class Forecasts extends React.Component<Props, State> {
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
-            timeline={forecastedTimeline}
+            timeline={sampledForecastedTimeline}
             blackouts={blackouts}
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
             startingYear={game.startingYear}
@@ -203,11 +220,37 @@ export default class Forecasts extends React.Component<Props, State> {
           <br />
           <br />
           <Toolbar>
+            <Typography variant="h6">Supply by Fuel</Typography>
+          </Toolbar>
+          <ChartForecastSupplyByFuel
+            height={140}
+            timeline={sampledForecastedTimeline}
+            domain={{ x: [rangeMin, rangeMax] }}
+            startingYear={game.startingYear}
+          />
+          {hasStorage && (
+            <div>
+              <br />
+              <br />
+              <Toolbar>
+                <Typography variant="h6">Stored power</Typography>
+              </Toolbar>
+              <ChartForecastStorage
+                height={140}
+                timeline={sampledForecastedTimeline}
+                domain={{ x: [rangeMin, rangeMax] }}
+                startingYear={game.startingYear}
+              />
+            </div>
+          )}
+          <br />
+          <br />
+          <Toolbar>
             <Typography variant="h6">Fuel Prices</Typography>
           </Toolbar>
           <ChartForecastFuelPrices
             height={140}
-            timeline={forecastedTimeline}
+            timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
           />
@@ -220,7 +263,7 @@ export default class Forecasts extends React.Component<Props, State> {
           </Toolbar>
           <ChartForecastWeather
             height={140}
-            timeline={forecastedTimeline}
+            timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
           />
