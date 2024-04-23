@@ -211,18 +211,22 @@ export default class NewGameDetails extends React.Component<Props, State> {
             {/* Scoring algorithm should also be updated in Game.tsx */}
             {scenario.ownership === "Investor" && (
               <div>
-                <p>+40 pts for each $1B of net worth at the end</p>
-                <p>+2 pts for every 100k customers at the end</p>
-                <p>+1 pt for each TWh of electricity supplied</p>
-                <p>-2 pts for each gigaton of greenhouse gas emissions</p>
-                <p>-8 pts for each TWh of blackouts</p>
+                <p>+40 pts per $1B of net worth at the end</p>
+                <p>+2 pts per 100k customers at the end</p>
+                <p>+1 pt per TWh of electricity supplied</p>
+                <p>-2 pts per gigaton of greenhouse gas emissions</p>
+                <p>-8 pts per TWh of blackouts</p>
               </div>
             )}
             {scenario.ownership === "Public" && (
               <div>
-                <p>+10 pts for each TWh of electricity supplied</p>
-                <p>-5 pts for each gigaton of greenhouse gas emissions</p>
-                <p>-10 pts for each TWh of blackouts</p>
+                <p>
+                  +/-80 pts per lifetime average $0.01/kWh charged above/below $
+                  {scenario.dollarsPerkWh}/kWh
+                </p>
+                <p>+10 pts per TWh of electricity supplied</p>
+                <p>-5 pts per gigaton of greenhouse gas emissions</p>
+                <p>-10 pts per TWh of blackouts</p>
               </div>
             )}
           </DialogContent>

@@ -346,9 +346,38 @@ export default class Finances extends React.Component<Props, State> {
                 }
               />
             )}
-            {scenario.ownership === "Investor" && (
-              <div className="flex-newline"></div>
+            {scenario.ownership === "Public" && (
+              <Typography
+                className="flex-newline"
+                variant="body2"
+                color="textSecondary"
+              >
+                Electricity Rate:&nbsp;
+                <Typography color="primary" component="strong">
+                  {formatMoneyConcise(game.dollarsPerkWh)}
+                </Typography>
+                /kWh
+              </Typography>
             )}
+            {scenario.ownership === "Public" && (
+              <Slider
+                id="rateSlider"
+                value={game.dollarsPerkWh}
+                aria-labelledby="The rate you charge for electricity generation"
+                valueLabelDisplay="off"
+                min={0}
+                step={0.01}
+                max={0.3}
+                onChange={(e: any, newTick: number | number[]) =>
+                  onDelta({
+                    dollarsPerkWh: Array.isArray(newTick)
+                      ? newTick[0]
+                      : newTick,
+                  })
+                }
+              />
+            )}
+            <div className="flex-newline"></div>
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               Plotting{" "}
             </Typography>

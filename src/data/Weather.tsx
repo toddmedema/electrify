@@ -21,7 +21,7 @@ const DUMMY_WEATHER = {
   WIND_KPH: 10,
 };
 
-// TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio)
+// TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio) for offline play
 // But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
 // Ideally caching this... so maybe upgrade to use https://tanstack.com/query/latest/docs/framework/react/overview ?
 export function initWeather(location: string, callback?: any) {
@@ -79,9 +79,7 @@ export function getWeather(date: DateType): RawWeatherType {
   };
 }
 
-// Is later multiplied by cloudiness
-// TODO should this just take in cloudiness? The game knows future weather...
-// TODO change to watts per sq meter or some fixed value, and verify that it's returning reasonably accurate values per location and season
+// TODO verify that it's returning reasonably accurate values per location and season
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
 // https://earthobservatory.nasa.gov/features/EnergyBalance/page2.php
 // indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight

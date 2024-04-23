@@ -74,8 +74,7 @@ export default class Forecasts extends React.Component<Props, State> {
       now.customers,
       TICKS_PER_YEAR * years
     );
-    // TODO performance optimization: figure out some way to just check if there's at least one storage facility built by the end of the timeline
-    // (right now we only track how much energy is stored, so can't just check end of timeline for that since batteries may be empty at that moment)
+
     let hasStorage = false;
     for (let i = 0; i < forecastedTimeline.length; i++) {
       if (forecastedTimeline[i].storedWh > 0) {

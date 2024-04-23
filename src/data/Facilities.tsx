@@ -233,7 +233,8 @@ export function GENERATORS(
       // https://energyinformative.org/lifespan-solar-panels/
     },
     // {
-    //   // NOPE - very limited location options for these, and only two in the world are >20MW
+    //   // as of 2018 very limited location options for these, and only two in the world are >20MW
+    //   // TODO revisit, a lot's changed
     //   name: 'Tidal',
     //   fuel: 'Tides',
     //   description: 'Stable output except 4 times per day',

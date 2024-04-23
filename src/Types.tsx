@@ -240,6 +240,7 @@ export interface ScenarioType {
   tutorialSteps?: TutorialStepType[];
   startingYear: number;
   cash: number;
+  dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;
   endMessage?: string;
@@ -254,6 +255,7 @@ export interface GameType {
   speed: SpeedType;
   inGame: boolean;
   feePerKgCO2e: number;
+  dollarsPerkWh: number;
   monthlyMarketingSpend: number;
   tutorialStep: number;
   date: DateType;

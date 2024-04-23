@@ -74,7 +74,8 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
         {s.summary}
         <br />
         <i>
-          {location.name} in {s.startingYear}
+          {location.name}, {s.startingYear}-
+          {s.startingYear + s.durationMonths / 12}
         </i>
       </span>
     );

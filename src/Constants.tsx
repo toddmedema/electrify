@@ -73,7 +73,7 @@ export const TICK_MS = {
   PAUSED: 250, // pause doesn't actually simulate frames, this is just for setTimeout timers
   SLOW: 200,
   NORMAL: 60,
-  FAST: 15,
+  FAST: 10,
 };
 
 export const INFLATION = 0.03;

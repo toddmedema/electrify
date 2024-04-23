@@ -92,6 +92,7 @@ const initialGame: GameType = {
   speed: "PAUSED",
   inGame: false,
   feePerKgCO2e: 0, // Start on easy mode
+  dollarsPerkWh: 0.07,
   monthlyMarketingSpend: 0,
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
@@ -402,6 +403,12 @@ function tickState(state: GameType) {
                 blackouts: Math.round(-8 * blackoutsTWh),
               }
             : {
+                rate: Math.round(
+                  80 *
+                    100 *
+                    (scenario.dollarsPerkWh -
+                      summary.revenue / (summary.supplyWh / 1000))
+                ),
                 supply: Math.round((10 * summary.supplyWh) / 1000000000000),
                 emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
                 blackouts: Math.round(-10 * blackoutsTWh),
@@ -441,17 +448,24 @@ function tickState(state: GameType) {
                 message: scenario.endMessage || (
                   <div>
                     Your final score is {finalScore}:<br />
-                    <br />+{score.supply} pts from electricity supplied
+                    <br />
+                    {score.supply} pts from electricity supplied
                     <br />
                     {scenario.ownership === "Investor" && (
                       <span>
-                        +{score.netWorth} pts from final net worth
+                        {score.netWorth} pts from final net worth
                         <br />
                       </span>
                     )}
                     {scenario.ownership === "Investor" && (
                       <span>
-                        +{score.customers} pts from final customers
+                        {score.customers} pts from final customers
+                        <br />
+                      </span>
+                    )}
+                    {scenario.ownership === "Public" && (
+                      <span>
+                        {score.rate} pts from electric rates
                         <br />
                       </span>
                     )}
@@ -684,13 +698,11 @@ function updateSupplyFacilitiesFinances(
   now.storedWh = storedWh;
 
   // Update finances
-  // TODO actually calculate market price / sale value
-  // Alternative: use rate by location, based on historic prices (not as fulfilling) - or at least use to double check
-  const dollarsPerWh = 0.07 / 1000;
+  // TODO have starting dollarsPerkWh rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const supplyWh =
     (Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
   const demandWh = (now.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-  const revenue = supplyWh * dollarsPerWh;
+  const revenue = (supplyWh / 1000) * state.dollarsPerkWh;
 
   // Facilities expenses
   let kgco2e = 0;
