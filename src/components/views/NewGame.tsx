@@ -13,7 +13,7 @@ import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import { getStorageJson } from "../../LocalStorage";
 import { LOCATIONS } from "../../Constants";
-import { SCENARIOS } from "../../Scenarios";
+import { SCENARIOS } from "../../data/Scenarios";
 import { GameType, LocalStoragePlayedType, ScenarioType } from "../../Types";
 
 export interface StateProps {
@@ -39,7 +39,7 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
   return (
     <Card className="build-list-item">
       <CardHeader
-        style={{ opacity: completed ? 0.8 : 1 }}
+        style={{ opacity: completed ? 0.5 : 1 }}
         action={
           <Button
             size="small"
@@ -123,9 +123,9 @@ export default function NewGame(props: Props): JSX.Element {
         </Toolbar>
       </div>
       <List dense className="scrollable cardList">
-        <Card>
-          <CardHeader title="Tutorials" />
-        </Card>
+        <Typography variant="h5" sx={{ paddingLeft: 1, paddingTop: 1 }}>
+          Tutorials
+        </Typography>
         {SCENARIOS.filter((s) => s.tutorialSteps).map((s) => {
           return (
             <TutorialListItem
@@ -136,9 +136,9 @@ export default function NewGame(props: Props): JSX.Element {
             />
           );
         })}
-        <Card>
-          <CardHeader title="Scenarios" />
-        </Card>
+        <Typography variant="h5" sx={{ paddingLeft: 1, paddingTop: 1 }}>
+          Scenarios
+        </Typography>
         {SCENARIOS.filter((s) => !s.tutorialSteps).map((s) => {
           return (
             <ScenarioListItem key={s.id} onDetails={props.onDetails} s={s} />

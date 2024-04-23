@@ -38,7 +38,7 @@ export function initWeather(location: string, callback?: any) {
       }
     },
     complete() {
-      if (weather.length !== EXPECTED_ROWS) {
+      if (weather.length < EXPECTED_ROWS) {
         console.warn(
           `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`
         );

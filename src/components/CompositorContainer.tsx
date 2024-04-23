@@ -2,7 +2,7 @@ import { connect } from "react-redux";
 import Redux from "redux";
 import { delta } from "../reducers/Game";
 import { dialogClose, snackbarClose } from "../reducers/UI";
-import { SCENARIOS } from "../Scenarios";
+import { SCENARIOS } from "../data/Scenarios";
 import { AppStateType, TransitionClassType, TutorialStepType } from "../Types";
 import Compositor, { DispatchProps, isNavCard, StateProps } from "./Compositor";
 
@@ -35,7 +35,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 };
 
 export const mapDispatchToProps = (
-  dispatch: Redux.Dispatch<any>,
+  dispatch: Redux.Dispatch<any>
 ): DispatchProps => {
   return {
     closeDialog(): void {
@@ -46,7 +46,7 @@ export const mapDispatchToProps = (
     },
     onTutorialStep(
       newStep: number,
-      tutorialSteps: TutorialStepType[] | undefined,
+      tutorialSteps: TutorialStepType[] | undefined
     ): void {
       const prevStep = (tutorialSteps || [])[newStep - 1];
       if (prevStep && prevStep.onNext) {
@@ -59,7 +59,7 @@ export const mapDispatchToProps = (
 
 const CompositorContainer = connect(
   mapStateToProps,
-  mapDispatchToProps,
+  mapDispatchToProps
 )(Compositor);
 
 export default CompositorContainer;

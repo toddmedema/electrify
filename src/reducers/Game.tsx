@@ -44,10 +44,10 @@ import {
   OUTSKIRTS_WIND_MULTIPLIER,
   LOCATIONS,
 } from "../Constants";
-import { GENERATORS, STORAGE } from "../Facilities";
+import { GENERATORS, STORAGE } from "../data/Facilities";
 import { logEvent } from "../Globals";
 import { getStorageJson, setStorageKeyValue } from "../LocalStorage";
-import { SCENARIOS } from "../Scenarios";
+import { SCENARIOS } from "../data/Scenarios";
 import { store } from "../Store";
 import {
   DateType,
@@ -106,16 +106,7 @@ export const gameSlice = createSlice({
   initialState: initialGame,
   reducers: {
     tick: (state) => {
-      if (!state.inGame) {
-        return;
-      }
-
-      if (state.speed === "PAUSED") {
-        previousTickMs = performance.now();
-        setTimeout(
-          () => store.dispatch(gameSlice.actions.tick()),
-          TICK_MS.PAUSED
-        );
+      if (!state.inGame || state.speed === "PAUSED") {
         return;
       }
 
@@ -184,30 +175,14 @@ export const gameSlice = createSlice({
       });
 
       // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
-      updateSupplyFacilitiesFinances(
-        state,
-        state.timeline[0],
-        state.timeline[0],
-        true
-      );
-      updateSupplyFacilitiesFinances(
-        state,
-        state.timeline[0],
-        state.timeline[0],
-        true
-      );
-      updateSupplyFacilitiesFinances(
-        state,
-        state.timeline[0],
-        state.timeline[0],
-        true
-      );
-      updateSupplyFacilitiesFinances(
-        state,
-        state.timeline[0],
-        state.timeline[0],
-        true
-      );
+      for (let i = 0; i < 4; i++) {
+        updateSupplyFacilitiesFinances(
+          state,
+          state.timeline[0],
+          state.timeline[0],
+          true
+        );
+      }
       state.timeline = reforecastSupply(state);
     },
     quit: () => {
@@ -261,6 +236,14 @@ export const gameSlice = createSlice({
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
+      if (previousSpeed === "PAUSED" && state.speed !== "PAUSED") {
+        previousTickMs = performance.now();
+        setTimeout(
+          () => store.dispatch(gameSlice.actions.tick()),
+          TICK_MS[state.speed]
+        );
+      }
+      previousSpeed = state.speed;
     },
   },
   extraReducers: (builder) => {

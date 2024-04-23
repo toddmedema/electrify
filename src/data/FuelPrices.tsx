@@ -9,7 +9,7 @@ import { getRandomRange } from "../helpers/Math";
 // ^^ 1949 - 2011, whole years only
 
 // Natural gas: https://www.eia.gov/dnav/ng/hist/n3020us3M.htm
-// ^^ 2019 - 1983, whole years only
+// ^^ 1983 - 2019, whole years only
 
 // Uranium: https://www.eia.gov/uranium/marketing/html/summarytable1b.php
 // 35Bbtu / lb - https://smartenergy.illinois.edu/energy-efficiency-basics/energy-concepts-and-terms
@@ -53,7 +53,6 @@ export function initFuelPrices(callback?: any) {
   });
 }
 
-// Returns fuel prices per MBTU (UNITS!!!)
 export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
     let referenceYear = date.year - 1;

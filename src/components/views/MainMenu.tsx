@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Button, IconButton } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
-import FacebookIcon from "@mui/icons-material/Facebook";
 import InfoIcon from "@mui/icons-material/Info";
 import { login } from "../../Globals";
 import { interactiveColor } from "../../Theme";
@@ -73,13 +72,6 @@ const MainMenu = (props: Props): JSX.Element => {
           size="large"
         >
           <EmailIcon />
-        </IconButton>
-        <IconButton
-          color="primary"
-          href="https://www.facebook.com/electrifygame"
-          size="large"
-        >
-          <FacebookIcon />
         </IconButton>
         <IconButton
           color="primary"

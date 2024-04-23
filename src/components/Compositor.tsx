@@ -127,7 +127,7 @@ export interface DispatchProps {
   closeSnackbar: () => void;
   onTutorialStep: (
     newStep: number,
-    tutorialSteps: TutorialStepType[] | undefined,
+    tutorialSteps: TutorialStepType[] | undefined
   ) => void;
 }
 
@@ -143,7 +143,7 @@ export default class Compositor extends React.Component<Props, {}> {
     if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
       this.props.onTutorialStep(
         index + (action === ACTIONS.PREV ? -1 : 1),
-        this.props.tutorialSteps,
+        this.props.tutorialSteps
       );
     }
   };

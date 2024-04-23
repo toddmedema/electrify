@@ -70,7 +70,7 @@ export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon 
 
 // How long between each simulated frame
 export const TICK_MS = {
-  PAUSED: 250, // pause doesn't actually simulate frames, this is just the timeout timer
+  PAUSED: 250, // pause doesn't actually simulate frames, this is just for setTimeout timers
   SLOW: 200,
   NORMAL: 60,
   FAST: 15,

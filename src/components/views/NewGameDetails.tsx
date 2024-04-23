@@ -29,7 +29,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import InfoIcon from "@mui/icons-material/Info";
 import { DIFFICULTIES, LOCATIONS } from "../../Constants";
 import { getDb, login } from "../../Globals";
-import { SCENARIOS } from "../../Scenarios";
+import { SCENARIOS } from "../../data/Scenarios";
 import { GameType, LocationType, ScenarioType, ScoreType } from "../../Types";
 
 const numbro = require("numbro");

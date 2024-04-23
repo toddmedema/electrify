@@ -4,7 +4,7 @@ import { logEvent } from "../../Globals";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
 import { LOCATIONS } from "../../Constants";
-import { SCENARIOS } from "../../Scenarios";
+import { SCENARIOS } from "../../data/Scenarios";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { AppStateType, GameType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
@@ -15,9 +15,18 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
+let lastLoad = performance.now();
+const LOADING_DEBOUNCE_MS = 1000;
+
 const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
   return {
     load: (game: GameType) => {
+      if (performance.now() - lastLoad < LOADING_DEBOUNCE_MS) {
+        // Compositor sometimes renders cards multiple times, no good for loading
+        return;
+      }
+
+      lastLoad = performance.now();
       logEvent("scenario_start", {
         id: game.scenarioId,
         difficulty: game.difficulty,

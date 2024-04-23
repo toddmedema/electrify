@@ -1,15 +1,15 @@
-import { LCWH } from "./helpers/Financials";
-import { DIFFICULTIES } from "./Constants";
+import { LCWH } from "../helpers/Financials";
+import { DIFFICULTIES } from "../Constants";
 import {
   FacilityOperatingType,
   GameType,
   GeneratorShoppingType,
   StorageShoppingType,
-} from "./Types";
+} from "../Types";
 import {
   getWindCapacityFactor,
   getSolarCapacityFactor,
-} from "./helpers/Energy";
+} from "../helpers/Energy";
 
 // TODO additional sources of information
 // BASE DATE: 2018

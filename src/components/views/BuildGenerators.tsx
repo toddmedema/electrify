@@ -42,7 +42,7 @@ import {
   LOAN_MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
-import { GENERATORS } from "../../Facilities";
+import { GENERATORS } from "../../data/Facilities";
 import {
   DateType,
   GameType,
