@@ -68,11 +68,12 @@ export const LOCATIONS = {
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 
+// How long between each simulated frame
 export const TICK_MS = {
-  PAUSED: 250,
-  SLOW: 100,
-  NORMAL: 40,
-  FAST: 1,
+  PAUSED: 250, // pause doesn't actually simulate frames, this is just the timeout timer
+  SLOW: 200,
+  NORMAL: 60,
+  FAST: 15,
 };
 
 export const INFLATION = 0.03;

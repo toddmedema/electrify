@@ -81,6 +81,7 @@ interface NewGameAction {
   location: LocationType;
 }
 
+let previousTickMs = 0;
 let previousSpeed = "PAUSED" as SpeedType;
 let previousMonth = "";
 const initialGame: GameType = {
@@ -109,6 +110,7 @@ export const gameSlice = createSlice({
       }
 
       if (state.speed === "PAUSED") {
+        previousTickMs = performance.now();
         setTimeout(
           () => store.dispatch(gameSlice.actions.tick()),
           TICK_MS.PAUSED
@@ -116,210 +118,18 @@ export const gameSlice = createSlice({
         return;
       }
 
-      state.date = getDateFromMinute(
-        state.date.minute + TICK_MINUTES,
-        state.startingYear
-      );
-      const now = getTimeFromTimeline(state.date.minute, state.timeline);
-      const prev = getTimeFromTimeline(
-        state.date.minute - TICK_MINUTES,
-        state.timeline
-      );
-      if (now && prev) {
-        updateSupplyFacilitiesFinances(state, prev, now);
-
-        if (previousMonth !== state.date.month) {
-          previousMonth = state.date.month;
-          const history = state.monthlyHistory;
-          const { cash, customers } = now;
-
-          // Record final history for the month, then generate the new timeline
-          history.unshift(
-            summarizeTimeline(state.timeline, state.startingYear)
-          );
-          state.timeline = generateNewTimeline(state, cash, customers);
-
-          // Pre-roll a few frames to compensate for temperature / demand jumps across months
-          for (let i = 0; i < 4; i++) {
-            updateSupplyFacilitiesFinances(
-              state,
-              state.timeline[0],
-              state.timeline[0],
-              true
-            );
-          }
-
-          // ===== TRIGGERS ======
-          // Failure: Bankrupt
-          if (now.cash < 0) {
-            logEvent("scenario_end", {
-              id: state.scenarioId,
-              type: "bankrupt",
-              difficulty: state.difficulty,
-            });
-            const summary = summarizeHistory(history);
-            setTimeout(
-              () =>
-                store.dispatch(
-                  dialogOpen({
-                    title: "Bankrupt!",
-                    message: `You've run out of money.
-                    You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
-                    earned ${formatMoneyConcise(summary.revenue)} in revenue
-                    and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
-                    open: true,
-                    notCancellable: true,
-                    actionLabel: "Try again",
-                    action: () => store.dispatch(gameSlice.actions.quit()),
-                  })
-                ),
-              1
-            );
-          }
-
-          // Failure: Too many blackouts
-          if (
-            history[1] &&
-            history[2] &&
-            history[3] &&
-            history[1].supplyWh < history[1].demandWh * 0.9 &&
-            history[2].supplyWh < history[2].demandWh * 0.9 &&
-            history[3].supplyWh < history[3].demandWh * 0.9
-          ) {
-            logEvent("scenario_end", {
-              id: state.scenarioId,
-              type: "blackouts",
-              difficulty: state.difficulty,
-            });
-            const summary = summarizeHistory(history);
-            setTimeout(
-              () =>
-                store.dispatch(
-                  dialogOpen({
-                    title: "Fired!",
-                    message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-                    You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
-                    earned ${formatMoneyConcise(summary.revenue)} in revenue
-                    and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
-                    open: true,
-                    notCancellable: true,
-                    actionLabel: "Try again",
-                    action: () => store.dispatch(gameSlice.actions.quit()),
-                  })
-                ),
-              1
-            );
-          }
-
-          const scenario =
-            SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
-
-          // Success: Survived duration
-          if (
-            state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)
-          ) {
-            const localStoragePlayed = (
-              getStorageJson("plays", { plays: [] }) as any
-            ).plays as LocalStoragePlayedType[];
-            setStorageKeyValue("plays", {
-              plays: [
-                ...localStoragePlayed,
-                {
-                  scenarioId: state.scenarioId,
-                  date: new Date().toString(),
-                } as LocalStoragePlayedType,
-              ],
-            });
-
-            // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
-            const summary = summarizeHistory(history);
-            const blackoutsTWh =
-              Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-            // Scoring algorithm should also be updated in Game.tsx
-            const score =
-              scenario.ownership === "Investor"
-                ? {
-                    supply: Math.round(summary.supplyWh / 1000000000000),
-                    netWorth: Math.round((40 * summary.netWorth) / 1000000000),
-                    customers: Math.round((2 * summary.customers) / 100000),
-                    emissions: Math.round((-2 * summary.kgco2e) / 1000000000),
-                    blackouts: Math.round(-8 * blackoutsTWh),
-                  }
-                : {
-                    supply: Math.round((10 * summary.supplyWh) / 1000000000000),
-                    emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
-                    blackouts: Math.round(-10 * blackoutsTWh),
-                  };
-
-            const finalScore = Object.values(score).reduce(
-              (a: number, b: number) => a + b
-            );
-            const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
-
-            if (!scenario.tutorialSteps) {
-              setTimeout(
-                () =>
-                  store.dispatch(
-                    submitHighscore({
-                      score: finalScore,
-                      scoreBreakdown: score, // For analytics purposes only
-                      scenarioId: scenario.id,
-                      difficulty,
-                    })
-                  ),
-                1
-              );
-            }
-
-            logEvent("scenario_end", {
-              id: scenario.id,
-              type: "win",
-              difficulty,
-              score: finalScore,
-            });
-            setTimeout(
-              () =>
-                store.dispatch(
-                  dialogOpen({
-                    title: scenario.endTitle || `You've retired!`,
-                    message: scenario.endMessage || (
-                      <div>
-                        Your final score is {finalScore}:<br />
-                        <br />+{score.supply} pts from electricity supplied
-                        <br />
-                        {scenario.ownership === "Investor" && (
-                          <span>
-                            +{score.netWorth} pts from final net worth
-                            <br />
-                          </span>
-                        )}
-                        {scenario.ownership === "Investor" && (
-                          <span>
-                            +{score.customers} pts from final customers
-                            <br />
-                          </span>
-                        )}
-                        {score.emissions} pts from emissions
-                        <br />
-                        {score.blackouts} pts from blackouts
-                        <br />
-                      </div>
-                    ),
-                    open: true,
-                    closeText: "Keep playing",
-                    actionLabel: "Return to menu",
-                    action: () => store.dispatch(gameSlice.actions.quit()),
-                  })
-                ),
-              1
-            );
-          }
-        }
+      // update simulation if accumulated delta exceeds frame time
+      // calculate multiple simulation frames per render if on a slow device
+      let delta = performance.now() - previousTickMs;
+      while (delta > TICK_MS[state.speed]) {
+        tickState(state);
+        delta -= TICK_MS[state.speed];
+        previousTickMs = performance.now();
       }
 
       setTimeout(
         () => store.dispatch(gameSlice.actions.tick()),
-        TICK_MS[state.speed]
+        Math.max(1, TICK_MS[state.speed] - delta)
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
@@ -479,6 +289,206 @@ export const {
 export default gameSlice.reducer;
 
 // ====== HELPERS ======
+
+// Ticks the state forward in place
+function tickState(state: GameType) {
+  state.date = getDateFromMinute(
+    state.date.minute + TICK_MINUTES,
+    state.startingYear
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  const prev = getTimeFromTimeline(
+    state.date.minute - TICK_MINUTES,
+    state.timeline
+  );
+  if (now && prev) {
+    updateSupplyFacilitiesFinances(state, prev, now);
+
+    if (previousMonth !== state.date.month) {
+      previousMonth = state.date.month;
+      const history = state.monthlyHistory;
+      const { cash, customers } = now;
+
+      // Record final history for the month, then generate the new timeline
+      history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      state.timeline = generateNewTimeline(state, cash, customers);
+
+      // Pre-roll a few frames to compensate for temperature / demand jumps across months
+      for (let i = 0; i < 4; i++) {
+        updateSupplyFacilitiesFinances(
+          state,
+          state.timeline[0],
+          state.timeline[0],
+          true
+        );
+      }
+
+      // ===== TRIGGERS ======
+      // Failure: Bankrupt
+      if (now.cash < 0) {
+        logEvent("scenario_end", {
+          id: state.scenarioId,
+          type: "bankrupt",
+          difficulty: state.difficulty,
+        });
+        const summary = summarizeHistory(history);
+        setTimeout(
+          () =>
+            store.dispatch(
+              dialogOpen({
+                title: "Bankrupt!",
+                message: `You've run out of money.
+                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+                earned ${formatMoneyConcise(summary.revenue)} in revenue
+                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                open: true,
+                notCancellable: true,
+                actionLabel: "Try again",
+                action: () => store.dispatch(gameSlice.actions.quit()),
+              })
+            ),
+          1
+        );
+      }
+
+      // Failure: Too many blackouts
+      if (
+        history[1] &&
+        history[2] &&
+        history[3] &&
+        history[1].supplyWh < history[1].demandWh * 0.9 &&
+        history[2].supplyWh < history[2].demandWh * 0.9 &&
+        history[3].supplyWh < history[3].demandWh * 0.9
+      ) {
+        logEvent("scenario_end", {
+          id: state.scenarioId,
+          type: "blackouts",
+          difficulty: state.difficulty,
+        });
+        const summary = summarizeHistory(history);
+        setTimeout(
+          () =>
+            store.dispatch(
+              dialogOpen({
+                title: "Fired!",
+                message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
+                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+                earned ${formatMoneyConcise(summary.revenue)} in revenue
+                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                open: true,
+                notCancellable: true,
+                actionLabel: "Try again",
+                action: () => store.dispatch(gameSlice.actions.quit()),
+              })
+            ),
+          1
+        );
+      }
+
+      const scenario =
+        SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
+
+      // Success: Survived duration
+      if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
+        const localStoragePlayed = (
+          getStorageJson("plays", { plays: [] }) as any
+        ).plays as LocalStoragePlayedType[];
+        setStorageKeyValue("plays", {
+          plays: [
+            ...localStoragePlayed,
+            {
+              scenarioId: state.scenarioId,
+              date: new Date().toString(),
+            } as LocalStoragePlayedType,
+          ],
+        });
+
+        // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
+        const summary = summarizeHistory(history);
+        const blackoutsTWh =
+          Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+        // Scoring algorithm should also be updated in Game.tsx
+        const score =
+          scenario.ownership === "Investor"
+            ? {
+                supply: Math.round(summary.supplyWh / 1000000000000),
+                netWorth: Math.round((40 * summary.netWorth) / 1000000000),
+                customers: Math.round((2 * summary.customers) / 100000),
+                emissions: Math.round((-2 * summary.kgco2e) / 1000000000),
+                blackouts: Math.round(-8 * blackoutsTWh),
+              }
+            : {
+                supply: Math.round((10 * summary.supplyWh) / 1000000000000),
+                emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
+                blackouts: Math.round(-10 * blackoutsTWh),
+              };
+
+        const finalScore = Object.values(score).reduce(
+          (a: number, b: number) => a + b
+        );
+        const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
+
+        if (!scenario.tutorialSteps) {
+          setTimeout(
+            () =>
+              store.dispatch(
+                submitHighscore({
+                  score: finalScore,
+                  scoreBreakdown: score, // For analytics purposes only
+                  scenarioId: scenario.id,
+                  difficulty,
+                })
+              ),
+            1
+          );
+        }
+
+        logEvent("scenario_end", {
+          id: scenario.id,
+          type: "win",
+          difficulty,
+          score: finalScore,
+        });
+        setTimeout(
+          () =>
+            store.dispatch(
+              dialogOpen({
+                title: scenario.endTitle || `You've retired!`,
+                message: scenario.endMessage || (
+                  <div>
+                    Your final score is {finalScore}:<br />
+                    <br />+{score.supply} pts from electricity supplied
+                    <br />
+                    {scenario.ownership === "Investor" && (
+                      <span>
+                        +{score.netWorth} pts from final net worth
+                        <br />
+                      </span>
+                    )}
+                    {scenario.ownership === "Investor" && (
+                      <span>
+                        +{score.customers} pts from final customers
+                        <br />
+                      </span>
+                    )}
+                    {score.emissions} pts from emissions
+                    <br />
+                    {score.blackouts} pts from blackouts
+                    <br />
+                  </div>
+                ),
+                open: true,
+                closeText: "Keep playing",
+                actionLabel: "Return to menu",
+                action: () => store.dispatch(gameSlice.actions.quit()),
+              })
+            ),
+          1
+        );
+      }
+    }
+  }
+}
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
 function getDemandW(
