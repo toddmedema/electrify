@@ -6,6 +6,8 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 import {
   formatMonthChartAxis,
@@ -61,6 +63,26 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
+          containerComponent={
+            <VictoryVoronoiContainer
+              voronoiDimension="x"
+              // Labels are rendered on EACH chart, so we only render on first one, otherwise we get duplicate labels
+              voronoiBlacklist={fuels.slice(1)}
+              labels={({ datum }) =>
+                fuels
+                  .map((f: FuelNameType) => f + ": " + formatWatts(datum[f]))
+                  .join("\n")
+              }
+              labelComponent={
+                <VictoryTooltip
+                  cornerRadius={2}
+                  constrainToVisibleArea
+                  flyoutStyle={{ fill: "white" }}
+                  style={{ textAnchor: "end" }}
+                />
+              }
+            />
+          }
         >
           <VictoryAxis
             tickCount={6}
@@ -96,6 +118,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           {fuels.map((f: FuelNameType, i: number) => (
             <VictoryLine
               key={i}
+              name={f}
               data={data}
               x="minute"
               y={f}

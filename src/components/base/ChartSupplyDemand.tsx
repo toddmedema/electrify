@@ -7,6 +7,8 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 import { getDateFromMinute, getSunriseSunset } from "../../helpers/DateTime";
 import { formatWatts } from "../../helpers/Format";
@@ -169,6 +171,29 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         domain={{ y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={height || 300}
+        containerComponent={
+          <VictoryVoronoiContainer
+            voronoiDimension="x"
+            // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
+            voronoiBlacklist={[
+              "supplyHistoric",
+              "supplyForecast",
+              "blackouts",
+              "current",
+            ]}
+            labels={({ datum }) =>
+              `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`
+            }
+            labelComponent={
+              <VictoryTooltip
+                cornerRadius={2}
+                constrainToVisibleArea
+                flyoutStyle={{ fill: "white" }}
+                style={{ textAnchor: "end" }}
+              />
+            }
+          />
+        }
       >
         <VictoryAxis
           tickValues={[sunrise, sunset]}
@@ -196,6 +221,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryArea
+          name="supplyHistoric"
           data={historic}
           x="minute"
           y="supplyW"
@@ -208,6 +234,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
+          name="supplyForecast"
           data={forecast}
           x="minute"
           y="supplyW"
@@ -219,6 +246,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
           }}
         />
         <VictoryLine
+          name="demand"
           data={timeline}
           x="minute"
           y="demandW"
@@ -231,6 +259,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         />
         {blackoutCount > 0 && (
           <VictoryArea
+            name="blackouts"
             data={blackouts}
             x="minute"
             y="value"
@@ -245,6 +274,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         )}
         {currentMinute !== rangeMax && (
           <VictoryLine
+            name="current"
             data={[
               { x: currentMinute, y: domainMin },
               { x: currentMinute, y: domainMax },

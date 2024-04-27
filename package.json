@@ -43,7 +43,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "pretty": "prettier --write \"src/**/*.{css,js,jsx,tsx,json}\""
+    "pretty": "prettier --write \"src/**/*.{css,js,jsx,tsx,json}\"",
+    "deploy": "./deploy.sh"
   },
   "eslintConfig": {
     "extends": [

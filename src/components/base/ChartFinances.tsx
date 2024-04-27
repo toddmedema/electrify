@@ -7,6 +7,8 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 
 interface ChartData {
@@ -30,7 +32,7 @@ const ChartFinances = (props: Props): JSX.Element => {
   const rangeMin = props.timeline[0].month;
   const rangeMax = Math.max(
     rangeMin + 11,
-    props.timeline[props.timeline.length - 1].month,
+    props.timeline[props.timeline.length - 1].month
   );
   const past = [] as ChartData[];
   const projected = [] as ChartData[];
@@ -57,6 +59,20 @@ const ChartFinances = (props: Props): JSX.Element => {
         domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={props.height || 300}
+        containerComponent={
+          <VictoryVoronoiContainer
+            voronoiDimension="x"
+            labels={({ datum }) => props.format(datum.value).toString()}
+            labelComponent={
+              <VictoryTooltip
+                cornerRadius={2}
+                constrainToVisibleArea
+                flyoutStyle={{ fill: "white" }}
+                style={{ textAnchor: "end" }}
+              />
+            }
+          />
+        }
       >
         <VictoryAxis
           tickFormat={(t) => formatMonthChartAxis(t, multiyear)}

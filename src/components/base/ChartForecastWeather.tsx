@@ -6,6 +6,8 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
@@ -47,6 +49,24 @@ export default class ChartForecastWeather extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
+          containerComponent={
+            <VictoryVoronoiContainer
+              voronoiDimension="x"
+              // Labels are rendered on EACH chart, so we only render on temperature, otherwise we get duplicate labels
+              voronoiBlacklist={["wind"]}
+              labels={({ datum }) =>
+                `Temperature: ${Math.round(datum.temperatureC)}°C\nWind: ${Math.round(datum.windKph)} km/h`
+              }
+              labelComponent={
+                <VictoryTooltip
+                  cornerRadius={2}
+                  constrainToVisibleArea
+                  flyoutStyle={{ fill: "white" }}
+                  style={{ textAnchor: "end" }}
+                />
+              }
+            />
+          }
         >
           <VictoryAxis
             tickCount={6}
@@ -78,6 +98,7 @@ export default class ChartForecastWeather extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="temperature"
             data={data}
             x="minute"
             y="temperatureC"
@@ -90,6 +111,7 @@ export default class ChartForecastWeather extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="wind"
             data={data}
             x="minute"
             y="windKph"
@@ -110,7 +132,7 @@ export default class ChartForecastWeather extends React.PureComponent<
             symbolSpacer={5}
             data={[
               { name: "Heat (°C)", symbol: { fill: temperatureColor } },
-              { name: "Wind (Kph)", symbol: { fill: windColor } },
+              { name: "Wind (km/h)", symbol: { fill: windColor } },
             ]}
           />
         </VictoryChart>
