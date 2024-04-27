@@ -6,6 +6,8 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 import { TickPresentFutureType } from "../../Types";
 import {
@@ -52,6 +54,24 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
+          containerComponent={
+            <VictoryVoronoiContainer
+              voronoiDimension="x"
+              // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels
+              voronoiBlacklist={["demand", "blackouts"]}
+              labels={({ datum }) =>
+                `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`
+              }
+              labelComponent={
+                <VictoryTooltip
+                  cornerRadius={2}
+                  constrainToVisibleArea
+                  flyoutStyle={{ fill: "white" }}
+                  style={{ textAnchor: "end" }}
+                />
+              }
+            />
+          }
         >
           <VictoryAxis
             tickCount={6}
@@ -85,6 +105,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="supply"
             data={timeline}
             x="minute"
             y="supplyW"
@@ -96,6 +117,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="demand"
             data={timeline}
             x="minute"
             y="demandW"
@@ -106,6 +128,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
             }}
           />
           <VictoryArea
+            name="blackouts"
             data={blackouts}
             x="minute"
             y="value"

@@ -6,12 +6,14 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
+  VictoryVoronoiContainer,
+  VictoryTooltip,
 } from "victory";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatMoneyConcise } from "../../helpers/Format";
+import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
 import { TickPresentFutureType } from "../../Types";
 import { chartTheme, fuelColors } from "../../Theme";
 
@@ -40,6 +42,27 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
+          containerComponent={
+            <VictoryVoronoiContainer
+              voronoiDimension="x"
+              // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
+              voronoiBlacklist={["naturalGas", "oil", "uranium"]}
+              labels={({ datum }) =>
+                `Coal: ${formatMoneyStable(datum.Coal)}
+                Natural Gas: ${formatMoneyStable(datum["Natural Gas"])}
+                Oil: ${formatMoneyStable(datum.Oil)}
+                Uranium: ${formatMoneyStable(datum.Uranium)}`
+              }
+              labelComponent={
+                <VictoryTooltip
+                  cornerRadius={2}
+                  constrainToVisibleArea
+                  flyoutStyle={{ fill: "white" }}
+                  style={{ textAnchor: "end" }}
+                />
+              }
+            />
+          }
         >
           <VictoryAxis
             tickCount={6}
@@ -72,18 +95,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             }}
           />
           <VictoryLine
-            data={timeline}
-            x="minute"
-            y="Natural Gas"
-            interpolation="natural"
-            style={{
-              data: {
-                stroke: fuelColors["Natural Gas"],
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
+            name="coal"
             data={timeline}
             x="minute"
             y="Coal"
@@ -96,6 +108,20 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="naturalGas"
+            data={timeline}
+            x="minute"
+            y="Natural Gas"
+            interpolation="natural"
+            style={{
+              data: {
+                stroke: fuelColors["Natural Gas"],
+                strokeWidth: 1,
+              },
+            }}
+          />
+          <VictoryLine
+            name="oil"
             data={timeline}
             x="minute"
             y="Oil"
@@ -108,6 +134,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             }}
           />
           <VictoryLine
+            name="uranium"
             data={timeline}
             x="minute"
             y="Uranium"
