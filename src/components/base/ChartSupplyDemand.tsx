@@ -84,6 +84,8 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
       ).sunset;
   }
 
+  const noon = sunrise + (sunset - sunrise) / 2
+
   // BLACKOUT CALCULATION
   let blackoutCount = 0;
   const blackouts = [
@@ -167,7 +169,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
     <div>
       <VictoryChart
         theme={VictoryTheme.material}
-        padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
+        padding={{ top: 10, bottom: 45, left: 55, right: 5 }}
         domain={{ y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={height || 300}
@@ -196,8 +198,8 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         }
       >
         <VictoryAxis
-          tickValues={[sunrise, sunset]}
-          tickFormat={["sunrise", "sunset"]}
+          tickValues={[sunrise, noon, sunset]}
+          tickFormat={["🌅", "☀️ ", "🌇"]}
           tickLabelComponent={<VictoryLabel dy={-5} />}
           style={{
             axis: chartTheme.axis,
