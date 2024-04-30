@@ -249,6 +249,7 @@ export interface ScenarioType {
 }
 
 export interface GameType {
+  seed: number;
   difficulty: DifficultyType;
   scenarioId: number;
   location: LocationType;
