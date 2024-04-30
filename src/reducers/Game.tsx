@@ -19,7 +19,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove } from "../helpers/Math";
+import { arrayMove, seedRandom } from "../helpers/Math";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
@@ -86,6 +86,7 @@ let previousTickMs = 0;
 let previousSpeed = "PAUSED" as SpeedType;
 let previousMonth = "";
 const initialGame: GameType = {
+  seed: Date.now() * Math.random(),
   scenarioId: 0,
   location: LOCATIONS["SF"],
   difficulty: "Employee",
@@ -134,6 +135,8 @@ export const gameSlice = createSlice({
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
       state.timeline = [] as TickPresentFutureType[];
+      state.seed = Date.now() * Math.random();
+      seedRandom(state.seed);
       const scenario =
         SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
