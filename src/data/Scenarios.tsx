@@ -418,7 +418,18 @@ export const SCENARIOS = [
         content: (
           <Typography variant="body1">
             This chart shows forecasted supply and demand over the next year -
-            including any upcoming blackouts.
+            including any upcoming blackouts. Try pausing a generator to see how
+            it affects your ability to meet demand.
+          </Typography>
+        ),
+      },
+      {
+        target: "#chartForecastSupplyByFuel",
+        content: (
+          <Typography variant="body1">
+            This chart shows what fuels are supplying your electricity. Try
+            dragging to re-order your facilities to see how it affects your fuel
+            consumption.
           </Typography>
         ),
       },
@@ -436,8 +447,9 @@ export const SCENARIOS = [
         target: "#chartForecastWeather",
         content: (
           <Typography variant="body1">
-            This chart shows forecasted weather, which contributes to demand -
-            and the output of renewable generators.
+            This chart shows forecasted weather, which affects demand (such as
+            heating and air conditioning) - and the output of solar and wind
+            generators.
           </Typography>
         ),
       },
@@ -450,8 +462,8 @@ export const SCENARIOS = [
             menu.
             <br />
             <br />
-            This tutorial will run for 1 year - see how the forecasts change
-            over time.
+            This tutorial will run for 1 year so that you can see how the
+            forecasts change over time.
           </Typography>
         ),
       },

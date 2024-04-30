@@ -220,6 +220,16 @@ export const gameSlice = createSlice({
       );
       state.timeline = reforecastSupply(state);
     },
+    togglePauseFacility: (state, action: PayloadAction<number>) => {
+      state.facilities.forEach(
+        (g: GeneratorOperatingType | StorageOperatingType) => {
+          if (g.id === action.payload) {
+            g.paused = !g.paused;
+          }
+        }
+      );
+      state.timeline = reforecastSupply(state);
+    },
     reprioritizeFacility: (
       state,
       action: PayloadAction<ReprioritizeFacilityAction>
@@ -269,6 +279,7 @@ export const {
   quit,
   buildFacility,
   sellFacility,
+  togglePauseFacility,
   reprioritizeFacility,
   loaded,
   setSpeed,
@@ -621,6 +632,13 @@ function updateSupplyFacilitiesFinances(
   let charge = 0;
   let storedWh = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
+    if (g.paused) {
+      g.currentW = Math.max(
+        0,
+        g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes
+      ); // ramp down
+      return;
+    }
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) {
         // Capable of generating electricity
@@ -715,7 +733,12 @@ function updateSupplyFacilitiesFinances(
   let principalRepayment = 0;
   facilities.forEach((g: FacilityShoppingType) => {
     if (g.yearsToBuildLeft === 0) {
-      expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
+      if (g.paused) {
+        // paused facilities only pay half of their operating costs
+        expensesOM += g.annualOperatingCost / TICKS_PER_YEAR / 2;
+      } else {
+        expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
+      }
       if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *

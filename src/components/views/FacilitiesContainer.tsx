@@ -1,7 +1,11 @@
 import Redux from "redux";
 import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
-import { sellFacility, reprioritizeFacility } from "../../reducers/Game";
+import {
+  sellFacility,
+  togglePauseFacility,
+  reprioritizeFacility,
+} from "../../reducers/Game";
 import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 
@@ -19,6 +23,9 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     onSell: (id) => {
       dispatch(sellFacility(id));
     },
+    onTogglePause: (id) => {
+      dispatch(togglePauseFacility(id));
+    },
     onReprioritize: (spotInList: number, delta: number) => {
       dispatch(reprioritizeFacility({ spotInList, delta }));
     },
@@ -30,7 +37,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
 const FacilitiesContainer = connect(
   mapStateToProps,
-  mapDispatchToProps,
+  mapDispatchToProps
 )(Facilities);
 
 export default FacilitiesContainer;

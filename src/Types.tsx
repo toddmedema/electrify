@@ -176,6 +176,7 @@ export interface GeneratorOperatingType
   currentW: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
+  paused: boolean;
 }
 
 export interface StorageOperatingType extends StorageShoppingType, LoanInfo {

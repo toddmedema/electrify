@@ -16,6 +16,8 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayIcon from "@mui/icons-material/PlayArrow";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
@@ -35,6 +37,7 @@ interface FacilityListItemProps {
   facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
+  onTogglePause: DispatchProps["onTogglePause"];
   onSell: DispatchProps["onSell"];
   onReprioritize: DispatchProps["onReprioritize"];
 }
@@ -52,7 +55,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
     setOpen(!open);
   };
 
-  const { facility } = props;
+  const { facility, onTogglePause } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   let secondaryText = "";
   if (underConstruction) {
@@ -131,8 +134,6 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                     ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
                     : ""}
                   .
-                  {!underConstruction &&
-                    ` You will be selling your facility to a competitor.`}
                 </DialogContentText>
               </DialogContent>
               <DialogActions>
@@ -153,6 +154,28 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               </DialogActions>
             </Dialog>
             <ListItemSecondaryAction>
+              {!underConstruction &&
+                props.listLength > 1 &&
+                !facility.paused && (
+                  <IconButton
+                    onClick={() => onTogglePause(facility.id)}
+                    edge="end"
+                    color="primary"
+                    size="large"
+                  >
+                    <PauseIcon />
+                  </IconButton>
+                )}
+              {facility.paused && (
+                <IconButton
+                  onClick={() => onTogglePause(facility.id)}
+                  edge="end"
+                  color="primary"
+                  size="large"
+                >
+                  <PlayIcon />
+                </IconButton>
+              )}
               {!underConstruction && props.listLength > 1 && (
                 <IconButton
                   onClick={toggleDialog}
@@ -188,6 +211,7 @@ export interface StateProps {
 export interface DispatchProps {
   onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
+  onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
   onStorageBuild: () => void;
 }
@@ -223,8 +247,14 @@ export default class Facilities extends React.Component<Props, {}> {
   }
 
   public render() {
-    const { game, onGeneratorBuild, onSell, onReprioritize, onStorageBuild } =
-      this.props;
+    const {
+      game,
+      onGeneratorBuild,
+      onSell,
+      onTogglePause,
+      onReprioritize,
+      onStorageBuild,
+    } = this.props;
     const facilitiesCount = game.facilities.length;
 
     return (
@@ -270,6 +300,7 @@ export default class Facilities extends React.Component<Props, {}> {
                         facility={g}
                         key={g.id}
                         onSell={onSell}
+                        onTogglePause={onTogglePause}
                         onReprioritize={onReprioritize}
                         spotInList={i}
                         listLength={facilitiesCount}
