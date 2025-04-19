@@ -13,6 +13,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SearchIcon from "@mui/icons-material/Search";
+import InputBase from '@mui/material/InputBase';
 
 export interface StateProps {}
 
@@ -48,10 +49,51 @@ function ManualItem(props: ManualEntry): JSX.Element {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Manual extends React.PureComponent<Props, {}> {
-  // TODO search state -> filter clones list of entries by title + entry text
+export default class Manual extends React.PureComponent<Props, { searchTerm: string }> {
+  state = {
+    searchTerm: ''
+  };
+
+  handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ searchTerm: event.target.value });
+  };
+
+  filterEntries = () => {
+    return MANUAL_ENTRIES.filter((entry) => {
+      const titleMatch = entry.title.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+      
+      let contentMatch = false;
+      const children = entry.entry.props.children;
+      
+      if (typeof children === 'string') {
+        contentMatch = children.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+      } else if (Array.isArray(children)) {
+        contentMatch = children.some(child => {
+          if (typeof child === 'string') {
+            return child.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+          }
+          if (child && typeof child === 'object' && 'props' in child) {
+            const childText = child.props.children;
+            if (typeof childText === 'string') {
+              return childText.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+            }
+          }
+          return false;
+        });
+      } else if (children && typeof children === 'object' && 'props' in children) {
+        const childText = children.props.children;
+        if (typeof childText === 'string') {
+          contentMatch = childText.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+        }
+      }
+
+      return titleMatch || contentMatch;
+    });
+  };
 
   public render() {
+    const filteredEntries = this.state.searchTerm ? this.filterEntries() : MANUAL_ENTRIES;
+
     return (
       <div className="flexContainer" id="gameCard">
         <div id="topbar">
@@ -66,15 +108,22 @@ export default class Manual extends React.PureComponent<Props, {}> {
               <ChevronLeftIcon />
             </IconButton>
             <Typography variant="h6">Electrify Manual</Typography>
-            <IconButton
-              onClick={this.props.onBack}
-              aria-label="search"
-              edge="end"
-              color="primary"
-              size="large"
-            >
-              <SearchIcon />
-            </IconButton>
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+              <InputBase
+                placeholder="Search..."
+                value={this.state.searchTerm}
+                onChange={this.handleSearch}
+                style={{ marginRight: '8px' }}
+              />
+              <IconButton
+                aria-label="search"
+                edge="end"
+                color="primary"
+                size="large"
+              >
+                <SearchIcon />
+              </IconButton>
+            </div>
           </Toolbar>
         </div>
         <List dense className="scrollable cardList" id="manual">
@@ -84,7 +133,7 @@ export default class Manual extends React.PureComponent<Props, {}> {
               about how they work in game - and in real life.
             </CardContent>
           </Card>
-          {MANUAL_ENTRIES.map((entry: ManualEntry) => (
+          {filteredEntries.map((entry: ManualEntry) => (
             <ManualItem {...entry} key={entry.title} />
           ))}
         </List>
