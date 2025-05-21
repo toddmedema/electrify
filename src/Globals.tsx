@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseApp = initializeApp({
-  apiKey: "AIzaSyBCZX3pfJe65LU1Ei_ONj6Yw2eaMKsZX7g",
+  apiKey: "CONTACT-ADMIN-TO-GET-KEY",
   authDomain: "electrify-game.firebaseapp.com",
   databaseURL: "https://electrify-game.firebaseio.com",
   projectId: "electrify-game",
