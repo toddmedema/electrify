@@ -18,6 +18,8 @@ With Node.js installed, run the following from the root of the repository:
 npm install
 ```
 
+To use the online high score capabilities, you will need to contact an admin to get a Firebase api key.
+
 ### Development Workflow: Serve & watch
 
 ```sh
