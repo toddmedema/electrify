@@ -10,13 +10,14 @@ import {
   Typography,
 } from "@mui/material";
 import { TICKS_PER_YEAR } from "../../Constants";
-import { GameType, TickPresentFutureType } from "../../Types";
+import { FuelNameType, GameType, TickPresentFutureType } from "../../Types";
 import {
   formatHour,
   getDateFromMinute,
   getTimeFromTimeline,
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
+import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { generateNewTimeline } from "../../reducers/Game";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
@@ -251,6 +252,7 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
             multiyear={years > 1}
+            fuels={getDispatchOrderedFuels(game.facilities) as FuelNameType[]}
           />
           {hasStorage && (
             <div>

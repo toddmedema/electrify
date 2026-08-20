@@ -10,8 +10,13 @@ import {
   VictoryVoronoiContainer,
   VictoryTooltip,
 } from "victory";
-import { getDateFromMinute, getSunriseSunset } from "../../helpers/DateTime";
-import { formatWatts } from "../../helpers/Format";
+import {
+  formatMinuteOfDayChartAxis,
+  getDateFromMinute,
+  getHourTicks,
+  getSunriseSunset,
+} from "../../helpers/DateTime";
+import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
 import {
   blackoutColor,
@@ -84,7 +89,10 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
       ).sunset;
   }
 
-  const noon = sunrise + (sunset - sunrise) / 2
+  const noon = sunrise + (sunset - sunrise) / 2;
+
+  // "Demand peaks in the early evening" only lands if you can read the clock off the axis
+  const hourTicks = getHourTicks(rangeMin, rangeMax);
 
   // BLACKOUT CALCULATION
   let blackoutCount = 0;
@@ -198,8 +206,8 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         }
       >
         <VictoryAxis
-          tickValues={[sunrise, noon, sunset]}
-          tickFormat={["🌅", "☀️ ", "🌇"]}
+          tickValues={hourTicks}
+          tickFormat={(t: number) => formatMinuteOfDayChartAxis(t)}
           tickLabelComponent={<VictoryLabel dy={-5} />}
           style={{
             axis: chartTheme.axis,
@@ -209,9 +217,25 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
             tickLabels: chartTheme.tickLabels,
           }}
         />
+        {/* Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable */}
+        <VictoryAxis
+          tickValues={[sunrise, noon, sunset]}
+          tickFormat={["🌅", "☀️ ", "🌇"]}
+          tickLabelComponent={<VictoryLabel dy={12} />}
+          style={{
+            axis: { stroke: "none" },
+            ticks: { stroke: "none" },
+            grid: {
+              display: "none",
+            },
+            tickLabels: chartTheme.tickLabels,
+          }}
+        />
         <VictoryAxis
           dependentAxis
-          tickFormat={(t: number) => formatWatts(t)}
+          tickFormat={(t: number, _i: number, ticks: number[]) =>
+            formatWattsAxis(t, ticks)
+          }
           tickLabelComponent={<VictoryLabel dx={5} />}
           fixLabelOverlap={true}
           style={{

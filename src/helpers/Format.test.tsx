@@ -1,4 +1,10 @@
-import { formatWatts } from "./Format";
+import {
+  formatWattHoursAxis,
+  formatWattHoursOfPeak,
+  formatWatts,
+  formatWattsAxis,
+  formatWattsOfPeak,
+} from "./Format";
 
 describe("formatWatts", () => {
   it("should correctly format numbers in the tens", () => {
@@ -44,5 +50,61 @@ describe("formatWatts", () => {
   it("should correctly handle the mantissa parameter when 4", () => {
     const result = formatWatts(1521, 4);
     expect(result).toEqual("1.521kW");
+  });
+});
+
+describe("formatWattsAxis", () => {
+  it("should render every tick in the unit of the largest one", () => {
+    const ticks = [0, 1e8, 2e8, 3e8, 4e8, 5e8];
+    expect(ticks.map((t) => formatWattsAxis(t, ticks))).toEqual([
+      "0MW",
+      "100MW",
+      "200MW",
+      "300MW",
+      "400MW",
+      "500MW",
+    ]);
+  });
+
+  it("should promote the whole axis once the largest tick crosses a unit", () => {
+    const ticks = [0, 3e8, 6e8, 9e8, 1.2e9];
+    expect(ticks.map((t) => formatWattsAxis(t, ticks))).toEqual([
+      "0GW",
+      "0.3GW",
+      "0.6GW",
+      "0.9GW",
+      "1.2GW",
+    ]);
+  });
+});
+
+describe("formatWattHoursAxis", () => {
+  it("should append h to the shared unit", () => {
+    const ticks = [0, 5e8, 1e9];
+    expect(ticks.map((t) => formatWattHoursAxis(t, ticks))).toEqual([
+      "0GWh",
+      "0.5GWh",
+      "1GWh",
+    ]);
+  });
+});
+
+describe("formatWattsOfPeak", () => {
+  it("should report the current output in the peak's unit", () => {
+    expect(formatWattsOfPeak(356000000, 500000000)).toEqual("356/500MW");
+  });
+
+  it("should keep an extra digit when the current output is below the peak's unit", () => {
+    expect(formatWattsOfPeak(100000000, 1000000000)).toEqual("0.1/1GW");
+  });
+
+  it("should handle an idle facility", () => {
+    expect(formatWattsOfPeak(0, 500000000)).toEqual("0/500MW");
+  });
+});
+
+describe("formatWattHoursOfPeak", () => {
+  it("should share a unit across the pair", () => {
+    expect(formatWattHoursOfPeak(100000000, 1000000000)).toEqual("0.1/1GWh");
   });
 });

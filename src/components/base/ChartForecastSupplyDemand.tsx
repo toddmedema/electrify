@@ -14,7 +14,7 @@ import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWatts } from "../../helpers/Format";
+import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import {
   blackoutColor,
   chartTheme,
@@ -93,7 +93,9 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWatts(t)}
+            tickFormat={(t: number, _i: number, ticks: number[]) =>
+              formatWattsAxis(t, ticks)
+            }
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
             style={{

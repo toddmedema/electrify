@@ -13,7 +13,7 @@ import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWattHours } from "../../helpers/Format";
+import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
 import { chartTheme, supplyColor } from "../../Theme";
 
 export interface Props {
@@ -76,7 +76,9 @@ export default class chartForecastStorage extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWattHours(t)}
+            tickFormat={(t: number, _i: number, ticks: number[]) =>
+              formatWattHoursAxis(t, ticks)
+            }
             tickLabelComponent={<VictoryLabel dx={10} />}
             fixLabelOverlap={true}
             style={{
