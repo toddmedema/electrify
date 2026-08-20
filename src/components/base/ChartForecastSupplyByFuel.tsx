@@ -7,9 +7,8 @@ import {
   VictoryLine,
   VictoryStack,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
@@ -94,29 +93,17 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
           domain={{ x: domain.x, y: [0, maxY] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // The stacked bands all carry the same datum, so only the demand line renders labels
-              voronoiBlacklist={fuels}
-              labels={({ datum }) =>
-                [
-                  ...[...fuels]
-                    .reverse()
-                    .map((f: FuelNameType) => f + ": " + formatWatts(datum[f])),
-                  "Demand: " + formatWatts(datum.demandW),
-                ].join("\n")
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              [
+                ...[...fuels]
+                  .reverse()
+                  .map((f: FuelNameType) => f + ": " + formatWatts(datum[f])),
+                "Demand: " + formatWatts(datum.demandW),
+              ].join("\n"),
+            // The stacked bands all carry the same datum, so only the demand line renders labels
+            voronoiBlacklist: fuels,
+          })}
         >
           <VictoryAxis
             tickCount={6}

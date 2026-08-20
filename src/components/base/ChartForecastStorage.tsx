@@ -5,9 +5,8 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMonthChartAxis,
@@ -41,20 +40,9 @@ export default class chartForecastStorage extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              labels={({ datum }) => formatWattHours(datum.storedWh)}
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) => formatWattHours(datum.storedWh),
+          })}
         >
           <VictoryAxis
             tickCount={6}

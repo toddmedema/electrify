@@ -5,9 +5,8 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
@@ -49,26 +48,14 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
-              voronoiBlacklist={PRICED_FUELS.slice(1)}
-              labels={({ datum }) =>
-                PRICED_FUELS.map(
-                  (f) => `${f}: ${formatMoneyStable(datum[f])}`
-                ).join("\n")
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              PRICED_FUELS.map(
+                (f) => `${f}: ${formatMoneyStable(datum[f])}`
+              ).join("\n"),
+            // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
+            voronoiBlacklist: PRICED_FUELS.slice(1),
+          })}
         >
           <VictoryAxis
             tickCount={6}

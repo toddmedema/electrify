@@ -42,6 +42,7 @@ export const blackoutColor = red[800]; // darker than red[500] so the translucen
 export const demandColor = grey[900];
 export const supplyColor = blue[600];
 export const temperatureColor = red[500];
+export const cursorColor = grey[600]; // hover crosshair, lighter than the data it crosses
 export const windColor = fuelColors.Wind; // for weather forecasts
 
 export default createTheme(

@@ -1,0 +1,48 @@
+import * as React from "react";
+import { createContainer, LineSegment, VictoryTooltip } from "victory";
+import { cursorColor } from "../../Theme";
+
+// Voronoi puts one tooltip on screen covering every series at the hovered x; cursor draws the
+// vertical line marking which x that is, so the numbers in the tooltip are tied to a place on
+// the chart rather than floating near the pointer.
+// createContainer's return type is too loose for TSX to accept as a component
+const VoronoiCursorContainer = createContainer(
+  "voronoi",
+  "cursor"
+) as React.ComponentType<any>;
+
+interface Props {
+  labels: (point: any) => string;
+  // Series that shouldn't raise their own tooltip, because one tooltip already reports them all
+  voronoiBlacklist?: string[];
+}
+
+// Shared hover behaviour for every chart in the game
+export function chartTooltipContainer({ labels, voronoiBlacklist }: Props) {
+  return (
+    <VoronoiCursorContainer
+      voronoiDimension="x"
+      cursorDimension="x"
+      voronoiBlacklist={voronoiBlacklist}
+      labels={labels}
+      cursorComponent={
+        <LineSegment
+          style={{
+            stroke: cursorColor,
+            strokeWidth: 1,
+            strokeDasharray: "3,2",
+            pointerEvents: "none",
+          }}
+        />
+      }
+      labelComponent={
+        <VictoryTooltip
+          cornerRadius={2}
+          constrainToVisibleArea
+          flyoutStyle={{ fill: "white" }}
+          style={{ textAnchor: "end" }}
+        />
+      }
+    />
+  );
+}

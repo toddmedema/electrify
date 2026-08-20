@@ -6,9 +6,8 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
 import {
@@ -49,24 +48,12 @@ export default class ChartForecastWeather extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // Labels are rendered on EACH chart, so we only render on temperature, otherwise we get duplicate labels
-              voronoiBlacklist={["wind"]}
-              labels={({ datum }) =>
-                `Temperature: ${Math.round(datum.temperatureC)}°C\nWind: ${Math.round(datum.windKph)} km/h`
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              `Temperature: ${Math.round(datum.temperatureC)}°C\nWind: ${Math.round(datum.windKph)} km/h`,
+            // Labels are rendered on EACH chart, so we only render on temperature, otherwise we get duplicate labels
+            voronoiBlacklist: ["wind"],
+          })}
         >
           <VictoryAxis
             tickCount={6}

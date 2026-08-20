@@ -7,9 +7,8 @@ import {
   VictoryLegend,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import {
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
@@ -181,29 +180,17 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         domain={{ y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={height || 300}
-        containerComponent={
-          <VictoryVoronoiContainer
-            voronoiDimension="x"
-            // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
-            voronoiBlacklist={[
-              "supplyHistoric",
-              "supplyForecast",
-              "blackouts",
-              "current",
-            ]}
-            labels={({ datum }) =>
-              `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`
-            }
-            labelComponent={
-              <VictoryTooltip
-                cornerRadius={2}
-                constrainToVisibleArea
-                flyoutStyle={{ fill: "white" }}
-                style={{ textAnchor: "end" }}
-              />
-            }
-          />
-        }
+        containerComponent={chartTooltipContainer({
+          labels: ({ datum }: any) =>
+            `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
+          // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
+          voronoiBlacklist: [
+            "supplyHistoric",
+            "supplyForecast",
+            "blackouts",
+            "current",
+          ],
+        })}
       >
         <VictoryAxis
           tickValues={hourTicks}
