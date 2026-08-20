@@ -1,0 +1,45 @@
+name: Deploy to Prod
+run-name: Deploying ${{ github.sha }} to electrifygame.com 🚀
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Never let two prod deploys run at once; queue them instead of cancelling,
+# so a half-finished S3 sync is never overwritten by a newer one mid-flight.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: 21.7.0
+          cache: npm
+
+      - run: npm ci
+
+      # Tests are not run here; workflow.yml already runs them on every push.
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Build and deploy to prod
+        env:
+          # Baked into the JS bundle at build time by create-react-app.
+          REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+        run: ./deploy.sh ci-prod

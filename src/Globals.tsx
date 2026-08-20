@@ -4,7 +4,10 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseApp = initializeApp({
-  apiKey: "CONTACT-ADMIN-TO-GET-KEY",
+  // Set by CI from a repo secret; falls back to the placeholder for local dev
+  // (contact an admin for a key). Firebase web API keys are public by design --
+  // access is controlled by Firestore rules and API key restrictions, not secrecy.
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "CONTACT-ADMIN-TO-GET-KEY",
   authDomain: "electrify-game.firebaseapp.com",
   databaseURL: "https://electrify-game.firebaseio.com",
   projectId: "electrify-game",

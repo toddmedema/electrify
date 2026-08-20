@@ -3,7 +3,9 @@
 # Requires the aws cli for s3 deploys (make sure to set your bucket region!)
 # Requires that you run `aws configure set preview.cloudfront true` to enable cloudfront invalidation
 
-TARGETS="beta prod local-beta local-prod"
+set -e
+
+TARGETS="beta prod local-beta local-prod ci-prod"
 target="$1"
 
 getTarget() {
@@ -25,6 +27,14 @@ deploy() {
     betabuild
   elif [ "$target" = "local-prod" ]; then
     prodbuild
+  elif [ "$target" = "ci-prod" ]; then
+    # Non-interactive prod deploy, used by the GitHub Action on pushes to master.
+    # Fail loudly rather than shipping a prod bundle with a broken Firebase key.
+    if [ -z "$REACT_APP_FIREBASE_API_KEY" ]; then
+      echo "REACT_APP_FIREBASE_API_KEY is not set; refusing to deploy prod." >&2
+      exit 1
+    fi
+    prod
   elif [ "$target" = "prod" ]; then
     read -p "Did you test on beta? (y/N) " -n 1
     echo
