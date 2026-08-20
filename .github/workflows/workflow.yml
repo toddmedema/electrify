@@ -1,6 +1,11 @@
 name: Test Code
 run-name: Running tests on behalf of ${{ github.actor }} 🚀
-on: [push]
+# Runs on pull requests only. Tests gate the merge (required status check on
+# master), so re-running them on the post-merge commit would only duplicate a
+# result we already have -- and slow down the prod deploy.
+on:
+  pull_request:
+  workflow_dispatch:
 jobs:
   npm-test:
     runs-on: ubuntu-latest
