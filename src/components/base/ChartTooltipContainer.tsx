@@ -5,10 +5,13 @@ import { cursorColor } from "../../Theme";
 // Voronoi puts one tooltip on screen covering every series at the hovered x; cursor draws the
 // vertical line marking which x that is, so the numbers in the tooltip are tied to a place on
 // the chart rather than floating near the pointer.
+// Cursor first, voronoi second: the combined container appends each behaviour's elements in
+// the order given, and SVG paints in document order, so this keeps the tooltip above the line
+// rather than letting the line strike through it.
 // createContainer's return type is too loose for TSX to accept as a component
-const VoronoiCursorContainer = createContainer(
-  "voronoi",
-  "cursor"
+const CursorVoronoiContainer = createContainer(
+  "cursor",
+  "voronoi"
 ) as React.ComponentType<any>;
 
 interface Props {
@@ -20,7 +23,7 @@ interface Props {
 // Shared hover behaviour for every chart in the game
 export function chartTooltipContainer({ labels, voronoiBlacklist }: Props) {
   return (
-    <VoronoiCursorContainer
+    <CursorVoronoiContainer
       voronoiDimension="x"
       cursorDimension="x"
       voronoiBlacklist={voronoiBlacklist}
