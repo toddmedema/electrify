@@ -1,21 +1,21 @@
 import * as React from "react";
 import {
+  VictoryArea,
   VictoryAxis,
   VictoryChart,
   VictoryLabel,
-  VictoryLegend,
   VictoryLine,
+  VictoryStack,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWatts } from "../../helpers/Format";
+import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
-import { chartTheme, fuelColors } from "../../Theme";
+import { chartTheme, demandColor, fuelColors } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -23,6 +23,8 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  // Bottom-to-top order of the stack, ie the order these fuels are dispatched in
+  fuels: FuelNameType[];
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -32,27 +34,56 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
 > {
   public render() {
     const { domain, height, timeline, startingYear, multiyear } = this.props;
-    // Extract the supply by fuel values
-    const data = timeline.map((t) => {
-      return { minute: t.minute, ...t.supplyByFuel };
+
+    // Anything generating in the forecast window belongs in the stack, even if it was built
+    // partway through and so isn't in the fleet the dispatch order was derived from
+    const fuelsInForecast = new Set<FuelNameType>();
+    timeline.forEach((t) => {
+      Object.keys(t.supplyByFuel).forEach((f) =>
+        fuelsInForecast.add(f as FuelNameType)
+      );
+    });
+    const fuels = this.props.fuels.filter((f) => fuelsInForecast.has(f));
+    fuelsInForecast.forEach((f) => {
+      if (fuels.indexOf(f) === -1) {
+        fuels.push(f);
+      }
     });
 
-    // Check at the end of the list in case anything new is built during the forecast window, and backfill zeroes as needed, until all fuels are present
-    const fuels = Object.keys(
-      timeline[timeline.length - 1].supplyByFuel
-    ).sort() as FuelNameType[];
-    for (let i = 0; i < data.length; i++) {
-      let missingFuel = false;
-      for (let f = 0; f < fuels.length; f++) {
-        if (!data[i][fuels[f]]) {
-          missingFuel = true;
-          data[i][fuels[f]] = 0;
-        }
+    // Every band needs a value at every x or the stack tears, so backfill the whole series.
+    // Each point carries every fuel as well as its own x/y, so that the shared tooltip can read
+    // the whole mix off whichever series the pointer landed on.
+    // The sampled forecast repeats its first minute, and a stack lines its bands up by x, so a
+    // duplicate x knocks every band after it out of alignment - drop repeats as we go.
+    const data: Array<{ [index: string]: number }> = [];
+    timeline.forEach((t) => {
+      if (data.length && data[data.length - 1].minute === t.minute) {
+        return;
       }
-      if (!missingFuel) {
-        break;
-      }
-    }
+      const point: { [index: string]: number } = {
+        minute: t.minute,
+        demandW: t.demandW,
+      };
+      fuels.forEach((f) => {
+        point[f] = t.supplyByFuel[f] || 0;
+      });
+      data.push(point);
+    });
+    const seriesByFuel = fuels.map((f) =>
+      data.map((point) => ({ ...point, x: point.minute, y: point[f] }))
+    );
+    const demandSeries = data.map((point) => ({
+      ...point,
+      x: point.minute,
+      y: point.demandW,
+    }));
+
+    // The stack tops out at total generation, which can sit either side of demand - leave room for both
+    let maxY = 0;
+    data.forEach((d) => {
+      const generated = fuels.reduce((sum, f) => sum + d[f], 0);
+      maxY = Math.max(maxY, generated, d.demandW);
+    });
 
     // Wrapping in spare div prevents excessive height bug
     return (
@@ -60,29 +91,19 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
         <VictoryChart
           theme={VictoryTheme.material}
           padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
-          domain={domain}
-          domainPadding={{ y: [6, 6] }}
+          domain={{ x: domain.x, y: [0, maxY] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // Labels are rendered on EACH chart, so we only render on first one, otherwise we get duplicate labels
-              voronoiBlacklist={fuels.slice(1)}
-              labels={({ datum }) =>
-                fuels
-                  .map((f: FuelNameType) => f + ": " + formatWatts(datum[f]))
-                  .join("\n")
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              [
+                ...[...fuels]
+                  .reverse()
+                  .map((f: FuelNameType) => f + ": " + formatWatts(datum[f])),
+                "Demand: " + formatWatts(datum.demandW),
+              ].join("\n"),
+            // The stacked bands all carry the same datum, so only the demand line renders labels
+            voronoiBlacklist: fuels,
+          })}
         >
           <VictoryAxis
             tickCount={6}
@@ -104,7 +125,9 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWatts(t)}
+            tickFormat={(t: number, _i: number, ticks: number[]) =>
+              formatWattsAxis(t, ticks)
+            }
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
             style={{
@@ -115,33 +138,54 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
               tickLabels: chartTheme.tickLabels,
             }}
           />
-          {fuels.map((f: FuelNameType, i: number) => (
-            <VictoryLine
-              key={i}
-              name={f}
-              data={data}
-              x="minute"
-              y={f}
-              style={{
-                data: {
-                  stroke: fuelColors[f],
-                  strokeWidth: 1,
-                },
-              }}
-            />
-          ))}
-          <VictoryLegend
-            x={270}
-            y={15}
-            centerTitle
-            orientation="vertical"
-            rowGutter={-5}
-            symbolSpacer={5}
-            data={fuels.map((f) => {
-              return { name: f, symbol: { fill: fuelColors[f] } };
-            })}
+          {/* Every band already covers every x, so let Victory stack them as given */}
+          <VictoryStack fillInMissingData={false}>
+            {fuels.map((f: FuelNameType, i: number) => (
+              <VictoryArea
+                key={f}
+                name={f}
+                data={seriesByFuel[i]}
+                style={{
+                  data: {
+                    fill: fuelColors[f],
+                    // A hairline of background between bands keeps them apart even where two
+                    // fuel colors are close, since seven series can't all be far apart
+                    stroke: "#ffffff",
+                    strokeWidth: 0.5,
+                  },
+                }}
+              />
+            ))}
+          </VictoryStack>
+          {/* Drawn over the stack so the gap between the two reads as the shortfall */}
+          <VictoryLine
+            name="demand"
+            data={demandSeries}
+            style={{
+              data: {
+                stroke: demandColor,
+                strokeWidth: 2,
+                strokeDasharray: "4,2",
+              },
+            }}
           />
         </VictoryChart>
+        {/* Below the plot rather than floating in it, where it used to clip the data */}
+        <div className="chartLegend">
+          {[...fuels].reverse().map((f: FuelNameType) => (
+            <span key={f} className="chartLegendItem">
+              <span
+                className="chartLegendSwatch"
+                style={{ backgroundColor: fuelColors[f] }}
+              />
+              {f}
+            </span>
+          ))}
+          <span className="chartLegendItem">
+            <span className="chartLegendSwatch chartLegendSwatch-demand" />
+            Demand
+          </span>
+        </div>
       </div>
     );
   }

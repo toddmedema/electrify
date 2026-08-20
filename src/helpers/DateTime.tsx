@@ -213,3 +213,38 @@ export function getDateFromMinute(
     year,
   };
 }
+
+// eg "4am", "12pm" - a bare clock time for chart axes, where the day and month are already known
+export function formatMinuteOfDayChartAxis(minute: number): string {
+  const hourOfDay = Math.floor((minute % 1440) / 60);
+  return (
+    (hourOfDay % 12 === 0 ? 12 : hourOfDay % 12) +
+    (hourOfDay < 12 ? "am" : "pm")
+  );
+}
+
+/**
+ * Clock ticks across a span of minutes, snapped to a whole number of hours and spaced so that
+ * at most `maxTicks` of them land in the span.
+ */
+export function getHourTicks(
+  rangeMin: number,
+  rangeMax: number,
+  maxTicks = 6
+): number[] {
+  const hoursSpanned = (rangeMax - rangeMin) / 60;
+  const step =
+    ([1, 2, 3, 4, 6, 8, 12] as number[]).find(
+      (h) => hoursSpanned / h <= maxTicks
+    ) || 24;
+  const stepMinutes = step * 60;
+  const ticks = [];
+  for (
+    let m = Math.ceil(rangeMin / stepMinutes) * stepMinutes;
+    m <= rangeMax;
+    m += stepMinutes
+  ) {
+    ticks.push(m);
+  }
+  return ticks;
+}

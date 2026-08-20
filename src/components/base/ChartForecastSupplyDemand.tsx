@@ -6,15 +6,14 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWatts } from "../../helpers/Format";
+import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import {
   blackoutColor,
   chartTheme,
@@ -54,24 +53,12 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels
-              voronoiBlacklist={["demand", "blackouts"]}
-              labels={({ datum }) =>
-                `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
+            // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels
+            voronoiBlacklist: ["demand", "blackouts"],
+          })}
         >
           <VictoryAxis
             tickCount={6}
@@ -93,7 +80,9 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWatts(t)}
+            tickFormat={(t: number, _i: number, ticks: number[]) =>
+              formatWattsAxis(t, ticks)
+            }
             tickLabelComponent={<VictoryLabel dx={5} />}
             fixLabelOverlap={true}
             style={{

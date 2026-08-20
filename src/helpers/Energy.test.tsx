@@ -1,4 +1,5 @@
 import {
+  getDispatchOrderedFuels,
   getSolarOutputFactor,
   getWindOutputFactor,
   getSolarCapacityFactor,
@@ -76,5 +77,35 @@ describe("getSolarCapacityFactor", () => {
     const result = getSolarCapacityFactor(irradiancesWM2);
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("getDispatchOrderedFuels", () => {
+  it("should return unique fuels in facility list order", () => {
+    const result = getDispatchOrderedFuels([
+      { fuel: "Coal" },
+      { fuel: "Natural Gas" },
+      { fuel: "Coal" },
+    ]);
+    expect(result).toEqual(["Coal", "Natural Gas"]);
+  });
+
+  it("should put must-run renewables below the dispatchable fuels", () => {
+    const result = getDispatchOrderedFuels([
+      { fuel: "Coal" },
+      { fuel: "Wind" },
+      { fuel: "Natural Gas" },
+      { fuel: "Sun" },
+    ]);
+    expect(result).toEqual(["Sun", "Wind", "Coal", "Natural Gas"]);
+  });
+
+  it("should skip storage, which has no fuel", () => {
+    const result = getDispatchOrderedFuels([{}, { fuel: "Coal" }, {}]);
+    expect(result).toEqual(["Coal"]);
+  });
+
+  it("should handle an empty fleet", () => {
+    expect(getDispatchOrderedFuels([])).toEqual([]);
   });
 });

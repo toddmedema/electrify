@@ -5,15 +5,14 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
-import { formatWattHours } from "../../helpers/Format";
+import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
 import { chartTheme, supplyColor } from "../../Theme";
 
 export interface Props {
@@ -41,20 +40,9 @@ export default class chartForecastStorage extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              labels={({ datum }) => formatWattHours(datum.storedWh)}
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) => formatWattHours(datum.storedWh),
+          })}
         >
           <VictoryAxis
             tickCount={6}
@@ -76,7 +64,9 @@ export default class chartForecastStorage extends React.PureComponent<
           />
           <VictoryAxis
             dependentAxis
-            tickFormat={(t: number) => formatWattHours(t)}
+            tickFormat={(t: number, _i: number, ticks: number[]) =>
+              formatWattHoursAxis(t, ticks)
+            }
             tickLabelComponent={<VictoryLabel dx={10} />}
             fixLabelOverlap={true}
             style={{

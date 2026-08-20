@@ -7,9 +7,8 @@ import {
   VictoryLabel,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 
 interface ChartData {
   month: number; // unique across years
@@ -59,20 +58,9 @@ const ChartFinances = (props: Props): JSX.Element => {
         domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={props.height || 300}
-        containerComponent={
-          <VictoryVoronoiContainer
-            voronoiDimension="x"
-            labels={({ datum }) => props.format(datum.value).toString()}
-            labelComponent={
-              <VictoryTooltip
-                cornerRadius={2}
-                constrainToVisibleArea
-                flyoutStyle={{ fill: "white" }}
-                style={{ textAnchor: "end" }}
-              />
-            }
-          />
-        }
+        containerComponent={chartTooltipContainer({
+          labels: ({ datum }: any) => props.format(datum.value).toString(),
+        })}
       >
         <VictoryAxis
           tickFormat={(t) => formatMonthChartAxis(t, multiyear)}

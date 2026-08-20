@@ -28,7 +28,9 @@ import { facilityCashBack } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatWattHours,
+  formatWattHoursOfPeak,
   formatWatts,
+  formatWattsOfPeak,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import GameCard from "../base/GameCard";
@@ -66,9 +68,9 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
     );
     secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
   } else if (facility.peakWh) {
-    secondaryText = `${formatWattHours(facility.currentWh).replace(/[^0-9.,]/g, "")}/${formatWattHours(facility.peakWh)}, ${formatWatts(facility.peakW)}`;
+    secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
   } else {
-    secondaryText = `${formatWatts(facility.currentW).replace(/[^0-9.,]/g, "")}/${formatWatts(facility.peakW)}`;
+    secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
   }
 
   return (

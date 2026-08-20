@@ -1,4 +1,5 @@
 import { EQUATOR_RADIANCE, OUTSKIRTS_WIND_MULTIPLIER } from "../Constants";
+import { FacilityOperatingType, GeneratorOperatingType } from "../Types";
 
 export function getWindOutputFactor(windKph: number) {
   // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
@@ -52,4 +53,33 @@ export function getSolarCapacityFactor(irradiancesWM2: number[]) {
       0
     ) / irradiancesWM2.length
   );
+}
+
+// Sun and Wind aren't dispatchable - they generate whatever the weather allows regardless of
+// where the player drags them - so a dispatch stack puts them on the bottom as must-run supply,
+// the same convention EIA and ISO generation stacks use.
+const MUST_RUN_FUELS = ["Sun", "Wind"];
+
+/**
+ * The fuels present in a fleet, ordered the way a dispatch stack is drawn: must-run renewables
+ * first, then the dispatchable fuels in the player's own merit order (their facility list order).
+ */
+export function getDispatchOrderedFuels(
+  facilities: Array<Partial<FacilityOperatingType>>
+): string[] {
+  const mustRun: string[] = [];
+  const dispatchable: string[] = [];
+  facilities.forEach((facility) => {
+    const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+    if (!fuel) {
+      return; // storage, which the stack tracks separately
+    }
+    const bucket = MUST_RUN_FUELS.indexOf(fuel) > -1 ? mustRun : dispatchable;
+    if (bucket.indexOf(fuel) === -1) {
+      bucket.push(fuel);
+    }
+  });
+  // Keep Sun below Wind for a stable stack rather than whichever the player happened to build first
+  mustRun.sort((a, b) => MUST_RUN_FUELS.indexOf(a) - MUST_RUN_FUELS.indexOf(b));
+  return [...mustRun, ...dispatchable];
 }

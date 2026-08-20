@@ -3,19 +3,17 @@ import {
   VictoryAxis,
   VictoryChart,
   VictoryLabel,
-  VictoryLegend,
   VictoryLine,
   VictoryTheme,
-  VictoryVoronoiContainer,
-  VictoryTooltip,
 } from "victory";
+import { chartTooltipContainer } from "./ChartTooltipContainer";
 import {
   formatMonthChartAxis,
   getDateFromMinute,
 } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
 import { TickPresentFutureType } from "../../Types";
-import { chartTheme, fuelColors } from "../../Theme";
+import { chartTheme, fuelColors, fuelDashArrays } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -24,6 +22,14 @@ export interface Props {
   startingYear: number;
   multiyear: boolean;
 }
+
+type PricedFuelType = "Coal" | "Natural Gas" | "Oil" | "Uranium";
+const PRICED_FUELS: PricedFuelType[] = [
+  "Coal",
+  "Natural Gas",
+  "Oil",
+  "Uranium",
+];
 
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class ChartForecastFuelPrices extends React.PureComponent<
@@ -42,27 +48,14 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           domain={domain}
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
-          containerComponent={
-            <VictoryVoronoiContainer
-              voronoiDimension="x"
-              // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
-              voronoiBlacklist={["naturalGas", "oil", "uranium"]}
-              labels={({ datum }) =>
-                `Coal: ${formatMoneyStable(datum.Coal)}
-                Natural Gas: ${formatMoneyStable(datum["Natural Gas"])}
-                Oil: ${formatMoneyStable(datum.Oil)}
-                Uranium: ${formatMoneyStable(datum.Uranium)}`
-              }
-              labelComponent={
-                <VictoryTooltip
-                  cornerRadius={2}
-                  constrainToVisibleArea
-                  flyoutStyle={{ fill: "white" }}
-                  style={{ textAnchor: "end" }}
-                />
-              }
-            />
-          }
+          containerComponent={chartTooltipContainer({
+            labels: ({ datum }: any) =>
+              PRICED_FUELS.map(
+                (f) => `${f}: ${formatMoneyStable(datum[f])}`
+              ).join("\n"),
+            // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
+            voronoiBlacklist: PRICED_FUELS.slice(1),
+          })}
         >
           <VictoryAxis
             tickCount={6}
@@ -94,76 +87,48 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
               tickLabels: chartTheme.tickLabels,
             }}
           />
-          <VictoryLine
-            name="coal"
-            data={timeline}
-            x="minute"
-            y="Coal"
-            interpolation="natural"
-            style={{
-              data: {
-                stroke: fuelColors.Coal,
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            name="naturalGas"
-            data={timeline}
-            x="minute"
-            y="Natural Gas"
-            interpolation="natural"
-            style={{
-              data: {
-                stroke: fuelColors["Natural Gas"],
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            name="oil"
-            data={timeline}
-            x="minute"
-            y="Oil"
-            interpolation="natural"
-            style={{
-              data: {
-                stroke: fuelColors.Oil,
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            name="uranium"
-            data={timeline}
-            x="minute"
-            y="Uranium"
-            interpolation="natural"
-            style={{
-              data: {
-                stroke: fuelColors.Uranium,
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLegend
-            x={270}
-            y={15}
-            centerTitle
-            orientation="vertical"
-            rowGutter={-5}
-            symbolSpacer={5}
-            data={[
-              { name: "Coal", symbol: { fill: fuelColors.Coal } },
-              {
-                name: "Natural Gas",
-                symbol: { fill: fuelColors["Natural Gas"] },
-              },
-              { name: "Oil", symbol: { fill: fuelColors.Oil } },
-              { name: "Uranium", symbol: { fill: fuelColors.Uranium } },
-            ]}
-          />
+          {PRICED_FUELS.map((f) => (
+            <VictoryLine
+              key={f}
+              name={f}
+              data={timeline}
+              x="minute"
+              y={f}
+              interpolation="natural"
+              style={{
+                data: {
+                  stroke: fuelColors[f],
+                  strokeWidth: 1.5,
+                  // Four overlapping lines are more than color alone can separate, so each
+                  // fuel also gets its own dash pattern
+                  strokeDasharray: fuelDashArrays[f],
+                },
+              }}
+            />
+          ))}
         </VictoryChart>
+        {/* Below the plot rather than floating in it, where it used to clip the data */}
+        <div className="chartLegend">
+          {PRICED_FUELS.map((f) => (
+            <span key={f} className="chartLegendItem">
+              <svg
+                className="chartLegendSwatch chartLegendSwatch-line"
+                viewBox="0 0 20 4"
+              >
+                <line
+                  x1="0"
+                  y1="2"
+                  x2="20"
+                  y2="2"
+                  stroke={fuelColors[f]}
+                  strokeWidth="3"
+                  strokeDasharray={fuelDashArrays[f]}
+                />
+              </svg>
+              {f}
+            </span>
+          ))}
+        </div>
       </div>
     );
   }

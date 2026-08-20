@@ -11,7 +11,7 @@ $bg_active: rgba(255, 255, 255, 0.9);
 $font_color_dark_primary: #ffffff;
 $bg_dark_primary: #161011;
 
-$blackout_red: #f44336; /* red500 https://material-ui.com/customization/color/ */
+$blackout_red: #c62828; /* red800 https://material-ui.com/customization/color/ - matches blackoutColor in Theme.tsx */
 $interactive_blue: #1e88e5; /* blue 600 */
 
 // ===============================================
@@ -397,6 +397,46 @@ span.weak {
     flex: 1 1 auto !important;
     overflow-y: auto;
   }
+}
+
+// Chart legends live below the plot instead of floating inside it, where they used to sit on
+// top of the data and clip. Plain HTML so they wrap on narrow screens and screen readers see them.
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 0 8px 0 55px; // line up with the plot area, past the y axis labels
+  font-size: 12px;
+  color: $font_color_faded;
+}
+
+.chartLegendItem {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.chartLegendSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+// The demand overlay is a dashed line rather than a filled band, so its key looks like one
+.chartLegendSwatch-demand {
+  height: 0;
+  border-top: 2px dashed $font_color_primary;
+  border-radius: 0;
+}
+
+// Line-chart keys carry the series' dash pattern, since that's what tells them apart
+.chartLegendSwatch-line {
+  width: 20px;
+  height: 4px;
+  border-radius: 0;
+  overflow: visible;
 }
 
 .top-right {
