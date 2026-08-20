@@ -54,6 +54,15 @@ deploy() {
   fi
 }
 
+# Git LFS pointer files build without error but publish 130-byte stubs in place
+# of every image and audio file, so check before anything reaches the bucket.
+assertNoLfsPointers() {
+  if grep -rql "https://git-lfs.github.com/spec/v1" build; then
+    echo "Build contains Git LFS pointers instead of real assets; aborting." >&2
+    echo "Run 'git lfs pull' and rebuild." >&2
+    exit 1
+  fi
+}
 prebuild() {
   # clear out old build files to prevent conflicts
   rm -rf build
@@ -67,6 +76,7 @@ betabuild() {
 
 beta() {
   betabuild
+  assertNoLfsPointers
   aws s3 cp build s3://beta.electrifygame.com --recursive --region us-east-2
 }
 
@@ -79,6 +89,7 @@ prodbuild() {
 
 prod() {
   prodbuild
+  assertNoLfsPointers
   # Deploy web app to prod with 1 day cache for most files, 6 month cache for art assets
   export AWS_DEFAULT_REGION='us-east-2'
   aws s3 cp build s3://electrifygame.com --recursive --exclude '*.mp3' --exclude '*.jpg' --exclude '*.png' --cache-control max-age=86400 --cache-control public

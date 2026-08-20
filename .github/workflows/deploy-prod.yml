@@ -20,6 +20,11 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          # Images and audio live in Git LFS (see .gitattributes). Without this
+          # the runner gets 130-byte pointer files, the build still succeeds, and
+          # every image and sound on the site ships as a stub.
+          lfs: true
 
       - name: Setup Node.js environment
         uses: actions/setup-node@v4.0.2
