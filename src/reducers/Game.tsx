@@ -119,7 +119,7 @@ function ensureTicking(state: GameType) {
     previousTickMs = performance.now();
     setTimeout(
       () => getStore().dispatch(gameSlice.actions.tick()),
-      TICK_MS[state.speed]
+      TICK_MS[state.speed],
     );
   }
 }
@@ -146,7 +146,7 @@ export const gameSlice = createSlice({
 
       setTimeout(
         () => getStore().dispatch(gameSlice.actions.tick()),
-        Math.max(1, TICK_MS[state.speed] - delta)
+        Math.max(1, TICK_MS[state.speed] - delta),
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
@@ -176,7 +176,7 @@ export const gameSlice = createSlice({
           state,
           search.peakW || 1000000,
           [],
-          []
+          [],
         ).find((g: FacilityShoppingType) => {
           for (const property in search) {
             if (g[property] !== search[property]) {
@@ -196,7 +196,7 @@ export const gameSlice = createSlice({
                 }
               }
               return true;
-            }
+            },
           );
           if (storage) {
             state = buildFacilityHelper(state, storage, false, true);
@@ -210,7 +210,7 @@ export const gameSlice = createSlice({
           state,
           state.timeline[0],
           state.timeline[0],
-          true
+          true,
         );
       }
       state.timeline = reforecastSupply(state);
@@ -219,7 +219,7 @@ export const gameSlice = createSlice({
       state = buildFacilityHelper(
         state,
         action.payload.facility,
-        action.payload.financed
+        action.payload.financed,
       );
       // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
       // assigned to the parameter is discarded and the forecast would never reach state
@@ -238,7 +238,7 @@ export const gameSlice = createSlice({
             return false;
           }
           return true;
-        }
+        },
       );
       state.timeline = reforecastSupply(state);
     },
@@ -248,18 +248,18 @@ export const gameSlice = createSlice({
           if (g.id === action.payload) {
             g.paused = !g.paused;
           }
-        }
+        },
       );
       state.timeline = reforecastSupply(state);
     },
     reprioritizeFacility: (
       state,
-      action: PayloadAction<ReprioritizeFacilityAction>
+      action: PayloadAction<ReprioritizeFacilityAction>,
     ) => {
       arrayMove(
         state.facilities,
         action.payload.spotInList,
-        action.payload.spotInList + action.payload.delta
+        action.payload.spotInList + action.payload.delta,
       );
       state.timeline = reforecastSupply(state);
     },
@@ -319,12 +319,12 @@ export default gameSlice.reducer;
 export function tickState(state: GameType) {
   state.date = getDateFromMinute(
     state.date.minute + TICK_MINUTES,
-    state.startingYear
+    state.startingYear,
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const prev = getTimeFromTimeline(
     state.date.minute - TICK_MINUTES,
-    state.timeline
+    state.timeline,
   );
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
@@ -344,7 +344,7 @@ export function tickState(state: GameType) {
           state,
           state.timeline[0],
           state.timeline[0],
-          true
+          true,
         );
       }
 
@@ -369,9 +369,8 @@ export function tickState(state: GameType) {
               open: true,
               notCancellable: true,
               actionLabel: "Try again",
-              action: () =>
-                getStore().dispatch(quit({ toScenarioList: true })),
-            })
+              action: () => getStore().dispatch(quit({ toScenarioList: true })),
+            }),
           );
         }, 1);
       }
@@ -403,9 +402,8 @@ export function tickState(state: GameType) {
               open: true,
               notCancellable: true,
               actionLabel: "Try again",
-              action: () =>
-                getStore().dispatch(quit({ toScenarioList: true })),
-            })
+              action: () => getStore().dispatch(quit({ toScenarioList: true })),
+            }),
           );
         }, 1);
       }
@@ -438,7 +436,7 @@ export function tickState(state: GameType) {
                   80 *
                     100 *
                     (scenario.dollarsPerkWh -
-                      summary.revenue / (summary.supplyWh / 1000))
+                      summary.revenue / (summary.supplyWh / 1000)),
                 ),
                 supply: Math.round((10 * summary.supplyWh) / 1000000000000),
                 emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
@@ -446,7 +444,7 @@ export function tickState(state: GameType) {
               };
 
         const finalScore = Object.values(score).reduce(
-          (a: number, b: number) => a + b
+          (a: number, b: number) => a + b,
         );
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
 
@@ -459,9 +457,9 @@ export function tickState(state: GameType) {
                   scoreBreakdown: score, // For analytics purposes only
                   scenarioId: scenario.id,
                   difficulty,
-                })
+                }),
               ),
-            1
+            1,
           );
         }
 
@@ -511,9 +509,9 @@ export function tickState(state: GameType) {
                 actionLabel: "Return to scenarios",
                 action: () =>
                   getStore().dispatch(quit({ toScenarioList: true })),
-              })
+              }),
             ),
-          1
+          1,
         );
       }
     }
@@ -525,18 +523,18 @@ function getDemandW(
   date: DateType,
   game: GameType,
   prev: TickPresentFutureType,
-  now: TickPresentFutureType
+  now: TickPresentFutureType,
 ) {
   const marketingGrowth =
     customersFromMarketingSpend(game.monthlyMarketingSpend) / TICKS_PER_MONTH;
   now.customers = Math.round(
     prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
-      marketingGrowth
+      marketingGrowth,
   );
   const { sunrise, sunset } = getSunriseSunset(
     date,
     game.location.lat,
-    game.location.long
+    game.location.long,
   );
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
@@ -577,7 +575,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
           date,
           state.location.lat,
           state.location.long,
-          weather.CLOUD_PCT
+          weather.CLOUD_PCT,
         ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C,
@@ -607,7 +605,7 @@ function updateSupplyFacilitiesFinances(
   state: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
-  simulated?: boolean
+  simulated?: boolean,
 ) {
   const { facilities, date } = state;
   const difficulty = DIFFICULTIES[state.difficulty];
@@ -628,7 +626,7 @@ function updateSupplyFacilitiesFinances(
   const windOutputFactor = getWindOutputFactor(now.windKph);
   const solarOutputFactor = getSolarOutputFactor(
     now.solarIrradianceWM2,
-    now.temperatureC
+    now.temperatureC,
   );
 
   // Pre-check how much extra supply we'll need to charge batteries
@@ -639,7 +637,7 @@ function updateSupplyFacilitiesFinances(
       indexOfLastUnchargedBattery = i;
       totalChargeNeeded += Math.min(
         g.peakW,
-        (g.peakWh - g.currentWh) * TICKS_PER_HOUR
+        (g.peakWh - g.currentWh) * TICKS_PER_HOUR,
       );
     }
   });
@@ -653,7 +651,7 @@ function updateSupplyFacilitiesFinances(
     if (g.paused) {
       g.currentW = Math.max(
         0,
-        g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes
+        g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
       ); // ramp down
       return;
     }
@@ -662,7 +660,7 @@ function updateSupplyFacilitiesFinances(
         // Capable of generating electricity
         const targetW = Math.max(
           0,
-          now.demandW * (1 + RESERVE_MARGIN) - supply
+          now.demandW * (1 + RESERVE_MARGIN) - supply,
         );
         switch (g.fuel) {
           case "Sun":
@@ -682,21 +680,21 @@ function updateSupplyFacilitiesFinances(
                 g.currentW = Math.min(
                   now.demandW + totalChargeNeeded - charge,
                   g.peakW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes
+                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
                 );
               } else {
                 // Otherwise just try to fulfill demand + reserve margin
                 g.currentW = Math.min(
                   g.peakW,
                   targetW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes
+                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
                 );
               }
             } else {
               g.currentW = Math.max(
                 0,
                 targetW,
-                g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes
+                g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
               );
             }
             break;
@@ -717,11 +715,11 @@ function updateSupplyFacilitiesFinances(
           g.currentW = -Math.min(
             g.peakW,
             supply - now.demandW - charge,
-            (g.peakWh - g.currentWh) * TICKS_PER_HOUR
+            (g.peakWh - g.currentWh) * TICKS_PER_HOUR,
           );
           g.currentWh = Math.min(
             g.peakWh,
-            g.currentWh - g.currentW / TICKS_PER_HOUR
+            g.currentWh - g.currentW / TICKS_PER_HOUR,
           );
           charge -= g.currentW / g.roundTripEfficiency;
         } else {
@@ -769,7 +767,6 @@ function updateSupplyFacilitiesFinances(
         const paymentInterest = getPaymentInterest(
           g.loanAmountLeft,
           INTEREST_RATE_YEARLY,
-          g.loanMonthlyPayment
         );
         const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
@@ -778,11 +775,8 @@ function updateSupplyFacilitiesFinances(
       }
     } else {
       expensesInterest +=
-        getPaymentInterest(
-          g.loanAmountLeft,
-          INTEREST_RATE_YEARLY,
-          g.loanMonthlyPayment
-        ) / TICKS_PER_MONTH;
+        getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY) /
+        TICKS_PER_MONTH;
     }
   });
   const expensesCarbonFee = state.feePerKgCO2e * kgco2e;
@@ -798,7 +792,7 @@ function updateSupplyFacilitiesFinances(
 
   // Save new financial info
   now.customers = Math.round(
-    prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth
+    prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth,
   );
   now.cash = Math.round(
     prev.cash +
@@ -808,7 +802,7 @@ function updateSupplyFacilitiesFinances(
       expensesCarbonFee -
       expensesInterest -
       expensesMarketing -
-      principalRepayment
+      principalRepayment,
   );
   now.netWorth = getNetWorth(facilities, now.cash);
   now.revenue = revenue;
@@ -824,7 +818,7 @@ function updateSupplyFacilitiesFinances(
 
 function reforecastSupply(
   state: GameType,
-  simulated?: boolean
+  simulated?: boolean,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -846,7 +840,7 @@ export function generateNewTimeline(
   readOnlyState: GameType,
   cash: number,
   customers: number,
-  ticks = TICKS_PER_DAY
+  ticks = TICKS_PER_DAY,
 ): TickPresentFutureType[] {
   // TODO performance optimization, figure out how to deep clone everything EXCEPT timeline, since I'm about to overwrite it
   const state = cloneDeep(readOnlyState);
@@ -890,7 +884,7 @@ function buildFacilityHelper(
   state: GameType,
   g: FacilityShoppingType,
   financed: boolean,
-  newGame = false
+  newGame = false,
 ): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
@@ -912,7 +906,7 @@ function buildFacilityHelper(
         loanMonthlyPayment: getMonthlyPayment(
           loanAmount,
           INTEREST_RATE_YEARLY,
-          LOAN_MONTHS
+          LOAN_MONTHS,
         ),
       };
     } else {
@@ -925,7 +919,7 @@ function buildFacilityHelper(
       id:
         state.facilities.reduce(
           (max: number, f: FacilityOperatingType) => (max > f.id ? max : f.id),
-          0
+          0,
         ) + 1,
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
@@ -945,7 +939,7 @@ function buildFacilityHelper(
 // TODO account for generator current value better - get rid of SELL_MULTIPLIER everywhere and depreciate buildCost over time
 function getNetWorth(
   facilities: FacilityOperatingType[],
-  cash: number
+  cash: number,
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {

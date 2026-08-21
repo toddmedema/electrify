@@ -21,19 +21,16 @@ const provider = new GoogleAuthProvider();
 
 export function login() {
   signInWithPopup(firebaseAppAuth, provider)
-    .then((result) => {
-      const credential =
-        GoogleAuthProvider.credentialFromResult(result) || ({} as any);
-      const token = credential.accessToken;
-      const user = result.user;
-      // IdP data available using getAdditionalUserInfo(result)
-      console.log(token, user);
+    .then(() => {
+      // The signed in user reaches the app through firebaseAppAuth.onAuthStateChanged
+      // (see App.tsx); nothing is needed here. Do not log the credential -- it carries an
+      // access token, and the console is readable by anything running on the page.
     })
     .catch((error) => {
       console.log(
         "Auth error: ",
         error,
-        GoogleAuthProvider.credentialFromError(error)
+        GoogleAuthProvider.credentialFromError(error),
       );
     });
 }
@@ -82,7 +79,7 @@ export function isSmallScreen(): boolean {
     document.documentElement.scrollWidth,
     document.body.offsetWidth,
     document.documentElement.offsetWidth,
-    document.documentElement.clientWidth
+    document.documentElement.clientWidth,
   );
   return width < 375;
 }
@@ -99,7 +96,7 @@ export function isBigScreen(): boolean {
     document.documentElement.scrollWidth,
     document.body.offsetWidth,
     document.documentElement.offsetWidth,
-    document.documentElement.clientWidth
+    document.documentElement.clientWidth,
   );
   return width > 650;
 }
@@ -117,7 +114,7 @@ export function isDesktopScreen(): boolean {
     document.documentElement.scrollWidth,
     document.body.offsetWidth,
     document.documentElement.offsetWidth,
-    document.documentElement.clientWidth
+    document.documentElement.clientWidth,
   );
   return width >= 1300;
 }
