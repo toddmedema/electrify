@@ -42,6 +42,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "sim": "node scripts/sim.js",
     "eject": "react-scripts eject",
     "pretty": "prettier --write \"src/**/*.{css,js,jsx,tsx,json}\"",
     "deploy": "./deploy.sh"

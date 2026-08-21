@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { UserType, ScoreType } from "../Types";
-import { RootState } from "../Store";
+import type { RootState } from "../Store";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "../Globals";
 

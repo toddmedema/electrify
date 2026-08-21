@@ -24,6 +24,21 @@ const DUMMY_WEATHER = {
 // TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio) for offline play
 // But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
 // Ideally caching this... so maybe upgrade to use https://tanstack.com/query/latest/docs/framework/react/overview ?
+function collectWeatherRow(row: any) {
+  const data = row.data as RawWeatherType;
+  if (data && data.YEAR) {
+    weather.push(data);
+  }
+}
+
+function warnIfWeatherIncomplete(location: string) {
+  if (weather.length < EXPECTED_ROWS) {
+    console.warn(
+      `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`
+    );
+  }
+}
+
 export function initWeather(location: string, callback?: any) {
   weather = [] as any; // reset each time to prevent accidentally appending to old state
   Papa.parse(`/data/WeatherRaw${location}.csv`, {
@@ -31,23 +46,28 @@ export function initWeather(location: string, callback?: any) {
     dynamicTyping: true,
     header: true,
     // worker: true,
-    step(row: any) {
-      const data = row.data as RawWeatherType;
-      if (data && data.YEAR) {
-        weather.push(data);
-      }
-    },
+    step: collectWeatherRow,
     complete() {
-      if (weather.length < EXPECTED_ROWS) {
-        console.warn(
-          `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`
-        );
-      }
+      warnIfWeatherIncomplete(location);
       if (callback) {
         callback();
       }
     },
   });
+}
+
+/**
+ * Synchronous counterpart to initWeather, for callers that already have the CSV contents
+ * (the headless simulator reads them off disk; the browser has to download them).
+ */
+export function initWeatherFromCsv(location: string, csv: string) {
+  weather = [] as any; // reset each time to prevent accidentally appending to old state
+  Papa.parse(csv, {
+    dynamicTyping: true,
+    header: true,
+    step: collectWeatherRow,
+  });
+  warnIfWeatherIncomplete(location);
 }
 
 export function getWeather(date: DateType): RawWeatherType {

@@ -48,7 +48,8 @@ import { GENERATORS, STORAGE } from "../data/Facilities";
 import { logEvent } from "../Globals";
 import { getStorageJson, setStorageKeyValue } from "../LocalStorage";
 import { SCENARIOS } from "../data/Scenarios";
-import { store } from "../Store";
+import { getStore } from "../StoreRegistry";
+import { start, loaded, quit } from "./GameActions";
 import {
   DateType,
   FacilityOperatingType,
@@ -80,6 +81,7 @@ interface NewGameAction {
   cash: number;
   customers: number;
   location: LocationType;
+  seed?: number; // Omitted in normal play; pin it to get a reproducible run (headless sim, bug repros)
 }
 
 let previousTickMs = 0;
@@ -122,26 +124,29 @@ export const gameSlice = createSlice({
       }
 
       setTimeout(
-        () => store.dispatch(gameSlice.actions.tick()),
+        () => getStore().dispatch(gameSlice.actions.tick()),
         Math.max(1, TICK_MS[state.speed] - delta)
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
       return { ...state, ...action.payload };
     },
-    start: (state, action: PayloadAction<number>) => {
-      state.scenarioId = action.payload;
-    },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
+      // Without this a second game in the same session inherits the first one's month and skips
+      // its first rollover, which also makes an otherwise identical seed produce a different run
+      previousMonth = "";
       state.timeline = [] as TickPresentFutureType[];
-      state.seed = Date.now() * Math.random();
+      state.seed = a.seed !== undefined ? a.seed : Date.now() * Math.random();
       seedRandom(state.seed);
       const scenario =
         SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
       state.startingYear = scenario.startingYear;
       state.feePerKgCO2e = scenario.feePerKgCO2e;
+      // The rate the scenario advertises on the new game screen, and the rate Public scenarios are
+      // scored against, so the game has to actually start there rather than at the slice default
+      state.dollarsPerkWh = scenario.dollarsPerkWh;
       state.location = a.location;
       state.timeline = generateNewTimeline(state, a.cash, a.customers);
 
@@ -189,19 +194,15 @@ export const gameSlice = createSlice({
       }
       state.timeline = reforecastSupply(state);
     },
-    quit: () => {
-      return cloneDeep(initialGame);
-    },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
       state = buildFacilityHelper(
         state,
         action.payload.facility,
         action.payload.financed
       );
-      state = {
-        ...state,
-        timeline: reforecastSupply(state),
-      };
+      // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
+      // assigned to the parameter is discarded and the forecast would never reach state
+      state.timeline = reforecastSupply(state);
     },
     sellFacility: (state, action: PayloadAction<number>) => {
       const id = action.payload; // (action as SellFacilityAction).id;
@@ -241,26 +242,34 @@ export const gameSlice = createSlice({
       );
       state.timeline = reforecastSupply(state);
     },
-    loaded: (state) => {
-      // Start ticking in game
-      setTimeout(() => {
-        return store.dispatch(gameSlice.actions.tick());
-      }, TICK_MS.PAUSED);
-      state.inGame = true;
-    },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
       if (previousSpeed === "PAUSED" && state.speed !== "PAUSED") {
         previousTickMs = performance.now();
         setTimeout(
-          () => store.dispatch(gameSlice.actions.tick()),
+          () => getStore().dispatch(gameSlice.actions.tick()),
           TICK_MS[state.speed]
         );
       }
       previousSpeed = state.speed;
     },
   },
+  // start, loaded and quit are declared in GameActions so that Card and UI can react to them
+  // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(start, (state, action) => {
+      state.scenarioId = action.payload;
+    });
+    builder.addCase(loaded, (state) => {
+      // Start ticking in game
+      setTimeout(() => {
+        return getStore().dispatch(gameSlice.actions.tick());
+      }, TICK_MS.PAUSED);
+      state.inGame = true;
+    });
+    builder.addCase(quit, () => {
+      return cloneDeep(initialGame);
+    });
     builder.addCase(dialogOpen, (state) => {
       previousSpeed = state.speed;
       state.speed = "PAUSED";
@@ -275,22 +284,24 @@ export const {
   tick,
   delta,
   initGame,
-  start,
-  quit,
   buildFacility,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
-  loaded,
   setSpeed,
 } = gameSlice.actions;
+
+// Re-exported so that everything still imports the game's actions from one place
+export { start, loaded, quit };
 
 export default gameSlice.reducer;
 
 // ====== HELPERS ======
 
 // Ticks the state forward in place
-function tickState(state: GameType) {
+// Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
+// without the wall-clock timers that the `tick` action uses.
+export function tickState(state: GameType) {
   state.date = getDateFromMinute(
     state.date.minute + TICK_MINUTES,
     state.startingYear
@@ -331,23 +342,22 @@ function tickState(state: GameType) {
           difficulty: state.difficulty,
         });
         const summary = summarizeHistory(history);
-        setTimeout(
-          () =>
-            store.dispatch(
-              dialogOpen({
-                title: "Bankrupt!",
-                message: `You've run out of money.
-                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+        setTimeout(() => {
+          const finished = getStore().getState().game;
+          getStore().dispatch(
+            dialogOpen({
+              title: "Bankrupt!",
+              message: `You've run out of money.
+                You survived for ${finished.date.year - finished.startingYear} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
                 and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
-                open: true,
-                notCancellable: true,
-                actionLabel: "Try again",
-                action: () => store.dispatch(gameSlice.actions.quit()),
-              })
-            ),
-          1
-        );
+              open: true,
+              notCancellable: true,
+              actionLabel: "Try again",
+              action: () => getStore().dispatch(quit()),
+            })
+          );
+        }, 1);
       }
 
       // Failure: Too many blackouts
@@ -365,23 +375,22 @@ function tickState(state: GameType) {
           difficulty: state.difficulty,
         });
         const summary = summarizeHistory(history);
-        setTimeout(
-          () =>
-            store.dispatch(
-              dialogOpen({
-                title: "Fired!",
-                message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-                You survived for ${store.getState().game.date.year - store.getState().game.startingYear} years,
+        setTimeout(() => {
+          const finished = getStore().getState().game;
+          getStore().dispatch(
+            dialogOpen({
+              title: "Fired!",
+              message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
+                You survived for ${finished.date.year - finished.startingYear} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
                 and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
-                open: true,
-                notCancellable: true,
-                actionLabel: "Try again",
-                action: () => store.dispatch(gameSlice.actions.quit()),
-              })
-            ),
-          1
-        );
+              open: true,
+              notCancellable: true,
+              actionLabel: "Try again",
+              action: () => getStore().dispatch(quit()),
+            })
+          );
+        }, 1);
       }
 
       const scenario =
@@ -436,7 +445,7 @@ function tickState(state: GameType) {
         if (!scenario.tutorialSteps) {
           setTimeout(
             () =>
-              store.dispatch(
+              getStore().dispatch(
                 submitHighscore({
                   score: finalScore,
                   scoreBreakdown: score, // For analytics purposes only
@@ -456,7 +465,7 @@ function tickState(state: GameType) {
         });
         setTimeout(
           () =>
-            store.dispatch(
+            getStore().dispatch(
               dialogOpen({
                 title: scenario.endTitle || `You've retired!`,
                 message: scenario.endMessage || (
@@ -492,7 +501,7 @@ function tickState(state: GameType) {
                 open: true,
                 closeText: "Keep playing",
                 actionLabel: "Return to menu",
-                action: () => store.dispatch(gameSlice.actions.quit()),
+                action: () => getStore().dispatch(quit()),
               })
             ),
           1
@@ -601,7 +610,7 @@ function updateSupplyFacilitiesFinances(
       if (f.yearsToBuildLeft === 0 && !simulated) {
         const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
         setTimeout(() => {
-          store.dispatch(snackbarOpen(message));
+          getStore().dispatch(snackbarOpen(message));
         }, 0);
       }
     }

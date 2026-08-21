@@ -1,5 +1,6 @@
 import { configureStore, ThunkAction, Action } from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+import { registerStore } from "./StoreRegistry";
 import cardReducer from "./reducers/Card";
 import gameReducer from "./reducers/Game";
 import settingsReducer from "./reducers/Settings";
@@ -15,6 +16,11 @@ export const store = configureStore({
     user: userReducer,
   },
 });
+
+export type AppStore = typeof store;
+
+// Lets the game reducer dispatch follow-up actions without importing this module back
+registerStore(store);
 
 // Use throughout your app instead of plain `useDispatch` and `useSelector`
 export const useAppDispatch = () => useDispatch<AppDispatch>();

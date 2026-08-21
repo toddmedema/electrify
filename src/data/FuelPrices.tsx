@@ -27,29 +27,58 @@ interface RawFuelPricesType {
   oil: number;
 }
 
+// Holds both the CSV's historic prices and the randomly extrapolated future ones, so it has to be
+// reset per game -- otherwise a second playthrough silently inherits the first one's future prices
+// and the run stops being a function of its seed.
 const fuelPrices = {} as any;
 
+// Emptied in place rather than reassigned so that the closure in getFuelPricesPerMBTU keeps
+// referring to a const, which no-loop-func requires
+function resetFuelPrices() {
+  Object.keys(fuelPrices).forEach((year: string) => {
+    delete fuelPrices[year];
+  });
+}
+
+function collectFuelPriceRow(row: any) {
+  const data = row.data as RawFuelPricesType;
+  fuelPrices[+data.year] = fuelPrices[+data.year] || {};
+  fuelPrices[+data.year][+data.month] = {
+    "Natural Gas": +data.naturalgas,
+    Coal: +data.coal,
+    Uranium: +data.uranium,
+    Oil: +data.oil,
+  };
+}
+
 export function initFuelPrices(callback?: any) {
+  resetFuelPrices();
   Papa.parse(`/data/FuelPricesRaw.csv`, {
     download: true,
     dynamicTyping: true,
     header: true,
     // worker: true,
-    step(row: any) {
-      const data = row.data as RawFuelPricesType;
-      fuelPrices[+data.year] = fuelPrices[+data.year] || {};
-      fuelPrices[+data.year][+data.month] = {
-        "Natural Gas": +data.naturalgas,
-        Coal: +data.coal,
-        Uranium: +data.uranium,
-        Oil: +data.oil,
-      };
-    },
+    step: collectFuelPriceRow,
     complete() {
       if (callback) {
         callback();
       }
     },
+  });
+}
+
+/**
+ * Synchronous counterpart to initFuelPrices, for callers that already have the CSV contents
+ * (the headless simulator reads them off disk; the browser has to download them).
+ * Note that getFuelPricesPerMBTU loops forever if no prices are ever loaded, so any
+ * non-browser entry point into the simulation has to call this first.
+ */
+export function initFuelPricesFromCsv(csv: string) {
+  resetFuelPrices();
+  Papa.parse(csv, {
+    dynamicTyping: true,
+    header: true,
+    step: collectFuelPriceRow,
   });
 }
 
