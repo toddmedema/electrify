@@ -79,6 +79,17 @@ export const mapDispatchToProps = (
     onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
       // Past the last step, which is how a finished walkthrough is represented too
       dispatch(delta({ tutorialStep: (tutorialSteps || []).length }));
+      // On its own, skipping just makes the overlay vanish and leaves the player sitting in
+      // a paused scenario with no idea what happened - so say so, and offer the way out
+      dispatch(
+        snackbarOpen({
+          message: "Walkthrough skipped - keep playing, or pick another tutorial",
+          actionLabel: "Tutorials",
+          action: () => dispatch(quit({ toScenarioList: true })),
+          open: true,
+          timeout: 6000,
+        })
+      );
     },
   };
 };

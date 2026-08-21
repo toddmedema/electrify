@@ -171,9 +171,7 @@ export default function NewGame(props: Props): JSX.Element {
           color="textSecondary"
           sx={{ paddingLeft: 1, paddingBottom: 1 }}
         >
-          {completedTutorials === 0
-            ? `New here? These ${TUTORIALS.length} walkthroughs teach the game in order.`
-            : `${completedTutorials} of ${TUTORIALS.length} complete`}
+          {completedTutorials} of {TUTORIALS.length} complete
         </Typography>
         <LinearProgress
           variant="determinate"
