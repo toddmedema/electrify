@@ -40,6 +40,7 @@ interface FacilityListItemProps {
   spotInList: number;
   listLength: number;
   onTogglePause: DispatchProps["onTogglePause"];
+  onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
   onReprioritize: DispatchProps["onReprioritize"];
 }
@@ -57,7 +58,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
     setOpen(!open);
   };
 
-  const { facility, onTogglePause } = props;
+  const { facility, onTogglePause, onPause } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   let secondaryText = "";
   if (underConstruction) {
@@ -160,7 +161,8 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                 props.listLength > 1 &&
                 !facility.paused && (
                   <IconButton
-                    onClick={() => onTogglePause(facility.id)}
+                    onClick={() => onPause(facility.id, facility.name)}
+                    aria-label={`Pause ${facility.name}`}
                     edge="end"
                     color="primary"
                     size="large"
@@ -171,6 +173,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               {facility.paused && (
                 <IconButton
                   onClick={() => onTogglePause(facility.id)}
+                  aria-label={`Resume ${facility.name}`}
                   edge="end"
                   color="primary"
                   size="large"
@@ -181,6 +184,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               {!underConstruction && props.listLength > 1 && (
                 <IconButton
                   onClick={toggleDialog}
+                  aria-label={`Sell ${facility.name}`}
                   edge="end"
                   color="primary"
                   size="large"
@@ -191,6 +195,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               {underConstruction && (
                 <IconButton
                   onClick={toggleDialog}
+                  aria-label={`Cancel construction of ${facility.name}`}
                   edge="end"
                   color="primary"
                   size="large"
@@ -214,6 +219,7 @@ export interface DispatchProps {
   onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
+  onPause: (id: FacilityOperatingType["id"], name: string) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
   onStorageBuild: () => void;
 }
@@ -254,6 +260,7 @@ export default class Facilities extends React.Component<Props, {}> {
       onGeneratorBuild,
       onSell,
       onTogglePause,
+      onPause,
       onReprioritize,
       onStorageBuild,
     } = this.props;
@@ -303,6 +310,7 @@ export default class Facilities extends React.Component<Props, {}> {
                         key={g.id}
                         onSell={onSell}
                         onTogglePause={onTogglePause}
+                        onPause={onPause}
                         onReprioritize={onReprioritize}
                         spotInList={i}
                         listLength={facilitiesCount}

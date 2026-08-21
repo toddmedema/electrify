@@ -103,6 +103,10 @@ $interactive_blue: #1e88e5; /* blue 600 */
 $abswidthmax: 650px;
 $absheightmax: 1025px;
 $absmaxdimension: 1025px;
+// Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
+// isDesktopScreen() in Globals.tsx. Below this, panes render too narrow to be worth it.
+$desktop_breakpoint: 1300px;
+$desktop_bodymax: 1500px;
 
 $sizemap: (
   large: 6vmin,
@@ -282,6 +286,22 @@ table {
 
 span.weak {
   font-weight: 100;
+}
+
+// Fixed so the primary topbar and every pane header in the desktop 3-pane layout share the
+// exact same height, regardless of their differing content (icon buttons vs. plain text)
+$topbar_height: 56px;
+
+#topbar .MuiToolbar-root {
+  min-height: $topbar_height !important;
+}
+
+// Stands in for the primary pane's topbar in the desktop 3-pane layout, so each pane is
+// identifiable without the (hidden, redundant) bottom nav. Selector needs to out-specificity
+// ".base_main .MuiToolbar-root" above (also !important) or its min-height:0 wins instead
+.base_main .MuiToolbar-root.paneHeader {
+  min-height: $topbar_height !important;
+  border-bottom: $border_accent;
 }
 
 .flex-newline {
@@ -710,6 +730,39 @@ $sizemap: (
 
   #tutorial-tooltip {
     width: auto;
+  }
+}
+
+// ===============================================
+// Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities,
+// Finances and Forecasts can render as panes side by side instead of one screen at a time
+// ===============================================
+@media screen and (min-width: $desktop_breakpoint) {
+  body {
+    max-width: $desktop_bodymax;
+  }
+
+  // Redundant once all three nav destinations are visible at the same time as panes
+  #navfooter {
+    display: none;
+  }
+
+  .desktop-panes {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+
+    > div {
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      border-right: $border_accent;
+
+      &:last-child {
+        border-right: none;
+      }
+    }
   }
 }
 

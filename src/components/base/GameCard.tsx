@@ -19,6 +19,12 @@ export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
+  // When this pane is shown alongside the others in the desktop layout, skip the header/nav
+  // chrome (money, date, speed controls, tab bar) since the primary pane already shows it once
+  chromeless?: boolean;
+  // Shown as this pane's own header when chromeless, since there's no bottom nav in that layout
+  // to tell the panes apart
+  title?: string;
 }
 
 export interface DispatchProps {
@@ -38,6 +44,19 @@ export function GameCard(props: Props) {
 
   if (!game.inGame || !now) {
     return <span />;
+  }
+
+  if (props.chromeless) {
+    return (
+      <div className={props.className + " flexContainer pane"}>
+        {props.title && (
+          <Toolbar className="paneHeader">
+            <Typography variant="h6">{props.title}</Typography>
+          </Toolbar>
+        )}
+        {props.children}
+      </div>
+    );
   }
 
   const smallScreen = isSmallScreen();

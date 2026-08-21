@@ -33,6 +33,7 @@ import {
   getStorageString,
   setStorageKeyValue,
 } from "../../LocalStorage";
+import { isDesktopScreen } from "../../Globals";
 import { generateNewTimeline } from "../../reducers/Game";
 import {
   DerivedHistoryKeysType,
@@ -305,7 +306,11 @@ export default class Finances extends React.Component<Props, State> {
     }
 
     return (
-      <GameCard className="finances">
+      <GameCard
+        className="finances"
+        chromeless={isDesktopScreen()}
+        title="Finances"
+      >
         <div className="scrollable">
           <br />
           <Toolbar>

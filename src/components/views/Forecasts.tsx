@@ -26,6 +26,7 @@ import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
+import { isDesktopScreen } from "../../Globals";
 
 interface BlackoutEdges {
   minute: number;
@@ -179,7 +180,11 @@ export default class Forecasts extends React.Component<Props, State> {
     );
 
     return (
-      <GameCard className="Forecasts">
+      <GameCard
+        className="Forecasts"
+        chromeless={isDesktopScreen()}
+        title="Forecasts"
+      >
         <div className="scrollable">
           <Toolbar>
             <Typography variant="h6">

@@ -104,6 +104,24 @@ export function isBigScreen(): boolean {
   return width > 650;
 }
 
+/**
+ * This function checks if the screen is wide enough to show Facilities, Finances and Forecasts
+ * side by side instead of one at a time -- keep in sync with $desktop_breakpoint in app.scss.
+ * Below this, panes render too narrow to be worth splitting into three columns.
+ *
+ * @returns {boolean} - Returns true if the screen width is at least 1300, otherwise false.
+ */
+export function isDesktopScreen(): boolean {
+  const width = Math.max(
+    document.body.scrollWidth,
+    document.documentElement.scrollWidth,
+    document.body.offsetWidth,
+    document.documentElement.offsetWidth,
+    document.documentElement.clientWidth
+  );
+  return width >= 1300;
+}
+
 export function getHistoryApi(): any {
   return refs.history;
 }

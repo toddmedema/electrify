@@ -18,12 +18,20 @@ interface Props {
   labels: (point: any) => string;
   // Series that shouldn't raise their own tooltip, because one tooltip already reports them all
   voronoiBlacklist?: string[];
+  // What this chart shows, read by screen readers instead of the raw SVG path data
+  ariaLabel: string;
 }
 
 // Shared hover behaviour for every chart in the game
-export function chartTooltipContainer({ labels, voronoiBlacklist }: Props) {
+export function chartTooltipContainer({
+  labels,
+  voronoiBlacklist,
+  ariaLabel,
+}: Props) {
   return (
     <CursorVoronoiContainer
+      role="img"
+      aria-label={ariaLabel}
       voronoiDimension="x"
       cursorDimension="x"
       voronoiBlacklist={voronoiBlacklist}

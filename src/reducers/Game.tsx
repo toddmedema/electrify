@@ -85,7 +85,13 @@ interface NewGameAction {
 }
 
 let previousTickMs = 0;
-let previousSpeed = "PAUSED" as SpeedType;
+// Only for restoring speed after a blocking dialog (bankrupt/fired/win) closes -- NOT used to
+// decide whether the tick loop needs restarting, since state.speed can change without going
+// through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
+let speedBeforeDialog = "PAUSED" as SpeedType;
+// Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
+// out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
+let tickLoopRunning = false;
 let previousMonth = "";
 const initialGame: GameType = {
   seed: Date.now() * Math.random(),
@@ -105,14 +111,30 @@ const initialGame: GameType = {
   monthlyHistory: [] as MonthlyHistoryType[],
 };
 
+// Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
+// Using a "is it running" flag rather than comparing against a remembered previous speed means
+// this works no matter how state.speed changed (setSpeed, dialogClose, or a future caller).
+function ensureTicking(state: GameType) {
+  if (state.speed !== "PAUSED" && !tickLoopRunning) {
+    tickLoopRunning = true;
+    previousTickMs = performance.now();
+    setTimeout(
+      () => getStore().dispatch(gameSlice.actions.tick()),
+      TICK_MS[state.speed]
+    );
+  }
+}
+
 export const gameSlice = createSlice({
   name: "game",
   initialState: initialGame,
   reducers: {
     tick: (state) => {
       if (!state.inGame || state.speed === "PAUSED") {
+        tickLoopRunning = false;
         return;
       }
+      tickLoopRunning = true;
 
       // update simulation if accumulated delta exceeds frame time
       // calculate multiple simulation frames per render if on a slow device
@@ -244,14 +266,7 @@ export const gameSlice = createSlice({
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
-      if (previousSpeed === "PAUSED" && state.speed !== "PAUSED") {
-        previousTickMs = performance.now();
-        setTimeout(
-          () => getStore().dispatch(gameSlice.actions.tick()),
-          TICK_MS[state.speed]
-        );
-      }
-      previousSpeed = state.speed;
+      ensureTicking(state);
     },
   },
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
@@ -271,11 +286,12 @@ export const gameSlice = createSlice({
       return cloneDeep(initialGame);
     });
     builder.addCase(dialogOpen, (state) => {
-      previousSpeed = state.speed;
+      speedBeforeDialog = state.speed;
       state.speed = "PAUSED";
     });
     builder.addCase(dialogClose, (state) => {
-      state.speed = previousSpeed;
+      state.speed = speedBeforeDialog;
+      ensureTicking(state);
     });
   },
 });

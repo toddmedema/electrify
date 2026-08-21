@@ -39,6 +39,8 @@ export const uiSlice = createSlice({
             message: action.payload.message,
             open: true,
             timeout: action.payload.timeout || initialUI.snackbar.timeout,
+            action: action.payload.action,
+            actionLabel: action.payload.actionLabel,
           },
         };
       }

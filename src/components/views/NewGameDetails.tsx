@@ -18,6 +18,7 @@ import {
   TableHead,
   TableRow,
   Toolbar,
+  Tooltip,
   Typography,
   Dialog,
   DialogTitle,
@@ -176,7 +177,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
             {Object.keys(DIFFICULTIES).map((d: string) => {
               return (
                 <MenuItem value={d} key={d}>
-                  {d}
+                  <Tooltip title={DIFFICULTIES[d].description} placement="right">
+                    <span>{d}</span>
+                  </Tooltip>
                 </MenuItem>
               );
             })}
