@@ -34,7 +34,26 @@ This runs the app at [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-This runs the unit tests defined in files with the `.test.tsx` extensio.
+This runs the unit tests defined in files with the `.test.tsx` extension.
+
+### Check everything
+
+```sh
+npm run check
+```
+
+Types, lint, formatting and tests, which is what CI runs on every pull request. Individually:
+
+| | |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint, with warnings treated as errors |
+| `npm run format` | Rewrite files with prettier |
+| `npm run format:check` | Report unformatted files without changing them |
+
+`npm test -- --coverage` reports coverage. `src/helpers` and `src/reducers` have floors set in
+`package.json` just under where they stand today, so a change that guts them fails rather than
+landing quietly; raise the floors as coverage grows.
 
 ### Simulate the game headlessly
 

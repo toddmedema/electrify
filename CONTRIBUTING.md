@@ -17,7 +17,8 @@ Code changes are welcome and should follow the guidelines below.
 
 ## Testing
 
-For us to consider merging your PR, all existing tests must pass.
+Run `npm run check` before opening a PR -- it runs types, lint, formatting and tests, which is
+exactly what CI checks. For us to consider merging your PR, all of it must pass.
 
 If your PR changes functionality that breaks a test, note it in your PR description and update the test and any other code affected.
 
@@ -25,7 +26,9 @@ If your PR adds new functionality, please do your best to add additional, passin
 
 ## Style Guide
 
-All code submissions should be formatted with prettier's default styling. We recommend using VSCode with the Prettier extension (esbenp.prettier-vscode)
+All code submissions should be formatted with prettier, configured in `.prettierrc`. Run
+`npm run format` before committing, or use VSCode with the Prettier extension
+(esbenp.prettier-vscode) set to format on save. CI fails on unformatted files.
 
 ## Pulling and pushing remote branches
 
