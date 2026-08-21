@@ -340,6 +340,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
           </IconButton>
         )}
         <IconButton
+          id="close-button"
           edge="end"
           color="primary"
           onClick={onBack}

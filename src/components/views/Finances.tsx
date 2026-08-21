@@ -310,6 +310,7 @@ export default class Finances extends React.Component<Props, State> {
         className="finances"
         chromeless={isDesktopScreen()}
         title="Finances"
+        id="financesPane"
       >
         <div className="scrollable">
           <br />

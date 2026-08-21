@@ -46,7 +46,7 @@ import {
 } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { logEvent } from "../Globals";
-import { getStorageJson, setStorageKeyValue } from "../LocalStorage";
+import { recordScenarioPlayed } from "../LocalStorage";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { start, loaded, quit } from "./GameActions";
@@ -57,7 +57,6 @@ import {
   LocationType,
   GameType,
   GeneratorOperatingType,
-  LocalStoragePlayedType,
   MonthlyHistoryType,
   SpeedType,
   StorageOperatingType,
@@ -416,18 +415,9 @@ export function tickState(state: GameType) {
 
       // Success: Survived duration
       if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
-        const localStoragePlayed = (
-          getStorageJson("plays", { plays: [] }) as any
-        ).plays as LocalStoragePlayedType[];
-        setStorageKeyValue("plays", {
-          plays: [
-            ...localStoragePlayed,
-            {
-              scenarioId: state.scenarioId,
-              date: new Date().toString(),
-            } as LocalStoragePlayedType,
-          ],
-        });
+        // Tutorials are already marked played once their walkthrough ends, so this is a
+        // no-op for the ones the player sat all the way through
+        recordScenarioPlayed(state.scenarioId);
 
         // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
         const summary = summarizeHistory(history);

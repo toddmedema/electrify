@@ -230,6 +230,14 @@ export interface TutorialStepType {
   onNext?: () => Redux.Action;
   target: string;
   content: JSX.Element;
+  // Above the desktop breakpoint the bottom nav is hidden and Facilities / Finances /
+  // Forecasts render side by side, so a step whose target lives in that nav - or whose
+  // selector matches more than one pane - needs a different target there, and usually
+  // different wording too, since there are no tabs left to switch between
+  desktop?: {
+    target: string;
+    content?: JSX.Element;
+  };
 }
 
 export interface ScenarioType {

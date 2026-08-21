@@ -176,9 +176,18 @@ body {
   right: 0;
 }
 
+// MUI toasts default to white-on-near-black, which reads as a different app alongside the
+// otherwise light UI - so invert it, and lean on a border plus the existing elevation
+// shadow to separate it from the white background behind
 .snackbar {
+  .MuiSnackbarContent-root {
+    background-color: $bg_primary;
+    border: 1px solid #bdbdbd; /* grey400, matches the app frame edges */
+    border-radius: 4px;
+  }
+
   span {
-    color: $font_color_dark_primary !important;
+    color: $font_color_primary !important;
   }
 }
 
@@ -479,6 +488,18 @@ $topbar_height: 56px;
   color: #bdbdbd; /* grey400 */
 }
 
+// How far through the 101-106 sequence the player is
+.tutorialProgressBar {
+  margin: 0 16px 12px 8px;
+  height: 4px !important;
+  border-radius: 2px;
+}
+
+// The next tutorial to play, so the sequence has one obvious entry point
+.tutorialNext {
+  border-left: 4px solid #1e88e5; /* blue600, matches primary buttons */
+}
+
 // Units appended to numbers in tables, de-emphasized so the number still reads first
 .unitSuffix {
   opacity: 0.6;
@@ -566,12 +587,18 @@ $topbar_height: 56px;
     max-width: 500px;
     box-sizing: border-box;
 
-    button {
+    .tutorialFooter {
+      display: flex;
+      align-items: center;
       margin-top: size(medium);
+      gap: size(small);
     }
 
-    .MuiButton-containedPrimary {
-      float: right;
+    // Pushes the buttons to the trailing edge, so the row reads progress-then-actions
+    .tutorialProgress {
+      margin-right: auto;
+      opacity: 0.6;
+      font-size: 0.85em;
     }
   }
 

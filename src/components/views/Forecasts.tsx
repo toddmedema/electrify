@@ -184,6 +184,7 @@ export default class Forecasts extends React.Component<Props, State> {
         className="Forecasts"
         chromeless={isDesktopScreen()}
         title="Forecasts"
+        id="forecastsPane"
       >
         <div className="scrollable">
           <Toolbar>
