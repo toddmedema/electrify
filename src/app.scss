@@ -288,17 +288,22 @@ span.weak {
   font-weight: 100;
 }
 
-.pausedChip {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
-  border-radius: 10px;
+// Its own full-width row below the toolbar rather than inline content sharing the toolbar's
+// flex row -- an inline chip or badge there added just enough width to force the speed buttons
+// onto their own wrapped line on narrow phones
+.pausedBanner {
+  padding: 3px 16px;
   background: $blackout_red;
   color: #ffffff;
-  font-size: 0.7em;
+  font-size: 0.8em;
   font-weight: bold;
-  letter-spacing: 0.03em;
-  vertical-align: middle;
+  text-align: center;
+}
+
+// Stands in for the primary pane's topbar in the desktop 3-pane layout, so each pane is
+// identifiable without the (hidden, redundant) bottom nav
+.paneHeader {
+  border-bottom: $border_accent;
 }
 
 .flex-newline {

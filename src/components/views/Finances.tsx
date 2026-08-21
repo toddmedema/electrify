@@ -306,7 +306,11 @@ export default class Finances extends React.Component<Props, State> {
     }
 
     return (
-      <GameCard className="finances" chromeless={isDesktopScreen()}>
+      <GameCard
+        className="finances"
+        chromeless={isDesktopScreen()}
+        title="Finances"
+      >
         <div className="scrollable">
           <br />
           <Toolbar>

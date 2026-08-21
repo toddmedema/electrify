@@ -180,7 +180,11 @@ export default class Forecasts extends React.Component<Props, State> {
     );
 
     return (
-      <GameCard className="Forecasts" chromeless={isDesktopScreen()}>
+      <GameCard
+        className="Forecasts"
+        chromeless={isDesktopScreen()}
+        title="Forecasts"
+      >
         <div className="scrollable">
           <Toolbar>
             <Typography variant="h6">
