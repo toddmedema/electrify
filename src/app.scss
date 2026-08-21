@@ -176,9 +176,18 @@ body {
   right: 0;
 }
 
+// MUI toasts default to white-on-near-black, which reads as a different app alongside the
+// otherwise light UI - so invert it, and lean on a border plus the existing elevation
+// shadow to separate it from the white background behind
 .snackbar {
+  .MuiSnackbarContent-root {
+    background-color: $bg_primary;
+    border: 1px solid #bdbdbd; /* grey400, matches the app frame edges */
+    border-radius: 4px;
+  }
+
   span {
-    color: $font_color_dark_primary !important;
+    color: $font_color_primary !important;
   }
 }
 

@@ -356,6 +356,9 @@ export default class Compositor extends React.Component<Props, {}> {
         </Dialog>
         <Snackbar
           className="snackbar"
+          // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
+          // off the side of the centered app frame
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={ui.snackbar.open}
           message={<span>{ui.snackbar.message}</span>}
           autoHideDuration={ui.snackbar.timeout}
