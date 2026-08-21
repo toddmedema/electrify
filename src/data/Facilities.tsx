@@ -19,7 +19,7 @@ export function GENERATORS(
   state: GameType,
   peakW: number,
   windSpeedsKph: number[],
-  irradiancesWM2: number[]
+  irradiancesWM2: number[],
 ) {
   const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -32,7 +32,7 @@ export function GENERATORS(
       }
       return acc;
     },
-    {} as { [index: string]: number }
+    {} as { [index: string]: number },
   );
 
   // Calculate intermittent generator capacity factors (here instead of passed in, since may eventually have different capacity factors

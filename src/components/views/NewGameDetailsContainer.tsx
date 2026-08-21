@@ -28,7 +28,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
 const NewGameDetailsContainer = connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(NewGameDetails);
 
 export default NewGameDetailsContainer;

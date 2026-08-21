@@ -74,7 +74,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
       getSunriseSunset(
         getDateFromMinute(rangeMin + 1440, startingYear),
         location.lat,
-        location.long
+        location.long,
       ).sunrise;
   }
   if (sunset < rangeMin) {
@@ -84,7 +84,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
       getSunriseSunset(
         getDateFromMinute(rangeMin + 1440, startingYear),
         location.lat,
-        location.long
+        location.long,
       ).sunset;
   }
 
@@ -121,7 +121,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         prev.minute,
         prev.demandW,
         d.minute,
-        d.demandW
+        d.demandW,
       );
       blackouts.push({ minute: intersectionTime, value: 0 });
       blackouts.push({ minute: intersectionTime, value: domainMax });
@@ -137,7 +137,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         prev.minute,
         prev.demandW,
         d.minute,
-        d.demandW
+        d.demandW,
       );
       blackouts.push({ minute: intersectionTime, value: domainMax });
       blackouts.push({ minute: intersectionTime, value: 0 });
@@ -154,10 +154,10 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
   // Divide between historic and forcast
   const currentMinute = props.currentMinute || 0;
   const historic = [...timeline].filter(
-    (d: ChartData) => d.minute <= currentMinute
+    (d: ChartData) => d.minute <= currentMinute,
   );
   const forecast = [...timeline].filter(
-    (d: ChartData) => d.minute >= currentMinute
+    (d: ChartData) => d.minute >= currentMinute,
   );
 
   const legendItems = [

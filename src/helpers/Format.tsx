@@ -81,7 +81,7 @@ export function getWattUnit(i: number): WattUnitType {
 export function formatWattsInUnit(
   i: number,
   unit: WattUnitType,
-  mantissa = 1
+  mantissa = 1,
 ): string {
   return (
     numbro(i / unit.divisor).format({

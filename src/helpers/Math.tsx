@@ -7,7 +7,7 @@ export function getIntersectionX(
   line2StartX: number,
   line2StartY: number,
   line2EndX: number,
-  line2EndY: number
+  line2EndY: number,
 ) {
   const denominator =
     (line2EndY - line2StartY) * (line1EndX - line1StartX) -

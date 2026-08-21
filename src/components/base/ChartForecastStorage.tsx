@@ -51,7 +51,7 @@ export default class chartForecastStorage extends React.PureComponent<
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,
-                multiyear
+                multiyear,
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

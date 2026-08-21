@@ -13,7 +13,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SearchIcon from "@mui/icons-material/Search";
-import InputBase from '@mui/material/InputBase';
+import InputBase from "@mui/material/InputBase";
 
 export interface StateProps {}
 
@@ -49,9 +49,12 @@ function ManualItem(props: ManualEntry): JSX.Element {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Manual extends React.PureComponent<Props, { searchTerm: string }> {
+export default class Manual extends React.PureComponent<
+  Props,
+  { searchTerm: string }
+> {
   state = {
-    searchTerm: ''
+    searchTerm: "",
   };
 
   handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,30 +63,44 @@ export default class Manual extends React.PureComponent<Props, { searchTerm: str
 
   filterEntries = () => {
     return MANUAL_ENTRIES.filter((entry) => {
-      const titleMatch = entry.title.toLowerCase().includes(this.state.searchTerm.toLowerCase());
-      
+      const titleMatch = entry.title
+        .toLowerCase()
+        .includes(this.state.searchTerm.toLowerCase());
+
       let contentMatch = false;
       const children = entry.entry.props.children;
-      
-      if (typeof children === 'string') {
-        contentMatch = children.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+
+      if (typeof children === "string") {
+        contentMatch = children
+          .toLowerCase()
+          .includes(this.state.searchTerm.toLowerCase());
       } else if (Array.isArray(children)) {
-        contentMatch = children.some(child => {
-          if (typeof child === 'string') {
-            return child.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+        contentMatch = children.some((child) => {
+          if (typeof child === "string") {
+            return child
+              .toLowerCase()
+              .includes(this.state.searchTerm.toLowerCase());
           }
-          if (child && typeof child === 'object' && 'props' in child) {
+          if (child && typeof child === "object" && "props" in child) {
             const childText = child.props.children;
-            if (typeof childText === 'string') {
-              return childText.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+            if (typeof childText === "string") {
+              return childText
+                .toLowerCase()
+                .includes(this.state.searchTerm.toLowerCase());
             }
           }
           return false;
         });
-      } else if (children && typeof children === 'object' && 'props' in children) {
+      } else if (
+        children &&
+        typeof children === "object" &&
+        "props" in children
+      ) {
         const childText = children.props.children;
-        if (typeof childText === 'string') {
-          contentMatch = childText.toLowerCase().includes(this.state.searchTerm.toLowerCase());
+        if (typeof childText === "string") {
+          contentMatch = childText
+            .toLowerCase()
+            .includes(this.state.searchTerm.toLowerCase());
         }
       }
 
@@ -92,7 +109,9 @@ export default class Manual extends React.PureComponent<Props, { searchTerm: str
   };
 
   public render() {
-    const filteredEntries = this.state.searchTerm ? this.filterEntries() : MANUAL_ENTRIES;
+    const filteredEntries = this.state.searchTerm
+      ? this.filterEntries()
+      : MANUAL_ENTRIES;
 
     return (
       <div className="flexContainer" id="gameCard">
@@ -108,12 +127,18 @@ export default class Manual extends React.PureComponent<Props, { searchTerm: str
               <ChevronLeftIcon />
             </IconButton>
             <Typography variant="h6">Electrify Manual</Typography>
-            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginLeft: "auto",
+              }}
+            >
               <InputBase
                 placeholder="Search..."
                 value={this.state.searchTerm}
                 onChange={this.handleSearch}
-                style={{ marginRight: '8px' }}
+                style={{ marginRight: "8px" }}
               />
               <IconButton
                 aria-label="search"
@@ -255,8 +280,8 @@ const MANUAL_ENTRIES = [
         </p>
         <p>
           <strong>Stored power</strong> (shown once you own storage) tracks the
-          energy in your batteries and reservoirs as they charge off surplus
-          and discharge into peaks.
+          energy in your batteries and reservoirs as they charge off surplus and
+          discharge into peaks.
         </p>
         <p>
           <strong>Fuel Prices</strong> projects the cost of each fuel you can

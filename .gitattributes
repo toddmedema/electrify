@@ -1,3 +1,8 @@
+# Normalise text files to LF in the index and the working tree, so that prettier's
+# check (and everyone's diffs) agree between Windows and CI. The LFS rules below use
+# -text, which overrides this for the binaries they match.
+* text=auto eol=lf
+
 *.psd filter=lfs diff=lfs merge=lfs -text
 *.ico filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text

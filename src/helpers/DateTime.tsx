@@ -34,7 +34,7 @@ export const EMPTY_HISTORY = {
 // edits acc in place to avoid making tons of extra objects
 export function reduceHistories(
   acc: MonthlyHistoryType,
-  t: MonthlyHistoryType
+  t: MonthlyHistoryType,
 ): MonthlyHistoryType {
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
@@ -54,7 +54,7 @@ export function reduceHistories(
 }
 
 export function deriveExpandedSummary(
-  s: MonthlyHistoryType
+  s: MonthlyHistoryType,
 ): DerivedHistoryType {
   const expenses =
     s.expensesFuel +
@@ -77,7 +77,7 @@ export function deriveExpandedSummary(
 export function summarizeTimeline(
   timeline: TickPresentFutureType[],
   startingYear: number,
-  filter?: (t: TickPresentFutureType) => boolean
+  filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
   // Go in reverse so that the last values for ending values (like net worth are used)
@@ -105,7 +105,7 @@ export function summarizeTimeline(
 
 export function summarizeHistory(
   timeline: MonthlyHistoryType[],
-  filter?: (t: MonthlyHistoryType) => boolean
+  filter?: (t: MonthlyHistoryType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
   // Go in reverse so that the last values for ending values (like net worth are used)
@@ -119,7 +119,7 @@ export function summarizeHistory(
 
 export function getTimeFromTimeline(
   minute: number,
-  timeline: TickPresentFutureType[]
+  timeline: TickPresentFutureType[],
 ): null | TickPresentFutureType {
   if (!timeline[0]) {
     return null;
@@ -149,7 +149,7 @@ export function formatMonthChartAxis(t: number, multiyear: boolean) {
 
 export function formatHour(date: DateType): string {
   const time = new Date(
-    `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`
+    `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`,
   );
   return time.toLocaleString("en-US", { hour: "numeric", hour12: true });
 }
@@ -173,7 +173,7 @@ export function getSunriseSunset(date: DateType, lat: number, long: number) {
   const calc = SunCalc.getTimes(
     new Date(`${date.month} 1, ${date.year}`),
     lat,
-    long
+    long,
   );
 
   return {
@@ -184,7 +184,7 @@ export function getSunriseSunset(date: DateType, lat: number, long: number) {
 
 export function getDateFromMinute(
   minute: number,
-  startingYear: number
+  startingYear: number,
 ): DateType {
   const minuteOfDay = minute % 1440;
   const hourOfDay = Math.floor(minuteOfDay / 60);
@@ -230,12 +230,12 @@ export function formatMinuteOfDayChartAxis(minute: number): string {
 export function getHourTicks(
   rangeMin: number,
   rangeMax: number,
-  maxTicks = 6
+  maxTicks = 6,
 ): number[] {
   const hoursSpanned = (rangeMax - rangeMin) / 60;
   const step =
     ([1, 2, 3, 4, 6, 8, 12] as number[]).find(
-      (h) => hoursSpanned / h <= maxTicks
+      (h) => hoursSpanned / h <= maxTicks,
     ) || 24;
   const stepMinutes = step * 60;
   const ticks = [];

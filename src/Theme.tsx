@@ -63,7 +63,7 @@ export default createTheme(
         lineHeight: 1.2,
       },
     },
-  } as DeprecatedThemeOptions)
+  } as DeprecatedThemeOptions),
 );
 
 export const chartTheme = {

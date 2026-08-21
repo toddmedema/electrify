@@ -37,7 +37,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 };
 
 export const mapDispatchToProps = (
-  dispatch: Redux.Dispatch<any>
+  dispatch: Redux.Dispatch<any>,
 ): DispatchProps => {
   return {
     closeDialog(): void {
@@ -49,7 +49,7 @@ export const mapDispatchToProps = (
     onTutorialStep(
       newStep: number,
       tutorialSteps: TutorialStepType[] | undefined,
-      scenarioId: number
+      scenarioId: number,
     ): void {
       const steps = tutorialSteps || [];
       const prevStep = steps[newStep - 1];
@@ -73,7 +73,7 @@ export const mapDispatchToProps = (
           action: () => dispatch(quit({ toScenarioList: true })),
           open: true,
           timeout: 6000,
-        })
+        }),
       );
     },
     onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
@@ -83,12 +83,13 @@ export const mapDispatchToProps = (
       // a paused scenario with no idea what happened - so say so, and offer the way out
       dispatch(
         snackbarOpen({
-          message: "Walkthrough closed - keep playing, or pick another tutorial",
+          message:
+            "Walkthrough closed - keep playing, or pick another tutorial",
           actionLabel: "Tutorials",
           action: () => dispatch(quit({ toScenarioList: true })),
           open: true,
           timeout: 6000,
-        })
+        }),
       );
     },
   };
@@ -96,7 +97,7 @@ export const mapDispatchToProps = (
 
 const CompositorContainer = connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(Compositor);
 
 export default CompositorContainer;

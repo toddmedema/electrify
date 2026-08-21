@@ -33,7 +33,7 @@ export default class ChartForecastWeather extends React.PureComponent<
     const { domain, height, timeline, startingYear, multiyear } = this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
     const data = timeline.filter(
-      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES
+      (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES,
     );
     // Make sure it gets the first + last entries for a full chart
     data.unshift(timeline[0]);
@@ -62,7 +62,7 @@ export default class ChartForecastWeather extends React.PureComponent<
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,
-                multiyear
+                multiyear,
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

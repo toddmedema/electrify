@@ -11,7 +11,7 @@ import { cursorColor } from "../../Theme";
 // createContainer's return type is too loose for TSX to accept as a component
 const CursorVoronoiContainer = createContainer(
   "cursor",
-  "voronoi"
+  "voronoi",
 ) as React.ComponentType<any>;
 
 interface Props {
