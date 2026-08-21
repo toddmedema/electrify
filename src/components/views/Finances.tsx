@@ -460,6 +460,12 @@ export default class Finances extends React.Component<Props, State> {
                       <TableCell>{k.label}</TableCell>
                       <TableCell align="right">
                         {format(summary[key as DerivedHistoryKeysType])}
+                        {k.suffix && (
+                          <span className="unitSuffix">
+                            {k.suffix.startsWith("/") ? "" : " "}
+                            {k.suffix}
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

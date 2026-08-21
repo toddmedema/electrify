@@ -75,7 +75,15 @@ export const cardSlice = createSlice({
       };
       return state;
     });
-    builder.addCase(quit, (state) => {
+    builder.addCase(quit, (state, action) => {
+      if (action.payload && action.payload.toScenarioList) {
+        return {
+          name: "NEW_GAME" as CardNameType,
+          ts: Date.now(),
+          history: ["NEW_GAME", "MAIN_MENU"] as CardNameType[],
+          toPrevious: false,
+        };
+      }
       state = { ...initialCard };
       return state;
     });
