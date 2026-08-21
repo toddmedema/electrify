@@ -34,7 +34,7 @@ function collectWeatherRow(row: any) {
 function warnIfWeatherIncomplete(location: string) {
   if (weather.length < EXPECTED_ROWS) {
     console.warn(
-      `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`
+      `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
     );
   }
 }
@@ -126,7 +126,7 @@ export function getRawSolarIrradianceWM2(
   date: DateType,
   lat: number,
   long: number,
-  cloudCoverPercent: number
+  cloudCoverPercent: number,
 ) {
   let irradiance = EQUATOR_RADIANCE; //* (1 - 0.007 * Math.abs(lat)); // w/m2 - redundant with day length bell curve?
   irradiance *= 1 - cloudCoverPercent / 400; // Very cloudy days = 25% reduction
@@ -134,7 +134,7 @@ export function getRawSolarIrradianceWM2(
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
       date.minuteOfDay - sunrise,
-      sunset - date.minuteOfDay
+      sunset - date.minuteOfDay,
     );
     return (
       irradiance / (1 + Math.pow(Math.E, -0.015 * (minutesFromDark - 200)))

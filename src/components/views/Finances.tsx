@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   MenuItem,
   Select,
+  SelectChangeEvent,
   Slider,
   Table,
   TableBody,
@@ -198,7 +199,7 @@ export default class Finances extends React.Component<Props, State> {
       expanded: getStorageBoolean("financesTableOpened", false),
       chartKey: getStorageString(
         "financesChartKey",
-        "profit"
+        "profit",
       ) as DerivedHistoryKeysType,
     };
   }
@@ -242,7 +243,7 @@ export default class Finances extends React.Component<Props, State> {
 
     const monthlyHistory = game.monthlyHistory.filter(
       (t: MonthlyHistoryType) =>
-        !year || t.year === year || (year === -1 && t.year === date.year)
+        !year || t.year === year || (year === -1 && t.year === date.year),
     );
     const previousMonths = summarizeHistory(monthlyHistory);
 
@@ -253,12 +254,12 @@ export default class Finances extends React.Component<Props, State> {
         summarizeTimeline(
           timeline,
           startingYear,
-          (t) => t.minute <= date.minute
-        )
+          (t) => t.minute <= date.minute,
+        ),
       );
     }
     const summary = deriveExpandedSummary(
-      summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY })
+      summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
 
     // For the monthly chart
@@ -281,7 +282,7 @@ export default class Finances extends React.Component<Props, State> {
           game,
           now.cash,
           now.customers,
-          TICKS_PER_MONTH * (1 + 12 - date.monthNumber)
+          TICKS_PER_MONTH * (1 + 12 - date.monthNumber),
         ); // Current month, plus the rest of the months
         for (let month = date.monthNumber + 1; month <= 12; month++) {
           const m = summarizeTimeline(
@@ -289,7 +290,7 @@ export default class Finances extends React.Component<Props, State> {
             game.startingYear,
             (t) =>
               getDateFromMinute(t.minute, game.startingYear).monthNumber ===
-              month
+              month,
           );
           presentFutureMonths.push(m);
         }
@@ -327,7 +328,7 @@ export default class Finances extends React.Component<Props, State> {
                 </Typography>
                 /mo&nbsp; (+
                 {numbro(
-                  customersFromMarketingSpend(game.monthlyMarketingSpend)
+                  customersFromMarketingSpend(game.monthlyMarketingSpend),
                 ).format({ average: true })}{" "}
                 customers)
               </Typography>
@@ -341,12 +342,12 @@ export default class Finances extends React.Component<Props, State> {
                 min={-1}
                 step={1}
                 max={getTickFromValue(
-                  Math.max(now.cash / 12, game.monthlyMarketingSpend)
+                  Math.max(now.cash / 12, game.monthlyMarketingSpend),
                 )}
-                onChange={(e: any, newTick: number | number[]) =>
+                onChange={(_e: Event, newTick: number | number[]) =>
                   onDelta({
                     monthlyMarketingSpend: getValueFromTick(
-                      Array.isArray(newTick) ? newTick[0] : newTick
+                      Array.isArray(newTick) ? newTick[0] : newTick,
                     ),
                   })
                 }
@@ -374,7 +375,7 @@ export default class Finances extends React.Component<Props, State> {
                 min={0}
                 step={0.01}
                 max={0.3}
-                onChange={(e: any, newTick: number | number[]) =>
+                onChange={(_e: Event, newTick: number | number[]) =>
                   onDelta({
                     dollarsPerkWh: Array.isArray(newTick)
                       ? newTick[0]
@@ -390,7 +391,9 @@ export default class Finances extends React.Component<Props, State> {
             <Select
               id="plotMetric"
               defaultValue={chartKey}
-              onChange={(e: any) => this.setChartKey(e.target.value)}
+              onChange={(e: SelectChangeEvent<string>) =>
+                this.setChartKey(e.target.value as DerivedHistoryKeysType)
+              }
             >
               {Object.keys(CHART_KEYS).map((key: string) => {
                 const k = CHART_KEYS[key];
@@ -420,7 +423,9 @@ export default class Finances extends React.Component<Props, State> {
             <Select
               id="plotYear"
               defaultValue={-1}
-              onChange={(e: any) => this.setState({ year: e.target.value })}
+              onChange={(e: SelectChangeEvent<number>) =>
+                this.setState({ year: e.target.value as number })
+              }
             >
               <MenuItem value={0}>All time</MenuItem>
               <MenuItem value={-1}>Current year</MenuItem>

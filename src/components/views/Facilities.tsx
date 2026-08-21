@@ -21,7 +21,14 @@ import PlayIcon from "@mui/icons-material/PlayArrow";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  Draggable,
+  DraggingStyle,
+  Droppable,
+  DropResult,
+  NotDraggingStyle,
+} from "@hello-pangea/dnd";
 import { TICK_MINUTES } from "../../Constants";
 import { FacilityOperatingType, GameType } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
@@ -45,7 +52,10 @@ interface FacilityListItemProps {
   onReprioritize: DispatchProps["onReprioritize"];
 }
 
-const getDraggableStyle = (isDragging: boolean, draggableStyle: any) => ({
+const getDraggableStyle = (
+  isDragging: boolean,
+  draggableStyle: DraggingStyle | NotDraggingStyle | undefined,
+): React.CSSProperties => ({
   userSelect: "none",
   border: isDragging ? `1px solid rgba(30, 136, 229, 0.5)` : "none", // Match buttons
   borderRadius: isDragging ? `4px` : "0",
@@ -65,7 +75,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
     const percentBuilt = Math.round(
       ((facility.yearsToBuild - facility.yearsToBuildLeft) /
         facility.yearsToBuild) *
-        100
+        100,
     );
     secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
   } else if (facility.peakWh) {
@@ -87,7 +97,7 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
           {...provided.dragHandleProps}
           style={getDraggableStyle(
             snapshot.isDragging,
-            provided.draggableProps.style
+            provided.draggableProps.style,
           )}
         >
           <ListItem disabled={underConstruction} className="facility">
@@ -232,7 +242,7 @@ export default class Facilities extends React.Component<Props, {}> {
     this.onDragEnd = this.onDragEnd.bind(this);
   }
 
-  public shouldComponentUpdate(nextProps: Props, nextState: any) {
+  public shouldComponentUpdate(nextProps: Props) {
     // In fast modes, skip frames so that CPU can focus on simulation
     switch (nextProps.game.speed) {
       case "FAST":
@@ -242,7 +252,7 @@ export default class Facilities extends React.Component<Props, {}> {
     }
   }
 
-  public onDragEnd(result: any) {
+  public onDragEnd(result: DropResult) {
     if (!result.destination) {
       // dropped outside the list
       return;
@@ -250,7 +260,7 @@ export default class Facilities extends React.Component<Props, {}> {
 
     this.props.onReprioritize(
       result.source.index,
-      result.destination.index - result.source.index
+      result.destination.index - result.source.index,
     );
   }
 
@@ -315,7 +325,7 @@ export default class Facilities extends React.Component<Props, {}> {
                         spotInList={i}
                         listLength={facilitiesCount}
                       />
-                    )
+                    ),
                   )}
                   {provided.placeholder}
                 </div>

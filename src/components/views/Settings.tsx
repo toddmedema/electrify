@@ -58,7 +58,9 @@ export default function Settings(props: Props): JSX.Element {
           color="primary"
           id="sound"
           checked={props.settings.audioEnabled}
-          onChange={(e: any) => props.onAudioChange(e.target.checked)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            props.onAudioChange(e.target.checked)
+          }
         />
         {props.settings.audioEnabled
           ? "Music and sound effects enabled."

@@ -52,7 +52,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
             ariaLabel: "Chart of forecasted fuel prices",
             labels: ({ datum }: any) =>
               PRICED_FUELS.map(
-                (f) => `${f}: ${formatMoneyStable(datum[f])}`
+                (f) => `${f}: ${formatMoneyStable(datum[f])}`,
               ).join("\n"),
             // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
             voronoiBlacklist: PRICED_FUELS.slice(1),
@@ -64,7 +64,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,
-                multiyear
+                multiyear,
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

@@ -18,6 +18,10 @@ import { getRandomRange } from "../helpers/Math";
 
 const Papa = require("papaparse");
 
+// The first year in FuelPricesRaw.csv. Asking for a year before this means the CSV was never
+// loaded, rather than that the game is being played in the 1970s.
+const EARLIEST_DATA_YEAR = 1975;
+
 interface RawFuelPricesType {
   month: number;
   year: number;
@@ -84,9 +88,17 @@ export function initFuelPricesFromCsv(csv: string) {
 
 export function getFuelPricesPerMBTU(date: DateType): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
+    // Prices only run from EARLIEST_DATA_YEAR, so anything before that means nothing was
+    // loaded. Without the floor this walks backwards forever and hangs whatever called it.
     let referenceYear = date.year - 1;
     while (fuelPrices[referenceYear] === undefined) {
       referenceYear--;
+      if (referenceYear < EARLIEST_DATA_YEAR) {
+        throw new Error(
+          `No fuel prices loaded, so none can be projected for ${date.year}. ` +
+            "Call initFuelPrices (browser) or initFuelPricesFromCsv (headless) first.",
+        );
+      }
     }
     fuelPrices[date.year] = {};
     let previous = fuelPrices[referenceYear][12];

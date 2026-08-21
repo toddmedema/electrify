@@ -12,6 +12,7 @@ import {
   IconButton,
   MenuItem,
   Select,
+  SelectChangeEvent,
   Table,
   TableBody,
   TableCell,
@@ -31,7 +32,13 @@ import InfoIcon from "@mui/icons-material/Info";
 import { DIFFICULTIES, LOCATIONS } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { SCENARIOS } from "../../data/Scenarios";
-import { GameType, LocationType, ScenarioType, ScoreType } from "../../Types";
+import {
+  DifficultyType,
+  GameType,
+  LocationType,
+  ScenarioType,
+  ScoreType,
+} from "../../Types";
 
 const numbro = require("numbro");
 
@@ -79,7 +86,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         collection(db, "scores"),
         where("scenarioId", "==", this.state.scenario.id),
         orderBy("score", "desc"),
-        limit(50)
+        limit(50),
       );
       let querySnapshot = await getDocs(q);
       querySnapshot.forEach((doc: any) => {
@@ -92,7 +99,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
         where("scenarioId", "==", this.state.scenario.id),
         where("uid", "==", uid),
         orderBy("score", "desc"),
-        limit(1)
+        limit(1),
       );
       querySnapshot = await getDocs(q);
       querySnapshot.forEach((doc: any) => {
@@ -113,7 +120,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const { scenario, scores, myTopScore, location, victoryDialogOpen } =
       this.state;
 
-    const toggleVictoryDialog = (e: any) => {
+    const toggleVictoryDialog = (e: React.SyntheticEvent) => {
       this.setState({ victoryDialogOpen: !victoryDialogOpen });
       e.stopPropagation();
     };
@@ -172,12 +179,17 @@ export default class NewGameDetails extends React.Component<Props, State> {
           Difficulty:&nbsp;
           <Select
             value={game.difficulty}
-            onChange={(e: any) => onDelta({ difficulty: e.target.value })}
+            onChange={(e: SelectChangeEvent<DifficultyType>) =>
+              onDelta({ difficulty: e.target.value as DifficultyType })
+            }
           >
             {Object.keys(DIFFICULTIES).map((d: string) => {
               return (
                 <MenuItem value={d} key={d}>
-                  <Tooltip title={DIFFICULTIES[d].description} placement="right">
+                  <Tooltip
+                    title={DIFFICULTIES[d].description}
+                    placement="right"
+                  >
                     <span>{d}</span>
                   </Tooltip>
                 </MenuItem>
@@ -237,7 +249,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             <Button
               color="primary"
               variant="contained"
-              onClick={(e: any) => {
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
                 toggleVictoryDialog(e);
               }}
             >

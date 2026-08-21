@@ -170,7 +170,8 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         content: (
           <Typography variant="body1">
-            Start the game by unpausing it. Hotkeys are in a row: `/1/2/3. Space and 0 also pause.
+            Start the game by unpausing it. Hotkeys are in a row: `/1/2/3. Space
+            and 0 also pause.
             <br />
             <br />
             This tutorial will run for 1 year. Try building different types of

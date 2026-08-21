@@ -1,6 +1,9 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, ScenarioType } from "../Types";
-import { runSimulation, SimResultType } from "./Simulator";
+import { createGame, runSimulation, SimResultType } from "./Simulator";
+import { TICKS_PER_MONTH } from "../Constants";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+import { tickState } from "../reducers/Game";
 
 jest.setTimeout(120000);
 
@@ -141,15 +144,34 @@ describe("simulation economics", () => {
     expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
   });
 
+  /**
+   * This used to run scenario 5 and assert zero emissions only `if` that run's fleet turned out
+   * to be renewables-only. Scenario 5 starts on a 450MW coal plant, so the condition was never
+   * true and the assertion never ran. Build the fleet the test wants rather than hoping a
+   * scenario supplies one.
+   */
   it("emits nothing when only renewables are running", () => {
-    // 106: Forecasting starts on wind and solar alone
-    const result = runSimulation({ scenarioId: 5, months: 12 });
-    const burnsFossilFuel = result.finalFacilities.some(
-      (f) => f.fuel && f.fuel !== "Sun" && f.fuel !== "Wind",
+    // Paradise is the one scenario that starts with both wind and solar
+    const state = createGame({ scenarioId: 105 });
+    state.facilities = state.facilities.filter(
+      (f) => f.fuel === "Sun" || f.fuel === "Wind",
     );
-    if (!burnsFossilFuel) {
-      expect(result.months.reduce((a, m) => a + m.kgco2e, 0)).toBe(0);
+    expect(state.facilities.length).toBeGreaterThan(0);
+
+    let generatedW = 0;
+    let kgco2e = 0;
+    for (let i = 0; i < TICKS_PER_MONTH; i++) {
+      tickState(state);
+      const now = getTimeFromTimeline(state.date.minute, state.timeline);
+      if (now) {
+        generatedW += now.supplyW;
+        kgco2e += now.kgco2e;
+      }
     }
+
+    // Without this the test would also pass on a fleet that never generated anything
+    expect(generatedW).toBeGreaterThan(0);
+    expect(kgco2e).toBe(0);
   });
 
   it("keeps the carbon fee proportional to emissions", () => {

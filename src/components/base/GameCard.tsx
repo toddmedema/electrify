@@ -39,8 +39,12 @@ export function GameCard(props: Props) {
   const { game } = props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
-  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
-  const [speedAnchorEl, setSpeedAnchorEl] = React.useState(null);
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
+    null,
+  );
+  const [speedAnchorEl, setSpeedAnchorEl] = React.useState<HTMLElement | null>(
+    null,
+  );
 
   if (!game.inGame || !now) {
     return <span />;
@@ -63,9 +67,10 @@ export function GameCard(props: Props) {
 
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
-  const handleMenuClick = (event: any) => setMenuAnchorEl(event.currentTarget);
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
+    setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
-  const handleSpeedClick = (event: any) =>
+  const handleSpeedClick = (event: React.MouseEvent<HTMLElement>) =>
     setSpeedAnchorEl(event.currentTarget);
   const handleSpeedClose = () => setSpeedAnchorEl(null);
 

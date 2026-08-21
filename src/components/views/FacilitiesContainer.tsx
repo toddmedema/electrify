@@ -36,7 +36,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
           action: () => dispatch(togglePauseFacility(id)),
           open: true,
           timeout: 6000,
-        })
+        }),
       );
     },
     onReprioritize: (spotInList: number, delta: number) => {
@@ -50,7 +50,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
 
 const FacilitiesContainer = connect(
   mapStateToProps,
-  mapDispatchToProps
+  mapDispatchToProps,
 )(Facilities);
 
 export default FacilitiesContainer;

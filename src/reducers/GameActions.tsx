@@ -21,5 +21,5 @@ export const loaded = createAction("game/loaded");
  * player wants is another scenario.
  */
 export const quit = createAction<{ toScenarioList?: boolean } | undefined>(
-  "game/quit"
+  "game/quit",
 );

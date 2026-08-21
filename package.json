@@ -5,13 +5,29 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
     "@hello-pangea/dnd": "^16.6.0",
     "@mui/icons-material": "^5.15.14",
     "@mui/material": "^5.15.14",
     "@reduxjs/toolkit": "^1.9.7",
+    "firebase": "^12.11.0",
+    "lodash.clonedeep": "^4.5.0",
+    "numbro": "^2.4.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hotkeys": "^2.0.0",
+    "react-joyride": "^2.8.0",
+    "react-redux": "^8.1.3",
+    "react-transition-group": "^4.4.5",
+    "redux": "^4.2.1",
+    "suncalc": "^1.9.0",
+    "victory": "^37.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.2",
@@ -19,24 +35,13 @@
     "@types/node": "^20.0.0",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^18.2.73",
+    "@types/react-dom": "^18.2.22",
     "@types/react-transition-group": "^4.4.10",
     "@types/victory": "^35.0.0",
-    "firebase": "^12.11.0",
-    "lodash.clonedeep": "^4.5.0",
-    "numbro": "^2.4.0",
-    "papaparse": "^5.4.1",
     "prettier": "^3.2.5",
-    "react": "^18.2.0",
-    "react-hotkeys": "^2.0.0",
-    "react-joyride": "^2.8.0",
-    "react-redux": "^8.1.3",
     "react-scripts": "5.0.1",
-    "react-transition-group": "^4.4.5",
     "sass": "^1.72.0",
-    "suncalc": "^1.9.0",
-    "typescript": "^4.9.5",
-    "victory": "^37.0.1",
-    "web-vitals": "^2.1.4"
+    "typescript": "^4.9.5"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -44,7 +49,12 @@
     "test": "react-scripts test",
     "sim": "node scripts/sim.js",
     "eject": "react-scripts eject",
-    "pretty": "prettier --write \"src/**/*.{css,js,jsx,tsx,json}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test -- --watchAll=false",
     "deploy": "./deploy.sh"
   },
   "eslintConfig": {
@@ -67,5 +77,27 @@
   },
   "engines": {
     "node": ">= 21 < 22"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.test.{ts,tsx}",
+      "!src/react-app-env.d.ts",
+      "!src/testing/SimCli.tsx"
+    ],
+    "coverageThreshold": {
+      "src/helpers/": {
+        "statements": 85,
+        "branches": 75,
+        "functions": 80,
+        "lines": 85
+      },
+      "src/reducers/": {
+        "statements": 75,
+        "branches": 58,
+        "functions": 50,
+        "lines": 75
+      }
+    }
   }
 }

@@ -52,7 +52,7 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
               cash: scenario.cash,
               customers: 1030000,
               location,
-            })
+            }),
           );
 
           dispatch(loaded());

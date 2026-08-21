@@ -31,7 +31,7 @@ const ChartFinances = (props: Props): JSX.Element => {
   const rangeMin = props.timeline[0].month;
   const rangeMax = Math.max(
     rangeMin + 11,
-    props.timeline[props.timeline.length - 1].month
+    props.timeline[props.timeline.length - 1].month,
   );
   const past = [] as ChartData[];
   const projected = [] as ChartData[];

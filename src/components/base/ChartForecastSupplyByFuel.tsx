@@ -40,7 +40,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
     const fuelsInForecast = new Set<FuelNameType>();
     timeline.forEach((t) => {
       Object.keys(t.supplyByFuel).forEach((f) =>
-        fuelsInForecast.add(f as FuelNameType)
+        fuelsInForecast.add(f as FuelNameType),
       );
     });
     const fuels = this.props.fuels.filter((f) => fuelsInForecast.has(f));
@@ -70,7 +70,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       data.push(point);
     });
     const seriesByFuel = fuels.map((f) =>
-      data.map((point) => ({ ...point, x: point.minute, y: point[f] }))
+      data.map((point) => ({ ...point, x: point.minute, y: point[f] })),
     );
     const demandSeries = data.map((point) => ({
       ...point,
@@ -112,7 +112,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,
-                multiyear
+                multiyear,
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}

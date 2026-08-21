@@ -21,7 +21,9 @@ export default function Navigation() {
       id="navfooter"
       showLabels
       value={cardName || "MAIN_MENU"}
-      onChange={(e: any, name: CardNameType) => dispatch(navigate(name))}
+      onChange={(_e: React.SyntheticEvent, name: CardNameType) =>
+        dispatch(navigate(name))
+      }
     >
       <BottomNavigationAction
         classes={{ label: "navlabel" }}

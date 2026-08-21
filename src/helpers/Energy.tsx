@@ -22,7 +22,7 @@ export function getWindOutputFactor(windKph: number) {
 // but that still means we'd need to track some additional historic value of "even though it's not currently snowing, they're still covered in snow"
 export function getSolarOutputFactor(
   irradianceWM2: number,
-  temepratureC: number
+  temepratureC: number,
 ) {
   return (
     (irradianceWM2 * Math.min(1, 1 - (temepratureC - 10) / 100)) /
@@ -50,7 +50,7 @@ export function getSolarCapacityFactor(irradiancesWM2: number[]) {
   return (
     irradiancesWM2.reduce(
       (acc, curr) => acc + getSolarOutputFactor(curr, 20),
-      0
+      0,
     ) / irradiancesWM2.length
   );
 }
@@ -65,7 +65,7 @@ const MUST_RUN_FUELS = ["Sun", "Wind"];
  * first, then the dispatchable fuels in the player's own merit order (their facility list order).
  */
 export function getDispatchOrderedFuels(
-  facilities: Array<Partial<FacilityOperatingType>>
+  facilities: Array<Partial<FacilityOperatingType>>,
 ): string[] {
   const mustRun: string[] = [];
   const dispatchable: string[] = [];

@@ -35,18 +35,24 @@ export function getStorageString(key: string, fallback: string): string {
   return val !== null ? val : fallback;
 }
 
-// Value can be boolean, number, string or stringifiable JSON
+// Value can be boolean, number, string or stringifiable JSON.
+// Writes throw when storage is full or the browser blocks it, and no caller has anything useful
+// to do about that, so by default the write is best effort. Pass ignoreErrors: false where the
+// value has to land.
 export function setStorageKeyValue(
   key: string,
   value: any,
   ignoreErrors = true,
 ) {
-  if (typeof value === "object") {
-    value = JSON.stringify(value);
-  } else {
-    value = value.toString();
+  const serialized =
+    typeof value === "object" ? JSON.stringify(value) : String(value);
+  try {
+    getLocalStorage().setItem(key, serialized);
+  } catch (err) {
+    if (!ignoreErrors) {
+      throw err;
+    }
   }
-  getLocalStorage().setItem(key, value);
 }
 
 function getPlays(): LocalStoragePlayedType[] {

@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { GlobalHotKeys } from "react-hotkeys";
-import Joyride, { ACTIONS, EVENTS, Step } from "react-joyride";
+import Joyride, { ACTIONS, CallBackProps, EVENTS, Step } from "react-joyride";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -90,8 +90,15 @@ interface TooltipProps {
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const { index, size, step, backProps, primaryProps, tooltipProps, isLastStep } =
-    props;
+  const {
+    index,
+    size,
+    step,
+    backProps,
+    primaryProps,
+    tooltipProps,
+    isLastStep,
+  } = props;
   const isString = typeof step.content === "string";
   // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
   // without one screen readers announce an anonymous dialog
@@ -141,7 +148,7 @@ export interface DispatchProps {
   onTutorialStep: (
     newStep: number,
     tutorialSteps: TutorialStepType[] | undefined,
-    scenarioId: number
+    scenarioId: number,
   ) => void;
   onTutorialEnd: (tutorialSteps: TutorialStepType[] | undefined) => void;
 }
@@ -193,7 +200,7 @@ export default class Compositor extends React.Component<Props, {}> {
     clearTimeout(this.resizeTimeout);
   }
 
-  public handleJoyrideCallback = (data: any) => {
+  public handleJoyrideCallback = (data: CallBackProps) => {
     const { action, index, type } = data;
     // Esc: leave the walkthrough without crediting it as done, so it's still offered on the
     // scenario list. Has to come first, since closing also reports STEP_AFTER
@@ -201,11 +208,15 @@ export default class Compositor extends React.Component<Props, {}> {
       this.props.onTutorialEnd(this.props.tutorialSteps);
       return;
     }
-    if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
+    const advancingEvents: string[] = [
+      EVENTS.STEP_AFTER,
+      EVENTS.TARGET_NOT_FOUND,
+    ];
+    if (advancingEvents.includes(type)) {
       this.props.onTutorialStep(
         index + (action === ACTIONS.PREV ? -1 : 1),
         this.props.tutorialSteps,
-        this.props.scenarioId
+        this.props.scenarioId,
       );
     }
   };

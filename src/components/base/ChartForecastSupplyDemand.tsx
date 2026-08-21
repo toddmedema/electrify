@@ -67,7 +67,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,
-                multiyear
+                multiyear,
               )
             }
             tickLabelComponent={<VictoryLabel dy={-5} />}
