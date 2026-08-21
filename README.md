@@ -36,6 +36,21 @@ npm test
 
 This runs the unit tests defined in files with the `.test.tsx` extensio.
 
+### Simulate the game headlessly
+
+```sh
+npm run sim -- --all
+```
+
+Plays every scenario through the real game reducer without a browser -- a 20 year run takes about
+half a second -- and checks that the economy obeyed its invariants (no NaNs, cash only moves by
+recorded revenue and expenses, storage can't invent electricity, and so on). Use it to sanity
+check a change to the simulation in seconds rather than by playing through the UI.
+
+`npm run sim -- --scenario 103` reports one scenario month by month, and `npm run sim -- --help`
+lists the flags. See [src/testing/README.md](src/testing/README.md) for what it checks and how it
+works.
+
 ### Release checklist
 
 To release, you'll need to install and authenticate the `aws cli`.

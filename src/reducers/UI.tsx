@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { DialogType, SnackbarType, UIType } from "../Types";
-import { quit } from "./Game";
+import { quit } from "./GameActions";
 
 export const initialUI: UIType = {
   dialog: {

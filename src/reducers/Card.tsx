@@ -2,8 +2,8 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { getHistoryApi, logEvent } from "../Globals";
 import { NAVIGATION_DEBOUNCE_MS } from "../Constants";
 import { CardNameType, CardType } from "../Types";
-import { start, loaded, quit } from "./Game";
-import { RootState } from "../Store";
+import { start, loaded, quit } from "./GameActions";
+import type { RootState } from "../Store";
 
 interface NavigateAction {
   name: CardNameType;
