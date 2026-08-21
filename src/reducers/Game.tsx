@@ -826,8 +826,12 @@ function reforecastSupply(
   state: GameType,
   simulated?: boolean
 ): TickPresentFutureType[] {
-  // Make temporary deep copy so that it can be revised in place
-  const newState = { ...state };
+  // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
+  // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
+  // spread shares the same facility objects, which let a forecast leave the real fleet sitting at
+  // its end-of-horizon state -- resuming a paused nuclear plant snapped straight to full output
+  // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
+  const newState = { ...state, facilities: cloneDeep(state.facilities) };
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
