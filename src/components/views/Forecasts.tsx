@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   MenuItem,
   Select,
+  SelectChangeEvent,
   Table,
   TableBody,
   TableCell,
@@ -53,7 +54,7 @@ export default class Forecasts extends React.Component<Props, State> {
     this.state = { year: 0, years: 1 };
   }
 
-  public shouldComponentUpdate(nextProps: Props, nextState: any) {
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
     // Because forecasts are computationally intense and long term, only update when the month or state changes
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
@@ -74,7 +75,7 @@ export default class Forecasts extends React.Component<Props, State> {
       game,
       now.cash,
       now.customers,
-      TICKS_PER_YEAR * years
+      TICKS_PER_YEAR * years,
     );
 
     let hasStorage = false;
@@ -162,21 +163,21 @@ export default class Forecasts extends React.Component<Props, State> {
 
     const blackoutStart = getDateFromMinute(
       largestBlackout.start,
-      game.startingYear
+      game.startingYear,
     );
     const blackoutEnd = getDateFromMinute(
       largestBlackout.end,
-      game.startingYear
+      game.startingYear,
     );
 
     // Downsample the data to 6 per day @ 1 year, less at longer, to make it more vague / forecast-y
     const sampledForecastedTimeline = forecastedTimeline.filter(
-      (t: TickPresentFutureType) => t.minute % (240 * years) < TICK_MINUTES
+      (t: TickPresentFutureType) => t.minute % (240 * years) < TICK_MINUTES,
     );
     // Make sure it gets the first + last entries for a full chart
     sampledForecastedTimeline.unshift(forecastedTimeline[0]);
     sampledForecastedTimeline.push(
-      forecastedTimeline[forecastedTimeline.length - 1]
+      forecastedTimeline[forecastedTimeline.length - 1],
     );
 
     return (
@@ -193,7 +194,9 @@ export default class Forecasts extends React.Component<Props, State> {
               <Select
                 id="forecastYears"
                 defaultValue={1}
-                onChange={(e: any) => this.setState({ years: e.target.value })}
+                onChange={(e: SelectChangeEvent<number>) =>
+                  this.setState({ years: e.target.value as number })
+                }
                 sx={{ float: "right" }}
               >
                 <MenuItem value={1}>1 year</MenuItem>

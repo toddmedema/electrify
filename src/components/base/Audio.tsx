@@ -45,7 +45,7 @@ export default class Audio extends React.Component<Props, {}> {
   // This will fire many times without any audio-related changes since it subscribes to settings
   // So we have to be careful in checking that it's actually an audio-related change,
   // And not a different event that contains valid-looking (but identical) audio info
-  componentDidUpdate(prevProps: StateProps, prevState: any) {
+  componentDidUpdate(prevProps: StateProps) {
     if (this.props.enabled !== prevProps.enabled) {
       this.handleEnableState(this.props.enabled);
     }

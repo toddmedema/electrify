@@ -67,7 +67,7 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
             size="small"
             variant={completed ? "outlined" : "contained"}
             color="primary"
-            onClick={(e: any) => onTutorial(s.id)}
+            onClick={() => onTutorial(s.id)}
             autoFocus={next}
           >
             {completed ? "Replay" : "Play"}
@@ -106,7 +106,7 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
   return (
     <Card
       className="build-list-item clickable-card"
-      onClick={(e: any) => onDetails({ scenarioId: s.id })}
+      onClick={() => onDetails({ scenarioId: s.id })}
     >
       <CardHeader
         avatar={<Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />}
@@ -115,7 +115,7 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
         action={
           <IconButton
             color="primary"
-            onClick={(e: any) => onDetails({ scenarioId: s.id })}
+            onClick={() => onDetails({ scenarioId: s.id })}
             size="large"
           >
             <ArrowRightIcon />
@@ -129,7 +129,7 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
 export default function NewGame(props: Props): JSX.Element {
   const ids = getPlayedScenarioIds();
   const completedTutorials = TUTORIALS.filter(
-    (s) => ids.indexOf(s.id) !== -1
+    (s) => ids.indexOf(s.id) !== -1,
   ).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
 

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import Redux from "redux";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
@@ -284,7 +285,7 @@ export interface SettingsType {
 export interface DialogType {
   message: string | JSX.Element | JSX.Element[];
   title: string;
-  action?: (e: any) => void;
+  action?: (e: React.MouseEvent<HTMLElement>) => void;
   actionLabel?: string;
   notCancellable?: boolean;
   closeText?: string;
@@ -292,7 +293,7 @@ export interface DialogType {
 }
 
 export interface SnackbarType {
-  action?: (e: any) => void;
+  action?: (e: React.MouseEvent<HTMLElement>) => void;
   actionLabel?: string;
   open: boolean;
   message: string;

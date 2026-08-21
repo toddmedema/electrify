@@ -70,13 +70,13 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
     INTEREST_RATE_YEARLY,
-    LOAN_MONTHS
+    LOAN_MONTHS,
   );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(
-    1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0)
+    1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const secondaryText = buildable ? (
     generator.description
@@ -92,12 +92,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
     setExpanded(!expanded);
   };
 
-  const toggleOpen = (e: any) => {
+  const toggleOpen = (e: React.SyntheticEvent) => {
     setOpen(!open);
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY);
   // <TableRow>
   // <TableCell>Payments during construction (interest only)</TableCell>
   // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
@@ -200,7 +200,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                     {/* btuPerWh * 1M = BTU per MWh, and prices are per million BTU,
                         so the two factors of a million cancel out */}
                     {formatMoneyConcise(
-                      generator.btuPerWh * fuelPrices[generator.fuel] || 0
+                      generator.btuPerWh * fuelPrices[generator.fuel] || 0,
                     )}
                     /MWh
                   </TableCell>
@@ -313,7 +313,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
             color="primary"
             disabled={cash < generator.buildCost}
             variant="contained"
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
               props.onBuild(false);
               toggleOpen(e);
             }}
@@ -323,7 +323,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
           <Button
             color="primary"
             variant="contained"
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
               props.onBuild(true);
               toggleOpen(e);
             }}
@@ -366,7 +366,7 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildGenerator: (
     generator: GeneratorShoppingType,
-    financed: boolean
+    financed: boolean,
   ) => void;
   onBack: () => void;
   onSpeedChange: (speed: SpeedType) => void;
@@ -382,10 +382,10 @@ export default function BuildGenerators(props: Props): JSX.Element {
   const mostRecentBuiltValue =
     (filtered.find((f) => f.id === mostRecentId) || {}).peakW || 500000000;
   const [sliderTick, setSliderTick] = React.useState<number>(
-    getTickFromW(mostRecentBuiltValue)
+    getTickFromW(mostRecentBuiltValue),
   );
   const [sort, setSort] = React.useState<string>("buildCost");
-  const [anchorEl, setAnchorEl] = React.useState(null);
+  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
 
   if (!now) {
     return <span />;
@@ -396,7 +396,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
     game,
     cash,
     now.customers,
-    TICKS_PER_YEAR * 3 // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
+    TICKS_PER_YEAR * 3, // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
   );
   const windSpeeds = forecastedTimeline.map((w) => w.windKph);
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
@@ -404,10 +404,10 @@ export default function BuildGenerators(props: Props): JSX.Element {
     game,
     getW(sliderTick),
     windSpeeds,
-    solarIrradiances
+    solarIrradiances,
   ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
 
-  const onSlider = (event: any, newValue: number | number[]) => {
+  const onSlider = (_event: Event, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
       newValue = newValue[0];
     }
@@ -419,7 +419,7 @@ export default function BuildGenerators(props: Props): JSX.Element {
     onSortClose();
   };
 
-  const onSortOpen = (event: any) => {
+  const onSortOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 

@@ -57,7 +57,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
     INTEREST_RATE_YEARLY,
-    LOAN_MONTHS
+    LOAN_MONTHS,
   );
   const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const secondaryText = buildable ? (
@@ -74,12 +74,12 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
     setExpanded(!expanded);
   };
 
-  const toggleOpen = (e: any) => {
+  const toggleOpen = (e: React.SyntheticEvent) => {
     setOpen(!open);
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY, monthlyPayment);
+  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY);
   // <TableRow>
   // <TableCell>Payments during construction (interest only)</TableCell>
   // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
@@ -223,7 +223,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
             color="primary"
             disabled={cash < storage.buildCost}
             variant="contained"
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
               props.onBuild(false);
               toggleOpen(e);
             }}
@@ -233,7 +233,7 @@ function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
           <Button
             color="primary"
             variant="contained"
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
               props.onBuild(true);
               toggleOpen(e);
             }}
@@ -288,10 +288,10 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
   const mostRecentBuiltValue =
     (filtered.find((f) => f.id === mostRecentId) || {}).peakWh || 500000000;
   const [sliderTick, setSliderTick] = React.useState<number>(
-    getTickFromW(mostRecentBuiltValue)
+    getTickFromW(mostRecentBuiltValue),
   );
   const [sort, setSort] = React.useState<string>("buildCost");
-  const [anchorEl, setAnchorEl] = React.useState(null);
+  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
 
   if (!now) {
     return <span />;
@@ -299,10 +299,10 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
 
   const cash = now.cash;
   const storage = STORAGE(game, getW(sliderTick)).sort((a, b) =>
-    a[sort] > b[sort] ? 1 : -1
+    a[sort] > b[sort] ? 1 : -1,
   );
 
-  const handleSliderChange = (event: any, newValue: number | number[]) => {
+  const handleSliderChange = (_event: Event, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
       newValue = newValue[0];
     }
@@ -314,7 +314,7 @@ export default function StorageBuildDialog(props: Props): JSX.Element {
     onSortClose();
   };
 
-  const onSortOpen = (event: any) => {
+  const onSortOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
