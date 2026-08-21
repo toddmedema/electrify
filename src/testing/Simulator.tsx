@@ -9,7 +9,7 @@ import gameReducer, {
   start,
   tickState,
 } from "../reducers/Game";
-import { DIFFICULTIES, LOCATIONS, TICKS_PER_HOUR } from "../Constants";
+import { DIFFICULTIES, LOCATIONS } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
