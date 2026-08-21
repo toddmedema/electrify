@@ -34,7 +34,13 @@ import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
 import { navigate } from "../reducers/Card";
 import { setSpeed } from "../reducers/Game";
+import { isDesktopScreen } from "../Globals";
 import { store } from "../Store";
+
+// All three of these cards are shown at once side by side above the desktop breakpoint (see
+// isDesktopScreen / $desktop_breakpoint), so they share one stable transition key there --
+// switching among them shouldn't slide/remount the pane group, since nothing visibly changes
+const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
 // Keep in sync with the Keyboard Shortcuts entry in the Manual and Settings
 const keyMap = {
@@ -138,6 +144,25 @@ export function isNavCard(name: CardNameType) {
 }
 
 export default class Compositor extends React.Component<Props, {}> {
+  private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  // isDesktopScreen() is read straight from the DOM rather than from state, so a resize needs
+  // its own trigger -- forceUpdate skips shouldComponentUpdate, which otherwise blocks re-renders
+  // when nothing about the current card has changed
+  public handleResize = () => {
+    clearTimeout(this.resizeTimeout);
+    this.resizeTimeout = setTimeout(() => this.forceUpdate(), 100);
+  };
+
+  public componentDidMount() {
+    window.addEventListener("resize", this.handleResize);
+  }
+
+  public componentWillUnmount() {
+    window.removeEventListener("resize", this.handleResize);
+    clearTimeout(this.resizeTimeout);
+  }
+
   public handleJoyrideCallback = (data: any) => {
     const { action, index, type } = data;
     if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
@@ -155,6 +180,16 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   private renderCard(): JSX.Element {
+    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them
+    if (isDesktopScreen() && isNavCard(this.props.card.name)) {
+      return (
+        <div className="desktop-panes">
+          <FacilitiesContainer />
+          <FinancesContainer />
+          <ForecastsContainer />
+        </div>
+      );
+    }
     switch (this.props.card.name) {
       case "BUILD_GENERATORS":
         return <BuildGeneratorsContainer />;
@@ -220,7 +255,11 @@ export default class Compositor extends React.Component<Props, {}> {
           }
         >
           <CSSTransition
-            key={this.props.card.name}
+            key={
+              isDesktopScreen() && isNavCard(this.props.card.name)
+                ? DESKTOP_PANES_KEY
+                : this.props.card.name
+            }
             classNames={""}
             timeout={{
               enter: CARD_TRANSITION_ANIMATION_MS,

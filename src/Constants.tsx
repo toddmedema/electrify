@@ -12,30 +12,40 @@ export const DIFFICULTIES = {
     expensesOM: 0.6,
     buildTime: 0.2,
     blackoutPenalty: 2,
+    description:
+      "Easiest: 40% cheaper facilities, 40% lower operating costs, 80% faster construction, and blackouts cost you the least growth.",
   },
   Employee: {
     buildCost: 0.7,
     expensesOM: 0.7,
     buildTime: 0.3,
     blackoutPenalty: 4,
+    description:
+      "Easy: 30% cheaper facilities, 30% lower operating costs, 70% faster construction, and lighter blackout penalties.",
   },
   Manager: {
     buildCost: 0.8,
     expensesOM: 0.8,
     buildTime: 0.5,
     blackoutPenalty: 6,
+    description:
+      "Medium: 20% cheaper facilities, 20% lower operating costs, 50% faster construction, and moderate blackout penalties.",
   },
   VP: {
     buildCost: 0.9,
     expensesOM: 0.9,
     buildTime: 0.7,
     blackoutPenalty: 8,
+    description:
+      "Hard: 10% cheaper facilities, 10% lower operating costs, 30% faster construction, and heavier blackout penalties.",
   },
   CEO: {
     buildCost: 1,
     expensesOM: 1,
     buildTime: 1,
     blackoutPenalty: 10,
+    description:
+      "Hardest: full-price facilities, full-price operations, full construction time, and the harshest blackout penalties.",
   },
 } as { [index: string]: DifficultyMultipliersType };
 

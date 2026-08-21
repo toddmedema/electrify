@@ -41,6 +41,7 @@ export default class chartForecastStorage extends React.PureComponent<
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
           containerComponent={chartTooltipContainer({
+            ariaLabel: "Chart of forecasted stored power",
             labels: ({ datum }: any) => formatWattHours(datum.storedWh),
           })}
         >

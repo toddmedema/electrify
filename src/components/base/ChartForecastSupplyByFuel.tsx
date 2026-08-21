@@ -94,6 +94,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           domain={{ x: domain.x, y: [0, maxY] }}
           height={height || 300}
           containerComponent={chartTooltipContainer({
+            ariaLabel: "Chart of forecasted electricity supply by fuel type",
             labels: ({ datum }: any) =>
               [
                 ...[...fuels]

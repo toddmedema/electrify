@@ -59,6 +59,7 @@ const ChartFinances = (props: Props): JSX.Element => {
         domainPadding={{ y: [6, 6] }}
         height={props.height || 300}
         containerComponent={chartTooltipContainer({
+          ariaLabel: `Chart of ${props.title} over time`,
           labels: ({ datum }: any) => props.format(datum.value).toString(),
         })}
       >

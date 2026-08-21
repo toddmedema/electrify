@@ -6,6 +6,7 @@ import {
   togglePauseFacility,
   reprioritizeFacility,
 } from "../../reducers/Game";
+import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 
@@ -25,6 +26,18 @@ const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
     },
     onTogglePause: (id) => {
       dispatch(togglePauseFacility(id));
+    },
+    onPause: (id, name) => {
+      dispatch(togglePauseFacility(id));
+      dispatch(
+        snackbarOpen({
+          message: `Paused ${name}`,
+          actionLabel: "Undo",
+          action: () => dispatch(togglePauseFacility(id)),
+          open: true,
+          timeout: 6000,
+        })
+      );
     },
     onReprioritize: (spotInList: number, delta: number) => {
       dispatch(reprioritizeFacility({ spotInList, delta }));

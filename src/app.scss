@@ -103,6 +103,10 @@ $interactive_blue: #1e88e5; /* blue 600 */
 $abswidthmax: 650px;
 $absheightmax: 1025px;
 $absmaxdimension: 1025px;
+// Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
+// isDesktopScreen() in Globals.tsx
+$desktop_breakpoint: 1000px;
+$desktop_bodymax: 1500px;
 
 $sizemap: (
   large: 6vmin,
@@ -282,6 +286,19 @@ table {
 
 span.weak {
   font-weight: 100;
+}
+
+.pausedChip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: $blackout_red;
+  color: #ffffff;
+  font-size: 0.7em;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
 }
 
 .flex-newline {
@@ -710,6 +727,39 @@ $sizemap: (
 
   #tutorial-tooltip {
     width: auto;
+  }
+}
+
+// ===============================================
+// Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities,
+// Finances and Forecasts can render as panes side by side instead of one screen at a time
+// ===============================================
+@media screen and (min-width: $desktop_breakpoint) {
+  body {
+    max-width: $desktop_bodymax;
+  }
+
+  // Redundant once all three nav destinations are visible at the same time as panes
+  #navfooter {
+    display: none;
+  }
+
+  .desktop-panes {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+
+    > div {
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      border-right: $border_accent;
+
+      &:last-child {
+        border-right: none;
+      }
+    }
   }
 }
 

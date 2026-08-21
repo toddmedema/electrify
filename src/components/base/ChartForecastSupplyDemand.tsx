@@ -54,6 +54,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
           containerComponent={chartTooltipContainer({
+            ariaLabel: "Chart of forecasted electricity supply and demand",
             labels: ({ datum }: any) =>
               `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
             // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels

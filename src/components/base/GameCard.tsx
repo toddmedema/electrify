@@ -19,6 +19,9 @@ export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
+  // When this pane is shown alongside the others in the desktop layout, skip the header/nav
+  // chrome (money, date, speed controls, tab bar) since the primary pane already shows it once
+  chromeless?: boolean;
 }
 
 export interface DispatchProps {
@@ -38,6 +41,14 @@ export function GameCard(props: Props) {
 
   if (!game.inGame || !now) {
     return <span />;
+  }
+
+  if (props.chromeless) {
+    return (
+      <div className={props.className + " flexContainer pane"}>
+        {props.children}
+      </div>
+    );
   }
 
   const smallScreen = isSmallScreen();
@@ -208,6 +219,11 @@ export function GameCard(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
+            {game.speed === "PAUSED" && (
+              <span className="pausedChip" aria-live="polite">
+                ⏸ PAUSED
+              </span>
+            )}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>

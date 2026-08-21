@@ -49,6 +49,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           domainPadding={{ y: [6, 6] }}
           height={height || 300}
           containerComponent={chartTooltipContainer({
+            ariaLabel: "Chart of forecasted fuel prices",
             labels: ({ datum }: any) =>
               PRICED_FUELS.map(
                 (f) => `${f}: ${formatMoneyStable(datum[f])}`
@@ -114,6 +115,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
               <svg
                 className="chartLegendSwatch chartLegendSwatch-line"
                 viewBox="0 0 20 4"
+                aria-hidden="true"
               >
                 <line
                   x1="0"

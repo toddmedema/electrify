@@ -181,6 +181,7 @@ const ChartSupplyDemand = (props: Props): JSX.Element => {
         domainPadding={{ y: [6, 6] }}
         height={height || 300}
         containerComponent={chartTooltipContainer({
+          ariaLabel: "Chart of electricity supply and demand over the day",
           labels: ({ datum }: any) =>
             `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
           // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
