@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { GlobalHotKeys } from "react-hotkeys";
-import Joyride, { ACTIONS, EVENTS } from "react-joyride";
+import Joyride, { ACTIONS, EVENTS, STATUS, Step } from "react-joyride";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -80,20 +80,32 @@ const shortcutHandlers = {
 interface TooltipProps {
   continuous: any;
   index: any;
+  size: number; // total number of steps in this walkthrough
   step: any;
   backProps: any;
   closeProps: any;
   primaryProps: any;
+  skipProps: any;
   tooltipProps: any;
   isLastStep: boolean;
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const { index, step, backProps, primaryProps, tooltipProps, isLastStep } =
-    props;
+  const {
+    index,
+    size,
+    step,
+    backProps,
+    primaryProps,
+    skipProps,
+    tooltipProps,
+    isLastStep,
+  } = props;
   const isString = typeof step.content === "string";
+  // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
+  // without one screen readers announce an anonymous dialog
   return (
-    <div id="tutorial-tooltip" {...tooltipProps}>
+    <div id="tutorial-tooltip" aria-label="Tutorial" {...tooltipProps}>
       {step.title && (
         <Typography variant="h6" gutterBottom>
           {step.title}
@@ -104,7 +116,18 @@ function Tooltip(props: TooltipProps): JSX.Element {
       ) : (
         step.content
       )}
-      <div>
+      <div className="tutorialFooter">
+        {/* Joyride's own showProgress only applies to its built-in tooltip */}
+        <span className="tutorialProgress">
+          Step {index + 1} of {size}
+        </span>
+        {/* On the last step "Play" already ends the walkthrough, and it credits it as done -
+            offering Skip alongside would only be a way to lose that credit by accident */}
+        {!isLastStep && (
+          <Button {...skipProps} size="small" color="primary">
+            Skip
+          </Button>
+        )}
         {index > 0 && (
           <Button {...backProps} color="primary">
             Back
@@ -114,7 +137,6 @@ function Tooltip(props: TooltipProps): JSX.Element {
           {isLastStep ? "Play" : "Next"}
         </Button>
       </div>
-      <div style={{ clear: "both" }}></div>
     </div>
   );
 }
@@ -124,6 +146,7 @@ export interface StateProps {
   settings: SettingsType;
   ui: UIType;
   transition: TransitionClassType;
+  scenarioId: number;
   tutorialStep: number;
   tutorialSteps?: TutorialStepType[];
 }
@@ -133,8 +156,10 @@ export interface DispatchProps {
   closeSnackbar: () => void;
   onTutorialStep: (
     newStep: number,
-    tutorialSteps: TutorialStepType[] | undefined
+    tutorialSteps: TutorialStepType[] | undefined,
+    scenarioId: number
   ) => void;
+  onTutorialEnd: (tutorialSteps: TutorialStepType[] | undefined) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -145,6 +170,27 @@ export function isNavCard(name: CardNameType) {
 
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+  private stepsCache:
+    | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
+    | undefined;
+
+  // Applies each step's desktop override when the panes are side by side, and drops the key
+  // either way so Joyride only ever sees a plain step. The result is cached because Joyride
+  // reloads its steps whenever the array isn't identical, which loses the current step -- but
+  // it still recomputes when handleResize carries the layout across the breakpoint
+  private stepsForViewport(steps: TutorialStepType[]): Step[] {
+    const desktop = isDesktopScreen();
+    const cache = this.stepsCache;
+    if (cache && cache.source === steps && cache.desktop === desktop) {
+      return cache.resolved;
+    }
+    const resolved = steps.map((step) => {
+      const { desktop: override, ...rest } = step;
+      return (desktop && override ? { ...rest, ...override } : rest) as Step;
+    });
+    this.stepsCache = { source: steps, desktop, resolved };
+    return resolved;
+  }
 
   // isDesktopScreen() is read straight from the DOM rather than from state, so a resize needs
   // its own trigger -- forceUpdate skips shouldComponentUpdate, which otherwise blocks re-renders
@@ -164,11 +210,22 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public handleJoyrideCallback = (data: any) => {
-    const { action, index, type } = data;
+    const { action, index, status, type } = data;
+    // Skip button or Esc: leave the walkthrough without crediting it as done, so it's still
+    // offered on the scenario list. Has to come first, since closing also reports STEP_AFTER
+    if (
+      action === ACTIONS.CLOSE ||
+      action === ACTIONS.SKIP ||
+      status === STATUS.SKIPPED
+    ) {
+      this.props.onTutorialEnd(this.props.tutorialSteps);
+      return;
+    }
     if ([EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
       this.props.onTutorialStep(
         index + (action === ACTIONS.PREV ? -1 : 1),
-        this.props.tutorialSteps
+        this.props.tutorialSteps,
+        this.props.scenarioId
       );
     }
   };
@@ -271,15 +328,20 @@ export default class Compositor extends React.Component<Props, {}> {
         </TransitionGroup>
         {tutorialSteps && (
           <Joyride
+            // Swapping in the desktop targets hands Joyride a different steps array, which it
+            // reloads mid-tour and ends up showing no tooltip behind a blocking overlay.
+            // Remounting instead resumes cleanly, since it starts from the stepIndex prop
+            key={isDesktopScreen() ? "desktop" : "compact"}
             callback={this.handleJoyrideCallback}
             continuous={true}
-            disableCloseOnEsc={true}
+            // Joyride traps Tab inside the tooltip, so Esc (alongside the Skip button) is the
+            // way back out for keyboard users -- WCAG 2.1.2. Overlay clicks still don't close,
+            // since those are far too easy to trigger by accident mid-walkthrough
             disableOverlayClose={true}
-            showProgress={true}
-            run={tutorialStep >= 0}
+            run={tutorialStep >= 0 && tutorialStep < tutorialSteps.length}
             tooltipComponent={Tooltip}
             stepIndex={tutorialStep}
-            steps={tutorialSteps}
+            steps={this.stepsForViewport(tutorialSteps)}
             styles={{
               options: {
                 beaconSize: 48,

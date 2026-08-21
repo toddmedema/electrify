@@ -199,6 +199,7 @@ export const SCENARIOS = [
     ],
     tutorialSteps: [
       {
+        disableBeacon: true, // causes tutorial to auto-start
         target: ".button-buildStorage",
         onNext: () => navigate({ name: "BUILD_STORAGE", dontRemember: true }),
         content: (
@@ -293,9 +294,21 @@ export const SCENARIOS = [
             tab. (Hotkey: W)
           </Typography>
         ),
+        desktop: {
+          target: "#financesPane",
+          content: (
+            <Typography variant="body1">
+              To run a profitable business, you'll need to understand the
+              Finances pane.
+            </Typography>
+          ),
+        },
       },
       {
         target: ".VictoryContainer",
+        // Unqualified, this matches the Facilities pane's chart first once all three panes
+        // are on screen
+        desktop: { target: "#financesPane .VictoryContainer" },
         content: (
           <Typography variant="body1">
             You can plot a variety of metrics by changing the dropdowns above
@@ -354,6 +367,15 @@ export const SCENARIOS = [
             business by heading to the "Finances" tab. (Hotkey: W)
           </Typography>
         ),
+        desktop: {
+          target: "#financesPane",
+          content: (
+            <Typography variant="body1">
+              When you have spare capacity, you can use marketing to grow your
+              business - look for it in the Finances pane.
+            </Typography>
+          ),
+        },
       },
       {
         target: "#marketingSlider",
@@ -413,6 +435,15 @@ export const SCENARIOS = [
             Forecasts tab. (Hotkey: E)
           </Typography>
         ),
+        desktop: {
+          target: "#forecastsPane",
+          content: (
+            <Typography variant="body1">
+              To truly succeed, you'll need to plan ahead - let's check out the
+              Forecasts pane.
+            </Typography>
+          ),
+        },
       },
       {
         target: "#chartForecastSupplyDemand",
@@ -573,3 +604,6 @@ export const SCENARIOS = [
   },
   // TODO more public-ownership scenarios, such as in LA or Nebraska
 ] as ScenarioType[];
+
+// The numbered 101-106 walkthroughs, in the order a new player should work through them
+export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);

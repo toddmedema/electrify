@@ -48,7 +48,9 @@ export function GameCard(props: Props) {
 
   if (props.chromeless) {
     return (
-      <div className={props.className + " flexContainer pane"}>
+      // id is how tutorial steps address an individual pane, since the bottom nav they'd
+      // otherwise point at is hidden in this layout
+      <div id={props.id} className={props.className + " flexContainer pane"}>
         {props.title && (
           <Toolbar className="paneHeader">
             <Typography variant="h6">{props.title}</Typography>

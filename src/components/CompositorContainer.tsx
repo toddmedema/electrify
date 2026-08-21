@@ -1,7 +1,8 @@
 import { connect } from "react-redux";
 import Redux from "redux";
-import { delta } from "../reducers/Game";
-import { dialogClose, snackbarClose } from "../reducers/UI";
+import { delta, quit } from "../reducers/Game";
+import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
+import { recordScenarioPlayed } from "../LocalStorage";
 import { SCENARIOS } from "../data/Scenarios";
 import { AppStateType, TransitionClassType, TutorialStepType } from "../Types";
 import Compositor, { DispatchProps, isNavCard, StateProps } from "./Compositor";
@@ -28,6 +29,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     settings: state.settings,
     ui: state.ui,
     transition,
+    scenarioId: state.game.scenarioId,
     tutorialStep: state.game.tutorialStep,
     tutorialSteps: (SCENARIOS.find((s) => s.id === state.game.scenarioId) || {})
       .tutorialSteps,
@@ -46,13 +48,37 @@ export const mapDispatchToProps = (
     },
     onTutorialStep(
       newStep: number,
-      tutorialSteps: TutorialStepType[] | undefined
+      tutorialSteps: TutorialStepType[] | undefined,
+      scenarioId: number
     ): void {
-      const prevStep = (tutorialSteps || [])[newStep - 1];
+      const steps = tutorialSteps || [];
+      const prevStep = steps[newStep - 1];
       if (prevStep && prevStep.onNext) {
         dispatch(prevStep.onNext());
       }
       dispatch(delta({ tutorialStep: newStep }));
+
+      if (newStep < steps.length) {
+        return;
+      }
+
+      // Finishing the walkthrough is what counts as doing the tutorial - the rest of the
+      // scenario is optional practice, and requiring it meant a checkmark cost up to four
+      // minutes of watching the sim run
+      recordScenarioPlayed(scenarioId);
+      dispatch(
+        snackbarOpen({
+          message: "Walkthrough complete - keep practicing, or move on",
+          actionLabel: "Tutorials",
+          action: () => dispatch(quit({ toScenarioList: true })),
+          open: true,
+          timeout: 6000,
+        })
+      );
+    },
+    onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
+      // Past the last step, which is how a finished walkthrough is represented too
+      dispatch(delta({ tutorialStep: (tutorialSteps || []).length }));
     },
   };
 };

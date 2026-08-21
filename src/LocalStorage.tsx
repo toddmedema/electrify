@@ -1,4 +1,5 @@
 import { getLocalStorage } from "./Globals";
+import { LocalStoragePlayedType } from "./Types";
 
 // Force specifying a default, since just doing (|| fallback) would bork on stored falsey values
 export function getStorageBoolean(key: string, fallback: boolean): boolean {
@@ -46,6 +47,32 @@ export function setStorageKeyValue(
     value = value.toString();
   }
   getLocalStorage().setItem(key, value);
+}
+
+function getPlays(): LocalStoragePlayedType[] {
+  return (getStorageJson("plays", { plays: [] }) as any)
+    .plays as LocalStoragePlayedType[];
+}
+
+// The scenarios (tutorials included) the player has finished, used for the completion
+// markers and progress in the scenario list
+export function getPlayedScenarioIds(): number[] {
+  return getPlays().map((p) => p.scenarioId);
+}
+
+// Only recorded the first time: nothing reads the repeats, so appending one entry per
+// replay would grow this list forever
+export function recordScenarioPlayed(scenarioId: number) {
+  const plays = getPlays();
+  if (plays.some((p) => p.scenarioId === scenarioId)) {
+    return;
+  }
+  setStorageKeyValue("plays", {
+    plays: [
+      ...plays,
+      { scenarioId, date: new Date().toString() } as LocalStoragePlayedType,
+    ],
+  });
 }
 
 // Check for free space in local storage by allocating space.
