@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { GlobalHotKeys } from "react-hotkeys";
-import Joyride, { ACTIONS, EVENTS, STATUS, Step } from "react-joyride";
+import Joyride, { ACTIONS, EVENTS, Step } from "react-joyride";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -85,22 +85,13 @@ interface TooltipProps {
   backProps: any;
   closeProps: any;
   primaryProps: any;
-  skipProps: any;
   tooltipProps: any;
   isLastStep: boolean;
 }
 
 function Tooltip(props: TooltipProps): JSX.Element {
-  const {
-    index,
-    size,
-    step,
-    backProps,
-    primaryProps,
-    skipProps,
-    tooltipProps,
-    isLastStep,
-  } = props;
+  const { index, size, step, backProps, primaryProps, tooltipProps, isLastStep } =
+    props;
   const isString = typeof step.content === "string";
   // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
   // without one screen readers announce an anonymous dialog
@@ -121,13 +112,6 @@ function Tooltip(props: TooltipProps): JSX.Element {
         <span className="tutorialProgress">
           Step {index + 1} of {size}
         </span>
-        {/* On the last step "Play" already ends the walkthrough, and it credits it as done -
-            offering Skip alongside would only be a way to lose that credit by accident */}
-        {!isLastStep && (
-          <Button {...skipProps} size="small" color="primary">
-            Skip
-          </Button>
-        )}
         {index > 0 && (
           <Button {...backProps} color="primary">
             Back
@@ -210,14 +194,10 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public handleJoyrideCallback = (data: any) => {
-    const { action, index, status, type } = data;
-    // Skip button or Esc: leave the walkthrough without crediting it as done, so it's still
-    // offered on the scenario list. Has to come first, since closing also reports STEP_AFTER
-    if (
-      action === ACTIONS.CLOSE ||
-      action === ACTIONS.SKIP ||
-      status === STATUS.SKIPPED
-    ) {
+    const { action, index, type } = data;
+    // Esc: leave the walkthrough without crediting it as done, so it's still offered on the
+    // scenario list. Has to come first, since closing also reports STEP_AFTER
+    if (action === ACTIONS.CLOSE) {
       this.props.onTutorialEnd(this.props.tutorialSteps);
       return;
     }
@@ -334,9 +314,9 @@ export default class Compositor extends React.Component<Props, {}> {
             key={isDesktopScreen() ? "desktop" : "compact"}
             callback={this.handleJoyrideCallback}
             continuous={true}
-            // Joyride traps Tab inside the tooltip, so Esc (alongside the Skip button) is the
-            // way back out for keyboard users -- WCAG 2.1.2. Overlay clicks still don't close,
-            // since those are far too easy to trigger by accident mid-walkthrough
+            // Joyride traps Tab inside the tooltip, so Esc is the way back out for keyboard
+            // users -- WCAG 2.1.2. Overlay clicks still don't close, since those are far too
+            // easy to trigger by accident mid-walkthrough
             disableOverlayClose={true}
             run={tutorialStep >= 0 && tutorialStep < tutorialSteps.length}
             tooltipComponent={Tooltip}
