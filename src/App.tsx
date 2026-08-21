@@ -1,6 +1,8 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
+import { useEffect } from "react";
 import { Provider } from "react-redux";
 import * as Redux from "redux";
+import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import { navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
@@ -27,34 +29,26 @@ declare module "redux" {
 }
 /* tslint:enable */
 
-function setupDevice() {
+// Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
+// listeners go away with the rest of them rather than outliving the component that added them.
+function setupDevice(): () => void {
   const platform = getDevicePlatform();
   // Platform-specific styles
   document.body.className += " " + platform;
 
-  document.addEventListener(
-    "backbutton",
-    () => {
-      store.dispatch(navigateBack());
-    },
-    false,
-  );
+  const onBackButton = () => store.dispatch(navigateBack());
+  const onPause = () => store.dispatch(pauseAudio());
+  const onResume = () => store.dispatch(resumeAudio());
 
-  document.addEventListener(
-    "pause",
-    () => {
-      store.dispatch(pauseAudio());
-    },
-    false,
-  );
+  document.addEventListener("backbutton", onBackButton, false);
+  document.addEventListener("pause", onPause, false);
+  document.addEventListener("resume", onResume, false);
 
-  document.addEventListener(
-    "resume",
-    () => {
-      store.dispatch(resumeAudio());
-    },
-    false,
-  );
+  return () => {
+    document.removeEventListener("backbutton", onBackButton, false);
+    document.removeEventListener("pause", onPause, false);
+    document.removeEventListener("resume", onResume, false);
+  };
 }
 
 function setupStorage(document: Document) {
@@ -77,35 +71,60 @@ function setupStorage(document: Document) {
 }
 
 export default function App() {
-  setupStorage(document);
+  /**
+   * All of this used to run in the component body. A function component's body runs on every
+   * render, and index.tsx mounts App inside React.StrictMode, which deliberately invokes it twice
+   * on mount in development -- so the visibility listener was registered twice and every hide or
+   * show dispatched pause/resume twice, the auth subscription was opened twice, and the cookie
+   * check ran twice. In an effect with a teardown, StrictMode's mount/unmount/mount cycle nets out
+   * to exactly one of each, and nothing is left behind if App ever unmounts.
+   */
+  useEffect(() => {
+    setupStorage(document);
 
-  window.onpopstate = (e) => {
-    store.dispatch(navigateBack());
-    e.preventDefault();
-  };
-  document.addEventListener(
-    "visibilitychange",
-    () => {
+    const onPopState = (e: PopStateEvent) => {
+      store.dispatch(navigateBack());
+      e.preventDefault();
+    };
+    window.addEventListener("popstate", onPopState);
+
+    const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         store.dispatch(pauseAudio());
       } else if (document.visibilityState === "visible") {
         store.dispatch(resumeAudio());
       }
-    },
-    false,
-  );
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange, false);
 
-  firebaseAppAuth.onAuthStateChanged((user: any) => {
-    store.dispatch(delta({ uid: (user || {}).uid }));
-  });
+    // Returns its own unsubscribe, which was previously dropped on the floor
+    const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
+      (user: User | null) => {
+        store.dispatch(delta({ uid: (user || ({} as Partial<User>)).uid }));
+      },
+    );
 
-  // Only triggers on app builds
-  document.addEventListener("deviceready", setupDevice, false);
+    // Only triggers on app builds. Cordova fires deviceready once, so the listeners it installs
+    // have to be torn down through the teardown it hands back rather than by removing this one.
+    let teardownDevice: (() => void) | undefined;
+    const onDeviceReady = () => {
+      teardownDevice = setupDevice();
+    };
+    document.addEventListener("deviceready", onDeviceReady, false);
 
-  return render();
-}
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      document.removeEventListener(
+        "visibilitychange",
+        onVisibilityChange,
+        false,
+      );
+      unsubscribeAuth();
+      document.removeEventListener("deviceready", onDeviceReady, false);
+      teardownDevice?.();
+    };
+  }, []);
 
-function render() {
   return (
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
