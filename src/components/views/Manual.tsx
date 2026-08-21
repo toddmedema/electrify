@@ -229,7 +229,98 @@ const MANUAL_ENTRIES = [
   },
   {
     title: `Forecasts`,
-    entry: <p>TODO how to read the forecast</p>,
+    entry: (
+      <div>
+        <p>
+          The Forecasts tab projects your company forward, so you can spot
+          problems before they cost you customers. Use the dropdown at the top
+          right to look ahead 1, 5, 10 or 20 years - the further out you look,
+          the coarser (and less certain) the projection.
+        </p>
+        <p>
+          <strong>Supply &amp; Demand</strong> plots your projected output
+          against projected demand. Wherever demand rises above supply, the gap
+          is shaded as a blackout. If any are forecasted, the table underneath
+          breaks them down: total energy not served, the size of the single
+          worst event, the peak shortage (how much extra capacity you'd need to
+          cover it) and when it happens. That "when" is the most useful number
+          on the page - it tells you whether you need generation that can ramp
+          up for a few hours, or baseload for a whole season.
+        </p>
+        <p>
+          <strong>Supply by Fuel</strong> breaks that same supply down by fuel,
+          in dispatch order. This is where you can see your merit order at work:
+          cheap, always-on sources carry the base, and expensive or fast-ramping
+          ones fill the peaks. Re-ordering your facilities changes this chart.
+        </p>
+        <p>
+          <strong>Stored power</strong> (shown once you own storage) tracks the
+          energy in your batteries and reservoirs as they charge off surplus
+          and discharge into peaks.
+        </p>
+        <p>
+          <strong>Fuel Prices</strong> projects the cost of each fuel you can
+          burn, based on real historical price data. Fuel prices move suddenly
+          and by a lot, which can flip a profitable plant into a money-loser -
+          watch this chart before committing to a decades-long build.
+        </p>
+        <p>
+          <strong>Weather</strong> projects temperature and sunlight for your
+          region. It drives demand (heating and air conditioning) as well as the
+          output of your solar and wind generators.
+        </p>
+        <p>
+          Forecasts assume you make no further changes, so treat them as "what
+          happens if I do nothing" rather than a promise. Pausing a generator or
+          reordering your stack updates them immediately, which makes them a
+          cheap way to test a decision before you pay for it.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: `Keyboard Shortcuts`,
+    entry: (
+      <div>
+        <p>
+          While a scenario is running, you can drive the game from the keyboard:
+        </p>
+        <table className="shortcuts">
+          <tbody>
+            <tr>
+              <td>
+                <kbd>`</kbd> <kbd>space</kbd> <kbd>0</kbd>
+              </td>
+              <td>Pause</td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
+              </td>
+              <td>Slow / normal / fast speed</td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>Q</kbd>
+              </td>
+              <td>Facilities tab</td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>W</kbd>
+              </td>
+              <td>Finances tab</td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>E</kbd>
+              </td>
+              <td>Forecasts tab</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    ),
   },
   {
     // Credit to https://www.e-education.psu.edu/ebf200/node/151
@@ -258,7 +349,7 @@ const MANUAL_ENTRIES = [
           you'll receive a score for how well you did. Try to beat your score
           the next time you play!
         </p>
-        <p>Scores are calculated as follows:</p>
+        <p>Investor-owned scenarios are scored as follows:</p>
         <p>
           4 pts for each $100M of net worth at the end
           <br />
@@ -266,9 +357,20 @@ const MANUAL_ENTRIES = [
           <br />
           1 pt for each TWh supplied
           <br />
-          -2 pts for each kTon of pollution
+          -2 pts for each megaton (1M tons) of CO2e emitted
           <br />
           -8 pts for each TWh of blackouts
+        </p>
+        <p>Public-owned scenarios are scored as follows:</p>
+        <p>
+          +/-80 pts for each $0.01/kWh that your lifetime average rate lands
+          below/above the scenario's target rate
+          <br />
+          10 pts for each TWh supplied
+          <br />
+          -5 pts for each megaton (1M tons) of CO2e emitted
+          <br />
+          -10 pts for each TWh of blackouts
         </p>
       </div>
     ),

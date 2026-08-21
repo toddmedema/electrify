@@ -11,6 +11,8 @@ import {
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { getStorageJson } from "../../LocalStorage";
 import { LOCATIONS } from "../../Constants";
 import { SCENARIOS } from "../../data/Scenarios";
@@ -39,7 +41,21 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
   return (
     <Card className="build-list-item">
       <CardHeader
-        style={{ opacity: completed ? 0.5 : 1 }}
+        style={{ opacity: completed ? 0.6 : 1 }}
+        avatar={
+          completed ? (
+            <CheckCircleIcon
+              className="tutorialComplete"
+              color="primary"
+              titleAccess={`${s.name} completed`}
+            />
+          ) : (
+            <RadioButtonUncheckedIcon
+              className="tutorialIncomplete"
+              titleAccess={`${s.name} not yet completed`}
+            />
+          )
+        }
         action={
           <Button
             size="small"
@@ -47,7 +63,7 @@ function TutorialListItem(props: TutorialListItemProps): JSX.Element {
             color="primary"
             onClick={(e: any) => onTutorial(s.id)}
           >
-            {completed ? "Done" : "Play"}
+            {completed ? "Replay" : "Play"}
           </Button>
         }
         title={s.name}

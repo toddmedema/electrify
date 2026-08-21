@@ -214,7 +214,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 <p>+40 pts per $1B of net worth at the end</p>
                 <p>+2 pts per 100k customers at the end</p>
                 <p>+1 pt per TWh of electricity supplied</p>
-                <p>-2 pts per gigaton of greenhouse gas emissions</p>
+                <p>-2 pts per megaton (1M tons) of greenhouse gas emissions</p>
                 <p>-8 pts per TWh of blackouts</p>
               </div>
             )}
@@ -225,7 +225,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   {scenario.dollarsPerkWh}/kWh
                 </p>
                 <p>+10 pts per TWh of electricity supplied</p>
-                <p>-5 pts per gigaton of greenhouse gas emissions</p>
+                <p>-5 pts per megaton (1M tons) of greenhouse gas emissions</p>
                 <p>-10 pts per TWh of blackouts</p>
               </div>
             )}

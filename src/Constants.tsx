@@ -48,7 +48,7 @@ export const LOCATIONS = {
   },
   SF: {
     id: "SF",
-    name: "San Fransisco, CA",
+    name: "San Francisco, CA",
     lat: 37.7749,
     long: -122.4194,
   },
@@ -60,7 +60,7 @@ export const LOCATIONS = {
   },
   SJU: {
     id: "SJU",
-    name: "San Juan, Puero Rico",
+    name: "San Juan, Puerto Rico",
     lat: 18.4671,
     long: -66.1185,
   },

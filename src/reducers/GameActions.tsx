@@ -15,4 +15,11 @@ import { createAction } from "@reduxjs/toolkit";
  */
 export const start = createAction<number>("game/start");
 export const loaded = createAction("game/loaded");
-export const quit = createAction("game/quit");
+/**
+ * Ends the scenario. Pass { toScenarioList: true } to land on the scenario list rather than the
+ * title screen - what you want after finishing (or failing) a scenario, since the next thing a
+ * player wants is another scenario.
+ */
+export const quit = createAction<{ toScenarioList?: boolean } | undefined>(
+  "game/quit"
+);

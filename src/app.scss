@@ -454,6 +454,48 @@ span.weak {
   margin-bottom: 100%;
 }
 
+// Completion state of each tutorial in the scenario list
+.tutorialIncomplete {
+  color: #bdbdbd; /* grey400 */
+}
+
+// Units appended to numbers in tables, de-emphasized so the number still reads first
+.unitSuffix {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+// Keyboard shortcut listings (Settings + Manual)
+.shortcuts {
+  margin: 8px auto;
+  border-collapse: collapse;
+  text-align: left;
+
+  td {
+    padding: 4px 8px;
+    vertical-align: middle;
+  }
+
+  td:first-child {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  kbd {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 1px 5px;
+    border: 1px solid #bdbdbd; /* grey400 */
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    background: #fafafa; /* grey50 */
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    text-align: center;
+  }
+}
+
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
   .clickable-card {

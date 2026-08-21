@@ -135,8 +135,9 @@ export const SCENARIOS = [
         target: ".action-seconday-text",
         content: (
           <Typography variant="body1">
-            See how long it will take to build, and the total cost of
-            electricity across its lifetime.
+            See how long it will take to build, the total cost of electricity
+            across its lifetime, and how much greenhouse gas it releases per
+            unit generated.
           </Typography>
         ),
       },
@@ -276,7 +277,7 @@ export const SCENARIOS = [
     durationMonths: 1,
     endTitle: "Tutorial complete!",
     endMessage:
-      "You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },
@@ -337,7 +338,7 @@ export const SCENARIOS = [
     durationMonths: 12,
     endTitle: "Tutorial complete!",
     endMessage:
-      "You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },

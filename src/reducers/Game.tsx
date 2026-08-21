@@ -354,7 +354,8 @@ export function tickState(state: GameType) {
               open: true,
               notCancellable: true,
               actionLabel: "Try again",
-              action: () => getStore().dispatch(quit()),
+              action: () =>
+                getStore().dispatch(quit({ toScenarioList: true })),
             })
           );
         }, 1);
@@ -387,7 +388,8 @@ export function tickState(state: GameType) {
               open: true,
               notCancellable: true,
               actionLabel: "Try again",
-              action: () => getStore().dispatch(quit()),
+              action: () =>
+                getStore().dispatch(quit({ toScenarioList: true })),
             })
           );
         }, 1);
@@ -500,8 +502,9 @@ export function tickState(state: GameType) {
                 ),
                 open: true,
                 closeText: "Keep playing",
-                actionLabel: "Return to menu",
-                action: () => getStore().dispatch(quit()),
+                actionLabel: "Return to scenarios",
+                action: () =>
+                  getStore().dispatch(quit({ toScenarioList: true })),
               })
             ),
           1

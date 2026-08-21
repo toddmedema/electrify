@@ -36,12 +36,12 @@ import { navigate } from "../reducers/Card";
 import { setSpeed } from "../reducers/Game";
 import { store } from "../Store";
 
+// Keep in sync with the Keyboard Shortcuts entry in the Manual and Settings
 const keyMap = {
   PAUSED: ["`", "space", "0"],
   SLOW: "1",
   NORMAL: "2",
   FAST: "3",
-  LIGHTNING: "4",
   FACILITIES: "q",
   FINANCES: "w",
   FORECASTS: "e",

@@ -40,4 +40,5 @@ res/
 config.json
 google-services.json
 GoogleService-Info.plist
+.env.local
 .idea

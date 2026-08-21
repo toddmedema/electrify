@@ -73,6 +73,11 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
     LOAN_MONTHS
   );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
+  // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
+  // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
+  const kgCO2ePerMWh = Math.round(
+    1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0)
+  );
   const secondaryText = buildable ? (
     generator.description
   ) : (
@@ -128,6 +133,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
               <br />
               {fuelPrices[generator.fuel] ? "~" : ""}
               {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+              <br />
+              {kgCO2ePerMWh > 0
+                ? `${kgCO2ePerMWh.toLocaleString()}kg CO2e/MWh`
+                : "No CO2e"}
             </Typography>
           </span>
         }
@@ -188,10 +197,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
+                    {/* btuPerWh * 1M = BTU per MWh, and prices are per million BTU,
+                        so the two factors of a million cancel out */}
                     {formatMoneyConcise(
-                      1000000 *
-                        generator.btuPerWh *
-                        fuelPrices[generator.fuel] || 0
+                      generator.btuPerWh * fuelPrices[generator.fuel] || 0
                     )}
                     /MWh
                   </TableCell>
@@ -224,22 +233,17 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
                   </TableCell>
                 </TableRow>
               )}
-              {fuel.kgCO2ePerBtu > 0 && (
-                <TableRow>
-                  <TableCell>
-                    Air pollution
-                    <Typography variant="body2" color="textSecondary">
-                      (kg of CO2 equivalent)
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {Math.round(
-                      1000000 * generator.btuPerWh * fuel.kgCO2ePerBtu || 0
-                    )}
-                    kg/MWh
-                  </TableCell>
-                </TableRow>
-              )}
+              <TableRow>
+                <TableCell>
+                  Air pollution
+                  <Typography variant="body2" color="textSecondary">
+                    Greenhouse gas released per unit generated
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  {kgCO2ePerMWh.toLocaleString()}kg CO2e/MWh
+                </TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </TableContainer>
