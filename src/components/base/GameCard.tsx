@@ -230,11 +230,6 @@ export function GameCard(props: Props) {
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
-        {game.speed === "PAUSED" && (
-          <div className="pausedBanner" aria-live="polite">
-            ⏸ Game paused — tap ▶ to resume
-          </div>
-        )}
       </div>
       <div
         id="yearProgressBar"
