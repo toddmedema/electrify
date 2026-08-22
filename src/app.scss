@@ -382,8 +382,13 @@ $topbar_height: 56px;
   padding: 0 !important;
 }
 
+// Facility rows paint an .outputProgressBar behind their contents, so both the text and the
+// action buttons have to be lifted over it - and they have to be lifted by the same amount, or
+// the full-width text block would cover the left edge of the buttons and eat their clicks.
+// `.MuiListItem-secondaryAction` is the slot class ListItem's own `secondaryAction` prop emits;
+// it outlives the deprecated ListItemSecondaryAction component's own class.
 .MuiListItemText-root,
-.MuiListItemSecondaryAction-root {
+.MuiListItem-secondaryAction {
   z-index: 1;
 }
 

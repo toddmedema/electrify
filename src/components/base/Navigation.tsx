@@ -26,21 +26,18 @@ export default function Navigation() {
       }
     >
       <BottomNavigationAction
-        classes={{ label: "navlabel" }}
         id="faciltiesNav"
         label="Facilities"
         value="FACILITIES"
         icon={<FlashOnIcon />}
       />
       <BottomNavigationAction
-        classes={{ label: "navlabel" }}
         id="financesNav"
         label="Finances"
         value="FINANCES"
         icon={<AttachMoneyIcon />}
       />
       <BottomNavigationAction
-        classes={{ label: "navlabel" }}
         id="forecastsNav"
         label="Forecasts"
         value="FORECASTS"
