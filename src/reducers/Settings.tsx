@@ -16,9 +16,10 @@ export const settingsSlice = createSlice({
   reducers: {
     change: (state, action: PayloadAction<Partial<SettingsType>>) => {
       const changes = action.payload || {};
-      // Update values in local storage
-      Object.keys(changes).forEach((key: string) => {
-        setStorageKeyValue(key, changes[key]);
+      // Update values in local storage. Object.entries rather than keys + lookup so the value
+      // stays tied to its key's type instead of needing a string index into SettingsType.
+      Object.entries(changes).forEach(([key, value]) => {
+        setStorageKeyValue(key, value);
       });
       return { ...state, ...changes };
     },

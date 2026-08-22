@@ -58,6 +58,7 @@ import {
   GameType,
   GeneratorOperatingType,
   MonthlyHistoryType,
+  ScoreBreakdownType,
   SpeedType,
   StorageOperatingType,
   TickPresentFutureType,
@@ -448,7 +449,7 @@ export function tickState(state: GameType) {
         const blackoutsTWh =
           Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
         // Scoring algorithm should also be updated in Game.tsx
-        const score =
+        const score: ScoreBreakdownType =
           scenario.ownership === "Investor"
             ? {
                 supply: Math.round(summary.supplyWh / 1000000000000),
@@ -469,9 +470,7 @@ export function tickState(state: GameType) {
                 blackouts: Math.round(-10 * blackoutsTWh),
               };
 
-        const finalScore = Object.values(score).reduce(
-          (a: number, b: number) => a + b,
-        );
+        const finalScore = Object.values(score).reduce((a, b) => a + b);
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
 
         if (!scenario.tutorialSteps) {

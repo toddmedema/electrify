@@ -12,13 +12,13 @@ export function getStorageBooleanOrUndefined(key: string): boolean | undefined {
   return val !== null ? val.toLowerCase() === "true" : undefined;
 }
 
-export function getStorageJson(key: string, fallback: object): object {
+export function getStorageJson<T extends object>(key: string, fallback: T): T {
   try {
     const item = getLocalStorage().getItem(key);
     if (item === null) {
       return fallback;
     }
-    const val = JSON.parse(item);
+    const val = JSON.parse(item) as T | null;
     return val !== null ? val : fallback;
   } catch (err) {
     return fallback;
@@ -41,7 +41,7 @@ export function getStorageString(key: string, fallback: string): string {
 // value has to land.
 export function setStorageKeyValue(
   key: string,
-  value: any,
+  value: unknown,
   ignoreErrors = true,
 ) {
   const serialized =
@@ -56,8 +56,9 @@ export function setStorageKeyValue(
 }
 
 function getPlays(): LocalStoragePlayedType[] {
-  return (getStorageJson("plays", { plays: [] }) as any)
-    .plays as LocalStoragePlayedType[];
+  return getStorageJson<{ plays: LocalStoragePlayedType[] }>("plays", {
+    plays: [],
+  }).plays;
 }
 
 // The scenarios (tutorials included) the player has finished, used for the completion
@@ -108,7 +109,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
   }
 
   try {
-    ls.setItem("test", null as any);
+    ls.removeItem("test");
   } catch (e) {
     // Ignore errors
   }
