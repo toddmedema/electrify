@@ -1,3 +1,4 @@
+import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import numbro from "numbro";
 import { submitHighscore } from "./User";
@@ -64,7 +65,6 @@ import {
   TickPresentFutureType,
   FuelProductionType,
 } from "../Types";
-const cloneDeep = require("lodash.clonedeep");
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -888,7 +888,16 @@ export function generateNewTimeline(
       expensesInterest: 0,
       expensesMarketing: 0,
       kgco2e: 0,
-    };
+      // reforecastWeatherAndPrices sets both of these on the next line, for every tick from
+      // the current minute onwards -- which is all of them, since the timeline starts there.
+      // Initialised anyway so a tick is a complete TickPresentFutureType the moment it exists,
+      // rather than one that happens to be patched up before anything reads it.
+      storedWh: 0,
+      supplyByFuel: {} as FuelProductionType,
+      // Asserted because FuelPricesType carries a `[index: string]: number` index signature,
+      // which a fresh object literal with a non-number field cannot satisfy. Same reason
+      // reforecastWeatherAndPrices asserts its own tick literal.
+    } as TickPresentFutureType;
   }
   state.timeline = reforecastWeatherAndPrices(state);
   state.timeline = reforecastDemand(state);

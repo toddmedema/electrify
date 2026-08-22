@@ -1,6 +1,7 @@
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
 // the reducer directly. Importing Store creates and registers it.
+import cloneDeep from "lodash.clonedeep";
 import "../Store";
 import gameReducer, {
   buildFacility,
@@ -29,7 +30,6 @@ import {
   ViolationType,
 } from "./Invariants";
 import { loadSimData } from "./SimData";
-const cloneDeep = require("lodash.clonedeep");
 
 export type StrategyType = "none" | "keepUp";
 

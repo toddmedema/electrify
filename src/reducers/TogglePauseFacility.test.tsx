@@ -1,9 +1,9 @@
+import cloneDeep from "lodash.clonedeep";
 import { PayloadAction } from "@reduxjs/toolkit";
 import gameReducer, { togglePauseFacility, tickState } from "./Game";
 import { TICK_MINUTES } from "../Constants";
 import { createGame } from "../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../Types";
-const cloneDeep = require("lodash.clonedeep");
 
 // Redux Toolkit freezes reducer output in development, and tickState mutates state in place
 function dispatch(state: GameType, action: PayloadAction<number>): GameType {
