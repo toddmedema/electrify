@@ -160,14 +160,16 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     (d: ChartData) => d.minute >= currentMinute,
   );
 
-  const legendItems = [
+  // Annotated so the optional blackout entry below is not measured against a type inferred
+  // from the first two colours alone
+  const legendItems: Array<{ name: string; symbol: { fill: string } }> = [
     { name: "Supply", symbol: { fill: supplyColor } },
     { name: "Demand", symbol: { fill: demandColor } },
   ];
   if (blackoutCount > 0) {
     legendItems.push({
       name: "Blackout",
-      symbol: { fill: blackoutColor as any },
+      symbol: { fill: blackoutColor },
     });
   }
 
@@ -182,7 +184,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         height={height || 300}
         containerComponent={chartTooltipContainer({
           ariaLabel: "Chart of electricity supply and demand over the day",
-          labels: ({ datum }: any) =>
+          labels: ({ datum }: { datum: ChartData }) =>
             `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
           // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
           voronoiBlacklist: [

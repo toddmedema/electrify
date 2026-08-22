@@ -1,3 +1,4 @@
+import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import Redux from "redux";
 
@@ -84,12 +85,18 @@ export interface CardType {
   toPrevious?: boolean;
 }
 
+// The per-category points that sum to `score`. Investor and public-ownership scenarios are
+// scored on different categories (see reducers/Game), so the keys vary by scenario.
+export type ScoreBreakdownType = Record<string, number>;
+
 export interface ScoreType {
   scenarioId: number;
   score: number;
-  scoreBreakdown: any;
+  scoreBreakdown: ScoreBreakdownType;
   difficulty: string;
-  date: any; // serverTimestamp from Firestore
+  // A FieldValue on the way out (serverTimestamp() is resolved by Firestore, not by us) and a
+  // Timestamp on the way back in
+  date: Timestamp | FieldValue;
   uid: string;
 }
 
@@ -211,6 +218,10 @@ export interface GeneratorShoppingType extends SharedShoppingType {
 }
 
 interface SharedShoppingType {
+  // TODO remove: this defeats type checking on every shopping type, but the build and
+  // facilities views index these by string and treat the Storage/Generator union as
+  // interchangeable, so it cannot go until those are narrowed properly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [index: string]: any;
   name: string;
   description: string;
@@ -284,7 +295,6 @@ export interface GameType {
 }
 
 export interface SettingsType {
-  [index: string]: any;
   audioEnabled?: boolean;
 }
 

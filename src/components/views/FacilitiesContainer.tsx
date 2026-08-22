@@ -1,4 +1,4 @@
-import Redux from "redux";
+import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
 import {
@@ -16,7 +16,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onGeneratorBuild: () => {
       dispatch(navigate({ name: "BUILD_GENERATORS", dontRemember: true }));

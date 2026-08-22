@@ -50,9 +50,11 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           height={height || 300}
           containerComponent={chartTooltipContainer({
             ariaLabel: "Chart of forecasted fuel prices",
-            labels: ({ datum }: any) =>
+            labels: ({ datum }: { datum: TickPresentFutureType }) =>
               PRICED_FUELS.map(
-                (f) => `${f}: ${formatMoneyStable(datum[f])}`,
+                // Every tick carries all four prices; the fallback is only here because the
+                // fuel prices are optional on the tick type
+                (f) => `${f}: ${formatMoneyStable(datum[f] ?? 0)}`,
               ).join("\n"),
             // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
             voronoiBlacklist: PRICED_FUELS.slice(1),

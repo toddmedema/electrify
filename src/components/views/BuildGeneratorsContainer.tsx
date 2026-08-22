@@ -1,5 +1,5 @@
+import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import Redux from "redux";
 import { navigate } from "../../reducers/Card";
 import { setSpeed, buildFacility } from "../../reducers/Game";
 import { AppStateType, GeneratorShoppingType, SpeedType } from "../../Types";
@@ -11,7 +11,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       dispatch(navigate("FACILITIES"));

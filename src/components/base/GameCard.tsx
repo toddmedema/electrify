@@ -1,6 +1,6 @@
+import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import { connect } from "react-redux";
-import Redux from "redux";
 import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FastForwardIcon from "@mui/icons-material/FastForward";
@@ -15,7 +15,7 @@ import { quit, setSpeed } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import NavigationContainer from "./NavigationContainer";
 
-export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
+export interface GameCardProps extends React.ComponentPropsWithoutRef<"div"> {
   children?: React.JSX.Element | React.JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
@@ -258,7 +258,7 @@ const mapStateToProps = (
   ...ownProps,
 });
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));

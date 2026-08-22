@@ -30,6 +30,20 @@ All code submissions should be formatted with prettier, configured in `.prettier
 `npm run format` before committing, or use VSCode with the Prettier extension
 (esbenp.prettier-vscode) set to format on save. CI fails on unformatted files.
 
+Lint rules live under `eslintConfig` in `package.json`, on top of the create-react-app
+defaults. `npm run lint` runs with `--max-warnings=0`, so anything it reports fails CI. The
+rules worth knowing about, and why they are on:
+
+- **`@typescript-eslint/no-explicit-any`** -- `any` switches off checking for everything
+  downstream of it, and the ones this codebase had were hiding real bugs. If you genuinely need
+  one, disable it on the line with a comment saying why.
+- **`no-console`**, allowing `warn` and `error` -- `console.log` is for debugging and should
+  not survive review. Warnings and errors are how the game reports real problems, so they stay.
+- **`@typescript-eslint/no-unused-vars`**, including caught errors -- an error that is caught
+  and never looked at is usually a swallowed bug. Prefix with `_` (`catch (_err)`) to say the
+  swallowing is deliberate.
+- **`eqeqeq`** (`null` exempt), **`no-var`**, **`prefer-const`**.
+
 ## Pulling and pushing remote branches
 
 Git can get a bit confusing when it comes to pushing and pulling other folks' branches, so here's a quick reference:

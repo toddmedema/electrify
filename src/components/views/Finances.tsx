@@ -204,7 +204,7 @@ export default class Finances extends React.Component<Props, State> {
     };
   }
 
-  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+  public shouldComponentUpdate(nextProps: Props) {
     // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
     switch (nextProps.game.speed) {
       case "FAST":

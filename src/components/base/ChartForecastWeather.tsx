@@ -50,7 +50,7 @@ export default class ChartForecastWeather extends React.PureComponent<
           height={height || 300}
           containerComponent={chartTooltipContainer({
             ariaLabel: "Chart of forecasted temperature and wind",
-            labels: ({ datum }: any) =>
+            labels: ({ datum }: { datum: TickPresentFutureType }) =>
               `Temperature: ${Math.round(datum.temperatureC)}°C\nWind: ${Math.round(datum.windKph)} km/h`,
             // Labels are rendered on EACH chart, so we only render on temperature, otherwise we get duplicate labels
             voronoiBlacklist: ["wind"],

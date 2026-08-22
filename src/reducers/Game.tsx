@@ -1,3 +1,4 @@
+import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import numbro from "numbro";
 import { submitHighscore } from "./User";
@@ -58,12 +59,12 @@ import {
   GameType,
   GeneratorOperatingType,
   MonthlyHistoryType,
+  ScoreBreakdownType,
   SpeedType,
   StorageOperatingType,
   TickPresentFutureType,
   FuelProductionType,
 } from "../Types";
-const cloneDeep = require("lodash.clonedeep");
 
 interface BuildFacilityAction {
   facility: FacilityShoppingType;
@@ -448,7 +449,7 @@ export function tickState(state: GameType) {
         const blackoutsTWh =
           Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
         // Scoring algorithm should also be updated in Game.tsx
-        const score =
+        const score: ScoreBreakdownType =
           scenario.ownership === "Investor"
             ? {
                 supply: Math.round(summary.supplyWh / 1000000000000),
@@ -469,9 +470,7 @@ export function tickState(state: GameType) {
                 blackouts: Math.round(-10 * blackoutsTWh),
               };
 
-        const finalScore = Object.values(score).reduce(
-          (a: number, b: number) => a + b,
-        );
+        const finalScore = Object.values(score).reduce((a, b) => a + b);
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
 
         if (!scenario.tutorialSteps) {
@@ -615,7 +614,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
 
 function reforecastDemand(state: GameType): TickPresentFutureType[] {
   let prev = state.timeline[0];
-  return state.timeline.map((t: TickPresentFutureType, i: number) => {
+  return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       t.demandW = getDemandW(date, state, prev, t);
@@ -670,7 +669,7 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
-  let supplyByFuel = {} as FuelProductionType;
+  const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
   let storedWh = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
@@ -889,7 +888,16 @@ export function generateNewTimeline(
       expensesInterest: 0,
       expensesMarketing: 0,
       kgco2e: 0,
-    };
+      // reforecastWeatherAndPrices sets both of these on the next line, for every tick from
+      // the current minute onwards -- which is all of them, since the timeline starts there.
+      // Initialised anyway so a tick is a complete TickPresentFutureType the moment it exists,
+      // rather than one that happens to be patched up before anything reads it.
+      storedWh: 0,
+      supplyByFuel: {} as FuelProductionType,
+      // Asserted because FuelPricesType carries a `[index: string]: number` index signature,
+      // which a fresh object literal with a non-number field cannot satisfy. Same reason
+      // reforecastWeatherAndPrices asserts its own tick literal.
+    } as TickPresentFutureType;
   }
   state.timeline = reforecastWeatherAndPrices(state);
   state.timeline = reforecastDemand(state);

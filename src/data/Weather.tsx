@@ -2,8 +2,7 @@ import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, RawWeatherType } from "../Types";
 import { getRandomRange } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
-
-const Papa = require("papaparse");
+import Papa from "papaparse";
 
 const STARTING_YEAR = 1980; // for weather data, Jan 1st, assumed to be the same for all locations
 const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
@@ -11,8 +10,8 @@ const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 
-let weather = [] as any;
-// Ordred oldest first
+// Ordered oldest first
+let weather: RawWeatherType[] = [];
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,
@@ -24,8 +23,8 @@ const DUMMY_WEATHER = {
 // TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio) for offline play
 // But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
 // Ideally caching this... so maybe upgrade to use https://tanstack.com/query/latest/docs/framework/react/overview ?
-function collectWeatherRow(row: any) {
-  const data = row.data as RawWeatherType;
+function collectWeatherRow(row: Papa.ParseStepResult<RawWeatherType>) {
+  const data = row.data;
   if (data && data.YEAR) {
     weather.push(data);
   }
@@ -39,9 +38,9 @@ function warnIfWeatherIncomplete(location: string) {
   }
 }
 
-export function initWeather(location: string, callback?: any) {
-  weather = [] as any; // reset each time to prevent accidentally appending to old state
-  Papa.parse(`/data/WeatherRaw${location}.csv`, {
+export function initWeather(location: string, callback?: () => void) {
+  weather = []; // reset each time to prevent accidentally appending to old state
+  Papa.parse<RawWeatherType>(`/data/WeatherRaw${location}.csv`, {
     download: true,
     dynamicTyping: true,
     header: true,
@@ -61,8 +60,8 @@ export function initWeather(location: string, callback?: any) {
  * (the headless simulator reads them off disk; the browser has to download them).
  */
 export function initWeatherFromCsv(location: string, csv: string) {
-  weather = [] as any; // reset each time to prevent accidentally appending to old state
-  Papa.parse(csv, {
+  weather = []; // reset each time to prevent accidentally appending to old state
+  Papa.parse<RawWeatherType>(csv, {
     dynamicTyping: true,
     header: true,
     step: collectWeatherRow,
@@ -85,14 +84,17 @@ export function getWeather(date: DateType): RawWeatherType {
     return weather[row] || DUMMY_WEATHER;
   }
 
-  // Otherwise, blend hours for smoother weather
+  // Otherwise, blend hours for smoother weather.
+  // The weights run with the clock: on the hour the reading is entirely the hour we are in,
+  // and it slides to the next hour's reading as the minutes tick over.
   const prev = weather[row];
   const next = weather[nextRow];
-  const prevPerc = minuteOfHour / 60;
-  const nextPerc = 1 - prevPerc;
+  const nextPerc = minuteOfHour / 60;
+  const prevPerc = 1 - nextPerc;
   return {
-    YEAR: next.year,
-    MONTH: next.month,
+    // The blended reading is stamped with the hour it starts in, not the one it is heading towards
+    YEAR: prev.YEAR,
+    MONTH: prev.MONTH,
     TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
     CLOUD_PCT: prev.CLOUD_PCT * prevPerc + next.CLOUD_PCT * nextPerc,
     WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
@@ -151,6 +153,9 @@ function forecastNextDay() {
   for (let row = 0; row < ROWS_PER_DAY; row++) {
     const prev = weather[length - ROWS_PER_YEAR + row];
     weather.push({
+      // Forecast rows are last year's same hour nudged, so they belong to the following year
+      YEAR: prev.YEAR + 1,
+      MONTH: prev.MONTH,
       TEMP_C: Math.min(45, Math.max(-20, prev.TEMP_C + temperatureModifier)),
       CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
       WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),

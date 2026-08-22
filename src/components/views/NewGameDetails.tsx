@@ -80,7 +80,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
   private async loadScores(uid: string) {
     if (this.state.scenario && uid) {
       const db = getDb();
-      let scores = [] as any; // tracking here synchronously because React state updates are async
+      // Tracked synchronously here because React state updates are async
+      let scores: ScoreType[] = [];
 
       let q = query(
         collection(db, "scores"),
@@ -89,8 +90,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
         limit(50),
       );
       let querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc: any) => {
-        scores = [...(scores || []), doc.data()];
+      querySnapshot.forEach((doc) => {
+        scores = [...scores, doc.data() as ScoreType];
         this.setState({ scores });
       });
 
@@ -102,13 +103,13 @@ export default class NewGameDetails extends React.Component<Props, State> {
         limit(1),
       );
       querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc: any) => {
-        this.setState({ myTopScore: doc.data() });
+      querySnapshot.forEach((doc) => {
+        this.setState({ myTopScore: doc.data() as ScoreType });
       });
     }
   }
 
-  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+  public shouldComponentUpdate(nextProps: Props) {
     if (!this.props.uid && nextProps.uid) {
       this.loadScores(nextProps.uid);
     }

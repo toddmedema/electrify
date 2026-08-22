@@ -1,4 +1,4 @@
-import Redux from "redux";
+import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { logEvent } from "../../Globals";
 import { initFuelPrices } from "../../data/FuelPrices";
@@ -18,7 +18,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 let lastLoad = performance.now();
 const LOADING_DEBOUNCE_MS = 1000;
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     load: (game: GameType) => {
       if (performance.now() - lastLoad < LOADING_DEBOUNCE_MS) {

@@ -42,7 +42,8 @@ export default class chartForecastStorage extends React.PureComponent<
           height={height || 300}
           containerComponent={chartTooltipContainer({
             ariaLabel: "Chart of forecasted stored power",
-            labels: ({ datum }: any) => formatWattHours(datum.storedWh),
+            labels: ({ datum }: { datum: TickPresentFutureType }) =>
+              formatWattHours(datum.storedWh),
           })}
         >
           <VictoryAxis

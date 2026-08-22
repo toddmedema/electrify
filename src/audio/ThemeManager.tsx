@@ -34,7 +34,7 @@ export class ThemeManager {
   private intensity: number;
   private paused: boolean;
   private theme: MusicDefinition;
-  private timeout: any;
+  private timeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(nodes: { [key: string]: AudioNode }, intensity: number = 0) {
     this.nodes = nodes;
@@ -89,9 +89,6 @@ export class ThemeManager {
   private startTheme(theme: MusicDefinition = this.theme) {
     this.fadeOut();
     this.theme = theme;
-    if (theme) {
-      console.log("starting " + theme.directory);
-    }
     this.loopTheme(true);
   }
 
@@ -143,11 +140,11 @@ export class ThemeManager {
   // Doesn't stop the current music nodes (lets them stop naturally for reverb)
   private loopTheme(newTheme: boolean = false) {
     if (this.paused) {
-      return console.log("Skipping music (paused)");
+      return;
     }
     const theme = this.theme;
     this.active = this.generateTracks();
-    theme.tracks.forEach((track: string, i: number) => {
+    theme.tracks.forEach((track: string) => {
       let file = this.getActiveInstrument(track);
       const active = this.intensity > 0 || Boolean(file);
       file = file || `${theme.directory}${track}`;
@@ -159,7 +156,10 @@ export class ThemeManager {
 
       const node = this.nodes[file];
       if (!node) {
-        console.log(file + " not loaded");
+        // Every file a theme names is loaded up front, and a failure there is already reported
+        // by loadAudioFiles -- so reaching this means MUSIC_DEFINITIONS names a track that
+        // getAllMusicFiles never fetched, which is a content bug rather than a runtime hiccup.
+        console.warn(`No audio node for ${file}; skipping that track`);
         return;
       }
 
@@ -186,13 +186,10 @@ export class ThemeManager {
     if (delta > 0) {
       // Fade in one inaudible (but active) baseline track randomly
       // (don't touch peak instrument, don't duplicate instruments)
-      console.log("looking for node to fade in");
       for (const inst of theme.tracks) {
         const activeinst = this.getActiveInstrument(inst) || "";
-        console.log(activeinst);
         const a = this.nodes[activeinst];
         if (a && a.isPlaying() && (a.getVolume() || 0) < 1.0) {
-          console.log("fading in " + activeinst);
           a.fadeIn();
           break;
         }
@@ -202,10 +199,8 @@ export class ThemeManager {
       // (don't touch the peak instrument, don't go below 1 active instrument)
       for (const inst of [...theme.tracks].reverse()) {
         const activeinst = this.getActiveInstrument(inst) || "";
-        console.log(activeinst);
         const a = this.nodes[activeinst];
         if (a && a.isPlaying() && (a.getVolume() || 0) > 0.9) {
-          console.log("fading out " + activeinst);
           a.fadeOut();
           break;
         }

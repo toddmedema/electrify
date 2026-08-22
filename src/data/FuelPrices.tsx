@@ -1,3 +1,4 @@
+import Papa from "papaparse";
 import { INFLATION } from "../Constants";
 import { DateType, FuelPricesType } from "../Types";
 import { getRandomRange } from "../helpers/Math";
@@ -16,8 +17,6 @@ import { getRandomRange } from "../helpers/Math";
 
 // Oil: imported crude oil prices https://www.eia.gov/outlooks/steo/realprices/
 
-const Papa = require("papaparse");
-
 // The first year in FuelPricesRaw.csv. Asking for a year before this means the CSV was never
 // loaded, rather than that the game is being played in the 1970s.
 const EARLIEST_DATA_YEAR = 1975;
@@ -34,18 +33,19 @@ interface RawFuelPricesType {
 // Holds both the CSV's historic prices and the randomly extrapolated future ones, so it has to be
 // reset per game -- otherwise a second playthrough silently inherits the first one's future prices
 // and the run stops being a function of its seed.
-const fuelPrices = {} as any;
+// year -> month (1-12) -> price per MBTU by fuel
+const fuelPrices: Record<number, Record<number, FuelPricesType>> = {};
 
 // Emptied in place rather than reassigned so that the closure in getFuelPricesPerMBTU keeps
 // referring to a const, which no-loop-func requires
 function resetFuelPrices() {
   Object.keys(fuelPrices).forEach((year: string) => {
-    delete fuelPrices[year];
+    delete fuelPrices[+year];
   });
 }
 
-function collectFuelPriceRow(row: any) {
-  const data = row.data as RawFuelPricesType;
+function collectFuelPriceRow(row: Papa.ParseStepResult<RawFuelPricesType>) {
+  const data = row.data;
   fuelPrices[+data.year] = fuelPrices[+data.year] || {};
   fuelPrices[+data.year][+data.month] = {
     "Natural Gas": +data.naturalgas,
@@ -55,9 +55,9 @@ function collectFuelPriceRow(row: any) {
   };
 }
 
-export function initFuelPrices(callback?: any) {
+export function initFuelPrices(callback?: () => void) {
   resetFuelPrices();
-  Papa.parse(`/data/FuelPricesRaw.csv`, {
+  Papa.parse<RawFuelPricesType>(`/data/FuelPricesRaw.csv`, {
     download: true,
     dynamicTyping: true,
     header: true,
@@ -79,7 +79,7 @@ export function initFuelPrices(callback?: any) {
  */
 export function initFuelPricesFromCsv(csv: string) {
   resetFuelPrices();
-  Papa.parse(csv, {
+  Papa.parse<RawFuelPricesType>(csv, {
     dynamicTyping: true,
     header: true,
     step: collectFuelPriceRow,

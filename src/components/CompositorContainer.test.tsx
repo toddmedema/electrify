@@ -1,6 +1,8 @@
 import * as React from "react";
+import type { UnknownAction } from "redux";
+import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
-import { CardNameType, TutorialStepType } from "../Types";
+import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
 import { mapDispatchToProps } from "./CompositorContainer";
 
 // Where `loaded` drops the player, and so where every walkthrough starts
@@ -33,12 +35,12 @@ interface Move {
  * reduced because the card reducer logs analytics and pushes browser history, neither of which
  * this is about - all that matters is which card the walkthrough asks for.
  */
-function step(move: Move): any[] {
-  const dispatched: any[] = [];
-  mapDispatchToProps((action: any) => {
+function step(move: Move): UnknownAction[] {
+  const dispatched: UnknownAction[] = [];
+  mapDispatchToProps(((action: UnknownAction) => {
     dispatched.push(action);
     return action;
-  }).onTutorialStep({
+  }) as AppDispatch).onTutorialStep({
     fromStep: move.fromStep,
     toStep: move.toStep,
     tutorialSteps: move.steps,
@@ -48,7 +50,7 @@ function step(move: Move): any[] {
   return dispatched;
 }
 
-function navigatedTo(dispatched: any[]): CardNameType | undefined {
+function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
   const navigations = dispatched.filter((a) => a.type === "card/navigate");
   if (navigations.length > 1) {
     throw new Error(
@@ -58,7 +60,8 @@ function navigatedTo(dispatched: any[]): CardNameType | undefined {
   if (navigations.length === 0) {
     return undefined;
   }
-  const payload = navigations[0].payload;
+  // card/navigate takes either a bare card name or a full navigation object
+  const payload = navigations[0].payload as string | NavigateActionType;
   return (typeof payload === "string" ? payload : payload.name) as CardNameType;
 }
 

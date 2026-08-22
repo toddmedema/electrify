@@ -1,7 +1,7 @@
 import { getAnalytics, logEvent as firebaseLogEvent } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { Firestore, getFirestore } from "firebase/firestore";
 
 const firebaseApp = initializeApp({
   // Set by CI from a repo secret; falls back to the placeholder for local dev
@@ -27,7 +27,7 @@ export function login() {
       // access token, and the console is readable by anything running on the page.
     })
     .catch((error) => {
-      console.log(
+      console.error(
         "Auth error: ",
         error,
         GoogleAuthProvider.credentialFromError(error),
@@ -35,28 +35,28 @@ export function login() {
     });
 }
 
-export interface ReactWindow extends Window {
-  platform?: string;
-  VERSION?: string;
-  AudioContext?: AudioContext;
-  test?: boolean;
+// The slice of the History API the game uses. Card navigation pushes a hash entry so the
+// browser back button steps back through cards; anything without a history object (tests,
+// non-browser hosts) gets a no-op.
+interface HistoryApi {
+  pushState: History["pushState"];
 }
 
 const refs = {
-  db: null as any,
+  db: null as Firestore | null,
   history:
     typeof window.history !== "undefined"
-      ? window.history
-      : { pushState: () => null },
+      ? (window.history as HistoryApi)
+      : { pushState: () => undefined },
   localStorage: null as Storage | null,
-  audioContext: null,
+  audioContext: null as AudioContext | null,
 };
 
 export function logEvent(eventName: string, args?: object): void {
   firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
 }
 
-export function getDb(): any {
+export function getDb(): Firestore {
   if (!refs.db) {
     refs.db = getFirestore(firebaseApp);
   }
@@ -119,7 +119,7 @@ export function isDesktopScreen(): boolean {
   return width >= 1300;
 }
 
-export function getHistoryApi(): any {
+export function getHistoryApi(): HistoryApi {
   return refs.history;
 }
 
@@ -128,15 +128,15 @@ export function getAudioContext(): AudioContext | null {
     return refs.audioContext;
   }
   try {
-    refs.audioContext = new (window.AudioContext as any)();
-  } catch (err) {
-    console.log("Web Audio API is not supported in this browser");
+    refs.audioContext = new window.AudioContext();
+  } catch (_err) {
+    console.warn("Web Audio API is not supported in this browser");
     refs.audioContext = null;
   }
   return refs.audioContext;
 }
 
-export function openWindow(url: string): any {
+export function openWindow(url: string): void {
   window.open(url, "_system");
 }
 
@@ -162,8 +162,8 @@ export function getLocalStorage(): Storage {
     if (!refs.localStorage) {
       refs.localStorage = {
         clear: () => null,
-        getItem: (s: string) => null,
-        key: (index: number | string) => null,
+        getItem: () => null,
+        key: () => null,
         length: 0,
         removeItem: () => null,
         setItem: () => null,

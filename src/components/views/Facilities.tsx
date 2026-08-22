@@ -403,7 +403,7 @@ export default class Facilities extends React.Component<Props, {}> {
           </Toolbar>
           <DragDropContext onDragEnd={this.onDragEnd}>
             <Droppable droppableId="droppable">
-              {(provided, snapshot) => (
+              {(provided) => (
                 <div {...provided.droppableProps} ref={provided.innerRef}>
                   {game.facilities.map(
                     (g: FacilityOperatingType, i: number) => (

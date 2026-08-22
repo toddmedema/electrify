@@ -35,23 +35,30 @@ function splitmix32(a: number) {
   };
 }
 
-let prng = null as any;
+type Prng = () => number;
 
-export function seedRandom(seed: number) {
+let prng: Prng | null = null;
+
+export function seedRandom(seed: number): Prng {
   prng = splitmix32(seed);
+  return prng;
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 export function getRandomRange(min: number, max: number) {
-  if (!prng) {
-    console.log("prng not seeded, generating now");
-    seedRandom(Date.now() * Math.random());
-  }
-  return prng() * (max - min) + min;
+  // A run is meant to be reproducible from its seed, so callers are expected to have seeded
+  // first. Self-seeding here keeps an unseeded caller working rather than throwing at them,
+  // at the cost of that one run not being replayable.
+  const random = prng ?? seedRandom(Date.now() * Math.random());
+  return random() * (max - min) + min;
 }
 
 // https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
-export function arrayMove(arr: any[], oldIndex: number, newIndex: number) {
+export function arrayMove<T>(
+  arr: Array<T | undefined>,
+  oldIndex: number,
+  newIndex: number,
+) {
   if (newIndex >= arr.length) {
     let k = newIndex - arr.length + 1;
     while (k--) {
