@@ -361,11 +361,109 @@ $topbar_height: 56px;
     z-index: 0; /* fixes bug with psuedo element z-index not working as expected */
   }
 
+  // The day clock: a strip of sky whose color, cloud cover and drift speed come straight from
+  // the tick the simulation is on, so time of day and weather are readable without any text.
+  // The 2px year bar below it is the year clock.
+  #skyBand {
+    position: relative;
+    height: 22px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    z-index: 100;
+    transition: background 2s linear;
+
+    .skyStars,
+    .skyClouds {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+
+    .skyStars {
+      background-image: radial-gradient(
+        1px 1px at 50% 50%,
+        #ffffff,
+        rgba(255, 255, 255, 0)
+      );
+      background-size: 37px 19px;
+      transition: opacity 2s linear;
+    }
+
+    .skyClouds {
+      background-image: radial-gradient(
+        closest-side,
+        rgba(255, 255, 255, 0.85),
+        rgba(255, 255, 255, 0)
+      );
+      background-size: 140px 46px;
+      background-repeat: repeat-x;
+      background-position-y: -8px;
+      animation-name: skyDrift;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+      transition: opacity 4s linear;
+    }
+
+    // Same signal as .blackout-pulsing on the toolbar above, so the two never disagree
+    &.blackout:after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: $blackout_red;
+      opacity: 0.45;
+      // pulsered swings background-color through white, which would wash the sky out on the
+      // off-beat; the band pulses its own opacity so the red only ever gets stronger or weaker
+      animation-name: pulseblackout;
+      animation-duration: 2s;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
+    }
+  }
+
   #yearProgressBar {
-    margin-top: -5px;
     height: 2px;
     background: $font_color_faded;
     z-index: 100;
+  }
+}
+
+@keyframes skyDrift {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: 280px;
+  }
+}
+
+@keyframes pulseblackout {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+// Ambient motion is decoration, not information - every one of these states is also carried by
+// color or opacity, so there's nothing to lose by holding still
+@media (prefers-reduced-motion: reduce) {
+  #skyBand .skyClouds,
+  #skyBand.blackout:after {
+    animation: none;
+  }
+
+  // This one carries its color *in* the animation, so stopping it would erase the blackout
+  // signal rather than freeze it - pin it to the shade the pulse peaks at instead
+  .blackout-pulsing:before {
+    animation: none;
+    background-color: $blackout_red;
   }
 }
 
@@ -685,11 +783,15 @@ $topbar_height: 56px;
   }
 
   .outputProgressBar {
-    background: #eeeeee; /* grey200 */
+    background: #eeeeee; /* grey200 fallback; the fuel tint is set inline per facility */
     position: absolute;
     top: 0;
     bottom: 2px;
     left: 0;
+    // Generators ramp over minutes, so let the bar slide there instead of snapping each tick
+    transition:
+      width 0.6s ease-out,
+      background 0.6s linear;
   }
 
   .MuiListItemAvatar-root {
@@ -701,6 +803,9 @@ $topbar_height: 56px;
       position: absolute;
       bottom: 0;
       left: 42px;
+      transition:
+        height 0.6s ease-out,
+        background-color 0.6s linear;
 
       &:after {
         content: "";
@@ -710,6 +815,27 @@ $topbar_height: 56px;
         left: 0;
         right: 0;
         bottom: 0;
+      }
+    }
+
+    // What this facility is doing, badged onto its own icon rather than given a column of its
+    // own, so the row gains a state without getting wider
+    .facilityActivity {
+      position: absolute;
+      bottom: -2px;
+      left: 23px; // tucked against the avatar, stopping short of the storage bar at 42px
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: $bg_primary;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .MuiSvgIcon-root {
+        font-size: 13px;
       }
     }
   }
