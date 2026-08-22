@@ -78,7 +78,7 @@
     ]
   },
   "engines": {
-    "node": ">= 21 < 22"
+    "node": ">= 24 < 25"
   },
   "jest": {
     "collectCoverageFrom": [
