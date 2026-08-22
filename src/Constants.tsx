@@ -55,24 +55,28 @@ export const LOCATIONS = {
     name: "Pittsburgh, PA",
     lat: 40.4406,
     long: -79.9959,
+    timeZone: "America/New_York",
   },
   SF: {
     id: "SF",
     name: "San Francisco, CA",
     lat: 37.7749,
     long: -122.4194,
+    timeZone: "America/Los_Angeles",
   },
   HNL: {
     id: "HNL",
     name: "Honolulu, HI",
     lat: 21.3099,
     long: -157.8581,
+    timeZone: "Pacific/Honolulu",
   },
   SJU: {
     id: "SJU",
     name: "San Juan, Puerto Rico",
     lat: 18.4671,
     long: -66.1185,
+    timeZone: "America/Puerto_Rico",
   },
 } as { [id: string]: LocationType };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96

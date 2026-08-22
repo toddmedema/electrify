@@ -29,6 +29,9 @@ export interface LocationType {
   name: string;
   lat: number;
   long: number;
+  // IANA zone, so sun times come out in the location's own local time rather than in whichever
+  // one the player's computer happens to be set to
+  timeZone: string;
 }
 
 export type FuelNameType =

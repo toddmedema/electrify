@@ -1,4 +1,6 @@
 import {
+  formatMoneyConcise,
+  formatMoneyStable,
   formatWattHoursAxis,
   formatWattHoursOfPeak,
   formatWatts,
@@ -106,5 +108,23 @@ describe("formatWattsOfPeak", () => {
 describe("formatWattHoursOfPeak", () => {
   it("should share a unit across the pair", () => {
     expect(formatWattHoursOfPeak(100000000, 1000000000)).toEqual("0.1/1GWh");
+  });
+});
+
+// A cost per unit is a division, so a zero denominator arrives here as Infinity or NaN. numbro
+// renders those literally, which is how "$INFINITY/MWh" reached the build screen.
+describe("money formatting of values that are not numbers", () => {
+  const NO_ESTIMATE = "\u2014";
+
+  it("still formats ordinary amounts", () => {
+    expect(formatMoneyConcise(1500000)).toEqual("$1.5M");
+    expect(formatMoneyStable(1500000)).toEqual("$1.50M");
+  });
+
+  it("shows a dash rather than a word for a value it cannot express", () => {
+    [Infinity, -Infinity, NaN].forEach((value) => {
+      expect(formatMoneyConcise(value)).toEqual(NO_ESTIMATE);
+      expect(formatMoneyStable(value)).toEqual(NO_ESTIMATE);
+    });
   });
 });

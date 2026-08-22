@@ -1,6 +1,29 @@
-import { arrayMove, getRandomRangeAt, newSeed, randomAt } from "./Math";
+import {
+  arrayMove,
+  getIntersectionX,
+  getRandomRangeAt,
+  newSeed,
+  randomAt,
+} from "./Math";
 
 const STREAM = 1;
+
+describe("getIntersectionX", () => {
+  it("finds where two crossing segments meet", () => {
+    // A rising line and a falling line through (5, 5)
+    expect(getIntersectionX(0, 0, 10, 10, 0, 10, 10, 0)).toBeCloseTo(5);
+  });
+
+  it("finds the crossing of a sloped line and a flat one", () => {
+    // Supply ramping past a flat demand line, which is what the chart actually uses this for
+    expect(getIntersectionX(0, 0, 10, 20, 0, 5, 10, 5)).toBeCloseTo(2.5);
+  });
+
+  // Parallel lines never meet, so there is no x to return. Callers treat the 0 as "no crossing"
+  it("returns zero for parallel lines rather than dividing by zero", () => {
+    expect(getIntersectionX(0, 0, 10, 10, 0, 5, 10, 15)).toEqual(0);
+  });
+});
 
 describe("randomAt", () => {
   it("stays inside [0, 1)", () => {

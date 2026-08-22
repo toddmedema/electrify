@@ -43,6 +43,10 @@ export function LCWH(
   const fuelCostPerWh =
     ((getFuelPricesPerMBTU(date, seed)[g.fuel] || 0) * g.btuPerWh) / 1000000;
   const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
+  // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
+  // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
+  // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money
+  // formatters render that as a dash.
   const totalWh =
     g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh =

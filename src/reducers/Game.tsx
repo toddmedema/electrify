@@ -555,11 +555,7 @@ function getDemandW(
     prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
       marketingGrowth,
   );
-  const { sunrise, sunset } = getSunriseSunset(
-    date,
-    game.location.lat,
-    game.location.long,
-  );
+  const { sunrise, sunset } = getSunriseSunset(date, game.location);
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
@@ -597,8 +593,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
         ...fuelPrices,
         solarIrradianceWM2: getRawSolarIrradianceWM2(
           date,
-          state.location.lat,
-          state.location.long,
+          state.location,
           weather.CLOUD_PCT,
         ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,

@@ -32,14 +32,25 @@ export function formatWattHours(i: number, mantissa = 1): string {
   return formatWatts(i, mantissa) + "h";
 }
 
+// Costs are derived from division, so a zero denominator reaches the formatters as Infinity or
+// NaN. numbro renders those literally -- "$INFINITY/MWh" was showing up on the build screen for a
+// generator whose estimated output was zero -- and a dash reads as the "no estimate" it means.
+const NO_ESTIMATE = "—";
+
 // used for numbers that flicker rapidly to preserve length / visual stability
 export function formatMoneyStable(i: number): string {
+  if (!Number.isFinite(i)) {
+    return NO_ESTIMATE;
+  }
   return (
     "$" + numbro(i).format({ average: true, totalLength: 3 }).toUpperCase()
   );
 }
 
 export function formatMoneyConcise(i: number): string {
+  if (!Number.isFinite(i)) {
+    return NO_ESTIMATE;
+  }
   return (
     "$" +
     numbro(i)

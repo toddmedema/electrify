@@ -1,5 +1,5 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
-import { DateType, RawWeatherType } from "../Types";
+import { DateType, LocationType, RawWeatherType } from "../Types";
 import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
 import Papa from "papaparse";
@@ -143,20 +143,18 @@ export function getWeather(date: DateType, seed: number): RawWeatherType {
  * If the current time is outside of sunrise and sunset, it returns 0, indicating no solar irradiance.
  *
  * @param {DateType} date - The date and time to calculate the irradiance for.
- * @param {number} lat - The latitude of the location to calculate the irradiance for.
- * @param {number} long - The longitude of the location to calculate the irradiance for.
+ * @param {LocationType} location - The location to calculate the irradiance for.
  * @param {number} cloudCoverPercent - The percentage of cloud cover, from 0 to 100.
  * @returns {number} - The calculated raw solar irradiance in W/m2.
  */
 export function getRawSolarIrradianceWM2(
   date: DateType,
-  lat: number,
-  long: number,
+  location: LocationType,
   cloudCoverPercent: number,
 ) {
   let irradiance = EQUATOR_RADIANCE; //* (1 - 0.007 * Math.abs(lat)); // w/m2 - redundant with day length bell curve?
   irradiance *= 1 - cloudCoverPercent / 400; // Very cloudy days = 25% reduction
-  const { sunrise, sunset } = getSunriseSunset(date, lat, long);
+  const { sunrise, sunset } = getSunriseSunset(date, location);
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
       date.minuteOfDay - sunrise,

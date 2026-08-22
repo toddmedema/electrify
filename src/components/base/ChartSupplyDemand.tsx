@@ -76,18 +76,15 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
 
-  let sunrise =
-    midnight + getSunriseSunset(date, location.lat, location.long).sunrise;
-  let sunset =
-    midnight + getSunriseSunset(date, location.lat, location.long).sunset;
+  let sunrise = midnight + getSunriseSunset(date, location).sunrise;
+  let sunset = midnight + getSunriseSunset(date, location).sunset;
   if (sunrise < rangeMin) {
     sunrise =
       midnight +
       1440 +
       getSunriseSunset(
         getDateFromMinute(rangeMin + 1440, startingYear),
-        location.lat,
-        location.long,
+        location,
       ).sunrise;
   }
   if (sunset < rangeMin) {
@@ -96,8 +93,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       1440 +
       getSunriseSunset(
         getDateFromMinute(rangeMin + 1440, startingYear),
-        location.lat,
-        location.long,
+        location,
       ).sunset;
   }
 
