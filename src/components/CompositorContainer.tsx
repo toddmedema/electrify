@@ -1,5 +1,5 @@
+import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
-import Redux from "redux";
 import { delta, quit } from "../reducers/Game";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import { recordScenarioPlayed } from "../LocalStorage";
@@ -42,9 +42,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-export const mapDispatchToProps = (
-  dispatch: Redux.Dispatch<any>,
-): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     closeDialog(): void {
       dispatch(dialogClose());

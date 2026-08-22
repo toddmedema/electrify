@@ -1,6 +1,6 @@
+import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import { connect } from "react-redux";
-import Redux from "redux";
 import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FastForwardIcon from "@mui/icons-material/FastForward";
@@ -258,7 +258,7 @@ const mapStateToProps = (
   ...ownProps,
 });
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));

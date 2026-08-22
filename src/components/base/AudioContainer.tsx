@@ -1,5 +1,5 @@
+import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import Redux from "redux";
 import { change as changeSettings } from "../../reducers/Settings";
 import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
@@ -11,7 +11,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     disableAudio(): void {
       dispatch(snackbarOpen("Audio not supported on this device; disabling."));

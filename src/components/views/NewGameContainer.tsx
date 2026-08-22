@@ -1,4 +1,4 @@
-import Redux from "redux";
+import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { delta, start, quit } from "../../reducers/Game";
 import { navigate } from "../../reducers/Card";
@@ -11,7 +11,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: Redux.Dispatch<any>): DispatchProps => {
+const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       dispatch(quit());
