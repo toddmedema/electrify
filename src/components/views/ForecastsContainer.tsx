@@ -1,7 +1,6 @@
-import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { AppStateType } from "../../Types";
-import Forecasts, { DispatchProps, StateProps } from "./Forecasts";
+import Forecasts, { StateProps } from "./Forecasts";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -9,13 +8,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
-  return {};
-};
-
-const ForecastsContainer = connect(
-  mapStateToProps,
-  mapDispatchToProps,
-)(Forecasts);
+const ForecastsContainer = connect(mapStateToProps)(Forecasts);
 
 export default ForecastsContainer;

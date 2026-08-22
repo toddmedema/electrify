@@ -144,7 +144,7 @@ export class ThemeManager {
     }
     const theme = this.theme;
     this.active = this.generateTracks();
-    theme.tracks.forEach((track: string, i: number) => {
+    theme.tracks.forEach((track: string) => {
       let file = this.getActiveInstrument(track);
       const active = this.intensity > 0 || Boolean(file);
       file = file || `${theme.directory}${track}`;

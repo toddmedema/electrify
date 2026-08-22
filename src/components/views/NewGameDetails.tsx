@@ -109,7 +109,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
   }
 
-  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+  public shouldComponentUpdate(nextProps: Props) {
     if (!this.props.uid && nextProps.uid) {
       this.loadScores(nextProps.uid);
     }

@@ -23,7 +23,7 @@ export const settingsSlice = createSlice({
       });
       return { ...state, ...changes };
     },
-    pauseAudio: (state) => {
+    pauseAudio: () => {
       pause();
     },
     resumeAudio: (state) => {

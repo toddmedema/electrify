@@ -221,6 +221,7 @@ interface SharedShoppingType {
   // TODO remove: this defeats type checking on every shopping type, but the build and
   // facilities views index these by string and treat the Storage/Generator union as
   // interchangeable, so it cannot go until those are narrowed properly.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [index: string]: any;
   name: string;
   description: string;

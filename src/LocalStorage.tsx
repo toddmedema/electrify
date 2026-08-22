@@ -20,7 +20,7 @@ export function getStorageJson<T extends object>(key: string, fallback: T): T {
     }
     const val = JSON.parse(item) as T | null;
     return val !== null ? val : fallback;
-  } catch (err) {
+  } catch (_err) {
     return fallback;
   }
 }
@@ -101,7 +101,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
       ls.setItem("test", n1000b.repeat(test));
       // If no exception, we're under the max. Raise min.
       min = test;
-    } catch (e) {
+    } catch (_e) {
       // If exception, we're over the max. Lower max.
       max = test;
     }
@@ -110,7 +110,7 @@ export function checkStorageFreeBytes(gls = getLocalStorage): number {
 
   try {
     ls.removeItem("test");
-  } catch (e) {
+  } catch (_e) {
     // Ignore errors
   }
   return min * 1000;

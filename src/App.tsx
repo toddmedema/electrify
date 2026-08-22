@@ -43,7 +43,7 @@ function setupStorage(document: Document) {
     if (!ret) {
       throw new Error("Cookies disabled");
     }
-  } catch (err) {
+  } catch (_err) {
     setTimeout(() => {
       store.dispatch(
         snackbarOpen("Please enable cookies for the app to function properly."),

@@ -27,7 +27,7 @@ export function login() {
       // access token, and the console is readable by anything running on the page.
     })
     .catch((error) => {
-      console.log(
+      console.error(
         "Auth error: ",
         error,
         GoogleAuthProvider.credentialFromError(error),
@@ -129,8 +129,8 @@ export function getAudioContext(): AudioContext | null {
   }
   try {
     refs.audioContext = new window.AudioContext();
-  } catch (err) {
-    console.log("Web Audio API is not supported in this browser");
+  } catch (_err) {
+    console.warn("Web Audio API is not supported in this browser");
     refs.audioContext = null;
   }
   return refs.audioContext;
@@ -162,8 +162,8 @@ export function getLocalStorage(): Storage {
     if (!refs.localStorage) {
       refs.localStorage = {
         clear: () => null,
-        getItem: (s: string) => null,
-        key: (index: number | string) => null,
+        getItem: () => null,
+        key: () => null,
         length: 0,
         removeItem: () => null,
         setItem: () => null,

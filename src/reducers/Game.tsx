@@ -614,7 +614,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
 
 function reforecastDemand(state: GameType): TickPresentFutureType[] {
   let prev = state.timeline[0];
-  return state.timeline.map((t: TickPresentFutureType, i: number) => {
+  return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       t.demandW = getDemandW(date, state, prev, t);
@@ -669,7 +669,7 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
-  let supplyByFuel = {} as FuelProductionType;
+  const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
   let storedWh = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
