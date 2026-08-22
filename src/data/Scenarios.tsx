@@ -24,7 +24,7 @@ export const SCENARIOS = [
     ],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: "#topbar",
         content: (
           <Typography variant="body1">
@@ -106,7 +106,7 @@ export const SCENARIOS = [
     facilities: [{ fuel: "Natural Gas", peakW: 500000000 }],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: ".button-buildGenerator",
         onNext: () =>
           navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
@@ -200,7 +200,7 @@ export const SCENARIOS = [
     ],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: ".button-buildStorage",
         onNext: () => navigate({ name: "BUILD_STORAGE", dontRemember: true }),
         content: (
@@ -286,7 +286,7 @@ export const SCENARIOS = [
     ],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: "#financesNav",
         onNext: () => navigate("FINANCES"),
         content: (
@@ -359,7 +359,7 @@ export const SCENARIOS = [
     ],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: "#financesNav",
         onNext: () => navigate("FINANCES"),
         content: (
@@ -427,7 +427,7 @@ export const SCENARIOS = [
     facilities: [{ fuel: "Coal", peakW: 450000000 }],
     tutorialSteps: [
       {
-        disableBeacon: true, // causes tutorial to auto-start
+        skipBeacon: true, // causes tutorial to auto-start
         target: "#forecastsNav",
         onNext: () => navigate("FORECASTS"),
         content: (

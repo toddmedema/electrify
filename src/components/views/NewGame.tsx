@@ -42,7 +42,7 @@ interface TutorialListItemProps {
   onTutorial: DispatchProps["onTutorial"];
 }
 
-function TutorialListItem(props: TutorialListItemProps): JSX.Element {
+function TutorialListItem(props: TutorialListItemProps): React.JSX.Element {
   const { s, onTutorial, completed, next } = props;
   return (
     <Card className={`build-list-item${next ? " tutorialNext" : ""}`}>
@@ -85,7 +85,7 @@ interface ScenarioListItemProps {
   onDetails: DispatchProps["onDetails"];
 }
 
-function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
+function ScenarioListItem(props: ScenarioListItemProps): React.JSX.Element {
   const { s, onDetails } = props;
   const location = LOCATIONS[s.locationId] || {
     name: "UNKNOWN",
@@ -126,7 +126,7 @@ function ScenarioListItem(props: ScenarioListItemProps): JSX.Element {
   );
 }
 
-export default function NewGame(props: Props): JSX.Element {
+export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
   const completedTutorials = TUTORIALS.filter(
     (s) => ids.indexOf(s.id) !== -1,

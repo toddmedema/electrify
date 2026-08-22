@@ -220,17 +220,17 @@ interface SharedShoppingType {
 }
 
 export interface TutorialStepType {
-  disableBeacon?: boolean;
+  skipBeacon?: boolean;
   onNext?: () => Redux.Action;
   target: string;
-  content: JSX.Element;
+  content: React.JSX.Element;
   // Above the desktop breakpoint the bottom nav is hidden and Facilities / Finances /
   // Forecasts render side by side, so a step whose target lives in that nav - or whose
   // selector matches more than one pane - needs a different target there, and usually
   // different wording too, since there are no tabs left to switch between
   desktop?: {
     target: string;
-    content?: JSX.Element;
+    content?: React.JSX.Element;
   };
 }
 
@@ -276,7 +276,7 @@ export interface SettingsType {
 }
 
 export interface DialogType {
-  message: string | JSX.Element | JSX.Element[];
+  message: string | React.JSX.Element | React.JSX.Element[];
   title: string;
   action?: (e: React.MouseEvent<HTMLElement>) => void;
   actionLabel?: string;

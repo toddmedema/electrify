@@ -59,7 +59,7 @@ interface GeneratorBuildItemProps {
   onBuild: (financed: boolean) => void;
 }
 
-function GeneratorBuildItem(props: GeneratorBuildItemProps): JSX.Element {
+function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const { generator, cash } = props;
   const fuel = FUELS[generator.fuel] || {};
   const fuelPrices = getFuelPricesPerMBTU(props.date);
@@ -374,7 +374,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default function BuildGenerators(props: Props): JSX.Element {
+export default function BuildGenerators(props: Props): React.JSX.Element {
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => !f.peakWh);

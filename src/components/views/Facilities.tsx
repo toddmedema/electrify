@@ -105,7 +105,7 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   DISCHARGING: "discharging",
 };
 
-function FacilityListItem(props: FacilityListItemProps): JSX.Element {
+function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   const toggleDialog = () => {
     setOpen(!open);

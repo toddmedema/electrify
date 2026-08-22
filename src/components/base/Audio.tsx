@@ -51,7 +51,7 @@ export default class Audio extends React.Component<Props, {}> {
     }
   }
 
-  public render(): JSX.Element | null {
+  public render(): React.JSX.Element | null {
     return null;
   }
 }

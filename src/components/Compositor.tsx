@@ -9,7 +9,14 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { GlobalHotKeys } from "react-hotkeys";
-import Joyride, { ACTIONS, CallBackProps, EVENTS, Step } from "react-joyride";
+import {
+  ACTIONS,
+  EVENTS,
+  Joyride,
+  type EventData,
+  type Step,
+  type TooltipRenderProps,
+} from "react-joyride";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -77,19 +84,7 @@ const shortcutHandlers = {
   },
 };
 
-interface TooltipProps {
-  continuous: any;
-  index: any;
-  size: number; // total number of steps in this walkthrough
-  step: any;
-  backProps: any;
-  closeProps: any;
-  primaryProps: any;
-  tooltipProps: any;
-  isLastStep: boolean;
-}
-
-function Tooltip(props: TooltipProps): JSX.Element {
+function Tooltip(props: TooltipRenderProps): React.JSX.Element {
   const {
     index,
     size,
@@ -165,6 +160,21 @@ export default class Compositor extends React.Component<Props, {}> {
     | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
     | undefined;
 
+  // react-transition-group falls back to ReactDOM.findDOMNode when no nodeRef is given, and
+  // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
+  // child at the same time, so each needs its own ref rather than one shared one -- they are
+  // cached per transition key, of which there is only ever the finite set of card names.
+  private nodeRefs = new Map<string, React.RefObject<HTMLDivElement | null>>();
+
+  private nodeRefFor(key: string): React.RefObject<HTMLDivElement | null> {
+    let ref = this.nodeRefs.get(key);
+    if (!ref) {
+      ref = React.createRef<HTMLDivElement>();
+      this.nodeRefs.set(key, ref);
+    }
+    return ref;
+  }
+
   // Applies each step's desktop override when the panes are side by side, and drops the key
   // either way so Joyride only ever sees a plain step. The result is cached because Joyride
   // reloads its steps whenever the array isn't identical, which loses the current step -- but
@@ -200,7 +210,7 @@ export default class Compositor extends React.Component<Props, {}> {
     clearTimeout(this.resizeTimeout);
   }
 
-  public handleJoyrideCallback = (data: CallBackProps) => {
+  public handleJoyrideCallback = (data: EventData) => {
     const { action, index, type } = data;
     // Esc: leave the walkthrough without crediting it as done, so it's still offered on the
     // scenario list. Has to come first, since closing also reports STEP_AFTER
@@ -227,7 +237,7 @@ export default class Compositor extends React.Component<Props, {}> {
     }
   }
 
-  private renderCard(): JSX.Element {
+  private renderCard(): React.JSX.Element {
     // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them
     if (isDesktopScreen() && isNavCard(this.props.card.name)) {
       return (
@@ -292,6 +302,12 @@ export default class Compositor extends React.Component<Props, {}> {
     const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
       this.props;
 
+    const transitionKey =
+      isDesktopScreen() && isNavCard(this.props.card.name)
+        ? DESKTOP_PANES_KEY
+        : this.props.card.name;
+    const transitionNodeRef = this.nodeRefFor(transitionKey);
+
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
     return (
@@ -299,22 +315,26 @@ export default class Compositor extends React.Component<Props, {}> {
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
           childFactory={(child) =>
-            React.cloneElement(child, { classNames: this.props.transition })
+            // @types/react 19 defaults ReactElement's props to unknown rather than any,
+            // so the element has to be named before cloneElement will accept classNames
+            React.cloneElement(
+              child as React.ReactElement<{ classNames: TransitionClassType }>,
+              { classNames: this.props.transition },
+            )
           }
         >
           <CSSTransition
-            key={
-              isDesktopScreen() && isNavCard(this.props.card.name)
-                ? DESKTOP_PANES_KEY
-                : this.props.card.name
-            }
+            key={transitionKey}
+            nodeRef={transitionNodeRef}
             classNames={""}
             timeout={{
               enter: CARD_TRANSITION_ANIMATION_MS,
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <div className="base_main">{this.renderCard()}</div>
+            <div className="base_main" ref={transitionNodeRef}>
+              {this.renderCard()}
+            </div>
           </CSSTransition>
         </TransitionGroup>
         {tutorialSteps && (
@@ -323,21 +343,21 @@ export default class Compositor extends React.Component<Props, {}> {
             // reloads mid-tour and ends up showing no tooltip behind a blocking overlay.
             // Remounting instead resumes cleanly, since it starts from the stepIndex prop
             key={isDesktopScreen() ? "desktop" : "compact"}
-            callback={this.handleJoyrideCallback}
+            onEvent={this.handleJoyrideCallback}
             continuous={true}
-            // Joyride traps Tab inside the tooltip, so Esc is the way back out for keyboard
-            // users -- WCAG 2.1.2. Overlay clicks still don't close, since those are far too
-            // easy to trigger by accident mid-walkthrough
-            disableOverlayClose={true}
             run={tutorialStep >= 0 && tutorialStep < tutorialSteps.length}
             tooltipComponent={Tooltip}
             stepIndex={tutorialStep}
             steps={this.stepsForViewport(tutorialSteps)}
-            styles={{
-              options: {
-                beaconSize: 48,
-                overlayColor: "rgba(0, 0, 0, 0.1)",
-              },
+            // v3 folded the old top-level styles.options, and the standalone
+            // disableOverlayClose prop, into this single options prop
+            options={{
+              beaconSize: 48,
+              overlayColor: "rgba(0, 0, 0, 0.1)",
+              // Joyride traps Tab inside the tooltip, so Esc is the way back out for
+              // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
+              // those are far too easy to trigger by accident mid-walkthrough
+              overlayClickAction: false,
             }}
           />
         )}

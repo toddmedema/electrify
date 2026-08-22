@@ -24,7 +24,7 @@ export interface Props {
   format: (n: number) => number | string;
 }
 
-const ChartFinances = (props: Props): JSX.Element => {
+const ChartFinances = (props: Props): React.JSX.Element => {
   // Figure out the boundaries of the chart data
   let domainMin = 0;
   let domainMax = 0;
