@@ -11,7 +11,6 @@ import {
   List,
   ListItem,
   ListItemAvatar,
-  ListItemSecondaryAction,
   ListItemText,
   Toolbar,
   Typography,
@@ -184,6 +183,56 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                 ? { opacity: (theme) => theme.palette.action.disabledOpacity }
                 : undefined
             }
+            secondaryAction={
+              <>
+                {!underConstruction &&
+                  props.listLength > 1 &&
+                  !facility.paused && (
+                    <IconButton
+                      onClick={() => onPause(facility.id, facility.name)}
+                      aria-label={`Pause ${facility.name}`}
+                      edge="end"
+                      color="primary"
+                      size="large"
+                    >
+                      <PauseIcon />
+                    </IconButton>
+                  )}
+                {facility.paused && (
+                  <IconButton
+                    onClick={() => onTogglePause(facility.id)}
+                    aria-label={`Resume ${facility.name}`}
+                    edge="end"
+                    color="primary"
+                    size="large"
+                  >
+                    <PlayIcon />
+                  </IconButton>
+                )}
+                {!underConstruction && props.listLength > 1 && (
+                  <IconButton
+                    onClick={toggleDialog}
+                    aria-label={`Sell ${facility.name}`}
+                    edge="end"
+                    color="primary"
+                    size="large"
+                  >
+                    <DeleteForeverIcon />
+                  </IconButton>
+                )}
+                {underConstruction && (
+                  <IconButton
+                    onClick={toggleDialog}
+                    aria-label={`Cancel construction of ${facility.name}`}
+                    edge="end"
+                    color="primary"
+                    size="large"
+                  >
+                    <CancelIcon />
+                  </IconButton>
+                )}
+              </>
+            }
           >
             <DragIndicatorIcon
               className="draggable-indicator"
@@ -262,54 +311,6 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                 </Button>
               </DialogActions>
             </Dialog>
-            <ListItemSecondaryAction>
-              {!underConstruction &&
-                props.listLength > 1 &&
-                !facility.paused && (
-                  <IconButton
-                    onClick={() => onPause(facility.id, facility.name)}
-                    aria-label={`Pause ${facility.name}`}
-                    edge="end"
-                    color="primary"
-                    size="large"
-                  >
-                    <PauseIcon />
-                  </IconButton>
-                )}
-              {facility.paused && (
-                <IconButton
-                  onClick={() => onTogglePause(facility.id)}
-                  aria-label={`Resume ${facility.name}`}
-                  edge="end"
-                  color="primary"
-                  size="large"
-                >
-                  <PlayIcon />
-                </IconButton>
-              )}
-              {!underConstruction && props.listLength > 1 && (
-                <IconButton
-                  onClick={toggleDialog}
-                  aria-label={`Sell ${facility.name}`}
-                  edge="end"
-                  color="primary"
-                  size="large"
-                >
-                  <DeleteForeverIcon />
-                </IconButton>
-              )}
-              {underConstruction && (
-                <IconButton
-                  onClick={toggleDialog}
-                  aria-label={`Cancel construction of ${facility.name}`}
-                  edge="end"
-                  color="primary"
-                  size="large"
-                >
-                  <CancelIcon />
-                </IconButton>
-              )}
-            </ListItemSecondaryAction>
           </ListItem>
         </div>
       )}
