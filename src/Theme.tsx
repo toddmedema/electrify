@@ -35,13 +35,6 @@ export const fuelDashArrays = {
   Oil: "2,3",
   Uranium: "9,3,2,3",
 };
-// Sky gradients for the ambient band under the top bar. Three keyframes the band interpolates
-// between as the sun climbs, so the player can read the time of day without reading the clock.
-export const skyPalette = {
-  night: { top: "#131c33", bottom: "#27324f" },
-  twilight: { top: "#3c4a76", bottom: "#d9784a" },
-  day: { top: "#6fb3e0", bottom: "#c6e5f7" },
-};
 
 // Facilities that burn or catch something get their fuel's color; storage has no fuel, so it
 // borrows the interactive blue the rest of the battery UI already uses.

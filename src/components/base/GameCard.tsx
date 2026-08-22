@@ -14,7 +14,6 @@ import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
 import { quit, setSpeed } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import NavigationContainer from "./NavigationContainer";
-import SkyBand from "./SkyBand";
 
 export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
   children?: JSX.Element | JSX.Element[] | undefined;
@@ -239,13 +238,6 @@ export function GameCard(props: Props) {
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      {/* The band is the day clock, the bar underneath it is the year clock */}
-      <SkyBand
-        date={date}
-        location={game.location}
-        now={now}
-        inBlackout={inBlackout}
-      />
       <div
         id="yearProgressBar"
         style={{
