@@ -20,7 +20,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove, seedRandom } from "../helpers/Math";
+import { arrayMove, newSeed } from "../helpers/Math";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
@@ -97,7 +97,7 @@ let previousMonth = "";
 // four times an hour of game time
 let previouslyInBlackout = false;
 const initialGame: GameType = {
-  seed: Date.now() * Math.random(),
+  seed: newSeed(),
   scenarioId: 0,
   location: LOCATIONS["SF"],
   difficulty: "Employee",
@@ -163,8 +163,7 @@ export const gameSlice = createSlice({
       previousMonth = "";
       previouslyInBlackout = false;
       state.timeline = [] as TickPresentFutureType[];
-      state.seed = a.seed !== undefined ? a.seed : Date.now() * Math.random();
-      seedRandom(state.seed);
+      state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
@@ -591,8 +590,8 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = getWeather(date);
-      const fuelPrices = getFuelPricesPerMBTU(date);
+      const weather = getWeather(date, state.seed);
+      const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
       return {
         ...t,
         ...fuelPrices,
@@ -785,7 +784,7 @@ function updateSupplyFacilitiesFinances(
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
         expensesFuel +=
-          (fuelBtu * getFuelPricesPerMBTU(date)[g.fuel]) / 1000000;
+          (fuelBtu * getFuelPricesPerMBTU(date, state.seed)[g.fuel]) / 1000000;
         kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
       if (g.loanAmountLeft > 0) {

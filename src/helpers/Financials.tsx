@@ -37,10 +37,11 @@ export function LCWH(
   g: GeneratorShoppingType,
   date: DateType,
   feePerKgCO2e: number,
+  seed: number,
 ) {
   const fuel = FUELS[g.fuel] || {};
   const fuelCostPerWh =
-    ((getFuelPricesPerMBTU(date)[g.fuel] || 0) * g.btuPerWh) / 1000000;
+    ((getFuelPricesPerMBTU(date, seed)[g.fuel] || 0) * g.btuPerWh) / 1000000;
   const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   const totalWh =
     g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;

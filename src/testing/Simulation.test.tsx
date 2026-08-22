@@ -1,11 +1,21 @@
 import { SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, ScenarioType } from "../Types";
+import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { createGame, runSimulation, SimResultType } from "./Simulator";
+import { loadSimData } from "./SimData";
 import { TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
 
 jest.setTimeout(120000);
+
+// Ticks a state forwards without the simulator around it, for tests that care about where the
+// game ends up rather than about how it played
+function runMonths(state: GameType, months: number) {
+  const until = state.date.monthsEllapsed + months;
+  while (state.date.monthsEllapsed < until) {
+    tickState(state);
+  }
+}
 
 function describeViolations(result: SimResultType): string {
   return result.violations
@@ -95,6 +105,32 @@ describe("simulation determinism", () => {
     const first = runSimulation({ scenarioId: 101, months: 24, seed: 1 });
     const second = runSimulation({ scenarioId: 101, months: 24, seed: 2 });
     expect(second.months).toEqual(first.months);
+  });
+
+  /**
+   * The test that makes save/load correct by construction rather than by inspection: a run that is
+   * stopped, serialized, has every module level cache thrown away, and is resumed has to match a
+   * run that was never interrupted. Weather and fuel prices both live outside the game slice, so
+   * this only passes if they rebuild themselves identically from the seed alone.
+   */
+  it("resumes a serialized game into the run it would have had", () => {
+    // Carbon Fee starts in 2020, past the end of both the weather and the fuel price data, so
+    // every value the resumed run needs has to be extrapolated rather than read off a CSV
+    const options = { scenarioId: 100, seed: 4242 };
+    const HALF_MONTHS = 24;
+
+    const uninterrupted = createGame(options);
+    runMonths(uninterrupted, HALF_MONTHS * 2);
+
+    const interrupted = createGame(options);
+    runMonths(interrupted, HALF_MONTHS);
+    const saved: GameType = JSON.parse(JSON.stringify(interrupted));
+    // Everything a reload throws away: the parsed CSVs, and the forecast weather and prices
+    // appended to them
+    loadSimData(uninterrupted.location.id);
+    runMonths(saved, HALF_MONTHS);
+
+    expect(saved.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
   });
 
   it("is unaffected by an unrelated run in between", () => {

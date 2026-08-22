@@ -55,6 +55,7 @@ interface GeneratorBuildItemProps {
   cash: number;
   date: DateType;
   generator: GeneratorShoppingType;
+  seed: number;
   secondaryMetric?: string;
   onBuild: (financed: boolean) => void;
 }
@@ -62,7 +63,7 @@ interface GeneratorBuildItemProps {
 function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const { generator, cash } = props;
   const fuel = FUELS[generator.fuel] || {};
-  const fuelPrices = getFuelPricesPerMBTU(props.date);
+  const fuelPrices = getFuelPricesPerMBTU(props.date, props.seed);
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
@@ -517,6 +518,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         {generators.map((g: GeneratorShoppingType, i: number) => (
           <GeneratorBuildItem
             date={game.date}
+            seed={game.seed}
             generator={g}
             key={i}
             cash={cash}

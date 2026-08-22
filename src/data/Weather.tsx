@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, RawWeatherType } from "../Types";
-import { getRandomRange } from "../helpers/Math";
+import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
 import Papa from "papaparse";
 
@@ -9,6 +9,8 @@ const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same 
 const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
+// Temperature, wind and cloud cover, one draw each per forecast day
+const DRAWS_PER_FORECAST_DAY = 3;
 
 // Ordered oldest first
 let weather: RawWeatherType[] = [];
@@ -69,18 +71,40 @@ export function initWeatherFromCsv(location: string, csv: string) {
   warnIfWeatherIncomplete(location);
 }
 
-export function getWeather(date: DateType): RawWeatherType {
+/**
+ * Fills in every forecast day from the end of what is loaded up to and including `throughDay`.
+ *
+ * Generating in order matters twice over: each forecast day is last year's same day nudged, so
+ * skipping days would forecast off a day that was never written; and going one day per call, the
+ * way this used to, left every lookup past the data returning DUMMY_WEATHER until the array
+ * happened to catch up -- which a game loaded straight into a year past 2019 never would.
+ */
+function forecastThroughDay(seed: number, throughDay: number) {
+  if (weather.length === 0) {
+    return; // Nothing loaded to extrapolate from
+  }
+  // A partially loaded final day gets regenerated rather than half-read
+  for (
+    let day = Math.floor(weather.length / ROWS_PER_DAY);
+    day <= throughDay;
+    day++
+  ) {
+    forecastDay(seed, day);
+  }
+}
+
+export function getWeather(date: DateType, seed: number): RawWeatherType {
   const minuteOfHour = date.minuteOfDay % 60;
-  const yearOffset = (date.year - STARTING_YEAR) * ROWS_PER_YEAR;
-  const monthOffset = (date.monthNumber - 1) * DAYS_PER_MONTH * ROWS_PER_DAY;
-  const dayOffset = 0; // Only relevant if I later simulated multiple days per month
-  const hourOffset = date.hourOfDay;
-  const row = yearOffset + monthOffset + dayOffset + hourOffset;
+  const dayIndex =
+    (date.year - STARTING_YEAR) * DAYS_PER_YEAR +
+    (date.monthNumber - 1) * DAYS_PER_MONTH; // Only one day per month is simulated
+  const row = dayIndex * ROWS_PER_DAY + date.hourOfDay;
   const nextRow = row + 1;
 
-  // Forecase more weather if it doesn't exist - Simple singular check to prevent infinite looping / freezing
+  // Forecast whatever is missing, including the next row's day when blending across midnight
+  forecastThroughDay(seed, Math.floor(nextRow / ROWS_PER_DAY));
+
   if (!weather[row] || !weather[nextRow]) {
-    forecastNextDay();
     return weather[row] || DUMMY_WEATHER;
   }
 
@@ -145,20 +169,45 @@ export function getRawSolarIrradianceWM2(
   return 0;
 }
 
-function forecastNextDay() {
-  const length = weather.length;
-  const temperatureModifier = getRandomRange(-4, 4.05);
-  const windModifier = getRandomRange(-3, 3.05);
-  const cloudModifier = getRandomRange(-20, 20);
+/**
+ * Writes the 24 rows of one forecast day: the same day a year earlier, nudged by three modifiers
+ * drawn from the day's own slice of the weather stream. Addressing the draws by day index rather
+ * than taking the next three off a running generator is what lets a day be regenerated later, or
+ * in a fresh process, and come out identical.
+ */
+function forecastDay(seed: number, dayIndex: number) {
+  const previousYearRow = (dayIndex - DAYS_PER_YEAR) * ROWS_PER_DAY;
+  const draw = dayIndex * DRAWS_PER_FORECAST_DAY;
+  const temperatureModifier = getRandomRangeAt(
+    seed,
+    RANDOM_STREAM.weather,
+    draw,
+    -4,
+    4.05,
+  );
+  const windModifier = getRandomRangeAt(
+    seed,
+    RANDOM_STREAM.weather,
+    draw + 1,
+    -3,
+    3.05,
+  );
+  const cloudModifier = getRandomRangeAt(
+    seed,
+    RANDOM_STREAM.weather,
+    draw + 2,
+    -20,
+    20,
+  );
   for (let row = 0; row < ROWS_PER_DAY; row++) {
-    const prev = weather[length - ROWS_PER_YEAR + row];
-    weather.push({
+    const prev = weather[previousYearRow + row];
+    weather[dayIndex * ROWS_PER_DAY + row] = {
       // Forecast rows are last year's same hour nudged, so they belong to the following year
       YEAR: prev.YEAR + 1,
       MONTH: prev.MONTH,
       TEMP_C: Math.min(45, Math.max(-20, prev.TEMP_C + temperatureModifier)),
       CLOUD_PCT: Math.min(100, Math.max(0, prev.CLOUD_PCT + cloudModifier)),
       WIND_KPH: Math.max(0, prev.WIND_KPH + windModifier),
-    });
+    };
   }
 }
