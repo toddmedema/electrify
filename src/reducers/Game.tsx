@@ -92,6 +92,9 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
 let previousMonth = "";
+// Edge-detects the blackout toast, so a sustained blackout announces itself once rather than
+// four times an hour of game time
+let previouslyInBlackout = false;
 const initialGame: GameType = {
   seed: Date.now() * Math.random(),
   scenarioId: 0,
@@ -157,6 +160,7 @@ export const gameSlice = createSlice({
       // Without this a second game in the same session inherits the first one's month and skips
       // its first rollover, which also makes an otherwise identical seed produce a different run
       previousMonth = "";
+      previouslyInBlackout = false;
       state.timeline = [] as TickPresentFutureType[];
       state.seed = a.seed !== undefined ? a.seed : Date.now() * Math.random();
       seedRandom(state.seed);
@@ -328,6 +332,28 @@ export function tickState(state: GameType) {
   );
   if (now && prev) {
     updateSupplyFacilitiesFinances(state, prev, now);
+
+    // The pulsing top bar only tells a player who is looking at it, and by default they're
+    // looking at Finances or Forecasts. Fire on the edges only, never per tick.
+    const inBlackout = now.supplyW < now.demandW;
+    if (inBlackout !== previouslyInBlackout) {
+      previouslyInBlackout = inBlackout;
+      const message = inBlackout
+        ? "Blackout! Demand is outrunning your supply."
+        : "Blackout over - supply is meeting demand again.";
+      setTimeout(() => {
+        // Pausing a plant is the usual way into a blackout, and it raises its own "Paused X /
+        // UNDO" toast. There's only one snackbar slot, so stealing it would take the undo away
+        // at the exact moment the player most wants it. The pulsing top bar and the red sky band
+        // already carry the blackout, so this toast yields rather than competes.
+        if (getStore().getState().ui.snackbar.open) {
+          return;
+        }
+        getStore().dispatch(
+          snackbarOpen({ message, open: true, timeout: 4000 }),
+        );
+      }, 0);
+    }
 
     if (previousMonth !== state.date.month) {
       previousMonth = state.date.month;

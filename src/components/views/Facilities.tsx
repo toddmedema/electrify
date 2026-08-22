@@ -21,6 +21,11 @@ import PlayIcon from "@mui/icons-material/PlayArrow";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import BoltIcon from "@mui/icons-material/Bolt";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import {
   DragDropContext,
   Draggable,
@@ -30,7 +35,12 @@ import {
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
 import { TICK_MINUTES } from "../../Constants";
-import { FacilityOperatingType, GameType } from "../../Types";
+import { fuelColors, storageColor, withAlpha } from "../../Theme";
+import {
+  FacilityOperatingType,
+  GameType,
+  GeneratorOperatingType,
+} from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
@@ -62,6 +72,45 @@ const getDraggableStyle = (
   ...draggableStyle,
 });
 
+// The one-glance answer to "what is this thing doing right now", so the fleet can be read down
+// the left edge without parsing any of the numbers next to it.
+type FacilityActivityType =
+  | "BUILDING"
+  | "PAUSED"
+  | "IDLE"
+  | "RUNNING"
+  | "CHARGING"
+  | "DISCHARGING";
+
+function activityIcon(activity: FacilityActivityType, color: string) {
+  const style = { color };
+  switch (activity) {
+    case "BUILDING":
+      return <HourglassEmptyIcon style={style} />;
+    case "PAUSED":
+      return <PauseIcon style={style} />;
+    case "IDLE":
+      return <PowerSettingsNewIcon style={style} />;
+    case "CHARGING":
+      return <ArrowUpwardIcon style={style} />;
+    case "DISCHARGING":
+      return <ArrowDownwardIcon style={style} />;
+    default:
+      return <BoltIcon style={style} />;
+  }
+}
+
+// Spoken form of the same thing, since the glyph is the only place some of these states are
+// reported and a screen reader can't see a lightning bolt
+const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
+  BUILDING: "under construction",
+  PAUSED: "paused",
+  IDLE: "idle",
+  RUNNING: "running",
+  CHARGING: "charging",
+  DISCHARGING: "discharging",
+};
+
 function FacilityListItem(props: FacilityListItemProps): JSX.Element {
   const [open, setOpen] = React.useState(false);
   const toggleDialog = () => {
@@ -70,6 +119,32 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
 
   const { facility, onTogglePause, onPause } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const isStorage = facility.peakWh > 0;
+
+  // Storage is charging or discharging depending on which way its stored energy moved since the
+  // last tick, which is only knowable by remembering the last one
+  const previousWh = React.useRef(facility.currentWh);
+  const whDelta = facility.currentWh - previousWh.current;
+  React.useEffect(() => {
+    previousWh.current = facility.currentWh;
+  });
+
+  let activity: FacilityActivityType = "RUNNING";
+  if (underConstruction) {
+    activity = "BUILDING";
+  } else if (facility.paused) {
+    activity = "PAUSED";
+  } else if (isStorage) {
+    // A battery holding steady is neither charging nor discharging, so don't claim either
+    activity = whDelta > 0 ? "CHARGING" : whDelta < 0 ? "DISCHARGING" : "IDLE";
+  } else if (facility.currentW <= 0) {
+    activity = "IDLE";
+  }
+
+  const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  const accentColor = (fuel && fuelColors[fuel]) || storageColor;
+  const outputFraction =
+    facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   let secondaryText = "";
   if (underConstruction) {
     const percentBuilt = Math.round(
@@ -105,11 +180,14 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
               className="draggable-indicator"
               color="primary"
             />
-            {facility.currentW > 1000 && (
+            {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
+                chart draws, and transitioned in CSS so ramping is visible as movement */}
+            {!underConstruction && (
               <div
                 className="outputProgressBar"
                 style={{
-                  width: `${(facility.currentW / facility.peakW) * 100}%`,
+                  width: `${outputFraction * 100}%`,
+                  background: withAlpha(accentColor, 0.18),
                 }}
               />
             )}
@@ -125,9 +203,18 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
                     className="capacityProgressBar"
                     style={{
                       height: `${(facility.currentWh / facility.peakWh) * 100}%`,
+                      backgroundColor:
+                        activity === "CHARGING" ? storageColor : undefined,
                     }}
                   />
                 )}
+                <div
+                  className="facilityActivity"
+                  role="img"
+                  aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
+                >
+                  {activityIcon(activity, accentColor)}
+                </div>
               </div>
             </ListItemAvatar>
             <ListItemText primary={facility.name} secondary={secondaryText} />
