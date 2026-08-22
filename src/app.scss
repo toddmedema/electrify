@@ -1,3 +1,5 @@
+@use "sass:map";
+
 $font_color_primary: #000000;
 $font_color_faded: #666666;
 
@@ -117,8 +119,8 @@ $sizemap: (
 );
 
 @function size($key) {
-  @if map-has-key($sizemap, $key) {
-    @return map-get($sizemap, $key);
+  @if map.has-key($sizemap, $key) {
+    @return map.get($sizemap, $key);
   }
 
   @warn "Unknown `#{$key}` in $sizemap.";
