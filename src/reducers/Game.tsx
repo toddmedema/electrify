@@ -867,9 +867,21 @@ export function generateNewTimeline(
   customers: number,
   ticks = TICKS_PER_DAY,
 ): TickPresentFutureType[] {
-  // TODO performance optimization, figure out how to deep clone everything EXCEPT timeline, since I'm about to overwrite it
-  const state = cloneDeep(readOnlyState);
-  state.timeline = new Array(ticks) as TickPresentFutureType[];
+  // Everything below runs against a private copy, because reforecastSupply ramps generators and
+  // pays down loans by mutating the facilities it is handed. Only the facilities need the deep
+  // clone though: the timeline is overwritten on the very next line, and by the end of a long
+  // scenario the monthly history is hundreds of entries that nothing in the forecast reads.
+  // Deep cloning either of them was work thrown away, on a function that can run a year of
+  // simulation several times a second.
+  const state = {
+    ...readOnlyState,
+    facilities: cloneDeep(readOnlyState.facilities),
+    monthlyHistory: [] as MonthlyHistoryType[],
+    timeline: new Array(ticks) as TickPresentFutureType[],
+  };
+  // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
+  // was the same number recomputed for every one of up to a year's worth of ticks
+  const netWorth = getNetWorth(state.facilities, cash);
   for (let i = 0; i < ticks; i++) {
     state.timeline[i] = {
       minute: state.date.minute + i * TICK_MINUTES,
@@ -880,7 +892,7 @@ export function generateNewTimeline(
       temperatureC: 0,
       cash,
       customers,
-      netWorth: getNetWorth(state.facilities, cash),
+      netWorth,
       revenue: 0,
       expensesFuel: 0,
       expensesOM: 0,

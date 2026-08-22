@@ -111,4 +111,9 @@ const ChartFinances = (props: Props): React.JSX.Element => {
     </div>
   );
 };
-export default ChartFinances;
+/**
+ * The series only changes when a month rolls over or the player changes something, so memoising
+ * lets the whole Victory subtree -- easily the most expensive render in the game -- be skipped
+ * on the frames in between. Finances hands over a referentially stable series for exactly this.
+ */
+export default React.memo(ChartFinances);

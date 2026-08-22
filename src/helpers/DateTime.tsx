@@ -168,8 +168,34 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
   };
 }
 
+interface SunriseSunsetType {
+  sunrise: number;
+  sunset: number;
+}
+
+/**
+ * Sun times only move with the month, the year and the location, so a whole game month's worth
+ * of ticks all get the same answer. Working it out from scratch each time was the single most
+ * expensive thing in the simulation: parsing a date out of a string and running suncalc's full
+ * solar model costs ~17us a call, and a year-long forecast asks for one per tick -- twice, once
+ * for irradiance and once for demand. Caching turns tens of milliseconds per forecast into a
+ * map lookup. One entry per month played (plus however far the forecasts look ahead), so the
+ * map stays in the hundreds of entries for even a very long game.
+ */
+const sunriseSunsetCache = new Map<string, SunriseSunsetType>();
+
 // returns minutes since midnight
-export function getSunriseSunset(date: DateType, lat: number, long: number) {
+export function getSunriseSunset(
+  date: DateType,
+  lat: number,
+  long: number,
+): SunriseSunsetType {
+  const key = `${date.month}|${date.year}|${lat}|${long}`;
+  const cached = sunriseSunsetCache.get(key);
+  if (cached) {
+    return cached;
+  }
+
   const calc = getTimes(new Date(`${date.month} 1, ${date.year}`), lat, long);
 
   // suncalc returns null above the polar circles, where the sun may never rise or never set
@@ -179,10 +205,12 @@ export function getSunriseSunset(date: DateType, lat: number, long: number) {
   const minuteOfDay = (d: Date | null, fallback: number) =>
     d ? d.getHours() * 60 + d.getMinutes() : fallback;
 
-  return {
+  const times = {
     sunrise: minuteOfDay(calc.sunrise, 6 * 60),
     sunset: minuteOfDay(calc.sunset, 18 * 60),
   };
+  sunriseSunsetCache.set(key, times);
+  return times;
 }
 
 export function getDateFromMinute(

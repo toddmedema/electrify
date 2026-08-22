@@ -47,6 +47,19 @@ export interface Props {
 
 // TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
 // and don't actually differentiate between reality +  forecast in data?
+const SUPPLY_DEMAND_CONTAINER = chartTooltipContainer({
+  ariaLabel: "Chart of electricity supply and demand over the day",
+  labels: ({ datum }: { datum: ChartData }) =>
+    `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
+  // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
+  voronoiBlacklist: [
+    "supplyHistoric",
+    "supplyForecast",
+    "blackouts",
+    "current",
+  ],
+});
+
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const { startingYear, height, legend, timeline, location } = props;
   // Figure out the boundaries of the chart data
@@ -182,18 +195,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
         domain={{ y: [domainMin, domainMax] }}
         domainPadding={{ y: [6, 6] }}
         height={height || 300}
-        containerComponent={chartTooltipContainer({
-          ariaLabel: "Chart of electricity supply and demand over the day",
-          labels: ({ datum }: { datum: ChartData }) =>
-            `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
-          // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
-          voronoiBlacklist: [
-            "supplyHistoric",
-            "supplyForecast",
-            "blackouts",
-            "current",
-          ],
-        })}
+        containerComponent={SUPPLY_DEMAND_CONTAINER}
       >
         <VictoryAxis
           tickValues={hourTicks}
