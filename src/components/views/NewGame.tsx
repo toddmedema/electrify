@@ -13,7 +13,7 @@ import {
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { LOCATIONS } from "../../Constants";
