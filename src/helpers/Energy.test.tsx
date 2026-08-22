@@ -52,7 +52,7 @@ describe("getSolarOutputFactor", () => {
 
 describe("getWindCapacityFactor", () => {
   it("should correctly handle empty case", () => {
-    const windSpeedsKph = [] as any;
+    const windSpeedsKph: number[] = [];
     const result = getWindCapacityFactor(windSpeedsKph);
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(1);
@@ -67,7 +67,7 @@ describe("getWindCapacityFactor", () => {
 
 describe("getSolarCapacityFactor", () => {
   it("should correctly handle empty case", () => {
-    const irradiancesWM2 = [] as any;
+    const irradiancesWM2: number[] = [];
     const result = getSolarCapacityFactor(irradiancesWM2);
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(1);

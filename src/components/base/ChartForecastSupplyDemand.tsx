@@ -55,7 +55,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
           height={height || 300}
           containerComponent={chartTooltipContainer({
             ariaLabel: "Chart of forecasted electricity supply and demand",
-            labels: ({ datum }: any) =>
+            labels: ({ datum }: { datum: TickPresentFutureType }) =>
               `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
             // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels
             voronoiBlacklist: ["demand", "blackouts"],

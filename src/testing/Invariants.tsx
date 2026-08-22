@@ -3,8 +3,12 @@ import {
   FacilityOperatingType,
   GameType,
   MonthlyHistoryType,
+  StorageOperatingType,
   TickPresentFutureType,
 } from "../Types";
+
+type TickFieldType = keyof TickPresentFutureType;
+type MonthFieldType = keyof MonthlyHistoryType;
 
 export interface ViolationType {
   rule: string;
@@ -19,7 +23,7 @@ const CASH_ROUNDING_TOLERANCE = 2;
 const MAX_VIOLATIONS_PER_RULE = 5;
 
 // Tick fields that should always hold a real, finite number
-const FINITE_TICK_FIELDS = [
+const FINITE_TICK_FIELDS: TickFieldType[] = [
   "supplyW",
   "demandW",
   "solarIrradianceWM2",
@@ -39,7 +43,7 @@ const FINITE_TICK_FIELDS = [
 ];
 
 // Tick fields that are physically incapable of going negative (cash and netWorth can, by design)
-const NON_NEGATIVE_TICK_FIELDS = [
+const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "supplyW",
   "demandW",
   "solarIrradianceWM2",
@@ -55,7 +59,7 @@ const NON_NEGATIVE_TICK_FIELDS = [
   "kgco2e",
 ];
 
-const FINITE_MONTH_FIELDS = [
+const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "supplyWh",
   "demandWh",
   "cash",
@@ -99,7 +103,9 @@ export class InvariantCollector {
   }
 }
 
-function isFinite_(v: any): boolean {
+// A type predicate, so a value that passes is narrowed to number for the comparisons that
+// follow rather than needing a cast at each one
+function isFinite_(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
@@ -116,18 +122,14 @@ export function checkTick(
   when: string,
   builtThisTick: boolean,
 ) {
-  FINITE_TICK_FIELDS.forEach((field: string) => {
-    if (!isFinite_((now as any)[field])) {
-      collector.add(
-        "tick value is finite",
-        when,
-        `${field} = ${(now as any)[field]}`,
-      );
+  FINITE_TICK_FIELDS.forEach((field) => {
+    if (!isFinite_(now[field])) {
+      collector.add("tick value is finite", when, `${field} = ${now[field]}`);
     }
   });
 
-  NON_NEGATIVE_TICK_FIELDS.forEach((field: string) => {
-    const value = (now as any)[field];
+  NON_NEGATIVE_TICK_FIELDS.forEach((field) => {
+    const value = now[field];
     if (isFinite_(value) && value < 0) {
       collector.add("tick value is non-negative", when, `${field} = ${value}`);
     }
@@ -145,7 +147,7 @@ export function checkTick(
   // so the fuel breakdown can never exceed the total it is a breakdown of.
   let supplyByFuelTotal = 0;
   Object.keys(now.supplyByFuel || {}).forEach((fuel: string) => {
-    const value = (now.supplyByFuel as any)[fuel];
+    const value = now.supplyByFuel[fuel];
     if (!isFinite_(value) || value < 0) {
       collector.add(
         "supplyByFuel is finite and non-negative",
@@ -225,7 +227,9 @@ export function checkTick(
     }
 
     if (f.peakWh) {
-      const storage = f as any;
+      // peakWh is only on storage; the union is indexable, so this is the narrowing the
+      // check above has already established
+      const storage = f as StorageOperatingType;
       if (!isFinite_(storage.currentWh)) {
         collector.add(
           "storage charge is finite",
@@ -275,12 +279,12 @@ export function checkMonth(
   month: MonthlyHistoryType,
   when: string,
 ) {
-  FINITE_MONTH_FIELDS.forEach((field: string) => {
-    if (!isFinite_((month as any)[field])) {
+  FINITE_MONTH_FIELDS.forEach((field) => {
+    if (!isFinite_(month[field])) {
       collector.add(
         "monthly total is finite",
         when,
-        `${field} = ${(month as any)[field]}`,
+        `${field} = ${month[field]}`,
       );
     }
   });

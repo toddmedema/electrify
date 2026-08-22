@@ -60,7 +60,8 @@ const ChartFinances = (props: Props): React.JSX.Element => {
         height={props.height || 300}
         containerComponent={chartTooltipContainer({
           ariaLabel: `Chart of ${props.title} over time`,
-          labels: ({ datum }: any) => props.format(datum.value).toString(),
+          labels: ({ datum }: { datum: ChartData }) =>
+            props.format(datum.value).toString(),
         })}
       >
         <VictoryAxis

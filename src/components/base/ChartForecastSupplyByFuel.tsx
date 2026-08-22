@@ -27,6 +27,10 @@ export interface Props {
   fuels: FuelNameType[];
 }
 
+// One x of the stack: the minute, the demand, and every fuel's output at that minute. Keyed
+// loosely because which fuels are present depends on what the player has built.
+type SupplyByFuelPoint = { [index: string]: number };
+
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class ChartForecastSupplyByFuel extends React.PureComponent<
   Props,
@@ -55,12 +59,12 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
     // the whole mix off whichever series the pointer landed on.
     // The sampled forecast repeats its first minute, and a stack lines its bands up by x, so a
     // duplicate x knocks every band after it out of alignment - drop repeats as we go.
-    const data: Array<{ [index: string]: number }> = [];
+    const data: SupplyByFuelPoint[] = [];
     timeline.forEach((t) => {
       if (data.length && data[data.length - 1].minute === t.minute) {
         return;
       }
-      const point: { [index: string]: number } = {
+      const point: SupplyByFuelPoint = {
         minute: t.minute,
         demandW: t.demandW,
       };
@@ -95,7 +99,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           height={height || 300}
           containerComponent={chartTooltipContainer({
             ariaLabel: "Chart of forecasted electricity supply by fuel type",
-            labels: ({ datum }: any) =>
+            labels: ({ datum }: { datum: SupplyByFuelPoint }) =>
               [
                 ...[...fuels]
                   .reverse()

@@ -15,7 +15,7 @@ import { quit, setSpeed } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import NavigationContainer from "./NavigationContainer";
 
-export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
+export interface GameCardProps extends React.ComponentPropsWithoutRef<"div"> {
   children?: React.JSX.Element | React.JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
