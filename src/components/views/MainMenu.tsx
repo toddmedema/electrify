@@ -19,7 +19,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const MainMenu = (props: Props): JSX.Element => {
+const MainMenu = (props: Props): React.JSX.Element => {
   return (
     <div id="menuCard">
       <div id="logo">

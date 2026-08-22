@@ -1,3 +1,4 @@
+import { getTimes } from "suncalc";
 import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
@@ -12,7 +13,6 @@ import {
   MonthlyHistoryType,
   TickPresentFutureType,
 } from "../Types";
-const SunCalc = require("suncalc");
 
 export const EMPTY_HISTORY = {
   month: 0,
@@ -170,15 +170,18 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
 
 // returns minutes since midnight
 export function getSunriseSunset(date: DateType, lat: number, long: number) {
-  const calc = SunCalc.getTimes(
-    new Date(`${date.month} 1, ${date.year}`),
-    lat,
-    long,
-  );
+  const calc = getTimes(new Date(`${date.month} 1, ${date.year}`), lat, long);
+
+  // suncalc returns null above the polar circles, where the sun may never rise or never set
+  // on a given day. None of the four locations the game ships get anywhere near that, so
+  // these fallbacks are only here to keep a hypothetical high-latitude location from
+  // crashing the simulation
+  const minuteOfDay = (d: Date | null, fallback: number) =>
+    d ? d.getHours() * 60 + d.getMinutes() : fallback;
 
   return {
-    sunrise: calc.sunrise.getHours() * 60 + calc.sunrise.getMinutes(),
-    sunset: calc.sunset.getHours() * 60 + calc.sunset.getMinutes(),
+    sunrise: minuteOfDay(calc.sunrise, 6 * 60),
+    sunset: minuteOfDay(calc.sunset, 18 * 60),
   };
 }
 

@@ -16,7 +16,7 @@ import { AppStateType, GameType, SpeedType } from "../../Types";
 import NavigationContainer from "./NavigationContainer";
 
 export interface GameCardProps extends React.ComponentPropsWithoutRef<any> {
-  children?: JSX.Element | JSX.Element[] | undefined;
+  children?: React.JSX.Element | React.JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
   // When this pane is shown alongside the others in the desktop layout, skip the header/nav

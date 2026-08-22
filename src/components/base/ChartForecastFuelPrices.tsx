@@ -60,7 +60,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
         >
           <VictoryAxis
             tickCount={6}
-            tickFormat={(t) =>
+            tickFormat={(t: number) =>
               formatMonthChartAxis(
                 getDateFromMinute(t, startingYear).monthsEllapsed +
                   12 * startingYear,

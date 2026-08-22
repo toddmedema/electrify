@@ -23,10 +23,10 @@ export interface DispatchProps {
 
 interface ManualEntry {
   title: string;
-  entry: JSX.Element;
+  entry: React.JSX.Element;
 }
 
-function ManualItem(props: ManualEntry): JSX.Element {
+function ManualItem(props: ManualEntry): React.JSX.Element {
   const [expanded, setExpanded] = React.useState(false);
 
   const toggleExpand = () => {

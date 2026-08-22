@@ -1,9 +1,9 @@
+import { eachLimit } from "async";
 import { AudioNode } from "../audio/AudioNode";
 import { ThemeManager } from "../audio/ThemeManager";
 import { MUSIC_DEFINITIONS } from "../Constants";
 import { getAudioContext } from "../Globals";
 import { AudioLoadingType } from "../Types";
-const eachLimit = require("async/eachLimit");
 
 export const state = {
   loaded: "UNLOADED" as AudioLoadingType,
@@ -91,7 +91,7 @@ export function loadAudioFiles() {
         },
       );
     },
-    (err?: Error) => {
+    (err?: Error | null) => {
       if (err) {
         state.loaded = "ERROR";
         return;

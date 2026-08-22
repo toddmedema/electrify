@@ -1,7 +1,6 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { useEffect } from "react";
 import { Provider } from "react-redux";
-import * as Redux from "redux";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import { navigateBack } from "./reducers/Card";
@@ -11,23 +10,6 @@ import { firebaseAppAuth, getDevicePlatform } from "./Globals";
 import { delta } from "./reducers/User";
 import { store } from "./Store";
 import theme from "./Theme";
-
-// This is necessary to prevent compiler errors until/unless we fix the rest of
-// the repo to reference custom-defined action types (similar to how redux-thunk does things)
-// TODO: Fix redux types
-/* tslint:disable */
-export type ThunkAction<
-  R,
-  S = {},
-  E = {},
-  A extends Redux.Action<any> = Redux.AnyAction,
-> = (dispatch: Redux.Dispatch<A>, getState: () => S, extraArgument: E) => R;
-declare module "redux" {
-  export interface Dispatch<A extends Redux.Action<any> = Redux.AnyAction> {
-    <R, E>(asyncAction: ThunkAction<R, {}, E, A>): R;
-  }
-}
-/* tslint:enable */
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.

@@ -48,7 +48,7 @@ interface StorageBuildItemProps {
   onBuild: (financed: boolean) => void;
 }
 
-function StorageBuildItem(props: StorageBuildItemProps): JSX.Element {
+function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -280,7 +280,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default function StorageBuildDialog(props: Props): JSX.Element {
+export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => f.peakWh);

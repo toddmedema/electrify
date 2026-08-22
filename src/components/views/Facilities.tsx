@@ -74,12 +74,7 @@ const getDraggableStyle = (
 // The one-glance answer to "what is this thing doing right now", so the fleet can be read down
 // the left edge without parsing any of the numbers next to it.
 type FacilityActivityType =
-  | "BUILDING"
-  | "PAUSED"
-  | "IDLE"
-  | "RUNNING"
-  | "CHARGING"
-  | "DISCHARGING";
+  "BUILDING" | "PAUSED" | "IDLE" | "RUNNING" | "CHARGING" | "DISCHARGING";
 
 function activityIcon(activity: FacilityActivityType, color: string) {
   const style = { color };
@@ -110,7 +105,7 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   DISCHARGING: "discharging",
 };
 
-function FacilityListItem(props: FacilityListItemProps): JSX.Element {
+function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   const toggleDialog = () => {
     setOpen(!open);

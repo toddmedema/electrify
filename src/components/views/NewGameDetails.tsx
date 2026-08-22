@@ -40,7 +40,7 @@ import {
   ScoreType,
 } from "../../Types";
 
-const numbro = require("numbro");
+import numbro from "numbro";
 
 export interface StateProps {
   game: GameType;
