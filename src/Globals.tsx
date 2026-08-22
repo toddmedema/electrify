@@ -68,20 +68,42 @@ export function getDevicePlatform(): "web" {
 }
 
 /**
- * This function checks if the screen size is small, based on the width of the document being < 375
+ * Reading scrollWidth / offsetWidth forces the browser to flush pending layout, and between the
+ * compositor, the game card and the panes the answer is asked for the better part of a dozen
+ * times per render -- which at FAST speed is a hundred renders a second, all for a number that
+ * only moves when the window does. So it is measured once and kept until a resize says otherwise.
  * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
+ */
+let cachedViewportWidth: number | null = null;
+
+function getViewportWidth(): number {
+  if (cachedViewportWidth === null) {
+    cachedViewportWidth = Math.max(
+      document.body.scrollWidth,
+      document.documentElement.scrollWidth,
+      document.body.offsetWidth,
+      document.documentElement.offsetWidth,
+      document.documentElement.clientWidth,
+    );
+  }
+  return cachedViewportWidth;
+}
+
+if (typeof window !== "undefined") {
+  const invalidate = () => {
+    cachedViewportWidth = null;
+  };
+  window.addEventListener("resize", invalidate);
+  window.addEventListener("orientationchange", invalidate);
+}
+
+/**
+ * This function checks if the screen size is small, based on the width of the document being < 375
  *
  * @returns {boolean} - Returns true if the screen width is less than 375, otherwise false.
  */
 export function isSmallScreen(): boolean {
-  const width = Math.max(
-    document.body.scrollWidth,
-    document.documentElement.scrollWidth,
-    document.body.offsetWidth,
-    document.documentElement.offsetWidth,
-    document.documentElement.clientWidth,
-  );
-  return width < 375;
+  return getViewportWidth() < 375;
 }
 
 /**
@@ -91,14 +113,7 @@ export function isSmallScreen(): boolean {
  * @returns {boolean} - Returns true if the screen width is greater than 650, otherwise false.
  */
 export function isBigScreen(): boolean {
-  const width = Math.max(
-    document.body.scrollWidth,
-    document.documentElement.scrollWidth,
-    document.body.offsetWidth,
-    document.documentElement.offsetWidth,
-    document.documentElement.clientWidth,
-  );
-  return width > 650;
+  return getViewportWidth() > 650;
 }
 
 /**
@@ -109,14 +124,7 @@ export function isBigScreen(): boolean {
  * @returns {boolean} - Returns true if the screen width is at least 1300, otherwise false.
  */
 export function isDesktopScreen(): boolean {
-  const width = Math.max(
-    document.body.scrollWidth,
-    document.documentElement.scrollWidth,
-    document.body.offsetWidth,
-    document.documentElement.offsetWidth,
-    document.documentElement.clientWidth,
-  );
-  return width >= 1300;
+  return getViewportWidth() >= 1300;
 }
 
 export function getHistoryApi(): HistoryApi {

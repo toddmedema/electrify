@@ -33,7 +33,7 @@ import {
   DropResult,
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
-import { TICK_MINUTES } from "../../Constants";
+import { TickThrottle } from "../../helpers/RenderThrottle";
 import { fuelColors, storageColor, withAlpha } from "../../Theme";
 import {
   FacilityOperatingType,
@@ -271,41 +271,43 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </div>
             </ListItemAvatar>
             <ListItemText primary={facility.name} secondary={secondaryText} />
-            <Dialog open={open} onClose={toggleDialog}>
-              <DialogTitle>
-                {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                {facility.peakWh
-                  ? formatWattHours(facility.peakWh)
-                  : formatWatts(facility.peakW)}{" "}
-                {facility.name.toLowerCase()} facility?
-              </DialogTitle>
-              <DialogContent>
-                <DialogContentText>
-                  You will receive{" "}
-                  {formatMoneyConcise(facilityCashBack(facility))}
-                  {facility.loanAmountLeft > 0
-                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                    : ""}
-                  .
-                </DialogContentText>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={toggleDialog} color="primary">
-                  Nevermind
-                </Button>
-                <Button
-                  onClick={() => {
-                    props.onSell(facility.id);
-                    toggleDialog();
-                  }}
-                  color="primary"
-                  variant="contained"
-                  autoFocus
-                >
-                  {underConstruction ? "Cancel construction" : "Sell"}
-                </Button>
-              </DialogActions>
-            </Dialog>
+            {open && (
+              <Dialog open onClose={toggleDialog}>
+                <DialogTitle>
+                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
+                  {facility.peakWh
+                    ? formatWattHours(facility.peakWh)
+                    : formatWatts(facility.peakW)}{" "}
+                  {facility.name.toLowerCase()} facility?
+                </DialogTitle>
+                <DialogContent>
+                  <DialogContentText>
+                    You will receive{" "}
+                    {formatMoneyConcise(facilityCashBack(facility))}
+                    {facility.loanAmountLeft > 0
+                      ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                      : ""}
+                    .
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={toggleDialog} color="primary">
+                    Nevermind
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      props.onSell(facility.id);
+                      toggleDialog();
+                    }}
+                    color="primary"
+                    variant="contained"
+                    autoFocus
+                  >
+                    {underConstruction ? "Cancel construction" : "Sell"}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+            )}
           </ListItem>
         </div>
       )}
@@ -334,14 +336,19 @@ export default class Facilities extends React.Component<Props, {}> {
     this.onDragEnd = this.onDragEnd.bind(this);
   }
 
+  private throttle = new TickThrottle();
+
+  // In fast mode, skip frames so that CPU can focus on simulation -- this pane carries the
+  // supply/demand chart, which is the single most expensive thing the game draws
   public shouldComponentUpdate(nextProps: Props) {
-    // In fast modes, skip frames so that CPU can focus on simulation
-    switch (nextProps.game.speed) {
-      case "FAST":
-        return (nextProps.game.date.minute / TICK_MINUTES) % 8 === 0;
-      default:
-        return true;
+    if (nextProps.game.speed !== "FAST") {
+      return true;
     }
+    return this.throttle.due(nextProps.game.date.minute, 8);
+  }
+
+  public componentDidUpdate() {
+    this.throttle.rendered(this.props.game.date.minute);
   }
 
   public onDragEnd(result: DropResult) {

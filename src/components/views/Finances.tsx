@@ -13,7 +13,8 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import { TICK_MINUTES, TICKS_PER_MONTH } from "../../Constants";
+import { TICKS_PER_MONTH } from "../../Constants";
+import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
@@ -172,6 +173,13 @@ interface State {
   chartKey: DerivedHistoryKeysType;
 }
 
+interface ChartPointType {
+  month: number; // unique across years
+  year: number;
+  value: number;
+  projected: boolean;
+}
+
 // -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
 function getValueFromTick(tick: number) {
   if (tick === -1) {
@@ -204,14 +212,21 @@ export default class Finances extends React.Component<Props, State> {
     };
   }
 
+  private chartSeriesCache:
+    { key: string; series: ChartPointType[] } | undefined;
+
+  private throttle = new TickThrottle();
+
+  // In fast mode, skip rendering alternating frames so that CPU can focus on simulation
   public shouldComponentUpdate(nextProps: Props) {
-    // In fast modes, skip rendering alternating frames so that CPU can focus on simulation
-    switch (nextProps.game.speed) {
-      case "FAST":
-        return (nextProps.game.date.minute / TICK_MINUTES) % 2 === 0;
-      default:
-        return true;
+    if (nextProps.game.speed !== "FAST") {
+      return true;
     }
+    return this.throttle.due(nextProps.game.date.minute, 2);
+  }
+
+  public componentDidUpdate() {
+    this.throttle.rendered(this.props.game.date.minute);
   }
 
   public setExpand(expanded: boolean) {
@@ -222,6 +237,83 @@ export default class Finances extends React.Component<Props, State> {
   public setChartKey(chartKey: DerivedHistoryKeysType) {
     setStorageKeyValue("financesChartKey", chartKey);
     this.setState({ chartKey });
+  }
+
+  /**
+   * The chart plots monthly aggregates, and the projection behind its dashed half is a whole
+   * simulated year. Rebuilding that every frame was the single most expensive thing the game
+   * did -- at FAST it ran a year of simulation up to fifty times a second to redraw a line
+   * whose points cannot move until the month does. So it is rebuilt when something that can
+   * actually change it changes: the month rolling over, or the player touching the metric, the
+   * year, a slider or the fleet.
+   */
+  private getChartSeries(
+    monthlyHistory: MonthlyHistoryType[],
+    cash: number,
+    customers: number,
+  ): ChartPointType[] {
+    const { game } = this.props;
+    const { startingYear, timeline, date } = game;
+    const { year, chartKey } = this.state;
+
+    const key = [
+      chartKey,
+      year,
+      date.monthsEllapsed,
+      game.monthlyHistory.length,
+      game.monthlyMarketingSpend,
+      game.dollarsPerkWh,
+      game.facilities.map((f) => `${f.id}${f.paused ? "p" : ""}`).join(","),
+    ].join("|");
+    const cached = this.chartSeriesCache;
+    if (cached && cached.key === key) {
+      return cached.series;
+    }
+
+    const monthly = [] as ChartPointType[];
+    for (const m of monthlyHistory) {
+      const s = deriveExpandedSummary(m);
+      monthly.unshift({
+        month: s.year * 12 + s.month,
+        year: s.year,
+        value: s[chartKey],
+        projected: false,
+      });
+    }
+    if (!year || year === -1 || date.year === year) {
+      // Add projected months if current year is included in chart
+      const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
+      if (date.month !== "Dec") {
+        // Project out for the rest of the year
+        const forecastedTimeline = generateNewTimeline(
+          game,
+          cash,
+          customers,
+          TICKS_PER_MONTH * (1 + 12 - date.monthNumber),
+        ); // Current month, plus the rest of the months
+        for (let month = date.monthNumber + 1; month <= 12; month++) {
+          const m = summarizeTimeline(
+            forecastedTimeline,
+            startingYear,
+            (t) =>
+              getDateFromMinute(t.minute, startingYear).monthNumber === month,
+          );
+          presentFutureMonths.push(m);
+        }
+      }
+      presentFutureMonths.forEach((m) => {
+        const s = deriveExpandedSummary(m);
+        monthly.push({
+          month: s.year * 12 + s.month,
+          year: s.year,
+          value: s[chartKey],
+          projected: true,
+        });
+      });
+    }
+
+    this.chartSeriesCache = { key, series: monthly };
+    return monthly;
   }
 
   public render() {
@@ -262,49 +354,11 @@ export default class Finances extends React.Component<Props, State> {
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
 
-    // For the monthly chart
-    const monthly = [];
-    for (const m of monthlyHistory) {
-      const s = deriveExpandedSummary(m);
-      monthly.unshift({
-        month: s.year * 12 + s.month,
-        year: s.year,
-        value: s[chartKey],
-        projected: false,
-      });
-    }
-    if (!year || year === -1 || date.year === year) {
-      // Add projected months if current year is included in chart
-      const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
-      if (date.month !== "Dec") {
-        // Project out for the rest of the year
-        const forecastedTimeline = generateNewTimeline(
-          game,
-          now.cash,
-          now.customers,
-          TICKS_PER_MONTH * (1 + 12 - date.monthNumber),
-        ); // Current month, plus the rest of the months
-        for (let month = date.monthNumber + 1; month <= 12; month++) {
-          const m = summarizeTimeline(
-            forecastedTimeline,
-            game.startingYear,
-            (t) =>
-              getDateFromMinute(t.minute, game.startingYear).monthNumber ===
-              month,
-          );
-          presentFutureMonths.push(m);
-        }
-      }
-      presentFutureMonths.forEach((m) => {
-        const s = deriveExpandedSummary(m);
-        monthly.push({
-          month: s.year * 12 + s.month,
-          year: s.year,
-          value: s[chartKey],
-          projected: true,
-        });
-      });
-    }
+    const monthly = this.getChartSeries(
+      monthlyHistory,
+      now.cash,
+      now.customers,
+    );
 
     return (
       <GameCard
