@@ -46,7 +46,11 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export const darkBlack = "0x000000";
+// What contained primary buttons darken to on hover. MUI passes this straight into a CSS custom
+// property, so it has to be a real CSS color: an invalid one drops the background to transparent
+// and leaves the light contrastText label sitting unreadable on the page behind it. blue800 also
+// clears 4.5:1 against that label, so hovering is the more legible of the two states.
+export const primaryDarkColor = blue[800];
 export const disabledColor = grey[100];
 export const interactiveColor = blue[600];
 export const blackoutColor = red[800]; // darker than red[500] so the translucent band reads on white
@@ -62,7 +66,7 @@ export default createTheme({
     primary: {
       light: disabledColor,
       main: supplyColor,
-      dark: darkBlack,
+      dark: primaryDarkColor,
       contrastText: grey[100],
     },
     secondary: amber,
