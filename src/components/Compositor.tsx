@@ -137,14 +137,20 @@ export interface StateProps {
   tutorialSteps?: TutorialStepType[];
 }
 
+// A walkthrough moving between two steps. Both ends are named because Back and Next need
+// telling apart: a step's onNext only applies to leaving it forwards
+export interface TutorialStepChangeType {
+  fromStep: number;
+  toStep: number;
+  tutorialSteps: TutorialStepType[] | undefined;
+  scenarioId: number;
+  currentCard: CardNameType;
+}
+
 export interface DispatchProps {
   closeDialog: () => void;
   closeSnackbar: () => void;
-  onTutorialStep: (
-    newStep: number,
-    tutorialSteps: TutorialStepType[] | undefined,
-    scenarioId: number,
-  ) => void;
+  onTutorialStep: (change: TutorialStepChangeType) => void;
   onTutorialEnd: (tutorialSteps: TutorialStepType[] | undefined) => void;
 }
 
@@ -223,11 +229,13 @@ export default class Compositor extends React.Component<Props, {}> {
       EVENTS.TARGET_NOT_FOUND,
     ];
     if (advancingEvents.includes(type)) {
-      this.props.onTutorialStep(
-        index + (action === ACTIONS.PREV ? -1 : 1),
-        this.props.tutorialSteps,
-        this.props.scenarioId,
-      );
+      this.props.onTutorialStep({
+        fromStep: index,
+        toStep: index + (action === ACTIONS.PREV ? -1 : 1),
+        tutorialSteps: this.props.tutorialSteps,
+        scenarioId: this.props.scenarioId,
+        currentCard: this.props.card.name,
+      });
     }
   };
 

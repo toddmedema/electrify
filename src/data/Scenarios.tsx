@@ -1,7 +1,6 @@
 import { Typography } from "@mui/material";
 import * as React from "react";
 
-import { navigate } from "../reducers/Card";
 import { setSpeed } from "../reducers/Game";
 import { ScenarioType } from "../Types";
 
@@ -25,6 +24,7 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: "#topbar",
         content: (
           <Typography variant="body1">
@@ -37,6 +37,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".VictoryContainer",
         content: (
           <Typography variant="body1">
@@ -53,6 +54,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".VictoryContainer",
         content: (
           <Typography variant="body1">
@@ -66,6 +68,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".facility",
         content: (
           <Typography variant="body1">
@@ -79,6 +82,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: "#speedChangeButtons",
         onNext: () => setSpeed("SLOW"),
         content: (
@@ -107,9 +111,8 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: ".button-buildGenerator",
-        onNext: () =>
-          navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
         content: (
           <Typography variant="body1">
             Build generators to produce additional electricity when you're
@@ -118,6 +121,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: "#peak-output",
         content: (
           <Typography variant="body1">
@@ -126,12 +130,14 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: "#sort",
         content: (
           <Typography variant="body1">Sort by different properties.</Typography>
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".action-seconday-text",
         content: (
           <Typography variant="body1">
@@ -142,6 +148,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".build-list-item",
         content: (
           <Typography variant="body1">
@@ -150,6 +157,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".buy-button",
         content: (
           <Typography variant="body1">
@@ -158,8 +166,8 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: "#close-button",
-        onNext: () => navigate("FACILITIES"),
         content: (
           <Typography variant="body1">
             Tap X to close the buy screen.
@@ -167,6 +175,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: "#speedChangeButtons",
         content: (
           <Typography variant="body1">
@@ -201,8 +210,8 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: ".button-buildStorage",
-        onNext: () => navigate({ name: "BUILD_STORAGE", dontRemember: true }),
         content: (
           <Typography variant="body1">
             When you're getting blackouts, generators aren't your only option.
@@ -214,6 +223,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_STORAGE", dontRemember: true },
         target: ".build-list-item",
         content: (
           <Typography variant="body1">
@@ -222,8 +232,8 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: { name: "BUILD_STORAGE", dontRemember: true },
         target: "#close-button",
-        onNext: () => navigate("FACILITIES"),
         content: (
           <Typography variant="body1">
             Tap X to close the build screen.
@@ -231,6 +241,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".capacityProgressBar",
         content: (
           <Typography variant="body1">
@@ -244,6 +255,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".facility",
         content: (
           <Typography variant="body1">
@@ -256,6 +268,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FACILITIES",
         target: ".facility",
         onNext: () => setSpeed("SLOW"),
         content: (
@@ -287,8 +300,8 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: "#financesNav",
-        onNext: () => navigate("FINANCES"),
         content: (
           <Typography variant="body1">
             To run a profitable business, you'll need to understand the Finances
@@ -306,6 +319,7 @@ export const SCENARIOS = [
         },
       },
       {
+        card: "FINANCES",
         target: ".VictoryContainer",
         // Unqualified, this matches the Facilities pane's chart first once all three panes
         // are on screen
@@ -319,6 +333,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FINANCES",
         target: ".MuiTable-root",
         content: (
           <Typography variant="body1">
@@ -329,6 +344,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FINANCES",
         target: "#speedChangeButtons",
         onNext: () => setSpeed("SLOW"),
         content: (
@@ -360,8 +376,8 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: "#financesNav",
-        onNext: () => navigate("FINANCES"),
         content: (
           <Typography variant="body1">
             When you have spare capacity, you can use marketing to grow your
@@ -379,6 +395,7 @@ export const SCENARIOS = [
         },
       },
       {
+        card: "FINANCES",
         target: "#marketingSlider",
         content: (
           <Typography variant="body1">
@@ -388,6 +405,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FINANCES",
         target: "#plotMetric",
         content: (
           <Typography variant="body1">
@@ -400,6 +418,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FINANCES",
         target: "#speedChangeButtons",
         onNext: () => setSpeed("SLOW"),
         content: (
@@ -428,8 +447,8 @@ export const SCENARIOS = [
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
+        card: "FACILITIES",
         target: "#forecastsNav",
-        onNext: () => navigate("FORECASTS"),
         content: (
           <Typography variant="body1">
             To truly succeed, you'll need to plan ahead - let's check out the
@@ -447,6 +466,7 @@ export const SCENARIOS = [
         },
       },
       {
+        card: "FORECASTS",
         target: "#chartForecastSupplyDemand",
         content: (
           <Typography variant="body1">
@@ -457,6 +477,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FORECASTS",
         target: "#chartForecastSupplyByFuel",
         content: (
           <Typography variant="body1">
@@ -467,6 +488,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FORECASTS",
         target: "#chartForecastFuelPrices",
         content: (
           <Typography variant="body1">
@@ -477,6 +499,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FORECASTS",
         target: "#chartForecastWeather",
         content: (
           <Typography variant="body1">
@@ -487,6 +510,7 @@ export const SCENARIOS = [
         ),
       },
       {
+        card: "FORECASTS",
         target: "#speedChangeButtons",
         onNext: () => setSpeed("FAST"),
         content: (
