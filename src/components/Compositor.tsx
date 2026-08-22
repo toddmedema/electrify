@@ -164,9 +164,9 @@ export default class Compositor extends React.Component<Props, {}> {
   // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
   // child at the same time, so each needs its own ref rather than one shared one -- they are
   // cached per transition key, of which there is only ever the finite set of card names.
-  private nodeRefs = new Map<string, React.RefObject<HTMLDivElement | null>>();
+  private nodeRefs = new Map<string, React.RefObject<HTMLDivElement>>();
 
-  private nodeRefFor(key: string): React.RefObject<HTMLDivElement | null> {
+  private nodeRefFor(key: string): React.RefObject<HTMLDivElement> {
     let ref = this.nodeRefs.get(key);
     if (!ref) {
       ref = React.createRef<HTMLDivElement>();
@@ -358,6 +358,11 @@ export default class Compositor extends React.Component<Props, {}> {
               // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
               // those are far too easy to trigger by accident mid-walkthrough
               overlayClickAction: false,
+              // v3 scrolls each target into view and waits for a scroll:end that never
+              // arrives for targets inside the non-scrolling card panes, which hangs the
+              // tour on step 4 of the generators walkthrough. Every target is already in
+              // view, so there is nothing to scroll to
+              skipScroll: true,
             }}
           />
         )}
