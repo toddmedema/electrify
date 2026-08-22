@@ -99,5 +99,10 @@
         "lines": 75
       }
     }
+  },
+  "overrides": {
+    "react-scripts": {
+      "typescript": "$typescript"
+    }
   }
 }
