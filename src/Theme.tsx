@@ -4,11 +4,7 @@
 // https://material-ui.com/customization/themes
 
 import { blue, grey, red, amber } from "@mui/material/colors";
-import {
-  createTheme,
-  adaptV4Theme,
-  DeprecatedThemeOptions,
-} from "@mui/material/styles";
+import { createTheme } from "@mui/material/styles";
 
 // Seven series can never all clear WCAG's 3:1 non-text contrast against each other - the
 // luminance ladder runs out at about four - so these are tuned for two things that are achievable:
@@ -60,26 +56,24 @@ export const temperatureColor = red[500];
 export const cursorColor = grey[600]; // hover crosshair, lighter than the data it crosses
 export const windColor = fuelColors.Wind; // for weather forecasts
 
-export default createTheme(
-  adaptV4Theme({
-    palette: {
-      mode: "light",
-      primary: {
-        light: disabledColor,
-        main: supplyColor,
-        dark: darkBlack,
-        contrastText: grey[100],
-      },
-      secondary: amber,
+export default createTheme({
+  palette: {
+    mode: "light",
+    primary: {
+      light: disabledColor,
+      main: supplyColor,
+      dark: darkBlack,
+      contrastText: grey[100],
     },
-    typography: {
-      fontSize: 14,
-      body1: {
-        lineHeight: 1.2,
-      },
+    secondary: amber,
+  },
+  typography: {
+    fontSize: 14,
+    body1: {
+      lineHeight: 1.2,
     },
-  } as DeprecatedThemeOptions),
-);
+  },
+});
 
 export const chartTheme = {
   axis: {

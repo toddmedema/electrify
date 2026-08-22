@@ -175,7 +175,16 @@ function FacilityListItem(props: FacilityListItemProps): JSX.Element {
             provided.draggableProps.style,
           )}
         >
-          <ListItem disabled={underConstruction} className="facility">
+          {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
+              all under-construction facilities need here. */}
+          <ListItem
+            className="facility"
+            sx={
+              underConstruction
+                ? { opacity: (theme) => theme.palette.action.disabledOpacity }
+                : undefined
+            }
+          >
             <DragIndicatorIcon
               className="draggable-indicator"
               color="primary"

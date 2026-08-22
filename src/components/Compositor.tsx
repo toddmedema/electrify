@@ -343,8 +343,13 @@ export default class Compositor extends React.Component<Props, {}> {
         )}
         <Dialog
           open={ui.dialog.open}
-          onClose={closeDialog}
-          disableEscapeKeyDown={ui.dialog.notCancellable}
+          // v9 replaced `disableEscapeKeyDown` with filtering on the close reason
+          onClose={(_event, reason) => {
+            if (ui.dialog.notCancellable && reason === "escapeKeyDown") {
+              return;
+            }
+            closeDialog();
+          }}
         >
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
