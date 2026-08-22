@@ -31,12 +31,7 @@ export interface LocationType {
 }
 
 export type FuelNameType =
-  | "Coal"
-  | "Wind"
-  | "Sun"
-  | "Natural Gas"
-  | "Uranium"
-  | "Oil";
+  "Coal" | "Wind" | "Sun" | "Natural Gas" | "Uranium" | "Oil";
 export interface FuelPricesType {
   [index: string]: number;
   "Natural Gas": number; // $/btu
@@ -168,12 +163,10 @@ export interface FuelType {
 }
 
 export type FacilityOperatingType =
-  | GeneratorOperatingType
-  | StorageOperatingType;
+  GeneratorOperatingType | StorageOperatingType;
 
 export interface GeneratorOperatingType
-  extends GeneratorShoppingType,
-    LoanInfo {
+  extends GeneratorShoppingType, LoanInfo {
   id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;

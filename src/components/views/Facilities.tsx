@@ -74,12 +74,7 @@ const getDraggableStyle = (
 // The one-glance answer to "what is this thing doing right now", so the fleet can be read down
 // the left edge without parsing any of the numbers next to it.
 type FacilityActivityType =
-  | "BUILDING"
-  | "PAUSED"
-  | "IDLE"
-  | "RUNNING"
-  | "CHARGING"
-  | "DISCHARGING";
+  "BUILDING" | "PAUSED" | "IDLE" | "RUNNING" | "CHARGING" | "DISCHARGING";
 
 function activityIcon(activity: FacilityActivityType, color: string) {
   const style = { color };
