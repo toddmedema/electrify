@@ -1,4 +1,4 @@
-const numbro = require("numbro");
+import numbro from "numbro";
 
 /**
  * This function formats a number representing watts into a string with appropriate units.

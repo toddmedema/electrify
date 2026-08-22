@@ -45,7 +45,7 @@ import ChartFinances from "../base/ChartFinances";
 import GameCard from "../base/GameCard";
 import { SCENARIOS } from "../../data/Scenarios";
 
-const numbro = require("numbro");
+import numbro from "numbro";
 
 interface ChartKeyMetadataType {
   label: string;
