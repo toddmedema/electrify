@@ -4,8 +4,14 @@ import { delta, quit } from "../reducers/Game";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import { recordScenarioPlayed } from "../LocalStorage";
 import { SCENARIOS } from "../data/Scenarios";
+import { navigate } from "../reducers/Card";
 import { AppStateType, TransitionClassType, TutorialStepType } from "../Types";
-import Compositor, { DispatchProps, isNavCard, StateProps } from "./Compositor";
+import Compositor, {
+  DispatchProps,
+  isNavCard,
+  StateProps,
+  TutorialStepChangeType,
+} from "./Compositor";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   let transition: TransitionClassType = "next";
@@ -46,19 +52,37 @@ export const mapDispatchToProps = (
     closeSnackbar(): void {
       dispatch(snackbarClose());
     },
-    onTutorialStep(
-      newStep: number,
-      tutorialSteps: TutorialStepType[] | undefined,
-      scenarioId: number,
-    ): void {
+    onTutorialStep({
+      fromStep,
+      toStep,
+      tutorialSteps,
+      scenarioId,
+      currentCard,
+    }: TutorialStepChangeType): void {
       const steps = tutorialSteps || [];
-      const prevStep = steps[newStep - 1];
-      if (prevStep && prevStep.onNext) {
-        dispatch(prevStep.onNext());
-      }
-      dispatch(delta({ tutorialStep: newStep }));
 
-      if (newStep < steps.length) {
+      // Only leaving a step forwards runs its one-way side effects - Back has no way to undo
+      // them, and replaying the previous step's would fire an effect nobody triggered
+      const leaving = toStep > fromStep ? steps[fromStep] : undefined;
+      if (leaving && leaving.onNext) {
+        dispatch(leaving.onNext());
+      }
+
+      // Steps declare the card their target lives on, and every step change navigates there
+      // regardless of direction. Otherwise Back leaves the player on whatever card the
+      // forward step navigated to, where Joyride can't find the target and shows no tooltip
+      const destination = steps[toStep] && steps[toStep].card;
+      if (destination) {
+        const name =
+          typeof destination === "string" ? destination : destination.name;
+        if (name !== currentCard) {
+          dispatch(navigate(destination));
+        }
+      }
+
+      dispatch(delta({ tutorialStep: toStep }));
+
+      if (toStep < steps.length) {
         return;
       }
 

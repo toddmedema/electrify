@@ -71,6 +71,12 @@ export type CardNameType =
   | "SETTINGS"
   | "CUSTOM_GAME";
 
+// What the card reducer's navigate action accepts, beyond a bare card name
+export interface NavigateActionType {
+  name: CardNameType;
+  dontRemember?: boolean;
+}
+
 export interface CardType {
   name: CardNameType;
   ts: number;
@@ -221,6 +227,13 @@ interface SharedShoppingType {
 
 export interface TutorialStepType {
   skipBeacon?: boolean;
+  // The card this step's target lives on. Every step change navigates here, in both
+  // directions, so stepping backwards over a step that navigated forwards still lands on
+  // the card holding the target instead of leaving Joyride with nothing to point at
+  card?: CardNameType | NavigateActionType;
+  // A one-way side effect of leaving this step forwards, such as starting the clock. It
+  // isn't replayed when stepping backwards, since nothing would undo it - navigation
+  // belongs in `card`, which works in both directions
   onNext?: () => Redux.Action;
   target: string;
   content: React.JSX.Element;
