@@ -50,7 +50,8 @@ import { logEvent } from "../Globals";
 import { recordScenarioPlayed } from "../LocalStorage";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
-import { start, loaded, quit } from "./GameActions";
+import { start, loaded, quit, resume } from "./GameActions";
+import { clearSaveFor } from "../SaveGame";
 import {
   DateType,
   FacilityOperatingType,
@@ -277,6 +278,25 @@ export const gameSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(start, (state, action) => {
       state.scenarioId = action.payload;
+      // An empty timeline is how the loading screen tells a new game from a resumed one, so make
+      // that true by construction rather than by whichever paths happen to lead here
+      state.timeline = [] as TickPresentFutureType[];
+    });
+    builder.addCase(resume, (_state, action) => {
+      const restored = cloneDeep(action.payload);
+      // The tick loop's module-level locals have to line up with the state being restored.
+      // Unlike initGame, this one keeps the month: clearing it would make the first tick record a
+      // second history entry for a month that's already in the log.
+      previousMonth = restored.date.month;
+      const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
+      previouslyInBlackout = now ? now.supplyW < now.demandW : false;
+      speedBeforeDialog = "PAUSED";
+      // Never resume mid-tick; loaded() flips inGame once the CSVs are back
+      restored.speed = "PAUSED";
+      restored.inGame = false;
+      // tickLoopRunning is deliberately left alone: any loop still alive clears the flag and stops
+      // on its next tick, since tick() bails while !inGame or PAUSED
+      return restored;
     });
     builder.addCase(loaded, (state) => {
       // Start ticking in game
@@ -311,7 +331,7 @@ export const {
 } = gameSlice.actions;
 
 // Re-exported so that everything still imports the game's actions from one place
-export { start, loaded, quit };
+export { start, loaded, quit, resume };
 
 export default gameSlice.reducer;
 
@@ -384,6 +404,9 @@ export function tickState(state: GameType) {
         });
         const summary = summarizeHistory(history);
         setTimeout(() => {
+          // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
+          // as this returns and would write the run straight back
+          clearSaveFor(state.scenarioId);
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -417,6 +440,7 @@ export function tickState(state: GameType) {
         });
         const summary = summarizeHistory(history);
         setTimeout(() => {
+          clearSaveFor(state.scenarioId);
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -493,50 +517,50 @@ export function tickState(state: GameType) {
           difficulty,
           score: finalScore,
         });
-        setTimeout(
-          () =>
-            getStore().dispatch(
-              dialogOpen({
-                title: scenario.endTitle || `You've retired!`,
-                message: scenario.endMessage || (
-                  <div>
-                    Your final score is {finalScore}:<br />
-                    <br />
-                    {score.supply} pts from electricity supplied
-                    <br />
-                    {scenario.ownership === "Investor" && (
-                      <span>
-                        {score.netWorth} pts from final net worth
-                        <br />
-                      </span>
-                    )}
-                    {scenario.ownership === "Investor" && (
-                      <span>
-                        {score.customers} pts from final customers
-                        <br />
-                      </span>
-                    )}
-                    {scenario.ownership === "Public" && (
-                      <span>
-                        {score.rate} pts from electric rates
-                        <br />
-                      </span>
-                    )}
-                    {score.emissions} pts from emissions
-                    <br />
-                    {score.blackouts} pts from blackouts
-                    <br />
-                  </div>
-                ),
-                open: true,
-                closeText: "Keep playing",
-                actionLabel: "Return to scenarios",
-                action: () =>
-                  getStore().dispatch(quit({ toScenarioList: true })),
-              }),
-            ),
-          1,
-        );
+        setTimeout(() => {
+          // The scenario is over even if the player takes "Keep playing"; autosave simply writes a
+          // fresh save at the next month rollover if they do
+          clearSaveFor(state.scenarioId);
+          getStore().dispatch(
+            dialogOpen({
+              title: scenario.endTitle || `You've retired!`,
+              message: scenario.endMessage || (
+                <div>
+                  Your final score is {finalScore}:<br />
+                  <br />
+                  {score.supply} pts from electricity supplied
+                  <br />
+                  {scenario.ownership === "Investor" && (
+                    <span>
+                      {score.netWorth} pts from final net worth
+                      <br />
+                    </span>
+                  )}
+                  {scenario.ownership === "Investor" && (
+                    <span>
+                      {score.customers} pts from final customers
+                      <br />
+                    </span>
+                  )}
+                  {scenario.ownership === "Public" && (
+                    <span>
+                      {score.rate} pts from electric rates
+                      <br />
+                    </span>
+                  )}
+                  {score.emissions} pts from emissions
+                  <br />
+                  {score.blackouts} pts from blackouts
+                  <br />
+                </div>
+              ),
+              open: true,
+              closeText: "Keep playing",
+              actionLabel: "Return to scenarios",
+              action: () => getStore().dispatch(quit({ toScenarioList: true })),
+            }),
+          );
+        }, 1);
       }
     }
   }

@@ -6,6 +6,7 @@ import { initWeather } from "../../data/Weather";
 import { LOCATIONS } from "../../Constants";
 import { SCENARIOS } from "../../data/Scenarios";
 import { initGame, loaded, delta } from "../../reducers/Game";
+import { isResumedGame } from "../../SaveGame";
 import { AppStateType, GameType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
 
@@ -27,37 +28,44 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       }
 
       lastLoad = performance.now();
+      // resume() has already restored the whole slice by the time a saved game reaches this
+      // screen, so all that's left is re-reading the CSVs it couldn't carry
+      const resumed = isResumedGame(game);
       logEvent("scenario_start", {
         id: game.scenarioId,
         difficulty: game.difficulty,
+        resumed,
       });
       const scenario = SCENARIOS.find((s) => s.id === game.scenarioId);
       if (!scenario) {
         return alert("Unknown scenario ID " + game.scenarioId);
       }
-      const location = LOCATIONS[scenario.locationId];
+      // A resumed game keeps the location it was saved with, so the weather CSV that gets loaded
+      // is the one its forecasts were built from
+      const location = resumed ? game.location : LOCATIONS[scenario.locationId];
       if (!location) {
         return alert("Unknown location ID " + scenario.locationId);
       }
 
       initWeather(location.id, () => {
-        // TODO load game state from localstorage if loading
-
         initFuelPrices(() => {
-          // Otherwise, generate from scratch
-          // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
-          dispatch(
-            initGame({
-              facilities: scenario.facilities,
-              cash: scenario.cash,
-              customers: 1030000,
-              location,
-            }),
-          );
+          if (!resumed) {
+            // Otherwise, generate from scratch
+            // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
+            dispatch(
+              initGame({
+                facilities: scenario.facilities,
+                cash: scenario.cash,
+                customers: 1030000,
+                location,
+              }),
+            );
+          }
 
           dispatch(loaded());
 
-          if (scenario.tutorialSteps) {
+          // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
+          if (scenario.tutorialSteps && !resumed) {
             setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
           }
         });

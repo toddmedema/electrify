@@ -55,6 +55,15 @@ export function setStorageKeyValue(
   }
 }
 
+// Best effort for the same reason as setStorageKeyValue: nothing useful to do if it throws
+export function removeStorageKey(key: string) {
+  try {
+    getLocalStorage().removeItem(key);
+  } catch (_err) {
+    // Ignore errors
+  }
+}
+
 function getPlays(): LocalStoragePlayedType[] {
   return getStorageJson<{ plays: LocalStoragePlayedType[] }>("plays", {
     plays: [],

@@ -1,4 +1,5 @@
 import { createAction } from "@reduxjs/toolkit";
+import type { GameType } from "../Types";
 
 /**
  * The game actions that other slices react to, declared here rather than by the game slice so that
@@ -7,8 +8,8 @@ import { createAction } from "@reduxjs/toolkit";
  * Game reaches out to Store (to dispatch follow-up actions) and to Scenarios (which imports Card),
  * so a direct Card -> Game import closes a cycle. Because Card needs these action creators while
  * its own slice is still being built, whichever module happened to load first would find them
- * undefined and the store would fail to assemble. This module imports nothing but Redux Toolkit,
- * so nothing can cycle back through it.
+ * undefined and the store would fail to assemble. This module imports nothing but Redux Toolkit
+ * and types, so nothing can cycle back through it.
  *
  * The type strings are the ones createSlice generated for a slice named "game", so devtools traces
  * and anything matching on action type are unaffected.
@@ -23,3 +24,8 @@ export const loaded = createAction("game/loaded");
 export const quit = createAction<{ toScenarioList?: boolean } | undefined>(
   "game/quit",
 );
+/**
+ * Restores a saved game slice, then routes to the loading screen the same way start does so that
+ * the weather and fuel price CSVs are back in memory before the first tick.
+ */
+export const resume = createAction<GameType>("game/resume");

@@ -7,11 +7,13 @@ import { interactiveColor } from "../../Theme";
 
 export interface StateProps {
   audioEnabled?: boolean;
+  hasSavedGame: boolean;
   uid?: string;
 }
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
+  onContinue: () => void;
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
@@ -26,12 +28,23 @@ const MainMenu = (props: Props): React.JSX.Element => {
         <img src="images/logo.svg" alt="Logo"></img>
       </div>
       <div id="centeredMenu">
+        {props.hasSavedGame && (
+          <Button
+            size="large"
+            variant="contained"
+            color="primary"
+            onClick={props.onContinue}
+            autoFocus={true}
+          >
+            Continue
+          </Button>
+        )}
         <Button
           size="large"
-          variant="contained"
+          variant={props.hasSavedGame ? "outlined" : "contained"}
           color="primary"
           onClick={props.onStart}
-          autoFocus={true}
+          autoFocus={!props.hasSavedGame}
         >
           Play
         </Button>
