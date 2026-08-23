@@ -26,10 +26,6 @@ export const SAVE_KEY = "savedGame";
 // Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
 export const SAVE_VERSION = 1;
 
-// One write per game month is roughly one a second at FAST speed, and the blob is ~100KB, so
-// rollovers inside this window are collapsed into the next eligible one
-const AUTOSAVE_THROTTLE_MS = 5000;
-
 export interface SaveGameType {
   version: number;
   savedAt: string; // ISO 8601
@@ -141,7 +137,12 @@ export function isResumedGame(game: GameType): boolean {
 }
 
 /**
- * Writes the game slice to local storage as the player plays. Returns its own teardown.
+ * Writes the game slice to local storage as the player plays: once at the turn of each game year,
+ * plus whatever is left over on the way out. Returns its own teardown.
+ *
+ * A game year is 1152 ticks, so even at FAST speed this is a write every eleven seconds or so --
+ * infrequent enough that it doesn't need throttling, and unthrottled means every year boundary
+ * actually lands rather than being collapsed into a later one.
  *
  * isSaveableScenario is injected rather than looked up here (see the note at the top of the file);
  * pass a predicate that rejects tutorials, which are short enough not to be worth saving and would
@@ -154,15 +155,16 @@ export function startAutosave(
   // The slice as of the last notification where a game was running. Quit resets the slice before
   // the subscriber sees it, so flushing on the way out needs the state as it was, not as it is.
   let live: GameType | undefined;
-  let savedMonthsEllapsed = -1;
-  let lastWriteMs = -Infinity;
-  // A full disk fails every month; saying so once is a warning, saying so every month is a bug
+  let savedYear = -1;
+  // What was actually written, so the flush below can tell whether anything has happened since
+  let savedMinute = -1;
+  // A full disk fails every year; saying so once is a warning, saying so every year is a bug
   let warnedAboutFailure = false;
 
   const write = (game: GameType) => {
     if (writeSave(game)) {
-      savedMonthsEllapsed = game.date.monthsEllapsed;
-      lastWriteMs = performance.now();
+      savedYear = game.date.year;
+      savedMinute = game.date.minute;
     } else if (!warnedAboutFailure) {
       warnedAboutFailure = true;
       store.dispatch(
@@ -172,16 +174,16 @@ export function startAutosave(
   };
 
   /**
-   * Writes whatever the throttle skipped, on the way out of a game -- quitting to the menu, hiding
-   * the tab, or closing it. Without this a player who quits mid-throttle comes back a few months
-   * behind where they left, since quit fires none of the page lifecycle events.
+   * Writes the part-year since the last save, on the way out of a game -- quitting to the menu,
+   * hiding the tab, or closing it. Without this a player who quits partway through a year comes
+   * back to the start of it, since quit fires none of the page lifecycle events.
    *
-   * Only ever updates a save that's still there. The first month of any game writes immediately
-   * (lastWriteMs is reset per game), so a missing save means the scenario ended and cleared it,
-   * and a bankrupt run shouldn't come back from the dead.
+   * Only ever updates a save that's still there. The first moment of any game writes immediately,
+   * so a missing save means the scenario ended and cleared it, and a bankrupt run shouldn't come
+   * back from the dead.
    */
   const flush = () => {
-    if (!live || live.date.monthsEllapsed === savedMonthsEllapsed) {
+    if (!live || live.date.minute === savedMinute) {
       return;
     }
     if (readSave()?.game.scenarioId !== live.scenarioId) {
@@ -198,19 +200,15 @@ export function startAutosave(
       return;
     }
     if (!live) {
-      // A game just started or resumed. Nothing of it is written yet, and its first month should
-      // land right away rather than waiting out a throttle left over from the previous game.
-      savedMonthsEllapsed = -1;
-      lastWriteMs = -Infinity;
+      // A game just started or resumed, and nothing of it is written yet. Saving immediately is
+      // what lets the flush above treat a missing save as "the scenario ended".
+      savedYear = -1;
+      savedMinute = -1;
     }
     live = game;
-    if (game.date.monthsEllapsed === savedMonthsEllapsed) {
-      return;
+    if (game.date.year !== savedYear) {
+      write(game);
     }
-    if (performance.now() - lastWriteMs < AUTOSAVE_THROTTLE_MS) {
-      return;
-    }
-    write(game);
   });
 
   const onVisibilityChange = () => {

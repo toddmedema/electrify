@@ -136,77 +136,93 @@ describe("SaveGame", () => {
       return self;
     }
 
-    function atMonth(base: GameType, monthsEllapsed: number): GameType {
-      return { ...base, date: { ...base.date, monthsEllapsed } };
+    // A game running at a given point in a given year
+    function playing(base: GameType, year: number, minute: number): GameType {
+      return { ...base, inGame: true, date: { ...base.date, year, minute } };
     }
 
-    function playing(base: GameType): GameType {
-      return { ...base, inGame: true };
-    }
+    // What quit leaves behind
+    const quit = { ...game, inGame: false };
 
-    it("writes the first month of a game immediately", () => {
-      const store = fakeStore({ ...game, inGame: false });
+    it("writes as soon as a game starts", () => {
+      const store = fakeStore(quit);
       const stop = startAutosave(store as never, () => true);
 
-      store.set(playing(atMonth(game, 0)));
-      expect(readSave()!.game.date.monthsEllapsed).toBe(0);
+      store.set(playing(game, 2020, 0));
+      expect(readSave()!.game.date.year).toBe(2020);
+
+      stop();
+    });
+
+    it("writes once a year, at the turn of the year", () => {
+      const store = fakeStore(quit);
+      const stop = startAutosave(store as never, () => true);
+
+      store.set(playing(game, 2020, 0));
+      // Mid-year progress isn't written on its own
+      store.set(playing(game, 2020, 100));
+      store.set(playing(game, 2020, 200));
+      expect(readSave()!.game.date.minute).toBe(0);
+
+      // ...until the year turns, which is never skipped, throttled or collapsed
+      store.set(playing(game, 2021, 300));
+      expect(readSave()!.game.date.minute).toBe(300);
+      store.set(playing(game, 2022, 400));
+      expect(readSave()!.game.date.minute).toBe(400);
 
       stop();
     });
 
     /**
      * The bug this guards: quitting from the in-game menu fires none of the page lifecycle events,
-     * and quit resets the slice before the subscriber sees it, so a player who quit mid-throttle
-     * came back a few months behind where they left off.
+     * and quit resets the slice before the subscriber sees it, so a player who quit partway
+     * through a year came back to the start of it.
      */
-    it("flushes what the throttle skipped when the player quits to the menu", () => {
-      const store = fakeStore({ ...game, inGame: false });
+    it("flushes the part-year when the player quits to the menu", () => {
+      const store = fakeStore(quit);
       const stop = startAutosave(store as never, () => true);
 
-      store.set(playing(atMonth(game, 0)));
-      // Inside the throttle window, so these don't reach storage on their own
-      store.set(playing(atMonth(game, 1)));
-      store.set(playing(atMonth(game, 2)));
-      expect(readSave()!.game.date.monthsEllapsed).toBe(0);
+      store.set(playing(game, 2020, 0));
+      store.set(playing(game, 2020, 5000));
+      expect(readSave()!.game.date.minute).toBe(0);
 
-      // What quit leaves behind
-      store.set({ ...game, inGame: false });
-      expect(readSave()!.game.date.monthsEllapsed).toBe(2);
+      store.set(quit);
+      expect(readSave()!.game.date.minute).toBe(5000);
 
       stop();
     });
 
     // Bankrupt and fired clear the save and then quit, and the flush must not undo that
     it("doesn't resurrect a save the scenario ending cleared", () => {
-      const store = fakeStore({ ...game, inGame: false });
+      const store = fakeStore(quit);
       const stop = startAutosave(store as never, () => true);
 
-      store.set(playing(atMonth(game, 0)));
-      store.set(playing(atMonth(game, 1)));
+      store.set(playing(game, 2020, 0));
+      store.set(playing(game, 2020, 5000));
       clearSave();
 
-      store.set({ ...game, inGame: false });
+      store.set(quit);
       expect(readSave()).toBeNull();
 
       stop();
     });
 
     it("leaves tutorials alone", () => {
-      const store = fakeStore({ ...game, inGame: false });
+      const store = fakeStore(quit);
       const stop = startAutosave(store as never, () => false);
 
-      store.set(playing(atMonth(game, 0)));
-      store.set({ ...game, inGame: false });
+      store.set(playing(game, 2020, 0));
+      store.set(quit);
       expect(readSave()).toBeNull();
 
       stop();
     });
 
     it("stops writing once torn down", () => {
-      const store = fakeStore({ ...game, inGame: false });
+      const store = fakeStore(quit);
       startAutosave(store as never, () => true)();
 
-      store.set(playing(atMonth(game, 0)));
+      store.set(playing(game, 2020, 0));
       expect(readSave()).toBeNull();
     });
   });
