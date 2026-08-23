@@ -151,20 +151,18 @@ export function startAutosave(
   store: AppStore,
   isSaveableScenario: (scenarioId: number) => boolean,
 ): () => void {
+  // The slice as of the last notification where a game was running. Quit resets the slice before
+  // the subscriber sees it, so flushing on the way out needs the state as it was, not as it is.
+  let live: GameType | undefined;
   let savedMonthsEllapsed = -1;
-  let lastWriteMs = 0;
-  // Set when a rollover was skipped by the throttle, so the change isn't lost if the player stops
-  // playing before the next one
-  let pending = false;
+  let lastWriteMs = -Infinity;
   // A full disk fails every month; saying so once is a warning, saying so every month is a bug
   let warnedAboutFailure = false;
 
-  const write = () => {
-    const game = store.getState().game;
+  const write = (game: GameType) => {
     if (writeSave(game)) {
       savedMonthsEllapsed = game.date.monthsEllapsed;
       lastWriteMs = performance.now();
-      pending = false;
     } else if (!warnedAboutFailure) {
       warnedAboutFailure = true;
       store.dispatch(
@@ -173,39 +171,55 @@ export function startAutosave(
     }
   };
 
-  const saveable = () => {
-    const game = store.getState().game;
-    return game.inGame && isSaveableScenario(game.scenarioId);
+  /**
+   * Writes whatever the throttle skipped, on the way out of a game -- quitting to the menu, hiding
+   * the tab, or closing it. Without this a player who quits mid-throttle comes back a few months
+   * behind where they left, since quit fires none of the page lifecycle events.
+   *
+   * Only ever updates a save that's still there. The first month of any game writes immediately
+   * (lastWriteMs is reset per game), so a missing save means the scenario ended and cleared it,
+   * and a bankrupt run shouldn't come back from the dead.
+   */
+  const flush = () => {
+    if (!live || live.date.monthsEllapsed === savedMonthsEllapsed) {
+      return;
+    }
+    if (readSave()?.game.scenarioId !== live.scenarioId) {
+      return;
+    }
+    write(live);
   };
 
   const unsubscribe = store.subscribe(() => {
-    if (!saveable()) {
+    const game = store.getState().game;
+    if (!game.inGame || !isSaveableScenario(game.scenarioId)) {
+      flush();
+      live = undefined;
       return;
     }
-    const { monthsEllapsed } = store.getState().game.date;
-    if (monthsEllapsed === savedMonthsEllapsed) {
+    if (!live) {
+      // A game just started or resumed. Nothing of it is written yet, and its first month should
+      // land right away rather than waiting out a throttle left over from the previous game.
+      savedMonthsEllapsed = -1;
+      lastWriteMs = -Infinity;
+    }
+    live = game;
+    if (game.date.monthsEllapsed === savedMonthsEllapsed) {
       return;
     }
-    pending = true;
     if (performance.now() - lastWriteMs < AUTOSAVE_THROTTLE_MS) {
       return;
     }
-    write();
+    write(game);
   });
 
-  // The write that actually matters: whatever the throttle skipped, flushed the moment the player
-  // leaves. pagehide rather than beforeunload, which mobile browsers routinely never fire.
-  const flush = () => {
-    if (pending && saveable()) {
-      write();
-    }
-  };
   const onVisibilityChange = () => {
     if (document.visibilityState === "hidden") {
       flush();
     }
   };
   document.addEventListener("visibilitychange", onVisibilityChange, false);
+  // pagehide rather than beforeunload, which mobile browsers routinely never fire
   window.addEventListener("pagehide", flush, false);
 
   return () => {

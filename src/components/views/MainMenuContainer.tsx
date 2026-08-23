@@ -6,39 +6,18 @@ import { navigate } from "../../reducers/Card";
 import { resume } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { readSave } from "../../SaveGame";
-import MainMenu, {
-  DispatchProps,
-  SavedGameSummary,
-  StateProps,
-} from "./MainMenu";
-
-// mapStateToProps runs on every dispatch, and connect compares its result shallowly, so a fresh
-// summary object each time would re-render the menu constantly. readSave is memoized and hands back
-// the same save until it changes, which makes it a usable cache key.
-let summarizedSave: ReturnType<typeof readSave>;
-let summary: SavedGameSummary | undefined;
+import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
 
 // A save whose scenario no longer exists can't be resumed, so it may as well not be offered
-function savedGameSummary(): SavedGameSummary | undefined {
+function hasSavedGame(): boolean {
   const save = readSave();
-  if (save === summarizedSave) {
-    return summary;
-  }
-  summarizedSave = save;
-  const scenario = save
-    ? SCENARIOS.find((s) => s.id === save.game.scenarioId)
-    : undefined;
-  summary =
-    save && scenario
-      ? { scenarioName: scenario.name, year: save.game.date.year }
-      : undefined;
-  return summary;
+  return !!save && SCENARIOS.some((s) => s.id === save.game.scenarioId);
 }
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     audioEnabled: state.settings.audioEnabled,
-    savedGame: savedGameSummary(),
+    hasSavedGame: hasSavedGame(),
     uid: state.user.uid,
   };
 };

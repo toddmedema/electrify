@@ -8,6 +8,7 @@ import {
   SAVE_KEY,
   SAVE_VERSION,
   serializeSave,
+  startAutosave,
   writeSave,
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
@@ -111,6 +112,103 @@ describe("SaveGame", () => {
     expect(readSave()).not.toBeNull();
     clearSaveFor(game.scenarioId);
     expect(readSave()).toBeNull();
+  });
+
+  describe("autosave", () => {
+    // Enough of a store for the subscriber: state it can read, and a way to notify
+    function fakeStore(initial: GameType) {
+      const listeners: Array<() => void> = [];
+      const self = {
+        state: initial,
+        dispatched: [] as unknown[],
+        getState: () => ({ game: self.state }),
+        subscribe: (fn: () => void) => {
+          listeners.push(fn);
+          return () => listeners.splice(listeners.indexOf(fn), 1);
+        },
+        dispatch: (a: unknown) => self.dispatched.push(a),
+        // Sets the slice the way a reducer would, then notifies like Redux does
+        set: (next: GameType) => {
+          self.state = next;
+          listeners.forEach((fn) => fn());
+        },
+      };
+      return self;
+    }
+
+    function atMonth(base: GameType, monthsEllapsed: number): GameType {
+      return { ...base, date: { ...base.date, monthsEllapsed } };
+    }
+
+    function playing(base: GameType): GameType {
+      return { ...base, inGame: true };
+    }
+
+    it("writes the first month of a game immediately", () => {
+      const store = fakeStore({ ...game, inGame: false });
+      const stop = startAutosave(store as never, () => true);
+
+      store.set(playing(atMonth(game, 0)));
+      expect(readSave()!.game.date.monthsEllapsed).toBe(0);
+
+      stop();
+    });
+
+    /**
+     * The bug this guards: quitting from the in-game menu fires none of the page lifecycle events,
+     * and quit resets the slice before the subscriber sees it, so a player who quit mid-throttle
+     * came back a few months behind where they left off.
+     */
+    it("flushes what the throttle skipped when the player quits to the menu", () => {
+      const store = fakeStore({ ...game, inGame: false });
+      const stop = startAutosave(store as never, () => true);
+
+      store.set(playing(atMonth(game, 0)));
+      // Inside the throttle window, so these don't reach storage on their own
+      store.set(playing(atMonth(game, 1)));
+      store.set(playing(atMonth(game, 2)));
+      expect(readSave()!.game.date.monthsEllapsed).toBe(0);
+
+      // What quit leaves behind
+      store.set({ ...game, inGame: false });
+      expect(readSave()!.game.date.monthsEllapsed).toBe(2);
+
+      stop();
+    });
+
+    // Bankrupt and fired clear the save and then quit, and the flush must not undo that
+    it("doesn't resurrect a save the scenario ending cleared", () => {
+      const store = fakeStore({ ...game, inGame: false });
+      const stop = startAutosave(store as never, () => true);
+
+      store.set(playing(atMonth(game, 0)));
+      store.set(playing(atMonth(game, 1)));
+      clearSave();
+
+      store.set({ ...game, inGame: false });
+      expect(readSave()).toBeNull();
+
+      stop();
+    });
+
+    it("leaves tutorials alone", () => {
+      const store = fakeStore({ ...game, inGame: false });
+      const stop = startAutosave(store as never, () => false);
+
+      store.set(playing(atMonth(game, 0)));
+      store.set({ ...game, inGame: false });
+      expect(readSave()).toBeNull();
+
+      stop();
+    });
+
+    it("stops writing once torn down", () => {
+      const store = fakeStore({ ...game, inGame: false });
+      startAutosave(store as never, () => true)();
+
+      store.set(playing(atMonth(game, 0)));
+      expect(readSave()).toBeNull();
+    });
   });
 
   it("recognizes a restored slice by its timeline", () => {
