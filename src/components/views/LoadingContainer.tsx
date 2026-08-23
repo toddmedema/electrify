@@ -4,7 +4,7 @@ import { logEvent } from "../../Globals";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
 import { LOCATIONS } from "../../Constants";
-import { SCENARIOS } from "../../data/Scenarios";
+import { getScenario } from "../../data/Scenarios";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
 import { AppStateType, GameType } from "../../Types";
@@ -36,7 +36,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         difficulty: game.difficulty,
         resumed,
       });
-      const scenario = SCENARIOS.find((s) => s.id === game.scenarioId);
+      const scenario = getScenario(game.scenarioId, game.customScenario);
       if (!scenario) {
         return alert("Unknown scenario ID " + game.scenarioId);
       }
@@ -58,6 +58,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
                 cash: scenario.cash,
                 customers: 1030000,
                 location,
+                // Only ever set by the custom game screen; every authored scenario leaves it
+                // undefined and draws a fresh seed
+                seed: scenario.seed,
               }),
             );
           }

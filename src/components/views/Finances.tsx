@@ -44,7 +44,7 @@ import {
 } from "../../Types";
 import ChartFinances from "../base/ChartFinances";
 import GameCard from "../base/GameCard";
-import { SCENARIOS } from "../../data/Scenarios";
+import { getScenario, SCENARIOS } from "../../data/Scenarios";
 
 import numbro from "numbro";
 
@@ -327,7 +327,7 @@ export default class Finances extends React.Component<Props, State> {
     }
 
     const scenario =
-      SCENARIOS.find((s) => s.id === game.scenarioId) || SCENARIOS[0];
+      getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
     const years = []; // Go in reverse so that newest value (current year) is on top
     for (let i = date.year; i >= startingYear; i--) {
       years.push(i);

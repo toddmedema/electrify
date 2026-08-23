@@ -17,7 +17,12 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { LOCATIONS } from "../../Constants";
-import { SCENARIOS, TUTORIALS } from "../../data/Scenarios";
+import {
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+  SCENARIOS,
+  TUTORIALS,
+} from "../../data/Scenarios";
 import { GameType, ScenarioType } from "../../Types";
 
 export interface StateProps {
@@ -26,6 +31,7 @@ export interface StateProps {
 
 export interface DispatchProps {
   onBack: () => void;
+  onCustomGame: () => void;
   onDetails: (delta: Partial<GameType>) => void;
   onManual: () => void;
   onTutorial: (scenarioId: number) => void;
@@ -82,16 +88,18 @@ function TutorialListItem(props: TutorialListItemProps): React.JSX.Element {
 
 interface ScenarioListItemProps {
   s: ScenarioType;
-  onDetails: DispatchProps["onDetails"];
+  // The custom game row opens its own setup screen rather than the scenario details one, so the
+  // row doesn't get to assume what selecting it does
+  onSelect: () => void;
 }
 
 function ScenarioListItem(props: ScenarioListItemProps): React.JSX.Element {
-  const { s, onDetails } = props;
+  const { s, onSelect } = props;
   const location = LOCATIONS[s.locationId] || {
     name: "UNKNOWN",
   };
   const summary =
-    s.id === 999 ? (
+    s.id === CUSTOM_SCENARIO_ID ? (
       s.summary
     ) : (
       <span>
@@ -104,20 +112,13 @@ function ScenarioListItem(props: ScenarioListItemProps): React.JSX.Element {
       </span>
     );
   return (
-    <Card
-      className="build-list-item clickable-card"
-      onClick={() => onDetails({ scenarioId: s.id })}
-    >
+    <Card className="build-list-item clickable-card" onClick={onSelect}>
       <CardHeader
         avatar={<Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />}
         title={s.name}
         subheader={summary}
         action={
-          <IconButton
-            color="primary"
-            onClick={() => onDetails({ scenarioId: s.id })}
-            size="large"
-          >
+          <IconButton color="primary" onClick={onSelect} size="large">
             <ArrowRightIcon />
           </IconButton>
         }
@@ -195,9 +196,18 @@ export default function NewGame(props: Props): React.JSX.Element {
         </Typography>
         {SCENARIOS.filter((s: ScenarioType) => !s.tutorialSteps).map((s) => {
           return (
-            <ScenarioListItem key={s.id} onDetails={props.onDetails} s={s} />
+            <ScenarioListItem
+              key={s.id}
+              onSelect={() => props.onDetails({ scenarioId: s.id })}
+              s={s}
+            />
           );
         })}
+        <ScenarioListItem
+          key={CUSTOM_SCENARIO_ID}
+          onSelect={props.onCustomGame}
+          s={DEFAULT_CUSTOM_SCENARIO}
+        />
       </List>
     </div>
   );

@@ -40,6 +40,15 @@ interface RawFuelPricesType {
 // year -> month (1-12) -> price per MBTU by fuel
 const fuelPrices: Record<number, Record<number, FuelPricesType>> = {};
 
+/**
+ * Whether any prices have been loaded yet. The game screens all run after the loading screen has
+ * read the CSV, but the new game screens don't - and asking for a price there is a question with
+ * no answer rather than the programming error getFuelPricesPerMBTU otherwise throws over.
+ */
+export function hasFuelPrices(): boolean {
+  return Object.keys(fuelPrices).length > 0;
+}
+
 // Emptied in place rather than reassigned so that the closure in projectYear keeps referring to
 // a const, which no-loop-func requires
 function resetFuelPrices() {
