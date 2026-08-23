@@ -79,6 +79,8 @@ export type CardNameType =
 export interface NavigateActionType {
   name: CardNameType;
   dontRemember?: boolean;
+  // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
+  entry?: string;
 }
 
 export interface CardType {
@@ -86,6 +88,7 @@ export interface CardType {
   ts: number;
   history?: CardNameType[];
   toPrevious?: boolean;
+  entry?: string;
 }
 
 // The per-category points that sum to `score`. Investor and public-ownership scenarios are

@@ -37,6 +37,8 @@ import {
 } from "../../LocalStorage";
 import { isDesktopScreen } from "../../Globals";
 import { generateNewTimeline } from "../../reducers/Game";
+import { MANUAL_ENTRY } from "../../data/Manual";
+import ManualLink from "../base/ManualLink";
 import {
   DerivedHistoryKeysType,
   GameType,
@@ -413,7 +415,12 @@ export default class Finances extends React.Component<Props, State> {
                 variant="body2"
                 color="textSecondary"
               >
-                Electricity Rate:&nbsp;
+                Electricity Rate
+                <ManualLink
+                  entry={MANUAL_ENTRY.RATES}
+                  label="electricity rates"
+                />
+                :&nbsp;
                 <Typography color="primary" component="strong">
                   {formatMoneyConcise(game.dollarsPerkWh)}
                 </Typography>

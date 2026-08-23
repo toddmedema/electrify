@@ -25,6 +25,7 @@ import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
 import { dialogOpen, dialogClose, snackbarOpen } from "./UI";
+import { navigate, navigateBack } from "./Card";
 import {
   DIFFICULTIES,
   DOWNPAYMENT_PERCENT,
@@ -90,6 +91,10 @@ let previousTickMs = 0;
 // decide whether the tick loop needs restarting, since state.speed can change without going
 // through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
 let speedBeforeDialog = "PAUSED" as SpeedType;
+// Same idea for the manual, which is a full-screen card over a game that would otherwise keep
+// ticking -- looking up "Blackouts" mid-crisis used to cause blackouts. Undefined whenever the
+// manual isn't what paused us, so leaving any other card doesn't resume a deliberate pause.
+let speedBeforeManual: SpeedType | undefined;
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
@@ -127,6 +132,16 @@ function ensureTicking(state: GameType) {
       TICK_MS[state.speed],
     );
   }
+}
+
+// Puts the clock back the way the player left it before the manual paused it
+function restoreSpeedAfterManual(state: GameType) {
+  if (speedBeforeManual === undefined) {
+    return;
+  }
+  state.speed = speedBeforeManual;
+  speedBeforeManual = undefined;
+  ensureTicking(state);
 }
 
 export const gameSlice = createSlice({
@@ -312,8 +327,23 @@ export const gameSlice = createSlice({
       state.inGame = true;
     });
     builder.addCase(quit, () => {
+      speedBeforeManual = undefined;
       return cloneDeep(initialGame);
     });
+    // Opening the manual pauses the game, and closing it puts the speed back. Without this the
+    // sim runs on while the player reads, which punishes them for looking something up
+    builder.addCase(navigate, (state, action) => {
+      const payload = action.payload;
+      const name = typeof payload === "string" ? payload : payload?.name;
+      if (name !== "MANUAL") {
+        // Navigating anywhere else (rather than backing out) still counts as leaving it
+        restoreSpeedAfterManual(state);
+      } else if (state.inGame && speedBeforeManual === undefined) {
+        speedBeforeManual = state.speed;
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(navigateBack, restoreSpeedAfterManual);
     builder.addCase(dialogOpen, (state) => {
       speedBeforeDialog = state.speed;
       state.speed = "PAUSED";
