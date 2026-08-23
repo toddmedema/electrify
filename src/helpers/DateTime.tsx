@@ -10,6 +10,7 @@ import {
 import {
   DateType,
   DerivedHistoryType,
+  LocationType,
   MonthlyHistoryType,
   TickPresentFutureType,
 } from "../Types";
@@ -184,26 +185,50 @@ interface SunriseSunsetType {
  */
 const sunriseSunsetCache = new Map<string, SunriseSunsetType>();
 
-// returns minutes since midnight
+/**
+ * Minutes since midnight at `timeZone` for an instant, read out of the tz database rather than
+ * off the clock of whatever machine happens to be running. Date's own getHours() answers in the
+ * runner's zone, which for a player outside the scenario's own timezone put sunrise after sunset
+ * and left the sun switched off for the whole game.
+ */
+function minuteOfDayIn(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: string) =>
+    Number(parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value);
+  return value("hour") * 60 + value("minute");
+}
+
+// returns minutes since midnight, in the location's own timezone
 export function getSunriseSunset(
   date: DateType,
-  lat: number,
-  long: number,
+  location: LocationType,
 ): SunriseSunsetType {
-  const key = `${date.month}|${date.year}|${lat}|${long}`;
+  const key = `${date.monthNumber}|${date.year}|${location.id}`;
   const cached = sunriseSunsetCache.get(key);
   if (cached) {
     return cached;
   }
 
-  const calc = getTimes(new Date(`${date.month} 1, ${date.year}`), lat, long);
+  // Built in UTC rather than parsed from a string, which Date reads in the runner's zone -- the
+  // instant handed to suncalc would otherwise shift with the machine too. Midday keeps the
+  // instant well inside the day being asked about whatever the location's offset is.
+  const calc = getTimes(
+    new Date(Date.UTC(date.year, date.monthNumber - 1, 1, 12)),
+    location.lat,
+    location.long,
+  );
 
   // suncalc returns null above the polar circles, where the sun may never rise or never set
   // on a given day. None of the four locations the game ships get anywhere near that, so
   // these fallbacks are only here to keep a hypothetical high-latitude location from
   // crashing the simulation
   const minuteOfDay = (d: Date | null, fallback: number) =>
-    d ? d.getHours() * 60 + d.getMinutes() : fallback;
+    d && !isNaN(d.getTime()) ? minuteOfDayIn(d, location.timeZone) : fallback;
 
   const times = {
     sunrise: minuteOfDay(calc.sunrise, 6 * 60),

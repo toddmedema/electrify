@@ -22,35 +22,63 @@ export function getIntersectionX(
   return line1StartX + (numerator1 / denominator) * (line1EndX - line1StartX);
 }
 
+// Every random draw in the simulation is addressed by (seed, stream, index) rather than pulled
+// from a running generator. That makes the whole run a pure function of its seed: any value can
+// be recomputed at any point, in any order, without knowing how many draws came before it -- so
+// nothing sequential has to be carried around for a reloaded game to match the one that was
+// saved, and the caches built on top of these draws come out the same cold as warm.
+//
+// Streams keep unrelated parts of the simulation out of each other's draws: weather and fuel
+// prices each walk their own index space, so adding a draw to one never shifts the other. The
+// values are arbitrary but have to stay distinct, and have to stay put -- changing one changes
+// what every existing seed produces.
+export const RANDOM_STREAM = {
+  weather: 1,
+  fuelPrices: 2,
+};
+
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
-function splitmix32(a: number) {
-  return function () {
-    a |= 0;
-    a = (a + 0x9e3779b9) | 0;
-    let t = a ^ (a >>> 16);
-    t = Math.imul(t, 0x21f0aaad);
-    t = t ^ (t >>> 15);
-    t = Math.imul(t, 0x735a2d97);
-    return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
-  };
+// splitmix32's finalizing mix, which spreads a counter-ish 32 bit value across the whole word.
+// Applied here to a hash of (seed, stream, index) rather than to successive counter states.
+function splitmix32Mix(a: number): number {
+  a = (a + 0x9e3779b9) | 0;
+  let t = a ^ (a >>> 16);
+  t = Math.imul(t, 0x21f0aaad);
+  t = t ^ (t >>> 15);
+  t = Math.imul(t, 0x735a2d97);
+  return ((t = t ^ (t >>> 15)) >>> 0) / 4294967296;
 }
 
-type Prng = () => number;
-
-let prng: Prng | null = null;
-
-export function seedRandom(seed: number): Prng {
-  prng = splitmix32(seed);
-  return prng;
+/**
+ * The simulation's only source of randomness: a value in [0, 1) determined entirely by the three
+ * coordinates it is given. Neighbouring indexes are as unrelated as distant ones, so callers can
+ * walk their index space in whatever order they need to.
+ */
+export function randomAt(seed: number, stream: number, index: number): number {
+  // Fold the coordinates together before mixing so that a change to any one of them disturbs the
+  // whole word rather than just its low bits
+  let h = seed | 0;
+  h = Math.imul(h ^ (stream + 0x9e3779b1), 0x85ebca6b) | 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) | 0;
+  h = Math.imul(h ^ index, 0x27d4eb2f) | 0;
+  return splitmix32Mix(h ^ (h >>> 16));
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
-export function getRandomRange(min: number, max: number) {
-  // A run is meant to be reproducible from its seed, so callers are expected to have seeded
-  // first. Self-seeding here keeps an unseeded caller working rather than throwing at them,
-  // at the cost of that one run not being replayable.
-  const random = prng ?? seedRandom(Date.now() * Math.random());
-  return random() * (max - min) + min;
+export function getRandomRangeAt(
+  seed: number,
+  stream: number,
+  index: number,
+  min: number,
+  max: number,
+): number {
+  return randomAt(seed, stream, index) * (max - min) + min;
+}
+
+// Seeds are mixed as 32 bit integers, so a wider one (a float, or Date.now() times something) is
+// silently truncated and no longer describes the run it is stored alongside. Mint them here.
+export function newSeed(): number {
+  return Math.floor(Math.random() * 2 ** 32);
 }
 
 // https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another

@@ -315,7 +315,7 @@ export function GENERATORS(
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
     g.yearsToBuild *= difficulty.buildTime;
-    g.lcWh = LCWH(g, state.date, state.feePerKgCO2e);
+    g.lcWh = LCWH(g, state.date, state.feePerKgCO2e, state.seed);
     return g.available;
   });
 

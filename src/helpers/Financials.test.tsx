@@ -3,9 +3,17 @@ import {
   facilityCashBack,
   getMonthlyPayment,
   getPaymentInterest,
+  LCWH,
 } from "./Financials";
-import { GENERATOR_SELL_MULTIPLIER, LOAN_MONTHS } from "../Constants";
-import { FacilityOperatingType } from "../Types";
+import {
+  GENERATOR_SELL_MULTIPLIER,
+  HOURS_PER_YEAR_REAL,
+  LOAN_MONTHS,
+} from "../Constants";
+import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
+import { getDateFromMinute } from "./DateTime";
+import { formatMoneyConcise } from "./Format";
+import { initFuelPricesFromCsv } from "../data/FuelPrices";
 
 // Only the fields these helpers read; the rest of an operating facility is irrelevant here
 function aFacility(
@@ -144,5 +152,62 @@ describe("customersFromMarketingSpend", () => {
     const costPer = (spend: number) =>
       spend / customersFromMarketingSpend(spend);
     expect(costPer(10000000)).toBeGreaterThan(costPer(100000));
+  });
+});
+
+describe("LCWH", () => {
+  // Only the fields LCWH reads
+  const generator = {
+    fuel: "Wind",
+    peakW: 100000000,
+    buildCost: 200000000,
+    annualOperatingCost: 4000000,
+    lifespanYears: 25,
+    capacityFactor: 0.35,
+    btuPerWh: 0,
+  } as GeneratorShoppingType;
+  const date = getDateFromMinute(0, 2020);
+  const SEED = 1;
+
+  beforeAll(() => {
+    initFuelPricesFromCsv(
+      ["year,month,naturalgas,coal,uranium,oil"]
+        .concat(
+          Array.from({ length: 12 }, (_v, i) => `2020,${i + 1},3,2,0.7,10`),
+        )
+        .join("\n"),
+    );
+  });
+
+  it("spreads build and operating costs across a lifetime of output", () => {
+    const totalWh = 100000000 * 25 * HOURS_PER_YEAR_REAL * 0.35;
+    expect(LCWH(generator, date, 0, SEED)).toBeCloseTo(
+      (200000000 + 4000000 * 25) / totalWh,
+      12,
+    );
+  });
+
+  it("charges a carbon fee against a fuel's emissions", () => {
+    const gas = {
+      ...generator,
+      fuel: "Natural Gas",
+      btuPerWh: 0.0035,
+    } as GeneratorShoppingType;
+    expect(LCWH(gas, date, 0.1, SEED)).toBeGreaterThan(
+      LCWH(gas, date, 0, SEED),
+    );
+  });
+
+  /**
+   * An intermittent generator sampled across a window with no sun in it comes back with a zero
+   * capacity factor, and dividing by that used to reach the build screen as "$INFINITY/MWh".
+   * The cost really is unbounded, so LCWH says so and the formatter renders it as a dash.
+   */
+  it("reports an unbounded cost for a generator expected to produce nothing", () => {
+    const dark = { ...generator, capacityFactor: 0 };
+    expect(LCWH(dark, date, 0, SEED)).toBe(Infinity);
+    expect(formatMoneyConcise(LCWH(dark, date, 0, SEED) * 1000000)).toEqual(
+      "\u2014",
+    );
   });
 });
