@@ -96,7 +96,7 @@ export function loadAudioFiles() {
         state.loaded = "ERROR";
         return;
       }
-      state.themeManager = new ThemeManager(audioNodes);
+      state.themeManager = new ThemeManager(ac, audioNodes);
       state.loaded = "LOADED";
       state.themeManager.setIntensity(1);
     },
