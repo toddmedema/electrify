@@ -108,7 +108,6 @@ $absmaxdimension: 1025px;
 // Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
 // isDesktopScreen() in Globals.tsx. Below this, panes render too narrow to be worth it.
 $desktop_breakpoint: 1300px;
-$desktop_bodymax: 1500px;
 
 $sizemap: (
   large: 6vmin,
@@ -134,7 +133,7 @@ $sizemap: (
 html {
   width: 100%;
   height: 100%;
-  background: #eee;
+  background: $bg_primary;
 }
 
 body {
@@ -151,11 +150,11 @@ body {
   user-select: none;
 }
 
+// Anything wider than a phone gets the whole window: the frame's width cap - and the side
+// borders that bounded it - only earned their keep while there was a grey page showing around it
 @media screen and (min-width: $abswidthmax) {
-  #root {
-    border-left: 1px solid #bdbdbd; /* grey400 */
-    border-right: 1px solid #bdbdbd; /* grey400 */
-    box-sizing: border-box;
+  body {
+    max-width: 100%;
   }
 }
 
@@ -184,7 +183,7 @@ body {
 .snackbar {
   .MuiSnackbarContent-root {
     background-color: $bg_primary;
-    border: 1px solid #bdbdbd; /* grey400, matches the app frame edges */
+    border: 1px solid #bdbdbd; /* grey400 */
     border-radius: 4px;
   }
 
@@ -805,10 +804,6 @@ $sizemap: (
 // Finances and Forecasts can render as panes side by side instead of one screen at a time
 // ===============================================
 @media screen and (min-width: $desktop_breakpoint) {
-  body {
-    max-width: $desktop_bodymax;
-  }
-
   // Redundant once all three nav destinations are visible at the same time as panes
   #navfooter {
     display: none;
