@@ -431,10 +431,14 @@ export function tickState(state: GameType) {
       }
 
       // ===== TRIGGERS ======
+      // state is an Immer draft, and it's revoked the moment this reducer returns - so anything
+      // the timeouts below need has to be read out here rather than from inside their callbacks
+      const scenarioId = state.scenarioId;
+
       // Failure: Bankrupt
       if (now.cash < 0) {
         logEvent("scenario_end", {
-          id: state.scenarioId,
+          id: scenarioId,
           type: "bankrupt",
           difficulty: state.difficulty,
         });
@@ -442,7 +446,7 @@ export function tickState(state: GameType) {
         setTimeout(() => {
           // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
           // as this returns and would write the run straight back
-          clearSaveFor(state.scenarioId);
+          clearSaveFor(scenarioId);
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -470,13 +474,13 @@ export function tickState(state: GameType) {
         history[3].supplyWh < history[3].demandWh * 0.9
       ) {
         logEvent("scenario_end", {
-          id: state.scenarioId,
+          id: scenarioId,
           type: "blackouts",
           difficulty: state.difficulty,
         });
         const summary = summarizeHistory(history);
         setTimeout(() => {
-          clearSaveFor(state.scenarioId);
+          clearSaveFor(scenarioId);
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -505,7 +509,7 @@ export function tickState(state: GameType) {
         if (ranked) {
           // Tutorials are already marked played once their walkthrough ends, so this is a
           // no-op for the ones the player sat all the way through
-          recordScenarioPlayed(state.scenarioId);
+          recordScenarioPlayed(scenarioId);
         }
 
         // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
@@ -536,6 +540,14 @@ export function tickState(state: GameType) {
 
         const finalScore = Object.values(score).reduce((a, b) => a + b);
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
+        // For a custom game getScenario() returns state.customScenario, which belongs to the same
+        // draft, so the fields the timeouts below read come out here too
+        const {
+          id: scoredScenarioId,
+          endTitle,
+          endMessage,
+          ownership,
+        } = scenario;
 
         // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
         // and rules the player gave themselves - would be scored against each other as if they
@@ -547,7 +559,7 @@ export function tickState(state: GameType) {
                 submitHighscore({
                   score: finalScore,
                   scoreBreakdown: score, // For analytics purposes only
-                  scenarioId: scenario.id,
+                  scenarioId: scoredScenarioId,
                   difficulty,
                 }),
               ),
@@ -556,7 +568,7 @@ export function tickState(state: GameType) {
         }
 
         logEvent("scenario_end", {
-          id: scenario.id,
+          id: scoredScenarioId,
           type: "win",
           difficulty,
           score: finalScore,
@@ -564,29 +576,29 @@ export function tickState(state: GameType) {
         setTimeout(() => {
           // The scenario is over even if the player takes "Keep playing"; autosave simply writes a
           // fresh save at the next month rollover if they do
-          clearSaveFor(state.scenarioId);
+          clearSaveFor(scenarioId);
           getStore().dispatch(
             dialogOpen({
-              title: scenario.endTitle || `You've retired!`,
-              message: scenario.endMessage || (
+              title: endTitle || `You've retired!`,
+              message: endMessage || (
                 <div>
                   Your final score is {finalScore}:<br />
                   <br />
                   {score.supply} pts from electricity supplied
                   <br />
-                  {scenario.ownership === "Investor" && (
+                  {ownership === "Investor" && (
                     <span>
                       {score.netWorth} pts from final net worth
                       <br />
                     </span>
                   )}
-                  {scenario.ownership === "Investor" && (
+                  {ownership === "Investor" && (
                     <span>
                       {score.customers} pts from final customers
                       <br />
                     </span>
                   )}
-                  {scenario.ownership === "Public" && (
+                  {ownership === "Public" && (
                     <span>
                       {score.rate} pts from electric rates
                       <br />
