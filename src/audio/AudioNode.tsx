@@ -25,10 +25,28 @@ export class AudioNode {
     this.source = null;
   }
 
-  public playOnce(initialVolume: number = 1, fadeInVolume: number = 0) {
+  /**
+   * Buffer sources are single-use: stopping one throws it away, so picking a track back up means
+   * building a new source and seeking into the buffer. offsetSeconds is where in the track to
+   * start, and startAt is when on the context clock to start it -- ThemeManager passes one shared
+   * startAt for every track in a theme so the stems stay aligned with each other.
+   */
+  public playOnce(
+    initialVolume: number = 1,
+    fadeInVolume: number = 0,
+    offsetSeconds: number = 0,
+    startAt?: number,
+  ) {
+    const when = startAt === undefined ? this.context.currentTime : startAt;
+    // Starting past the end of a buffer plays nothing at all, so treat an out-of-range seek as
+    // the top of the track: restarting is a worse outcome than resuming, silence is worse still.
+    const offset =
+      offsetSeconds > 0 && offsetSeconds < this.buffer.duration
+        ? offsetSeconds
+        : 0;
     this.gain = this.context.createGain();
     this.gain.connect(this.context.destination);
-    this.gain.gain.setValueAtTime(initialVolume, this.context.currentTime);
+    this.gain.gain.setValueAtTime(initialVolume, when);
     if (fadeInVolume) {
       this.fadeIn(fadeInVolume);
     }
@@ -37,7 +55,7 @@ export class AudioNode {
     source.buffer = this.buffer;
     source.connect(this.gain);
     source.start = source.start || source.noteOn; // polyfill for old browsers
-    source.start(0);
+    source.start(when, offset);
   }
 
   public fadeIn(peak?: number, seconds?: number) {
