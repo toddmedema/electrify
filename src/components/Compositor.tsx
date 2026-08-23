@@ -50,7 +50,8 @@ import { store } from "../Store";
 // switching among them shouldn't slide/remount the pane group, since nothing visibly changes
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
-// Keep in sync with the Keyboard Shortcuts entry in the Manual and Settings
+// Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
+// both list. react-hotkeys ignores key events from inputs, so `?` still types into a text field
 const keyMap = {
   PAUSED: ["`", "space", "0"],
   SLOW: "1",
@@ -59,6 +60,7 @@ const keyMap = {
   FACILITIES: "q",
   FINANCES: "w",
   FORECASTS: "e",
+  MANUAL: ["?", "shift+/"],
 };
 
 const shortcutHandlers = {
@@ -82,6 +84,9 @@ const shortcutHandlers = {
   },
   FORECASTS: () => {
     store.dispatch(navigate("FORECASTS"));
+  },
+  MANUAL: () => {
+    store.dispatch(navigate("MANUAL"));
   },
 };
 

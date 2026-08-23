@@ -1,413 +1,351 @@
 import * as React from "react";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  Collapse,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   IconButton,
+  InputAdornment,
+  InputBase,
   List,
+  ListSubheader,
   Toolbar,
   Typography,
 } from "@mui/material";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ClearIcon from "@mui/icons-material/Clear";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
-import InputBase from "@mui/material/InputBase";
+import {
+  MANUAL_ENTRIES,
+  MANUAL_GROUPS,
+  ManualEntryType,
+  ManualGroupType,
+  manualEntryText,
+} from "../../data/Manual";
 
-export interface StateProps {}
+export interface StateProps {
+  // Set when the player arrived via a deep link from a term shown elsewhere in the game
+  // (see ManualLink) - that entry opens and scrolls into view
+  focusEntry?: string;
+}
 
 export interface DispatchProps {
   onBack: () => void;
 }
 
-interface ManualEntry {
-  title: string;
-  entry: React.JSX.Element;
+export interface Props extends StateProps, DispatchProps {}
+
+const DISCORD_URL = "https://discord.gg/2fTDHE7";
+
+// Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
+// once here rather than on every keystroke
+const SORTED_ENTRIES = [...MANUAL_ENTRIES].sort((a, b) => {
+  if (Boolean(a.pinned) !== Boolean(b.pinned)) {
+    return a.pinned ? -1 : 1;
+  }
+  const groupDelta =
+    MANUAL_GROUPS.indexOf(a.group) - MANUAL_GROUPS.indexOf(b.group);
+  return groupDelta !== 0 ? groupDelta : a.title.localeCompare(b.title);
+});
+
+// Everything an entry can be found by, lowercased once at load
+const SEARCH_TEXT: Record<string, string> = {};
+SORTED_ENTRIES.forEach((entry: ManualEntryType) => {
+  SEARCH_TEXT[entry.title] =
+    `${entry.title} ${entry.keywords || ""} ${manualEntryText(entry.entry)}`.toLowerCase();
+});
+
+// The manual unmounts whenever the player leaves it, so "where was I" has to live outside the
+// component: looking up a second term shouldn't mean re-typing the first one and scrolling back
+// down the list. Deep links deliberately start fresh instead (see below).
+let lastSearchTerm = "";
+let lastScrollTop = 0;
+
+export function clearManualMemory() {
+  lastSearchTerm = "";
+  lastScrollTop = 0;
 }
 
-function ManualItem(props: ManualEntry): React.JSX.Element {
-  const [expanded, setExpanded] = React.useState(false);
+function entryId(title: string): string {
+  return `manual-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
 
-  const toggleExpand = () => {
-    setExpanded(!expanded);
-  };
+// Wraps each occurrence of the search term in a <mark>, so a hit inside a long entry is
+// findable by eye rather than by re-reading the paragraph
+function markMatches(
+  text: string,
+  term: string,
+  keyPrefix: string,
+): React.ReactNode {
+  const haystack = text.toLowerCase();
+  if (haystack.indexOf(term) === -1) {
+    return text;
+  }
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  let n = 0;
+  let found = haystack.indexOf(term);
+  while (found !== -1) {
+    if (found > cursor) {
+      parts.push(text.slice(cursor, found));
+    }
+    parts.push(
+      <mark key={`${keyPrefix}-${n++}`}>
+        {text.slice(found, found + term.length)}
+      </mark>,
+    );
+    cursor = found + term.length;
+    found = haystack.indexOf(term, cursor);
+  }
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+  return parts;
+}
 
+// Rebuilds an entry's markup with the matches highlighted. Walks the whole tree rather than
+// just the top level, since that's where the interesting text is
+function highlight(
+  node: React.ReactNode,
+  term: string,
+  keyPrefix = "m",
+): React.ReactNode {
+  if (!term) {
+    return node;
+  }
+  if (typeof node === "string") {
+    return markMatches(node, term, keyPrefix);
+  }
+  if (Array.isArray(node)) {
+    return node.map((child: React.ReactNode, i: number) => (
+      <React.Fragment key={i}>
+        {highlight(child, term, `${keyPrefix}-${i}`)}
+      </React.Fragment>
+    ));
+  }
+  if (React.isValidElement(node)) {
+    const children = (node.props as { children?: React.ReactNode }).children;
+    // Void elements (<img>) and component elements (<KeyboardShortcuts/>) have nothing to
+    // walk - their text, if any, only exists once React renders them
+    if (children === undefined) {
+      return node;
+    }
+    return React.cloneElement(
+      node as React.ReactElement<{ children?: React.ReactNode }>,
+      undefined,
+      highlight(children, term, keyPrefix),
+    );
+  }
+  return node;
+}
+
+interface ManualItemProps {
+  entry: ManualEntryType;
+  searchTerm: string;
+  expanded: boolean;
+  onToggle: (title: string, expanded: boolean) => void;
+  itemRef?: React.Ref<HTMLDivElement>;
+}
+
+function ManualItem(props: ManualItemProps): React.JSX.Element {
+  const { entry, searchTerm, expanded } = props;
+  const id = entryId(entry.title);
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
-      <CardHeader title={props.title} />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
-      )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <CardContent>{props.entry}</CardContent>
-      </Collapse>
-    </Card>
+    <Accordion
+      className="manual-entry"
+      expanded={expanded}
+      onChange={(_event: React.SyntheticEvent, isExpanded: boolean) =>
+        props.onToggle(entry.title, isExpanded)
+      }
+      ref={props.itemRef}
+      square
+      disableGutters
+      slotProps={{ transition: { unmountOnExit: true } }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon color="primary" />}
+        aria-controls={`${id}-content`}
+        id={`${id}-header`}
+      >
+        <Typography variant="h6" component="span">
+          {highlight(entry.title, searchTerm, `${id}-title`)}
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails id={`${id}-content`}>
+        {highlight(entry.entry, searchTerm, id)}
+      </AccordionDetails>
+    </Accordion>
   );
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export default function Manual(props: Props): React.JSX.Element {
+  const { focusEntry, onBack } = props;
+  // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
+  const [searchTerm, setSearchTerm] = React.useState<string>(
+    focusEntry ? "" : lastSearchTerm,
+  );
+  // Which entries the player has explicitly opened or closed. Anything not in here falls back
+  // to the default for the current mode: open while searching, closed while browsing
+  const [toggled, setToggled] = React.useState<Record<string, boolean>>({});
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const focusRef = React.useRef<HTMLDivElement>(null);
 
-export default class Manual extends React.PureComponent<
-  Props,
-  { searchTerm: string }
-> {
-  state = {
-    searchTerm: "",
-  };
+  const term = searchTerm.trim().toLowerCase();
+  const searching = term.length > 0;
 
-  handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.setState({ searchTerm: event.target.value });
-  };
-
-  filterEntries = () => {
-    return MANUAL_ENTRIES.filter((entry) => {
-      const titleMatch = entry.title
-        .toLowerCase()
-        .includes(this.state.searchTerm.toLowerCase());
-
-      let contentMatch = false;
-      const children = entry.entry.props.children;
-
-      if (typeof children === "string") {
-        contentMatch = children
-          .toLowerCase()
-          .includes(this.state.searchTerm.toLowerCase());
-      } else if (Array.isArray(children)) {
-        contentMatch = children.some((child) => {
-          if (typeof child === "string") {
-            return child
-              .toLowerCase()
-              .includes(this.state.searchTerm.toLowerCase());
-          }
-          if (child && typeof child === "object" && "props" in child) {
-            const childText = child.props.children;
-            if (typeof childText === "string") {
-              return childText
-                .toLowerCase()
-                .includes(this.state.searchTerm.toLowerCase());
-            }
-          }
-          return false;
-        });
-      } else if (
-        children &&
-        typeof children === "object" &&
-        "props" in children
-      ) {
-        const childText = children.props.children;
-        if (typeof childText === "string") {
-          contentMatch = childText
-            .toLowerCase()
-            .includes(this.state.searchTerm.toLowerCase());
-        }
-      }
-
-      return titleMatch || contentMatch;
-    });
-  };
-
-  public render() {
-    const filteredEntries = this.state.searchTerm
-      ? this.filterEntries()
-      : MANUAL_ENTRIES;
-
-    return (
-      <div className="flexContainer" id="gameCard">
-        <div id="topbar">
-          <Toolbar>
-            <IconButton
-              onClick={this.props.onBack}
-              aria-label="back"
-              edge="start"
-              color="primary"
-              size="large"
-            >
-              <ChevronLeftIcon />
-            </IconButton>
-            <Typography variant="h6">Electrify Manual</Typography>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginLeft: "auto",
-              }}
-            >
-              <InputBase
-                placeholder="Search..."
-                value={this.state.searchTerm}
-                onChange={this.handleSearch}
-                style={{ marginRight: "8px" }}
-              />
-              <IconButton
-                aria-label="search"
-                edge="end"
-                color="primary"
-                size="large"
-              >
-                <SearchIcon />
-              </IconButton>
-            </div>
-          </Toolbar>
-        </div>
-        <List dense className="scrollable cardList" id="manual">
-          <Card>
-            <CardContent>
-              Here, you can look up specific terms and mechanics to learn more
-              about how they work in game - and in real life.
-            </CardContent>
-          </Card>
-          {filteredEntries.map((entry: ManualEntry) => (
-            <ManualItem {...entry} key={entry.title} />
-          ))}
-        </List>
-      </div>
-    );
+  // Entering or leaving search changes what "expanded" defaults to, so the player's per-entry
+  // overrides from the other mode no longer mean anything
+  const wasSearching = React.useRef(searching);
+  if (wasSearching.current !== searching) {
+    wasSearching.current = searching;
+    setToggled({});
   }
-}
 
-const MANUAL_ENTRIES = [
-  {
-    title: `Blackouts`,
-    entry: (
-      <div>
-        <p>
-          If you don't supply enough electricity to meet demand, you'll cause
-          rolling blackouts that cost you customers (and thus revenue).
-        </p>
-        <p>
-          Like utilities in real life, you aren't financially responsible for
-          blackouts. But, if you have chronic blackouts, your board of directors
-          might fire you!
-        </p>
+  React.useEffect(() => {
+    lastSearchTerm = searchTerm;
+  }, [searchTerm]);
+
+  // Restore the scroll position from the last visit. Before paint, so the list doesn't flash
+  // at the top first - and a deep link scrolls to its own entry instead (below)
+  React.useLayoutEffect(() => {
+    if (listRef.current && !focusEntry) {
+      listRef.current.scrollTop = lastScrollTop;
+    }
+  }, [focusEntry]);
+
+  React.useEffect(() => {
+    const focused = focusRef.current;
+    // jsdom has no layout, and so no scrollIntoView
+    if (focusEntry && focused && focused.scrollIntoView) {
+      focused.scrollIntoView({ block: "start" });
+    }
+  }, [focusEntry]);
+
+  const matches = React.useMemo(
+    () =>
+      searching
+        ? SORTED_ENTRIES.filter((entry: ManualEntryType) =>
+            SEARCH_TEXT[entry.title].includes(term),
+          )
+        : SORTED_ENTRIES,
+    [searching, term],
+  );
+
+  const onToggle = React.useCallback((title: string, expanded: boolean) => {
+    setToggled((previous: Record<string, boolean>) => ({
+      ...previous,
+      [title]: expanded,
+    }));
+  }, []);
+
+  const renderEntry = (entry: ManualEntryType) => {
+    const isFocused = entry.title === focusEntry;
+    return (
+      <ManualItem
+        key={entry.title}
+        entry={entry}
+        searchTerm={term}
+        expanded={toggled[entry.title] ?? (searching || isFocused)}
+        onToggle={onToggle}
+        itemRef={isFocused ? focusRef : undefined}
+      />
+    );
+  };
+
+  const pinned = matches.filter((entry: ManualEntryType) => entry.pinned);
+
+  return (
+    <div className="flexContainer" id="gameCard">
+      <div id="topbar">
+        <Toolbar>
+          <IconButton
+            onClick={onBack}
+            aria-label="back"
+            edge="start"
+            color="primary"
+            size="large"
+          >
+            <ChevronLeftIcon />
+          </IconButton>
+          <Typography variant="h6">Electrify Manual</Typography>
+          <InputBase
+            className="manual-search"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              setSearchTerm(event.target.value)
+            }
+            inputProps={{ "aria-label": "Search the manual" }}
+            startAdornment={
+              <InputAdornment position="start">
+                <SearchIcon color="primary" fontSize="small" />
+              </InputAdornment>
+            }
+            endAdornment={
+              searchTerm ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setSearchTerm("")}
+                    aria-label="clear search"
+                    color="primary"
+                    size="small"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null
+            }
+          />
+        </Toolbar>
       </div>
-    ),
-  },
-  {
-    title: `BTU and MMBTU`,
-    entry: (
-      <p>
-        The British Thermal Unit is a measure of heat energy. MMBTU is one
-        million BTU, and equals approximately 300 kWh of electrical energy.
-      </p>
-    ),
-  },
-  {
-    // Credit to https://www.e-education.psu.edu/ebf200/node/151
-    title: `Customers, Demand & Marketing`,
-    entry: (
-      <div>
-        <p>
-          More customers drives more demand. Although individual customer types
-          (residential, commercial, industrial) have different demand curves,
-          we've aggregated them into a single "customers" number that reflects a
-          blend of customer types. Here's what demand by type looks like in real
-          life:
-        </p>
-        <img
-          src="/images/manual-demand-customer-types.png"
-          alt="Source: https://www.eia.gov/todayinenergy/detail.php?id=10211"
-        />
-        <p>
-          Like in real life, you as a company can spend money on marketing to
-          acquire more customers (you exist as one of many electricity
-          generation companies customers can select from). Your customer base
-          also naturally grows or shrinks depending on if you provide them good
-          service (i.e. few blackouts).
-        </p>
-        <p>
-          Load changes continuously as people turn stuff on and off, as
-          temperature changes, as the natural light comes and goes, and so on.
-          This pattern of changing load is called a "load shape". We can have
-          daily load shapes, weekly ones, and annual ones. The following diagram
-          shows the path of load for three different weeks at three different
-          times of year in 2009:
-        </p>
-        <img src="/images/manual-demand.jpg" alt="Demand chart" />
-      </div>
-    ),
-  },
-  {
-    title: `Emissions and CO2e`,
-    entry: (
-      <div>
-        <p>
-          CO2e stands for Carbon Dioxide equivalent, a measure of the greenhouse
-          warming impact of various pollutants.
-        </p>
-        <p>
-          Electricity generation is the 2nd largest source of greenhouse gas in
-          the United States, but our utilities have no financial incentive to
-          reduce their emissions.
-        </p>
-        <p>
-          One of the highest-rated proposals to reduce emissions is a "Carbon
-          Fee" that creates a financial incentive for businesses to reduce their
-          carbon footprint through innovation. Electrify lets you experiment
-          with different levels of carbon fees, and see how technology
-          innovation can enable better business decisions than the fossil fuels
-          of the past.
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: `Forecasts`,
-    entry: (
-      <div>
-        <p>
-          The Forecasts tab projects your company forward, so you can spot
-          problems before they cost you customers. Use the dropdown at the top
-          right to look ahead 1, 5, 10 or 20 years - the further out you look,
-          the coarser (and less certain) the projection.
-        </p>
-        <p>
-          <strong>Supply &amp; Demand</strong> plots your projected output
-          against projected demand. Wherever demand rises above supply, the gap
-          is shaded as a blackout. If any are forecasted, the table underneath
-          breaks them down: total energy not served, the size of the single
-          worst event, the peak shortage (how much extra capacity you'd need to
-          cover it) and when it happens. That "when" is the most useful number
-          on the page - it tells you whether you need generation that can ramp
-          up for a few hours, or baseload for a whole season.
-        </p>
-        <p>
-          <strong>Supply by Fuel</strong> breaks that same supply down by fuel,
-          in dispatch order. This is where you can see your merit order at work:
-          cheap, always-on sources carry the base, and expensive or fast-ramping
-          ones fill the peaks. Re-ordering your facilities changes this chart.
-        </p>
-        <p>
-          <strong>Stored power</strong> (shown once you own storage) tracks the
-          energy in your batteries and reservoirs as they charge off surplus and
-          discharge into peaks.
-        </p>
-        <p>
-          <strong>Fuel Prices</strong> projects the cost of each fuel you can
-          burn, based on real historical price data. Fuel prices move suddenly
-          and by a lot, which can flip a profitable plant into a money-loser -
-          watch this chart before committing to a decades-long build.
-        </p>
-        <p>
-          <strong>Weather</strong> projects temperature and sunlight for your
-          region. It drives demand (heating and air conditioning) as well as the
-          output of your solar and wind generators.
-        </p>
-        <p>
-          Forecasts assume you make no further changes, so treat them as "what
-          happens if I do nothing" rather than a promise. Pausing a generator or
-          reordering your stack updates them immediately, which makes them a
-          cheap way to test a decision before you pay for it.
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: `Keyboard Shortcuts`,
-    entry: (
-      <div>
-        <p>
-          While a scenario is running, you can drive the game from the keyboard:
-        </p>
-        <table className="shortcuts">
-          <tbody>
-            <tr>
-              <td>
-                <kbd>`</kbd> <kbd>space</kbd> <kbd>0</kbd>
-              </td>
-              <td>Pause</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
-              </td>
-              <td>Slow / normal / fast speed</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>Q</kbd>
-              </td>
-              <td>Facilities tab</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>W</kbd>
-              </td>
-              <td>Finances tab</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>E</kbd>
-              </td>
-              <td>Forecasts tab</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    ),
-  },
-  {
-    // Credit to https://www.e-education.psu.edu/ebf200/node/151
-    title: `Prioritizing Generators`,
-    entry: (
-      <div>
-        <p>
-          Companies prioritize their generation stack based on how long they
-          take to ramp up and down, their marginal cost (fuel) and whether
-          they're controllable.
-        </p>
-        <p>
-          Here's a real-world generation stack from the PJM
-          (Pennsylvania-Jersey-Maryland) market in 2008:
-        </p>
-        <img src="/images/manual-generation-stack.jpg" alt="Generation stack" />
-      </div>
-    ),
-  },
-  {
-    title: `Score`,
-    entry: (
-      <div>
-        <p>
-          At the end of your term as CEO (each scenario has a different length),
-          you'll receive a score for how well you did. Try to beat your score
-          the next time you play!
-        </p>
-        <p>Investor-owned scenarios are scored as follows:</p>
-        <p>
-          4 pts for each $100M of net worth at the end
-          <br />
-          2 pts for each 100k customers at the end
-          <br />
-          1 pt for each TWh supplied
-          <br />
-          -2 pts for each megaton (1M tons) of CO2e emitted
-          <br />
-          -8 pts for each TWh of blackouts
-        </p>
-        <p>Public-owned scenarios are scored as follows:</p>
-        <p>
-          +/-80 pts for each $0.01/kWh that your lifetime average rate lands
-          below/above the scenario's target rate
-          <br />
-          10 pts for each TWh supplied
-          <br />
-          -5 pts for each megaton (1M tons) of CO2e emitted
-          <br />
-          -10 pts for each TWh of blackouts
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: `Total Cost of Energy`,
-    entry: (
-      <p>
-        Also known as "Levelized Cost of Energy", it's the expected cost of all
-        energy produced by the plant during its lifetime, including
-        construction, maintenance and fuel.
-      </p>
-    ),
-  },
-].sort((a, b) => (a.title > b.title ? 1 : -1)) as ManualEntry[];
+      <List
+        dense
+        component="div"
+        className="scrollable cardList"
+        id="manual"
+        ref={listRef}
+        // Recorded as it happens rather than on unmount: by the time an unmount cleanup runs,
+        // React has already detached the node and every detached node reports a scrollTop of 0
+        onScroll={(event: React.UIEvent<HTMLDivElement>) => {
+          lastScrollTop = event.currentTarget.scrollTop;
+        }}
+      >
+        <Typography variant="caption" component="p" className="manual-intro">
+          Look up terms and mechanics to learn more about how they work in game
+          - and in real life.
+        </Typography>
+        {matches.length === 0 && (
+          <div className="manual-empty">
+            <Typography variant="body1">
+              No entries match "{searchTerm}".
+            </Typography>
+            <Typography variant="body2">
+              Think it belongs in here? Ask us on{" "}
+              <a href={DISCORD_URL} target="_blank" rel="noreferrer">
+                Discord
+              </a>
+              .
+            </Typography>
+          </div>
+        )}
+        {pinned.map(renderEntry)}
+        {MANUAL_GROUPS.map((group: ManualGroupType) => {
+          const entries = matches.filter(
+            (entry: ManualEntryType) => !entry.pinned && entry.group === group,
+          );
+          if (entries.length === 0) {
+            return null;
+          }
+          return (
+            <React.Fragment key={group}>
+              <ListSubheader component="div" className="manual-group">
+                {group}
+              </ListSubheader>
+              {entries.map(renderEntry)}
+            </React.Fragment>
+          );
+        })}
+      </List>
+    </div>
+  );
+}

@@ -37,6 +37,9 @@ export const cardSlice = createSlice({
       return {
         ...state,
         name: a.name,
+        // Cleared rather than carried over, so a plain visit to the manual doesn't reopen
+        // whichever entry the last deep link pointed at
+        entry: a.entry,
         history: [
           a.dontRemember ? state.name : a.name,
           ...(state.history || []),

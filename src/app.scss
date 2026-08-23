@@ -517,8 +517,10 @@ $topbar_height: 56px;
   font-size: 0.85em;
 }
 
-// Keyboard shortcut listings (Settings + Manual)
-.shortcuts {
+// Two-column "key(s) -> meaning" listings: keyboard shortcuts (Settings + Manual) and the
+// manual's score tables, whose point values need to line up in a column to be comparable
+.shortcuts,
+.points {
   margin: 8px auto;
   border-collapse: collapse;
   text-align: left;
@@ -533,6 +535,10 @@ $topbar_height: 56px;
     white-space: nowrap;
   }
 
+  kbd + kbd {
+    margin-left: 4px;
+  }
+
   kbd {
     display: inline-block;
     min-width: 1.6em;
@@ -545,6 +551,46 @@ $topbar_height: 56px;
     font-size: 0.85em;
     line-height: 1.5;
     text-align: center;
+  }
+}
+
+.points {
+  max-width: 100%;
+
+  td:first-child {
+    font-weight: 500;
+  }
+}
+
+// Pushed to the trailing edge of the manual's toolbar, opposite the back button. Toolbars in
+// here wrap (see .base_main .MuiToolbar-root), so on a phone this drops to its own row rather
+// than crowding the title; min-width lets it shrink to fit instead of overflowing.
+.manual-search {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+
+  input {
+    min-width: 0;
+  }
+}
+
+// The "?" next to a term the game shows, which opens that term's manual entry
+.manual-link {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: $interactive_blue;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+
+  &:focus-visible {
+    outline: 2px solid $interactive_blue;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 }
 
@@ -651,8 +697,79 @@ $topbar_height: 56px;
   }
 
   #manual {
+    figure {
+      margin: size(base) 0;
+    }
+
     img {
-      width: 100%;
+      // Sized from the intrinsic width/height on the tag, shrinking to fit a narrow phone but
+      // never stretching past the file's own resolution - the source charts are 576-834px
+      // wide, and blowing them up to fill a desktop pane just blurs them
+      max-width: 100%;
+      height: auto;
+    }
+
+    figcaption {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: size(small);
+    }
+
+    .manual-intro {
+      display: block;
+      padding: 0 size(base) size(base) size(base);
+      opacity: 0.7;
+    }
+
+    .manual-empty {
+      padding: size(base) size(base) size(base) size(base);
+      text-align: center;
+    }
+
+    // Sticky so the player can still tell which section they're scrolling through
+    .manual-group {
+      background: #eceff1; /* blueGray50, matches .cardList behind it */
+      line-height: 32px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.75rem;
+    }
+
+    mark {
+      background: #ffe082; /* amber200 */
+      color: inherit;
+    }
+  }
+
+  // Manual entries are Accordions rather than clickable Cards, which is what gets them
+  // keyboard focus, aria-expanded and a real heading for free
+  .manual-entry {
+    margin: 0 size(small) size(base) size(small);
+
+    // MUI zeroes the radius on a square Accordion but keeps the before-pseudo divider that
+    // stacked accordions use; these are separate cards, so it isn't wanted
+    &:before {
+      display: none;
+    }
+
+    .MuiAccordionSummary-root {
+      padding: 0 size(base);
+
+      &:hover {
+        background: #eeeeee; /* grey200 - grey50 on white was effectively invisible */
+      }
+
+      // WCAG 2.4.7: keyboard users need to see which entry they're on
+      &:focus-visible {
+        background: #e3f2fd; /* blue50 */
+        outline: 2px solid $interactive_blue;
+        outline-offset: -2px;
+      }
+    }
+
+    .MuiAccordionDetails-root {
+      padding: 0 size(base) size(base) size(base);
     }
   }
 

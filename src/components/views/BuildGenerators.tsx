@@ -50,6 +50,8 @@ import {
   SpeedType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
+import { MANUAL_ENTRY } from "../../data/Manual";
+import ManualLink from "../base/ManualLink";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -157,6 +159,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                 <TableRow>
                   <TableCell>
                     Total energy cost
+                    <ManualLink entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY} />
                     <Typography variant="body2" color="textSecondary">
                       Across life, based on{" "}
                       {Math.round(generator.capacityFactor * 100)}% uptime
@@ -170,6 +173,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               <TableRow>
                 <TableCell>
                   Average output
+                  <ManualLink
+                    entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+                    label="capacity factor"
+                  />
                   <Typography variant="body2" color="textSecondary">
                     Across a year
                   </Typography>
@@ -211,6 +218,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                 <TableRow>
                   <TableCell>
                     Ramp up/down time
+                    <ManualLink
+                      entry={MANUAL_ENTRY.RAMP_RATE}
+                      label="ramp rate"
+                    />
                     <Typography variant="body2" color="textSecondary">
                       To go from zero to full output
                     </Typography>
@@ -237,6 +248,10 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               <TableRow>
                 <TableCell>
                   Air pollution
+                  <ManualLink
+                    entry={MANUAL_ENTRY.EMISSIONS}
+                    label="CO2e emissions"
+                  />
                   <Typography variant="body2" color="textSecondary">
                     Greenhouse gas released per unit generated
                   </Typography>

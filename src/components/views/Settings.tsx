@@ -2,6 +2,7 @@ import * as React from "react";
 import { Checkbox, IconButton, Toolbar, Typography } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { SettingsType } from "../../Types";
+import KeyboardShortcuts from "../base/KeyboardShortcuts";
 import packageJson from "../../../package.json";
 
 export interface StateProps {
@@ -65,44 +66,10 @@ export default function Settings(props: Props): React.JSX.Element {
         {props.settings.audioEnabled
           ? "Music and sound effects enabled."
           : "Music and sound effects disabled."}
-        {/* Keep in sync with keyMap in Compositor.tsx and the Manual entry */}
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Keyboard Shortcuts
         </Typography>
-        <table className="shortcuts">
-          <tbody>
-            <tr>
-              <td>
-                <kbd>`</kbd> <kbd>space</kbd> <kbd>0</kbd>
-              </td>
-              <td>Pause</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>
-              </td>
-              <td>Slow / normal / fast speed</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>Q</kbd>
-              </td>
-              <td>Facilities tab</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>W</kbd>
-              </td>
-              <td>Finances tab</td>
-            </tr>
-            <tr>
-              <td>
-                <kbd>E</kbd>
-              </td>
-              <td>Forecasts tab</td>
-            </tr>
-          </tbody>
-        </table>
+        <KeyboardShortcuts />
         <Typography className="version">
           Electrify App v{packageJson.version}
         </Typography>

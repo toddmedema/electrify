@@ -40,6 +40,8 @@ import {
   LOAN_MONTHS,
 } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
+import { MANUAL_ENTRY } from "../../data/Manual";
+import ManualLink from "../base/ManualLink";
 import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
@@ -148,6 +150,10 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               <TableRow>
                 <TableCell>
                   Ramp up/down time
+                  <ManualLink
+                    entry={MANUAL_ENTRY.RAMP_RATE}
+                    label="ramp rate"
+                  />
                   <Typography variant="body2" color="textSecondary">
                     To go from zero to full output
                   </Typography>
