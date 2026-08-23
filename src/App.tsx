@@ -8,6 +8,8 @@ import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform } from "./Globals";
 import { delta } from "./reducers/User";
+import { SCENARIOS } from "./data/Scenarios";
+import { startAutosave } from "./SaveGame";
 import { store } from "./Store";
 import theme from "./Theme";
 
@@ -79,6 +81,16 @@ export default function App() {
     };
     document.addEventListener("visibilitychange", onVisibilityChange, false);
 
+    // Registered here rather than next to the store because the tutorial lookup needs the
+    // scenarios, and reducers/Game already reaches back into SaveGame -- App sits above both, so
+    // nothing can cycle. Tutorials are excluded: they're short, restoring a mid-walkthrough step
+    // isn't worth the complexity, and it means starting one can't clobber a real save.
+    const stopAutosave = startAutosave(
+      store,
+      (scenarioId: number) =>
+        !SCENARIOS.find((s) => s.id === scenarioId)?.tutorialSteps,
+    );
+
     // Returns its own unsubscribe, which was previously dropped on the floor
     const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
       (user: User | null) => {
@@ -101,6 +113,7 @@ export default function App() {
         onVisibilityChange,
         false,
       );
+      stopAutosave();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);
       teardownDevice?.();

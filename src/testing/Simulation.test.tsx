@@ -5,6 +5,7 @@ import { loadSimData } from "./SimData";
 import { TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
+import { parseSave, serializeSave } from "../SaveGame";
 
 jest.setTimeout(120000);
 
@@ -124,7 +125,12 @@ describe("simulation determinism", () => {
 
     const interrupted = createGame(options);
     runMonths(interrupted, HALF_MONTHS);
-    const saved: GameType = JSON.parse(JSON.stringify(interrupted));
+    // Through the real save envelope, so the shipped serialize/validate path is what's covered
+    const parsed = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(interrupted))),
+    );
+    expect(parsed).not.toBeNull();
+    const saved: GameType = parsed!.game;
     // Everything a reload throws away: the parsed CSVs, and the forecast weather and prices
     // appended to them
     loadSimData(uninterrupted.location.id);

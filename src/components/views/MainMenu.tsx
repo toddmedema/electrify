@@ -1,17 +1,24 @@
 import * as React from "react";
-import { Button, IconButton } from "@mui/material";
+import { Button, IconButton, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import { login } from "../../Globals";
 import { interactiveColor } from "../../Theme";
 
+export interface SavedGameSummary {
+  scenarioName: string;
+  year: number;
+}
+
 export interface StateProps {
   audioEnabled?: boolean;
+  savedGame?: SavedGameSummary;
   uid?: string;
 }
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
+  onContinue: () => void;
   onSettings: () => void;
   onManual: () => void;
   onStart: () => void;
@@ -26,12 +33,27 @@ const MainMenu = (props: Props): React.JSX.Element => {
         <img src="images/logo.svg" alt="Logo"></img>
       </div>
       <div id="centeredMenu">
+        {props.savedGame && (
+          <Button
+            size="large"
+            variant="contained"
+            color="primary"
+            onClick={props.onContinue}
+            autoFocus={true}
+            style={{ flexDirection: "column", lineHeight: 1.2 }}
+          >
+            Continue
+            <Typography variant="caption" style={{ textTransform: "none" }}>
+              {props.savedGame.scenarioName} &middot; {props.savedGame.year}
+            </Typography>
+          </Button>
+        )}
         <Button
           size="large"
-          variant="contained"
+          variant={props.savedGame ? "outlined" : "contained"}
           color="primary"
           onClick={props.onStart}
-          autoFocus={true}
+          autoFocus={!props.savedGame}
         >
           Play
         </Button>
