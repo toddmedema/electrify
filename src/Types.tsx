@@ -269,6 +269,9 @@ export interface ScenarioType {
   summary?: string;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
+  // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
+  // this off and draws a fresh seed each play; only the custom game screen sets it
+  seed?: number;
   startingYear: number;
   cash: number;
   dollarsPerkWh: number;
@@ -283,6 +286,9 @@ export interface GameType {
   seed: number;
   difficulty: DifficultyType;
   scenarioId: number;
+  // The scenario the player assembled on the custom game screen. Authored scenarios live in
+  // SCENARIOS, this one only ever exists here, so every lookup has to go through getScenario()
+  customScenario?: ScenarioType;
   location: LocationType;
   speed: SpeedType;
   inGame: boolean;

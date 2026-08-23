@@ -48,7 +48,7 @@ import {
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { logEvent } from "../Globals";
 import { recordScenarioPlayed } from "../LocalStorage";
-import { SCENARIOS } from "../data/Scenarios";
+import { CUSTOM_SCENARIO_ID, getScenario, SCENARIOS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { start, loaded, quit, resume } from "./GameActions";
 import { clearSaveFor } from "../SaveGame";
@@ -166,7 +166,7 @@ export const gameSlice = createSlice({
       state.timeline = [] as TickPresentFutureType[];
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
-        SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
+        getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
       state.startingYear = scenario.startingYear;
       state.feePerKgCO2e = scenario.feePerKgCO2e;
@@ -205,6 +205,12 @@ export const gameSlice = createSlice({
           );
           if (storage) {
             state = buildFacilityHelper(state, storage, false, true);
+          } else {
+            // A spec that matches nothing used to vanish without a trace, which is a rough way to
+            // find out that the technology you picked wasn't invented yet in the year you started
+            console.warn(
+              `No facility matches ${JSON.stringify(search)} in ${scenario.startingYear}, skipping it`,
+            );
           }
         }
       });
@@ -459,13 +465,18 @@ export function tickState(state: GameType) {
       }
 
       const scenario =
-        SCENARIOS.find((s) => s.id === state.scenarioId) || SCENARIOS[0];
+        getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
 
       // Success: Survived duration
       if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
-        // Tutorials are already marked played once their walkthrough ends, so this is a
-        // no-op for the ones the player sat all the way through
-        recordScenarioPlayed(state.scenarioId);
+        // Every custom game shares one id, so recording it would light up a completion marker for
+        // a scenario nobody authored, and its score belongs to nothing comparable
+        const ranked = scenario.id !== CUSTOM_SCENARIO_ID;
+        if (ranked) {
+          // Tutorials are already marked played once their walkthrough ends, so this is a
+          // no-op for the ones the player sat all the way through
+          recordScenarioPlayed(state.scenarioId);
+        }
 
         // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
         const summary = summarizeHistory(history);
@@ -496,7 +507,10 @@ export function tickState(state: GameType) {
         const finalScore = Object.values(score).reduce((a, b) => a + b);
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
 
-        if (!scenario.tutorialSteps) {
+        // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
+        // and rules the player gave themselves - would be scored against each other as if they
+        // were the same scenario
+        if (!scenario.tutorialSteps && ranked) {
           setTimeout(
             () =>
               getStore().dispatch(

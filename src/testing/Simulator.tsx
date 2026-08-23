@@ -35,6 +35,9 @@ export type StrategyType = "none" | "keepUp";
 
 export interface SimOptionsType {
   scenarioId: number;
+  // A scenario that isn't in SCENARIOS - a custom game, or one being tried out. Its id wins over
+  // scenarioId, the same way the real game treats the one on the slice
+  scenario?: ScenarioType;
   difficulty?: DifficultyType;
   months?: number; // Defaults to the scenario's own duration
   seed?: number;
@@ -96,6 +99,7 @@ function formatWhen(state: GameType): string {
  */
 export function createGame(options: SimOptionsType): GameType {
   const scenario =
+    options.scenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
     SCENARIOS[0];
   loadSimData(scenario.locationId);
@@ -113,6 +117,11 @@ function setUpGame(
     delta({
       difficulty: options.difficulty,
       monthlyMarketingSpend: options.monthlyMarketingSpend,
+      // A scenario that isn't in SCENARIOS can only be found again through the slice, which is
+      // exactly what the custom game screen does before it starts a game
+      customScenario: SCENARIOS.some((s: ScenarioType) => s.id === scenario.id)
+        ? undefined
+        : scenario,
     }),
   );
   state = gameReducer(
@@ -182,7 +191,14 @@ function resolveOptions(
     scenarioId: scenario.id,
     difficulty: options.difficulty || "Employee",
     months: options.months || scenario.durationMonths || 12 * 20,
-    seed: options.seed === undefined ? DEFAULT_SEED : options.seed,
+    // A scenario carrying its own seed is pinned to it, the same as in a real game; the sim's
+    // fixed default only covers the authored scenarios, none of which set one
+    seed:
+      options.seed !== undefined
+        ? options.seed
+        : scenario.seed !== undefined
+          ? scenario.seed
+          : DEFAULT_SEED,
     dollarsPerkWh:
       options.dollarsPerkWh === undefined ? null : options.dollarsPerkWh,
     monthlyMarketingSpend: options.monthlyMarketingSpend || 0,
@@ -192,6 +208,7 @@ function resolveOptions(
 
 export function runSimulation(options: SimOptionsType): SimResultType {
   const scenario =
+    options.scenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
     SCENARIOS[0];
   const resolved = resolveOptions(scenario, options);

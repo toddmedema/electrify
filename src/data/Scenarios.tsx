@@ -632,3 +632,46 @@ export const SCENARIOS = [
 
 // The numbered 101-106 walkthroughs, in the order a new player should work through them
 export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);
+
+// Reserved for the game the player builds themselves; no authored scenario may use it
+export const CUSTOM_SCENARIO_ID = 999;
+
+/**
+ * The one place the game turns a scenario id into a scenario.
+ *
+ * Authored scenarios live in SCENARIOS, but a custom game is assembled at runtime and rides along
+ * on the game slice instead, so a bare SCENARIOS.find() silently falls back to the wrong scenario
+ * for it - which is what broke the custom game screen in the first place.
+ */
+export function getScenario(
+  scenarioId: number,
+  custom?: ScenarioType,
+): ScenarioType | undefined {
+  if (scenarioId === CUSTOM_SCENARIO_ID) {
+    return custom;
+  }
+  return SCENARIOS.find((s: ScenarioType) => s.id === scenarioId);
+}
+
+/**
+ * What the custom game screen opens on before the player has set one up, and the row that opens
+ * it in the scenario list - which shows only its name, icon and summary, since the rest is
+ * whatever they last chose rather than anything fixed.
+ *
+ * Deliberately not in SCENARIOS: everything that walks that array (the sim CLI and its tests, the
+ * scenario list itself) means the authored scenarios.
+ */
+export const DEFAULT_CUSTOM_SCENARIO = {
+  id: CUSTOM_SCENARIO_ID,
+  name: "Custom Game",
+  icon: "battery",
+  summary: "Set your own location, era and rules",
+  locationId: "SF",
+  ownership: "Investor",
+  startingYear: 2020,
+  cash: 200000000,
+  dollarsPerkWh: 0.07,
+  durationMonths: 12 * 20,
+  feePerKgCO2e: 0,
+  facilities: [{ name: "Natural Gas", peakW: 500000000 }],
+} as ScenarioType;

@@ -16,6 +16,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onBack: () => {
       dispatch(quit());
     },
+    onCustomGame: () => {
+      dispatch(navigate("CUSTOM_GAME"));
+    },
     onDetails: (d: Partial<GameType>) => {
       dispatch(delta(d));
       dispatch(navigate("NEW_GAME_DETAILS"));

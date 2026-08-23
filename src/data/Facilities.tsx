@@ -1,4 +1,5 @@
 import { LCWH } from "../helpers/Financials";
+import { hasFuelPrices } from "./FuelPrices";
 import { DIFFICULTIES } from "../Constants";
 import {
   FacilityOperatingType,
@@ -315,7 +316,12 @@ export function GENERATORS(
     g.buildCost *= difficulty.buildCost;
     g.annualOperatingCost *= difficulty.expensesOM;
     g.yearsToBuild *= difficulty.buildTime;
-    g.lcWh = LCWH(g, state.date, state.feePerKgCO2e, state.seed);
+    // The custom game screen asks what can be built in a year before any game has loaded the
+    // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no
+    // fuel prices behind it is genuinely unknown rather than zero
+    g.lcWh = hasFuelPrices()
+      ? LCWH(g, state.date, state.feePerKgCO2e, state.seed)
+      : Infinity;
     return g.available;
   });
 

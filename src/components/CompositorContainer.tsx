@@ -3,9 +3,14 @@ import { connect } from "react-redux";
 import { delta, quit } from "../reducers/Game";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import { recordScenarioPlayed } from "../LocalStorage";
-import { SCENARIOS } from "../data/Scenarios";
+import { getScenario } from "../data/Scenarios";
 import { navigate } from "../reducers/Card";
-import { AppStateType, TransitionClassType, TutorialStepType } from "../Types";
+import {
+  AppStateType,
+  ScenarioType,
+  TransitionClassType,
+  TutorialStepType,
+} from "../Types";
 import Compositor, {
   DispatchProps,
   isNavCard,
@@ -37,8 +42,10 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     transition,
     scenarioId: state.game.scenarioId,
     tutorialStep: state.game.tutorialStep,
-    tutorialSteps: (SCENARIOS.find((s) => s.id === state.game.scenarioId) || {})
-      .tutorialSteps,
+    tutorialSteps: (
+      getScenario(state.game.scenarioId, state.game.customScenario) ||
+      ({} as Partial<ScenarioType>)
+    ).tutorialSteps,
   };
 };
 

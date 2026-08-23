@@ -29,9 +29,10 @@ import {
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CloseIcon from "@mui/icons-material/Close";
 import InfoIcon from "@mui/icons-material/Info";
+import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, LOCATIONS } from "../../Constants";
 import { getDb, login } from "../../Globals";
-import { SCENARIOS } from "../../data/Scenarios";
+import { getScenario } from "../../data/Scenarios";
 import {
   DifficultyType,
   GameType,
@@ -67,7 +68,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const scenario =
-      SCENARIOS.find((s) => s.id === props.game.scenarioId) || null;
+      getScenario(props.game.scenarioId, props.game.customScenario) || null;
     this.state = {
       scenario,
       location: scenario ? LOCATIONS[scenario.locationId || null] : null,
@@ -224,27 +225,10 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </IconButton>
           </DialogTitle>
           <DialogContent>
-            {/* Scoring algorithm should also be updated in Game.tsx */}
-            {scenario.ownership === "Investor" && (
-              <div>
-                <p>+40 pts per $1B of net worth at the end</p>
-                <p>+2 pts per 100k customers at the end</p>
-                <p>+1 pt per TWh of electricity supplied</p>
-                <p>-2 pts per megaton (1M tons) of greenhouse gas emissions</p>
-                <p>-8 pts per TWh of blackouts</p>
-              </div>
-            )}
-            {scenario.ownership === "Public" && (
-              <div>
-                <p>
-                  +/-80 pts per lifetime average $0.01/kWh charged above/below $
-                  {scenario.dollarsPerkWh}/kWh
-                </p>
-                <p>+10 pts per TWh of electricity supplied</p>
-                <p>-5 pts per megaton (1M tons) of greenhouse gas emissions</p>
-                <p>-10 pts per TWh of blackouts</p>
-              </div>
-            )}
+            <VictoryConditions
+              ownership={scenario.ownership}
+              dollarsPerkWh={scenario.dollarsPerkWh}
+            />
           </DialogContent>
           <DialogActions>
             <Button

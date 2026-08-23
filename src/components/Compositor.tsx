@@ -30,6 +30,7 @@ import {
 import AudioContainer from "./base/AudioContainer";
 import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
+import CustomGameContainer from "./views/CustomGameContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
 import FinancesContainer from "./views/FinancesContainer";
 import ForecastsContainer from "./views/ForecastsContainer";
@@ -279,6 +280,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <NewGameContainer />;
       case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
+      case "CUSTOM_GAME":
+        return <CustomGameContainer />;
       default:
         throw new Error("Unknown card " + this.props.card.name);
     }
