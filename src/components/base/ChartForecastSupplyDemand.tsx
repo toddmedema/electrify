@@ -1,25 +1,21 @@
 import * as React from "react";
+import uPlot from "uplot";
+import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  VictoryArea,
-  VictoryAxis,
-  VictoryChart,
-  VictoryLabel,
-  VictoryLine,
-  VictoryTheme,
-} from "victory";
-import { chartTooltipContainer } from "./ChartTooltipContainer";
+  bandsPlugin,
+  padRange,
+  spansFromEdges,
+  stepTicks,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import {
-  formatMonthChartAxis,
-  getDateFromMinute,
+  formatMinuteAsMonthAxis,
+  MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
-import {
-  blackoutColor,
-  chartTheme,
-  demandColor,
-  supplyColor,
-} from "../../Theme";
+import { blackoutColor, demandColor, supplyColor } from "../../Theme";
 
 interface BlackoutEdges {
   minute: number;
@@ -35,6 +31,66 @@ export interface Props {
   multiyear: boolean;
 }
 
+interface State {
+  timeline: TickPresentFutureType[];
+  domain: Props["domain"];
+  blackoutSpans: Array<[number, number]>;
+  startingYear: number;
+  multiyear: boolean;
+}
+
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  return {
+    width: 0, // set by UPlotChart
+    height: 0,
+    padding: [5 * scale, 5 * scale, 0, 0],
+    cursor: {
+      x: true,
+      y: false,
+      points: { show: false },
+      drag: { x: false, y: false, setScale: false },
+    },
+    legend: { show: false },
+    scales: {
+      x: { time: false, range: () => getState().domain.x },
+      y: {
+        range: () => {
+          const [min, max] = getState().domain.y;
+          return padRange(min, max);
+        },
+      },
+    },
+    axes: [
+      xAxis(scale, {
+        splits: () => {
+          const [min, max] = getState().domain.x;
+          return stepTicks(min, max, MINUTES_PER_MONTH);
+        },
+        values: (_u, splits) => {
+          const s = getState();
+          return splits.map((t) =>
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+          );
+        },
+      }),
+      yAxis(scale, {
+        values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
+      }),
+    ],
+    series: [
+      {},
+      { stroke: supplyColor, width: 1, points: { show: false } },
+      { stroke: demandColor, width: 2, points: { show: false } },
+    ],
+    plugins: [bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3)],
+  };
+}
+
+function tooltip(idx: number, state: State): string {
+  const d = state.timeline[idx];
+  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+}
+
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class chartForecastSupplyDemand extends React.PureComponent<
   Props,
@@ -44,94 +100,33 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
     const { domain, height, timeline, blackouts, startingYear, multiyear } =
       this.props;
 
-    // Wrapping in spare div prevents excessive height bug
+    const minutes = new Array<number>(timeline.length);
+    const supply = new Array<number>(timeline.length);
+    const demand = new Array<number>(timeline.length);
+    timeline.forEach((t: TickPresentFutureType, i: number) => {
+      minutes[i] = t.minute;
+      supply[i] = t.supplyW;
+      demand[i] = t.demandW;
+    });
+
+    const state: State = {
+      timeline,
+      domain,
+      blackoutSpans: spansFromEdges(blackouts),
+      startingYear,
+      multiyear,
+    };
+
     return (
-      <div id="chartForecastSupplyDemand">
-        <VictoryChart
-          theme={VictoryTheme.material}
-          padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
-          domain={domain}
-          domainPadding={{ y: [6, 6] }}
-          height={height || 300}
-          containerComponent={chartTooltipContainer({
-            ariaLabel: "Chart of forecasted electricity supply and demand",
-            labels: ({ datum }: { datum: TickPresentFutureType }) =>
-              `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
-            // Labels are rendered on EACH chart, so we only render on supply, otherwise we get duplicate labels
-            voronoiBlacklist: ["demand", "blackouts"],
-          })}
-        >
-          <VictoryAxis
-            tickCount={6}
-            tickFormat={(t: number) =>
-              formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthsEllapsed +
-                  12 * startingYear,
-                multiyear,
-              )
-            }
-            tickLabelComponent={<VictoryLabel dy={-5} />}
-            style={{
-              axis: chartTheme.axis,
-              grid: {
-                display: "none",
-              },
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          <VictoryAxis
-            dependentAxis
-            tickFormat={(t: number, _i: number, ticks: number[]) =>
-              formatWattsAxis(t, ticks)
-            }
-            tickLabelComponent={<VictoryLabel dx={5} />}
-            fixLabelOverlap={true}
-            style={{
-              axis: chartTheme.axis,
-              grid: {
-                display: "none",
-              },
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          <VictoryLine
-            name="supply"
-            data={timeline}
-            x="minute"
-            y="supplyW"
-            style={{
-              data: {
-                stroke: supplyColor,
-                strokeWidth: 1,
-              },
-            }}
-          />
-          <VictoryLine
-            name="demand"
-            data={timeline}
-            x="minute"
-            y="demandW"
-            style={{
-              data: {
-                stroke: demandColor,
-              },
-            }}
-          />
-          <VictoryArea
-            name="blackouts"
-            data={blackouts}
-            x="minute"
-            y="value"
-            style={{
-              data: {
-                stroke: "none",
-                fill: blackoutColor,
-                opacity: 0.3,
-              },
-            }}
-          />
-        </VictoryChart>
-      </div>
+      <UPlotChart<State>
+        id="chartForecastSupplyDemand"
+        ariaLabel="Chart of forecasted electricity supply and demand"
+        height={height}
+        state={state}
+        data={[minutes, supply, demand]}
+        buildOptions={buildOptions}
+        tooltip={tooltip}
+      />
     );
   }
 }

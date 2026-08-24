@@ -219,7 +219,10 @@ export default class Finances extends React.Component<Props, State> {
 
   private throttle = new TickThrottle();
 
-  // In fast mode, skip rendering alternating frames so that CPU can focus on simulation
+  // In fast mode, skip rendering alternating frames so that CPU can focus on simulation.
+  // Left at 1 in 2 when the charts moved to uPlot: measured either way this pane costs about
+  // 3ms a render, because its chart is memoised and only redraws on a month rollover. What the
+  // cheaper chart bought here is a calmer worst frame, not a cheaper typical one.
   public shouldComponentUpdate(nextProps: Props) {
     if (nextProps.game.speed !== "FAST") {
       return true;

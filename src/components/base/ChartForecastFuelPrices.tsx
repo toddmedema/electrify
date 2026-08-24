@@ -1,19 +1,21 @@
 import * as React from "react";
+import uPlot from "uplot";
+import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  VictoryAxis,
-  VictoryChart,
-  VictoryLabel,
-  VictoryLine,
-  VictoryTheme,
-} from "victory";
-import { chartTooltipContainer } from "./ChartTooltipContainer";
+  dashArray,
+  padRange,
+  SPLINE,
+  stepTicks,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import {
-  formatMonthChartAxis,
-  getDateFromMinute,
+  formatMinuteAsMonthAxis,
+  MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
 import { TickPresentFutureType } from "../../Types";
-import { chartTheme, fuelColors, fuelDashArrays } from "../../Theme";
+import { fuelColors, fuelDashArrays } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -31,6 +33,69 @@ const PRICED_FUELS: PricedFuelType[] = [
   "Uranium",
 ];
 
+interface State {
+  prices: number[][];
+  domain: Props["domain"];
+  startingYear: number;
+  multiyear: boolean;
+}
+
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  return {
+    width: 0, // set by UPlotChart
+    height: 0,
+    padding: [5 * scale, 5 * scale, 0, 0],
+    cursor: {
+      x: true,
+      y: false,
+      points: { show: false },
+      drag: { x: false, y: false, setScale: false },
+    },
+    legend: { show: false },
+    scales: {
+      x: { time: false, range: () => getState().domain.x },
+      y: { range: (_u, min, max) => padRange(min, max) },
+    },
+    axes: [
+      xAxis(scale, {
+        splits: () => {
+          const [min, max] = getState().domain.x;
+          return stepTicks(min, max, MINUTES_PER_MONTH);
+        },
+        values: (_u, splits) => {
+          const s = getState();
+          return splits.map((t) =>
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+          );
+        },
+      }),
+      yAxis(scale, {
+        grid: true,
+        label: "Per MMBTU",
+        values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
+      }),
+    ],
+    series: [
+      {},
+      ...PRICED_FUELS.map((f) => ({
+        stroke: fuelColors[f],
+        width: 1.5,
+        // Four overlapping lines are more than color alone can separate, so each
+        // fuel also gets its own dash pattern
+        dash: dashArray(fuelDashArrays[f]),
+        points: { show: false },
+        paths: SPLINE,
+      })),
+    ],
+  };
+}
+
+function tooltip(idx: number, state: State): string {
+  return PRICED_FUELS.map(
+    (f, i) => `${f}: ${formatMoneyStable(state.prices[i][idx])}`,
+  ).join("\n");
+}
+
 // This is a pureComponent because its props should change much less frequently than it renders
 export default class ChartForecastFuelPrices extends React.PureComponent<
   Props,
@@ -39,77 +104,27 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
   public render() {
     const { domain, height, timeline, startingYear, multiyear } = this.props;
 
-    // Wrapping in spare div prevents excessive height bug
+    const minutes = new Array<number>(timeline.length);
+    // Every tick carries all four prices; the fallback is only here because the fuel prices
+    // are optional on the tick type
+    const prices = PRICED_FUELS.map(() => new Array<number>(timeline.length));
+    timeline.forEach((t: TickPresentFutureType, i: number) => {
+      minutes[i] = t.minute;
+      PRICED_FUELS.forEach((f, fi) => {
+        prices[fi][i] = t[f] ?? 0;
+      });
+    });
+
     return (
       <div id="chartForecastFuelPrices">
-        <VictoryChart
-          theme={VictoryTheme.material}
-          padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
-          domain={domain}
-          domainPadding={{ y: [6, 6] }}
-          height={height || 300}
-          containerComponent={chartTooltipContainer({
-            ariaLabel: "Chart of forecasted fuel prices",
-            labels: ({ datum }: { datum: TickPresentFutureType }) =>
-              PRICED_FUELS.map(
-                // Every tick carries all four prices; the fallback is only here because the
-                // fuel prices are optional on the tick type
-                (f) => `${f}: ${formatMoneyStable(datum[f] ?? 0)}`,
-              ).join("\n"),
-            // Labels are rendered on EACH chart, so we only render on Coal, otherwise we get duplicate labels
-            voronoiBlacklist: PRICED_FUELS.slice(1),
-          })}
-        >
-          <VictoryAxis
-            tickCount={6}
-            tickFormat={(t: number) =>
-              formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthsEllapsed +
-                  12 * startingYear,
-                multiyear,
-              )
-            }
-            tickLabelComponent={<VictoryLabel dy={-5} />}
-            style={{
-              axis: chartTheme.axis,
-              grid: {
-                display: "none",
-              },
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          <VictoryAxis
-            dependentAxis
-            axisLabelComponent={<VictoryLabel dy={-30} />}
-            label="Per MMBTU"
-            tickFormat={(t: number) => formatMoneyConcise(t)}
-            tickLabelComponent={<VictoryLabel dx={5} />}
-            fixLabelOverlap={true}
-            style={{
-              axis: chartTheme.axis,
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          {PRICED_FUELS.map((f) => (
-            <VictoryLine
-              key={f}
-              name={f}
-              data={timeline}
-              x="minute"
-              y={f}
-              interpolation="natural"
-              style={{
-                data: {
-                  stroke: fuelColors[f],
-                  strokeWidth: 1.5,
-                  // Four overlapping lines are more than color alone can separate, so each
-                  // fuel also gets its own dash pattern
-                  strokeDasharray: fuelDashArrays[f],
-                },
-              }}
-            />
-          ))}
-        </VictoryChart>
+        <UPlotChart<State>
+          ariaLabel="Chart of forecasted fuel prices"
+          height={height}
+          state={{ prices, domain, startingYear, multiyear }}
+          data={[minutes, ...prices]}
+          buildOptions={buildOptions}
+          tooltip={tooltip}
+        />
         {/* Below the plot rather than floating in it, where it used to clip the data */}
         <div className="chartLegend">
           {PRICED_FUELS.map((f) => (
