@@ -11,6 +11,10 @@ import { TICK_MINUTES } from "../Constants";
  *
  * Asking how far the game clock has moved since the last render instead is independent of the
  * stride, and a clock that has gone backwards (a new game starting) always renders.
+ *
+ * This throttles the clock and nothing else. A pane that keeps its own state has to let a state
+ * change through shouldComponentUpdate regardless of what due() says, or the player's clicks go
+ * into a queue that only the clock can drain -- and the clock does stop.
  */
 export class TickThrottle {
   private lastRenderedMinute = -Infinity;

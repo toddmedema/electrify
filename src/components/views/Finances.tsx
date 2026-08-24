@@ -32,7 +32,7 @@ import {
 } from "../../helpers/Format";
 import {
   getStorageBoolean,
-  getStorageString,
+  getStorageChoice,
   setStorageKeyValue,
 } from "../../LocalStorage";
 import { isDesktopScreen } from "../../Globals";
@@ -159,40 +159,43 @@ const CHART_KEYS = {
   },
 } as { [index: string]: ChartKeyMetadataType };
 
-export interface StateProps {
-  game: GameType;
-}
-
-export interface DispatchProps {
-  onDelta: (delta: Partial<GameType>) => void;
-}
-
-export interface Props extends StateProps, DispatchProps {}
-
-interface State {
-  range: string;
-  expanded: boolean;
-  chartKey: DerivedHistoryKeysType;
-}
-
-interface ChartPointType {
-  month: number; // unique across years
-  year: number;
-  value: number;
-  projected: boolean;
-}
+const CHART_KEY_STORAGE_KEY = "financesChartKey";
+// Still says year, because a stored year is still one of the options and reading it back is
+// worth more than a tidy name. The two sentinels it used to hold aren't options any more, and
+// getStorageChoice drops them for us
+const CHART_RANGE_STORAGE_KEY = "financesChartYear";
 
 /**
  * What the "for" dropdown is set to. A backwards range is a year the game has actually been to,
  * so it is its own value; the rest are named, because "the current year" follows the clock and a
- * forward range isn't a year at all. Previously all three were numbers with 0 and -1 as
- * sentinels, which had no room left for "the next ten years".
+ * forward range isn't a year at all. These were numbers with 0 and -1 as sentinels, which had no
+ * room left for "the next ten years".
  */
 const ALL_TIME = "all";
 const CURRENT_YEAR = "current";
 const FUTURE_PREFIX = "next";
 // Matching the horizons the Forecasts pane offers, so the two panes look ahead the same distance
 const FUTURE_YEARS = [1, 5, 10, 20];
+
+const futureRange = (years: number) => `${FUTURE_PREFIX}${years}`;
+
+// Newest first, so that the year being played is at the top of the dropdown
+function getPlayedYears(game: GameType): number[] {
+  const years = [];
+  for (let i = game.date.year; i >= game.startingYear; i--) {
+    years.push(i);
+  }
+  return years;
+}
+
+function getPlotRangeOptions(game: GameType): string[] {
+  return [
+    ALL_TIME,
+    CURRENT_YEAR,
+    ...FUTURE_YEARS.map(futureRange),
+    ...getPlayedYears(game).map(String),
+  ];
+}
 
 // One shared array, so that a range with nothing ahead of it keeps handing back the same empty
 // projection and the series cache can go on comparing by identity
@@ -218,9 +221,9 @@ export function parseRange(
     return { mode: "year", year: currentYear };
   }
   const year = Number(range);
-  // Anything unrecognised lands here too, including a value left in local storage by a build
-  // that offered ranges this one doesn't. The emptiness check is because Number("") is 0, which
-  // is finite, and would chart the year nothing happened in
+  // getStorageChoice already drops a stored range that isn't on offer, so this is the last line
+  // rather than the first. The emptiness check is because Number("") is 0, which is finite, and
+  // would chart the year nothing happened in
   if (range !== "" && Number.isFinite(year)) {
     return { mode: "year", year };
   }
@@ -261,6 +264,29 @@ export function projectMonths(
   return months;
 }
 
+export interface StateProps {
+  game: GameType;
+}
+
+export interface DispatchProps {
+  onDelta: (delta: Partial<GameType>) => void;
+}
+
+export interface Props extends StateProps, DispatchProps {}
+
+interface State {
+  range: string;
+  expanded: boolean;
+  chartKey: DerivedHistoryKeysType;
+}
+
+interface ChartPointType {
+  month: number; // unique across years
+  year: number;
+  value: number;
+  projected: boolean;
+}
+
 // -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
 function getValueFromTick(tick: number) {
   if (tick === -1) {
@@ -283,11 +309,18 @@ function getTickFromValue(v: number) {
 export default class Finances extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    // Building a facility unmounts this pane, so both dropdowns have to be remembered outside
+    // the component or the player lands back on this year's profit every time they return
     this.state = {
-      range: getStorageString("financesChartRange", CURRENT_YEAR),
+      range: getStorageChoice(
+        CHART_RANGE_STORAGE_KEY,
+        getPlotRangeOptions(props.game),
+        CURRENT_YEAR,
+      ),
       expanded: getStorageBoolean("financesTableOpened", false),
-      chartKey: getStorageString(
-        "financesChartKey",
+      chartKey: getStorageChoice(
+        CHART_KEY_STORAGE_KEY,
+        Object.keys(CHART_KEYS),
         "profit",
       ) as DerivedHistoryKeysType,
     };
@@ -298,7 +331,7 @@ export default class Finances extends React.Component<Props, State> {
   // screen, so switching metric no longer re-simulates; the series is cheap but has to stay
   // referentially stable, because that is what lets ChartFinances memoise its canvas.
   private projectionCache:
-    { key: string; months: MonthlyHistoryType[] } | undefined;
+    { key: string; range: string; months: MonthlyHistoryType[] } | undefined;
   private seriesCache:
     | {
         chartKey: DerivedHistoryKeysType;
@@ -323,8 +356,15 @@ export default class Finances extends React.Component<Props, State> {
   // Left at 1 in 2 when the charts moved to uPlot: measured either way this pane costs about
   // 3ms a render, because its chart is memoised and only redraws on a month rollover. What the
   // cheaper chart bought here is a calmer worst frame, not a cheaper typical one.
-  public shouldComponentUpdate(nextProps: Props) {
-    if (nextProps.game.speed !== "FAST") {
+  //
+  // Only the clock is throttled. The metric and the year live in state, and skipping a state
+  // change means dropping something the player just asked for: the dropdown redraws itself with
+  // the new label -- it keeps its own state, and nothing here can stop it -- while the chart goes
+  // on plotting the old metric until the clock happens to come round. That reads as a selector
+  // that does nothing, and if the clock has stopped (a scenario that has ended, a backgrounded
+  // tab) it never comes round at all.
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+    if (nextState !== this.state || nextProps.game.speed !== "FAST") {
       return true;
     }
     return this.throttle.due(nextProps.game.date.minute, 2);
@@ -346,12 +386,12 @@ export default class Finances extends React.Component<Props, State> {
   }
 
   public setChartKey(chartKey: DerivedHistoryKeysType) {
-    setStorageKeyValue("financesChartKey", chartKey);
+    setStorageKeyValue(CHART_KEY_STORAGE_KEY, chartKey);
     this.setState({ chartKey });
   }
 
   public setRange(range: string) {
-    setStorageKeyValue("financesChartRange", range);
+    setStorageKeyValue(CHART_RANGE_STORAGE_KEY, range);
     this.setState({ range });
   }
 
@@ -392,13 +432,17 @@ export default class Finances extends React.Component<Props, State> {
     const sinceLast = Date.now() - this.lastProjectionMs;
     if (
       cached &&
+      // Only what the game did under a range the player already had. Asking for a different
+      // range is a direct request, and answering it with the last range's months would put the
+      // wrong line on screen for a quarter of a second before correcting itself
+      cached.range === this.state.range &&
       range.mode === "future" &&
       range.years > 1 &&
       sinceLast < Finances.PROJECTION_THROTTLE_MS
     ) {
       // Mid-drag: draw the projection from before the drag started, and come back for the real
-      // one once the player has stopped moving. forceUpdate rather than setState because in FAST
-      // mode shouldComponentUpdate would otherwise swallow the catch-up render
+      // one once the player has stopped moving. forceUpdate rather than setState because this
+      // is catching up on the game's own inputs, not on a change the player just made here
       if (!this.projectionCatchup) {
         this.projectionCatchup = setTimeout(() => {
           this.projectionCatchup = undefined;
@@ -415,7 +459,7 @@ export default class Finances extends React.Component<Props, State> {
     const months = projectMonths(game, cash, customers, monthsAhead);
 
     this.lastProjectionMs = Date.now();
-    this.projectionCache = { key, months };
+    this.projectionCache = { key, range: this.state.range, months };
     return months;
   }
 
@@ -483,10 +527,7 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
-    const years = []; // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= startingYear; i--) {
-      years.push(i);
-    }
+    const years = getPlayedYears(game);
 
     // A forward range still draws every month on the record behind its projection, so that the
     // trajectory the forecast comes out of is on screen next to it
@@ -611,6 +652,7 @@ export default class Finances extends React.Component<Props, State> {
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               Plotting{" "}
             </Typography>
+            {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
             <Select
               id="plotMetric"
               value={chartKey}
@@ -654,10 +696,7 @@ export default class Finances extends React.Component<Props, State> {
               <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
               {FUTURE_YEARS.map((y: number) => {
                 return (
-                  <MenuItem
-                    value={`${FUTURE_PREFIX}${y}`}
-                    key={`${FUTURE_PREFIX}${y}`}
-                  >
+                  <MenuItem value={futureRange(y)} key={futureRange(y)}>
                     Next {y} {y === 1 ? "year" : "years"}
                   </MenuItem>
                 );

@@ -202,12 +202,15 @@ export function verticalLinePlugin(
 
 /**
  * A legend inside the plot, where Victory's was. Position is in design units, so it lands in
- * the same place it used to at any pane width.
+ * the same place it used to at any pane width. `align` says which edge of the block designX
+ * anchors: "left" pins the dots, "right" pins the end of the longest label, so a legend can sit
+ * flush with the plot's right edge whatever its labels happen to be.
  */
 export function legendPlugin(
   getItems: () => LegendItem[],
   designX: number,
   designY: number,
+  align: "left" | "right" = "left",
 ): uPlot.Plugin {
   return {
     hooks: {
@@ -217,22 +220,30 @@ export function legendPlugin(
           return;
         }
         const scale = u.width / DESIGN_WIDTH;
-        const x = designX * scale;
-        let y = designY * scale;
         const radius = 3.5 * scale;
+        const gap = 5 * scale;
         const lineHeight = 16 * scale;
         u.ctx.save();
         u.ctx.font = chartFont(scale);
         // The axes leave their own alignment on the context, so say what this wants
         u.ctx.textAlign = "left";
         u.ctx.textBaseline = "middle";
+        // The dots share a column, so the block is only as wide as its longest label
+        let x = designX * scale;
+        if (align === "right") {
+          const widest = Math.max(
+            ...items.map((item) => u.ctx.measureText(item.name).width),
+          );
+          x -= radius + gap + widest;
+        }
+        let y = designY * scale;
         for (const item of items) {
           u.ctx.fillStyle = item.fill;
           u.ctx.beginPath();
           u.ctx.arc(x, y, radius, 0, Math.PI * 2);
           u.ctx.fill();
           u.ctx.fillStyle = LEGEND_TEXT;
-          u.ctx.fillText(item.name, x + radius + 5 * scale, y);
+          u.ctx.fillText(item.name, x + radius + gap, y);
           y += lineHeight;
         }
         u.ctx.restore();
