@@ -250,8 +250,15 @@ export default class Finances extends React.Component<Props, State> {
   // Left at 1 in 2 when the charts moved to uPlot: measured either way this pane costs about
   // 3ms a render, because its chart is memoised and only redraws on a month rollover. What the
   // cheaper chart bought here is a calmer worst frame, not a cheaper typical one.
-  public shouldComponentUpdate(nextProps: Props) {
-    if (nextProps.game.speed !== "FAST") {
+  //
+  // Only the clock is throttled. The metric and the year live in state, and skipping a state
+  // change means dropping something the player just asked for: the dropdown redraws itself with
+  // the new label -- it keeps its own state, and nothing here can stop it -- while the chart goes
+  // on plotting the old metric until the clock happens to come round. That reads as a selector
+  // that does nothing, and if the clock has stopped (a scenario that has ended, a backgrounded
+  // tab) it never comes round at all.
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+    if (nextState !== this.state || nextProps.game.speed !== "FAST") {
       return true;
     }
     return this.throttle.due(nextProps.game.date.minute, 2);
@@ -483,6 +490,7 @@ export default class Finances extends React.Component<Props, State> {
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               Plotting{" "}
             </Typography>
+            {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
             <Select
               id="plotMetric"
               value={chartKey}
