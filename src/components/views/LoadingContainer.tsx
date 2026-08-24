@@ -31,11 +31,16 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       // resume() has already restored the whole slice by the time a saved game reaches this
       // screen, so all that's left is re-reading the CSVs it couldn't carry
       const resumed = isResumedGame(game);
-      logEvent("scenario_start", {
-        id: game.scenarioId,
-        difficulty: game.difficulty,
-        resumed,
-      });
+      // A replay is closer to a new game than a resumed one: nothing of the run is restored, it
+      // is simulated again from the seed startReplay put on the slice
+      const replaying = !!game.replayPlayback;
+      if (!replaying) {
+        logEvent("scenario_start", {
+          id: game.scenarioId,
+          difficulty: game.difficulty,
+          resumed,
+        });
+      }
       const scenario = getScenario(game.scenarioId, game.customScenario);
       if (!scenario) {
         return alert("Unknown scenario ID " + game.scenarioId);
@@ -58,9 +63,10 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
                 cash: scenario.cash,
                 customers: 1030000,
                 location,
-                // Only ever set by the custom game screen; every authored scenario leaves it
-                // undefined and draws a fresh seed
-                seed: scenario.seed,
+                // A replay has to run on the seed it was recorded with. Otherwise only the custom
+                // game screen sets one; every authored scenario leaves it undefined and draws a
+                // fresh seed
+                seed: replaying ? game.seed : scenario.seed,
               }),
             );
           }
@@ -68,7 +74,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           dispatch(loaded());
 
           // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
-          if (scenario.tutorialSteps && !resumed) {
+          if (scenario.tutorialSteps && !resumed && !replaying) {
             setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
           }
         });

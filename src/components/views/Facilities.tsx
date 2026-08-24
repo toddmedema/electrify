@@ -55,6 +55,9 @@ interface FacilityListItemProps {
   facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
+  // A replay is a recording of somebody else's decisions; letting the viewer make their own
+  // would desync the run from the actions still queued up against it
+  readOnly: boolean;
   onTogglePause: DispatchProps["onTogglePause"];
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
@@ -111,7 +114,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     setOpen(!open);
   };
 
-  const { facility, onTogglePause, onPause } = props;
+  const { facility, onTogglePause, onPause, readOnly } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
 
@@ -158,6 +161,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       key={"f" + facility.id}
       draggableId={"f" + facility.id}
       index={props.spotInList}
+      isDragDisabled={readOnly}
     >
       {(provided, snapshot) => (
         <div
@@ -180,7 +184,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             }
             secondaryAction={
               <>
-                {!underConstruction &&
+                {!readOnly &&
+                  !underConstruction &&
                   props.listLength > 1 &&
                   !facility.paused && (
                     <IconButton
@@ -193,7 +198,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <PauseIcon />
                     </IconButton>
                   )}
-                {facility.paused && (
+                {!readOnly && facility.paused && (
                   <IconButton
                     onClick={() => onTogglePause(facility.id)}
                     aria-label={`Resume ${facility.name}`}
@@ -204,7 +209,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     <PlayIcon />
                   </IconButton>
                 )}
-                {!underConstruction && props.listLength > 1 && (
+                {!readOnly && !underConstruction && props.listLength > 1 && (
                   <IconButton
                     onClick={toggleDialog}
                     aria-label={`Sell ${facility.name}`}
@@ -215,7 +220,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     <DeleteForeverIcon />
                   </IconButton>
                 )}
-                {underConstruction && (
+                {!readOnly && underConstruction && (
                   <IconButton
                     onClick={toggleDialog}
                     aria-label={`Cancel construction of ${facility.name}`}
@@ -229,10 +234,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </>
             }
           >
-            <DragIndicatorIcon
-              className="draggable-indicator"
-              color="primary"
-            />
+            {!readOnly && (
+              <DragIndicatorIcon
+                className="draggable-indicator"
+                color="primary"
+              />
+            )}
             {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
                 chart draws, and transitioned in CSS so ramping is visible as movement */}
             {!underConstruction && (
@@ -374,6 +381,7 @@ export default class Facilities extends React.Component<Props, {}> {
       onStorageBuild,
     } = this.props;
     const facilitiesCount = game.facilities.length;
+    const readOnly = !!game.replayPlayback;
 
     return (
       <GameCard>
@@ -388,25 +396,29 @@ export default class Facilities extends React.Component<Props, {}> {
         <List dense className="scrollable">
           <Toolbar style={{ paddingBottom: "4px" }}>
             <Typography variant="h6">Facilities</Typography>
-            <Button
-              size="small"
-              variant="outlined"
-              color="primary"
-              onClick={onGeneratorBuild}
-              className="button-buildGenerator"
-            >
-              + Generator
-            </Button>
-            &nbsp;&nbsp;&nbsp;
-            <Button
-              size="small"
-              variant="outlined"
-              color="primary"
-              onClick={onStorageBuild}
-              className="button-buildStorage"
-            >
-              + Storage
-            </Button>
+            {!readOnly && (
+              <>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={onGeneratorBuild}
+                  className="button-buildGenerator"
+                >
+                  + Generator
+                </Button>
+                &nbsp;&nbsp;&nbsp;
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={onStorageBuild}
+                  className="button-buildStorage"
+                >
+                  + Storage
+                </Button>
+              </>
+            )}
           </Toolbar>
           <DragDropContext onDragEnd={this.onDragEnd}>
             <Droppable droppableId="droppable">
@@ -423,6 +435,7 @@ export default class Facilities extends React.Component<Props, {}> {
                         onReprioritize={onReprioritize}
                         spotInList={i}
                         listLength={facilitiesCount}
+                        readOnly={readOnly}
                       />
                     ),
                   )}
@@ -431,7 +444,7 @@ export default class Facilities extends React.Component<Props, {}> {
               )}
             </Droppable>
           </DragDropContext>
-          {facilitiesCount < 2 && (
+          {facilitiesCount < 2 && !readOnly && (
             <Typography
               color="textSecondary"
               variant="body2"

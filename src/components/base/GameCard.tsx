@@ -194,6 +194,9 @@ export function GameCard(props: Props) {
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
   const speed = game.speed;
+  // Watching somebody else's run rather than playing your own. The speed controls stay live --
+  // being able to pause and fast forward is most of the point of a replay
+  const isReplay = !!game.replayPlayback;
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
@@ -246,12 +249,14 @@ export function GameCard(props: Props) {
           <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
             Send feedback
           </MenuItem>
-          <MenuItem onClick={onQuit}>Quit</MenuItem>
+          <MenuItem onClick={onQuit}>
+            {isReplay ? "Exit replay" : "Quit"}
+          </MenuItem>
         </Menu>
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuAnchorEl, onManual, onQuit],
+    [menuAnchorEl, onManual, onQuit, isReplay],
   );
 
   const nav = React.useMemo(() => <NavigationContainer />, []);
@@ -288,6 +293,7 @@ export function GameCard(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
+            {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>

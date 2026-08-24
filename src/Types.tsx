@@ -104,6 +104,54 @@ export interface ScoreType {
   // Timestamp on the way back in
   date: Timestamp | FieldValue;
   uid: string;
+  // Id of the document in the `replays` collection holding the run that set this score, when one
+  // was small enough to keep. A reference rather than the replay itself, so that opening a
+  // leaderboard downloads fifty scores instead of fifty replays
+  replayId?: string;
+}
+
+// The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
+// prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
+export type ReplayActionNameType =
+  | "buildFacility"
+  | "sellFacility"
+  | "togglePauseFacility"
+  | "reprioritizeFacility"
+  | "delta";
+
+export interface ReplayActionType {
+  // Game minute the action was taken at, which is always a tick boundary
+  minute: number;
+  type: ReplayActionNameType;
+  // The reducer's own payload, verbatim. Untyped here because it differs per action and comes
+  // back off the network as untrusted JSON; decodeReplay is what makes it safe to apply
+  payload: unknown;
+}
+
+export interface ReplayType {
+  version: number;
+  appVersion: string; // For bug reports
+  scenarioId: number;
+  difficulty: DifficultyType;
+  seed: number;
+  startingYear: number;
+  durationMinutes: number; // How far the recorded run got
+  actions: ReplayActionType[];
+}
+
+/**
+ * A replay on its way to or from Firestore. `actions` is a JSON string rather than a real array
+ * so that the nested payloads can't run into Firestore's rules about what may sit inside one, and
+ * so that the size measured against the 1 MiB document limit is the size actually stored.
+ */
+export interface ReplayDocType extends Omit<ReplayType, "actions"> {
+  actions: string;
+}
+
+// Where a replay has got to while it's being watched
+export interface ReplayPlaybackType {
+  actions: ReplayActionType[];
+  index: number; // Next action to apply
 }
 
 export interface LocalStoragePlayedType {
@@ -304,6 +352,14 @@ export interface GameType {
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
+  // Every simulation-affecting thing the player has done this run, for the replay attached to a
+  // high score. Undefined means the run isn't being recorded: before a game starts, while one is
+  // being watched, after resuming a save from before replays existed, or once a run has grown
+  // past MAX_REPLAY_ACTIONS. Persisted with the rest of the slice, so a replay survives a reload
+  replayLog?: ReplayActionType[];
+  // Set only while watching a replay. Doubles as the "this is a replay" flag: player controls are
+  // hidden, nothing is autosaved, and no score is submitted while it's here
+  replayPlayback?: ReplayPlaybackType;
 }
 
 export interface SettingsType {

@@ -8,6 +8,7 @@ import gameReducer, {
   delta,
   initGame,
   start,
+  startReplay,
   tickState,
 } from "../reducers/Game";
 import { DIFFICULTIES, LOCATIONS } from "../Constants";
@@ -20,6 +21,7 @@ import {
   GameType,
   GeneratorShoppingType,
   MonthlyHistoryType,
+  ReplayType,
   ScenarioType,
   TickPresentFutureType,
 } from "../Types";
@@ -139,6 +141,34 @@ function setUpGame(
   if (options.dollarsPerkWh !== null) {
     state = gameReducer(state, delta({ dollarsPerkWh: options.dollarsPerkWh }));
   }
+  // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
+  return cloneDeep(state);
+}
+
+/**
+ * Sets a game up to play a replay back, the way the loading screen does in the browser: the
+ * scenario and the seed the replay carries, and nothing else of the original run. Ticking the
+ * result forward re-runs that run, applying each recorded action as the clock reaches it.
+ *
+ * Also a regression harness -- replay a recorded game against a new build and diff the monthly
+ * history to see what a balance change actually did.
+ */
+export function createGameFromReplay(replay: ReplayType): GameType {
+  const scenario =
+    SCENARIOS.find((s: ScenarioType) => s.id === replay.scenarioId) ||
+    SCENARIOS[0];
+  loadSimData(scenario.locationId);
+  let state = gameReducer(undefined, startReplay(replay));
+  state = gameReducer(
+    state,
+    initGame({
+      facilities: scenario.facilities,
+      cash: scenario.cash,
+      customers: DEFAULT_CUSTOMERS,
+      location: LOCATIONS[scenario.locationId],
+      seed: replay.seed,
+    }),
+  );
   // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
   return cloneDeep(state);
 }
