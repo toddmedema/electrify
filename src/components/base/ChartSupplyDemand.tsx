@@ -124,7 +124,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3),
       verticalLinePlugin(() => getState().currentMinute, "#000000", 0.5),
-      legendPlugin(() => getState().legendItems, 280, 18),
+      // Flush with the plot's right edge: 350 design units less the 5 of right padding
+      legendPlugin(() => getState().legendItems, 345, 18, "right"),
     ],
   };
 }
