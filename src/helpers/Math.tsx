@@ -75,6 +75,27 @@ export function getRandomRangeAt(
   return randomAt(seed, stream, index) * (max - min) + min;
 }
 
+/**
+ * A standard normal draw (mean 0, standard deviation 1) addressed the same way `randomAt` is.
+ *
+ * Box-Muller over a pair of uniforms, which is why one normal costs two indexes: the pair is
+ * taken from `2 * index` and `2 * index + 1` rather than from neighbouring indexes, so callers
+ * can walk their own index space one normal at a time without two of them ever sharing a uniform.
+ *
+ * Weather anomalies are the reason this exists. A uniform nudge gives every deviation inside its
+ * range the same likelihood and nothing at all outside it, which is the wrong shape for a
+ * departure from normal: real ones cluster near average with occasional outliers, and have no
+ * hard cutoff. Scaling a normal by an observed standard deviation reproduces the spread that was
+ * actually measured.
+ */
+export function normalAt(seed: number, stream: number, index: number): number {
+  // Guarded because Box-Muller takes a log of the first uniform, and randomAt's range is
+  // half open -- a draw of exactly 0 would return -Infinity
+  const u1 = Math.max(Number.MIN_VALUE, randomAt(seed, stream, index * 2));
+  const u2 = randomAt(seed, stream, index * 2 + 1);
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
 // Seeds are mixed as 32 bit integers, so a wider one (a float, or Date.now() times something) is
 // silently truncated and no longer describes the run it is stored alongside. Mint them here.
 export function newSeed(): number {
