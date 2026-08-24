@@ -3,9 +3,15 @@ import {
   getDateFromMinute,
   getHourTicks,
   getSunriseSunset,
+  MINUTES_PER_MONTH,
+  summarizeTimeline,
+  summarizeTimelineByMonth,
 } from "./DateTime";
-import { LOCATIONS } from "../Constants";
-import { DateType } from "../Types";
+import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
+import { DateType, MonthlyHistoryType } from "../Types";
+import { SCENARIOS } from "../data/Scenarios";
+import { generateNewTimeline } from "../reducers/Game";
+import { createGame } from "../testing/Simulator";
 
 describe("formatMinuteOfDayChartAxis", () => {
   it("should render midnight as 12am", () => {
@@ -93,5 +99,82 @@ describe("getSunriseSunset", () => {
     // Guards the assertion above from passing only because the runner happens to sit in the
     // location's own zone
     expect(typeof machineOffsetMinutes).toEqual("number");
+  });
+});
+
+describe("summarizeTimelineByMonth", () => {
+  const startingYear = SCENARIOS[0].startingYear;
+
+  /**
+   * The finances chart used to build its projection by calling summarizeTimeline once per month
+   * with a filter. This has to be the same answer, or a projected month would stop reading the
+   * way a recorded one does at the point the two meet on the chart.
+   */
+  it("should match summarizing each month separately", () => {
+    const game = createGame({ scenarioId: 103 });
+    const timeline = generateNewTimeline(
+      game,
+      game.timeline[0].cash,
+      game.timeline[0].customers,
+      TICKS_PER_MONTH * 5,
+    );
+
+    const byMonth = summarizeTimelineByMonth(timeline, startingYear);
+
+    const months = new Set(
+      timeline.map((t) => Math.floor(t.minute / MINUTES_PER_MONTH)),
+    );
+    expect(byMonth.length).toEqual(months.size);
+    [...months]
+      .sort((a, b) => a - b)
+      .forEach((month: number, i: number) => {
+        expect(byMonth[i]).toEqual(
+          summarizeTimeline(
+            timeline,
+            startingYear,
+            (t) => Math.floor(t.minute / MINUTES_PER_MONTH) === month,
+          ),
+        );
+      });
+  });
+
+  it("should return the months oldest first", () => {
+    const game = createGame({ scenarioId: 103 });
+    const timeline = generateNewTimeline(
+      game,
+      game.timeline[0].cash,
+      game.timeline[0].customers,
+      TICKS_PER_MONTH * 14,
+    );
+
+    const byMonth = summarizeTimelineByMonth(timeline, startingYear);
+
+    const asMonthIndex = (m: MonthlyHistoryType) => m.year * 12 + m.month;
+    const indexes = byMonth.map(asMonthIndex);
+    expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+    expect(new Set(indexes).size).toEqual(indexes.length);
+    // Long enough to roll over a year, which the month numbers wrap on but the ordering must not
+    expect(byMonth[byMonth.length - 1].year).toBeGreaterThan(byMonth[0].year);
+  });
+
+  it("should total the same as summarizing the whole span at once", () => {
+    const game = createGame({ scenarioId: 103 });
+    const timeline = generateNewTimeline(
+      game,
+      game.timeline[0].cash,
+      game.timeline[0].customers,
+      TICKS_PER_MONTH * 6,
+    );
+
+    const byMonth = summarizeTimelineByMonth(timeline, startingYear);
+    const whole = summarizeTimeline(timeline, startingYear);
+
+    const totalRevenue = byMonth.reduce(
+      (sum: number, m: MonthlyHistoryType) => sum + m.revenue,
+      0,
+    );
+    expect(totalRevenue).toBeCloseTo(whole.revenue, 4);
+    // Ending values are carried rather than added, and belong to the oldest tick either way
+    expect(byMonth[0].cash).toEqual(whole.cash);
   });
 });

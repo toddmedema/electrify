@@ -15,6 +15,9 @@ import {
   TickPresentFutureType,
 } from "../Types";
 
+/** A game month, in minutes -- the unit the forecast charts step their x axis in. */
+export const MINUTES_PER_MONTH = DAYS_PER_MONTH * 1440;
+
 export const EMPTY_HISTORY = {
   month: 0,
   year: 0,
@@ -74,6 +77,36 @@ export function deriveExpandedSummary(
   };
 }
 
+/**
+ * Everything reduceHistories does for a single tick, without first building the copy of it that
+ * used to be spread into a MonthlyHistoryType. A year-long forecast is over a thousand ticks and
+ * a twenty-year one over twenty thousand, so that copy was the bulk of the work.
+ */
+function accumulateTick(
+  summary: MonthlyHistoryType,
+  t: TickPresentFutureType,
+  startingYear: number,
+) {
+  const date = getMonthYearFromMinute(t.minute, startingYear);
+  // Integrate instantaneous electricity (watts) to watt hours
+  // Only electricity isn't multiplied by this during tick calculations (financials are)
+  summary.supplyWh +=
+    (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  summary.demandWh += (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  summary.kgco2e += t.kgco2e;
+  summary.revenue += t.revenue;
+  summary.expensesFuel += t.expensesFuel;
+  summary.expensesOM += t.expensesOM;
+  summary.expensesMarketing += t.expensesMarketing;
+  summary.expensesCarbonFee += t.expensesCarbonFee;
+  summary.expensesInterest += t.expensesInterest;
+  summary.cash = t.cash;
+  summary.customers = t.customers;
+  summary.netWorth = t.netWorth;
+  summary.month = date.monthNumber;
+  summary.year = date.year;
+}
+
 // start + end inclusive - can be used to summarize a month, but also any arbitrary timeline group
 export function summarizeTimeline(
   timeline: TickPresentFutureType[],
@@ -85,23 +118,43 @@ export function summarizeTimeline(
   for (let i = timeline.length - 1; i >= 0; i--) {
     const t = timeline[i];
     if (!filter || filter(t)) {
-      // TODO perf this gets called a lot, but only need
-      const date = getMonthYearFromMinute(t.minute, startingYear);
-      // Integrate instantaneous electricity (watts) to watt hours
-      // Only electricity isn't multiplied by this during tick calculations (financials are)
-      const supplyWh =
-        (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-      const demandWh = (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-      reduceHistories(summary, {
-        ...t,
-        supplyWh,
-        demandWh,
-        month: date.monthNumber,
-        year: date.year,
-      });
+      accumulateTick(summary, t, startingYear);
     }
   }
   return summary;
+}
+
+/**
+ * Every month a timeline spans, oldest first, in a single pass.
+ *
+ * The same answer as calling summarizeTimeline once per month with a filter, which is what the
+ * finances chart did while it only ever projected to the end of the current year. That approach
+ * is O(months x ticks): twelve scans of a year-long forecast is merely wasteful, but 240 scans of
+ * a twenty-year one takes over a second and a half -- more than ten times what simulating those
+ * twenty years costs in the first place.
+ */
+export function summarizeTimelineByMonth(
+  timeline: TickPresentFutureType[],
+  startingYear: number,
+): MonthlyHistoryType[] {
+  const byMonth = new Map<number, MonthlyHistoryType>();
+  // Reverse, with each tick overwriting the ending values, for the same reason summarizeTimeline
+  // does it -- so a month summarized here reads the same way as one recorded during play
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const t = timeline[i];
+    // DAYS_PER_MONTH is 1, so this is the same count getMonthYearFromMinute works from, and it
+    // keeps counting past 12 rather than wrapping, which makes it unique across years
+    const month = Math.floor(t.minute / MINUTES_PER_MONTH);
+    let summary = byMonth.get(month);
+    if (!summary) {
+      summary = { ...EMPTY_HISTORY };
+      byMonth.set(month, summary);
+    }
+    accumulateTick(summary, t, startingYear);
+  }
+  return [...byMonth.keys()]
+    .sort((a, b) => a - b)
+    .map((month) => byMonth.get(month) as MonthlyHistoryType);
 }
 
 export function summarizeHistory(
@@ -147,9 +200,6 @@ export function formatMonthChartAxis(t: number, multiyear: boolean) {
   }
   return MONTHS[t % 12];
 }
-
-/** A game month, in minutes -- the unit the forecast charts step their x axis in. */
-export const MINUTES_PER_MONTH = DAYS_PER_MONTH * 1440;
 
 /**
  * The month label for a point on a forecast chart, whose x is a minute of the game rather than
