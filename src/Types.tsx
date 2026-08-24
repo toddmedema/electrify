@@ -371,6 +371,11 @@ export interface DialogType {
   title: string;
   action?: (e: React.MouseEvent<HTMLElement>) => void;
   actionLabel?: string;
+  // For dialogs where the second choice is an action of its own rather than "never mind" - the
+  // end of a tutorial offers the next tutorial or the main menu, and neither is a dismissal.
+  // Set alongside notCancellable, this replaces the close button rather than adding a third one
+  secondaryAction?: (e: React.MouseEvent<HTMLElement>) => void;
+  secondaryLabel?: string;
   notCancellable?: boolean;
   closeText?: string;
   open: boolean;

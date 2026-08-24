@@ -1,3 +1,4 @@
+import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import numbro from "numbro";
@@ -48,8 +49,14 @@ import {
 } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
 import { logEvent } from "../Globals";
-import { recordScenarioPlayed } from "../LocalStorage";
-import { CUSTOM_SCENARIO_ID, getScenario, SCENARIOS } from "../data/Scenarios";
+import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
+import {
+  CUSTOM_SCENARIO_ID,
+  getNextTutorial,
+  getScenario,
+  SCENARIOS,
+  TUTORIALS,
+} from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { start, loaded, quit, resume, startReplay } from "./GameActions";
 import { clearSaveFor } from "../SaveGame";
@@ -62,6 +69,7 @@ import {
   GameType,
   GeneratorOperatingType,
   MonthlyHistoryType,
+  ScenarioType,
   ScoreBreakdownType,
   SpeedType,
   StorageOperatingType,
@@ -504,6 +512,70 @@ function applyPendingReplayActions(state: GameType) {
   }
 }
 
+/**
+ * Ends whatever is running and drops the player straight into a tutorial.
+ *
+ * quit() first because start() only swaps the scenario id: on its own the new run would inherit
+ * the finished one's facilities, cash and walkthrough position.
+ */
+export function startTutorial(dispatch: AppDispatch, scenarioId: number) {
+  dispatch(quit());
+  dispatch(start(scenarioId));
+}
+
+/**
+ * The end of a tutorial, which is a different moment from the end of a scenario: there's no score
+ * to report and the useful next step is the next tutorial, so this celebrates, says where the
+ * player is in the sequence, and offers that next tutorial rather than a scoreboard.
+ */
+function tutorialCompleteDialog({
+  title,
+  message,
+  nextTutorial,
+}: {
+  title: string;
+  message?: string;
+  nextTutorial?: ScenarioType;
+}) {
+  const played = getPlayedScenarioIds();
+  const completed = TUTORIALS.filter(
+    (t: ScenarioType) => played.indexOf(t.id) !== -1,
+  ).length;
+  return dialogOpen({
+    title: `🎉 ${title}`,
+    message: (
+      <div>
+        {message && (
+          <span>
+            {message}
+            <br />
+            <br />
+          </span>
+        )}
+        <strong>
+          {completed} of {TUTORIALS.length} tutorials complete
+        </strong>
+        {nextTutorial && (
+          <span>
+            <br />
+            Up next: {nextTutorial.name}
+          </span>
+        )}
+      </div>
+    ),
+    open: true,
+    // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
+    notCancellable: true,
+    secondaryLabel: "Main menu",
+    secondaryAction: () => getStore().dispatch(quit()),
+    actionLabel: nextTutorial ? "Next tutorial" : "Back to tutorials",
+    action: () =>
+      nextTutorial
+        ? startTutorial(getStore().dispatch, nextTutorial.id)
+        : getStore().dispatch(quit({ toScenarioList: true })),
+  });
+}
+
 // Ticks the state forward in place
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
@@ -692,6 +764,9 @@ export function tickState(state: GameType) {
           endMessage,
           ownership,
         } = scenario;
+        const isTutorial = Boolean(scenario.tutorialSteps);
+        // Read out here with everything else the timeouts need, rather than from inside them
+        const nextTutorial = getNextTutorial(scoredScenarioId);
 
         // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
         // and rules the player gave themselves - would be scored against each other as if they
@@ -728,6 +803,15 @@ export function tickState(state: GameType) {
           // fresh save at the next month rollover if they do
           if (!isReplay) {
             clearSaveFor(scenarioId);
+          }
+          if (isTutorial) {
+            return getStore().dispatch(
+              tutorialCompleteDialog({
+                title: endTitle || "Tutorial complete!",
+                message: endMessage,
+                nextTutorial,
+              }),
+            );
           }
           getStore().dispatch(
             dialogOpen({

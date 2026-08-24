@@ -633,6 +633,19 @@ export const SCENARIOS = [
 // The numbered 101-106 walkthroughs, in the order a new player should work through them
 export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);
 
+/**
+ * The tutorial that follows this one in the authored sequence, so that finishing one can hand
+ * the player straight into the next rather than back through the scenario list.
+ *
+ * Undefined for the last tutorial, and for anything that isn't a tutorial at all (a scenario or
+ * a custom game), which is what "is there a next tutorial to offer?" reduces to at both call
+ * sites - the in-game menu and the completion dialog
+ */
+export function getNextTutorial(scenarioId: number): ScenarioType | undefined {
+  const index = TUTORIALS.findIndex((s: ScenarioType) => s.id === scenarioId);
+  return index === -1 ? undefined : TUTORIALS[index + 1];
+}
+
 // Reserved for the game the player builds themselves; no authored scenario may use it
 export const CUSTOM_SCENARIO_ID = 999;
 

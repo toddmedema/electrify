@@ -35,7 +35,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const DISCORD_URL = "https://discord.gg/2fTDHE7";
+const FEEDBACK_EMAIL = "mailto:todd@fabricate.io";
 
 // Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
 // once here rather than on every keystroke
@@ -320,10 +320,7 @@ export default function Manual(props: Props): React.JSX.Element {
               No entries match "{searchTerm}".
             </Typography>
             <Typography variant="body2">
-              Think it belongs in here? Ask us on{" "}
-              <a href={DISCORD_URL} target="_blank" rel="noreferrer">
-                Discord
-              </a>
+              Think it belongs in here? <a href={FEEDBACK_EMAIL}>Let us know</a>
               .
             </Typography>
           </div>
