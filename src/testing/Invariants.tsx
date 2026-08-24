@@ -40,6 +40,8 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "expensesInterest",
   "expensesMarketing",
   "kgco2e",
+  "interestRate",
+  "inflationRate",
 ];
 
 // Tick fields that are physically incapable of going negative (cash and netWorth can, by design)
@@ -57,6 +59,8 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "expensesInterest",
   "expensesMarketing",
   "kgco2e",
+  // A lender can quote any rate it likes, but never a negative one
+  "interestRate",
 ];
 
 const FINITE_MONTH_FIELDS: MonthFieldType[] = [
@@ -72,6 +76,8 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "expensesInterest",
   "expensesMarketing",
   "kgco2e",
+  "interestRate",
+  "inflationRate",
 ];
 
 /**

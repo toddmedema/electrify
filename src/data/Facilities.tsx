@@ -1,5 +1,6 @@
 import { LCWH } from "../helpers/Financials";
 import { hasFuelPrices } from "./FuelPrices";
+import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import {
   FacilityOperatingType,
@@ -11,6 +12,25 @@ import {
   getWindCapacityFactor,
   getSolarCapacityFactor,
 } from "../helpers/Energy";
+
+/**
+ * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
+ * here is quoted in real terms - the exponents that remain are technology trends, not price
+ * levels - so inflation is what carries them forward from the day the run opens.
+ *
+ * The index is anchored on the game's own starting year, so the opening month always costs
+ * exactly what the table says whether the scenario begins in 1980 or 2020. Anchoring it on a
+ * fixed year instead would hand a 1980 run 1980 dollar costs against a nominal retail rate and
+ * make it trivially profitable.
+ *
+ * The custom game screen asks what can be built before any game has loaded the economic data,
+ * so an unloaded index is 1 rather than a thrown error - the same reason hasFuelPrices exists.
+ */
+function getCostInflation(state: GameType): number {
+  return hasEconomy()
+    ? getInflationIndex(state.date, state.startingYear, state.seed)
+    : 1;
+}
 
 // TODO additional sources of information
 // BASE DATE: 2018
@@ -64,7 +84,7 @@ export function GENERATORS(
       spinMinutes: 360,
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: 0.05 * peakW * Math.pow(1.04, year - 2018),
+      annualOperatingCost: 0.05 * peakW * Math.pow(1.01, year - 2018),
       // ~$0.007 -> 0.01/kwh 2008->18, +4%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
       // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 3 + magnitude / 3,
@@ -91,7 +111,7 @@ export function GENERATORS(
       btuPerWh: 10.5,
       // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 600,
-      annualOperatingCost: 0.1 * peakW * Math.pow(1.005, year - 2018),
+      annualOperatingCost: 0.1 * peakW,
       // ~$0.016 -> 0168/kwh 2008->18, +0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
       // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 5 + magnitude / 4,
@@ -120,7 +140,7 @@ export function GENERATORS(
       // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
       // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW * Math.pow(1.02, year - 2018),
+      annualOperatingCost: 0.05 * peakW,
       // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
       // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
@@ -148,7 +168,7 @@ export function GENERATORS(
       btuPerWh: 11,
       // https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW * Math.pow(1.02, year - 2018),
+      annualOperatingCost: 0.05 * peakW,
       // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
       // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       yearsToBuild: 1 + magnitude / 3,
@@ -188,7 +208,7 @@ export function GENERATORS(
       maxPeakW: 1500000000,
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.04 * peakW * Math.pow(1.02, year - 2018),
+      annualOperatingCost: 0.04 * peakW,
       // TODO estimated 2% decline per year
       // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       // TODO depends on location
@@ -218,7 +238,7 @@ export function GENERATORS(
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.025 * peakW * Math.pow(1.02, year - 2018),
+      annualOperatingCost: 0.025 * peakW,
       // TODO estimated 2% decline per year
       // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -312,9 +332,10 @@ export function GENERATORS(
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
+  const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
-    g.buildCost *= difficulty.buildCost;
-    g.annualOperatingCost *= difficulty.expensesOM;
+    g.buildCost *= difficulty.buildCost * inflation;
+    g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
     // The custom game screen asks what can be built in a year before any game has loaded the
     // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no
@@ -401,9 +422,10 @@ export function STORAGE(state: GameType, peakWh: number) {
 
   // update with calculations that occur across all entries, like difficulty multipliers
   const difficulty = DIFFICULTIES[state.difficulty];
+  const inflation = getCostInflation(state);
   storage = storage.filter((g: StorageShoppingType) => {
-    g.buildCost *= difficulty.buildCost;
-    g.annualOperatingCost *= difficulty.expensesOM;
+    g.buildCost *= difficulty.buildCost * inflation;
+    g.annualOperatingCost *= difficulty.expensesOM * inflation;
     g.yearsToBuild *= difficulty.buildTime;
     return g.available;
   });

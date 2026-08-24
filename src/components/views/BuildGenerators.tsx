@@ -38,7 +38,6 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
-  INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -56,6 +55,7 @@ import ManualLink from "../base/ManualLink";
 interface GeneratorBuildItemProps {
   cash: number;
   date: DateType;
+  interestRate: number;
   generator: GeneratorShoppingType;
   seed: number;
   secondaryMetric?: string;
@@ -72,7 +72,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const loanAmount = props.generator.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
-    INTEREST_RATE_YEARLY,
+    props.interestRate,
     LOAN_MONTHS,
   );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
@@ -100,7 +100,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY);
+  // const monthlyInterest = getPaymentInterest(loanAmount, props.interestRate);
   // <TableRow>
   // <TableCell>Payments during construction (interest only)</TableCell>
   // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
@@ -303,9 +303,15 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Interest rate</TableCell>
+                  <TableCell>
+                    Interest rate
+                    <ManualLink
+                      entry={MANUAL_ENTRY.INTEREST_RATES}
+                      label="interest rate"
+                    />
+                  </TableCell>
                   <TableCell align="right">
-                    {(INTEREST_RATE_YEARLY * 100).toFixed(1)}%
+                    {(props.interestRate * 100).toFixed(2)}%
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -534,6 +540,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           <GeneratorBuildItem
             date={game.date}
             seed={game.seed}
+            interestRate={game.interestRate}
             generator={g}
             key={i}
             cash={cash}

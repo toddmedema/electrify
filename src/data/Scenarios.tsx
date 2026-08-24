@@ -11,7 +11,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 1,
@@ -100,7 +100,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
@@ -162,6 +162,10 @@ export const SCENARIOS = [
         content: (
           <Typography variant="body1">
             Click on the price to buy it, either in cash or with a loan.
+            <br />
+            <br />A loan's interest rate depends on the economy and on your
+            company's own finances - and once you sign, that rate is fixed for
+            the life of the loan.
           </Typography>
         ),
       },
@@ -196,7 +200,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 6,
@@ -286,7 +290,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 1,
@@ -345,6 +349,20 @@ export const SCENARIOS = [
       },
       {
         card: "FINANCES",
+        target: ".MuiTable-root",
+        content: (
+          <Typography variant="body1">
+            The expanded table includes your <strong>interest rate</strong> -
+            what a new loan would cost you today. It moves with the economy, and
+            with how healthy your own books look.
+            <br />
+            <br />
+            Both it and inflation can be charted, like any other metric.
+          </Typography>
+        ),
+      },
+      {
+        card: "FINANCES",
         target: "#speedChangeButtons",
         onNext: () => setSpeed("SLOW"),
         content: (
@@ -362,7 +380,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
@@ -437,7 +455,7 @@ export const SCENARIOS = [
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2020,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
@@ -534,7 +552,7 @@ export const SCENARIOS = [
     summary: `New limits have been placed on pollution - can you modernize the company?`,
     ownership: "Investor",
     startingYear: 2020,
-    cash: 300000000,
+    cash: 330000000,
     feePerKgCO2e: 50 / 1000,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 12,
@@ -551,7 +569,7 @@ export const SCENARIOS = [
     summary: `Cheap natural gas has been discovered nearby - are you ready for the boom?`,
     ownership: "Investor",
     startingYear: 2006,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 20,
@@ -565,7 +583,7 @@ export const SCENARIOS = [
     summary: "A beautiful island - with a complex grid.",
     ownership: "Investor",
     startingYear: 2004,
-    cash: 250000000,
+    cash: 275000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 12,
@@ -583,7 +601,7 @@ export const SCENARIOS = [
     summary: "Technology is advancing rapidly - can you keep up?",
     ownership: "Investor",
     startingYear: 2002,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 12,
@@ -600,7 +618,7 @@ export const SCENARIOS = [
     summary: "A remote island, with expensive fuel and destructive weather.",
     ownership: "Public",
     startingYear: 2000,
-    cash: 200000000,
+    cash: 220000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 20,
@@ -618,7 +636,7 @@ export const SCENARIOS = [
     summary: "Your coal business faces new challenges - and opportunities.",
     ownership: "Investor",
     startingYear: 1980,
-    cash: 180000000,
+    cash: 198000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 20,
@@ -682,7 +700,7 @@ export const DEFAULT_CUSTOM_SCENARIO = {
   locationId: "SF",
   ownership: "Investor",
   startingYear: 2020,
-  cash: 200000000,
+  cash: 220000000,
   dollarsPerkWh: 0.07,
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,

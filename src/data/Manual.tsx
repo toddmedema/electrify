@@ -22,6 +22,7 @@ export const MANUAL_ENTRY = {
   CUSTOMERS: "Customers, Demand & Marketing",
   EMISSIONS: "Emissions and CO2e",
   FORECASTS: "Forecasts",
+  INTEREST_RATES: "Interest Rates & Inflation",
   KEYBOARD_SHORTCUTS: "Keyboard Shortcuts",
   PRIORITIZING_GENERATORS: "Prioritizing Generators",
   RAMP_RATE: "Ramp Rate",
@@ -451,6 +452,56 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           able to follow it. A slow plant is only useful for the demand that's
           there all day, which is why ramp rate, not price, is usually what
           decides whether a plant can help with a peak.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.INTEREST_RATES,
+    group: "Money",
+    keywords:
+      "prime rate loan borrowing credit leverage debt apr financing mortgage cpi cost of living",
+    entry: (
+      <div>
+        <p>
+          Financing a plant means borrowing most of its cost over 30 years, and
+          the interest on that loan is an operating expense for every one of
+          them. What you're quoted is built from two things: what money costs
+          everybody, and what it costs <em>you</em>.
+        </p>
+        <p>
+          The first is the <strong>prime rate</strong>, the benchmark banks lend
+          their best customers at. It moves on a cycle of eight to twelve years
+          rather than month to month, and you have no influence over it
+          whatsoever. It has been as low as 3.25% and, in December 1980, as high
+          as 21.5% - so a scenario set in 1980 is playing a genuinely different
+          game to one set in 2020.
+        </p>
+        <p>
+          The second is your <strong>credit</strong>, and that part is entirely
+          yours. Four things are weighed: whether you're profitable, how much
+          cash you're sitting on relative to what you're worth, how much of the
+          fleet is already mortgaged, and how many years of revenue it would
+          take to repay what you owe. Fall short on any of them and the premium
+          over prime goes up. The important consequence is that{" "}
+          <strong>debt makes debt more expensive</strong>: every plant you
+          finance raises the price of financing the next one, which is exactly
+          how it works for a real utility.
+        </p>
+        <p>
+          A loan's rate is fixed on the day you sign it and never changes, so{" "}
+          <em>when</em> you borrow matters permanently. Building out during a
+          cheap decade leaves you paying that rate long after the economy has
+          turned - and a plant financed at the top of a cycle is still paying
+          for it thirty years later.
+        </p>
+        <p>
+          <strong>Inflation</strong> is the other half of the same cycle, and it
+          leads it: prices run away first, and rates are raised to chase them.
+          It pushes up what fuel costs and what it costs to build and operate a
+          plant, year after year. Your rate per kWh does not rise on its own to
+          match, so on a long scenario inflation quietly eats your margin unless
+          you're a public utility and can raise the rate yourself.
         </p>
       </div>
     ),

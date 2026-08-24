@@ -33,6 +33,8 @@ export const EMPTY_HISTORY = {
   expensesInterest: 0,
   expensesMarketing: 0,
   netWorth: 0,
+  interestRate: 0,
+  inflationRate: 0,
 } as MonthlyHistoryType;
 
 // edits acc in place to avoid making tons of extra objects
@@ -52,6 +54,10 @@ export function reduceHistories(
   acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
+  // Rates are a level, not a flow: adding twelve months of them together would be nonsense, so
+  // the period reports the one in force at its end
+  acc.interestRate = t.interestRate;
+  acc.inflationRate = t.inflationRate;
   acc.month = t.month;
   acc.year = t.year;
   return acc;
@@ -103,6 +109,9 @@ function accumulateTick(
   summary.cash = t.cash;
   summary.customers = t.customers;
   summary.netWorth = t.netWorth;
+  // Levels rather than flows, carried the same way reduceHistories carries them
+  summary.interestRate = t.interestRate;
+  summary.inflationRate = t.inflationRate;
   summary.month = date.monthNumber;
   summary.year = date.year;
 }
@@ -114,8 +123,10 @@ export function summarizeTimeline(
   filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
-  // Go in reverse so that the last values for ending values (like net worth are used)
-  for (let i = timeline.length - 1; i >= 0; i--) {
+  // Ticks are ordered oldest first, so walk forwards: reduceHistories keeps the last value it
+  // sees for the point-in-time fields, and the period should report the balances it ended on.
+  // Note that summarizeHistory below walks the other way, because monthlyHistory is newest first.
+  for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     if (!filter || filter(t)) {
       accumulateTick(summary, t, startingYear);
@@ -138,9 +149,10 @@ export function summarizeTimelineByMonth(
   startingYear: number,
 ): MonthlyHistoryType[] {
   const byMonth = new Map<number, MonthlyHistoryType>();
-  // Reverse, with each tick overwriting the ending values, for the same reason summarizeTimeline
-  // does it -- so a month summarized here reads the same way as one recorded during play
-  for (let i = timeline.length - 1; i >= 0; i--) {
+  // Forwards, with each tick overwriting the ending values, for the same reason summarizeTimeline
+  // does it -- so a month summarized here reads the same way as one recorded during play, and
+  // each one reports the balances it ended on rather than the ones it opened with
+  for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     // DAYS_PER_MONTH is 1, so this is the same count getMonthYearFromMinute works from, and it
     // keeps counting past 12 rather than wrapping, which makes it unique across years
@@ -162,7 +174,9 @@ export function summarizeHistory(
   filter?: (t: MonthlyHistoryType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
-  // Go in reverse so that the last values for ending values (like net worth are used)
+  // Months are ordered newest first (state.monthlyHistory is built by unshifting), so walking
+  // backwards is what ends on the most recent one - the opposite direction to summarizeTimeline
+  // above, for the opposite array order.
   for (let i = timeline.length - 1; i >= 0; i--) {
     if (!filter || filter(timeline[i])) {
       reduceHistories(summary, timeline[i]);
