@@ -1,8 +1,10 @@
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
+  getNextTutorial,
   getScenario,
   SCENARIOS,
+  TUTORIALS,
 } from "./Scenarios";
 import { ScenarioType } from "../Types";
 
@@ -39,5 +41,22 @@ describe("getScenario", () => {
     expect(
       SCENARIOS.some((s: ScenarioType) => s.id === CUSTOM_SCENARIO_ID),
     ).toBe(false);
+  });
+});
+
+describe("getNextTutorial", () => {
+  it("follows the authored order", () => {
+    expect(getNextTutorial(TUTORIALS[0].id)).toBe(TUTORIALS[1]);
+  });
+
+  it("finds nothing after the last tutorial", () => {
+    expect(getNextTutorial(TUTORIALS[TUTORIALS.length - 1].id)).toBeUndefined();
+  });
+
+  // Which is what both callers rely on to decide whether to offer one at all
+  it("finds nothing for a scenario that isn't a tutorial", () => {
+    const scenario = SCENARIOS.find((s: ScenarioType) => !s.tutorialSteps);
+    expect(getNextTutorial((scenario as ScenarioType).id)).toBeUndefined();
+    expect(getNextTutorial(CUSTOM_SCENARIO_ID)).toBeUndefined();
   });
 });

@@ -11,7 +11,8 @@ import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
-import { quit, setSpeed } from "../../reducers/Game";
+import { getNextTutorial } from "../../data/Scenarios";
+import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import NavigationContainer from "./NavigationContainer";
 
@@ -30,6 +31,7 @@ export interface GameCardProps extends React.ComponentPropsWithoutRef<"div"> {
 export interface DispatchProps {
   onManual: () => void;
   onSpeedChange: (speed: SpeedType) => void;
+  onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
 }
 
@@ -181,7 +183,7 @@ function buildSpeedOptions({
 }
 
 export function GameCard(props: Props) {
-  const { game, onManual, onQuit, onSpeedChange } = props;
+  const { game, onManual, onNextTutorial, onQuit, onSpeedChange } = props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -194,6 +196,9 @@ export function GameCard(props: Props) {
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
   const speed = game.speed;
+  // Undefined outside a tutorial, and on the last one - so this doubles as "is there a next
+  // tutorial to offer?" for the menu item below
+  const nextTutorial = getNextTutorial(game.scenarioId);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
@@ -246,12 +251,19 @@ export function GameCard(props: Props) {
           <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
             Send feedback
           </MenuItem>
+          {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
+              not the scenario list they'd have to go back through to reach it */}
+          {nextTutorial && (
+            <MenuItem onClick={() => onNextTutorial(nextTutorial.id)}>
+              Next tutorial
+            </MenuItem>
+          )}
           <MenuItem onClick={onQuit}>Quit</MenuItem>
         </Menu>
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuAnchorEl, onManual, onQuit],
+    [menuAnchorEl, onManual, onNextTutorial, onQuit, nextTutorial],
   );
 
   const nav = React.useMemo(() => <NavigationContainer />, []);
@@ -319,6 +331,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
+    },
+    onNextTutorial: (scenarioId: number) => {
+      startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
       dispatch(quit());

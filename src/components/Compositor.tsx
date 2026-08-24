@@ -234,7 +234,11 @@ export default class Compositor extends React.Component<Props, {}> {
       EVENTS.STEP_AFTER,
       EVENTS.TARGET_NOT_FOUND,
     ];
-    if (advancingEvents.includes(type)) {
+    // Quitting tears the walkthrough's targets out of the DOM, and Joyride reports that as
+    // TARGET_NOT_FOUND on the way out. Advancing on it navigated the just-reset game back onto
+    // the step's card, which then rendered nothing because the game was over - a blank screen
+    // where the main menu should be. tutorialStep is only >= 0 while a walkthrough is live
+    if (advancingEvents.includes(type) && this.props.tutorialStep >= 0) {
       this.props.onTutorialStep({
         fromStep: index,
         toStep: index + (action === ACTIONS.PREV ? -1 : 1),
@@ -384,9 +388,12 @@ export default class Compositor extends React.Component<Props, {}> {
         )}
         <Dialog
           open={ui.dialog.open}
-          // v9 replaced `disableEscapeKeyDown` with filtering on the close reason
-          onClose={(_event, reason) => {
-            if (ui.dialog.notCancellable && reason === "escapeKeyDown") {
+          // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A
+          // notCancellable dialog is one whose buttons are the only way forward - the end of a
+          // run, the end of a tutorial - so a backdrop click has to be refused alongside Esc,
+          // or dismissing it strands the player in a game that's already over
+          onClose={() => {
+            if (ui.dialog.notCancellable) {
               return;
             }
             closeDialog();
@@ -395,6 +402,11 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
+            {ui.dialog.secondaryAction && (
+              <Button color="primary" onClick={ui.dialog.secondaryAction}>
+                {ui.dialog.secondaryLabel || "Close"}
+              </Button>
+            )}
             {!ui.dialog.notCancellable && (
               <Button color="primary" onClick={closeDialog}>
                 {ui.dialog.closeText || (ui.dialog.action ? "Cancel" : "OK")}
