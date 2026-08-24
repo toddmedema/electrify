@@ -24,7 +24,7 @@
     "react-transition-group": "^4.4.5",
     "redux": "^5.0.1",
     "suncalc": "^2.0.1",
-    "victory": "^37.3.6",
+    "uplot": "^1.6.32",
     "web-vitals": "^6.1.1"
   },
   "devDependencies": {

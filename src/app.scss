@@ -459,6 +459,28 @@ $topbar_height: 56px;
 
 // Chart legends live below the plot instead of floating inside it, where they used to sit on
 // top of the data and clip. Plain HTML so they wrap on narrow screens and screen readers see them.
+// One tooltip covering every series at the hovered x, the way the Victory voronoi container's
+// did, positioned by the chart's own cursor handler
+.chartTooltip {
+  position: absolute;
+  display: none;
+  z-index: 10;
+  padding: 2px 4px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  background: $bg_primary;
+  color: $font_color_primary;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: pre;
+  pointer-events: none;
+}
+
+// The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
+.uplot .u-cursor-x {
+  border-right: 1px dashed #757575;
+}
+
 .chartLegend {
   display: flex;
   flex-wrap: wrap;

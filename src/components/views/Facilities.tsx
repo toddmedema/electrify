@@ -345,13 +345,15 @@ export default class Facilities extends React.Component<Props, {}> {
 
   private throttle = new TickThrottle();
 
-  // In fast mode, skip frames so that CPU can focus on simulation -- this pane carries the
-  // supply/demand chart, which is the single most expensive thing the game draws
+  // In fast mode, skip frames so that CPU can focus on simulation. This used to be 1 frame in
+  // 8, when the supply/demand chart was on Victory and one pane render cost 18ms; on uPlot the
+  // same render is 3.6ms, so 1 in 2 refreshes the pane four times as often and still costs less
+  // per tick than the old setting did.
   public shouldComponentUpdate(nextProps: Props) {
     if (nextProps.game.speed !== "FAST") {
       return true;
     }
-    return this.throttle.due(nextProps.game.date.minute, 8);
+    return this.throttle.due(nextProps.game.date.minute, 2);
   }
 
   public componentDidUpdate() {

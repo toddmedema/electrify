@@ -148,6 +148,24 @@ export function formatMonthChartAxis(t: number, multiyear: boolean) {
   return MONTHS[t % 12];
 }
 
+/** A game month, in minutes -- the unit the forecast charts step their x axis in. */
+export const MINUTES_PER_MONTH = DAYS_PER_MONTH * 1440;
+
+/**
+ * The month label for a point on a forecast chart, whose x is a minute of the game rather than
+ * a month index. Every forecast chart's x axis wants this.
+ */
+export function formatMinuteAsMonthAxis(
+  minute: number,
+  startingYear: number,
+  multiyear: boolean,
+): string {
+  return formatMonthChartAxis(
+    getDateFromMinute(minute, startingYear).monthsEllapsed + 12 * startingYear,
+    multiyear,
+  );
+}
+
 export function formatHour(date: DateType): string {
   const time = new Date(
     `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`,

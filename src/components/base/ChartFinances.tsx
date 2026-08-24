@@ -1,14 +1,9 @@
 import * as React from "react";
+import uPlot from "uplot";
+import UPlotChart, { BuildContext } from "./UPlotChart";
+import { padRange, stepTicks, titlePlugin, xAxis, yAxis } from "./UPlotHelpers";
 import { formatMonthChartAxis } from "../../helpers/DateTime";
-import { chartTheme, demandColor } from "../../Theme";
-import {
-  VictoryAxis,
-  VictoryChart,
-  VictoryLabel,
-  VictoryLine,
-  VictoryTheme,
-} from "victory";
-import { chartTooltipContainer } from "./ChartTooltipContainer";
+import { demandColor } from "../../Theme";
 
 interface ChartData {
   month: number; // unique across years
@@ -24,6 +19,71 @@ export interface Props {
   format: (n: number) => number | string;
 }
 
+interface State {
+  timeline: ChartData[];
+  title: string;
+  format: Props["format"];
+  range: [number, number];
+  domain: [number, number];
+  multiyear: boolean;
+}
+
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  return {
+    width: 0, // set by UPlotChart
+    height: 0,
+    padding: [10 * scale, 5 * scale, 0, 0],
+    cursor: {
+      x: true,
+      y: false,
+      points: { show: false },
+      drag: { x: false, y: false, setScale: false },
+    },
+    legend: { show: false },
+    scales: {
+      x: { time: false, range: () => getState().range },
+      y: { range: () => getState().domain },
+    },
+    axes: [
+      xAxis(scale, {
+        splits: () => {
+          const [min, max] = getState().range;
+          return stepTicks(min, max, 1);
+        },
+        values: (_u, splits) => {
+          const s = getState();
+          return splits.map((t) => formatMonthChartAxis(t, s.multiyear));
+        },
+      }),
+      yAxis(scale, {
+        grid: true,
+        values: (_u, splits) => splits.map((t) => String(getState().format(t))),
+      }),
+    ],
+    series: [
+      {},
+      {
+        stroke: demandColor,
+        width: 2,
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: demandColor,
+        width: 2,
+        dash: [4, 4],
+        points: { show: false },
+        spanGaps: false,
+      },
+    ],
+    plugins: [titlePlugin(() => getState().title, 200, 7)],
+  };
+}
+
+function tooltip(idx: number, state: State): string {
+  return state.format(state.timeline[idx].value).toString();
+}
+
 const ChartFinances = (props: Props): React.JSX.Element => {
   // Figure out the boundaries of the chart data
   let domainMin = 0;
@@ -33,87 +93,51 @@ const ChartFinances = (props: Props): React.JSX.Element => {
     rangeMin + 11,
     props.timeline[props.timeline.length - 1].month,
   );
-  const past = [] as ChartData[];
-  const projected = [] as ChartData[];
-  props.timeline.forEach((d: ChartData) => {
+  // One aligned x per month, with each half of the series blanked out where the other one runs,
+  // so that recorded months draw solid and projected ones dashed
+  const months = new Array<number>(props.timeline.length);
+  const past = new Array<number | null>(props.timeline.length);
+  const projected = new Array<number | null>(props.timeline.length);
+  let lastPast = -1;
+  props.timeline.forEach((d: ChartData, i: number) => {
     domainMin = Math.min(domainMin, d.value);
     domainMax = Math.max(domainMax, d.value);
-    if (d.projected) {
-      projected.push(d);
-    } else {
-      past.push(d);
+    months[i] = d.month;
+    past[i] = d.projected ? null : d.value;
+    projected[i] = d.projected ? d.value : null;
+    if (!d.projected) {
+      lastPast = i;
     }
   });
-  if (projected.length > 0 && past.length > 0) {
-    projected.push(past[past.length - 1]);
+  // The projection picks up where the record leaves off, rather than starting a month adrift
+  if (lastPast > -1 && lastPast + 1 < props.timeline.length) {
+    projected[lastPast] = props.timeline[lastPast].value;
   }
   const multiyear = rangeMax - rangeMin > 12;
 
-  // Wrapping in spare div prevents excessive height bug
+  const state: State = {
+    timeline: props.timeline,
+    title: props.title,
+    format: props.format,
+    range: [rangeMin, rangeMax],
+    domain: padRange(domainMin, domainMax),
+    multiyear,
+  };
+
   return (
-    <div>
-      <VictoryChart
-        theme={VictoryTheme.material}
-        padding={{ top: 10, bottom: 25, left: 55, right: 5 }}
-        domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
-        domainPadding={{ y: [6, 6] }}
-        height={props.height || 300}
-        containerComponent={chartTooltipContainer({
-          ariaLabel: `Chart of ${props.title} over time`,
-          labels: ({ datum }: { datum: ChartData }) =>
-            props.format(datum.value).toString(),
-        })}
-      >
-        <VictoryAxis
-          tickFormat={(t: number) => formatMonthChartAxis(t, multiyear)}
-          tickLabelComponent={<VictoryLabel dy={-5} />}
-          style={{
-            axis: chartTheme.axis,
-            grid: {
-              display: "none",
-            },
-            tickLabels: chartTheme.tickLabels,
-          }}
-        />
-        <VictoryAxis
-          dependentAxis
-          tickFormat={props.format}
-          tickLabelComponent={<VictoryLabel dx={5} />}
-          fixLabelOverlap={true}
-          style={{
-            axis: chartTheme.axis,
-            tickLabels: chartTheme.tickLabels,
-          }}
-        />
-        <VictoryLine
-          data={past}
-          x="month"
-          y="value"
-          style={{
-            data: {
-              stroke: demandColor,
-            },
-          }}
-        />
-        <VictoryLine
-          data={projected}
-          x="month"
-          y="value"
-          style={{
-            data: {
-              stroke: demandColor,
-              strokeDasharray: "4,4",
-            },
-          }}
-        />
-        <VictoryLabel textAnchor="middle" x={200} y={7} text={props.title} />
-      </VictoryChart>
-    </div>
+    <UPlotChart<State>
+      ariaLabel={`Chart of ${props.title} over time`}
+      height={props.height}
+      state={state}
+      data={[months, past, projected]}
+      buildOptions={buildOptions}
+      tooltip={tooltip}
+    />
   );
 };
 /**
  * The series only changes when a month rolls over or the player changes something, so memoising
- * lets the whole Victory subtree -- easily the most expensive render in the game -- be skipped
- * on the frames in between. Finances hands over a referentially stable series for exactly this.
+ * lets the whole chart -- data prep, aligned arrays and the canvas redraw -- be skipped on the
+ * frames in between. Finances hands over a referentially stable series for exactly this.
  */
 export default React.memo(ChartFinances);

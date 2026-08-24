@@ -1,19 +1,14 @@
 import * as React from "react";
-import {
-  VictoryAxis,
-  VictoryChart,
-  VictoryLabel,
-  VictoryLine,
-  VictoryTheme,
-} from "victory";
-import { chartTooltipContainer } from "./ChartTooltipContainer";
+import uPlot from "uplot";
+import UPlotChart, { BuildContext } from "./UPlotChart";
+import { padRange, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import {
-  formatMonthChartAxis,
-  getDateFromMinute,
+  formatMinuteAsMonthAxis,
+  MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
-import { chartTheme, supplyColor } from "../../Theme";
+import { supplyColor } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -21,6 +16,57 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
+}
+
+interface State {
+  timeline: TickPresentFutureType[];
+  domain: Props["domain"];
+  startingYear: number;
+  multiyear: boolean;
+}
+
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  return {
+    width: 0, // set by UPlotChart
+    height: 0,
+    padding: [5 * scale, 5 * scale, 0, 0],
+    cursor: {
+      x: true,
+      y: false,
+      points: { show: false },
+      drag: { x: false, y: false, setScale: false },
+    },
+    legend: { show: false },
+    scales: {
+      x: { time: false, range: () => getState().domain.x },
+      y: {
+        range: (_u, min, max) => padRange(min, max),
+      },
+    },
+    axes: [
+      xAxis(scale, {
+        splits: () => {
+          const [min, max] = getState().domain.x;
+          return stepTicks(min, max, MINUTES_PER_MONTH);
+        },
+        values: (_u, splits) => {
+          const s = getState();
+          return splits.map((t) =>
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+          );
+        },
+      }),
+      yAxis(scale, {
+        values: (_u, splits) =>
+          splits.map((t) => formatWattHoursAxis(t, splits)),
+      }),
+    ],
+    series: [{}, { stroke: supplyColor, width: 1, points: { show: false } }],
+  };
+}
+
+function tooltip(idx: number, state: State): string {
+  return formatWattHours(state.timeline[idx].storedWh);
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -31,67 +77,23 @@ export default class chartForecastStorage extends React.PureComponent<
   public render() {
     const { domain, height, timeline, startingYear, multiyear } = this.props;
 
-    // Wrapping in spare div prevents excessive height bug
+    const minutes = new Array<number>(timeline.length);
+    const stored = new Array<number>(timeline.length);
+    timeline.forEach((t: TickPresentFutureType, i: number) => {
+      minutes[i] = t.minute;
+      stored[i] = t.storedWh;
+    });
+
     return (
-      <div id="chartForecastStorage">
-        <VictoryChart
-          theme={VictoryTheme.material}
-          padding={{ top: 5, bottom: 25, left: 55, right: 5 }}
-          domain={domain}
-          domainPadding={{ y: [6, 6] }}
-          height={height || 300}
-          containerComponent={chartTooltipContainer({
-            ariaLabel: "Chart of forecasted stored power",
-            labels: ({ datum }: { datum: TickPresentFutureType }) =>
-              formatWattHours(datum.storedWh),
-          })}
-        >
-          <VictoryAxis
-            tickCount={6}
-            tickFormat={(t: number) =>
-              formatMonthChartAxis(
-                getDateFromMinute(t, startingYear).monthsEllapsed +
-                  12 * startingYear,
-                multiyear,
-              )
-            }
-            tickLabelComponent={<VictoryLabel dy={-5} />}
-            style={{
-              axis: chartTheme.axis,
-              grid: {
-                display: "none",
-              },
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          <VictoryAxis
-            dependentAxis
-            tickFormat={(t: number, _i: number, ticks: number[]) =>
-              formatWattHoursAxis(t, ticks)
-            }
-            tickLabelComponent={<VictoryLabel dx={10} />}
-            fixLabelOverlap={true}
-            style={{
-              axis: chartTheme.axis,
-              grid: {
-                display: "none",
-              },
-              tickLabels: chartTheme.tickLabels,
-            }}
-          />
-          <VictoryLine
-            data={timeline}
-            x="minute"
-            y="storedWh"
-            style={{
-              data: {
-                stroke: supplyColor,
-                strokeWidth: 1,
-              },
-            }}
-          />
-        </VictoryChart>
-      </div>
+      <UPlotChart<State>
+        id="chartForecastStorage"
+        ariaLabel="Chart of forecasted stored power"
+        height={height}
+        state={{ timeline, domain, startingYear, multiyear }}
+        data={[minutes, stored]}
+        buildOptions={buildOptions}
+        tooltip={tooltip}
+      />
     );
   }
 }

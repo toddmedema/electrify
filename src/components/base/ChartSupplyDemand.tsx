@@ -1,14 +1,18 @@
 import * as React from "react";
+import uPlot from "uplot";
+import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
-  VictoryArea,
-  VictoryAxis,
-  VictoryChart,
-  VictoryLabel,
-  VictoryLegend,
-  VictoryLine,
-  VictoryTheme,
-} from "victory";
-import { chartTooltipContainer } from "./ChartTooltipContainer";
+  bandsPlugin,
+  chartFont,
+  legendPlugin,
+  LegendItem,
+  padRange,
+  spansFromEdges,
+  TICK_LABEL_FILL,
+  verticalLinePlugin,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import {
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
@@ -17,12 +21,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
-import {
-  blackoutColor,
-  chartTheme,
-  demandColor,
-  supplyColor,
-} from "../../Theme";
+import { blackoutColor, demandColor, supplyColor } from "../../Theme";
 import { LocationType } from "../../Types";
 
 interface ChartData {
@@ -45,21 +44,98 @@ export interface Props {
   startingYear: number;
 }
 
+// Everything the plot's callbacks read. Rebuilt every render and handed to UPlotChart, which
+// keeps the newest one reachable from options that were built once.
+interface State {
+  timeline: ChartData[];
+  domain: [number, number];
+  range: [number, number];
+  hourTicks: number[];
+  sunTicks: number[];
+  blackoutSpans: Array<[number, number]>;
+  currentMinute: number | null;
+  legendItems: LegendItem[];
+}
+
+const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
+const HISTORIC_FILL = "#e3f2fd"; // blue50
+
+function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  return {
+    width: 0, // set by UPlotChart
+    height: 0,
+    padding: [10 * scale, 5 * scale, 0, 0],
+    cursor: {
+      x: true,
+      y: false,
+      points: { show: false },
+      drag: { x: false, y: false, setScale: false },
+    },
+    legend: { show: false },
+    scales: {
+      x: { time: false, range: () => getState().range },
+      y: { range: () => getState().domain },
+    },
+    axes: [
+      xAxis(scale, {
+        size: 27,
+        splits: () => getState().hourTicks,
+        values: (_u, splits) => splits.map(formatMinuteOfDayChartAxis),
+      }),
+      {
+        // Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable
+        scale: "x",
+        side: 2,
+        stroke: TICK_LABEL_FILL,
+        font: chartFont(scale),
+        grid: { show: false },
+        ticks: { show: false },
+        border: { show: false },
+        size: 18 * scale,
+        gap: 0,
+        splits: () => getState().sunTicks,
+        values: () => SUN_LABELS,
+      },
+      yAxis(scale, {
+        values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
+      }),
+    ],
+    series: [
+      {},
+      {
+        stroke: supplyColor,
+        width: 1.75,
+        fill: HISTORIC_FILL,
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: supplyColor,
+        width: 1,
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: demandColor,
+        width: 2.5,
+        points: { show: false },
+      },
+    ],
+    plugins: [
+      bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3),
+      verticalLinePlugin(() => getState().currentMinute, "#000000", 0.5),
+      legendPlugin(() => getState().legendItems, 280, 18),
+    ],
+  };
+}
+
+function tooltip(idx: number, state: State): string {
+  const d = state.timeline[idx];
+  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+}
+
 // TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
 // and don't actually differentiate between reality +  forecast in data?
-const SUPPLY_DEMAND_CONTAINER = chartTooltipContainer({
-  ariaLabel: "Chart of electricity supply and demand over the day",
-  labels: ({ datum }: { datum: ChartData }) =>
-    `Supply: ${formatWatts(datum.supplyW)}\nDemand: ${formatWatts(datum.demandW)}`,
-  // Labels are rendered on EACH chart, so we only render on demand, otherwise we get duplicate labels
-  voronoiBlacklist: [
-    "supplyHistoric",
-    "supplyForecast",
-    "blackouts",
-    "current",
-  ],
-});
-
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const { startingYear, height, legend, timeline, location } = props;
   // Figure out the boundaries of the chart data
@@ -160,161 +236,52 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     value: isBlackout ? domainMax : 0,
   });
 
-  // Divide between historic and forcast
+  // Divide between historic and forecast. One aligned x per tick, with each series blanked out
+  // where it doesn't apply, so the two halves of supply can be styled differently.
   const currentMinute = props.currentMinute || 0;
-  const historic = [...timeline].filter(
-    (d: ChartData) => d.minute <= currentMinute,
-  );
-  const forecast = [...timeline].filter(
-    (d: ChartData) => d.minute >= currentMinute,
-  );
+  const minutes = new Array<number>(timeline.length);
+  const supplyHistoric = new Array<number | null>(timeline.length);
+  const supplyForecast = new Array<number | null>(timeline.length);
+  const demand = new Array<number>(timeline.length);
+  timeline.forEach((d: ChartData, i: number) => {
+    minutes[i] = d.minute;
+    supplyHistoric[i] = d.minute <= currentMinute ? d.supplyW : null;
+    supplyForecast[i] = d.minute >= currentMinute ? d.supplyW : null;
+    demand[i] = d.demandW;
+  });
 
-  // Annotated so the optional blackout entry below is not measured against a type inferred
-  // from the first two colours alone
-  const legendItems: Array<{ name: string; symbol: { fill: string } }> = [
-    { name: "Supply", symbol: { fill: supplyColor } },
-    { name: "Demand", symbol: { fill: demandColor } },
-  ];
-  if (blackoutCount > 0) {
-    legendItems.push({
-      name: "Blackout",
-      symbol: { fill: blackoutColor },
-    });
+  // The blackout key only earns its place once there has been a blackout to explain
+  const legendItems: LegendItem[] = [];
+  if (legend) {
+    legendItems.push(
+      { name: "Supply", fill: supplyColor },
+      { name: "Demand", fill: demandColor },
+    );
+    if (blackoutCount > 0) {
+      legendItems.push({ name: "Blackout", fill: blackoutColor });
+    }
   }
 
-  // Wrapping in spare div prevents excessive height bug
+  const state: State = {
+    timeline,
+    domain: padRange(domainMin, domainMax),
+    range: [rangeMin, rangeMax],
+    hourTicks,
+    sunTicks: [sunrise, noon, sunset],
+    blackoutSpans: spansFromEdges(blackouts),
+    currentMinute: currentMinute === rangeMax ? null : currentMinute,
+    legendItems,
+  };
+
   return (
-    <div>
-      <VictoryChart
-        theme={VictoryTheme.material}
-        padding={{ top: 10, bottom: 45, left: 55, right: 5 }}
-        domain={{ y: [domainMin, domainMax] }}
-        domainPadding={{ y: [6, 6] }}
-        height={height || 300}
-        containerComponent={SUPPLY_DEMAND_CONTAINER}
-      >
-        <VictoryAxis
-          tickValues={hourTicks}
-          tickFormat={(t: number) => formatMinuteOfDayChartAxis(t)}
-          tickLabelComponent={<VictoryLabel dy={-5} />}
-          style={{
-            axis: chartTheme.axis,
-            grid: {
-              display: "none",
-            },
-            tickLabels: chartTheme.tickLabels,
-          }}
-        />
-        {/* Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable */}
-        <VictoryAxis
-          tickValues={[sunrise, noon, sunset]}
-          tickFormat={["🌅", "☀️ ", "🌇"]}
-          tickLabelComponent={<VictoryLabel dy={12} />}
-          style={{
-            axis: { stroke: "none" },
-            ticks: { stroke: "none" },
-            grid: {
-              display: "none",
-            },
-            tickLabels: chartTheme.tickLabels,
-          }}
-        />
-        <VictoryAxis
-          dependentAxis
-          tickFormat={(t: number, _i: number, ticks: number[]) =>
-            formatWattsAxis(t, ticks)
-          }
-          tickLabelComponent={<VictoryLabel dx={5} />}
-          fixLabelOverlap={true}
-          style={{
-            axis: chartTheme.axis,
-            grid: {
-              display: "none",
-            },
-            tickLabels: chartTheme.tickLabels,
-          }}
-        />
-        <VictoryArea
-          name="supplyHistoric"
-          data={historic}
-          x="minute"
-          y="supplyW"
-          style={{
-            data: {
-              stroke: supplyColor,
-              strokeWidth: 1.75,
-              fill: "#e3f2fd", // blue50
-            },
-          }}
-        />
-        <VictoryLine
-          name="supplyForecast"
-          data={forecast}
-          x="minute"
-          y="supplyW"
-          style={{
-            data: {
-              stroke: supplyColor,
-              strokeWidth: 1,
-            },
-          }}
-        />
-        <VictoryLine
-          name="demand"
-          data={timeline}
-          x="minute"
-          y="demandW"
-          style={{
-            data: {
-              stroke: demandColor,
-              strokeWidth: 2.5,
-            },
-          }}
-        />
-        {blackoutCount > 0 && (
-          <VictoryArea
-            name="blackouts"
-            data={blackouts}
-            x="minute"
-            y="value"
-            style={{
-              data: {
-                stroke: "none",
-                fill: blackoutColor,
-                opacity: 0.3,
-              },
-            }}
-          />
-        )}
-        {currentMinute !== rangeMax && (
-          <VictoryLine
-            name="current"
-            data={[
-              { x: currentMinute, y: domainMin },
-              { x: currentMinute, y: domainMax },
-            ]}
-            style={{
-              data: {
-                stroke: "#000000",
-                strokeWidth: 1,
-                opacity: 0.5,
-              },
-            }}
-          />
-        )}
-        {legend && (
-          <VictoryLegend
-            x={280}
-            y={12}
-            centerTitle
-            orientation="vertical"
-            rowGutter={-5}
-            symbolSpacer={5}
-            data={legendItems}
-          />
-        )}
-      </VictoryChart>
-    </div>
+    <UPlotChart<State>
+      ariaLabel="Chart of electricity supply and demand over the day"
+      height={height}
+      state={state}
+      data={[minutes, supplyHistoric, supplyForecast, demand]}
+      buildOptions={buildOptions}
+      tooltip={tooltip}
+    />
   );
 };
 export default ChartSupplyDemand;
