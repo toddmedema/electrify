@@ -20,6 +20,23 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// Every chart watches its container for a width to lay out in, and jsdom has no ResizeObserver.
+// One that never reports is the honest stub here: jsdom lays nothing out, so the width stays at
+// zero and uPlot is never built, which is exactly what the charts do in a real pane of no width.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    public observe() {
+      return undefined;
+    }
+    public unobserve() {
+      return undefined;
+    }
+    public disconnect() {
+      return undefined;
+    }
+  };
+}
+
 // jsdom has no IndexedDB, so Firebase Analytics warns loudly the first time anything logs an
 // event. Nothing under test cares what was reported, so the transport is stubbed out entirely.
 jest.mock("firebase/analytics", () => ({

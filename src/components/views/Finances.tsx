@@ -18,11 +18,11 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
-  getDateFromMinute,
   getTimeFromTimeline,
   reduceHistories,
   summarizeHistory,
   summarizeTimeline,
+  summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
 import { customersFromMarketingSpend } from "../../helpers/Financials";
 import {
@@ -32,7 +32,7 @@ import {
 } from "../../helpers/Format";
 import {
   getStorageBoolean,
-  getStorageString,
+  getStorageChoice,
   setStorageKeyValue,
 } from "../../LocalStorage";
 import { isDesktopScreen } from "../../Globals";
@@ -168,6 +168,111 @@ const CHART_KEYS = {
   },
 } as { [index: string]: ChartKeyMetadataType };
 
+const CHART_KEY_STORAGE_KEY = "financesChartKey";
+// Still says year, because a stored year is still one of the options and reading it back is
+// worth more than a tidy name. The two sentinels it used to hold aren't options any more, and
+// getStorageChoice drops them for us
+const CHART_RANGE_STORAGE_KEY = "financesChartYear";
+
+/**
+ * What the "for" dropdown is set to. A backwards range is a year the game has actually been to,
+ * so it is its own value; the rest are named, because "the current year" follows the clock and a
+ * forward range isn't a year at all. These were numbers with 0 and -1 as sentinels, which had no
+ * room left for "the next ten years".
+ */
+const ALL_TIME = "all";
+const CURRENT_YEAR = "current";
+const FUTURE_PREFIX = "next";
+// Matching the horizons the Forecasts pane offers, so the two panes look ahead the same distance
+const FUTURE_YEARS = [1, 5, 10, 20];
+
+const futureRange = (years: number) => `${FUTURE_PREFIX}${years}`;
+
+// Newest first, so that the year being played is at the top of the dropdown
+function getPlayedYears(game: GameType): number[] {
+  const years = [];
+  for (let i = game.date.year; i >= game.startingYear; i--) {
+    years.push(i);
+  }
+  return years;
+}
+
+function getPlotRangeOptions(game: GameType): string[] {
+  return [
+    ALL_TIME,
+    CURRENT_YEAR,
+    ...FUTURE_YEARS.map(futureRange),
+    ...getPlayedYears(game).map(String),
+  ];
+}
+
+// One shared array, so that a range with nothing ahead of it keeps handing back the same empty
+// projection and the series cache can go on comparing by identity
+const EMPTY_PROJECTION: MonthlyHistoryType[] = [];
+
+type ParsedRangeType =
+  | { mode: "all" }
+  | { mode: "year"; year: number }
+  | { mode: "future"; years: number };
+
+export function parseRange(
+  range: string,
+  currentYear: number,
+): ParsedRangeType {
+  if (range === ALL_TIME) {
+    return { mode: "all" };
+  }
+  if (range.startsWith(FUTURE_PREFIX)) {
+    const years = Number(range.slice(FUTURE_PREFIX.length));
+    if (FUTURE_YEARS.includes(years)) {
+      return { mode: "future", years };
+    }
+    return { mode: "year", year: currentYear };
+  }
+  const year = Number(range);
+  // getStorageChoice already drops a stored range that isn't on offer, so this is the last line
+  // rather than the first. The emptiness check is because Number("") is 0, which is finite, and
+  // would chart the year nothing happened in
+  if (range !== "" && Number.isFinite(year)) {
+    return { mode: "year", year };
+  }
+  return { mode: "year", year: currentYear };
+}
+
+/**
+ * The current month, followed by `monthsAhead` complete simulated months.
+ *
+ * The current month comes from the live timeline, which already covers it from its start; the
+ * forecast only picks up from the current minute. Starting part way through a month is also why
+ * a whole extra month of ticks is simulated: it is what guarantees `monthsAhead` complete months
+ * after this one, since the forecast's own first bucket is only the rest of the current month
+ * and whatever trails off its end is the matching part of a later one. Both are dropped rather
+ * than drawn as months that only half happened.
+ */
+export function projectMonths(
+  game: GameType,
+  cash: number,
+  customers: number,
+  monthsAhead: number,
+): MonthlyHistoryType[] {
+  const months = [summarizeTimeline(game.timeline, game.startingYear)];
+  if (monthsAhead > 0) {
+    const forecast = generateNewTimeline(
+      game,
+      cash,
+      customers,
+      TICKS_PER_MONTH * (1 + monthsAhead),
+    );
+    months.push(
+      ...summarizeTimelineByMonth(forecast, game.startingYear).slice(
+        1,
+        1 + monthsAhead,
+      ),
+    );
+  }
+  return months;
+}
+
 export interface StateProps {
   game: GameType;
 }
@@ -179,7 +284,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 interface State {
-  year: number;
+  range: string;
   expanded: boolean;
   chartKey: DerivedHistoryKeysType;
 }
@@ -213,18 +318,46 @@ function getTickFromValue(v: number) {
 export default class Finances extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    // Building a facility unmounts this pane, so both dropdowns have to be remembered outside
+    // the component or the player lands back on this year's profit every time they return
     this.state = {
-      year: -1, // current year
+      range: getStorageChoice(
+        CHART_RANGE_STORAGE_KEY,
+        getPlotRangeOptions(props.game),
+        CURRENT_YEAR,
+      ),
       expanded: getStorageBoolean("financesTableOpened", false),
-      chartKey: getStorageString(
-        "financesChartKey",
+      chartKey: getStorageChoice(
+        CHART_KEY_STORAGE_KEY,
+        Object.keys(CHART_KEYS),
         "profit",
       ) as DerivedHistoryKeysType,
     };
   }
 
-  private chartSeriesCache:
-    { key: string; series: ChartPointType[] } | undefined;
+  // Two caches rather than one, because the two halves of the work are invalidated by
+  // different things. The projection is the expensive half and doesn't care which metric is on
+  // screen, so switching metric no longer re-simulates; the series is cheap but has to stay
+  // referentially stable, because that is what lets ChartFinances memoise its canvas.
+  private projectionCache:
+    { key: string; range: string; months: MonthlyHistoryType[] } | undefined;
+  private seriesCache:
+    | {
+        chartKey: DerivedHistoryKeysType;
+        range: string;
+        historyLength: number;
+        projected: MonthlyHistoryType[];
+        series: ChartPointType[];
+      }
+    | undefined;
+
+  // Rebuilding a twenty-year projection costs ~120ms, and the marketing and rate sliders change
+  // one of its inputs on every pointer move. Drawing from the previous projection while the
+  // player is still dragging keeps the slider smooth, and the trailing timer below makes sure
+  // the chart catches up with wherever they let go.
+  private static readonly PROJECTION_THROTTLE_MS = 250;
+  private lastProjectionMs = 0;
+  private projectionCatchup: ReturnType<typeof setTimeout> | undefined;
 
   private throttle = new TickThrottle();
 
@@ -232,8 +365,15 @@ export default class Finances extends React.Component<Props, State> {
   // Left at 1 in 2 when the charts moved to uPlot: measured either way this pane costs about
   // 3ms a render, because its chart is memoised and only redraws on a month rollover. What the
   // cheaper chart bought here is a calmer worst frame, not a cheaper typical one.
-  public shouldComponentUpdate(nextProps: Props) {
-    if (nextProps.game.speed !== "FAST") {
+  //
+  // Only the clock is throttled. The metric and the year live in state, and skipping a state
+  // change means dropping something the player just asked for: the dropdown redraws itself with
+  // the new label -- it keeps its own state, and nothing here can stop it -- while the chart goes
+  // on plotting the old metric until the clock happens to come round. That reads as a selector
+  // that does nothing, and if the clock has stopped (a scenario that has ended, a backgrounded
+  // tab) it never comes round at all.
+  public shouldComponentUpdate(nextProps: Props, nextState: State) {
+    if (nextState !== this.state || nextProps.game.speed !== "FAST") {
       return true;
     }
     return this.throttle.due(nextProps.game.date.minute, 2);
@@ -243,97 +383,151 @@ export default class Finances extends React.Component<Props, State> {
     this.throttle.rendered(this.props.game.date.minute);
   }
 
+  public componentWillUnmount() {
+    if (this.projectionCatchup) {
+      clearTimeout(this.projectionCatchup);
+    }
+  }
+
   public setExpand(expanded: boolean) {
     setStorageKeyValue("financesTableOpened", expanded);
     this.setState({ expanded });
   }
 
   public setChartKey(chartKey: DerivedHistoryKeysType) {
-    setStorageKeyValue("financesChartKey", chartKey);
+    setStorageKeyValue(CHART_KEY_STORAGE_KEY, chartKey);
     this.setState({ chartKey });
   }
 
+  public setRange(range: string) {
+    setStorageKeyValue(CHART_RANGE_STORAGE_KEY, range);
+    this.setState({ range });
+  }
+
   /**
-   * The chart plots monthly aggregates, and the projection behind its dashed half is a whole
-   * simulated year. Rebuilding that every frame was the single most expensive thing the game
-   * did -- at FAST it ran a year of simulation up to fifty times a second to redraw a line
-   * whose points cannot move until the month does. So it is rebuilt when something that can
-   * actually change it changes: the month rolling over, or the player touching the metric, the
-   * year, a slider or the fleet.
+   * The months the chart draws as a dashed projection: the current one, plus however far ahead
+   * the selected range looks.
+   *
+   * Simulating them is by far the most expensive thing this pane does -- at FAST it once ran a
+   * year of simulation up to fifty times a second to redraw a line whose points cannot move
+   * until the month does. So it is rebuilt only when something that can actually change it
+   * changes: the month rolling over, or the player touching the range, a slider or the fleet.
    */
-  private getChartSeries(
-    monthlyHistory: MonthlyHistoryType[],
+  private getProjectedMonths(
+    range: ParsedRangeType,
     cash: number,
     customers: number,
-  ): ChartPointType[] {
+  ): MonthlyHistoryType[] {
     const { game } = this.props;
-    const { startingYear, timeline, date } = game;
-    const { year, chartKey } = this.state;
+    const { date } = game;
+
+    // A year that is already in the books has nothing ahead of it to project
+    if (range.mode === "year" && range.year !== date.year) {
+      return EMPTY_PROJECTION;
+    }
 
     const key = [
-      chartKey,
-      year,
+      this.state.range,
       date.monthsEllapsed,
       game.monthlyHistory.length,
       game.monthlyMarketingSpend,
       game.dollarsPerkWh,
       game.facilities.map((f) => `${f.id}${f.paused ? "p" : ""}`).join(","),
     ].join("|");
-    const cached = this.chartSeriesCache;
+    const cached = this.projectionCache;
     if (cached && cached.key === key) {
+      return cached.months;
+    }
+    const sinceLast = Date.now() - this.lastProjectionMs;
+    if (
+      cached &&
+      // Only what the game did under a range the player already had. Asking for a different
+      // range is a direct request, and answering it with the last range's months would put the
+      // wrong line on screen for a quarter of a second before correcting itself
+      cached.range === this.state.range &&
+      range.mode === "future" &&
+      range.years > 1 &&
+      sinceLast < Finances.PROJECTION_THROTTLE_MS
+    ) {
+      // Mid-drag: draw the projection from before the drag started, and come back for the real
+      // one once the player has stopped moving. forceUpdate rather than setState because this
+      // is catching up on the game's own inputs, not on a change the player just made here
+      if (!this.projectionCatchup) {
+        this.projectionCatchup = setTimeout(() => {
+          this.projectionCatchup = undefined;
+          this.forceUpdate();
+        }, Finances.PROJECTION_THROTTLE_MS - sinceLast);
+      }
+      return cached.months;
+    }
+
+    // A backwards range still projects the rest of the year it is looking at, which is what the
+    // chart has always drawn behind its dashed half
+    const monthsAhead =
+      range.mode === "future" ? 12 * range.years : 12 - date.monthNumber;
+    const months = projectMonths(game, cash, customers, monthsAhead);
+
+    this.lastProjectionMs = Date.now();
+    this.projectionCache = { key, range: this.state.range, months };
+    return months;
+  }
+
+  /**
+   * The chart's points for the metric on screen. Cheap next to the projection, but it has to
+   * hand back the same array when nothing has moved, because that referential stability is what
+   * lets ChartFinances memoise its canvas across the frames in between.
+   */
+  private getChartSeries(
+    monthlyHistory: MonthlyHistoryType[],
+    projected: MonthlyHistoryType[],
+  ): ChartPointType[] {
+    const { chartKey, range } = this.state;
+    const historyLength = this.props.game.monthlyHistory.length;
+    const cached = this.seriesCache;
+    if (
+      cached &&
+      cached.chartKey === chartKey &&
+      cached.range === range &&
+      cached.historyLength === historyLength &&
+      cached.projected === projected
+    ) {
       return cached.series;
     }
 
-    const monthly = [] as ChartPointType[];
+    const point = (m: MonthlyHistoryType, isProjected: boolean) => {
+      const summary = deriveExpandedSummary(m);
+      return {
+        month: summary.year * 12 + summary.month,
+        year: summary.year,
+        value: summary[chartKey],
+        projected: isProjected,
+      };
+    };
+
+    const series = [] as ChartPointType[];
+    // game.monthlyHistory is newest first, so unshifting puts the chart back in time order
     for (const m of monthlyHistory) {
-      const s = deriveExpandedSummary(m);
-      monthly.unshift({
-        month: s.year * 12 + s.month,
-        year: s.year,
-        value: s[chartKey],
-        projected: false,
-      });
+      series.unshift(point(m, false));
     }
-    if (!year || year === -1 || date.year === year) {
-      // Add projected months if current year is included in chart
-      const presentFutureMonths = [summarizeTimeline(timeline, startingYear)];
-      if (date.month !== "Dec") {
-        // Project out for the rest of the year
-        const forecastedTimeline = generateNewTimeline(
-          game,
-          cash,
-          customers,
-          TICKS_PER_MONTH * (1 + 12 - date.monthNumber),
-        ); // Current month, plus the rest of the months
-        for (let month = date.monthNumber + 1; month <= 12; month++) {
-          const m = summarizeTimeline(
-            forecastedTimeline,
-            startingYear,
-            (t) =>
-              getDateFromMinute(t.minute, startingYear).monthNumber === month,
-          );
-          presentFutureMonths.push(m);
-        }
-      }
-      presentFutureMonths.forEach((m) => {
-        const s = deriveExpandedSummary(m);
-        monthly.push({
-          month: s.year * 12 + s.month,
-          year: s.year,
-          value: s[chartKey],
-          projected: true,
-        });
-      });
+    for (const m of projected) {
+      series.push(point(m, true));
     }
 
-    this.chartSeriesCache = { key, series: monthly };
-    return monthly;
+    this.seriesCache = {
+      chartKey,
+      range,
+      historyLength,
+      projected,
+      series,
+    };
+    return series;
   }
 
   public render() {
     const { game, onDelta } = this.props;
     const { startingYear, timeline, date } = game;
-    const { year, expanded, chartKey } = this.state;
+    const { expanded, chartKey } = this.state;
+    const range = parseRange(this.state.range, date.year);
     const now = getTimeFromTimeline(date.minute, timeline);
 
     if (!now) {
@@ -342,20 +536,30 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
-    const years = []; // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= startingYear; i--) {
-      years.push(i);
-    }
+    const years = getPlayedYears(game);
 
+    // A forward range still draws every month on the record behind its projection, so that the
+    // trajectory the forecast comes out of is on screen next to it
     const monthlyHistory = game.monthlyHistory.filter(
       (t: MonthlyHistoryType) =>
-        !year || t.year === year || (year === -1 && t.year === date.year),
+        range.mode === "year" ? t.year === range.year : true,
     );
-    const previousMonths = summarizeHistory(monthlyHistory);
 
-    // For the summary table
-    const summaryMonths = [previousMonths];
-    if (year === -1 || year === date.year) {
+    const projectedMonths = this.getProjectedMonths(
+      range,
+      now.cash,
+      now.customers,
+    );
+    const monthly = this.getChartSeries(monthlyHistory, projectedMonths);
+
+    // For the summary table. A backwards range totals what has happened, a forward one totals
+    // what is projected to -- which for cash and net worth means where the horizon leaves them,
+    // since reduceHistories carries those through rather than adding them up
+    const summaryMonths =
+      range.mode === "future"
+        ? [...projectedMonths]
+        : [summarizeHistory(monthlyHistory)];
+    if (range.mode === "year" && range.year === date.year) {
       summaryMonths.push(
         summarizeTimeline(
           timeline,
@@ -366,12 +570,6 @@ export default class Finances extends React.Component<Props, State> {
     }
     const summary = deriveExpandedSummary(
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
-    );
-
-    const monthly = this.getChartSeries(
-      monthlyHistory,
-      now.cash,
-      now.customers,
     );
 
     return (
@@ -463,9 +661,10 @@ export default class Finances extends React.Component<Props, State> {
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               Plotting{" "}
             </Typography>
+            {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
             <Select
               id="plotMetric"
-              defaultValue={chartKey}
+              value={chartKey}
               onChange={(e: SelectChangeEvent<string>) =>
                 this.setChartKey(e.target.value as DerivedHistoryKeysType)
               }
@@ -496,18 +695,24 @@ export default class Finances extends React.Component<Props, State> {
               for{" "}
             </Typography>
             <Select
-              id="plotYear"
-              defaultValue={-1}
-              onChange={(e: SelectChangeEvent<number>) =>
-                this.setState({ year: e.target.value as number })
+              id="plotRange"
+              value={this.state.range}
+              onChange={(e: SelectChangeEvent<string>) =>
+                this.setRange(e.target.value)
               }
             >
-              <MenuItem value={0}>All time</MenuItem>
-              <MenuItem value={-1}>Current year</MenuItem>
-              props.game.date.year
+              <MenuItem value={ALL_TIME}>All time</MenuItem>
+              <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
+              {FUTURE_YEARS.map((y: number) => {
+                return (
+                  <MenuItem value={futureRange(y)} key={futureRange(y)}>
+                    Next {y} {y === 1 ? "year" : "years"}
+                  </MenuItem>
+                );
+              })}
               {years.map((y: number) => {
                 return (
-                  <MenuItem value={y} key={y}>
+                  <MenuItem value={String(y)} key={y}>
                     {y}
                   </MenuItem>
                 );
