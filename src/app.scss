@@ -298,6 +298,20 @@ span.weak {
   font-weight: 100;
 }
 
+// Says which of the two things sharing the game UI you're looking at. Deliberately loud: the
+// controls a replay hides are the other clue, and their absence is easy to miss
+.replayBadge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: $interactive_blue;
+  color: $bg_primary;
+  font-size: 0.6em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
 // Fixed so the primary topbar and every pane header in the desktop 3-pane layout share the
 // exact same height, regardless of their differing content (icon buttons vs. plain text)
 $topbar_height: 56px;

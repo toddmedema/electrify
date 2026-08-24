@@ -196,8 +196,12 @@ export function GameCard(props: Props) {
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
   const speed = game.speed;
+  // Watching somebody else's run rather than playing your own. The speed controls stay live --
+  // being able to pause and fast forward is most of the point of a replay
+  const isReplay = !!game.replayPlayback;
   // Undefined outside a tutorial, and on the last one - so this doubles as "is there a next
-  // tutorial to offer?" for the menu item below
+  // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
+  // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
@@ -258,12 +262,14 @@ export function GameCard(props: Props) {
               Next tutorial
             </MenuItem>
           )}
-          <MenuItem onClick={onQuit}>Quit</MenuItem>
+          <MenuItem onClick={onQuit}>
+            {isReplay ? "Exit replay" : "Quit"}
+          </MenuItem>
         </Menu>
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuAnchorEl, onManual, onNextTutorial, onQuit, nextTutorial],
+    [menuAnchorEl, onManual, onNextTutorial, onQuit, nextTutorial, isReplay],
   );
 
   const nav = React.useMemo(() => <NavigationContainer />, []);
@@ -300,6 +306,7 @@ export function GameCard(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
+            {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>

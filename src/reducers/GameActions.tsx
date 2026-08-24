@@ -1,5 +1,5 @@
 import { createAction } from "@reduxjs/toolkit";
-import type { GameType } from "../Types";
+import type { GameType, ReplayType } from "../Types";
 
 /**
  * The game actions that other slices react to, declared here rather than by the game slice so that
@@ -29,3 +29,9 @@ export const quit = createAction<{ toScenarioList?: boolean } | undefined>(
  * the weather and fuel price CSVs are back in memory before the first tick.
  */
 export const resume = createAction<GameType>("game/resume");
+/**
+ * Starts watching a replay. Takes the same route as start and resume -- the loading screen is
+ * what re-reads the weather and fuel price CSVs, and it's initGame, with the replay's own seed,
+ * that rebuilds the run the actions will be applied to.
+ */
+export const startReplay = createAction<ReplayType>("game/startReplay");

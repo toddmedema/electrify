@@ -1,9 +1,10 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigateBack } from "../../reducers/Card";
-import { start, delta } from "../../reducers/Game";
+import { start, delta, startReplay } from "../../reducers/Game";
+import { snackbarOpen } from "../../reducers/UI";
 import { startWithSaveGuard } from "./StartGame";
-import { AppStateType, GameType } from "../../Types";
+import { AppStateType, GameType, ReplayType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -23,6 +24,14 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onStart: (scenarioId: number) => {
       startWithSaveGuard(dispatch, () => dispatch(start(scenarioId)));
+    },
+    // Watching a replay simulates a whole game, but never writes one, so unlike onStart it has
+    // no autosave to clobber and needs no confirmation
+    onWatchReplay: (replay: ReplayType) => {
+      dispatch(startReplay(replay));
+    },
+    onReplayError: (message: string) => {
+      dispatch(snackbarOpen(message));
     },
   };
 };

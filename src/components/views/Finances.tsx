@@ -392,6 +392,7 @@ export default class Finances extends React.Component<Props, State> {
             {scenario.ownership === "Investor" && (
               <Slider
                 id="marketingSlider"
+                disabled={!!game.replayPlayback}
                 value={getTickFromValue(game.monthlyMarketingSpend)}
                 aria-labelledby="marketing monthly budget"
                 valueLabelDisplay="off"
@@ -430,6 +431,7 @@ export default class Finances extends React.Component<Props, State> {
             {scenario.ownership === "Public" && (
               <Slider
                 id="rateSlider"
+                disabled={!!game.replayPlayback}
                 value={game.dollarsPerkWh}
                 aria-labelledby="The rate you charge for electricity generation"
                 valueLabelDisplay="off"

@@ -58,8 +58,9 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
-import { start, loaded, quit, resume } from "./GameActions";
+import { start, loaded, quit, resume, startReplay } from "./GameActions";
 import { clearSaveFor } from "../SaveGame";
+import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   DateType,
   FacilityOperatingType,
@@ -74,6 +75,7 @@ import {
   StorageOperatingType,
   TickPresentFutureType,
   FuelProductionType,
+  ReplayActionType,
 } from "../Types";
 
 interface BuildFacilityAction {
@@ -178,7 +180,14 @@ export const gameSlice = createSlice({
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
-      return { ...state, ...action.payload };
+      // Assigned onto the draft rather than spread into a new object, which is equivalent for a
+      // partial merge and is what lets the recorder below append to the draft's own log. Immer
+      // rejects a reducer that both mutates its draft and returns a replacement for it
+      Object.assign(state, action.payload);
+      const recorded = recordedDelta(action.payload);
+      if (recorded) {
+        recordReplayAction(state, "delta", recorded);
+      }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
@@ -187,6 +196,9 @@ export const gameSlice = createSlice({
       previousMonth = "";
       previouslyInBlackout = false;
       state.timeline = [] as TickPresentFutureType[];
+      // A game being watched is not a game being recorded; anything else starts an empty log,
+      // which is also what tells serializeReplay the run was recorded from its very first minute
+      state.replayLog = state.replayPlayback ? undefined : [];
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
@@ -248,54 +260,28 @@ export const gameSlice = createSlice({
         );
       }
       state.timeline = reforecastSupply(state);
+      // Anything the player did before the clock first moved -- setting a rate or a marketing
+      // budget on the way in. tickState picks up everything after this
+      applyPendingReplayActions(state);
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
-      state = buildFacilityHelper(
-        state,
-        action.payload.facility,
-        action.payload.financed,
-      );
-      // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
-      // assigned to the parameter is discarded and the forecast would never reach state
-      state.timeline = reforecastSupply(state);
+      applyBuildFacility(state, action.payload);
+      recordReplayAction(state, "buildFacility", action.payload);
     },
     sellFacility: (state, action: PayloadAction<number>) => {
-      const id = action.payload; // (action as SellFacilityAction).id;
-      // in one loop, refund cash from selling + remove from list
-      state.facilities = state.facilities.filter(
-        (g: GeneratorOperatingType | StorageOperatingType) => {
-          if (g.id === id) {
-            const now = getTimeFromTimeline(state.date.minute, state.timeline);
-            if (now) {
-              now.cash += facilityCashBack(g);
-            }
-            return false;
-          }
-          return true;
-        },
-      );
-      state.timeline = reforecastSupply(state);
+      applySellFacility(state, action.payload);
+      recordReplayAction(state, "sellFacility", action.payload);
     },
     togglePauseFacility: (state, action: PayloadAction<number>) => {
-      state.facilities.forEach(
-        (g: GeneratorOperatingType | StorageOperatingType) => {
-          if (g.id === action.payload) {
-            g.paused = !g.paused;
-          }
-        },
-      );
-      state.timeline = reforecastSupply(state);
+      applyTogglePauseFacility(state, action.payload);
+      recordReplayAction(state, "togglePauseFacility", action.payload);
     },
     reprioritizeFacility: (
       state,
       action: PayloadAction<ReprioritizeFacilityAction>,
     ) => {
-      arrayMove(
-        state.facilities,
-        action.payload.spotInList,
-        action.payload.spotInList + action.payload.delta,
-      );
-      state.timeline = reforecastSupply(state);
+      applyReprioritizeFacility(state, action.payload);
+      recordReplayAction(state, "reprioritizeFacility", action.payload);
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
@@ -323,9 +309,34 @@ export const gameSlice = createSlice({
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
+      // Saves written before replays existed have no log, and a run recorded from halfway
+      // through would play back as a different game. Undefined is how the recorder is told to
+      // stay off for the rest of this run, so the score it eventually sets carries no replay
+      if (!Array.isArray(restored.replayLog)) {
+        restored.replayLog = undefined;
+      }
+      // Nothing ever autosaves a replay, so anything here came out of a hand-edited save
+      restored.replayPlayback = undefined;
       // tickLoopRunning is deliberately left alone: any loop still alive clears the flag and stops
       // on its next tick, since tick() bails while !inGame or PAUSED
       return restored;
+    });
+    /**
+     * Sets a replay up to be watched. Nothing is simulated here: this only puts the scenario, the
+     * difficulty and the seed in place, then hands over to the loading screen, which reloads the
+     * data files and calls initGame the same way it does for a new game.
+     */
+    builder.addCase(startReplay, (_state, action) => {
+      const replay = action.payload;
+      speedBeforeManual = undefined;
+      speedBeforeDialog = "PAUSED";
+      return {
+        ...cloneDeep(initialGame),
+        scenarioId: replay.scenarioId,
+        difficulty: replay.difficulty,
+        seed: replay.seed,
+        replayPlayback: { actions: cloneDeep(replay.actions), index: 0 },
+      };
     });
     builder.addCase(loaded, (state) => {
       // Start ticking in game
@@ -375,11 +386,131 @@ export const {
 } = gameSlice.actions;
 
 // Re-exported so that everything still imports the game's actions from one place
-export { start, loaded, quit, resume };
+export { start, loaded, quit, resume, startReplay };
 
 export default gameSlice.reducer;
 
 // ====== HELPERS ======
+
+/**
+ * The simulation-affecting player actions, as plain functions of (state, payload).
+ *
+ * Both the reducers above and replay playback go through these, which is what makes a replay
+ * reproduce the original run rather than an approximation of it: there is one implementation of
+ * "the player built a plant", not two that have to be kept in step.
+ */
+function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
+  state = buildFacilityHelper(state, payload.facility, payload.financed);
+  // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
+  // assigned to the parameter is discarded and the forecast would never reach state
+  state.timeline = reforecastSupply(state);
+}
+
+function applySellFacility(state: GameType, id: number) {
+  // in one loop, refund cash from selling + remove from list
+  state.facilities = state.facilities.filter(
+    (g: GeneratorOperatingType | StorageOperatingType) => {
+      if (g.id === id) {
+        const now = getTimeFromTimeline(state.date.minute, state.timeline);
+        if (now) {
+          now.cash += facilityCashBack(g);
+        }
+        return false;
+      }
+      return true;
+    },
+  );
+  state.timeline = reforecastSupply(state);
+}
+
+function applyTogglePauseFacility(state: GameType, id: number) {
+  state.facilities.forEach(
+    (g: GeneratorOperatingType | StorageOperatingType) => {
+      if (g.id === id) {
+        g.paused = !g.paused;
+      }
+    },
+  );
+  state.timeline = reforecastSupply(state);
+}
+
+function applyReprioritizeFacility(
+  state: GameType,
+  payload: ReprioritizeFacilityAction,
+) {
+  arrayMove(
+    state.facilities,
+    payload.spotInList,
+    payload.spotInList + payload.delta,
+  );
+  state.timeline = reforecastSupply(state);
+}
+
+/**
+ * Replays one recorded action. The payload came off the network, so anything shaped wrong is
+ * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
+ * wrong is a disappointment, one that throws takes the whole game down with it.
+ */
+function applyReplayAction(state: GameType, entry: ReplayActionType) {
+  const payload = entry.payload;
+  switch (entry.type) {
+    case "buildFacility": {
+      const build = payload as Partial<BuildFacilityAction>;
+      if (typeof build?.facility === "object" && build.facility !== null) {
+        applyBuildFacility(state, {
+          facility: build.facility,
+          financed: !!build.financed,
+        });
+      }
+      break;
+    }
+    case "sellFacility":
+      if (typeof payload === "number") {
+        applySellFacility(state, payload);
+      }
+      break;
+    case "togglePauseFacility":
+      if (typeof payload === "number") {
+        applyTogglePauseFacility(state, payload);
+      }
+      break;
+    case "reprioritizeFacility": {
+      const move = payload as Partial<ReprioritizeFacilityAction>;
+      if (Number.isFinite(move?.spotInList) && Number.isFinite(move?.delta)) {
+        applyReprioritizeFacility(state, move as ReprioritizeFacilityAction);
+      }
+      break;
+    }
+    case "delta": {
+      const recorded = recordedDelta((payload || {}) as Partial<GameType>);
+      if (recorded) {
+        Object.assign(state, recorded);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Applies every recorded action the clock has reached. Called from inside the tick rather than
+ * from a store subscriber because at FAST speed one dispatch of `tick` runs several ticks, and a
+ * subscriber would only see the last of them -- every action in between would land late.
+ */
+function applyPendingReplayActions(state: GameType) {
+  const playback = state.replayPlayback;
+  if (!playback) {
+    return;
+  }
+  while (
+    playback.index < playback.actions.length &&
+    playback.actions[playback.index].minute <= state.date.minute
+  ) {
+    applyReplayAction(state, playback.actions[playback.index]);
+    playback.index++;
+  }
+}
 
 /**
  * Ends whatever is running and drops the player straight into a tutorial.
@@ -506,19 +637,28 @@ export function tickState(state: GameType) {
       // state is an Immer draft, and it's revoked the moment this reducer returns - so anything
       // the timeouts below need has to be read out here rather than from inside their callbacks
       const scenarioId = state.scenarioId;
+      // A replay reaches every one of these the same way the original run did, and must set off
+      // none of their side effects: it is not a played game, it has no score of its own to
+      // submit, and the save it would clear belongs to whoever is watching. The dialogs still
+      // show, since a replay ending with "Bankrupt!" is the point of watching it
+      const isReplay = !!state.replayPlayback;
 
       // Failure: Bankrupt
       if (now.cash < 0) {
-        logEvent("scenario_end", {
-          id: scenarioId,
-          type: "bankrupt",
-          difficulty: state.difficulty,
-        });
+        if (!isReplay) {
+          logEvent("scenario_end", {
+            id: scenarioId,
+            type: "bankrupt",
+            difficulty: state.difficulty,
+          });
+        }
         const summary = summarizeHistory(history);
         setTimeout(() => {
           // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
           // as this returns and would write the run straight back
-          clearSaveFor(scenarioId);
+          if (!isReplay) {
+            clearSaveFor(scenarioId);
+          }
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -545,14 +685,18 @@ export function tickState(state: GameType) {
         history[2].supplyWh < history[2].demandWh * 0.9 &&
         history[3].supplyWh < history[3].demandWh * 0.9
       ) {
-        logEvent("scenario_end", {
-          id: scenarioId,
-          type: "blackouts",
-          difficulty: state.difficulty,
-        });
+        if (!isReplay) {
+          logEvent("scenario_end", {
+            id: scenarioId,
+            type: "blackouts",
+            difficulty: state.difficulty,
+          });
+        }
         const summary = summarizeHistory(history);
         setTimeout(() => {
-          clearSaveFor(scenarioId);
+          if (!isReplay) {
+            clearSaveFor(scenarioId);
+          }
           const finished = getStore().getState().game;
           getStore().dispatch(
             dialogOpen({
@@ -577,7 +721,7 @@ export function tickState(state: GameType) {
       if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
         // Every custom game shares one id, so recording it would light up a completion marker for
         // a scenario nobody authored, and its score belongs to nothing comparable
-        const ranked = scenario.id !== CUSTOM_SCENARIO_ID;
+        const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
         if (ranked) {
           // Tutorials are already marked played once their walkthrough ends, so this is a
           // no-op for the ones the player sat all the way through
@@ -628,6 +772,9 @@ export function tickState(state: GameType) {
         // and rules the player gave themselves - would be scored against each other as if they
         // were the same scenario
         if (!scenario.tutorialSteps && ranked) {
+          // Pulled out of the draft here rather than inside the timeout, which runs after the
+          // reducer has returned and revoked it
+          const replay = serializeReplay(state);
           setTimeout(
             () =>
               getStore().dispatch(
@@ -636,22 +783,27 @@ export function tickState(state: GameType) {
                   scoreBreakdown: score, // For analytics purposes only
                   scenarioId: scoredScenarioId,
                   difficulty,
+                  replay,
                 }),
               ),
             1,
           );
         }
 
-        logEvent("scenario_end", {
-          id: scoredScenarioId,
-          type: "win",
-          difficulty,
-          score: finalScore,
-        });
+        if (!isReplay) {
+          logEvent("scenario_end", {
+            id: scoredScenarioId,
+            type: "win",
+            difficulty,
+            score: finalScore,
+          });
+        }
         setTimeout(() => {
           // The scenario is over even if the player takes "Keep playing"; autosave simply writes a
           // fresh save at the next month rollover if they do
-          clearSaveFor(scenarioId);
+          if (!isReplay) {
+            clearSaveFor(scenarioId);
+          }
           if (isTutorial) {
             return getStore().dispatch(
               tutorialCompleteDialog({
@@ -704,6 +856,9 @@ export function tickState(state: GameType) {
       }
     }
   }
+
+  // After the tick, the way a player's click lands after the tick that brought the clock to it
+  applyPendingReplayActions(state);
 }
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)

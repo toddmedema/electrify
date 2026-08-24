@@ -194,7 +194,13 @@ export function startAutosave(
 
   const unsubscribe = store.subscribe(() => {
     const game = store.getState().game;
-    if (!game.inGame || !isSaveableScenario(game.scenarioId)) {
+    // A replay is somebody else's run being re-simulated; writing it over the watcher's own save
+    // would cost them their game
+    if (
+      !game.inGame ||
+      game.replayPlayback ||
+      !isSaveableScenario(game.scenarioId)
+    ) {
       flush();
       live = undefined;
       return;

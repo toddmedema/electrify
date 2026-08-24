@@ -509,13 +509,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: MANUAL_ENTRY.SCORE,
     group: "Gameplay",
-    keywords: "points scoring high score end of game investor public",
+    keywords:
+      "points scoring high score end of game investor public replay watch",
     entry: (
       <div>
         <p>
           At the end of your term as CEO (each scenario has a different length),
           you'll receive a score for how well you did. Try to beat your score
           the next time you play!
+        </p>
+        <p>
+          If you're logged in, your score goes on the scenario's global
+          leaderboard along with a replay of the run that set it. Any score with
+          a play button beside it can be watched from the start, at whatever
+          speed you like - a good way to see how somebody else got there.
         </p>
         <p>Investor-owned scenarios are scored as follows:</p>
         <table className="points">
