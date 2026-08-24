@@ -137,4 +137,26 @@ describe("the Finances chart selectors", () => {
     expect(metricSelect()).toHaveTextContent("Net Worth");
     expect(plottedMetric()).toContain("Net Worth");
   });
+
+  // A remount is what going off to build a facility and coming back amounts to, and the period
+  // is the half of the pair that used to snap back to the current year on the way in
+  it("remembers the period across a remount", async () => {
+    const view = renderFinances(game, "PAUSED");
+    await choose(periodSelect(), "All time");
+    const allTime = summarised("Revenue");
+    view.unmount();
+
+    renderFinances(game, "PAUSED");
+    expect(periodSelect()).toHaveTextContent("All time");
+    expect(summarised("Revenue")).toEqual(allTime);
+  });
+
+  // Each game offers only the years it has reached, so one left over from a longer game has to
+  // be dropped rather than left selected on a year the dropdown cannot even list
+  it("falls back to the current year when the stored one predates this game", () => {
+    localStorage.setItem("financesChartYear", "2099");
+
+    renderFinances(game, "PAUSED");
+    expect(periodSelect()).toHaveTextContent("Current year");
+  });
 });

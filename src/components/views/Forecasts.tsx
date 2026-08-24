@@ -19,6 +19,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
+import { getStorageChoice, setStorageKeyValue } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
@@ -28,6 +29,9 @@ import ChartForecastStorage from "../base/ChartForecastStorage";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
 import { isDesktopScreen } from "../../Globals";
+
+const FORECAST_YEARS_KEY = "forecastYears";
+const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
 
 interface BlackoutEdges {
   minute: number;
@@ -42,16 +46,23 @@ export interface DispatchProps {}
 
 export interface Props extends StateProps, DispatchProps {}
 
-// TODO move forecast years to UI reducer, so that it's preserved across page changes
 interface State {
-  year: number;
   years: number;
 }
 
 export default class Forecasts extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { year: 0, years: 1 };
+    // Building a facility unmounts this pane, so the horizon has to be remembered outside the
+    // component or every trip to the build screen drops the player back to a one year forecast
+    this.state = {
+      years: getStorageChoice(FORECAST_YEARS_KEY, FORECAST_YEARS_OPTIONS, 1),
+    };
+  }
+
+  public setYears(years: number) {
+    setStorageKeyValue(FORECAST_YEARS_KEY, years);
+    this.setState({ years });
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
@@ -193,16 +204,17 @@ export default class Forecasts extends React.Component<Props, State> {
               Supply & Demand
               <Select
                 id="forecastYears"
-                defaultValue={1}
+                value={years}
                 onChange={(e: SelectChangeEvent<number>) =>
-                  this.setState({ years: e.target.value as number })
+                  this.setYears(e.target.value as number)
                 }
                 sx={{ float: "right" }}
               >
-                <MenuItem value={1}>1 year</MenuItem>
-                <MenuItem value={5}>5 years</MenuItem>
-                <MenuItem value={10}>10 years</MenuItem>
-                <MenuItem value={20}>20 years</MenuItem>
+                {FORECAST_YEARS_OPTIONS.map((y: number) => (
+                  <MenuItem value={y} key={y}>
+                    {y} year{y > 1 ? "s" : ""}
+                  </MenuItem>
+                ))}
               </Select>
             </Typography>
           </Toolbar>
