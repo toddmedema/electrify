@@ -901,11 +901,33 @@ function getDemandW(
   return demandMultiple * now.customers;
 }
 
-function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
+const KG_PER_MEGATON = 1000000000;
+
+/**
+ * Everything the player has emitted so far, in megatons of CO2e, which is what the weather warms
+ * and destabilises in proportion to.
+ *
+ * Summed from the monthly history rather than carried as its own field so that it needs no
+ * migration, no place in a save, and no chance of disagreeing with the emissions the player is
+ * actually scored on. The history is one entry per month -- a few hundred at the very most -- and
+ * this runs once per reforecast, not once per tick.
+ */
+function getCumulativeMegatons(monthlyHistory: MonthlyHistoryType[]): number {
+  let kgco2e = 0;
+  for (let i = 0; i < monthlyHistory.length; i++) {
+    kgco2e += monthlyHistory[i].kgco2e;
+  }
+  return kgco2e / KG_PER_MEGATON;
+}
+
+function reforecastWeatherAndPrices(
+  state: GameType,
+  cumulativeMegatons: number,
+): TickPresentFutureType[] {
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = getWeather(date, state.seed);
+      const weather = getWeather(date, state.seed, cumulativeMegatons);
       const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
       return {
         ...t,
@@ -1192,6 +1214,9 @@ export function generateNewTimeline(
     monthlyHistory: [] as MonthlyHistoryType[],
     timeline: new Array(ticks) as TickPresentFutureType[],
   };
+  const cumulativeMegatons = getCumulativeMegatons(
+    readOnlyState.monthlyHistory,
+  );
   // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
   // was the same number recomputed for every one of up to a year's worth of ticks
   const netWorth = getNetWorth(state.facilities, cash);
@@ -1224,7 +1249,11 @@ export function generateNewTimeline(
       // reforecastWeatherAndPrices asserts its own tick literal.
     } as TickPresentFutureType;
   }
-  state.timeline = reforecastWeatherAndPrices(state);
+  // Read off the caller's history, not the blanked copy above, and frozen for the whole horizon:
+  // what the player emits over the coming month is exactly what the forecast cannot know. It
+  // advances at the month rollover, which is when this runs, so the forecast never shifts under a
+  // player mid-month.
+  state.timeline = reforecastWeatherAndPrices(state, cumulativeMegatons);
   state.timeline = reforecastDemand(state);
   state.timeline = reforecastSupply(state, true);
   return state.timeline;

@@ -3,6 +3,7 @@ import {
   getIntersectionX,
   getRandomRangeAt,
   newSeed,
+  normalAt,
   randomAt,
 } from "./Math";
 
@@ -77,6 +78,57 @@ describe("getRandomRangeAt", () => {
     const result = getRandomRangeAt(12345, STREAM, 0, min, max);
     expect(result).toBeGreaterThanOrEqual(min);
     expect(result).toBeLessThan(max);
+  });
+});
+
+describe("normalAt", () => {
+  const sample = (seed: number, count: number) =>
+    Array.from({ length: count }, (_, index) => normalAt(seed, STREAM, index));
+
+  it("comes out standard normal", () => {
+    const values = sample(12345, 20000);
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const sd = Math.sqrt(
+      values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length,
+    );
+    expect(mean).toBeCloseTo(0, 1);
+    expect(sd).toBeCloseTo(1, 1);
+  });
+
+  it("puts about two thirds of its draws within one standard deviation", () => {
+    // The property that makes this the right shape for a weather anomaly, and the one a uniform
+    // does not have: most departures are small, big ones are rare, and none are impossible
+    const values = sample(999, 20000);
+    const within = (limit: number) =>
+      values.filter((v) => Math.abs(v) < limit).length / values.length;
+    expect(within(1)).toBeCloseTo(0.68, 1);
+    expect(within(2)).toBeCloseTo(0.95, 1);
+    expect(Math.max(...values.map(Math.abs))).toBeGreaterThan(3);
+  });
+
+  it("returns the same value for the same coordinates, whatever came before", () => {
+    const expected = normalAt(12345, STREAM, 7);
+    for (let index = 0; index < 100; index++) {
+      normalAt(999, STREAM, index); // Draws that would have advanced a sequential generator
+    }
+    expect(normalAt(12345, STREAM, 7)).toEqual(expected);
+  });
+
+  it("gives neighbouring indexes unrelated values rather than a shared uniform", () => {
+    // One normal costs two uniforms, so a naive implementation would have index 0 and index 1
+    // drawing from overlapping pairs
+    const values = sample(12345, 500);
+    for (let index = 1; index < values.length; index++) {
+      expect(values[index]).not.toEqual(values[index - 1]);
+    }
+  });
+
+  it("never returns a value that would poison the simulation", () => {
+    for (let seed = 0; seed < 50; seed++) {
+      for (let index = 0; index < 200; index++) {
+        expect(Number.isFinite(normalAt(seed, STREAM, index))).toBe(true);
+      }
+    }
   });
 });
 
