@@ -32,7 +32,7 @@ import {
 } from "../../helpers/Format";
 import {
   getStorageBoolean,
-  getStorageString,
+  getStorageChoice,
   setStorageKeyValue,
 } from "../../LocalStorage";
 import { isDesktopScreen } from "../../Globals";
@@ -159,6 +159,26 @@ const CHART_KEYS = {
   },
 } as { [index: string]: ChartKeyMetadataType };
 
+const CHART_KEY_STORAGE_KEY = "financesChartKey";
+const CHART_YEAR_STORAGE_KEY = "financesChartYear";
+
+// The two entries of the year dropdown that aren't a year, and so stay valid in any game
+const ALL_TIME = 0;
+const CURRENT_YEAR = -1;
+
+// Newest first, so that the year being played is at the top of the dropdown
+function getPlayedYears(game: GameType): number[] {
+  const years = [];
+  for (let i = game.date.year; i >= game.startingYear; i--) {
+    years.push(i);
+  }
+  return years;
+}
+
+function getPlotYearOptions(game: GameType): number[] {
+  return [ALL_TIME, CURRENT_YEAR, ...getPlayedYears(game)];
+}
+
 export interface StateProps {
   game: GameType;
 }
@@ -204,11 +224,18 @@ function getTickFromValue(v: number) {
 export default class Finances extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    // Building a facility unmounts this pane, so both dropdowns have to be remembered outside
+    // the component or the player lands back on this year's profit every time they return
     this.state = {
-      year: -1, // current year
+      year: getStorageChoice(
+        CHART_YEAR_STORAGE_KEY,
+        getPlotYearOptions(props.game),
+        CURRENT_YEAR,
+      ),
       expanded: getStorageBoolean("financesTableOpened", false),
-      chartKey: getStorageString(
-        "financesChartKey",
+      chartKey: getStorageChoice(
+        CHART_KEY_STORAGE_KEY,
+        Object.keys(CHART_KEYS),
         "profit",
       ) as DerivedHistoryKeysType,
     };
@@ -240,8 +267,13 @@ export default class Finances extends React.Component<Props, State> {
   }
 
   public setChartKey(chartKey: DerivedHistoryKeysType) {
-    setStorageKeyValue("financesChartKey", chartKey);
+    setStorageKeyValue(CHART_KEY_STORAGE_KEY, chartKey);
     this.setState({ chartKey });
+  }
+
+  public setYear(year: number) {
+    setStorageKeyValue(CHART_YEAR_STORAGE_KEY, year);
+    this.setState({ year });
   }
 
   /**
@@ -333,10 +365,7 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
-    const years = []; // Go in reverse so that newest value (current year) is on top
-    for (let i = date.year; i >= startingYear; i--) {
-      years.push(i);
-    }
+    const years = getPlayedYears(game);
 
     const monthlyHistory = game.monthlyHistory.filter(
       (t: MonthlyHistoryType) =>
@@ -456,7 +485,7 @@ export default class Finances extends React.Component<Props, State> {
             </Typography>
             <Select
               id="plotMetric"
-              defaultValue={chartKey}
+              value={chartKey}
               onChange={(e: SelectChangeEvent<string>) =>
                 this.setChartKey(e.target.value as DerivedHistoryKeysType)
               }
@@ -488,14 +517,13 @@ export default class Finances extends React.Component<Props, State> {
             </Typography>
             <Select
               id="plotYear"
-              defaultValue={-1}
+              value={year}
               onChange={(e: SelectChangeEvent<number>) =>
-                this.setState({ year: e.target.value as number })
+                this.setYear(e.target.value as number)
               }
             >
-              <MenuItem value={0}>All time</MenuItem>
-              <MenuItem value={-1}>Current year</MenuItem>
-              props.game.date.year
+              <MenuItem value={ALL_TIME}>All time</MenuItem>
+              <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
               {years.map((y: number) => {
                 return (
                   <MenuItem value={y} key={y}>

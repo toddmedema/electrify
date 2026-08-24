@@ -35,6 +35,23 @@ export function getStorageString(key: string, fallback: string): string {
   return val !== null ? val : fallback;
 }
 
+// Restores a dropdown's last choice. The stored value is only honoured while it's still one of
+// the options on offer - a metric that has since been renamed, or a year belonging to a game
+// that's been replaced, falls back rather than leaving the control showing something it can't
+// plot. Works for numeric and string valued selects alike, since storage only holds strings.
+export function getStorageChoice<T extends number | string>(
+  key: string,
+  options: readonly T[],
+  fallback: T,
+): T {
+  const val = getLocalStorage().getItem(key);
+  if (val === null) {
+    return fallback;
+  }
+  const match = options.find((option) => String(option) === val);
+  return match !== undefined ? match : fallback;
+}
+
 // Value can be boolean, number, string or stringifiable JSON.
 // Writes throw when storage is full or the browser blocks it, and no caller has anything useful
 // to do about that, so by default the write is best effort. Pass ignoreErrors: false where the
