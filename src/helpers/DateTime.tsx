@@ -87,8 +87,10 @@ export function summarizeTimeline(
   filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
-  // Go in reverse so that the last values for ending values (like net worth are used)
-  for (let i = timeline.length - 1; i >= 0; i--) {
+  // Ticks are ordered oldest first, so walk forwards: reduceHistories keeps the last value it
+  // sees for the point-in-time fields, and the period should report the balances it ended on.
+  // Note that summarizeHistory below walks the other way, because monthlyHistory is newest first.
+  for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     if (!filter || filter(t)) {
       // TODO perf this gets called a lot, but only need
@@ -115,7 +117,9 @@ export function summarizeHistory(
   filter?: (t: MonthlyHistoryType) => boolean,
 ): MonthlyHistoryType {
   const summary = { ...EMPTY_HISTORY };
-  // Go in reverse so that the last values for ending values (like net worth are used)
+  // Months are ordered newest first (state.monthlyHistory is built by unshifting), so walking
+  // backwards is what ends on the most recent one - the opposite direction to summarizeTimeline
+  // above, for the opposite array order.
   for (let i = timeline.length - 1; i >= 0; i--) {
     if (!filter || filter(timeline[i])) {
       reduceHistories(summary, timeline[i]);

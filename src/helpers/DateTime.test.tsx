@@ -1,11 +1,14 @@
 import {
+  EMPTY_HISTORY,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
   getSunriseSunset,
+  summarizeHistory,
+  summarizeTimeline,
 } from "./DateTime";
-import { LOCATIONS } from "../Constants";
-import { DateType } from "../Types";
+import { LOCATIONS, TICK_MINUTES } from "../Constants";
+import { DateType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
 
 describe("formatMinuteOfDayChartAxis", () => {
   it("should render midnight as 12am", () => {
@@ -93,5 +96,88 @@ describe("getSunriseSunset", () => {
     // Guards the assertion above from passing only because the runner happens to sit in the
     // location's own zone
     expect(typeof machineOffsetMinutes).toEqual("number");
+  });
+});
+
+// The two summarize helpers walk arrays that are ordered opposite ways, and reduceHistories keeps
+// the LAST value it sees for point-in-time fields (cash, customers, net worth, the rates). Which
+// end of each array is "last" is the whole of what these cover.
+describe("summarizeTimeline", () => {
+  // Ticks are oldest first, the way generateNewTimeline builds them
+  function ticks(values: number[]): TickPresentFutureType[] {
+    return values.map(
+      (cash: number, i: number) =>
+        ({
+          minute: i * TICK_MINUTES,
+          supplyW: 0,
+          demandW: 0,
+          cash,
+          customers: 1000 + i,
+          netWorth: cash * 2,
+          revenue: 10,
+          expensesFuel: 1,
+          expensesOM: 0,
+          expensesCarbonFee: 0,
+          expensesInterest: 0,
+          expensesMarketing: 0,
+          kgco2e: 0,
+          interestRate: 0.04 + i / 1000,
+          inflationRate: 0.02,
+        }) as TickPresentFutureType,
+    );
+  }
+
+  it("reports the balances the period ended on, not the ones it opened with", () => {
+    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
+    expect(summary.cash).toEqual(300);
+    expect(summary.netWorth).toEqual(600);
+    expect(summary.customers).toEqual(1002);
+  });
+
+  it("reports the rate in force at the end of the period", () => {
+    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
+    expect(summary.interestRate).toBeCloseTo(0.042, 10);
+  });
+
+  it("still totals the flows across every tick", () => {
+    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
+    expect(summary.revenue).toEqual(30);
+    expect(summary.expensesFuel).toEqual(3);
+  });
+
+  it("ends on the last tick the filter kept, not the last one in the array", () => {
+    const summary = summarizeTimeline(
+      ticks([100, 200, 300, 400]),
+      2020,
+      (t) => t.cash <= 300,
+    );
+    expect(summary.cash).toEqual(300);
+    expect(summary.revenue).toEqual(30);
+  });
+});
+
+describe("summarizeHistory", () => {
+  // Months are newest first, the way state.monthlyHistory is built by unshifting
+  function months(values: number[]): MonthlyHistoryType[] {
+    return values.map(
+      (cash: number) =>
+        ({
+          ...EMPTY_HISTORY,
+          cash,
+          netWorth: cash * 2,
+          revenue: 10,
+        }) as MonthlyHistoryType,
+    );
+  }
+
+  it("reports the balances of the most recent month", () => {
+    // Newest first, so 300 is the newest month and 100 the oldest
+    const summary = summarizeHistory(months([300, 200, 100]));
+    expect(summary.cash).toEqual(300);
+    expect(summary.netWorth).toEqual(600);
+  });
+
+  it("still totals the flows across every month", () => {
+    expect(summarizeHistory(months([300, 200, 100])).revenue).toEqual(30);
   });
 });
