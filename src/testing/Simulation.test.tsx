@@ -56,6 +56,31 @@ describe("simulation invariants", () => {
     );
   });
 
+  // Twenty years of 1980's economy, which is the harshest rate environment the data has: prime
+  // opens at 21.5% and every loan signed in the first months is still being paid off at the end.
+  // The failure this guards against is a loan whose monthly interest outgrows its payment, which
+  // would amortize backwards and never close -- the reason a loan's rate is fixed at origination.
+  it("amortizes every loan away over a twenty year run", () => {
+    const result = runSimulation({
+      scenarioId: 102, // The End of an Era, starting 1980
+      months: 240,
+      strategy: "keepUp",
+    });
+    expectNoViolations(result);
+    result.finalFacilities.forEach((f) => {
+      // Either still under construction, or paying down rather than growing
+      expect(f.loanAmountLeft).toBeLessThanOrEqual(f.loanAmountTotal);
+      expect(Number.isFinite(f.loanAmountLeft)).toBe(true);
+    });
+    result.months.forEach((m) => {
+      expect(m.interestRate).toBeGreaterThan(0);
+      // Prime has reached 21.5% in this era, and a struggling company pays a multiple of it
+      expect(m.interestRate).toBeLessThan(1);
+      expect(m.inflationRate).toBeGreaterThan(-0.05);
+      expect(m.inflationRate).toBeLessThan(0.25);
+    });
+  });
+
   it("holds while spending on marketing", () => {
     expectNoViolations(
       runSimulation({

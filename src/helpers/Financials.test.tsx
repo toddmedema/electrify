@@ -1,8 +1,14 @@
 import {
   customersFromMarketingSpend,
+  CreditInputsType,
   facilityCashBack,
+  getCompanyInterestRate,
+  getCreditInputs,
+  getCreditPremium,
   getMonthlyPayment,
   getPaymentInterest,
+  getTotalDebt,
+  MAX_CREDIT_POINTS,
   LCWH,
 } from "./Financials";
 import {
@@ -209,5 +215,137 @@ describe("LCWH", () => {
     expect(formatMoneyConcise(LCWH(dark, date, 0, SEED) * 1000000)).toEqual(
       "\u2014",
     );
+  });
+});
+
+// A company a lender has no complaint about: profitable, liquid, barely borrowed
+function aCleanCompany(
+  overrides: Partial<CreditInputsType> = {},
+): CreditInputsType {
+  return {
+    profitMargin: 0.1,
+    cashRatio: 0.1,
+    debtToCapital: 0.4,
+    debtToRevenue: 2,
+    ...overrides,
+  };
+}
+
+describe("getCreditPremium", () => {
+  it("lends at prime to a company with nothing wrong with it", () => {
+    expect(getCreditPremium(aCleanCompany())).toEqual(1);
+  });
+
+  it("charges nothing extra for being better than the bar", () => {
+    // Sitting on twice the cash asked for doesn't earn a discount - prime is the floor
+    expect(
+      getCreditPremium(
+        aCleanCompany({ profitMargin: 0.5, cashRatio: 0.9, debtToCapital: 0 }),
+      ),
+    ).toEqual(1);
+  });
+
+  // The worked example from the issue: 10 points for no margin, 5 for holding only 5% cash
+  it("charges 5% of prime for each point a company falls short by", () => {
+    const premium = getCreditPremium(
+      aCleanCompany({ profitMargin: 0, cashRatio: 0.05 }),
+    );
+    expect(premium).toBeCloseTo(1.75, 10);
+    expect(
+      getCompanyInterestRate(
+        0.05,
+        aCleanCompany({
+          profitMargin: 0,
+          cashRatio: 0.05,
+        }),
+      ),
+    ).toBeCloseTo(0.0875, 10);
+  });
+
+  it("keeps charging a company whose losses keep growing", () => {
+    const bad = getCreditPremium(aCleanCompany({ profitMargin: -0.1 }));
+    const worse = getCreditPremium(aCleanCompany({ profitMargin: -0.3 }));
+    expect(worse).toBeGreaterThan(bad);
+    expect(bad).toBeGreaterThan(1);
+  });
+
+  // The feedback loop the issue is missing without it: borrowing to build makes the next
+  // loan dearer, whatever the income statement says
+  it("charges more for being levered, holding profit and cash fixed", () => {
+    const modest = getCreditPremium(aCleanCompany({ debtToCapital: 0.4 }));
+    const stretched = getCreditPremium(aCleanCompany({ debtToCapital: 0.8 }));
+    expect(stretched).toBeGreaterThan(modest);
+    // 40 points of leverage above the line, at half a point each, at 5% of prime each
+    expect(stretched).toBeCloseTo(1 + 20 * 0.05, 10);
+  });
+
+  it("charges more for owing more years of revenue, holding everything else fixed", () => {
+    const covered = getCreditPremium(aCleanCompany({ debtToRevenue: 2 }));
+    const stretched = getCreditPremium(aCleanCompany({ debtToRevenue: 6 }));
+    expect(stretched).toBeGreaterThan(covered);
+  });
+
+  it("stops pricing a company that is past saving", () => {
+    const hopeless = getCreditPremium({
+      profitMargin: -10,
+      cashRatio: -1,
+      debtToCapital: 1,
+      debtToRevenue: 100,
+    });
+    expect(hopeless).toEqual(1 + MAX_CREDIT_POINTS * 0.05);
+  });
+});
+
+describe("getTotalDebt", () => {
+  it("adds up what is still owed across the fleet", () => {
+    expect(
+      getTotalDebt([
+        aFacility({ loanAmountLeft: 1000 }),
+        aFacility({ loanAmountLeft: 2500 }),
+        aFacility(), // Bought outright
+      ]),
+    ).toEqual(3500);
+  });
+});
+
+describe("getCreditInputs", () => {
+  const aMonth = (revenue: number, expenses: number) =>
+    ({
+      revenue,
+      expensesFuel: expenses,
+      expensesOM: 0,
+      expensesCarbonFee: 0,
+      expensesInterest: 0,
+      expensesMarketing: 0,
+      supplyWh: 1000,
+    }) as never;
+
+  it("prices a company on its first day off its balance sheet alone", () => {
+    // No history to read a margin from, and dividing by that revenue would be a NaN rate
+    const inputs = getCreditInputs([], 1000, 1000, []);
+    expect(getCreditPremium(inputs)).toEqual(1);
+  });
+
+  it("reads the margin off a year of results", () => {
+    const months = new Array(12).fill(aMonth(100, 80));
+    const inputs = getCreditInputs(months, 500, 1000, []);
+    expect(inputs.profitMargin).toBeCloseTo(0.2, 10);
+    expect(inputs.cashRatio).toBeCloseTo(0.5, 10);
+  });
+
+  it("annualises a partial year rather than judging it as a whole one", () => {
+    // Three months in, a company owing one month's revenue is not owing a third of a year's
+    const months = new Array(3).fill(aMonth(100, 80));
+    const inputs = getCreditInputs(months, 500, 1000, [
+      aFacility({ loanAmountLeft: 1200 }),
+    ]);
+    expect(inputs.debtToRevenue).toBeCloseTo(1, 10);
+  });
+
+  it("counts debt against what is financing the fleet", () => {
+    const inputs = getCreditInputs([aMonth(100, 50)], 500, 1000, [
+      aFacility({ loanAmountLeft: 1000 }),
+    ]);
+    expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
   });
 });

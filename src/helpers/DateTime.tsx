@@ -30,6 +30,8 @@ export const EMPTY_HISTORY = {
   expensesInterest: 0,
   expensesMarketing: 0,
   netWorth: 0,
+  interestRate: 0,
+  inflationRate: 0,
 } as MonthlyHistoryType;
 
 // edits acc in place to avoid making tons of extra objects
@@ -49,6 +51,10 @@ export function reduceHistories(
   acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
+  // Rates are a level, not a flow: adding twelve months of them together would be nonsense, so
+  // the period reports the one in force at its end
+  acc.interestRate = t.interestRate;
+  acc.inflationRate = t.inflationRate;
   acc.month = t.month;
   acc.year = t.year;
   return acc;

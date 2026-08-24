@@ -34,11 +34,7 @@ import {
   formatMoneyStable,
   formatWatts,
 } from "../../helpers/Format";
-import {
-  DOWNPAYMENT_PERCENT,
-  INTEREST_RATE_YEARLY,
-  LOAN_MONTHS,
-} from "../../Constants";
+import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
@@ -46,6 +42,7 @@ import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
+  interestRate: number;
   storage: StorageShoppingType;
   onBuild: (financed: boolean) => void;
 }
@@ -58,7 +55,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(
     loanAmount,
-    INTEREST_RATE_YEARLY,
+    props.interestRate,
     LOAN_MONTHS,
   );
   const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
@@ -81,7 +78,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, INTEREST_RATE_YEARLY);
+  // const monthlyInterest = getPaymentInterest(loanAmount, props.interestRate);
   // <TableRow>
   // <TableCell>Payments during construction (interest only)</TableCell>
   // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
@@ -203,9 +200,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Interest rate</TableCell>
+                  <TableCell>
+                    Interest rate
+                    <ManualLink
+                      entry={MANUAL_ENTRY.INTEREST_RATES}
+                      label="interest rate"
+                    />
+                  </TableCell>
                   <TableCell align="right">
-                    {(INTEREST_RATE_YEARLY * 100).toFixed(1)}%
+                    {(props.interestRate * 100).toFixed(2)}%
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -418,6 +421,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             storage={g}
             key={i}
             cash={cash}
+            interestRate={game.interestRate}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
               onBack();

@@ -24,7 +24,9 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
-export const SAVE_VERSION = 1;
+// 2: facilities carry the rate their loan was signed at, and the game carries the rate a new one
+// would cost. A version 1 save has neither, and a loan with no rate cannot be repaid.
+export const SAVE_VERSION = 2;
 
 export interface SaveGameType {
   version: number;

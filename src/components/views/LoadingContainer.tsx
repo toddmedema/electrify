@@ -1,6 +1,7 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { logEvent } from "../../Globals";
+import { initEconomy } from "../../data/Economy";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
 import { LOCATIONS } from "../../Constants";
@@ -54,29 +55,31 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
 
       initWeather(location.id, () => {
         initFuelPrices(() => {
-          if (!resumed) {
-            // Otherwise, generate from scratch
-            // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
-            dispatch(
-              initGame({
-                facilities: scenario.facilities,
-                cash: scenario.cash,
-                customers: 1030000,
-                location,
-                // A replay has to run on the seed it was recorded with. Otherwise only the custom
-                // game screen sets one; every authored scenario leaves it undefined and draws a
-                // fresh seed
-                seed: replaying ? game.seed : scenario.seed,
-              }),
-            );
-          }
+          initEconomy(() => {
+            if (!resumed) {
+              // Otherwise, generate from scratch
+              // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
+              dispatch(
+                initGame({
+                  facilities: scenario.facilities,
+                  cash: scenario.cash,
+                  customers: 1030000,
+                  location,
+                  // A replay has to run on the seed it was recorded with. Otherwise only the custom
+                  // game screen sets one; every authored scenario leaves it undefined and draws a
+                  // fresh seed
+                  seed: replaying ? game.seed : scenario.seed,
+                }),
+              );
+            }
 
-          dispatch(loaded());
+            dispatch(loaded());
 
-          // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
-          if (scenario.tutorialSteps && !resumed && !replaying) {
-            setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
-          }
+            // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
+            if (scenario.tutorialSteps && !resumed && !replaying) {
+              setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
+            }
+          });
         });
       });
     },

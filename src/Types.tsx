@@ -221,6 +221,11 @@ interface HistoryForecastShared {
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
   expensesMarketing: number; // total
   kgco2e: number; // total
+  // Point in time rather than totals: what a new loan would cost, and what prices were doing,
+  // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
+  // keeps the last one it sees, the way it does for cash and net worth.
+  interestRate: number; // Annual, as a fraction. Prime plus the company's own credit premium
+  inflationRate: number; // Annualised, as a fraction. Can be negative
 }
 
 export interface FuelType {
@@ -252,6 +257,11 @@ interface LoanInfo {
   loanAmountTotal: number;
   loanAmountLeft: number;
   loanMonthlyPayment: number;
+  // The rate this particular loan was signed at, fixed for its whole 30 year life. Kept per
+  // facility rather than read from the current rate so that a later spike cannot push a month's
+  // interest above a payment that was struck years earlier, which would grow the balance forever.
+  // 0 for anything bought outright.
+  interestRate: number;
 }
 
 export type FacilityShoppingType = StorageShoppingType | GeneratorShoppingType;
@@ -346,6 +356,12 @@ export interface GameType {
   feePerKgCO2e: number;
   dollarsPerkWh: number;
   monthlyMarketingSpend: number;
+  // What a loan signed right now would cost, and the multiplier on prime that gets there.
+  // Both recomputed once a month. The premium is kept separately so that a forecast can price
+  // future months against where prime is heading while holding the company's own creditworthiness
+  // fixed -- what the player does next is exactly what the forecast cannot know.
+  interestRate: number;
+  creditPremium: number;
   tutorialStep: number;
   date: DateType;
   startingYear: number;

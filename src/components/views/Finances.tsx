@@ -126,6 +126,11 @@ const CHART_KEYS = {
     formatTable: formatMoneyStable,
     nesting: 1,
   },
+  interestRate: {
+    label: "Interest rate",
+    format: (n: number) => `${(n * 100).toFixed(2)}%`,
+    nesting: 2,
+  },
   expensesCarbonFee: {
     label: "Carbon fees",
     format: formatMoneyConcise,
@@ -156,6 +161,10 @@ const CHART_KEYS = {
     format: formatMoneyConcise,
     formatTable: formatMoneyStable,
     nesting: 1,
+  },
+  inflationRate: {
+    label: "Inflation",
+    format: (n: number) => `${(n * 100).toFixed(1)}%`,
   },
 } as { [index: string]: ChartKeyMetadataType };
 

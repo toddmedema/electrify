@@ -35,6 +35,7 @@ export function getIntersectionX(
 export const RANDOM_STREAM = {
   weather: 1,
   fuelPrices: 2,
+  economy: 3,
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript

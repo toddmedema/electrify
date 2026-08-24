@@ -5,6 +5,7 @@ import numbro from "numbro";
 import { submitHighscore } from "./User";
 import {
   getDateFromMinute,
+  getMonthYearFromMinute,
   getTimeFromTimeline,
   summarizeHistory,
   summarizeTimeline,
@@ -13,9 +14,12 @@ import {
 import {
   customersFromMarketingSpend,
   facilityCashBack,
+  getCreditInputs,
+  getCreditPremium,
   getMonthlyPayment,
   getPaymentInterest,
 } from "../helpers/Financials";
+import { getInflationRate, getPrimeRate } from "../data/Economy";
 import {
   formatMoneyConcise,
   formatWatts,
@@ -122,6 +126,10 @@ const initialGame: GameType = {
   feePerKgCO2e: 0, // Start on easy mode
   dollarsPerkWh: 0.07,
   monthlyMarketingSpend: 0,
+  // Placeholders until initGame prices the company against the year it actually starts in. The
+  // new game screens read these before any economic data has been loaded.
+  interestRate: INTEREST_RATE_YEARLY,
+  creditPremium: 1,
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
   facilities: [] as FacilityOperatingType[],
   startingYear: 2020,
@@ -204,6 +212,14 @@ export const gameSlice = createSlice({
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
       state.date = getDateFromMinute(0, scenario.startingYear);
       state.startingYear = scenario.startingYear;
+      // A company on day one has no track record, no debt and nothing but cash, so it borrows at
+      // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
+      // repriced against its own results at the first month rollover, and every one after.
+      state.creditPremium = getCreditPremium(
+        getCreditInputs([], a.cash, a.cash, []),
+      );
+      state.interestRate =
+        getPrimeRate(state.date, state.seed) * state.creditPremium;
       state.feePerKgCO2e = scenario.feePerKgCO2e;
       // The rate the scenario advertises on the new game screen, and the rate Public scenarios are
       // scored against, so the game has to actually start there rather than at the slice default
@@ -621,6 +637,14 @@ export function tickState(state: GameType) {
 
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
+      // Reprice the company's credit off the year that just closed, before the forecast is built
+      // against it. Once a month, not once a tick: a lender looks at a year of results, and a
+      // rate that moved every tick would be unplannable.
+      state.creditPremium = getCreditPremium(
+        getCreditInputs(history, cash, now.netWorth, state.facilities),
+      );
+      state.interestRate =
+        getPrimeRate(state.date, state.seed) * state.creditPremium;
       state.timeline = generateNewTimeline(state, cash, customers);
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
@@ -1126,7 +1150,7 @@ function updateSupplyFacilitiesFinances(
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
           g.loanAmountLeft,
-          INTEREST_RATE_YEARLY,
+          g.interestRate,
         );
         const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
@@ -1135,8 +1159,7 @@ function updateSupplyFacilitiesFinances(
       }
     } else {
       expensesInterest +=
-        getPaymentInterest(g.loanAmountLeft, INTEREST_RATE_YEARLY) /
-        TICKS_PER_MONTH;
+        getPaymentInterest(g.loanAmountLeft, g.interestRate) / TICKS_PER_MONTH;
     }
   });
   const expensesCarbonFee = state.feePerKgCO2e * kgco2e;
@@ -1172,6 +1195,15 @@ function updateSupplyFacilitiesFinances(
   now.expensesInterest = expensesInterest;
   now.expensesMarketing = expensesMarketing;
   now.kgco2e = kgco2e;
+  // Deliberately this tick's own month rather than `date`, which is the month the game is
+  // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
+  // the same line serve the record and the projection: history keeps what the rate was, and the
+  // forecast walks prime out to wherever it is heading instead of flat-lining today's value all
+  // the way to December. The credit premium is held fixed across the horizon on purpose - what
+  // the player does between now and then is exactly what a forecast cannot know.
+  const tickMonth = getMonthYearFromMinute(now.minute, state.startingYear);
+  now.inflationRate = getInflationRate(tickMonth, state.seed);
+  now.interestRate = getPrimeRate(tickMonth, state.seed) * state.creditPremium;
 
   return now;
 }
@@ -1238,6 +1270,9 @@ export function generateNewTimeline(
       expensesInterest: 0,
       expensesMarketing: 0,
       kgco2e: 0,
+      // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
+      interestRate: 0,
+      inflationRate: 0,
       // reforecastWeatherAndPrices sets both of these on the next line, for every tick from
       // the current minute onwards -- which is all of them, since the timeline starts there.
       // Initialised anyway so a tick is a complete TickPresentFutureType the moment it exists,
@@ -1281,6 +1316,7 @@ function buildFacilityHelper(
       loanAmountTotal: 0,
       loanAmountLeft: 0,
       loanMonthlyPayment: 0,
+      interestRate: 0, // Nothing borrowed, nothing owed
     };
     if (newGame) {
       // Don't charge anything for initial builds
@@ -1293,9 +1329,10 @@ function buildFacilityHelper(
         loanAmountLeft: loanAmount,
         loanMonthlyPayment: getMonthlyPayment(
           loanAmount,
-          INTEREST_RATE_YEARLY,
+          state.interestRate,
           LOAN_MONTHS,
         ),
+        interestRate: state.interestRate,
       };
     } else {
       // purchased in cash

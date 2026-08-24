@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { initEconomyFromCsv } from "../data/Economy";
 import { initFuelPricesFromCsv } from "../data/FuelPrices";
 import { initWeatherFromCsv } from "../data/Weather";
 import { LocationIdType } from "../Types";
@@ -8,7 +9,7 @@ import { LocationIdType } from "../Types";
 const DATA_DIR = path.resolve(__dirname, "..", "..", "public", "data");
 
 /**
- * Loads the weather and fuel price data the simulation needs, resetting whatever a previous
+ * Loads the weather, fuel price and economic data the simulation needs, resetting whatever a previous
  * run left behind. Both modules loop or throw when asked for data they don't have, so this
  * has to run before any simulation is started.
  */
@@ -19,5 +20,8 @@ export function loadSimData(locationId: LocationIdType) {
   );
   initFuelPricesFromCsv(
     fs.readFileSync(path.join(DATA_DIR, "FuelPricesRaw.csv"), "utf8"),
+  );
+  initEconomyFromCsv(
+    fs.readFileSync(path.join(DATA_DIR, "EconomyRaw.csv"), "utf8"),
   );
 }
