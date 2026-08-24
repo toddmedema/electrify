@@ -108,9 +108,9 @@ describe("Manual", () => {
     expect(
       screen.getByText(/No entries match "hydrogen fuel cells"/),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Discord" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Let us know" })).toHaveAttribute(
       "href",
-      expect.stringContaining("discord"),
+      expect.stringContaining("mailto:"),
     );
   });
 

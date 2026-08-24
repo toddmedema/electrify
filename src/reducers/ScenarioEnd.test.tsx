@@ -1,7 +1,14 @@
+import type * as React from "react";
 import { produce } from "immer";
-import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
+import {
+  CUSTOM_SCENARIO_ID,
+  getNextTutorial,
+  SCENARIOS,
+  TUTORIALS,
+} from "../data/Scenarios";
+import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
-import { tickState } from "./Game";
+import { quit, tickState } from "./Game";
 import { GameType, ScenarioType } from "../Types";
 
 /**
@@ -56,5 +63,62 @@ describe("ending a scenario from inside the reducer", () => {
     }
     expect(state.monthlyHistory[0].cash).toBeLessThan(0);
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
+  });
+});
+
+describe("finishing a tutorial", () => {
+  const tutorial = TUTORIALS[0];
+  const next = getNextTutorial(tutorial.id) as ScenarioType;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    // The store is a module singleton, so each case starts from a game that isn't running
+    getStore().dispatch(quit());
+  });
+  afterEach(() => jest.useRealTimers());
+
+  // Runs the tutorial out to its end and hands back the dialog the reducer opened for it
+  function finishTutorial() {
+    let state = createGame({ scenarioId: tutorial.id });
+    while (state.date.monthsEllapsed < tutorial.durationMonths) {
+      state = tick(state);
+    }
+    jest.runOnlyPendingTimers();
+    return getStore().getState().ui.dialog;
+  }
+
+  it("celebrates rather than showing a score", () => {
+    const dialog = finishTutorial();
+    expect(dialog.open).toBe(true);
+    expect(dialog.title).toContain(tutorial.endTitle as string);
+    // Dismissing would leave the player sitting in a scenario that's already over
+    expect(dialog.notCancellable).toBe(true);
+  });
+
+  it("leads with the next tutorial and keeps the main menu as the way out", () => {
+    const dialog = finishTutorial();
+    expect(dialog.actionLabel).toBe("Next tutorial");
+    expect(dialog.secondaryLabel).toBe("Main menu");
+  });
+
+  it("starts the next tutorial without a trip through the scenario list", () => {
+    const dialog = finishTutorial();
+    (dialog.action as (e: React.MouseEvent<HTMLElement>) => void)(
+      {} as React.MouseEvent<HTMLElement>,
+    );
+    const state = getStore().getState();
+    expect(state.game.scenarioId).toBe(next.id);
+    // The loading screen is what re-reads the weather and fuel price CSVs for the new location
+    expect(state.card.name).toBe("LOADING");
+  });
+
+  it("goes back to the title screen from the secondary button", () => {
+    const dialog = finishTutorial();
+    (dialog.secondaryAction as (e: React.MouseEvent<HTMLElement>) => void)(
+      {} as React.MouseEvent<HTMLElement>,
+    );
+    const state = getStore().getState();
+    expect(state.card.name).toBe("MAIN_MENU");
+    expect(state.ui.dialog.open).toBe(false);
   });
 });

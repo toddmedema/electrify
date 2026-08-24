@@ -1,8 +1,10 @@
 import * as React from "react";
 import type { UnknownAction } from "redux";
+import { ACTIONS, EVENTS, type EventData } from "react-joyride";
 import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
+import Compositor, { type Props as CompositorProps } from "./Compositor";
 import { mapDispatchToProps } from "./CompositorContainer";
 
 // Where `loaded` drops the player, and so where every walkthrough starts
@@ -206,5 +208,54 @@ describe("walkthrough steps", () => {
         ]);
       });
     });
+  });
+});
+
+describe("handleJoyrideCallback", () => {
+  const steps = walkthrough("102: Generators");
+
+  function fire(tutorialStep: number, event: Partial<EventData>) {
+    const onTutorialStep = jest.fn();
+    const onTutorialEnd = jest.fn();
+    const compositor = new Compositor({
+      tutorialStep,
+      tutorialSteps: steps,
+      scenarioId: 1,
+      card: { name: STARTING_CARD, ts: 0 },
+      onTutorialStep,
+      onTutorialEnd,
+    } as unknown as CompositorProps);
+    compositor.handleJoyrideCallback(event as EventData);
+    return { onTutorialStep, onTutorialEnd };
+  }
+
+  it("advances past a target that never turns up mid-walkthrough", () => {
+    const { onTutorialStep } = fire(2, {
+      action: ACTIONS.NEXT,
+      index: 2,
+      type: EVENTS.TARGET_NOT_FOUND,
+    });
+    expect(onTutorialStep).toHaveBeenCalled();
+  });
+
+  // Quitting takes the targets out of the DOM, which Joyride reports the same way. Acting on it
+  // navigated the freshly reset game back onto the walkthrough's card, which had nothing left to
+  // render - a blank screen where the main menu should be
+  it("ignores targets disappearing once the walkthrough is over", () => {
+    const { onTutorialStep } = fire(-1, {
+      action: ACTIONS.NEXT,
+      index: 2,
+      type: EVENTS.TARGET_NOT_FOUND,
+    });
+    expect(onTutorialStep).not.toHaveBeenCalled();
+  });
+
+  it("still ends the walkthrough when the player closes it", () => {
+    const { onTutorialEnd } = fire(2, {
+      action: ACTIONS.CLOSE,
+      index: 2,
+      type: EVENTS.STEP_AFTER,
+    });
+    expect(onTutorialEnd).toHaveBeenCalledWith(steps);
   });
 });
