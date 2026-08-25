@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
 import Finances, { parseRange, projectMonths } from "./Finances";
@@ -8,10 +8,11 @@ import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
 import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
 
-// Every test in here plays a couple of game years and then renders the real pane, chart and all,
-// so the slowest of them sit close enough to Jest's 5s default to turn into a coin flip once the
-// machine is under load. Nothing here waits on anything, so a ceiling this high only ever catches
-// a genuine hang
+// Every test in here plays a couple of game years and then renders the real pane, chart and all.
+// The slowest now runs in about a second -- see `choose` and `summarised` for where the rest of
+// it went -- so nothing should come near this. Kept well clear of the default only because
+// nothing here waits on anything, which makes a ceiling this high a hang detector rather than
+// something a loaded machine can trip
 jest.setTimeout(30000);
 
 // The card chrome is connected to the store and hides its children until a game is running, none
@@ -53,9 +54,19 @@ function summarised(label: string): string {
   return labelCell.nextElementSibling?.textContent || "";
 }
 
+// `delay: null` drops the timer userEvent otherwise waits on between the events of a click.
+// There are roughly forty clicks in this file and nothing in the pane is waiting on a timer, so
+// that wait was most of what the suite spent its time on
+const user = userEvent.setup({ delay: null });
+
+// Found by text inside the open listbox rather than by accessible name, for the same reason
+// `summarised` is: asking for an option by name makes testing-library compute one for every
+// option in the list, at over a second a call. The role query for the listbox itself carries no
+// name, so it stays cheap
 async function choose(select: HTMLElement, option: string) {
-  await userEvent.click(select);
-  await userEvent.click(await screen.findByRole("option", { name: option }));
+  await user.click(select);
+  const listbox = await screen.findByRole("listbox");
+  await user.click(within(listbox).getByText(option));
 }
 
 // Carbon Fee: a twelve year scenario, so a couple of years in it is still running and none of the
