@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
 import Finances, { parseRange, projectMonths } from "./Finances";
@@ -7,6 +7,12 @@ import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
 import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
+
+// Every test in here plays a couple of game years and then renders the real pane, chart and all,
+// so the slowest of them sit close enough to Jest's 5s default to turn into a coin flip once the
+// machine is under load. Nothing here waits on anything, so a ceiling this high only ever catches
+// a genuine hang
+jest.setTimeout(30000);
 
 // The card chrome is connected to the store and hides its children until a game is running, none
 // of which this is about. A plain wrapper puts the pane's own contents straight into the document
@@ -39,10 +45,12 @@ function periodSelect(): HTMLElement {
 }
 
 // The period select doesn't reach the chart's accessible name -- it changes which months are in
-// it -- so the summary underneath, which is totalled over exactly the same months, stands in
+// it -- so the summary underneath, which is totalled over exactly the same months, stands in.
+// Found by its label cell rather than by the row's accessible name: asking for a row by name
+// makes testing-library compute one for every row in the table, which costs over a second a call
 function summarised(label: string): string {
-  const row = screen.getByRole("row", { name: new RegExp(`^${label} `) });
-  return within(row).getAllByRole("cell")[1].textContent || "";
+  const labelCell = screen.getByText(label, { selector: "td" });
+  return labelCell.nextElementSibling?.textContent || "";
 }
 
 async function choose(select: HTMLElement, option: string) {
