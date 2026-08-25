@@ -187,6 +187,9 @@ export interface RawWeatherType {
   TEMP_C: number;
   CLOUD_PCT: number; // 0 - 100
   WIND_KPH: number;
+  // Recorded and carried through the forecast, but nothing simulates it yet: hydro inflow, snow
+  // sitting on panels and the cooling water a thermal plant needs are all downstream of having it
+  PRECIP_MM: number; // in that hour
 }
 
 // All amounts are the average across the time window

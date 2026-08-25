@@ -11,3 +11,7 @@
 *.svg filter=lfs diff=lfs merge=lfs -text
 zipalign filter=lfs diff=lfs merge=lfs -text
 *.ai filter=lfs diff=lfs merge=lfs -text
+
+# Packed weather records. Bytes rather than text, so the eol=lf rule above must not touch them,
+# and a diff of one is noise. Not LFS: they are 57KB each and written once, never edited.
+*.bin binary

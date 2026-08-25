@@ -1,11 +1,19 @@
 import { EQUATOR_RADIANCE, OUTSKIRTS_WIND_MULTIPLIER } from "../Constants";
 import { FacilityOperatingType, GeneratorOperatingType } from "../Types";
 
+const KPH_PER_MS = 3.6;
+
 export function getWindOutputFactor(windKph: number) {
   // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
-  // Divide by 5 to convert from kph to m/s
+  // The 5 was labelled as the kph to m/s conversion, but it never was one: the CSVs this was
+  // tuned against stored metres per second under a WIND_KPH heading, so it is really the derate
+  // that made a 10m reading behave like a turbine. The ERA5 files that replaced them are honestly
+  // in kph, so the conversion is now done properly alongside it, and the derate is left exactly
+  // as it was - the point of the change is the data source, not a rebalanced wind fleet.
   const turbineWindMS =
-    (OUTSKIRTS_WIND_MULTIPLIER * (windKph * Math.pow(100 / 10, 0.34))) / 5;
+    (OUTSKIRTS_WIND_MULTIPLIER *
+      ((windKph / KPH_PER_MS) * Math.pow(100 / 10, 0.34))) /
+    5;
 
   // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
   const windOutputFactor =

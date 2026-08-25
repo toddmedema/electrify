@@ -6,24 +6,29 @@ import {
   getWindCapacityFactor,
 } from "./Energy";
 
+// The argument is the wind at the site in kph, and the turbine sees a fraction of it - so the
+// speeds that matter to the power curve are several times the ones quoted in m/s below
 describe("getWindOutputFactor", () => {
-  it("should return 0 for wind speeds less than 3 m/s", () => {
+  it("should return 0 below the turbine's cut-in speed", () => {
     const windKph = 2;
     const result = getWindOutputFactor(windKph);
     expect(result).toEqual(0);
   });
 
-  it("should return 0 for wind speeds greater than 25 m/s", () => {
-    const windKph = 100;
+  it("should return 0 above the turbine's cut-out speed", () => {
+    const windKph = 150;
     const result = getWindOutputFactor(windKph);
     expect(result).toEqual(0);
   });
 
-  it("should correctly calculate the wind output factor for wind speeds between 3 and 14 m/s", () => {
-    const windKph = 20;
-    const result = getWindOutputFactor(windKph);
-    expect(result).toBeGreaterThanOrEqual(0);
-    expect(result).toBeLessThanOrEqual(1);
+  it("should slope between cut-in and rated speed", () => {
+    // 20kph at the site is 5.6m/s, which the gradient and derate together turn into 4.9m/s at the
+    // hub: not quite two metres a second above cut-in, of the eleven that reach rated output
+    const result = getWindOutputFactor(20);
+    expect(result).toBeCloseTo(0.169, 3);
+    // Doubling the wind more than doubles what comes out, until it flattens off at rated
+    expect(getWindOutputFactor(40)).toBeGreaterThan(2 * result);
+    expect(getWindOutputFactor(80)).toEqual(1);
   });
 });
 

@@ -5,11 +5,10 @@
  * Output goes straight to stdout rather than through console.log, which jest decorates with a
  * stack trace after every call.
  */
-import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { getLocation } from "../helpers/Locations";
 import { DifficultyType, ScenarioType } from "../Types";
 import { formatReport } from "./Report";
+import { getSimLocation, simLocationIds } from "./SimData";
 import { runSimulation, SimOptionsType, StrategyType } from "./Simulator";
 
 jest.setTimeout(600000);
@@ -38,9 +37,9 @@ function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
   if (year === undefined && !locationId) {
     return undefined;
   }
-  if (locationId && !getLocation(locationId)) {
+  if (locationId && !getSimLocation(locationId)) {
     throw new Error(
-      `Unknown location "${locationId}". Known: ${Object.keys(LOCATIONS).join(", ")}`,
+      `Unknown location "${locationId}". Downloaded: ${simLocationIds().join(", ")}`,
     );
   }
   return {
@@ -48,7 +47,7 @@ function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
     id: CUSTOM_SCENARIO_ID,
     startingYear: year === undefined ? scenario.startingYear : year,
     ...(locationId
-      ? { locationId, location: getLocation(locationId) }
+      ? { locationId, location: getSimLocation(locationId) }
       : undefined),
   };
 }
