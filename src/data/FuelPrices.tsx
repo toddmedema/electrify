@@ -268,22 +268,29 @@ function collectFuelPriceRow(data: RawFuelPricesType) {
   };
 }
 
-export function initFuelPrices(callback?: () => void) {
+/**
+ * Downloads the record, for the browser.
+ *
+ * @param callback - Called once, with the reason if the record could not be loaded. A caller that
+ *   starts the game regardless would be starting one whose first tick throws: there is no price to
+ *   fall back on, which is what getFuelPricesPerMBTU refuses to invent.
+ */
+export function initFuelPrices(callback?: (failure?: string) => void) {
   resetFuelPrices();
+  const done = (failure?: string) => {
+    if (callback) {
+      callback(failure);
+    }
+  };
   fetchCsv<RawFuelPricesType>(`/data/FuelPricesRaw.csv`)
     .then((rows: RawFuelPricesType[]) => {
       rows.forEach(collectFuelPriceRow);
       // Has to run before anything is projected, and while the table holds only real rows
       buildFuelTrends();
-      if (callback) {
-        callback();
-      }
+      done();
     })
     .catch((e: Error) => {
-      // The callback is deliberately not fired: it starts the game, and getFuelPricesPerMBTU
-      // throws for a game with no prices, so hanging the loading screen is the more legible of
-      // the two failures
-      console.error(`Could not load the fuel price record: ${e.message}`);
+      done(`Could not load the fuel price record: ${e.message}`);
     });
 }
 

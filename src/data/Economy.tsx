@@ -163,19 +163,27 @@ function collectEconomyRow(data: RawEconomyType) {
   }
 }
 
-export function initEconomy(callback?: () => void) {
+/**
+ * Downloads the record, for the browser.
+ *
+ * @param callback - Called once, with the reason if the record could not be loaded. A caller that
+ *   starts the game regardless would be starting one whose first tick throws: there is no rate to
+ *   fall back on, which is what getEconomy refuses to invent.
+ */
+export function initEconomy(callback?: (failure?: string) => void) {
   resetEconomy();
+  const done = (failure?: string) => {
+    if (callback) {
+      callback(failure);
+    }
+  };
   fetchCsv<RawEconomyType>(`/data/EconomyRaw.csv`)
     .then((rows: RawEconomyType[]) => {
       rows.forEach(collectEconomyRow);
-      if (callback) {
-        callback();
-      }
+      done();
     })
     .catch((e: Error) => {
-      // The callback is deliberately not fired: it starts the game, and getEconomy throws for a
-      // game with no rates, so hanging the loading screen is the more legible of the two failures
-      console.error(`Could not load the economic record: ${e.message}`);
+      done(`Could not load the economic record: ${e.message}`);
     });
 }
 

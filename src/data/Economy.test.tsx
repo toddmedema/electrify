@@ -1,5 +1,7 @@
 import {
   getInflationIndex,
+  hasEconomy,
+  initEconomy,
   getInflationRate,
   getPrimeRate,
   initEconomyFromCsv,
@@ -214,5 +216,43 @@ describe("Economy", () => {
         getInflationIndex(target, FIXTURE_STARTING_YEAR, SEED),
       ).toBeCloseTo(cold, 10);
     });
+  });
+});
+
+// The download path, which the loading screen is the only caller of. What is pinned here is that a
+// failed fetch reports the reason rather than leaving that screen waiting on a callback that never
+// comes -- there is no partial record to carry on with, so the game cannot start either way.
+describe("initEconomy", () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it("loads the record and calls back with no failure", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve("month,year,prime,inflation\n12,2019,4.75,0.0180"),
+    }) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initEconomy(resolve));
+    expect(failure).toBeUndefined();
+    expect(hasEconomy()).toBe(true);
+  });
+
+  it("calls back with the status when the file cannot be fetched", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 404 }) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initEconomy(resolve));
+    expect(failure).toMatch(/economic record/);
+    expect(failure).toMatch(/404/);
+  });
+
+  it("calls back with the reason when the network is down", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initEconomy(resolve));
+    expect(failure).toMatch(/offline/);
   });
 });
