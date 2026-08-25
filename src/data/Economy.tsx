@@ -152,10 +152,12 @@ function collectEconomyRow(data: RawEconomyType) {
     return;
   }
   economy[+data.year] = economy[+data.year] || {};
-  economy[+data.year][+data.month] = {
+  // Frozen because getEconomy hands the cached object straight to its callers rather than
+  // copying it per read, and a caller that wrote to one would be rewriting history
+  economy[+data.year][+data.month] = Object.freeze({
     prime: +data.prime / 100,
     inflation: +data.inflation,
-  };
+  });
   const month = absoluteMonth(+data.year, +data.month);
   if (month > seamMonth) {
     seamMonth = month;
@@ -336,9 +338,8 @@ function getEconomy(date: MonthRefType, seed: number): MonthEconomyType {
     economy[year] = {};
   }
   if (economy[year][date.monthNumber] === undefined) {
-    economy[year][date.monthNumber] = projectMonth(
-      absoluteMonth(year, date.monthNumber),
-      seed,
+    economy[year][date.monthNumber] = Object.freeze(
+      projectMonth(absoluteMonth(year, date.monthNumber), seed),
     );
   }
   return economy[year][date.monthNumber];

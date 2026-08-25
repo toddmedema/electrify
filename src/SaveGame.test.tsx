@@ -104,6 +104,29 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
+  // The location is checked in full rather than just for being an object, the same way a replay's
+  // is: its id becomes the path of the weather file the loading screen fetches, and the rest of it
+  // drives the sun model
+  it("ignores a save whose location isn't one", () => {
+    const save = serializeSave(game);
+    const withLocation = (location: unknown) =>
+      parseSave({ ...save, game: { ...save.game, location } });
+    expect(withLocation(undefined)).toBeNull();
+    expect(withLocation({})).toBeNull();
+    // Straight into `/data/weather/<id>.bin`
+    expect(
+      withLocation({ ...save.game.location, id: "../../secrets" }),
+    ).toBeNull();
+    // Off the globe, which the sun model has no answer for
+    expect(withLocation({ ...save.game.location, lat: 400 })).toBeNull();
+    expect(withLocation({ ...save.game.location, long: "west" })).toBeNull();
+    expect(
+      withLocation({ ...save.game.location, timeZone: undefined }),
+    ).toBeNull();
+    // And the real one still round trips
+    expect(parseSave(save)).not.toBeNull();
+  });
+
   // Tutorials run a single month and hit the win trigger on the way past. Clearing on any
   // scenario ending would throw away a real game the player still wanted.
   it("only clears the save belonging to the scenario that ended", () => {

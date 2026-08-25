@@ -125,6 +125,22 @@ describe("decodeWeather", () => {
       ),
     ).toThrow(/describes 24/);
   });
+
+  // A row's month is worked out from its position -- one recorded day per calendar month -- so a
+  // file claiming more days than a year has months would hand every reader of RawWeatherType a
+  // MONTH of 13 and up, which is not a month and which nothing downstream would question
+  it("refuses more days a year than a year has months", () => {
+    expect(() =>
+      decodeWeather(
+        buildFile({ daysPerYear: 13, hoursPerDay: 1, yearCount: 1 }, [
+          { temp: 0, cloud: 0, wind: 0, precip: 0 },
+        ]),
+      ),
+    ).toThrow(/13 days a year/);
+    expect(() =>
+      decodeWeather(buildFile({ daysPerYear: 0, hoursPerDay: 1 })),
+    ).toThrow(/0 days a year/);
+  });
 });
 
 // Reading what is actually in public/data is the only check that the fetch script and this

@@ -1134,6 +1134,9 @@ function updateSupplyFacilitiesFinances(
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;
+  // Hoisted out of the loop below, the way the demand pass at the top of this file already does
+  // it: prices move by the month, and this is per facility per tick
+  const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
   facilities.forEach((g: FacilityShoppingType) => {
     if (g.yearsToBuildLeft === 0) {
       if (g.paused) {
@@ -1146,8 +1149,7 @@ function updateSupplyFacilitiesFinances(
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        expensesFuel +=
-          (fuelBtu * getFuelPricesPerMBTU(date, state.seed)[g.fuel]) / 1000000;
+        expensesFuel += (fuelBtu * fuelPrices[g.fuel]) / 1000000;
         kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
       }
       if (g.loanAmountLeft > 0) {
@@ -1177,7 +1179,12 @@ function updateSupplyFacilitiesFinances(
   const expensesMarketing = state.monthlyMarketingSpend / TICKS_PER_MONTH;
 
   // Customers
-  const percentDemandUnfulfilled = (demandWh - supplyWh) / demandWh;
+  // Demand is the customer count times a multiple, so a run that blacks out for long enough
+  // rounds its last customer away and arrives here with no demand at all. Without the guard that
+  // is 0/0, and the NaN goes straight into the customer count and the cash balance and stays
+  // there -- a lost game turned into a corrupted one, with no way back to a number
+  const percentDemandUnfulfilled =
+    demandWh > 0 ? (demandWh - supplyWh) / demandWh : 0;
   const organicGrowthRate =
     ORGANIC_GROWTH_MAX_ANNUAL -
     difficulty.blackoutPenalty * percentDemandUnfulfilled;

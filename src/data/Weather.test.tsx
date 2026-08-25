@@ -155,6 +155,23 @@ describe("getWeather", () => {
     expect(getWeather(dateAt(3, 10), SEED)).toEqual(fixtureRow(0, 3, 10));
   });
 
+  // A forecast day is last year's same day nudged, so with less than a year loaded forecastDay
+  // reaches back past the start of the array and dies on `previous.YEAR` -- mid-tick, a long way
+  // from the load that caused it, and only once the player has started playing. Said here
+  // instead, the way decodeWeather refuses a file it cannot vouch for
+  it("refuses a record too short to forecast from", () => {
+    const short = fixtureRows().slice(0, MONTHS_PER_YEAR * HOURS_PER_MONTH - 1);
+    expect(() => initWeatherFromRows("PIT", short)).toThrow(/at least/);
+    expect(() => initWeatherFromRows("PIT", [])).toThrow(/at least/);
+    // Exactly a year is enough: there is a year to forecast the next one from
+    expect(() =>
+      initWeatherFromRows(
+        "PIT",
+        fixtureRows().slice(0, MONTHS_PER_YEAR * HOURS_PER_MONTH),
+      ),
+    ).not.toThrow();
+  });
+
   it("blends towards the next hour as the minutes tick over", () => {
     const here = fixtureRow(0, 3, 10).TEMP_C;
     const next = fixtureRow(0, 3, 11).TEMP_C;
@@ -323,9 +340,18 @@ describe("getWeather", () => {
     it("keeps a century of forecasts centred on the month's own average", () => {
       for (const month of [1, 4, 7, 10]) {
         const means = forecastDailyMeans(month, "TEMP_C", 100);
-        // Standard error over 100 years is a tenth of the month's spread, so anything approaching
-        // a whole standard deviation of bias is a walk, not noise
-        expect(mean(means)).toBeCloseTo(monthlyTempC(month), 0);
+        // Judged against the standard error rather than a flat tolerance. A hundred draws of a
+        // month whose spread is `tempSpreadC` puts the error on their mean at a tenth of that --
+        // 0.8C for January -- so a fixed 0.5C was inside the noise and passed or failed on which
+        // seed the fixture happened to use: measured across forty of them the bias averages
+        // 0.04C with a standard deviation of 0.78C, and better than half of them clear 0.5C.
+        // Three standard errors keeps that at a fraction of a percent while still being a long
+        // way inside the walk this guards against, which reached +12C.
+        const standardError = tempSpreadC(month) / 10;
+        expect(Math.abs(mean(means) - monthlyTempC(month))).toBeLessThan(
+          3 * standardError,
+        );
+        // And well inside the month's own year to year spread, whatever the seed
         expect(Math.abs(mean(means) - monthlyTempC(month))).toBeLessThan(
           tempSpreadC(month),
         );

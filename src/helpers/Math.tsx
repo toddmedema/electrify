@@ -32,10 +32,15 @@ export function getIntersectionX(
 // prices each walk their own index space, so adding a draw to one never shifts the other. The
 // values are arbitrary but have to stay distinct, and have to stay put -- changing one changes
 // what every existing seed produces.
+//
+// `normalAt` costs two uniforms per draw and addresses them at `2 * index`, so a stream it is
+// used on is not a stream `randomAt` may also be used on: the two index spaces interleave and
+// half the uniforms come out shared. Weather needs both kinds, so it gets a stream per kind.
 export const RANDOM_STREAM = {
-  weather: 1,
-  fuelPrices: 2,
-  economy: 3,
+  weather: 1, // normalAt only -- the per field anomalies
+  fuelPrices: 2, // normalAt only
+  economy: 3, // randomAt only
+  weatherShape: 4, // randomAt only -- which recorded day a forecast borrows its shape from
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
@@ -82,6 +87,10 @@ export function getRandomRangeAt(
  * Box-Muller over a pair of uniforms, which is why one normal costs two indexes: the pair is
  * taken from `2 * index` and `2 * index + 1` rather than from neighbouring indexes, so callers
  * can walk their own index space one normal at a time without two of them ever sharing a uniform.
+ *
+ * That holds only against other `normalAt` draws. Because it consumes `2 * index`, a stream that
+ * also takes plain `randomAt` draws interleaves the two spaces and hands the same uniform out
+ * twice -- so a caller needing both kinds takes a stream for each, the way weather does.
  *
  * Weather anomalies are the reason this exists. A uniform nudge gives every deviation inside its
  * range the same likelihood and nothing at all outside it, which is the wrong shape for a

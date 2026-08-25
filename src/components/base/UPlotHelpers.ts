@@ -273,14 +273,20 @@ export function verticalLinePlugin(
 }
 
 /**
- * A legend inside the plot, where Victory's was. Position is in design units, so it lands in
- * the same place it used to at any pane width. `align` says which edge of the block designX
- * anchors: "left" pins the dots, "right" pins the end of the longest label, so a legend can sit
- * flush with the plot's right edge whatever its labels happen to be.
+ * A legend inside the plot, where Victory's was.
+ *
+ * `inset` is how far in from the plot's own edge the block sits, in design units, and `align`
+ * says which edge that is: "left" pins the dots to the left edge, "right" pins the end of the
+ * longest label to the right one, so a legend sits flush whatever its labels happen to be.
+ *
+ * Measured off `u.bbox` rather than the canvas, for the same reason titlePlugin is: the y axis
+ * is only as wide as its labels, so the plot no longer starts or ends where a fixed offset from
+ * the canvas edge would put it. `designY` stays a canvas offset, which is what the title uses
+ * too -- it is the top padding these charts share, not anything the axes move.
  */
 export function legendPlugin(
   getItems: () => LegendItem[],
-  designX: number,
+  inset: number,
   designY: number,
   align: "left" | "right" = "left",
 ): uPlot.Plugin {
@@ -301,12 +307,18 @@ export function legendPlugin(
         u.ctx.textAlign = "left";
         u.ctx.textBaseline = "middle";
         // The dots share a column, so the block is only as wide as its longest label
-        let x = designX * scale;
+        let x;
         if (align === "right") {
           const widest = Math.max(
             ...items.map((item) => u.ctx.measureText(item.name).width),
           );
-          x -= radius + gap + widest;
+          x =
+            u.bbox.left +
+            u.bbox.width -
+            inset * scale -
+            (radius + gap + widest);
+        } else {
+          x = u.bbox.left + inset * scale;
         }
         let y = designY * scale;
         for (const item of items) {
