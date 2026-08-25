@@ -1,8 +1,14 @@
+import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame, runSimulation } from "../testing/Simulator";
-import { FacilityOperatingType, ScenarioType } from "../Types";
+import {
+  FacilityOperatingType,
+  LocationType,
+  MonthlyHistoryType,
+  ScenarioType,
+} from "../Types";
 
 // The settings a player might pick on the custom game screen, all different from both the slice
 // defaults and the first authored scenario, which is what a broken lookup falls back to
@@ -97,5 +103,50 @@ describe("a custom game", () => {
     // passing because nothing reaches the end
     runSimulation({ scenarioId: 4 }); // 104: Finances, also one month long
     expect(getPlayedScenarioIds()).toContain(4);
+  });
+
+  // The point of a scenario carrying a whole location rather than an id: a place the game has
+  // never shipped can still be played, so nothing downstream may quietly re-resolve the id
+  it("is played at the location it carries, not the one its id names", () => {
+    const UNLISTED: LocationType = {
+      // The id still picks the weather file, so this borrows one that exists; the rest of the
+      // fields are what a location outside LOCATIONS would bring with it
+      id: "SF",
+      name: "Somewhere Not In LOCATIONS",
+      lat: 12.3456,
+      long: 65.4321,
+      timeZone: "Etc/UTC",
+    };
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: { ...CUSTOM, locationId: "PIT", location: UNLISTED },
+    });
+
+    expect(state.location).toEqual(UNLISTED);
+    expect(state.location.name).not.toBe(LOCATIONS.PIT.name);
+    expect(state.location.lat).toBe(12.3456);
+  });
+
+  // The weather data ends in 2019 and is forecast forwards from there, and the fuel prices are
+  // projected year by year, so a start decades past the record has to be simulated rather than
+  // read. Nothing before 1980 is offered, because there is nothing to project backwards from.
+  it("plays a start far past the end of the recorded data", () => {
+    const result = runSimulation({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2080,
+        durationMonths: 12 * 5,
+      } as ScenarioType,
+    });
+
+    expect(result.months[0].year).toBe(2080);
+    expect(result.months[result.months.length - 1].year).toBe(2084);
+    expect(result.violationCount).toBe(0);
+    // Weather that was forecast rather than the zeroed DUMMY_WEATHER a missing row returns,
+    // which would flatten demand to the same number every month
+    const demands = result.months.map((m: MonthlyHistoryType) => m.demandWh);
+    expect(Math.min(...demands)).toBeGreaterThan(0);
+    expect(new Set(demands).size).toBe(demands.length);
   });
 });

@@ -23,7 +23,12 @@ export type MonthType =
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
 
-export type LocationIdType = "PIT" | "SF" | "HNL" | "SJU";
+// Deliberately open rather than a union of the places that happen to ship today: a custom game
+// may hold a location that isn't in LOCATIONS at all, so nothing is allowed to key off the
+// closed set. Resolve one through getLocation / getScenarioLocation rather than indexing
+// LOCATIONS directly, and check anything untrusted with isValidLocationId -- the id ends up in
+// the path of a weather file.
+export type LocationIdType = string;
 export interface LocationType {
   id: LocationIdType;
   name: string;
@@ -135,6 +140,10 @@ export interface ReplayType {
   difficulty: DifficultyType;
   seed: number;
   startingYear: number;
+  // Where the run was played. A scenario id no longer pins this down -- a custom game carries its
+  // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
+  // without it a replay would silently be re-simulated against a different city's weather
+  location: LocationType;
   durationMinutes: number; // How far the recorded run got
   actions: ReplayActionType[];
 }
@@ -327,6 +336,10 @@ export interface ScenarioType {
   name: string;
   icon: string; // assumed to be images/<string>.svg
   locationId: LocationIdType;
+  // The full location, for scenarios whose location isn't in LOCATIONS -- which is every custom
+  // game, since the player may eventually pick a place no table knows about. When it's set it
+  // wins over locationId; getScenarioLocation is the one place that resolves the two.
+  location?: LocationType;
   summary?: string;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];

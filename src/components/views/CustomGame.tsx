@@ -29,14 +29,15 @@ import InfoIcon from "@mui/icons-material/Info";
 import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, LOCATIONS } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
+import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getDateFromMinute } from "../../helpers/DateTime";
+import { getLocation, getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { newSeed } from "../../helpers/Math";
 import {
   DifficultyType,
   FacilityShoppingType,
   GameType,
-  LocationIdType,
   LocationType,
   ScenarioType,
 } from "../../Types";
@@ -54,10 +55,21 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-// Weather data runs 1980 - 2019 and is projected forwards from there, so anything from 1980 on
-// plays; earlier would have nothing to project from
-const STARTING_YEARS = [1980, 1990, 2000, 2010, 2020];
-const DURATION_YEARS = [1, 5, 10, 20, 40];
+// Only the floor is a real constraint: the recorded weather begins in WEATHER_STARTING_YEAR and
+// the fuel prices in 1975, and a year before that has nothing to project forwards from. Forwards
+// there is no limit - the weather forecast and the price projection both run indefinitely, so a
+// 2100 start just plays eighty years of projection - and this is simply as far ahead as seemed
+// worth offering. Stepped by decade because a dropdown is the wrong control for 121 rows.
+const LATEST_STARTING_YEAR = 2100;
+const STARTING_YEAR_STEP = 10;
+const STARTING_YEARS = Array.from(
+  {
+    length:
+      (LATEST_STARTING_YEAR - WEATHER_STARTING_YEAR) / STARTING_YEAR_STEP + 1,
+  },
+  (_v: unknown, i: number) => WEATHER_STARTING_YEAR + i * STARTING_YEAR_STEP,
+);
+const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
 const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
@@ -144,6 +156,18 @@ export default function CustomGame(props: Props): React.JSX.Element {
     0,
   );
 
+  // Every place that can be picked. LOCATIONS plus, if the scenario is being played somewhere
+  // that isn't in it, that place too -- a custom game may carry a location no table lists, and a
+  // Select whose value isn't one of its options renders blank and drops the choice on the next
+  // edit. Ordered with the table first so the odd one out doesn't jump the list around.
+  const selectableLocations = React.useMemo(() => {
+    const current = getScenarioLocation(scenario);
+    const listed = Object.values(LOCATIONS);
+    return current && !listed.some((l: LocationType) => l.id === current.id)
+      ? [...listed, current]
+      : listed;
+  }, [scenario]);
+
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
   const unavailable = scenario.facilities.filter(
@@ -196,14 +220,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
             <TableRow>
               <TableCell>Location</TableCell>
               <TableCell>
+                {/* The scenario carries the whole location rather than just its id, so a custom
+                    game stays playable even if the table it was picked from changes underneath it
+                    - and so it can eventually hold somewhere the table never listed */}
                 <Select
                   id="location"
-                  value={scenario.locationId}
-                  onChange={(e: SelectChangeEvent<LocationIdType>) =>
-                    change({ locationId: e.target.value as LocationIdType })
+                  value={getScenarioLocation(scenario)?.id || ""}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    change({
+                      locationId: e.target.value,
+                      location: getLocation(e.target.value),
+                    })
                   }
                 >
-                  {Object.values(LOCATIONS).map((l: LocationType) => {
+                  {selectableLocations.map((l: LocationType) => {
                     return (
                       <MenuItem value={l.id} key={l.id}>
                         {l.name}

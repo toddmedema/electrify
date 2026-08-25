@@ -306,7 +306,7 @@ export function getSunriseSunset(
   );
 
   // suncalc returns null above the polar circles, where the sun may never rise or never set
-  // on a given day. None of the four locations the game ships get anywhere near that, so
+  // on a given day. None of the locations the game ships get anywhere near that, so
   // these fallbacks are only here to keep a hypothetical high-latitude location from
   // crashing the simulation
   const minuteOfDay = (d: Date | null, fallback: number) =>

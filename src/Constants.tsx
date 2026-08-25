@@ -64,6 +64,23 @@ export const LOCATIONS = {
     long: -122.4194,
     timeZone: "America/Los_Angeles",
   },
+  LA: {
+    id: "LA",
+    name: "Los Angeles, CA",
+    lat: 34.0522,
+    long: -118.2437,
+    timeZone: "America/Los_Angeles",
+  },
+  // Its forty years read as coastal range rather than Sierra -- a 9C to 17C annual swing that
+  // peaks in September, which is the marine layer's signature and not the high country's --
+  // so it's placed and named for the Santa Cruz Mountains
+  CAMountains: {
+    id: "CAMountains",
+    name: "Santa Cruz Mountains, CA",
+    lat: 37.1041,
+    long: -122.0308,
+    timeZone: "America/Los_Angeles",
+  },
   HNL: {
     id: "HNL",
     name: "Honolulu, HI",

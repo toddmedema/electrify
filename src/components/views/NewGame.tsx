@@ -16,7 +16,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { getPlayedScenarioIds } from "../../LocalStorage";
-import { LOCATIONS } from "../../Constants";
+import { getScenarioLocation } from "../../helpers/Locations";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -95,9 +95,7 @@ interface ScenarioListItemProps {
 
 function ScenarioListItem(props: ScenarioListItemProps): React.JSX.Element {
   const { s, onSelect } = props;
-  const location = LOCATIONS[s.locationId] || {
-    name: "UNKNOWN",
-  };
+  const location = getScenarioLocation(s) || { name: "UNKNOWN" };
   const summary =
     s.id === CUSTOM_SCENARIO_ID ? (
       s.summary

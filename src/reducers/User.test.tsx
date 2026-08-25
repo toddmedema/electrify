@@ -1,5 +1,6 @@
 import userReducer, { submitHighscore } from "./User";
 import { MAX_REPLAY_BYTES, REPLAY_VERSION } from "../Replay";
+import { LOCATIONS } from "../Constants";
 import { ReplayType, UserType } from "../Types";
 
 const mockAddDoc = jest.fn();
@@ -24,6 +25,7 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
     difficulty: "Employee",
     seed: 12345,
     startingYear: 2020,
+    location: LOCATIONS.SF,
     durationMinutes: 43200,
     actions: [{ minute: 1440, type: "sellFacility", payload: 3 }],
     ...overrides,

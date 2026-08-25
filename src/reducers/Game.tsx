@@ -339,8 +339,8 @@ export const gameSlice = createSlice({
     });
     /**
      * Sets a replay up to be watched. Nothing is simulated here: this only puts the scenario, the
-     * difficulty and the seed in place, then hands over to the loading screen, which reloads the
-     * data files and calls initGame the same way it does for a new game.
+     * location, the difficulty and the seed in place, then hands over to the loading screen, which
+     * reloads the data files and calls initGame the same way it does for a new game.
      */
     builder.addCase(startReplay, (_state, action) => {
       const replay = action.payload;
@@ -351,6 +351,9 @@ export const gameSlice = createSlice({
         scenarioId: replay.scenarioId,
         difficulty: replay.difficulty,
         seed: replay.seed,
+        // The loading screen reads this back rather than looking the scenario's location up,
+        // which is what makes the replay run against the weather the original player saw
+        location: cloneDeep(replay.location),
         replayPlayback: { actions: cloneDeep(replay.actions), index: 0 },
       };
     });

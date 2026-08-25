@@ -1,5 +1,6 @@
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
+import { isValidLocation } from "./helpers/Locations";
 import {
   GameType,
   ReplayActionNameType,
@@ -28,7 +29,9 @@ import {
  */
 
 // Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
-export const REPLAY_VERSION = 1;
+// 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
+// where it is played, so there is no safe way to migrate one.
+export const REPLAY_VERSION = 2;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -139,6 +142,7 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     difficulty: game.difficulty,
     seed: game.seed,
     startingYear: game.startingYear,
+    location: cloneDeep(game.location),
     durationMinutes: game.date.minute,
     actions: cloneDeep(game.replayLog),
   };
@@ -218,7 +222,10 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
     !isFiniteNumber(doc.startingYear) ||
-    typeof doc.difficulty !== "string"
+    typeof doc.difficulty !== "string" ||
+    // Checked in full rather than trusted: the location's id becomes the path of the weather file
+    // the loading screen fetches, and its lat/long drive the sun model
+    !isValidLocation(doc.location)
   ) {
     return null;
   }
@@ -233,6 +240,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
     startingYear: doc.startingYear,
+    location: doc.location,
     durationMinutes: isFiniteNumber(doc.durationMinutes)
       ? doc.durationMinutes
       : 0,

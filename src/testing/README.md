@@ -28,6 +28,17 @@ which prints a month by month table (customers, demand, supplied, unserved, cash
 profit, emissions), totals for the run, the fleet it finished with, and any invariant violations.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
 
+`--year` and `--location` play an authored scenario somewhere or somewhen else, which is the
+only way to exercise a start past the recorded weather from the command line:
+
+```sh
+npm run sim -- --scenario 103 --year 2080 --months 240 --strategy keepUp
+```
+
+Both come back as a custom game rather than the scenario they started from, because that is what
+they are: `initGame` resolves an authored id straight back out of `SCENARIOS`, so an edited copy
+handed over under its original id would have its edits silently dropped.
+
 ## What it checks
 
 The point is not the numbers, it's the **invariants** -- rules the economy must obey no matter
@@ -35,15 +46,15 @@ what the balance looks like. They run on every tick of every simulated month, an
 reports the game time it happened and the values involved, so a broken run points at a line of
 code rather than a vibe.
 
-| | |
-|---|---|
-| Finite values | No `NaN` or `Infinity` reaches any tick or monthly field. `NaN` propagates silently through the whole economy, so this is the one that catches the most |
-| Signs | Supply, demand, customers, stored energy, revenue and every expense stay non-negative; demand stays positive. Cash and net worth may go negative, by design |
-| Cash continuity | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick |
-| Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity |
-| Fleet bounds | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
-| Supply accounting | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge |
-| Monthly totals | Billed supply never exceeds demand, and every total is finite |
+|                     |                                                                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finite values       | No `NaN` or `Infinity` reaches any tick or monthly field. `NaN` propagates silently through the whole economy, so this is the one that catches the most                                           |
+| Signs               | Supply, demand, customers, stored energy, revenue and every expense stay non-negative; demand stays positive. Cash and net worth may go negative, by design                                       |
+| Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                |
+| Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                    |
+| Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
+| Supply accounting   | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge                                                                                                              |
+| Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends
 of the difficulty range, marketing spend, and a run that builds on credit. It also pins down

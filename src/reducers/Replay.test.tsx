@@ -116,6 +116,38 @@ describe("recording a run", () => {
     });
   });
 
+  /**
+   * A scenario id used to be enough to say where a run happened. It isn't any more -- a custom
+   * game carries its own location, and an authored one can be given one that isn't in LOCATIONS
+   * -- so the replay has to record it, and watching one has to read it back rather than looking
+   * the scenario up again. Without both halves a replay is re-simulated against another city's
+   * weather and stops matching the run it claims to be.
+   */
+  it("records where the run was played", () => {
+    const replay = serializeReplay(played)!;
+    expect(replay.location).toEqual(played.location);
+  });
+
+  it("is watched at the location it recorded, not the scenario's", () => {
+    const replay = roundTripped(serializeReplay(played)!);
+    const elsewhere = {
+      ...replay,
+      // Same weather file, so the run still loads; everything else is what a location outside
+      // LOCATIONS would bring, and none of it can come from a scenario lookup
+      location: {
+        id: replay.location.id,
+        name: "Somewhere Not In LOCATIONS",
+        lat: 12.3456,
+        long: 65.4321,
+        timeZone: "Etc/UTC",
+      },
+    };
+
+    expect(createGameFromReplay(elsewhere).location).toEqual(
+      elsewhere.location,
+    );
+  });
+
   it("stays small enough to hang off a high score", () => {
     // A whole save of the same run is hundreds of kilobytes; this is the reason replays are
     // stored as actions rather than as states

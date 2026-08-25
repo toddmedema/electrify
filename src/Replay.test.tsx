@@ -7,6 +7,7 @@ import {
   replayByteLength,
   REPLAY_VERSION,
 } from "./Replay";
+import { LOCATIONS } from "./Constants";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
 
 // Only the two fields the recorder touches, so these tests don't need a whole simulation to run
@@ -25,6 +26,7 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
     difficulty: "Employee",
     seed: 12345,
     startingYear: 2020,
+    location: LOCATIONS.SF,
     durationMinutes: 43200,
     actions: [
       { minute: 0, type: "delta", payload: { dollarsPerkWh: 0.12 } },
@@ -153,6 +155,42 @@ describe("decodeReplay", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.seed;
     expect(decodeReplay(doc)).toBeNull();
+  });
+
+  // A scenario id no longer says where a run was played, so a replay without a location has
+  // nowhere to be re-simulated -- which is the whole reason REPLAY_VERSION went to 2
+  it("ignores a replay that doesn't say where it was played", () => {
+    const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
+    delete doc.location;
+    expect(decodeReplay(doc)).toBeNull();
+  });
+
+  it("ignores a location that isn't one", () => {
+    const bad = [
+      "SF",
+      { id: "SF" },
+      { ...LOCATIONS.SF, lat: 91 },
+      { ...LOCATIONS.SF, long: "west" },
+      // The id becomes the path of the weather file the loading screen fetches
+      { ...LOCATIONS.SF, id: "../../secrets" },
+    ];
+    bad.forEach((location: unknown) => {
+      expect(decodeReplay({ ...encodeReplay(aReplay()), location })).toBeNull();
+    });
+  });
+
+  it("keeps a location the game doesn't ship, so a custom run replays where it was played", () => {
+    const unlisted = {
+      id: "REY",
+      name: "Reykjavik, Iceland",
+      lat: 64.1466,
+      long: -21.9426,
+      timeZone: "Atlantic/Reykjavik",
+    };
+    const decoded = decodeReplay(
+      JSON.parse(JSON.stringify(encodeReplay(aReplay({ location: unlisted })))),
+    );
+    expect(decoded!.location).toEqual(unlisted);
   });
 
   /**

@@ -34,9 +34,10 @@ import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES, LOCATIONS } from "../../Constants";
+import { DIFFICULTIES } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
+import { getScenarioLocation } from "../../helpers/Locations";
 import { decodeReplay } from "../../Replay";
 import {
   DifficultyType,
@@ -81,7 +82,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       getScenario(props.game.scenarioId, props.game.customScenario) || null;
     this.state = {
       scenario,
-      location: scenario ? LOCATIONS[scenario.locationId || null] : null,
+      location: getScenarioLocation(scenario) || null,
     };
     if (props.uid) {
       this.loadScores(props.uid);

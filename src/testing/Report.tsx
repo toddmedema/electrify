@@ -1,4 +1,4 @@
-import { LOCATIONS } from "../Constants";
+import { getScenarioLocation } from "../helpers/Locations";
 import { deriveExpandedSummary, summarizeHistory } from "../helpers/DateTime";
 import {
   formatMoneyConcise,
@@ -135,7 +135,7 @@ export function formatReport(
 ): string {
   const maxRows = options.maxRows || DEFAULT_MAX_ROWS;
   const { scenario, months, options: opts } = result;
-  const location = LOCATIONS[scenario.locationId];
+  const location = getScenarioLocation(scenario);
   const summary = summarizeHistory(result.months);
   const derived = deriveExpandedSummary(summary);
   const first = months[0];

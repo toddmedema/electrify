@@ -1,4 +1,8 @@
-import { getWeather, initWeatherFromCsv } from "./Weather";
+import {
+  getWeather,
+  initWeatherFromCsv,
+  WEATHER_STARTING_YEAR,
+} from "./Weather";
 import { getDateFromMinute } from "../helpers/DateTime";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
@@ -183,6 +187,21 @@ describe("getWeather", () => {
     expect(Number.isFinite(forecast.WIND_KPH)).toBe(true);
     expect(Number.isFinite(forecast.YEAR)).toBe(true);
     expect(Number.isFinite(forecast.MONTH)).toBe(true);
+  });
+
+  // The custom game screen builds its year list off WEATHER_STARTING_YEAR, so a date before the
+  // record can only arrive from a hand-edited save or an older scenario. Pinned here because
+  // opening the timeline makes the year a thing players choose: it has to come back as an empty
+  // reading rather than reaching into the arrays at a negative index.
+  it("survives a date before the data starts", () => {
+    const before = getWeather(dateAt(-24, 8), SEED, 100);
+    expect(Number.isFinite(before.TEMP_C)).toBe(true);
+    expect(Number.isFinite(before.CLOUD_PCT)).toBe(true);
+    expect(Number.isFinite(before.WIND_KPH)).toBe(true);
+  });
+
+  it("starts the record at the year the custom game screen offers as its floor", () => {
+    expect(WEATHER_STARTING_YEAR).toBe(FIXTURE_STARTING_YEAR);
   });
 
   // The bug this replaced: forecasting filled a single day per cache miss, so a lookup years past
