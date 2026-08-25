@@ -139,7 +139,11 @@ export interface ReplayType {
   scenarioId: number;
   difficulty: DifficultyType;
   seed: number;
-  startingYear: number;
+  // Recorded for bug reports, alongside appVersion, and deliberately not read back: playback
+  // reloads the scenario and takes the year from it, so a replay that disagreed with its own
+  // scenario would be describing a run that could not be reproduced anyway. Not required on the
+  // way in for the same reason
+  startingYear?: number;
   // Where the run was played. A scenario id no longer pins this down -- a custom game carries its
   // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
   // without it a replay would silently be re-simulated against a different city's weather

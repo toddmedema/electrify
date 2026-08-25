@@ -1,4 +1,5 @@
 import packageJson from "../package.json";
+import { isValidLocation } from "./helpers/Locations";
 import {
   getStorageJson,
   removeStorageKey,
@@ -71,8 +72,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
-    typeof game.location !== "object" ||
-    game.location === null
+    // Checked in full rather than trusted, the same way decodeReplay checks a replay's: the
+    // location's id becomes the path of the weather file the loading screen fetches, and its
+    // lat/long and time zone drive the sun model. A save is hand-editable too
+    !isValidLocation(game.location)
   ) {
     return null;
   }

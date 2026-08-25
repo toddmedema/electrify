@@ -24,6 +24,13 @@ export function getMonthlyPayment(
   months: number,
 ): number {
   const monthlyRate = interestRate / 12;
+  // The amortisation formula is 0/0 at a rate of zero, and a NaN payment spreads to the balance,
+  // the cash and the net worth without ever announcing itself. Prime has a floor of 3.25% and
+  // the credit premium only multiplies it, so nothing in the game reaches this today -- but this
+  // is exported, and an interest free loan is a plain division rather than an undefined one
+  if (monthlyRate === 0) {
+    return months > 0 ? principal / months : principal;
+  }
   return principal * (monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
 }
 

@@ -221,7 +221,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
-    !isFiniteNumber(doc.startingYear) ||
     typeof doc.difficulty !== "string" ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
@@ -239,7 +238,10 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
-    startingYear: doc.startingYear,
+    // Diagnostic only (see ReplayType), so a document without one is still a replay
+    startingYear: isFiniteNumber(doc.startingYear)
+      ? doc.startingYear
+      : undefined,
     location: doc.location,
     durationMinutes: isFiniteNumber(doc.durationMinutes)
       ? doc.durationMinutes

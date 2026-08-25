@@ -35,6 +35,15 @@ function aFacility(
 }
 
 describe("getMonthlyPayment", () => {
+  // The amortisation formula is 0/0 at a rate of zero, and a NaN payment spreads to the balance,
+  // the cash and the net worth without ever announcing itself. Nothing in the game reaches this
+  // today -- prime has a 3.25% floor and the credit premium only multiplies it -- but this is
+  // exported, and an interest free loan is a plain division rather than an undefined one
+  it("splits the principal evenly when there is no interest to pay", () => {
+    expect(getMonthlyPayment(1200, 0, 12)).toBe(100);
+    expect(getMonthlyPayment(1200, 0, 0)).toBe(1200);
+  });
+
   it("amortizes the principal away over the term", () => {
     const principal = 1000000;
     const rate = 0.06;
