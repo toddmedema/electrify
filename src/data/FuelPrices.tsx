@@ -260,12 +260,14 @@ function collectFuelPriceRow(data: RawFuelPricesType) {
     return;
   }
   fuelPrices[+data.year] = fuelPrices[+data.year] || {};
-  fuelPrices[+data.year][+data.month] = {
+  // Frozen because getFuelPricesPerMBTU hands the cached object straight to its callers rather
+  // than copying it per tick, and a caller that wrote to one would be rewriting the record
+  fuelPrices[+data.year][+data.month] = Object.freeze({
     "Natural Gas": +data.naturalgas,
     Coal: +data.coal,
     Uranium: +data.uranium,
     Oil: +data.oil,
-  };
+  });
 }
 
 /**
@@ -351,7 +353,7 @@ function projectYear(
         anchorPrice(trend, thisMonth) *
         Math.exp(Math.min(limit, Math.max(-limit, departure)));
     });
-    fuelPrices[year][month] = prices;
+    fuelPrices[year][month] = Object.freeze(prices);
     previous = prices;
   }
 }

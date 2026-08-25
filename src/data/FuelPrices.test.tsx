@@ -177,6 +177,23 @@ describe("getFuelPricesPerMBTU", () => {
     );
   });
 
+  // Handed out by reference rather than copied per tick, so a caller that wrote to one would be
+  // rewriting the record for every read after it
+  it("hands back prices nothing can write to", () => {
+    const prices = pricesIn(FIXTURE_STARTING_YEAR, 6);
+    expect(() => {
+      (prices as FuelPricesType).Coal = 999;
+    }).toThrow();
+  });
+
+  // The same, for a month the projection invented rather than one the record carried
+  it("hands back projected prices nothing can write to", () => {
+    const prices = pricesIn(FIXTURE_ENDING_YEAR + 5, 6);
+    expect(() => {
+      (prices as FuelPricesType).Coal = 999;
+    }).toThrow();
+  });
+
   // The projection carries the last recorded month's departure from trend forward rather than
   // restarting at the trend, so the handoff out of the data is a month's move, not a step change
   it("picks up where the record left off rather than jumping", () => {
