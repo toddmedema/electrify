@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Button,
   Checkbox,
   IconButton,
   MenuItem,
@@ -16,11 +17,15 @@ import packageJson from "../../../package.json";
 
 export interface StateProps {
   settings: SettingsType;
+  // What the saved game is called, or undefined when there's nothing to export
+  savedGame?: string;
 }
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
   onUnitsChange: (change: UnitSystemType) => void;
+  onExportSave: () => void;
+  onImportSave: (file: File) => void;
   onBack: () => void;
 }
 
@@ -45,6 +50,19 @@ export default function Settings(props: Props): React.JSX.Element {
   // <Checkbox id="experimental" label="Experimental" value={props.settings.experimental} onChange={props.onExperimentalChange}>
   //   {(props.settings.experimental) ? 'Experimental features are currently enabled.' : 'Experimental features are currently disabled.'}
   // </Checkbox>
+
+  // The file picker is driven by the Import button rather than wrapping it, so that both buttons
+  // are plainly buttons and the disabled Export one behaves like one
+  const fileInput = React.useRef<HTMLInputElement>(null);
+  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    // Cleared so that picking the same file again still counts as a change, which is what a
+    // player who fixed a bad file by hand and came back would expect
+    e.target.value = "";
+    if (file) {
+      props.onImportSave(file);
+    }
+  };
 
   return (
     <div className="flexContainer" id="gameCard">
@@ -96,6 +114,41 @@ export default function Settings(props: Props): React.JSX.Element {
           {props.settings.units === "imperial"
             ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
             : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
+        </Typography>
+        <Typography variant="h6" style={{ marginTop: 24 }}>
+          Saved Game
+        </Typography>
+        <div>
+          <Button
+            variant="outlined"
+            color="primary"
+            disabled={!props.savedGame}
+            onClick={props.onExportSave}
+            style={{ margin: "0 6px" }}
+          >
+            Export
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => fileInput.current?.click()}
+            style={{ margin: "0 6px" }}
+          >
+            Import
+          </Button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            aria-label="Save game file"
+            onChange={onFileChosen}
+          />
+        </div>
+        <Typography variant="body2" color="textSecondary">
+          {props.savedGame
+            ? `Export downloads your saved game (${props.savedGame}) to keep or share. Importing one replaces it.`
+            : "You need a game in progress to export one - start a game, then come back here. You can still import a save that someone shared with you."}
         </Typography>
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Keyboard Shortcuts

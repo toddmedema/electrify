@@ -1,7 +1,37 @@
 import type { AppDispatch } from "../../Store";
-import { getScenario } from "../../data/Scenarios";
 import { dialogClose, dialogOpen } from "../../reducers/UI";
-import { readSave } from "../../SaveGame";
+import { describeSave, resumableSave } from "../../SaveFile";
+
+/**
+ * Runs something that would replace the autosave, first asking about the game already in it.
+ *
+ * Autosave keeps one slot, so starting a new game or importing someone else's replaces whatever
+ * is there. Proceeds straight away when there's nothing to lose.
+ */
+export function confirmReplacingSave(
+  dispatch: AppDispatch,
+  { title, actionLabel }: { title: string; actionLabel: string },
+  proceed: () => void,
+) {
+  const resumable = resumableSave();
+  if (!resumable) {
+    return proceed();
+  }
+  dispatch(
+    dialogOpen({
+      title,
+      message: `Your saved game (${describeSave(resumable)}) will be replaced.`,
+      open: true,
+      closeText: "Cancel",
+      actionLabel,
+      // The dialog's action button doesn't close the dialog on its own
+      action: () => {
+        dispatch(dialogClose());
+        proceed();
+      },
+    }),
+  );
+}
 
 /**
  * Starts a game, first asking about the autosave if starting would overwrite it.
@@ -14,26 +44,9 @@ export function startWithSaveGuard(
   dispatch: AppDispatch,
   startGame: () => void,
 ) {
-  // Autosave keeps one slot, so a new game replaces whatever's in it
-  const save = readSave();
-  const saved = save
-    ? getScenario(save.game.scenarioId, save.game.customScenario)
-    : undefined;
-  if (!save || !saved) {
-    return startGame();
-  }
-  dispatch(
-    dialogOpen({
-      title: "Start a new game?",
-      message: `Your saved game (${saved.name}, ${save.game.date.year}) will be replaced.`,
-      open: true,
-      closeText: "Cancel",
-      actionLabel: "Start new game",
-      // The dialog's action button doesn't close the dialog on its own
-      action: () => {
-        dispatch(dialogClose());
-        startGame();
-      },
-    }),
+  confirmReplacingSave(
+    dispatch,
+    { title: "Start a new game?", actionLabel: "Start new game" },
+    startGame,
   );
 }
