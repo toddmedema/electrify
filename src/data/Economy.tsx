@@ -1,4 +1,4 @@
-import Papa from "papaparse";
+import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { getRandomRangeAt, RANDOM_STREAM } from "../helpers/Math";
 
 // Rates only move with the calendar month, so this asks for just that rather than a whole
@@ -74,12 +74,14 @@ const BLEND_MONTHS = 24;
 // are: changing it changes what every existing seed produces.
 const DRAWS_PER_CYCLE = 3;
 
-interface RawEconomyType {
-  month: number;
-  year: number;
-  prime: number; // percent, eg 4.75
-  inflation: number; // fraction, eg 0.018
-}
+// The CSV's columns, as the text they are written as. Everything is coerced with unary + on the
+// way into the table below, so the reader is left with no opinion about which columns are numbers.
+type RawEconomyType = {
+  month: string;
+  year: string;
+  prime: string; // percent, eg 4.75
+  inflation: string; // fraction, eg 0.018
+};
 
 export interface MonthEconomyType {
   prime: number; // fraction, eg 0.0475
@@ -143,10 +145,10 @@ function resetEconomy() {
   inflationIndexAnchor = 0;
 }
 
-function collectEconomyRow(row: Papa.ParseStepResult<RawEconomyType>) {
-  const data = row.data;
-  // Papa hands back a trailing blank row for a file ending in a newline
-  if (!data || !data.year || !data.month) {
+function collectEconomyRow(data: RawEconomyType) {
+  // A column left empty by a hand edit. Reading it as year 0 would file the row under a date no
+  // game can reach, which is a row quietly missing from the record rather than a loud failure.
+  if (!data.year || !data.month) {
     return;
   }
   economy[+data.year] = economy[+data.year] || {};
@@ -161,19 +163,28 @@ function collectEconomyRow(row: Papa.ParseStepResult<RawEconomyType>) {
   }
 }
 
-export function initEconomy(callback?: () => void) {
+/**
+ * Downloads the record, for the browser.
+ *
+ * @param callback - Called once, with the reason if the record could not be loaded. A caller that
+ *   starts the game regardless would be starting one whose first tick throws: there is no rate to
+ *   fall back on, which is what getEconomy refuses to invent.
+ */
+export function initEconomy(callback?: (failure?: string) => void) {
   resetEconomy();
-  Papa.parse<RawEconomyType>(`/data/EconomyRaw.csv`, {
-    download: true,
-    dynamicTyping: true,
-    header: true,
-    step: collectEconomyRow,
-    complete() {
-      if (callback) {
-        callback();
-      }
-    },
-  });
+  const done = (failure?: string) => {
+    if (callback) {
+      callback(failure);
+    }
+  };
+  fetchCsv<RawEconomyType>(`/data/EconomyRaw.csv`)
+    .then((rows: RawEconomyType[]) => {
+      rows.forEach(collectEconomyRow);
+      done();
+    })
+    .catch((e: Error) => {
+      done(`Could not load the economic record: ${e.message}`);
+    });
 }
 
 /**
@@ -184,11 +195,7 @@ export function initEconomy(callback?: () => void) {
  */
 export function initEconomyFromCsv(csv: string) {
   resetEconomy();
-  Papa.parse<RawEconomyType>(csv, {
-    dynamicTyping: true,
-    header: true,
-    step: collectEconomyRow,
-  });
+  parseCsv<RawEconomyType>(csv).forEach(collectEconomyRow);
 }
 
 /**

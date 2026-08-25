@@ -56,15 +56,23 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return alert("Unknown location ID " + scenario.locationId);
       }
 
-      initWeather(location.id, (failure?: string) => {
-        if (failure) {
+      initWeather(location.id, (weatherFailure?: string) => {
+        if (weatherFailure) {
           // Every city the picker offers has a file behind it, so this is a download that failed
           // rather than a place that was never fetched -- and starting anyway would hand back a
           // game where the weather never changes, which reads as the game being broken
-          return alert(failure);
+          return alert(weatherFailure);
         }
-        initFuelPrices(() => {
-          initEconomy(() => {
+        // The two records below have no fallback at all: a game started without them throws on
+        // its first tick rather than playing oddly, so each one stops here the way weather does
+        initFuelPrices((fuelFailure?: string) => {
+          if (fuelFailure) {
+            return alert(fuelFailure);
+          }
+          initEconomy((economyFailure?: string) => {
+            if (economyFailure) {
+              return alert(economyFailure);
+            }
             if (!resumed) {
               // Otherwise, generate from scratch
               // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal

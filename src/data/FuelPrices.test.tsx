@@ -1,5 +1,7 @@
 import {
   getFuelEscalation,
+  hasFuelPrices,
+  initFuelPrices,
   getFuelPricesPerMBTU,
   initFuelPricesFromCsv,
   LATEST_DATA_YEAR,
@@ -159,6 +161,15 @@ describe("getFuelPricesPerMBTU", () => {
     expect(pricesIn(FIXTURE_ENDING_YEAR + 1, 6, SEED + 1)).not.toEqual(first);
   });
 
+  // FuelPricesRaw.csv happens not to end in a newline, which is the only reason the trailing
+  // blank row the old reader handed back never landed in the table as year NaN. Adding one to the
+  // file should stay a whitespace change.
+  it("reads a file ending in a newline the same as one that does not", () => {
+    const withNewline = { ...pricesIn(FIXTURE_STARTING_YEAR, 6) };
+    initFuelPricesFromCsv(fixtureCsv() + "\n");
+    expect(pricesIn(FIXTURE_STARTING_YEAR, 6)).toEqual(withNewline);
+  });
+
   it("explains itself rather than hanging when nothing has been loaded", () => {
     initFuelPricesFromCsv("year,month,naturalgas,coal,uranium,oil");
     expect(() => pricesIn(FIXTURE_STARTING_YEAR, 1)).toThrow(
@@ -290,5 +301,45 @@ describe("getFuelEscalation", () => {
   it("puts a 2080 start an order of magnitude above the record", () => {
     expect(getFuelEscalation(2080)).toBeGreaterThan(9);
     expect(getFuelEscalation(2080)).toBeLessThan(12);
+  });
+});
+
+// The download path, which the loading screen is the only caller of. What is pinned here is that a
+// failed fetch reports the reason rather than leaving that screen waiting on a callback that never
+// comes -- there is no partial record to carry on with, so the game cannot start either way.
+describe("initFuelPrices", () => {
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it("loads the record and calls back with no failure", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(
+          "month,year,coal,naturalgas,uranium,oil\n12,2019,2.9,1.09,0.0011,9.76",
+        ),
+    }) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initFuelPrices(resolve));
+    expect(failure).toBeUndefined();
+    expect(hasFuelPrices()).toBe(true);
+  });
+
+  it("calls back with the status when the file cannot be fetched", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 404 }) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initFuelPrices(resolve));
+    expect(failure).toMatch(/fuel price record/);
+    expect(failure).toMatch(/404/);
+  });
+
+  it("calls back with the reason when the network is down", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
+    const failure = await new Promise((resolve) => initFuelPrices(resolve));
+    expect(failure).toMatch(/offline/);
   });
 });

@@ -1,5 +1,5 @@
-import Papa from "papaparse";
 import { DateType, FuelPricesType } from "../Types";
+import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
@@ -67,14 +67,16 @@ interface FuelTrendType extends DepartureType {
   baseline: number; // $/MBTU the trend passes through, in the anchor month
 }
 
-interface RawFuelPricesType {
-  month: number;
-  year: number;
-  naturalgas: number;
-  coal: number;
-  uranium: number;
-  oil: number;
-}
+// The CSV's columns, as the text they are written as. Everything is coerced with unary + on the
+// way into the table below, so the reader is left with no opinion about which columns are numbers.
+type RawFuelPricesType = {
+  month: string;
+  year: string;
+  naturalgas: string;
+  coal: string;
+  uranium: string;
+  oil: string;
+};
 
 // Holds both the CSV's historic prices and the randomly extrapolated future ones, so it has to be
 // reset per game -- otherwise a second playthrough silently inherits the first one's future prices
@@ -251,8 +253,12 @@ function anchorPrice(trend: FuelTrendType, month: number): number {
   );
 }
 
-function collectFuelPriceRow(row: Papa.ParseStepResult<RawFuelPricesType>) {
-  const data = row.data;
+function collectFuelPriceRow(data: RawFuelPricesType) {
+  // A column left empty by a hand edit. Reading it as year 0 would file the row under a date no
+  // game can reach, and buildFuelTrends would then average the record against a month of zeroes.
+  if (!data.year || !data.month) {
+    return;
+  }
   fuelPrices[+data.year] = fuelPrices[+data.year] || {};
   fuelPrices[+data.year][+data.month] = {
     "Natural Gas": +data.naturalgas,
@@ -262,22 +268,30 @@ function collectFuelPriceRow(row: Papa.ParseStepResult<RawFuelPricesType>) {
   };
 }
 
-export function initFuelPrices(callback?: () => void) {
+/**
+ * Downloads the record, for the browser.
+ *
+ * @param callback - Called once, with the reason if the record could not be loaded. A caller that
+ *   starts the game regardless would be starting one whose first tick throws: there is no price to
+ *   fall back on, which is what getFuelPricesPerMBTU refuses to invent.
+ */
+export function initFuelPrices(callback?: (failure?: string) => void) {
   resetFuelPrices();
-  Papa.parse<RawFuelPricesType>(`/data/FuelPricesRaw.csv`, {
-    download: true,
-    dynamicTyping: true,
-    header: true,
-    // worker: true,
-    step: collectFuelPriceRow,
-    complete() {
+  const done = (failure?: string) => {
+    if (callback) {
+      callback(failure);
+    }
+  };
+  fetchCsv<RawFuelPricesType>(`/data/FuelPricesRaw.csv`)
+    .then((rows: RawFuelPricesType[]) => {
+      rows.forEach(collectFuelPriceRow);
       // Has to run before anything is projected, and while the table holds only real rows
       buildFuelTrends();
-      if (callback) {
-        callback();
-      }
-    },
-  });
+      done();
+    })
+    .catch((e: Error) => {
+      done(`Could not load the fuel price record: ${e.message}`);
+    });
 }
 
 /**
@@ -288,11 +302,7 @@ export function initFuelPrices(callback?: () => void) {
  */
 export function initFuelPricesFromCsv(csv: string) {
   resetFuelPrices();
-  Papa.parse<RawFuelPricesType>(csv, {
-    dynamicTyping: true,
-    header: true,
-    step: collectFuelPriceRow,
-  });
+  parseCsv<RawFuelPricesType>(csv).forEach(collectFuelPriceRow);
   buildFuelTrends();
 }
 
