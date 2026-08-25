@@ -5,7 +5,9 @@
  * Output goes straight to stdout rather than through console.log, which jest decorates with a
  * stack trace after every call.
  */
-import { SCENARIOS } from "../data/Scenarios";
+import { LOCATIONS } from "../Constants";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
+import { getLocation } from "../helpers/Locations";
 import { DifficultyType, ScenarioType } from "../Types";
 import { formatReport } from "./Report";
 import { runSimulation, SimOptionsType, StrategyType } from "./Simulator";
@@ -19,6 +21,36 @@ function write(s: string) {
 function envNumber(name: string): number | undefined {
   const raw = process.env[name];
   return raw === undefined || raw === "" ? undefined : Number(raw);
+}
+
+/**
+ * An authored scenario played somewhere or somewhen else, for --year and --location.
+ *
+ * Comes back under CUSTOM_SCENARIO_ID because that is what it now is. initGame resolves the
+ * scenario it builds from through getScenario(), which reads an authored id straight back out of
+ * SCENARIOS -- so an edited copy handed over under its original id has its edits silently thrown
+ * away, and the run reports the year it was actually played rather than the one that was asked
+ * for. The name is kept so the report still says which scenario it started from.
+ */
+function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
+  const year = envNumber("SIM_YEAR");
+  const locationId = process.env.SIM_LOCATION;
+  if (year === undefined && !locationId) {
+    return undefined;
+  }
+  if (locationId && !getLocation(locationId)) {
+    throw new Error(
+      `Unknown location "${locationId}". Known: ${Object.keys(LOCATIONS).join(", ")}`,
+    );
+  }
+  return {
+    ...scenario,
+    id: CUSTOM_SCENARIO_ID,
+    startingYear: year === undefined ? scenario.startingYear : year,
+    ...(locationId
+      ? { locationId, location: getLocation(locationId) }
+      : undefined),
+  };
 }
 
 function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
@@ -44,7 +76,11 @@ function runSweep() {
     "  ------------------------- -------- -------------------- --------- --------- ----------",
   );
   SCENARIOS.forEach((scenario: ScenarioType) => {
-    const result = runSimulation({ ...options, scenarioId: scenario.id });
+    const result = runSimulation({
+      ...options,
+      scenarioId: scenario.id,
+      scenario: withOverrides(scenario),
+    });
     totalViolations += result.violationCount;
     const demandWh = result.months.reduce((a, m) => a + m.demandWh, 0);
     const supplyWh = result.months.reduce((a, m) => a + m.supplyWh, 0);
@@ -80,11 +116,13 @@ function runSweep() {
 }
 
 function runSingle() {
-  const scenarioId = envNumber("SIM_SCENARIO");
+  const scenarioId = envNumber("SIM_SCENARIO") ?? 101;
+  const base = SCENARIOS.find((s: ScenarioType) => s.id === scenarioId);
   const started = Date.now();
   const result = runSimulation({
     ...baseOptions(),
-    scenarioId: scenarioId === undefined ? 101 : scenarioId,
+    scenarioId,
+    scenario: base && withOverrides(base),
   });
   write(
     formatReport(result, {

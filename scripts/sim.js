@@ -12,6 +12,8 @@ const path = require("path");
 
 const FLAGS = {
   "--scenario": "SIM_SCENARIO",
+  "--year": "SIM_YEAR",
+  "--location": "SIM_LOCATION",
   "--difficulty": "SIM_DIFFICULTY",
   "--months": "SIM_MONTHS",
   "--seed": "SIM_SEED",
@@ -30,8 +32,11 @@ Runs the game's simulation headlessly and reports what happened.
   npm run sim                              one scenario, default settings
   npm run sim -- --all                     every scenario, one line each
   npm run sim -- --scenario 103 --full     every month of "The Shale Boom"
+  npm run sim -- --year 2080 --months 240  a twenty-year run starting in 2080
 
   --scenario <id>        Scenario to play (default 101). --list shows the ids
+  --year <n>             Override the scenario's starting year (1980 and up)
+  --location <id>        Override where it's played: PIT, SF, LA, CAMountains, HNL, SJU
   --difficulty <name>    Intern | Employee | Manager | VP | CEO (default Employee)
   --months <n>           Override the scenario's own duration
   --seed <n>             Pin the run's randomness (default 12345)

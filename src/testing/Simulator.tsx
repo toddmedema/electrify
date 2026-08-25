@@ -11,15 +11,17 @@ import gameReducer, {
   startReplay,
   tickState,
 } from "../reducers/Game";
-import { DIFFICULTIES, LOCATIONS } from "../Constants";
+import { DIFFICULTIES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { getScenarioLocation } from "../helpers/Locations";
 import {
   DifficultyType,
   FacilityOperatingType,
   GameType,
   GeneratorShoppingType,
+  LocationType,
   MonthlyHistoryType,
   ReplayType,
   ScenarioType,
@@ -34,6 +36,22 @@ import {
 import { loadSimData } from "./SimData";
 
 export type StrategyType = "none" | "keepUp";
+
+/**
+ * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
+ * back to the menu; a headless run that quietly simulated the wrong city would just print a
+ * plausible report about somewhere else.
+ */
+function scenarioLocation(scenario: ScenarioType): LocationType {
+  const location = getScenarioLocation(scenario);
+  if (!location) {
+    throw new Error(
+      `Scenario "${scenario.name}" has no location: "${scenario.locationId}" isn't in LOCATIONS ` +
+        "and no full location was carried on the scenario itself.",
+    );
+  }
+  return location;
+}
 
 export interface SimOptionsType {
   scenarioId: number;
@@ -104,7 +122,7 @@ export function createGame(options: SimOptionsType): GameType {
     options.scenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
     SCENARIOS[0];
-  loadSimData(scenario.locationId);
+  loadSimData(scenarioLocation(scenario).id);
   return setUpGame(scenario, resolveOptions(scenario, options));
 }
 
@@ -132,7 +150,7 @@ function setUpGame(
       facilities: scenario.facilities,
       cash: scenario.cash,
       customers: DEFAULT_CUSTOMERS,
-      location: LOCATIONS[scenario.locationId],
+      location: scenarioLocation(scenario),
       seed: options.seed,
     }),
   );
@@ -157,7 +175,9 @@ export function createGameFromReplay(replay: ReplayType): GameType {
   const scenario =
     SCENARIOS.find((s: ScenarioType) => s.id === replay.scenarioId) ||
     SCENARIOS[0];
-  loadSimData(scenario.locationId);
+  // The replay's own location, not the scenario's: that is the whole point of recording it, and
+  // it is also what the loading screen uses in the browser
+  loadSimData(replay.location.id);
   let state = gameReducer(undefined, startReplay(replay));
   state = gameReducer(
     state,
@@ -165,7 +185,7 @@ export function createGameFromReplay(replay: ReplayType): GameType {
       facilities: scenario.facilities,
       cash: scenario.cash,
       customers: DEFAULT_CUSTOMERS,
-      location: LOCATIONS[scenario.locationId],
+      location: replay.location,
       seed: replay.seed,
     }),
   );
@@ -243,7 +263,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     SCENARIOS[0];
   const resolved = resolveOptions(scenario, options);
 
-  loadSimData(scenario.locationId);
+  loadSimData(scenarioLocation(scenario).id);
   let state = setUpGame(scenario, resolved);
 
   const collector = new InvariantCollector();

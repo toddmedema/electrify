@@ -29,14 +29,16 @@ import InfoIcon from "@mui/icons-material/Info";
 import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, LOCATIONS } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
+import { WEATHER_STARTING_YEAR } from "../../data/Weather";
+import { getFuelEscalation } from "../../data/FuelPrices";
 import { getDateFromMinute } from "../../helpers/DateTime";
+import { getLocation, getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { newSeed } from "../../helpers/Math";
 import {
   DifficultyType,
   FacilityShoppingType,
   GameType,
-  LocationIdType,
   LocationType,
   ScenarioType,
 } from "../../Types";
@@ -54,10 +56,80 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-// Weather data runs 1980 - 2019 and is projected forwards from there, so anything from 1980 on
-// plays; earlier would have nothing to project from
-const STARTING_YEARS = [1980, 1990, 2000, 2010, 2020];
-const DURATION_YEARS = [1, 5, 10, 20, 40];
+// Only the floor is a real constraint: the recorded weather begins in WEATHER_STARTING_YEAR and
+// the fuel prices in 1975, and a year before that has nothing to project forwards from. Forwards
+// there is no limit - the weather forecast and the price projection both run indefinitely, so a
+// 2100 start just plays eighty years of projection - and this is simply as far ahead as seemed
+// worth offering. Stepped by decade because a dropdown is the wrong control for 121 rows.
+const LATEST_STARTING_YEAR = 2100;
+const STARTING_YEAR_STEP = 10;
+const STARTING_YEARS = Array.from(
+  {
+    length:
+      (LATEST_STARTING_YEAR - WEATHER_STARTING_YEAR) / STARTING_YEAR_STEP + 1,
+  },
+  (_v: unknown, i: number) => WEATHER_STARTING_YEAR + i * STARTING_YEAR_STEP,
+);
+const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
+// The era the rates and fees above are written in: cents per kilowatt hour a player recognises,
+// against the fuel prices the data ends on.
+const RATE_BASE_YEAR = 2020;
+
+/**
+ * A rate or a fee re-quoted into the money of the year the game starts in.
+ *
+ * Fuel is the one price the game reads at face value for the year it is in - build costs and O&M
+ * are anchored on whatever year a game starts, so they always open at what the tables say. A 2080
+ * game therefore opens against sixty years of escalated fuel, and offering it a literal seven
+ * cents a kilowatt hour is offering a game that is bankrupt inside a quarter.
+ *
+ * Only forwards. A game starting before RATE_BASE_YEAR is played against real recorded prices
+ * rather than a projection, so there is no escalation to undo, and deflating those rates would
+ * change every historical scenario's balance for no reason.
+ */
+function inEraMoney(base: number, startingYear: number): number {
+  const factor =
+    getFuelEscalation(Math.max(startingYear, RATE_BASE_YEAR)) /
+    getFuelEscalation(RATE_BASE_YEAR);
+  // Two significant figures, so the offered numbers stay round enough to choose between
+  return Number((base * factor).toPrecision(2));
+}
+
+// The option nearest a value, used to keep the player's position in a list when the era under it
+// moves, and to migrate a custom game stored before these became era-aware.
+function nearestIndex(options: number[], value: number): number {
+  let best = 0;
+  options.forEach((option: number, i: number) => {
+    if (Math.abs(option - value) < Math.abs(options[best] - value)) {
+      best = i;
+    }
+  });
+  return best;
+}
+
+/**
+ * A stored custom game with its rate and fee snapped onto the options its own starting year
+ * offers.
+ *
+ * Only ever changes a game saved before those became era-aware. Doing it on the way in rather
+ * than on the way out is what keeps the screen honest: showing the nearest option while the
+ * scenario still held the old number would start a game at a rate the player was never shown.
+ * There is no recovering what they originally meant -- fifty dollars a ton is a rounding error in
+ * 2090 money -- so the nearest option is the best that can be done, once.
+ */
+function inEraScenario(scenario: ScenarioType): ScenarioType {
+  const rates = RATES_PER_KWH.map((r: number) =>
+    inEraMoney(r, scenario.startingYear),
+  );
+  const fees = FEES_PER_TON.map((f: number) =>
+    inEraMoney(f, scenario.startingYear),
+  );
+  return {
+    ...scenario,
+    dollarsPerkWh: rates[nearestIndex(rates, scenario.dollarsPerkWh)],
+    feePerKgCO2e: fees[nearestIndex(fees, scenario.feePerKgCO2e * 1000)] / 1000,
+  };
+}
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
 const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
@@ -123,7 +195,9 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
 
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
-  const [scenario, setScenario] = React.useState<ScenarioType>(props.scenario);
+  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
+    inEraScenario(props.scenario),
+  );
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
@@ -144,6 +218,32 @@ export default function CustomGame(props: Props): React.JSX.Element {
     0,
   );
 
+  // What a kilowatt hour may be charged at, and what a ton of CO2e may be feed, in the money of
+  // the year the game starts in. Both move with the starting year, which is why changing that
+  // year has to re-quote whatever was already chosen rather than leaving a 2020 rate on a 2080
+  // game -- see changeStartingYear below.
+  const rateOptions = React.useMemo(
+    () =>
+      RATES_PER_KWH.map((r: number) => inEraMoney(r, scenario.startingYear)),
+    [scenario.startingYear],
+  );
+  const feeOptions = React.useMemo(
+    () => FEES_PER_TON.map((f: number) => inEraMoney(f, scenario.startingYear)),
+    [scenario.startingYear],
+  );
+
+  // Every place that can be picked. LOCATIONS plus, if the scenario is being played somewhere
+  // that isn't in it, that place too -- a custom game may carry a location no table lists, and a
+  // Select whose value isn't one of its options renders blank and drops the choice on the next
+  // edit. Ordered with the table first so the odd one out doesn't jump the list around.
+  const selectableLocations = React.useMemo(() => {
+    const current = getScenarioLocation(scenario);
+    const listed = Object.values(LOCATIONS);
+    return current && !listed.some((l: LocationType) => l.id === current.id)
+      ? [...listed, current]
+      : listed;
+  }, [scenario]);
+
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
   const unavailable = scenario.facilities.filter(
@@ -153,6 +253,23 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
+  };
+
+  /**
+   * Moving the game's era, and carrying the prices that are quoted in it along.
+   *
+   * The player picked "the cheapest rate" or "the middling carbon fee", not a literal number of
+   * cents, so the same position in each list is what survives the move. Rolling 2020 forward to
+   * 2080 and leaving seven cents behind would silently hand back a game that cannot be won.
+   */
+  const changeStartingYear = (startingYear: number) => {
+    const rate = nearestIndex(rateOptions, scenario.dollarsPerkWh);
+    const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
+    change({
+      startingYear,
+      dollarsPerkWh: inEraMoney(RATES_PER_KWH[rate], startingYear),
+      feePerKgCO2e: inEraMoney(FEES_PER_TON[fee], startingYear) / 1000,
+    });
   };
 
   const addFacility = () => {
@@ -196,14 +313,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
             <TableRow>
               <TableCell>Location</TableCell>
               <TableCell>
+                {/* The scenario carries the whole location rather than just its id, so a custom
+                    game stays playable even if the table it was picked from changes underneath it
+                    - and so it can eventually hold somewhere the table never listed */}
                 <Select
                   id="location"
-                  value={scenario.locationId}
-                  onChange={(e: SelectChangeEvent<LocationIdType>) =>
-                    change({ locationId: e.target.value as LocationIdType })
+                  value={getScenarioLocation(scenario)?.id || ""}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    change({
+                      locationId: e.target.value,
+                      location: getLocation(e.target.value),
+                    })
                   }
                 >
-                  {Object.values(LOCATIONS).map((l: LocationType) => {
+                  {selectableLocations.map((l: LocationType) => {
                     return (
                       <MenuItem value={l.id} key={l.id}>
                         {l.name}
@@ -220,7 +343,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   id="startingYear"
                   value={scenario.startingYear}
                   onChange={(e: SelectChangeEvent<number>) =>
-                    change({ startingYear: Number(e.target.value) })
+                    changeStartingYear(Number(e.target.value))
                   }
                 >
                   {STARTING_YEARS.map((y: number) => {
@@ -310,7 +433,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     change({ dollarsPerkWh: Number(e.target.value) })
                   }
                 >
-                  {RATES_PER_KWH.map((r: number) => {
+                  {rateOptions.map((r: number) => {
                     return (
                       <MenuItem value={r} key={r}>
                         ${r.toFixed(2)}/kWh
@@ -340,10 +463,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     change({ feePerKgCO2e: Number(e.target.value) })
                   }
                 >
-                  {FEES_PER_TON.map((f: number) => {
+                  {feeOptions.map((f: number) => {
                     return (
                       <MenuItem value={f / 1000} key={f}>
-                        ${f}/ton
+                        ${Math.round(f).toLocaleString("en-US")}/ton
                       </MenuItem>
                     );
                   })}

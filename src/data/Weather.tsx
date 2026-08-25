@@ -2,9 +2,14 @@ import { DAYS_PER_MONTH, DAYS_PER_YEAR, EQUATOR_RADIANCE } from "../Constants";
 import { DateType, LocationType, RawWeatherType } from "../Types";
 import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
+import { isValidLocationId } from "../helpers/Locations";
 import Papa from "papaparse";
 
-const STARTING_YEAR = 1980; // for weather data, Jan 1st, assumed to be the same for all locations
+// The first year any location has data for, Jan 1st. Everything after the recorded years is
+// forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
+// game may start -- which is why the custom game screen builds its year list off it.
+export const WEATHER_STARTING_YEAR = 1980;
+const STARTING_YEAR = WEATHER_STARTING_YEAR; // assumed to be the same for all locations
 const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
 const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
@@ -172,6 +177,17 @@ function warnIfWeatherIncomplete(location: string) {
 
 export function initWeather(location: string, callback?: () => void) {
   weather = []; // reset each time to prevent accidentally appending to old state
+  if (!isValidLocationId(location)) {
+    // A location id is now any string rather than a checked union, and it arrives here from a
+    // saved game or a replay document on its way into a URL
+    console.error(
+      `Refusing to load weather for invalid location id "${location}"`,
+    );
+    if (callback) {
+      callback();
+    }
+    return;
+  }
   Papa.parse<RawWeatherType>(`/data/WeatherRaw${location}.csv`, {
     download: true,
     dynamicTyping: true,

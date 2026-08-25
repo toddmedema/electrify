@@ -4,7 +4,7 @@ import { logEvent } from "../../Globals";
 import { initEconomy } from "../../data/Economy";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
-import { LOCATIONS } from "../../Constants";
+import { getScenarioLocation } from "../../helpers/Locations";
 import { getScenario } from "../../data/Scenarios";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
@@ -47,8 +47,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return alert("Unknown scenario ID " + game.scenarioId);
       }
       // A resumed game keeps the location it was saved with, so the weather CSV that gets loaded
-      // is the one its forecasts were built from
-      const location = resumed ? game.location : LOCATIONS[scenario.locationId];
+      // is the one its forecasts were built from. A replay is the same story: startReplay put
+      // the location the run was recorded in on the slice, which is the only thing that keeps a
+      // replay from being re-simulated somewhere else
+      const location =
+        resumed || replaying ? game.location : getScenarioLocation(scenario);
       if (!location) {
         return alert("Unknown location ID " + scenario.locationId);
       }
