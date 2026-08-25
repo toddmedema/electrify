@@ -137,6 +137,12 @@ describe("a custom game", () => {
         ...CUSTOM,
         startingYear: 2080,
         durationMonths: 12 * 5,
+        // Quoted in 2080 money, the way the custom game screen offers it. Fuel prices are the one
+        // thing the game reads at face value for the year it is in, so a 2080 game charging a
+        // literal ten cents a kilowatt hour against sixty years of escalated fuel is bankrupt in
+        // its first quarter -- which is what this test caught when the escalation went in.
+        dollarsPerkWh: 1.1,
+        feePerKgCO2e: 530 / 1000,
       } as ScenarioType,
     });
 

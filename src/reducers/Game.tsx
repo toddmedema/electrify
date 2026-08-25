@@ -1155,10 +1155,18 @@ function updateSupplyFacilitiesFinances(
           g.loanAmountLeft,
           g.interestRate,
         );
-        const paymentPrincipal = g.loanMonthlyPayment - paymentInterest;
+        // Never more principal than is actually outstanding. The last payment of a loan is a
+        // whole tick's worth against whatever fraction of it is left, so without the floor the
+        // balance settles a few dollars below zero and stays there for the rest of the run --
+        // which reads as the lender owing the player money, counts towards net worth, and trips
+        // the loan invariant on every tick from then on
+        const paymentPrincipal = Math.min(
+          (g.loanMonthlyPayment - paymentInterest) / TICKS_PER_MONTH,
+          g.loanAmountLeft,
+        );
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
-        principalRepayment += paymentPrincipal / TICKS_PER_MONTH;
-        g.loanAmountLeft -= paymentPrincipal / TICKS_PER_MONTH;
+        principalRepayment += paymentPrincipal;
+        g.loanAmountLeft -= paymentPrincipal;
       }
     } else {
       expensesInterest +=
