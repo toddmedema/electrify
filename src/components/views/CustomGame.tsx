@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Autocomplete,
   Button,
   Card,
   CardHeader,
@@ -27,19 +28,19 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES, LOCATIONS } from "../../Constants";
+import { DIFFICULTIES } from "../../Constants";
+import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getDateFromMinute } from "../../helpers/DateTime";
-import { getLocation, getScenarioLocation } from "../../helpers/Locations";
+import { getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { newSeed } from "../../helpers/Math";
 import {
   DifficultyType,
   FacilityShoppingType,
   GameType,
-  LocationType,
   ScenarioType,
 } from "../../Types";
 
@@ -232,17 +233,36 @@ export default function CustomGame(props: Props): React.JSX.Element {
     [scenario.startingYear],
   );
 
-  // Every place that can be picked. LOCATIONS plus, if the scenario is being played somewhere
-  // that isn't in it, that place too -- a custom game may carry a location no table lists, and a
-  // Select whose value isn't one of its options renders blank and drops the choice on the next
-  // edit. Ordered with the table first so the odd one out doesn't jump the list around.
-  const selectableLocations = React.useMemo(() => {
-    const current = getScenarioLocation(scenario);
-    const listed = Object.values(LOCATIONS);
-    return current && !listed.some((l: LocationType) => l.id === current.id)
-      ? [...listed, current]
-      : listed;
-  }, [scenario]);
+  // Every place that can be picked: the six in the bundle to begin with, and every city with
+  // downloaded weather once the index arrives, which is a download rather than a rebuild
+  const [cities, setCities] = React.useState<CityType[]>(getCities);
+  React.useEffect(() => {
+    let live = true;
+    initCities().then((loaded: CityType[]) => {
+      if (live) {
+        setCities(loaded);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Plus, if the scenario is being played somewhere the index doesn't list, that place too -- a
+  // custom game may carry a location no catalogue has heard of, and a picker whose value isn't
+  // one of its options renders blank and drops the choice on the next edit. Listed last, under
+  // its own heading, so it doesn't shuffle the rest of the list around.
+  const current = getScenarioLocation(scenario);
+  const selectableLocations = React.useMemo(
+    () =>
+      current && !cities.some((c: CityType) => c.id === current.id)
+        ? [...cities, { ...current, region: "Custom" }]
+        : cities,
+    [current, cities],
+  );
+  const location = selectableLocations.find(
+    (c: CityType) => c.id === current?.id,
+  );
 
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
@@ -314,26 +334,36 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>Location</TableCell>
               <TableCell>
                 {/* The scenario carries the whole location rather than just its id, so a custom
-                    game stays playable even if the table it was picked from changes underneath it
-                    - and so it can eventually hold somewhere the table never listed */}
-                <Select
+                    game stays playable even if the catalogue it was picked from changes
+                    underneath it - and so it can hold somewhere the catalogue never listed.
+                    Typed rather than scrolled: a few hundred cities is well past what a menu of
+                    them is any use for. */}
+                <Autocomplete
                   id="location"
-                  value={getScenarioLocation(scenario)?.id || ""}
-                  onChange={(e: SelectChangeEvent<string>) =>
-                    change({
-                      locationId: e.target.value,
-                      location: getLocation(e.target.value),
-                    })
+                  options={selectableLocations}
+                  groupBy={(l: CityType) => l.region}
+                  getOptionLabel={(l: CityType) => l.name}
+                  isOptionEqualToValue={(a: CityType, b: CityType) =>
+                    a.id === b.id
                   }
-                >
-                  {selectableLocations.map((l: LocationType) => {
-                    return (
-                      <MenuItem value={l.id} key={l.id}>
-                        {l.name}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
+                  value={location}
+                  onChange={(_e: unknown, picked: CityType | null) => {
+                    if (picked) {
+                      change({ locationId: picked.id, location: picked });
+                    }
+                  }}
+                  disableClearable
+                  autoHighlight
+                  openOnFocus
+                  sx={{ minWidth: 200 }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      variant="standard"
+                      placeholder="Search cities"
+                    />
+                  )}
+                />
               </TableCell>
             </TableRow>
             <TableRow>

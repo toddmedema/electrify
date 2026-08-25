@@ -71,9 +71,9 @@ export const LOCATIONS = {
     long: -118.2437,
     timeZone: "America/Los_Angeles",
   },
-  // Its forty years read as coastal range rather than Sierra -- a 9C to 17C annual swing that
-  // peaks in September, which is the marine layer's signature and not the high country's --
-  // so it's placed and named for the Santa Cruz Mountains
+  // Named for where its data was read as coming from, back when it was a CSV of unknown
+  // provenance. It now genuinely is the Santa Cruz Mountains: every location is fetched from
+  // these coordinates, so the name and the weather can no longer disagree
   CAMountains: {
     id: "CAMountains",
     name: "Santa Cruz Mountains, CA",

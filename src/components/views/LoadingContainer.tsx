@@ -56,7 +56,13 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         return alert("Unknown location ID " + scenario.locationId);
       }
 
-      initWeather(location.id, () => {
+      initWeather(location.id, (failure?: string) => {
+        if (failure) {
+          // Every city the picker offers has a file behind it, so this is a download that failed
+          // rather than a place that was never fetched -- and starting anyway would hand back a
+          // game where the weather never changes, which reads as the game being broken
+          return alert(failure);
+        }
         initFuelPrices(() => {
           initEconomy(() => {
             if (!resumed) {

@@ -36,7 +36,8 @@ Runs the game's simulation headlessly and reports what happened.
 
   --scenario <id>        Scenario to play (default 101). --list shows the ids
   --year <n>             Override the scenario's starting year (1980 and up)
-  --location <id>        Override where it's played: PIT, SF, LA, CAMountains, HNL, SJU
+  --location <id>        Override where it's played: any city with downloaded weather
+                         (npm run fetch-weather -- --list)
   --difficulty <name>    Intern | Employee | Manager | VP | CEO (default Employee)
   --months <n>           Override the scenario's own duration
   --seed <n>             Pin the run's randomness (default 12345)

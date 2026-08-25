@@ -3,7 +3,7 @@ import { DateType, LocationType, RawWeatherType } from "../Types";
 import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
 import { isValidLocationId } from "../helpers/Locations";
-import Papa from "papaparse";
+import { decodeWeather } from "./WeatherBinary";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -48,6 +48,7 @@ const DUMMY_WEATHER = {
   TEMP_C: 0,
   CLOUD_PCT: 0,
   WIND_KPH: 10,
+  PRECIP_MM: 0,
 };
 
 // The three fields that are forecast, and the physical floor and ceiling each one has to respect
@@ -157,67 +158,74 @@ function buildClimatology() {
   climatology = months;
 }
 
-// TODO download weather for all locations at start with a 2s init delay, like loading audio (but after audio) for offline play
-// But only if worker: true starts working - TICKET: https://github.com/mholt/PapaParse/issues/753
-// Ideally caching this... so maybe upgrade to use https://tanstack.com/query/latest/docs/framework/react/overview ?
-function collectWeatherRow(row: Papa.ParseStepResult<RawWeatherType>) {
-  const data = row.data;
-  if (data && data.YEAR) {
-    weather.push(data);
-  }
-}
-
-function warnIfWeatherIncomplete(location: string) {
+/**
+ * Loads a location's record, replacing whatever the last game left behind.
+ *
+ * Everything else in this file reads `weather` by row offset, so nothing may be forecast until
+ * this has run and the climatology has been built off real data.
+ */
+export function initWeatherFromRows(
+  location: string,
+  rows: RawWeatherType[],
+): void {
+  weather = rows; // replaced rather than appended to, so a second game doesn't inherit the first's
   if (weather.length < EXPECTED_ROWS) {
     console.warn(
       `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
     );
   }
-}
-
-export function initWeather(location: string, callback?: () => void) {
-  weather = []; // reset each time to prevent accidentally appending to old state
-  if (!isValidLocationId(location)) {
-    // A location id is now any string rather than a checked union, and it arrives here from a
-    // saved game or a replay document on its way into a URL
-    console.error(
-      `Refusing to load weather for invalid location id "${location}"`,
-    );
-    if (callback) {
-      callback();
-    }
-    return;
-  }
-  Papa.parse<RawWeatherType>(`/data/WeatherRaw${location}.csv`, {
-    download: true,
-    dynamicTyping: true,
-    header: true,
-    // worker: true,
-    step: collectWeatherRow,
-    complete() {
-      warnIfWeatherIncomplete(location);
-      // Has to run before anything is forecast, and while the array still holds only real data
-      buildClimatology();
-      if (callback) {
-        callback();
-      }
-    },
-  });
+  // Has to run while the array still holds only recorded data, before anything is forecast
+  buildClimatology();
 }
 
 /**
- * Synchronous counterpart to initWeather, for callers that already have the CSV contents
- * (the headless simulator reads them off disk; the browser has to download them).
+ * Synchronous counterpart to initWeather, for callers that already hold the file
+ * (the headless simulator reads it off disk; the browser has to download it).
  */
-export function initWeatherFromCsv(location: string, csv: string) {
-  weather = []; // reset each time to prevent accidentally appending to old state
-  Papa.parse<RawWeatherType>(csv, {
-    dynamicTyping: true,
-    header: true,
-    step: collectWeatherRow,
-  });
-  warnIfWeatherIncomplete(location);
-  buildClimatology();
+export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
+  initWeatherFromRows(location, decodeWeather(buffer));
+}
+
+/**
+ * Downloads a location's record, for the browser.
+ *
+ * TODO download several locations at start with a 2s init delay, like loading audio (but after
+ * audio) for offline play. At 57KB apiece rather than 265KB of CSV that is far cheaper than it
+ * was, though at 282 catalogued locations it can no longer be all of them.
+ *
+ * @param callback - Called once, with the reason if the record could not be loaded. A caller that
+ *   starts the game regardless would be starting one played on DUMMY_WEATHER: every hour of every
+ *   year 0C and still, which runs perfectly well and is not a game anyone meant to play.
+ */
+export function initWeather(
+  location: string,
+  callback?: (failure?: string) => void,
+) {
+  weather = []; // reset immediately, so a failed load can't be played on the last game's weather
+  const done = (failure?: string) => {
+    if (callback) {
+      callback(failure);
+    }
+  };
+  if (!isValidLocationId(location)) {
+    // A location id is now any string rather than a checked union, and it arrives here from a
+    // saved game or a replay document on its way into a URL
+    return done(`"${location}" is not a location id weather can be loaded for`);
+  }
+  fetch(`/data/weather/${location}.bin`)
+    .then((response: Response) => {
+      if (!response.ok) {
+        throw new Error(`${response.status} fetching the weather file`);
+      }
+      return response.arrayBuffer();
+    })
+    .then((buffer: ArrayBuffer) => {
+      initWeatherFromBinary(location, buffer);
+      done();
+    })
+    .catch((e: Error) => {
+      done(`Could not load the weather for ${location}: ${e.message}`);
+    });
 }
 
 /**
@@ -288,6 +296,7 @@ export function getWeather(
     TEMP_C: prev.TEMP_C * prevPerc + next.TEMP_C * nextPerc,
     CLOUD_PCT: prev.CLOUD_PCT * prevPerc + next.CLOUD_PCT * nextPerc,
     WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
+    PRECIP_MM: prev.PRECIP_MM * prevPerc + next.PRECIP_MM * nextPerc,
   };
 }
 
@@ -400,6 +409,12 @@ function forecastDay(seed: number, dayIndex: number) {
       // Forecast rows follow the same month a year earlier, so they belong to the following year
       YEAR: previous.YEAR + 1,
       MONTH: previous.MONTH,
+      // Precipitation is taken from the borrowed day whole, rather than being given an anomaly of
+      // its own like the three fields below. Rain is mostly zeroes with a long tail rather than
+      // anything a normal distribution describes, so a real wet or dry day of the right month is
+      // a better forecast than a mean plus a shock - and it costs no draw, which is what keeps
+      // adding it from shifting every temperature and wind number that came before it.
+      PRECIP_MM: shape.PRECIP_MM,
     } as RawWeatherType;
     FORECAST_FIELDS.forEach((field) => {
       const stats = month.stats[field];
@@ -453,7 +468,13 @@ function applyClimateForcing(
   }
   const month = climatology[monthSlotOf(dayIndex)];
   const { warmingC, spread } = climateShift(cumulativeMegatons);
-  const forced = { YEAR: reading.YEAR, MONTH: reading.MONTH } as RawWeatherType;
+  // Precipitation passes through untouched. A warmer atmosphere does carry more water, but
+  // nothing simulates rain yet, and a coupling no one can feel is a coupling no one can check
+  const forced = {
+    YEAR: reading.YEAR,
+    MONTH: reading.MONTH,
+    PRECIP_MM: reading.PRECIP_MM,
+  } as RawWeatherType;
   FORECAST_FIELDS.forEach((field) => {
     const { mean } = month.stats[field];
     const physical = PHYSICAL_BOUNDS[field];

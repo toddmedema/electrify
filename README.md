@@ -70,6 +70,33 @@ check a change to the simulation in seconds rather than by playing through the U
 lists the flags. See [src/testing/README.md](src/testing/README.md) for what it checks and how it
 works.
 
+### Add a city to play in
+
+Every location is a single file in `public/data/weather`: forty years of hourly readings for the
+twelve days a year the game actually simulates, packed into 57KB. Whichever cities have been
+downloaded are exactly the ones the custom game screen offers - `public/data/weather/index.json`
+is written by the same script and is what the picker reads.
+
+```sh
+npm run fetch-weather -- --list
+```
+
+lists the 282 cities in `scripts/cities.json` and marks the ones already downloaded; naming some
+of them fetches them, and naming none fetches everything still missing:
+
+```sh
+npm run fetch-weather -- Tokyo Nairobi Reykjavik
+```
+
+The data is ERA5 reanalysis from the [Open-Meteo archive
+API](https://open-meteo.com/en/docs/historical-weather-api), which is free and needs no key but
+rate limits to roughly ten cities an hour and twenty a day. The script paces itself against that,
+writes each city out as it finishes and skips whatever is already on disk - so filling in the rest
+of the catalogue is a matter of running it again tomorrow rather than leaving it running.
+
+To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. An `id` ends up
+in save games and replays, so it can never be changed afterwards; everything else can.
+
 ### Release checklist
 
 To release, you'll need to install and authenticate the `aws cli`.

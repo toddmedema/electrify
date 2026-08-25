@@ -1,9 +1,10 @@
 import {
   getWeather,
-  initWeatherFromCsv,
+  initWeatherFromRows,
   WEATHER_STARTING_YEAR,
 } from "./Weather";
 import { getDateFromMinute } from "../helpers/DateTime";
+import { RawWeatherType } from "../Types";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
 // single year of data is 12 months x 24 hours. The fixture starts at 1980, the first year the
@@ -40,8 +41,17 @@ const monthlyWindKph = (month: number) => 2 + 3 * winterness(month);
 // ...and how far a given year strays from it. Roughly 8x the swing in January that July gets,
 // mirroring Pittsburgh's real 5.8C January against its 2.3C August.
 const tempSpreadC = (month: number) => 1 + 7 * winterness(month);
+// Rain before dawn in the winter half of the year and never in the summer half, which is the
+// shape precipitation really has -- mostly nothing, occasionally something -- and is the reason
+// it is resampled from a real day rather than drawn from a distribution like the other fields
+const precipMm = (month: number, hour: number) =>
+  winterness(month) > 0.5 && hour >= 2 && hour < 6 ? 0.5 : 0;
 
-function fixtureRow(yearIndex: number, month: number, hour: number) {
+function fixtureRow(
+  yearIndex: number,
+  month: number,
+  hour: number,
+): RawWeatherType {
   const wave = yearWave(yearIndex);
   // Amplitude varies by year so that the hour to hour shape genuinely differs between the
   // historic days a forecast can borrow from, which is what makes the resampling observable
@@ -58,24 +68,20 @@ function fixtureRow(yearIndex: number, month: number, hour: number) {
       Math.max(0, monthlyCloudPct(month) + 6 * diurnal + 20 * wave),
     ),
     WIND_KPH: Math.max(0, monthlyWindKph(month) + 0.2 * diurnal + 1.5 * wave),
+    PRECIP_MM: precipMm(month, hour),
   };
 }
 
-function fixtureCsv(): string {
-  const rows = ["YEAR,MONTH,TEMP_C,CLOUD_PCT,WIND_KPH"];
+function fixtureRows(): RawWeatherType[] {
+  const rows: RawWeatherType[] = [];
   for (let yearIndex = 0; yearIndex < FIXTURE_YEARS; yearIndex++) {
     for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
       for (let hour = 0; hour < HOURS_PER_MONTH; hour++) {
-        const row = fixtureRow(yearIndex, month, hour);
-        rows.push(
-          [row.YEAR, row.MONTH, row.TEMP_C, row.CLOUD_PCT, row.WIND_KPH].join(
-            ",",
-          ),
-        );
+        rows.push(fixtureRow(yearIndex, month, hour));
       }
     }
   }
-  return rows.join("\n");
+  return rows;
 }
 
 function dateAt(month: number, hourOfDay: number, minuteOfHour = 0) {
@@ -138,7 +144,7 @@ describe("getWeather", () => {
     // The fixture is deliberately eight years rather than the forty the real data has, and the
     // loader warns about that. Silence it so a passing run has a clean log.
     warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    initWeatherFromCsv("PIT", fixtureCsv());
+    initWeatherFromRows("PIT", fixtureRows());
   });
 
   afterEach(() => {
@@ -185,8 +191,34 @@ describe("getWeather", () => {
     expect(Number.isFinite(forecast.TEMP_C)).toBe(true);
     expect(Number.isFinite(forecast.CLOUD_PCT)).toBe(true);
     expect(Number.isFinite(forecast.WIND_KPH)).toBe(true);
+    expect(Number.isFinite(forecast.PRECIP_MM)).toBe(true);
     expect(Number.isFinite(forecast.YEAR)).toBe(true);
     expect(Number.isFinite(forecast.MONTH)).toBe(true);
+  });
+
+  // Precipitation is the one field that isn't given an anomaly of its own: a forecast day takes
+  // it whole from the real day it borrowed its shape from. So it has to stay in the record's own
+  // vocabulary -- a wet hour of that month, or nothing -- rather than becoming a drizzle that
+  // never stops, which is what a mean plus a normal shock would make of a mostly-zero field.
+  it("forecasts precipitation by resampling real days rather than averaging them", () => {
+    const januaryHours = [];
+    const julyHours = [];
+    for (let hour = 0; hour < HOURS_PER_MONTH; hour++) {
+      januaryHours.push(
+        getWeather(dateAt(monthIndex(FIXTURE_YEARS + 2, 1), hour), SEED)
+          .PRECIP_MM,
+      );
+      julyHours.push(
+        getWeather(dateAt(monthIndex(FIXTURE_YEARS + 2, 7), hour), SEED)
+          .PRECIP_MM,
+      );
+    }
+    // Every value is one the record actually holds for that month, and January's wet hours are
+    // still the small hours rather than being smeared across the day
+    expect(new Set(januaryHours)).toEqual(new Set([0, 0.5]));
+    expect(januaryHours.filter((mm: number) => mm > 0).length).toEqual(4);
+    // ...and a month that has never rained in this fixture still doesn't
+    expect(julyHours.every((mm: number) => mm === 0)).toBe(true);
   });
 
   // The custom game screen builds its year list off WEATHER_STARTING_YEAR, so a date before the
@@ -229,7 +261,7 @@ describe("getWeather", () => {
       walked.push(getWeather(dateAt(month, 8), SEED));
     }
 
-    initWeatherFromCsv("PIT", fixtureCsv()); // Back to a cache holding only the loaded data
+    initWeatherFromRows("PIT", fixtureRows()); // Back to a cache holding only the loaded data
     const jumped = getWeather(
       dateAt(monthIndex(FIXTURE_YEARS + 3, 12), 8),
       SEED,
@@ -240,7 +272,7 @@ describe("getWeather", () => {
 
   it("forecasts different weather for a different seed", () => {
     const first = getWeather(dateAt(monthIndex(FIXTURE_YEARS, 2), 8), SEED);
-    initWeatherFromCsv("PIT", fixtureCsv());
+    initWeatherFromRows("PIT", fixtureRows());
     const second = getWeather(
       dateAt(monthIndex(FIXTURE_YEARS, 2), 8),
       SEED + 1,
@@ -366,7 +398,7 @@ describe("getWeather", () => {
         SEED,
         0,
       );
-      initWeatherFromCsv("PIT", fixtureCsv());
+      initWeatherFromRows("PIT", fixtureRows());
       const unspecified = getWeather(
         dateAt(monthIndex(FIXTURE_YEARS, 3), 14),
         SEED,
