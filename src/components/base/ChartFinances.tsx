@@ -76,7 +76,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         spanGaps: false,
       },
     ],
-    plugins: [titlePlugin(() => getState().title, 200, 7)],
+    plugins: [titlePlugin(() => getState().title, 7)],
   };
 }
 

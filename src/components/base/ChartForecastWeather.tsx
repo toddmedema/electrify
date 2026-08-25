@@ -1,21 +1,14 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import {
-  legendPlugin,
-  padRange,
-  SPLINE,
-  stepTicks,
-  xAxis,
-  yAxis,
-} from "./UPlotHelpers";
+import { padRange, SPLINE, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { temperatureColor, windColor } from "../../Theme";
+import { temperatureAxisColor, temperatureColor, windColor } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -32,12 +25,10 @@ interface State {
   multiyear: boolean;
 }
 
-// Temperature and wind share one axis, as they did on Victory: the numbers are close enough in
-// range that a second scale would only add a second set of labels to read
-const LEGEND = [
-  { name: "Heat (°C)", fill: temperatureColor },
-  { name: "Wind (km/h)", fill: windColor },
-];
+// A scale each, labelled on its own side and coloured to match its line: degrees and km/h only
+// looked like one axis because the numbers happened to overlap, and sharing it flattened whichever
+// of the two had the narrower spread.
+const WIND_SCALE = "wind";
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
@@ -54,6 +45,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     scales: {
       x: { time: false, range: () => getState().domain.x },
       y: { range: (_u, min, max) => padRange(min, max) },
+      [WIND_SCALE]: { range: (_u, min, max) => padRange(min, max) },
     },
     axes: [
       xAxis(scale, {
@@ -70,6 +62,15 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       }),
       yAxis(scale, {
         grid: true,
+        label: "Heat (°C)",
+        stroke: temperatureAxisColor,
+        values: (_u, splits) => splits.map((t) => String(Math.round(t))),
+      }),
+      yAxis(scale, {
+        scale: WIND_SCALE,
+        side: 1,
+        label: "Wind (km/h)",
+        stroke: windColor,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
     ],
@@ -81,9 +82,14 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         points: { show: false },
         paths: SPLINE,
       },
-      { stroke: windColor, width: 1, points: { show: false }, paths: SPLINE },
+      {
+        scale: WIND_SCALE,
+        stroke: windColor,
+        width: 1,
+        points: { show: false },
+        paths: SPLINE,
+      },
     ],
-    plugins: [legendPlugin(() => LEGEND, 270, 20)],
   };
 }
 

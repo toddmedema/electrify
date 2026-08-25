@@ -21,12 +21,50 @@ export const TICK_LABEL_FILL = chartTheme.tickLabels.fill;
 // VictoryTheme.material's colours for the parts of an axis that aren't the baseline
 const GRID_STROKE = "#ECEFF1";
 const TICK_STROKE = "#90A4AE";
+// How far a tick pokes out of the axis, and how far the label then sits from it, in design units
+const TICK_SIZE = 5;
+const LABEL_GAP = 4;
 // Victory drew legend text in its material theme's near-black rather than the axes' grey
 const LEGEND_TEXT = "#252525";
 
-/** A font string at the chart's current scale. */
+/**
+ * A font string at the chart's current scale.
+ *
+ * Whole pixels on purpose: uPlot rescales axis fonts for the device by rewriting the `<n>px` in
+ * this string, and its pattern only matches digits, so a fractional size would leave it
+ * rewriting the ".9" of "43.9px" and handing the canvas a font it can't parse.
+ */
 export function chartFont(scale: number, sizePx = 12): string {
-  return `${(sizePx * scale).toFixed(1)}px ${CHART_FONT_FAMILY}`;
+  return `${Math.max(1, Math.round(sizePx * scale))}px ${CHART_FONT_FAMILY}`;
+}
+
+/**
+ * Design units to canvas pixels, for the plugins below that paint on the canvas themselves.
+ *
+ * uPlot works in CSS pixels but never scales the context, multiplying every coordinate it draws
+ * by the device ratio instead -- so `u.bbox` and anything else reaching the canvas is in device
+ * pixels, and a plugin that positions itself in CSS pixels lands short of where it means to on
+ * any display that isn't at 100%.
+ */
+function canvasScale(u: uPlot): number {
+  return (u.width / DESIGN_WIDTH) * uPlot.pxRatio;
+}
+
+// A context of our own to ask how wide a label will be, since axis sizes have to be settled
+// before there is a plot to measure with
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
+/** Width of `text` in CSS pixels at `font`, whose size is `sizePx`. */
+function textWidth(text: string, font: string, sizePx: number): number {
+  if (measureCtx === undefined) {
+    measureCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!measureCtx) {
+    // No canvas to measure with (jsdom); a half-em per character is close enough for digits
+    return text.length * sizePx * 0.55;
+  }
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
 }
 
 export interface LegendItem {
@@ -38,11 +76,17 @@ interface AxisOptions {
   /** Which tick values to draw; omitted lets uPlot choose */
   splits?: uPlot.Axis.Splits;
   values: uPlot.Axis.Values;
-  /** Space reserved for the axis, in design units */
+  /** Space reserved for the axis, in design units; omitted fits it to the labels */
   size?: number;
   label?: string;
   /** Only the charts that showed Victory's default grid ask for one */
   grid?: boolean;
+  /** Which y scale the axis reads, for the charts that carry two */
+  scale?: string;
+  /** uPlot's sides: 1 is right, 3 is left */
+  side?: 1 | 3;
+  /** Ticks, labels and axis label in one colour, to tie an axis to its series */
+  stroke?: string;
 }
 
 /**
@@ -72,7 +116,7 @@ export function niceSplits(min: number, max: number, target = 5): number[] {
 
 function axisCommon(scale: number, o: AxisOptions) {
   return {
-    stroke: TICK_LABEL_FILL,
+    stroke: o.stroke ?? TICK_LABEL_FILL,
     font: chartFont(scale),
     grid: o.grid
       ? {
@@ -82,7 +126,12 @@ function axisCommon(scale: number, o: AxisOptions) {
           dash: [10 * scale, 5 * scale],
         }
       : { show: false },
-    ticks: { show: true, stroke: TICK_STROKE, width: 1, size: 5 * scale },
+    ticks: {
+      show: true,
+      stroke: TICK_STROKE,
+      width: 1,
+      size: TICK_SIZE * scale,
+    },
     border: { show: true, stroke: chartTheme.axis.stroke, width: 1 },
     label: o.label,
     labelFont: chartFont(scale),
@@ -102,14 +151,37 @@ export function xAxis(scale: number, o: AxisOptions): uPlot.Axis {
   };
 }
 
-/** The y axis every chart shares. Wider than x because the labels sit beside it. */
+/**
+ * The y axis every chart shares.
+ *
+ * Its width follows the labels rather than a fixed reserve: uPlot draws them right up against
+ * the plot, so anything left over opens as a gap on the far side -- between "Per MMBTU" and
+ * "$12" on the fuel chart, which is what gave the reserve away.
+ */
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
+  const font = chartFont(scale);
+  const fontSize = 12 * scale;
+  const fixed = TICK_SIZE * scale + LABEL_GAP * scale;
   return {
     ...axisCommon(scale, o),
-    scale: "y",
-    side: 3,
-    size: (o.size ?? 55) * scale,
-    gap: 4 * scale,
+    scale: o.scale ?? "y",
+    side: o.side ?? 3,
+    size:
+      o.size != null
+        ? o.size * scale
+        : (_u, values) => {
+            let widest = 0;
+            for (const value of values || []) {
+              if (value != null) {
+                widest = Math.max(
+                  widest,
+                  textWidth(String(value), font, fontSize),
+                );
+              }
+            }
+            return Math.ceil(fixed + widest);
+          },
+    gap: LABEL_GAP * scale,
     splits: o.splits ?? ((_u, _i, min, max) => niceSplits(min, max)),
   };
 }
@@ -219,7 +291,7 @@ export function legendPlugin(
         if (items.length === 0) {
           return;
         }
-        const scale = u.width / DESIGN_WIDTH;
+        const scale = canvasScale(u);
         const radius = 3.5 * scale;
         const gap = 5 * scale;
         const lineHeight = 16 * scale;
@@ -252,10 +324,13 @@ export function legendPlugin(
   };
 }
 
-/** A caption over the plot, which the finance charts carry instead of a legend. */
+/**
+ * A caption over the plot, which the finance charts carry instead of a legend. Centred on the
+ * plot rather than on a fixed offset, since the y axis is only as wide as its labels and so a
+ * chart of percentages and a chart of dollars no longer start in the same place.
+ */
 export function titlePlugin(
   getTitle: () => string,
-  designX: number,
   designY: number,
 ): uPlot.Plugin {
   return {
@@ -265,13 +340,13 @@ export function titlePlugin(
         if (!title) {
           return;
         }
-        const scale = u.width / DESIGN_WIDTH;
+        const scale = canvasScale(u);
         u.ctx.save();
         u.ctx.font = chartFont(scale, 14);
         u.ctx.fillStyle = chartTheme.axis.stroke;
         u.ctx.textAlign = "center";
         u.ctx.textBaseline = "middle";
-        u.ctx.fillText(title, designX * scale, designY * scale);
+        u.ctx.fillText(title, u.bbox.left + u.bbox.width / 2, designY * scale);
         u.ctx.restore();
       },
     },
