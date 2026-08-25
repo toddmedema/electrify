@@ -159,6 +159,15 @@ describe("getFuelPricesPerMBTU", () => {
     expect(pricesIn(FIXTURE_ENDING_YEAR + 1, 6, SEED + 1)).not.toEqual(first);
   });
 
+  // FuelPricesRaw.csv happens not to end in a newline, which is the only reason the trailing
+  // blank row the old reader handed back never landed in the table as year NaN. Adding one to the
+  // file should stay a whitespace change.
+  it("reads a file ending in a newline the same as one that does not", () => {
+    const withNewline = { ...pricesIn(FIXTURE_STARTING_YEAR, 6) };
+    initFuelPricesFromCsv(fixtureCsv() + "\n");
+    expect(pricesIn(FIXTURE_STARTING_YEAR, 6)).toEqual(withNewline);
+  });
+
   it("explains itself rather than hanging when nothing has been loaded", () => {
     initFuelPricesFromCsv("year,month,naturalgas,coal,uranium,oil");
     expect(() => pricesIn(FIXTURE_STARTING_YEAR, 1)).toThrow(
