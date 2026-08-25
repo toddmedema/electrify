@@ -15,9 +15,11 @@ const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 const MONTHS_PER_YEAR = 12;
-// One normal each for temperature, wind and cloud cover, plus a uniform to pick which historic
-// year the day borrows its hour to hour shape from
-const DRAWS_PER_FORECAST_DAY = 4;
+// One normal each for temperature, wind and cloud cover. The uniform that picks which recorded
+// day a forecast borrows its shape from is addressed by day index on a stream of its own, since
+// normalAt and randomAt cannot share one (see RANDOM_STREAM).
+// (kept a literal rather than FORECAST_FIELDS.length, which is declared further down this file)
+const DRAWS_PER_FORECAST_DAY = 3;
 
 // How much of last year's departure from normal carries into this year's, for the same month.
 // The point of it being well under 1 is that the departure decays back towards normal instead of
@@ -81,6 +83,10 @@ interface MonthClimatologyType {
 // its seasonality from its own forty years rather than from anything written per location here,
 // which is what makes this scale to a seventh city.
 let climatology: MonthClimatologyType[] = [];
+
+// Bumped by every initWeather call, so an earlier download that lands after a later one can tell
+// that it is no longer the load anybody is waiting on
+let loadGeneration = 0;
 
 // Which calendar month a day index falls in, 0 based. Written against the constants rather than
 // assuming twelve days a year, so raising DAYS_PER_MONTH does not silently scramble the seasons.
@@ -163,11 +169,23 @@ function buildClimatology() {
  *
  * Everything else in this file reads `weather` by row offset, so nothing may be forecast until
  * this has run and the climatology has been built off real data.
+ *
+ * Short data throws rather than warning, the same way decodeWeather does. A forecast day is last
+ * year's same day nudged, so with less than a year loaded `forecastDay` reaches back past the
+ * start of the array and dies on `previous.YEAR` mid-tick -- a crash a long way from the load
+ * that caused it, and only once the player has started playing.
  */
 export function initWeatherFromRows(
   location: string,
   rows: RawWeatherType[],
 ): void {
+  if (rows.length < ROWS_PER_YEAR) {
+    weather = [];
+    climatology = [];
+    throw new Error(
+      `Weather data for ${location} holds ${rows.length} rows, and a forecast needs at least the ${ROWS_PER_YEAR} of one year`,
+    );
+  }
   weather = rows; // replaced rather than appended to, so a second game doesn't inherit the first's
   if (weather.length < EXPECTED_ROWS) {
     console.warn(
@@ -201,8 +219,19 @@ export function initWeather(
   location: string,
   callback?: (failure?: string) => void,
 ) {
-  weather = []; // reset immediately, so a failed load can't be played on the last game's weather
+  // Reset immediately, so a failed load can't be played on the last game's weather. The
+  // climatology goes with it: leaving the last location's monthly means behind would let
+  // applyClimateForcing bend a reading against a city it never came from.
+  weather = [];
+  climatology = [];
+  // Two loads can be in flight at once -- backing out of the loading screen and picking somewhere
+  // else -- and without this the slower one wins simply by finishing last, handing the player a
+  // game played somewhere they didn't choose
+  const generation = ++loadGeneration;
   const done = (failure?: string) => {
+    if (generation !== loadGeneration) {
+      return; // Superseded by a later initWeather; that call owns the callback now
+    }
     if (callback) {
       callback(failure);
     }
@@ -220,6 +249,9 @@ export function initWeather(
       return response.arrayBuffer();
     })
     .then((buffer: ArrayBuffer) => {
+      if (generation !== loadGeneration) {
+        return; // A later load is already the one that counts; don't overwrite its rows
+      }
       initWeatherFromBinary(location, buffer);
       done();
     })
@@ -376,11 +408,13 @@ function forecastDay(seed: number, dayIndex: number) {
   const previousYearRow = (dayIndex - DAYS_PER_YEAR) * ROWS_PER_DAY;
   const draw = dayIndex * DRAWS_PER_FORECAST_DAY;
 
-  // A real day of this same month, whose hour to hour shape this day borrows
+  // A real day of this same month, whose hour to hour shape this day borrows. Addressed by day
+  // index on its own stream: a uniform drawn from the anomalies' stream would land on one of the
+  // pair some other day's normal is built from, since normalAt addresses those at 2 * index.
   const shapeRow =
     month.historicRows[
       Math.floor(
-        randomAt(seed, RANDOM_STREAM.weather, draw + FORECAST_FIELDS.length) *
+        randomAt(seed, RANDOM_STREAM.weatherShape, dayIndex) *
           month.historicRows.length,
       )
     ];

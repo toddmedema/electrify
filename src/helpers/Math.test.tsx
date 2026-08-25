@@ -5,6 +5,7 @@ import {
   newSeed,
   normalAt,
   randomAt,
+  RANDOM_STREAM,
 } from "./Math";
 
 const STREAM = 1;
@@ -129,6 +130,33 @@ describe("normalAt", () => {
         expect(Number.isFinite(normalAt(seed, STREAM, index))).toBe(true);
       }
     }
+  });
+
+  // The reason RANDOM_STREAM is one entry per kind of draw rather than one per subsystem, and
+  // the bug that made it so: a normal is built from the uniforms at 2*index and 2*index+1, so a
+  // stream taking plain randomAt draws as well hands the same uniform out twice. Weather did
+  // exactly that -- half its shape-day picks were also the second half of another day's cloud
+  // cover normal -- and pinning the addressing here is what stops the two spaces silently
+  // merging again
+  it("is built from the uniforms at 2*index and 2*index+1", () => {
+    const seed = 12345;
+    for (const index of [0, 1, 3, 17]) {
+      const u1 = Math.max(Number.MIN_VALUE, randomAt(seed, STREAM, index * 2));
+      const u2 = randomAt(seed, STREAM, index * 2 + 1);
+      expect(normalAt(seed, STREAM, index)).toBeCloseTo(
+        Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2),
+        12,
+      );
+    }
+  });
+});
+
+describe("RANDOM_STREAM", () => {
+  // Two subsystems sharing a stream would have one's draws shift the other's, and a stream that
+  // changed value would change what every existing seed produces
+  it("names every stream once", () => {
+    const ids = Object.values(RANDOM_STREAM);
+    expect(new Set(ids).size).toEqual(ids.length);
   });
 });
 

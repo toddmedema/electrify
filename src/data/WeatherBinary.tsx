@@ -18,6 +18,11 @@ const MAGIC = "EWX1";
 const SUPPORTED_VERSION = 1;
 const HEADER_BYTES = 16;
 const BYTES_PER_ROW = 5;
+// decodeWeather works out which month a row belongs to from its position -- one recorded day per
+// calendar month -- so a file claiming more days than a year has months would number rows MONTH
+// 13 and up, which is not a month and which every reader of RawWeatherType would go on to
+// believe. The decoder is otherwise happy at any smaller shape, which is what its tests use.
+const MAX_DAYS_PER_YEAR = 12;
 
 export interface WeatherFileHeaderType {
   version: number;
@@ -61,6 +66,20 @@ function readHeader(view: DataView, byteLength: number): WeatherFileHeaderType {
     yearCount: view.getUint16(10, true),
     rowCount: Math.floor((byteLength - HEADER_BYTES) / BYTES_PER_ROW),
   };
+  if (header.daysPerYear < 1 || header.daysPerYear > MAX_DAYS_PER_YEAR) {
+    throw new Error(
+      `Weather file holds ${header.daysPerYear} days a year, and a day has to be a month of the ${MAX_DAYS_PER_YEAR} in one`,
+    );
+  }
+  if (header.hoursPerDay < 1) {
+    throw new Error("Weather file holds no hours a day");
+  }
+  const bodyBytes = byteLength - HEADER_BYTES;
+  if (bodyBytes % BYTES_PER_ROW !== 0) {
+    throw new Error(
+      `Weather file has ${bodyBytes % BYTES_PER_ROW} bytes left over after its ${header.rowCount} rows`,
+    );
+  }
   const expected = header.daysPerYear * header.hoursPerDay * header.yearCount;
   if (header.rowCount !== expected) {
     throw new Error(
