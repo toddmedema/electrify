@@ -394,8 +394,13 @@ export interface GameType {
   replayPlayback?: ReplayPlaybackType;
 }
 
+// Which units the player reads. Only ever affects display: everything the game stores and
+// simulates is metric, and helpers/Units converts on the way out. See base/UnitsContext.
+export type UnitSystemType = "metric" | "imperial";
+
 export interface SettingsType {
   audioEnabled?: boolean;
+  units: UnitSystemType;
 }
 
 export interface DialogType {

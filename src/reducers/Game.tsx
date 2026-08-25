@@ -1,7 +1,6 @@
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import numbro from "numbro";
 import { submitHighscore } from "./User";
 import {
   getDateFromMinute,
@@ -26,6 +25,7 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove, newSeed } from "../helpers/Math";
+import { formatLargeMass } from "../helpers/Units";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
@@ -693,7 +693,7 @@ export function tickState(state: GameType) {
               message: `You've run out of money.
                 You survived for ${finished.date.year - finished.startingYear} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`,
               open: true,
               notCancellable: true,
               actionLabel: "Try again",
@@ -731,7 +731,7 @@ export function tickState(state: GameType) {
               message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
                 You survived for ${finished.date.year - finished.startingYear} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${numbro(summary.kgco2e / 1000).format({ thousandSeparated: true, mantissa: 0 })} tons of pollution.`,
+                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`,
               open: true,
               notCancellable: true,
               actionLabel: "Try again",

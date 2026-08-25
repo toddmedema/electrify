@@ -1,5 +1,7 @@
 import * as React from "react";
 import { ScenarioType } from "../../Types";
+import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
+import { useUnits } from "./UnitsContext";
 
 export interface Props {
   ownership: ScenarioType["ownership"];
@@ -14,13 +16,15 @@ export interface Props {
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
   const { ownership, dollarsPerkWh } = props;
+  const units = useUnits();
+  const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
   if (ownership === "Investor") {
     return (
       <div>
         <p>+40 pts per $1B of net worth at the end</p>
         <p>+2 pts per 100k customers at the end</p>
         <p>+1 pt per TWh of electricity supplied</p>
-        <p>-2 pts per megaton (1M tons) of greenhouse gas emissions</p>
+        <p>-2 pts per {perEmissions} of greenhouse gas emissions</p>
         <p>-8 pts per TWh of blackouts</p>
       </div>
     );
@@ -32,7 +36,7 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
         {dollarsPerkWh}/kWh
       </p>
       <p>+10 pts per TWh of electricity supplied</p>
-      <p>-5 pts per megaton (1M tons) of greenhouse gas emissions</p>
+      <p>-5 pts per {perEmissions} of greenhouse gas emissions</p>
       <p>-10 pts per TWh of blackouts</p>
     </div>
   );

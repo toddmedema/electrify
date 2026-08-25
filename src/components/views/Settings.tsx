@@ -1,7 +1,16 @@
 import * as React from "react";
-import { Checkbox, IconButton, Toolbar, Typography } from "@mui/material";
+import {
+  Checkbox,
+  IconButton,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import { SettingsType } from "../../Types";
+import { SettingsType, UnitSystemType } from "../../Types";
+import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import KeyboardShortcuts from "../base/KeyboardShortcuts";
 import packageJson from "../../../package.json";
 
@@ -11,6 +20,7 @@ export interface StateProps {
 
 export interface DispatchProps {
   onAudioChange: (change: boolean) => void;
+  onUnitsChange: (change: UnitSystemType) => void;
   onBack: () => void;
 }
 
@@ -66,6 +76,27 @@ export default function Settings(props: Props): React.JSX.Element {
         {props.settings.audioEnabled
           ? "Music and sound effects enabled."
           : "Music and sound effects disabled."}
+        <Typography variant="h6" style={{ marginTop: 24 }}>
+          Units
+        </Typography>
+        <Select
+          id="units"
+          value={props.settings.units}
+          onChange={(e: SelectChangeEvent<UnitSystemType>) =>
+            props.onUnitsChange(e.target.value as UnitSystemType)
+          }
+        >
+          {UNIT_SYSTEMS.map((system: UnitSystemType) => (
+            <MenuItem value={system} key={system}>
+              {UNIT_SYSTEM_LABELS[system]}
+            </MenuItem>
+          ))}
+        </Select>
+        <Typography variant="body2" color="textSecondary">
+          {props.settings.units === "imperial"
+            ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
+            : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
+        </Typography>
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Keyboard Shortcuts
         </Typography>

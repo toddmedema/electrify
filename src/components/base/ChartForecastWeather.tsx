@@ -3,12 +3,21 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { padRange, SPLINE, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
 import { TICK_MINUTES } from "../../Constants";
-import { TickPresentFutureType } from "../../Types";
+import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { temperatureAxisColor, temperatureColor, windColor } from "../../Theme";
+import {
+  formatSpeed,
+  formatTemperature,
+  speedUnit,
+  temperatureUnit,
+  toDisplaySpeed,
+  toDisplayTemperature,
+} from "../../helpers/Units";
+import { UnitsContext } from "./UnitsContext";
 
 export interface Props {
   height?: number;
@@ -23,6 +32,7 @@ interface State {
   domain: Props["domain"];
   startingYear: number;
   multiyear: boolean;
+  units: UnitSystemType;
 }
 
 // A scale each, labelled on its own side and coloured to match its line: degrees and km/h only
@@ -62,14 +72,14 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       }),
       yAxis(scale, {
         grid: true,
-        label: "Heat (°C)",
+        label: `Heat (${temperatureUnit(getState().units)})`,
         stroke: temperatureAxisColor,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
       yAxis(scale, {
         scale: WIND_SCALE,
         side: 1,
-        label: "Wind (km/h)",
+        label: `Wind (${speedUnit(getState().units)})`,
         stroke: windColor,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
@@ -95,15 +105,21 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 
 function tooltip(idx: number, state: State): string {
   const d = state.data[idx];
-  return `Temperature: ${Math.round(d.temperatureC)}°C\nWind: ${Math.round(d.windKph)} km/h`;
+  return `Temperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}`;
 }
 
-// This is a pureComponent because its props should change much less frequently than it renders
+// This is a pureComponent because its props should change much less frequently than it renders.
+// The lines themselves are plotted in the display unit, so the axis a line is labelled with is
+// the one it is drawn against - converting only the labels would leave 20°F sitting where -7 is.
 export default class ChartForecastWeather extends React.PureComponent<
   Props,
   {}
 > {
+  // A PureComponent would block a prop change here, but a context change is delivered anyway
+  static contextType = UnitsContext;
+
   public render() {
+    const units = this.context as UnitSystemType;
     const { domain, height, timeline, startingYear, multiyear } = this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
     const data = timeline.filter(
@@ -118,8 +134,8 @@ export default class ChartForecastWeather extends React.PureComponent<
     const wind = new Array<number>(data.length);
     data.forEach((t: TickPresentFutureType, i: number) => {
       minutes[i] = t.minute;
-      temperature[i] = t.temperatureC;
-      wind[i] = t.windKph;
+      temperature[i] = toDisplayTemperature(t.temperatureC, units);
+      wind[i] = toDisplaySpeed(t.windKph, units);
     });
 
     return (
@@ -127,9 +143,11 @@ export default class ChartForecastWeather extends React.PureComponent<
         id="chartForecastWeather"
         ariaLabel="Chart of forecasted temperature and wind"
         height={height}
-        state={{ data, domain, startingYear, multiyear }}
+        state={{ data, domain, startingYear, multiyear, units }}
         data={[minutes, temperature, wind]}
         buildOptions={buildOptions}
+        // The axis labels are baked into the options, so a change of system rebuilds the plot
+        structureKey={units}
         tooltip={tooltip}
       />
     );

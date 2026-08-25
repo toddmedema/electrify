@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Provider } from "react-redux";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
+import UnitsProvider from "./components/base/UnitsContext";
 import { navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
@@ -124,7 +125,11 @@ export default function App() {
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
         <Provider store={store}>
-          <CompositorContainer store={store} />
+          {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
+              settings change that did not also change the card */}
+          <UnitsProvider>
+            <CompositorContainer store={store} />
+          </UnitsProvider>
         </Provider>
       </ThemeProvider>
     </StyledEngineProvider>

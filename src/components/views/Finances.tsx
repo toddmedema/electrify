@@ -43,7 +43,15 @@ import {
   DerivedHistoryKeysType,
   GameType,
   MonthlyHistoryType,
+  UnitSystemType,
 } from "../../Types";
+import {
+  formatLargeMassValue,
+  largeMassUnit,
+  massUnit,
+  toDisplayMass,
+} from "../../helpers/Units";
+import { UnitsContext } from "../base/UnitsContext";
 import ChartFinances from "../base/ChartFinances";
 import GameCard from "../base/GameCard";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
@@ -58,115 +66,133 @@ interface ChartKeyMetadataType {
   nesting?: number; // default 0 / unnested
 }
 
-const CHART_KEYS = {
-  profit: {
-    label: "Profit",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-  },
-  profitPerkWh: {
-    label: "Unit profit",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    suffix: "/kWh",
-    nesting: 1,
-  },
-  revenue: {
-    label: "Revenue",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-  },
-  revenuePerkWh: {
-    label: "Unit revenue",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    suffix: "/kWh",
-    nesting: 1,
-  },
-  supplyWh: {
-    label: "Power sold",
-    format: (n: number) => `${formatWatts(n, 0)}h`,
-    nesting: 1,
-  },
-  demandWh: {
-    label: "Demand",
-    format: (n: number) => `${formatWatts(n, 0)}h`,
-  },
-  customers: {
-    label: "Customers",
-    format: (n: number) => numbro(n).format({ average: true }),
-    nesting: 1,
-  },
-  expenses: {
-    label: "Expenses",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-  },
-  expensesFuel: {
-    label: "Fuel",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  expensesOM: {
-    label: "Operations",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  expensesMarketing: {
-    label: "Marketing",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  expensesInterest: {
-    label: "Loan interest",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  interestRate: {
-    label: "Interest rate",
-    format: (n: number) => `${(n * 100).toFixed(2)}%`,
-    nesting: 2,
-  },
-  expensesCarbonFee: {
-    label: "Carbon fees",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  kgco2e: {
-    label: "CO2e emitted",
-    format: (n: number) =>
-      `${numbro(n / 1000).format({ thousandSeparated: true, mantissa: 0 })}`,
-    suffix: "tons",
-    nesting: 2,
-  },
-  kgco2ePerMWh: {
-    label: "Emissions factor",
-    format: (n: number) =>
-      `${numbro(n).format({ thousandSeparated: true, mantissa: 0 })}`,
-    suffix: "kg/MWh",
-    nesting: 2,
-  },
-  netWorth: {
-    label: "Net Worth",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-  },
-  cash: {
-    label: "Cash",
-    format: formatMoneyConcise,
-    formatTable: formatMoneyStable,
-    nesting: 1,
-  },
-  inflationRate: {
-    label: "Inflation",
-    format: (n: number) => `${(n * 100).toFixed(1)}%`,
-  },
-} as { [index: string]: ChartKeyMetadataType };
+// Two tables rather than one built per render: the labels are the same either way, and only
+// the two emissions rows care which system they are read in
+function buildChartKeys(units: UnitSystemType): {
+  [index: string]: ChartKeyMetadataType;
+} {
+  return {
+    profit: {
+      label: "Profit",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+    },
+    profitPerkWh: {
+      label: "Unit profit",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      suffix: "/kWh",
+      nesting: 1,
+    },
+    revenue: {
+      label: "Revenue",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+    },
+    revenuePerkWh: {
+      label: "Unit revenue",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      suffix: "/kWh",
+      nesting: 1,
+    },
+    supplyWh: {
+      label: "Power sold",
+      format: (n: number) => `${formatWatts(n, 0)}h`,
+      nesting: 1,
+    },
+    demandWh: {
+      label: "Demand",
+      format: (n: number) => `${formatWatts(n, 0)}h`,
+    },
+    customers: {
+      label: "Customers",
+      format: (n: number) => numbro(n).format({ average: true }),
+      nesting: 1,
+    },
+    expenses: {
+      label: "Expenses",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+    },
+    expensesFuel: {
+      label: "Fuel",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    expensesOM: {
+      label: "Operations",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    expensesMarketing: {
+      label: "Marketing",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    expensesInterest: {
+      label: "Loan interest",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    interestRate: {
+      label: "Interest rate",
+      format: (n: number) => `${(n * 100).toFixed(2)}%`,
+      nesting: 2,
+    },
+    expensesCarbonFee: {
+      label: "Carbon fees",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    kgco2e: {
+      label: "CO2e emitted",
+      format: (n: number) => formatLargeMassValue(n, units),
+      suffix: largeMassUnit(units),
+      nesting: 2,
+    },
+    kgco2ePerMWh: {
+      label: "Emissions factor",
+      format: (n: number) =>
+        numbro(toDisplayMass(n, units)).format({
+          thousandSeparated: true,
+          mantissa: 0,
+        }),
+      suffix: `${massUnit(units)}/MWh`,
+      nesting: 2,
+    },
+    netWorth: {
+      label: "Net Worth",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+    },
+    cash: {
+      label: "Cash",
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    inflationRate: {
+      label: "Inflation",
+      format: (n: number) => `${(n * 100).toFixed(1)}%`,
+    },
+  };
+}
+
+const CHART_KEYS_BY_SYSTEM: {
+  [system in UnitSystemType]: { [index: string]: ChartKeyMetadataType };
+} = {
+  metric: buildChartKeys("metric"),
+  imperial: buildChartKeys("imperial"),
+};
+
+// The metrics on offer, which no system changes - the stored choice is checked against these
+const CHART_KEY_NAMES = Object.keys(CHART_KEYS_BY_SYSTEM.metric);
 
 const CHART_KEY_STORAGE_KEY = "financesChartKey";
 // Still says year, because a stored year is still one of the options and reading it back is
@@ -316,6 +342,11 @@ function getTickFromValue(v: number) {
 }
 
 export default class Finances extends React.Component<Props, State> {
+  // Context rather than a prop: shouldComponentUpdate below throttles renders against the game
+  // clock, which a prop change would have to be excepted from - a context change is delivered
+  // whatever it says
+  static contextType = UnitsContext;
+
   constructor(props: Props) {
     super(props);
     // Building a facility unmounts this pane, so both dropdowns have to be remembered outside
@@ -329,7 +360,7 @@ export default class Finances extends React.Component<Props, State> {
       expanded: getStorageBoolean("financesTableOpened", false),
       chartKey: getStorageChoice(
         CHART_KEY_STORAGE_KEY,
-        Object.keys(CHART_KEYS),
+        CHART_KEY_NAMES,
         "profit",
       ) as DerivedHistoryKeysType,
     };
@@ -525,6 +556,7 @@ export default class Finances extends React.Component<Props, State> {
 
   public render() {
     const { game, onDelta } = this.props;
+    const chartKeys = CHART_KEYS_BY_SYSTEM[this.context as UnitSystemType];
     const { startingYear, timeline, date } = game;
     const { expanded, chartKey } = this.state;
     const range = parseRange(this.state.range, date.year);
@@ -669,13 +701,13 @@ export default class Finances extends React.Component<Props, State> {
                 this.setChartKey(e.target.value as DerivedHistoryKeysType)
               }
             >
-              {Object.keys(CHART_KEYS).map((key: string) => {
-                const k = CHART_KEYS[key];
+              {CHART_KEY_NAMES.map((key: string) => {
+                const k = chartKeys[key];
                 let label = k.label;
-                if (chartKey !== key && CHART_KEYS[key].nesting) {
+                if (chartKey !== key && chartKeys[key].nesting) {
                   // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
                   label =
-                    new Array((CHART_KEYS[key].nesting || 0) + 1).join(" -") +
+                    new Array((chartKeys[key].nesting || 0) + 1).join(" -") +
                     " " +
                     label;
                 }
@@ -724,12 +756,12 @@ export default class Finances extends React.Component<Props, State> {
               height={140}
               timeline={monthly}
               title={
-                CHART_KEYS[chartKey].label +
-                (CHART_KEYS[chartKey].suffix
-                  ? ` (${CHART_KEYS[chartKey].suffix})`
+                chartKeys[chartKey].label +
+                (chartKeys[chartKey].suffix
+                  ? ` (${chartKeys[chartKey].suffix})`
                   : "")
               }
-              format={CHART_KEYS[chartKey].format}
+              format={chartKeys[chartKey].format}
             />
           ) : (
             <span />
@@ -740,8 +772,8 @@ export default class Finances extends React.Component<Props, State> {
           >
             <Table size="small">
               <TableBody>
-                {Object.keys(CHART_KEYS).map((key: string) => {
-                  const k = CHART_KEYS[key];
+                {CHART_KEY_NAMES.map((key: string) => {
+                  const k = chartKeys[key];
                   const format = k.formatTable || k.format;
                   return (
                     <TableRow
