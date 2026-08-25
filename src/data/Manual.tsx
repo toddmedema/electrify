@@ -2,6 +2,37 @@ import * as React from "react";
 import KeyboardShortcuts, {
   SHORTCUTS_SEARCH_TEXT,
 } from "../components/base/KeyboardShortcuts";
+import { useUnits } from "../components/base/UnitsContext";
+import {
+  formatLargeMassApprox,
+  formatPricePerLargeMass,
+  KG_PER_MEGATONNE,
+  largeMassUnit,
+  massUnitName,
+} from "../helpers/Units";
+
+// The entries are static markup, so the handful of places that name a unit read the setting
+// through a component of their own rather than the array becoming a function of it. Their text
+// is not walked by the search (see manualEntryText), which is what the keywords are for.
+function MassUnitName(): React.JSX.Element {
+  return <>{massUnitName(useUnits())}</>;
+}
+
+function LargeMassUnit(): React.JSX.Element {
+  return <>{largeMassUnit(useUnits())}</>;
+}
+
+// The illustrative fee in the carbon fee entry, quoted per whichever ton the player reads in -
+// $50 a tonne is $45 a ton
+const EXAMPLE_FEE_PER_KG = 0.05;
+
+function ExampleCarbonFee(): React.JSX.Element {
+  return <>{formatPricePerLargeMass(EXAMPLE_FEE_PER_KG, useUnits())}</>;
+}
+
+function EmissionsPerPoint(): React.JSX.Element {
+  return <>{formatLargeMassApprox(KG_PER_MEGATONNE, useUnits())}</>;
+}
 
 // Groups the entries into sections, so the list doesn't open on "Blackouts" and "BTU" purely
 // because the alphabet says so. Ordered the way they're shown.
@@ -232,22 +263,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: MANUAL_ENTRY.CARBON_FEE,
     group: "Money",
-    keywords: "carbon tax carbon price pollution fee co2 per ton",
+    keywords: "carbon tax carbon price pollution fee co2 per ton tonne",
     entry: (
       <div>
         <p>
           A carbon fee is a charge on pollution, meant to cover the damage it
           does to everyone else. It's billed by the amount of greenhouse gas
-          emitted, measured in tons of CO2 equivalent, and it shows up in your
-          P&amp;L as an operating expense on every dirty MWh you generate.
+          emitted, measured in <LargeMassUnit /> of CO2 equivalent, and it shows
+          up in your P&amp;L as an operating expense on every dirty MWh you
+          generate.
         </p>
         <p>
           Electricity generation is the 2nd largest source of greenhouse gas in
           the United States, and without a fee a utility has no financial reason
           to cut its emissions - the cheapest plant to run wins no matter what
-          comes out of the stack. A fee changes the merit order itself: at $50
-          per ton a coal plant can become more expensive to run than the gas
-          plant beside it, without a single rule telling you to shut it down.
+          comes out of the stack. A fee changes the merit order itself: at{" "}
+          <ExampleCarbonFee /> a coal plant can become more expensive to run
+          than the gas plant beside it, without a single rule telling you to
+          shut it down.
         </p>
         <p>
           Scenarios set their own fee, and custom games let you dial it from $0
@@ -308,14 +341,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: MANUAL_ENTRY.EMISSIONS,
     group: "Physics & Units",
-    keywords: "greenhouse gas pollution carbon dioxide equivalent tons",
+    keywords:
+      "greenhouse gas pollution carbon dioxide equivalent tons tonnes kilograms pounds",
     entry: (
       <div>
         <p>
           CO2e stands for Carbon Dioxide equivalent, a measure of the greenhouse
-          warming impact of various pollutants. Each generator lists the
-          kilograms of CO2e it releases per MWh, which is what makes a coal
-          plant and a gas plant of the same size comparable.
+          warming impact of various pollutants. Each generator lists the{" "}
+          <MassUnitName /> of CO2e it releases per MWh, which is what makes a
+          coal plant and a gas plant of the same size comparable.
         </p>
         <p>
           Electricity generation is the 2nd largest source of greenhouse gas in
@@ -592,7 +626,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             </tr>
             <tr>
               <td>-2</td>
-              <td>per megaton (1M tons) of CO2e emitted</td>
+              <td>
+                per <EmissionsPerPoint /> of CO2e emitted
+              </td>
             </tr>
             <tr>
               <td>-8</td>
@@ -616,7 +652,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             </tr>
             <tr>
               <td>-5</td>
-              <td>per megaton (1M tons) of CO2e emitted</td>
+              <td>
+                per <EmissionsPerPoint /> of CO2e emitted
+              </td>
             </tr>
             <tr>
               <td>-10</td>

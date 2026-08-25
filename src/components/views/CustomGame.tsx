@@ -36,6 +36,8 @@ import { getFuelEscalation } from "../../data/FuelPrices";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
+import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
+import { useUnits } from "../base/UnitsContext";
 import { newSeed } from "../../helpers/Math";
 import {
   DifficultyType,
@@ -196,6 +198,7 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
 
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
+  const units = useUnits();
   const [scenario, setScenario] = React.useState<ScenarioType>(() =>
     inEraScenario(props.scenario),
   );
@@ -496,7 +499,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   {feeOptions.map((f: number) => {
                     return (
                       <MenuItem value={f / 1000} key={f}>
-                        ${Math.round(f).toLocaleString("en-US")}/ton
+                        {/* The options are set per tonne, and the value stays per kilogram
+                            whichever way it is quoted - only the label moves */}
+                        {formatPricePerLargeMass(f / 1000, units)}
                       </MenuItem>
                     );
                   })}
@@ -713,8 +718,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
         <DialogTitle>Carbon fee</DialogTitle>
         <DialogContent>
           A fee placed on pollution to cover its damage to society. Charged by
-          the amount of greenhouse gas emitted, generally measured in "tons of
-          CO2 equivalent".
+          the amount of greenhouse gas emitted, measured in{" "}
+          {largeMassUnit(units)} of CO2 equivalent.
         </DialogContent>
         <DialogActions>
           <Button

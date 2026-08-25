@@ -50,7 +50,9 @@ import {
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
 import { MANUAL_ENTRY } from "../../data/Manual";
+import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
+import { useUnits } from "../base/UnitsContext";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -64,6 +66,7 @@ interface GeneratorBuildItemProps {
 
 function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const { generator, cash } = props;
+  const units = useUnits();
   const fuel = FUELS[generator.fuel] || {};
   const fuelPrices = getFuelPricesPerMBTU(props.date, props.seed);
   const [expanded, setExpanded] = React.useState(false);
@@ -138,7 +141,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
               <br />
               {kgCO2ePerMWh > 0
-                ? `${kgCO2ePerMWh.toLocaleString()}kg CO2e/MWh`
+                ? `${formatMass(kgCO2ePerMWh, units)} CO2e/MWh`
                 : "No CO2e"}
             </Typography>
           </span>
@@ -257,7 +260,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
-                  {kgCO2ePerMWh.toLocaleString()}kg CO2e/MWh
+                  {formatMass(kgCO2ePerMWh, units)} CO2e/MWh
                 </TableCell>
               </TableRow>
             </TableBody>
