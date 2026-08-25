@@ -57,6 +57,9 @@ export const blackoutColor = red[800]; // darker than red[500] so the translucen
 export const demandColor = grey[900];
 export const supplyColor = blue[600];
 export const temperatureColor = red[500];
+// The temperature line wants red500's punch against white, but 3.7:1 is too thin for the axis
+// labels that name it, so the axis carrying it takes the darker shade instead
+export const temperatureAxisColor = red[800];
 export const cursorColor = grey[600]; // hover crosshair, lighter than the data it crosses
 export const windColor = fuelColors.Wind; // for weather forecasts
 
