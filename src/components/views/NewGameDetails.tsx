@@ -177,18 +177,18 @@ export default class NewGameDetails extends React.Component<Props, State> {
 
   private renderReplayCell(score: ScoreType) {
     if (!score.replayId) {
-      return <TableCell padding="none" />;
+      return <TableCell className="replay" />;
     }
     const replayId = score.replayId;
     if (this.state.loadingReplayId === replayId) {
       return (
-        <TableCell padding="none">
+        <TableCell className="replay">
           <CircularProgress size={20} />
         </TableCell>
       );
     }
     return (
-      <TableCell padding="none">
+      <TableCell className="replay">
         <IconButton
           onClick={() => this.watchReplay(replayId)}
           aria-label="Watch replay"
@@ -366,17 +366,17 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell padding="none">#</TableCell>
+                <TableCell className="rank">#</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Score</TableCell>
                 <TableCell>Difficulty</TableCell>
-                <TableCell padding="none">Replay</TableCell>
+                <TableCell className="replay">Replay</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {myTopScore && (
                 <TableRow style={OWN_ROW_STYLE}>
-                  <TableCell padding="none" />
+                  <TableCell className="rank" />
                   <TableCell colSpan={2}>
                     Your best: {formatScore(myTopScore.score)}
                   </TableCell>
@@ -409,7 +409,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   const mine = Boolean(uid) && score.uid === uid;
                   return (
                     <TableRow key={i} style={mine ? OWN_ROW_STYLE : undefined}>
-                      <TableCell padding="none">{i + 1}</TableCell>
+                      <TableCell className="rank">{i + 1}</TableCell>
                       {/* Scores set before display names existed carry no name */}
                       <TableCell>{score.displayName || "Anonymous"}</TableCell>
                       <TableCell>{formatScore(score.score)}</TableCell>
