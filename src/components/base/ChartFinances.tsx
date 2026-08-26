@@ -127,6 +127,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
   return (
     <UPlotChart<State>
       ariaLabel={`Chart of ${props.title} over time`}
+      id="chartFinances"
       height={props.height}
       state={state}
       data={[months, past, projected]}
