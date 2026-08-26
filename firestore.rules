@@ -24,10 +24,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Keep in sync with validateDisplayName in src/helpers/DisplayName.tsx. The client is what
-    // gives a player a useful error message; this is what makes the constraint true.
+    // The structural half of validateDisplayName in src/helpers/DisplayName.tsx -- length,
+    // charset, spacing. Keep the two in sync: the client is what gives a player a useful error
+    // message, and this is what makes the constraint true.
     // matches() is anchored to the whole string, so the pattern covers the charset and rules out
     // a leading or trailing space in one go; the second clause rules out doubled spaces.
+    // The reserved-name blocklist is deliberately NOT mirrored here. It is a courtesy, not a
+    // security boundary, and a list that has to be redeployed to change belongs in the client.
     function isValidDisplayName(name) {
       return name is string
         && name.size() >= 3

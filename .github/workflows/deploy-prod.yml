@@ -36,6 +36,33 @@ jobs:
 
       # Tests are not run here; workflow.yml already runs them on every push.
 
+      # Firestore rules and indexes go out BEFORE the bundle that depends on them.
+      # The other order ships a client whose reads the deployed rules still refuse,
+      # which fails closed and looks to a player like the game is broken.
+      #
+      # Refuses to continue without the credential rather than skipping, on the same
+      # reasoning as deploy.sh's REACT_APP_FIREBASE_API_KEY check: a silent skip would
+      # leave the rules and the bundle out of step with nothing to say so.
+      #
+      # The secret is the JSON from Firebase Console -> Project settings ->
+      # Service accounts -> Generate new private key, pasted whole.
+      - name: Deploy Firestore rules and indexes
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT is not set; refusing to deploy prod." >&2
+            echo "Add it as a repository secret, or the client will ship against stale rules." >&2
+            exit 1
+          fi
+          # Written outside the workspace so a stray build glob can never sweep a
+          # private key into the bundle, and removed even if the deploy fails.
+          key="$(mktemp -d)/firebase-service-account.json"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
+          GOOGLE_APPLICATION_CREDENTIALS="$key" \
+            npx --yes firebase-tools@15 deploy --only firestore --non-interactive
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
