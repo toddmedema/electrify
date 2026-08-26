@@ -50,6 +50,30 @@ describe("ending a scenario from inside the reducer", () => {
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
   });
 
+  /**
+   * The score screen is a component now rather than JSX built in here, so what the reducer owes it
+   * is the numbers. previousBest in particular is read before the score write, so that "was 640"
+   * reports the run before this one and not the one just finished.
+   */
+  it("hands the score screen everything it needs", () => {
+    getStore().dispatch(quit());
+    const scenario = customScenario({ durationMonths: 2, name: "A Test Run" });
+    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
+    while (state.date.monthsEllapsed < (scenario.durationMonths as number)) {
+      state = tick(state);
+    }
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).not.toBeNull();
+    expect(victory?.scenarioName).toBe("A Test Run");
+    expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
+    // Every custom game shares one id, so its score belongs to nothing comparable
+    expect(victory?.ranked).toBe(false);
+    // Opening the score screen stops the clock, the way any other dialog does
+    expect(getStore().getState().game.speed).toBe("PAUSED");
+  });
+
   it("goes bankrupt without reading the revoked draft", () => {
     // No cash and a marketing budget far past what the fleet earns: it is under within a month
     const scenario = customScenario({ cash: 0, durationMonths: 12 * 20 });

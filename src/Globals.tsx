@@ -1,6 +1,11 @@
 import { getAnalytics, logEvent as firebaseLogEvent } from "firebase/analytics";
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 
 const firebaseApp = initializeApp({
@@ -33,6 +38,14 @@ export function login() {
         GoogleAuthProvider.credentialFromError(error),
       );
     });
+}
+
+/**
+ * Signs the player out. The app hears about it through firebaseAppAuth.onAuthStateChanged the
+ * same way it hears about signing in, so nothing needs to be reset here -- see App.tsx.
+ */
+export function logout(): Promise<void> {
+  return signOut(firebaseAppAuth);
 }
 
 // The slice of the History API the game uses. Card navigation pushes a hash entry so the

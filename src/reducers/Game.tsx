@@ -29,7 +29,13 @@ import { formatLargeMass } from "../helpers/Units";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
-import { dialogOpen, dialogClose, snackbarOpen } from "./UI";
+import {
+  dialogOpen,
+  dialogClose,
+  snackbarOpen,
+  victoryOpen,
+  victoryClose,
+} from "./UI";
 import { navigate, navigateBack } from "./Card";
 import {
   DIFFICULTIES,
@@ -387,6 +393,16 @@ export const gameSlice = createSlice({
       state.speed = "PAUSED";
     });
     builder.addCase(dialogClose, (state) => {
+      state.speed = speedBeforeDialog;
+      ensureTicking(state);
+    });
+    // The score screen stops the clock the same way any other dialog does - "Keep playing"
+    // resumes at whatever speed the run was going when it ended
+    builder.addCase(victoryOpen, (state) => {
+      speedBeforeDialog = state.speed;
+      state.speed = "PAUSED";
+    });
+    builder.addCase(victoryClose, (state) => {
       state.speed = speedBeforeDialog;
       ensureTicking(state);
     });
@@ -787,13 +803,17 @@ export function tickState(state: GameType) {
         // draft, so the fields the timeouts below read come out here too
         const {
           id: scoredScenarioId,
+          name: scenarioName,
           endTitle,
           endMessage,
-          ownership,
         } = scenario;
         const isTutorial = Boolean(scenario.tutorialSteps);
         // Read out here with everything else the timeouts need, rather than from inside them
         const nextTutorial = getNextTutorial(scoredScenarioId);
+        // Read now rather than inside the timeout, so that "was 640" reports the run before this
+        // one: submitHighscore below overwrites it the moment its write lands
+        const previousBest =
+          getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
 
         // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
         // and rules the player gave themselves - would be scored against each other as if they
@@ -840,43 +860,19 @@ export function tickState(state: GameType) {
               }),
             );
           }
+          // Only the numbers: the breakdown, the personal best and the rank are base/VictoryDialog's
+          // to render, so that the parts which arrive over the network can fill themselves in
           getStore().dispatch(
-            dialogOpen({
-              title: endTitle || `You've retired!`,
-              message: endMessage || (
-                <div>
-                  Your final score is {finalScore}:<br />
-                  <br />
-                  {score.supply} pts from electricity supplied
-                  <br />
-                  {ownership === "Investor" && (
-                    <span>
-                      {score.netWorth} pts from final net worth
-                      <br />
-                    </span>
-                  )}
-                  {ownership === "Investor" && (
-                    <span>
-                      {score.customers} pts from final customers
-                      <br />
-                    </span>
-                  )}
-                  {ownership === "Public" && (
-                    <span>
-                      {score.rate} pts from electric rates
-                      <br />
-                    </span>
-                  )}
-                  {score.emissions} pts from emissions
-                  <br />
-                  {score.blackouts} pts from blackouts
-                  <br />
-                </div>
-              ),
-              open: true,
-              closeText: "Keep playing",
-              actionLabel: "Return to scenarios",
-              action: () => getStore().dispatch(quit({ toScenarioList: true })),
+            victoryOpen({
+              scenarioId: scoredScenarioId,
+              scenarioName,
+              difficulty,
+              score: finalScore,
+              breakdown: score,
+              endTitle,
+              endMessage,
+              ranked,
+              previousBest,
             }),
           );
         }, 1);

@@ -19,9 +19,15 @@ export interface StateProps {
   settings: SettingsType;
   // What the saved game is called, or undefined when there's nothing to export
   savedGame?: string;
+  loggedIn: boolean;
+  // The leaderboard name, when one has been claimed
+  displayName?: string;
 }
 
 export interface DispatchProps {
+  onLogin: () => void;
+  onLogout: () => void;
+  onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onExportSave: () => void;
@@ -94,6 +100,48 @@ export default function Settings(props: Props): React.JSX.Element {
         {props.settings.audioEnabled
           ? "Music and sound effects enabled."
           : "Music and sound effects disabled."}
+        <Typography variant="h6" style={{ marginTop: 24 }}>
+          Account
+        </Typography>
+        {props.loggedIn ? (
+          <div>
+            <Typography variant="body2" color="textSecondary">
+              {props.displayName
+                ? `On the leaderboard as ${props.displayName}.`
+                : "You're logged in, but haven't picked a leaderboard name yet."}
+            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={props.onChangeName}
+              style={{ margin: "0 6px" }}
+            >
+              {props.displayName ? "Change name" : "Pick a name"}
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={props.onLogout}
+              style={{ margin: "0 6px" }}
+            >
+              Log out
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={props.onLogin}
+              style={{ margin: "0 6px" }}
+            >
+              Log in
+            </Button>
+            <Typography variant="body2" color="textSecondary">
+              Log in to put your name on the global high score board.
+            </Typography>
+          </div>
+        )}
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Units
         </Typography>
