@@ -17,7 +17,7 @@ import {
   formatMinuteAsMonthAxis,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { temperatureAxisColor, temperatureColor, windColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 import {
   formatSpeed,
   formatTemperature,
@@ -88,7 +88,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       yAxis(scale, {
         grid: true,
         label: `Heat (${temperatureUnit(getState().units)})`,
-        stroke: temperatureAxisColor,
+        stroke: chartPalette().temperatureAxis,
         size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
@@ -96,7 +96,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         scale: WIND_SCALE,
         side: 1,
         label: `Wind (${speedUnit(getState().units)})`,
-        stroke: windColor,
+        stroke: chartPalette().wind,
         size: FORECAST_AXIS_RIGHT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
@@ -104,14 +104,14 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     series: [
       {},
       {
-        stroke: temperatureColor,
+        stroke: chartPalette().temperature,
         width: 1,
         points: { show: false },
         paths: SPLINE,
       },
       {
         scale: WIND_SCALE,
-        stroke: windColor,
+        stroke: chartPalette().wind,
         width: 1,
         points: { show: false },
         paths: SPLINE,

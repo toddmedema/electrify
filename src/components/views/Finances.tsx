@@ -753,10 +753,14 @@ export default class Finances extends React.Component<Props, State> {
     const tiles = keys.map((key: DerivedHistoryKeysType) => {
       const values = months.map((m: DerivedHistoryType) => m[key]);
       const metadata = chartKeys[key];
+      const latest = metadata.format(values[values.length - 1] || 0);
       return {
         metricKey: key,
         label: metadata.label,
-        value: String(metadata.format(values[values.length - 1] || 0)),
+        // A number with no unit on it is a different number: "380K" of CO2e could be anything
+        value: metadata.suffix
+          ? `${latest}${metadata.suffix.startsWith("/") ? "" : " "}${metadata.suffix}`
+          : String(latest),
         values,
       };
     });
@@ -872,16 +876,22 @@ export default class Finances extends React.Component<Props, State> {
                 <Typography color="primary" component="strong">
                   {formatMoneyConcise(game.monthlyMarketingSpend)}
                 </Typography>
-                /mo&nbsp;&mdash;&nbsp;customers{" "}
-                {numbro(now.customers).format({ average: true })}
-                &nbsp;&rarr;&nbsp;
-                <Typography color="primary" component="strong">
-                  {numbro(
-                    now.customers +
-                      customersFromMarketingSpend(game.monthlyMarketingSpend),
-                  ).format({ average: true })}
-                </Typography>
-                &nbsp;next month
+                /mo&nbsp;&mdash;&nbsp;
+                {numbro(now.customers).format({ average: true })} customers
+                {game.monthlyMarketingSpend > 0 && (
+                  <>
+                    &nbsp;&rarr;&nbsp;
+                    <Typography color="primary" component="strong">
+                      {numbro(
+                        now.customers +
+                          customersFromMarketingSpend(
+                            game.monthlyMarketingSpend,
+                          ),
+                      ).format({ average: true })}
+                    </Typography>
+                    &nbsp;next month
+                  </>
+                )}
               </Typography>
             )}
             {scenario.ownership === "Investor" && (

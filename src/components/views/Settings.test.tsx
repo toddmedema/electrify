@@ -5,13 +5,14 @@ import Settings, { Props } from "./Settings";
 
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
-    settings: { units: "metric" },
+    settings: { units: "metric", theme: "system" },
     loggedIn: false,
     onLogin: () => undefined,
     onLogout: () => undefined,
     onChangeName: () => undefined,
     onAudioChange: () => undefined,
     onUnitsChange: () => undefined,
+    onThemeChange: () => undefined,
     onExportSave: () => undefined,
     onImportSave: () => undefined,
     onBack: () => undefined,

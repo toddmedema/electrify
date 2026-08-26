@@ -14,7 +14,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
-import { demandColor, fuelColors, withAlpha } from "../../Theme";
+import { chartPalette, fuelColors, withAlpha } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -122,17 +122,17 @@ function buildOptions(
       ...fuels.map((f) => ({
         fill:
           highlightFuel && f !== highlightFuel
-            ? withAlpha(fuelColors[f], MUTED_BAND_ALPHA)
-            : fuelColors[f],
+            ? withAlpha(fuelColors()[f], MUTED_BAND_ALPHA)
+            : fuelColors()[f],
         // A hairline of background between bands keeps them apart even where two
         // fuel colors are close, since seven series can't all be far apart
-        stroke: "#ffffff",
+        stroke: chartPalette().background,
         width: 0.5,
         points: { show: false },
       })),
       {
         // Drawn over the stack so the gap between the two reads as the shortfall
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2,
         dash: [4, 2],
         points: { show: false },

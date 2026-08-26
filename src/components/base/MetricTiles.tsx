@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import Sparkline from "./Sparkline";
-import { interactiveColor, mutedSeriesColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 /**
  * The Finances metric picker on a screen with room for one: every headline metric drawn at once,
@@ -46,6 +46,9 @@ export default function MetricTiles(props: Props): React.JSX.Element {
             key={tile.metricKey}
             type="button"
             className={selected ? "metricTile selected" : "metricTile"}
+            // Named, because the tile reads as "Profit $6.79M" plus a picture of a line, and
+            // what the button does is plot it
+            aria-label={`Plot ${tile.label}`}
             aria-pressed={selected}
             onClick={() => onSelect(tile.metricKey)}
           >
@@ -61,7 +64,9 @@ export default function MetricTiles(props: Props): React.JSX.Element {
             </Typography>
             <Sparkline
               values={tile.values}
-              color={selected ? interactiveColor : mutedSeriesColor}
+              color={
+                selected ? chartPalette().interactive : chartPalette().muted
+              }
               width={80}
               height={18}
               ariaLabel={`${tile.label} trend`}

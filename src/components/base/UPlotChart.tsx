@@ -2,6 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale } from "./UPlotHelpers";
+import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 
 /**
  * The React shell every chart in the game sits in.
@@ -121,6 +122,15 @@ export default function UPlotChart<S>(
   const tooltipRef = React.useRef(props.tooltip);
   tooltipRef.current = props.tooltip;
 
+  // A plot's options are built once and then only fed data, so the colours in them are the
+  // ones that were in force when it was built. Switching palette therefore has to rebuild --
+  // which is what this version does, by changing below alongside width and structure
+  const themeVersion = React.useSyncExternalStore(
+    subscribeThemeMode,
+    getThemeVersion,
+    getThemeVersion,
+  );
+
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
     const measure = () => setWidth(root.clientWidth);
@@ -169,9 +179,9 @@ export default function UPlotChart<S>(
       plotRef.current = null;
       drawnRef.current = null;
     };
-    // Data changes go through setData below; only size and shape rebuild
+    // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey]);
+  }, [width, height, structureKey, themeVersion]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {

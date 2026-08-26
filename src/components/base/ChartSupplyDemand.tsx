@@ -8,7 +8,7 @@ import {
   LegendItem,
   padRange,
   spansFromEdges,
-  TICK_LABEL_FILL,
+  tickLabelFill,
   verticalLinePlugin,
   xAxis,
   yAxis,
@@ -21,7 +21,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
-import { blackoutColor, demandColor, supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 import { LocationType } from "../../Types";
 
 interface ChartData {
@@ -86,7 +86,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         // Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable
         scale: "x",
         side: 2,
-        stroke: TICK_LABEL_FILL,
+        stroke: tickLabelFill(),
         font: chartFont(scale),
         grid: { show: false },
         ticks: { show: false },
@@ -103,27 +103,31 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     series: [
       {},
       {
-        stroke: supplyColor,
+        stroke: chartPalette().supply,
         width: 1.75,
         fill: HISTORIC_FILL,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: supplyColor,
+        stroke: chartPalette().supply,
         width: 1,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2.5,
         points: { show: false },
       },
     ],
     plugins: [
-      bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3),
-      verticalLinePlugin(() => getState().currentMinute, "#000000", 0.5),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      verticalLinePlugin(
+        () => getState().currentMinute,
+        chartPalette().axis,
+        0.5,
+      ),
       // Flush with the plot's own right edge, wherever the y axis leaves it
       legendPlugin(() => getState().legendItems, 0, 18, "right"),
     ],
@@ -255,11 +259,11 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const legendItems: LegendItem[] = [];
   if (legend) {
     legendItems.push(
-      { name: "Supply", fill: supplyColor },
-      { name: "Demand", fill: demandColor },
+      { name: "Supply", fill: chartPalette().supply },
+      { name: "Demand", fill: chartPalette().demand },
     );
     if (blackoutCount > 0) {
-      legendItems.push({ name: "Blackout", fill: blackoutColor });
+      legendItems.push({ name: "Blackout", fill: chartPalette().blackout });
     }
   }
 

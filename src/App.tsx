@@ -1,5 +1,5 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Provider } from "react-redux";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
@@ -11,8 +11,14 @@ import { firebaseAppAuth, getDevicePlatform } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
 import { startAutosave } from "./SaveGame";
-import { store } from "./Store";
-import theme from "./Theme";
+import { store, useAppSelector } from "./Store";
+import {
+  createAppTheme,
+  prefersDarkMode,
+  resolveThemeMode,
+  setThemeMode,
+} from "./Theme";
+import { ThemeChoiceType } from "./Types";
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -53,6 +59,55 @@ function setupStorage(document: Document) {
       );
     }, 0);
   }
+}
+
+/**
+ * Paints the app in the palette the player asked for.
+ *
+ * Three things have to agree on it and none of them can be reached the same way: MUI's own
+ * components read a theme through context, everything styled by hand reads custom properties off
+ * <html>, and the charts paint to a canvas and so have to be told in JavaScript (see Theme.tsx).
+ * This is the one place that knows, so it sets all three.
+ *
+ * Inside the Provider because it reads the setting from the store, and above everything else
+ * because a palette change has to reach the whole tree.
+ */
+function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+  const choice: ThemeChoiceType = useAppSelector(
+    (state) => state.settings.theme,
+  );
+  // "System" is a standing instruction rather than a value, and the system can change its mind
+  // while the game is open - at sunset, on a schedule, or because the player just flipped it
+  const [systemDark, setSystemDark] = useState(prefersDarkMode);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemDark(query.matches);
+    query.addEventListener("change", onChange);
+    // The listener can only have missed something between the first render and here
+    onChange();
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  const mode =
+    choice === "system"
+      ? systemDark
+        ? "dark"
+        : "light"
+      : resolveThemeMode(choice);
+  // In a layout effect rather than in the render body: telling Theme.tsx wakes every chart
+  // that subscribed to it, and waking a component while another one is rendering is exactly
+  // what React warns about. Before paint, so neither of the two lands a frame late
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = mode;
+    setThemeMode(mode);
+  }, [mode]);
+
+  return (
+    <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+  );
 }
 
 export default function App() {
@@ -139,15 +194,15 @@ export default function App() {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <Provider store={store}>
+      <Provider store={store}>
+        <ThemedApp>
           {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
               settings change that did not also change the card */}
           <UnitsProvider>
             <CompositorContainer store={store} />
           </UnitsProvider>
-        </Provider>
-      </ThemeProvider>
+        </ThemedApp>
+      </Provider>
     </StyledEngineProvider>
   );
 }

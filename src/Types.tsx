@@ -388,6 +388,36 @@ export interface ScenarioType {
   facilities: Array<Partial<FacilityShoppingType>>;
 }
 
+/**
+ * What kind of thing happened, which is all the event log's icons and colours are keyed off.
+ * The text itself is written where the event is raised, since that's the only place that knows
+ * how much energy went unserved or which fuel moved.
+ */
+export type GameEventKindType =
+  | "BLACKOUT"
+  | "BLACKOUT_OVER"
+  | "CONSTRUCTION"
+  | "BUILD"
+  | "SELL"
+  | "LOAN"
+  | "FUEL_PRICE";
+
+/**
+ * One line of the company's history.
+ *
+ * A blackout used to be a toolbar that pulsed and then stopped, a finished plant a toast that
+ * lasted four seconds - so a player who was looking at another pane, or away from the screen,
+ * had no way to find out what had happened to them. These are kept instead.
+ */
+export interface GameEventType {
+  // Monotonic within a run, so React has a key that doesn't move when the log is trimmed
+  id: number;
+  kind: GameEventKindType;
+  // When it happened, as the game clock read it at the time ("Mar 2024")
+  label: string;
+  message: string;
+}
+
 export interface GameType {
   seed: number;
   difficulty: DifficultyType;
@@ -412,6 +442,9 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
+  // Newest first, capped at MAX_EVENTS. Optional because a save written before the log existed
+  // has none, and an empty log and a missing one mean the same thing to everything that reads it
+  eventLog?: GameEventType[];
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
@@ -427,9 +460,18 @@ export interface GameType {
 // simulates is metric, and helpers/Units converts on the way out. See base/UnitsContext.
 export type UnitSystemType = "metric" | "imperial";
 
+// Which of the two palettes is being painted. See Theme.tsx (the charts, which draw to a canvas)
+// and the custom properties at the top of app.scss (everything else)
+export type ThemeModeType = "light" | "dark";
+
+// What the player asked for, which is a third thing: "system" is a standing instruction to
+// follow the OS rather than a palette of its own, and it can change while the game is open
+export type ThemeChoiceType = ThemeModeType | "system";
+
 export interface SettingsType {
   audioEnabled?: boolean;
   units: UnitSystemType;
+  theme: ThemeChoiceType;
 }
 
 export interface DialogType {

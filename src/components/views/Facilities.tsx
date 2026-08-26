@@ -36,7 +36,7 @@ import {
   NotDraggingStyle,
 } from "@hello-pangea/dnd";
 import { TickThrottle } from "../../helpers/RenderThrottle";
-import { fuelColors, storageColor, withAlpha } from "../../Theme";
+import { chartPalette, facilityColor, withAlpha } from "../../Theme";
 import {
   FacilityOperatingType,
   GameType,
@@ -155,7 +155,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
-  const accentColor = (fuel && fuelColors[fuel]) || storageColor;
+  const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   let secondaryText = "";
@@ -345,7 +345,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     style={{
                       height: `${(facility.currentWh / facility.peakWh) * 100}%`,
                       backgroundColor:
-                        activity === "CHARGING" ? storageColor : undefined,
+                        activity === "CHARGING"
+                          ? chartPalette().storage
+                          : undefined,
                     }}
                   />
                 )}

@@ -15,7 +15,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
-import { supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -74,7 +74,10 @@ function buildOptions(showXLabels: boolean) {
           splits.map((t) => formatWattHoursAxis(t, splits)),
       }),
     ],
-    series: [{}, { stroke: supplyColor, width: 1, points: { show: false } }],
+    series: [
+      {},
+      { stroke: chartPalette().supply, width: 1, points: { show: false } },
+    ],
   });
 }
 

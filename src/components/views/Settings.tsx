@@ -10,8 +10,9 @@ import {
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import { SettingsType, UnitSystemType } from "../../Types";
+import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
+import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts from "../base/KeyboardShortcuts";
 import packageJson from "../../../package.json";
 
@@ -30,6 +31,7 @@ export interface DispatchProps {
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
   onUnitsChange: (change: UnitSystemType) => void;
+  onThemeChange: (change: ThemeChoiceType) => void;
   onExportSave: () => void;
   onImportSave: (file: File) => void;
   onBack: () => void;
@@ -162,6 +164,27 @@ export default function Settings(props: Props): React.JSX.Element {
           {props.settings.units === "imperial"
             ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
             : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
+        </Typography>
+        <Typography variant="h6" style={{ marginTop: 24 }}>
+          Appearance
+        </Typography>
+        <Select
+          id="theme"
+          value={props.settings.theme}
+          onChange={(e: SelectChangeEvent<ThemeChoiceType>) =>
+            props.onThemeChange(e.target.value as ThemeChoiceType)
+          }
+        >
+          {THEME_CHOICES.map((choice: ThemeChoiceType) => (
+            <MenuItem value={choice} key={choice}>
+              {THEME_LABELS[choice]}
+            </MenuItem>
+          ))}
+        </Select>
+        <Typography variant="body2" color="textSecondary">
+          {props.settings.theme === "system"
+            ? "Follows whatever your device is set to, and changes with it."
+            : "Sessions run long; the charts are drawn for both."}
         </Typography>
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Saved Game

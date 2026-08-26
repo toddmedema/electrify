@@ -1,5 +1,5 @@
 import uPlot from "uplot";
-import { chartTheme, withAlpha } from "../../Theme";
+import { chartPalette, withAlpha } from "../../Theme";
 
 /**
  * Shared pieces for the game's uPlot charts: axis styling that matches what the charts looked
@@ -32,11 +32,18 @@ export function chartScale(width: number): number {
 }
 
 export const CHART_FONT_FAMILY = `Roboto, "Helvetica Neue", Helvetica, sans-serif`;
-export const TICK_LABEL_FILL = chartTheme.tickLabels.fill;
 
-// VictoryTheme.material's colours for the parts of an axis that aren't the baseline
-const GRID_STROKE = "#ECEFF1";
-const TICK_STROKE = "#90A4AE";
+/**
+ * The colour an axis labels itself in, read at the moment it is built.
+ *
+ * A function rather than a constant because the palette can change under a running game, and a
+ * module-level constant would hold whichever one happened to be in force when the bundle loaded
+ * -- see Theme.tsx, and the rebuild UPlotChart does when it hears the palette change.
+ */
+export function tickLabelFill(): string {
+  return chartPalette().tickLabel;
+}
+
 // How far a tick pokes out of the axis, and how far the label then sits from it, in design units
 const TICK_SIZE = 5;
 const LABEL_GAP = 4;
@@ -46,9 +53,6 @@ const LABEL_GAP = 4;
 // axis was sized, a glyph with a negative left bearing, plain antialiasing - clips the first
 // character off every label.
 const LABEL_EDGE_PAD = 4;
-// Victory drew legend text in its material theme's near-black rather than the axes' grey
-const LEGEND_TEXT = "#252525";
-
 /** What an axis carrying a `label` adds to its own size, in design units. */
 export const AXIS_LABEL_SIZE = 16;
 
@@ -158,24 +162,25 @@ export function niceSplits(min: number, max: number, target = 5): number[] {
 }
 
 function axisCommon(scale: number, o: AxisOptions) {
+  const palette = chartPalette();
   return {
-    stroke: o.stroke ?? TICK_LABEL_FILL,
+    stroke: o.stroke ?? palette.tickLabel,
     font: chartFont(scale),
     grid: o.grid
       ? {
           show: true,
-          stroke: GRID_STROKE,
+          stroke: palette.grid,
           width: 1,
           dash: [10 * scale, 5 * scale],
         }
       : { show: false },
     ticks: {
       show: true,
-      stroke: TICK_STROKE,
+      stroke: palette.tick,
       width: 1,
       size: TICK_SIZE * scale,
     },
-    border: { show: true, stroke: chartTheme.axis.stroke, width: 1 },
+    border: { show: true, stroke: palette.axis, width: 1 },
     label: o.label,
     labelFont: chartFont(scale),
     labelSize: o.label ? AXIS_LABEL_SIZE * scale : undefined,
@@ -377,7 +382,7 @@ export function legendPlugin(
           u.ctx.beginPath();
           u.ctx.arc(x, y, radius, 0, Math.PI * 2);
           u.ctx.fill();
-          u.ctx.fillStyle = LEGEND_TEXT;
+          u.ctx.fillStyle = chartPalette().legendText;
           u.ctx.fillText(item.name, x + radius + gap, y);
           y += lineHeight;
         }
@@ -406,7 +411,7 @@ export function titlePlugin(
         const scale = canvasScale(u);
         u.ctx.save();
         u.ctx.font = chartFont(scale, 14);
-        u.ctx.fillStyle = chartTheme.axis.stroke;
+        u.ctx.fillStyle = chartPalette().axis;
         u.ctx.textAlign = "center";
         u.ctx.textBaseline = "middle";
         u.ctx.fillText(title, u.bbox.left + u.bbox.width / 2, designY * scale);

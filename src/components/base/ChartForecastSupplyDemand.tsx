@@ -17,7 +17,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
-import { blackoutColor, demandColor, supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 interface BlackoutEdges {
   minute: number;
@@ -89,10 +89,12 @@ function buildOptions(showXLabels: boolean) {
     ],
     series: [
       {},
-      { stroke: supplyColor, width: 1, points: { show: false } },
-      { stroke: demandColor, width: 2, points: { show: false } },
+      { stroke: chartPalette().supply, width: 1, points: { show: false } },
+      { stroke: chartPalette().demand, width: 2, points: { show: false } },
     ],
-    plugins: [bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3)],
+    plugins: [
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+    ],
   });
 }
 

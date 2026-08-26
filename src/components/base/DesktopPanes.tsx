@@ -13,8 +13,16 @@ import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 
 const WEIGHTS_KEY = "desktopPaneWeights";
 
-// Facilities needs the least width, Finances and Forecasts the most
-const DEFAULT_WEIGHTS = [1, 1.15, 1.15];
+// A layout is only meaningful for the number of panes it was dragged with, and the same window
+// can be showing two of them (a laptop), three (a desktop) or four (an ultrawide) over an
+// afternoon of resizing. Three keeps the original key, so an existing saved layout still loads
+function weightsKey(count: number): string {
+  return count === 3 ? WEIGHTS_KEY : `${WEIGHTS_KEY}${count}`;
+}
+
+// Facilities needs the least width, Finances and Forecasts the most, and the event log is a
+// column of short lines that only ever gets the room left over
+const DEFAULT_WEIGHTS = [1, 1.15, 1.15, 0.75];
 
 // A pane narrower than this stops being readable, so a drag can't push one past it
 const MIN_PANE_PX = 240;
@@ -39,7 +47,7 @@ function defaultWeights(count: number): number[] {
 }
 
 function loadWeights(count: number): number[] {
-  const stored = getStorageJson<number[]>(WEIGHTS_KEY, []);
+  const stored = getStorageJson<number[]>(weightsKey(count), []);
   // A layout saved when there were a different number of panes says nothing about this one
   return isUsableWeights(stored, count) ? stored : defaultWeights(count);
 }
@@ -77,6 +85,16 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
   // out, and is what the next one measures from
   const weightsRef = React.useRef(weights);
   weightsRef.current = weights;
+
+  // A window crossing the ultrawide breakpoint gains or loses a column under a mounted
+  // component, and a grid template with the wrong number of tracks in it lays out nothing at
+  // all. Reloading rather than reslicing, since each pane count has a layout of its own
+  const paneCount = panes.length;
+  React.useEffect(() => {
+    setWeights((current: number[]) =>
+      current.length === paneCount ? current : loadWeights(paneCount),
+    );
+  }, [paneCount]);
 
   // The room the panes have to share, split the way the weights currently say to
   const paneWidths = (): number[] => {
@@ -141,7 +159,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
     }
     dragRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
-    setStorageKeyValue(WEIGHTS_KEY, weightsRef.current);
+    setStorageKeyValue(weightsKey(panes.length), weightsRef.current);
   };
 
   const onKeyDown =
@@ -158,7 +176,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
       e.preventDefault();
       const resized = resize(index, paneWidths(), step);
       if (resized) {
-        setStorageKeyValue(WEIGHTS_KEY, resized);
+        setStorageKeyValue(weightsKey(panes.length), resized);
       }
     };
 
@@ -167,12 +185,14 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
     const reset = defaultWeights(panes.length);
     weightsRef.current = reset;
     setWeights(reset);
-    setStorageKeyValue(WEIGHTS_KEY, reset);
+    setStorageKeyValue(weightsKey(panes.length), reset);
   };
 
   // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
   // never changes the total width the panes have to share
-  const template = weights.map((w) => `${w}fr`).join(` ${SPLITTER_PX}px `);
+  const sized =
+    weights.length === panes.length ? weights : loadWeights(panes.length);
+  const template = sized.map((w) => `${w}fr`).join(` ${SPLITTER_PX}px `);
 
   return (
     <div
