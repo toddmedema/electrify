@@ -24,6 +24,12 @@ const TICK_STROKE = "#90A4AE";
 // How far a tick pokes out of the axis, and how far the label then sits from it, in design units
 const TICK_SIZE = 5;
 const LABEL_GAP = 4;
+// A gutter outside the widest label. uPlot leaves no padding on a side that carries an axis, so
+// an axis sized to the exact width of its labels draws them flush against the canvas edge, and
+// anything that measures a hair narrower than it paints - a font that finished loading after the
+// axis was sized, a glyph with a negative left bearing, plain antialiasing - clips the first
+// character off every label.
+const LABEL_EDGE_PAD = 4;
 // Victory drew legend text in its material theme's near-black rather than the axes' grey
 const LEGEND_TEXT = "#252525";
 
@@ -161,7 +167,7 @@ export function xAxis(scale: number, o: AxisOptions): uPlot.Axis {
 export function yAxis(scale: number, o: AxisOptions): uPlot.Axis {
   const font = chartFont(scale);
   const fontSize = 12 * scale;
-  const fixed = TICK_SIZE * scale + LABEL_GAP * scale;
+  const fixed = (TICK_SIZE + LABEL_GAP + LABEL_EDGE_PAD) * scale;
   return {
     ...axisCommon(scale, o),
     scale: o.scale ?? "y",

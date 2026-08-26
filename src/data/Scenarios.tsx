@@ -700,7 +700,7 @@ export const DEFAULT_CUSTOM_SCENARIO = {
   locationId: "SF",
   ownership: "Investor",
   startingYear: 2020,
-  cash: 220000000,
+  cash: 200000000,
   dollarsPerkWh: 0.07,
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,

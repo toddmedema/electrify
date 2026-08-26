@@ -111,8 +111,8 @@ function nearestIndex(options: number[], value: number): number {
 }
 
 /**
- * A stored custom game with its rate and fee snapped onto the options its own starting year
- * offers.
+ * A stored custom game with its cash, rate and fee snapped onto the options this screen
+ * offers - the rate and fee against its own starting year.
  *
  * Only ever changes a game saved before those became era-aware. Doing it on the way in rather
  * than on the way out is what keeps the screen honest: showing the nearest option while the
@@ -129,6 +129,9 @@ function inEraScenario(scenario: ScenarioType): ScenarioType {
   );
   return {
     ...scenario,
+    // Cash is quoted the same in every era, so this only catches a game stored against an
+    // amount the picker no longer offers - which would otherwise render the field blank
+    cash: STARTING_CASH[nearestIndex(STARTING_CASH, scenario.cash)],
     dollarsPerkWh: rates[nearestIndex(rates, scenario.dollarsPerkWh)],
     feePerKgCO2e: fees[nearestIndex(fees, scenario.feePerKgCO2e * 1000)] / 1000,
   };
@@ -215,13 +218,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const sizes = (adding?.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W).filter(
     (size) => !adding || size <= adding.maxSize,
   );
-  // Starting facilities are built free and already finished, so the only limit is what the
-  // technology could actually be built at in that year
-  const totalPeakW = scenario.facilities.reduce(
-    (sum: number, f: Partial<FacilityShoppingType>) => sum + (f.peakW || 0),
-    0,
-  );
-
   // What a kilowatt hour may be charged at, and what a ton of CO2e may be feed, in the money of
   // the year the game starts in. Both move with the starting year, which is why changing that
   // year has to re-quote whatever was already chosen rather than leaving a 2020 rate on a 2080
@@ -567,15 +563,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
         <Typography variant="h6" sx={{ paddingLeft: 1, paddingTop: 1 }}>
           Starting facilities
-        </Typography>
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          sx={{ paddingLeft: 1 }}
-        >
-          {scenario.facilities.length === 0
-            ? "None - you'll be blacking out until you build something"
-            : `${formatWatts(totalPeakW)} of generation, free and already running`}
         </Typography>
         {unavailable.length > 0 && (
           <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>
