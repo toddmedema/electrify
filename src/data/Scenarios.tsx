@@ -38,7 +38,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".VictoryContainer",
+        target: "#chartSupplyDemand",
         content: (
           <Typography variant="body1">
             Make money by supplying demand for electricity, measured in
@@ -55,7 +55,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".VictoryContainer",
+        target: "#chartSupplyDemand",
         content: (
           <Typography variant="body1">
             Your generators automatically spin up to meet demand as best they
@@ -324,10 +324,7 @@ export const SCENARIOS = [
       },
       {
         card: "FINANCES",
-        target: ".VictoryContainer",
-        // Unqualified, this matches the Facilities pane's chart first once all three panes
-        // are on screen
-        desktop: { target: "#financesPane .VictoryContainer" },
+        target: "#chartFinances",
         content: (
           <Typography variant="body1">
             You can plot a variety of metrics by changing the dropdowns above

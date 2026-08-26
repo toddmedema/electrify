@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as React from "react";
 import type { UnknownAction } from "redux";
 import { ACTIONS, EVENTS, type EventData } from "react-joyride";
@@ -164,6 +166,48 @@ describe("onTutorialStep", () => {
   });
 });
 
+/**
+ * Every component's markup as one blob to search. Source only: the test files are full of
+ * fixture markup no walkthrough will ever point at.
+ */
+const SOURCE = (function read(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return read(full);
+    }
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)
+      ? [fs.readFileSync(full, "utf8")]
+      : [];
+  });
+})(path.join(__dirname, "..")).join("\n");
+
+/** Both targets a step can carry, since the desktop override is a selector of its own */
+function targetsOf(steps: TutorialStepType[]): string[] {
+  return steps
+    .flatMap((s) => [s.target, s.desktop && s.desktop.target])
+    .filter((t): t is string => Boolean(t));
+}
+
+/** Whether anything in the app still declares the id or class a simple selector names */
+function declares(simple: string): boolean {
+  const name = simple.slice(1);
+  if (simple.startsWith("#")) {
+    return SOURCE.includes(`id="${name}"`);
+  }
+  // MUI generates its own class names, so there is nothing of ours to find. Those steps lean
+  // on the card check above instead
+  if (name.startsWith("Mui")) {
+    return true;
+  }
+  // Class attributes are often assembled from a template, so look for the whole word anywhere
+  // on a line that sets one rather than trying to parse the value out
+  return SOURCE.split("\n").some(
+    (line) =>
+      line.includes("className") && line.split(/[^\w-]+/).includes(name),
+  );
+}
+
 describe("walkthrough steps", () => {
   const tutorials = SCENARIOS.filter((s) => s.tutorialSteps);
 
@@ -206,6 +250,22 @@ describe("walkthrough steps", () => {
           toStep,
           cardOf(steps[toStep]),
         ]);
+      });
+    });
+
+    /**
+     * Joyride reports a selector matching nothing as TARGET_NOT_FOUND, which the walkthrough
+     * handles by moving straight on - so a step pointing at markup that has since been renamed
+     * quietly vanishes rather than failing. The move off Victory took `.VictoryContainer` with
+     * it exactly that way, and the tutorial lost its tour of the supply/demand graph without a
+     * single red test. Rendering every card would be the airtight check; scanning the source
+     * for the id or class each selector names catches the same kind of rename far cheaper.
+     */
+    it(`${scenario.name} points every step at markup that still exists`, () => {
+      targetsOf(steps).forEach((target) => {
+        target.split(/\s+/).forEach((simple) => {
+          expect([target, declares(simple)]).toEqual([target, true]);
+        });
       });
     });
   });
