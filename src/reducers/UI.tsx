@@ -14,6 +14,7 @@ export const initialUI: UIType = {
     timeout: 6000,
   },
   victory: null,
+  selectedFacilityId: null,
 };
 
 export const uiSlice = createSlice({
@@ -64,12 +65,18 @@ export const uiSlice = createSlice({
     victoryClose: (state) => {
       state.victory = null;
     },
+    // Null deselects. Clicking the row that's already selected sends null rather than its own id,
+    // so the pane doesn't need a second action to close itself
+    selectFacility: (state, action: PayloadAction<number | null>) => {
+      state.selectedFacilityId = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
       state.victory = null;
+      state.selectedFacilityId = null;
     });
   },
 });
@@ -82,6 +89,7 @@ export const {
   dialogClose,
   victoryOpen,
   victoryClose,
+  selectFacility,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

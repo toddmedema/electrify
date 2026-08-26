@@ -1,8 +1,8 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
-import Finances, { parseRange, projectMonths } from "./Finances";
+import Finances, { getComparison, parseRange, projectMonths } from "./Finances";
 import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
@@ -81,9 +81,17 @@ function playMonths(months: number): GameType {
   return state;
 }
 
-function renderFinances(game: GameType, speed: SpeedType) {
+function renderFinances(
+  game: GameType,
+  speed: SpeedType,
+  selectedFacilityId: number | null = null,
+) {
   return render(
-    <Finances game={{ ...game, speed }} onDelta={() => undefined} />,
+    <Finances
+      game={{ ...game, speed }}
+      selectedFacilityId={selectedFacilityId}
+      onDelta={() => undefined}
+    />,
   );
 }
 
@@ -312,5 +320,114 @@ describe("projectMonths", () => {
       Math.floor(game.timeline[0].minute / MINUTES_PER_MONTH),
     );
     expect(months[0].month).toEqual(game.date.monthNumber);
+  });
+});
+
+/**
+ * The change column, which is what turns a table of totals into something scannable: a
+ * profit of "-$51.4K" says nothing on its own about whether the company is recovering.
+ */
+describe("the month over month column", () => {
+  const game = playMonths(26);
+
+  // The change sits in the row's third cell, past the label and the period total. Both role
+  // queries go without a `name`, which is what keeps them cheap over a table this size
+  function changeCell(label: string): HTMLElement {
+    const row = screen
+      .getAllByRole("row")
+      .find((r: HTMLElement) =>
+        r.textContent?.startsWith(label),
+      ) as HTMLElement;
+    return within(row).getAllByRole("cell")[2];
+  }
+
+  function toneOf(label: string): string {
+    const cell = changeCell(label);
+    if (cell.className.includes("good")) {
+      return "good";
+    }
+    return cell.className.includes("bad") ? "bad" : "flat";
+  }
+
+  /**
+   * The game with a two month record of its own making, so a test can say which way a
+   * number moved instead of asking the simulation what it happened to do.
+   */
+  function withChange(changes: Partial<MonthlyHistoryType>): GameType {
+    const previous = game.monthlyHistory[1];
+    return {
+      ...game,
+      // Newest first, the order the game itself keeps
+      monthlyHistory: [{ ...previous, ...changes }, previous],
+    };
+  }
+
+  it("compares the month just closed against the one before it", () => {
+    const comparison = getComparison(game);
+    const [latest, previous] = game.monthlyHistory;
+    expect(comparison).toBeDefined();
+    expect(comparison?.label).toBeTruthy();
+    expect(comparison?.current.revenue).toEqual(latest.revenue);
+    expect(comparison?.previous.revenue).toEqual(previous.revenue);
+  });
+
+  it("has nothing to compare against in a company's first month", () => {
+    const newborn = createGame({ scenarioId: 100 });
+    expect(newborn.monthlyHistory).toHaveLength(0);
+    expect(getComparison(newborn)).toBeUndefined();
+    // And one month on the record is still one month short of a comparison
+    expect(
+      getComparison({
+        ...newborn,
+        monthlyHistory: [game.monthlyHistory[0]],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("puts the change beside each total once there are two months on the record", () => {
+    renderFinances(game, "PAUSED");
+    const comparison = getComparison(game);
+    expect(screen.getByText(comparison?.label || "")).toBeInTheDocument();
+    // Every metric gets one, even if it is the em dash that means it hasn't moved
+    expect(changeCell("Profit").textContent).not.toEqual("");
+    expect(changeCell("Revenue").textContent).not.toEqual("");
+  });
+
+  // Both point up, so the arrow alone can't tell these apart -- and colouring a rise in
+  // spending the same green as a rise in earnings would be exactly backwards
+  it("reads a rise in revenue as good news and a rise in an expense as bad", () => {
+    renderFinances(withChange({ revenue: 0 }), "PAUSED");
+    expect(toneOf("Revenue")).toEqual("bad");
+
+    cleanup();
+    const previous = game.monthlyHistory[1];
+    renderFinances(
+      withChange({
+        revenue: previous.revenue * 1.5,
+        expensesFuel: previous.expensesFuel * 1.5,
+      }),
+      "PAUSED",
+    );
+    expect(toneOf("Revenue")).toEqual("good");
+    expect(toneOf("Fuel")).toEqual("bad");
+    expect(toneOf("Expenses")).toEqual("bad");
+  });
+
+  it("says nothing about a month that came in where the last one did", () => {
+    renderFinances(withChange({}), "PAUSED");
+    expect(toneOf("Revenue")).toEqual("flat");
+    expect(changeCell("Revenue").textContent).toEqual("—");
+  });
+
+  it("reports what a selected facility has contributed, and nothing when none is", () => {
+    renderFinances(game, "PAUSED", null);
+    expect(screen.queryByText(/of your fleet/)).toBeNull();
+
+    cleanup();
+    renderFinances(game, "PAUSED", game.facilities[0].id);
+    expect(
+      screen.getByText(game.facilities[0].name, { selector: "strong" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/of your fleet/)).toBeInTheDocument();
   });
 });

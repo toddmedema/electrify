@@ -258,7 +258,7 @@ export type FacilityOperatingType =
   GeneratorOperatingType | StorageOperatingType;
 
 export interface GeneratorOperatingType
-  extends GeneratorShoppingType, LoanInfo {
+  extends GeneratorShoppingType, LoanInfo, LifetimeTotals {
   id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;
@@ -266,11 +266,32 @@ export interface GeneratorOperatingType
   paused: boolean;
 }
 
-export interface StorageOperatingType extends StorageShoppingType, LoanInfo {
+export interface StorageOperatingType
+  extends StorageShoppingType, LoanInfo, LifetimeTotals {
   id: number; // Monotonically increasing
   currentWh: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
+}
+
+/**
+ * What one facility has actually done since it came online, so a row can report whether it is
+ * earning its keep rather than only what it cost to build. Accumulated per tick by
+ * updateSupplyFacilitiesFinances, and only while the game is really ticking -- a forecast runs
+ * against a deep clone of the fleet and throws the clone away, so its ticks never land here.
+ *
+ * Every field is optional because a save written before these existed has none of them, and a
+ * fleet resumed from one should keep playing rather than start reporting NaN. Read them through
+ * helpers/Financials' facilityLifetime, which is where the zero defaults live.
+ */
+export interface LifetimeTotals {
+  lifetimeWh?: number; // Delivered to the grid. Storage counts discharge only, not charging
+  // What it could have delivered running flat out over the same span, ie the denominator of its
+  // capacity factor. Accrues from the moment construction finishes, so pauses and idle hours
+  // count against it the way they do for a real plant
+  lifetimePotentialWh?: number;
+  lifetimeRevenue?: number; // Its pro-rata share of what the company sold
+  lifetimeExpenses?: number; // Its own fuel, O&M, carbon fees and loan interest
 }
 
 interface LoanInfo {
@@ -458,6 +479,11 @@ export interface VictoryType {
 export interface UIType {
   dialog: DialogType;
   snackbar: SnackbarType;
+  // The facility the player has clicked in the fleet list, or null for none. UI rather than game
+  // state: it changes nothing about the simulation, and it is read by all three panes -- the
+  // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Finances reports what
+  // it has earned. Cleared when the run ends, or when the facility is sold out from under it
+  selectedFacilityId: number | null;
   // The score screen for a run that just ended, or null when none has. Its own slot rather than a
   // `dialog`, because the shared dialog only holds a title and a message and this one fills
   // itself in as async results arrive

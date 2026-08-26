@@ -16,6 +16,8 @@ export interface LegendItemType {
   dash?: string | undefined;
   /** Drawn as a rule rather than a block, for a series that is a line over the others */
   rule?: boolean;
+  /** Faded back, for a series the chart itself is currently drawing faded back */
+  muted?: boolean;
 }
 
 export interface Props {
@@ -29,7 +31,12 @@ export default function ChartLegend(props: Props): React.JSX.Element {
       className={"chartLegend" + (props.inline ? " chartLegend-inline" : "")}
     >
       {props.items.map((item) => (
-        <span key={item.name} className="chartLegendItem">
+        <span
+          key={item.name}
+          className={
+            "chartLegendItem" + (item.muted ? " chartLegendItem-muted" : "")
+          }
+        >
           {item.dash ? (
             <svg
               className="chartLegendSwatch chartLegendSwatch-line"
