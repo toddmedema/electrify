@@ -1,7 +1,14 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import { padRange, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
+import {
+  FORECAST_AXIS_LEFT,
+  FORECAST_AXIS_RIGHT,
+  padRange,
+  stepTicks,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
@@ -16,6 +23,10 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  /** False where a chart below this one carries the month names for the whole stack */
+  showXLabels?: boolean;
+  /** Shares a cursor with the other charts drawn against the same months */
+  syncKey?: string;
 }
 
 interface State {
@@ -25,11 +36,11 @@ interface State {
   multiyear: boolean;
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
-  return {
+function buildOptions(showXLabels: boolean) {
+  return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, 5 * scale, 0, 0],
+    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -45,6 +56,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     },
     axes: [
       xAxis(scale, {
+        showLabels: showXLabels,
         splits: () => {
           const [min, max] = getState().domain.x;
           return stepTicks(min, max, MINUTES_PER_MONTH);
@@ -57,12 +69,13 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         },
       }),
       yAxis(scale, {
+        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) =>
           splits.map((t) => formatWattHoursAxis(t, splits)),
       }),
     ],
     series: [{}, { stroke: supplyColor, width: 1, points: { show: false } }],
-  };
+  });
 }
 
 function tooltip(idx: number, state: State): string {
@@ -75,7 +88,15 @@ export default class chartForecastStorage extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, startingYear, multiyear } = this.props;
+    const {
+      domain,
+      height,
+      timeline,
+      startingYear,
+      multiyear,
+      showXLabels,
+      syncKey,
+    } = this.props;
 
     const minutes = new Array<number>(timeline.length);
     const stored = new Array<number>(timeline.length);
@@ -91,7 +112,9 @@ export default class chartForecastStorage extends React.PureComponent<
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}
         data={[minutes, stored]}
-        buildOptions={buildOptions}
+        buildOptions={buildOptions(showXLabels !== false)}
+        structureKey={String(showXLabels !== false)}
+        syncKey={syncKey}
         tooltip={tooltip}
       />
     );

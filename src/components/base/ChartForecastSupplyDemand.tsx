@@ -3,6 +3,8 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   bandsPlugin,
+  FORECAST_AXIS_LEFT,
+  FORECAST_AXIS_RIGHT,
   padRange,
   spansFromEdges,
   stepTicks,
@@ -29,6 +31,10 @@ export interface Props {
   domain: { x: [number, number]; y: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  /** False where a chart below this one carries the month names for the whole stack */
+  showXLabels?: boolean;
+  /** Shares a cursor with the other charts drawn against the same months */
+  syncKey?: string;
 }
 
 interface State {
@@ -39,11 +45,13 @@ interface State {
   multiyear: boolean;
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
-  return {
+function buildOptions(showXLabels: boolean) {
+  return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, 5 * scale, 0, 0],
+    // Right gutter reserved rather than used, so this plot ends where the weather chart's
+    // second axis makes that one end -- see FORECAST_AXIS_RIGHT
+    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -62,6 +70,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     },
     axes: [
       xAxis(scale, {
+        showLabels: showXLabels,
         splits: () => {
           const [min, max] = getState().domain.x;
           return stepTicks(min, max, MINUTES_PER_MONTH);
@@ -74,6 +83,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         },
       }),
       yAxis(scale, {
+        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
       }),
     ],
@@ -83,7 +93,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       { stroke: demandColor, width: 2, points: { show: false } },
     ],
     plugins: [bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3)],
-  };
+  });
 }
 
 function tooltip(idx: number, state: State): string {
@@ -97,8 +107,16 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, blackouts, startingYear, multiyear } =
-      this.props;
+    const {
+      domain,
+      height,
+      timeline,
+      blackouts,
+      startingYear,
+      multiyear,
+      showXLabels,
+      syncKey,
+    } = this.props;
 
     const minutes = new Array<number>(timeline.length);
     const supply = new Array<number>(timeline.length);
@@ -124,7 +142,9 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
         height={height}
         state={state}
         data={[minutes, supply, demand]}
-        buildOptions={buildOptions}
+        buildOptions={buildOptions(showXLabels !== false)}
+        structureKey={String(showXLabels !== false)}
+        syncKey={syncKey}
         tooltip={tooltip}
       />
     );

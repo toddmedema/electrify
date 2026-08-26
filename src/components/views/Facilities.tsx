@@ -386,7 +386,35 @@ export default class Facilities extends React.Component<Props, {}> {
     const readOnly = !!game.replayPlayback;
 
     return (
-      <GameCard>
+      <GameCard className="facilities" id="facilitiesPane">
+        {/* The pane's own header rather than a row inside the list, so it lines up with the
+            other panes' headers and the build buttons stay put as the fleet scrolls */}
+        <Toolbar className="paneHeader">
+          <Typography variant="h6">Facilities</Typography>
+          {!readOnly && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                onClick={onGeneratorBuild}
+                className="button-buildGenerator"
+              >
+                + Generator
+              </Button>
+              &nbsp;&nbsp;&nbsp;
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                onClick={onStorageBuild}
+                className="button-buildStorage"
+              >
+                + Storage
+              </Button>
+            </>
+          )}
+        </Toolbar>
         <ChartSupplyDemand
           height={180}
           timeline={game.timeline}
@@ -396,32 +424,6 @@ export default class Facilities extends React.Component<Props, {}> {
           startingYear={game.startingYear}
         />
         <List dense className="scrollable">
-          <Toolbar style={{ paddingBottom: "4px" }}>
-            <Typography variant="h6">Facilities</Typography>
-            {!readOnly && (
-              <>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={onGeneratorBuild}
-                  className="button-buildGenerator"
-                >
-                  + Generator
-                </Button>
-                &nbsp;&nbsp;&nbsp;
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={onStorageBuild}
-                  className="button-buildStorage"
-                >
-                  + Storage
-                </Button>
-              </>
-            )}
-          </Toolbar>
           <DragDropContext onDragEnd={this.onDragEnd}>
             <Droppable droppableId="droppable">
               {(provided) => (

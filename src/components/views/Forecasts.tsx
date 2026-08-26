@@ -21,17 +21,28 @@ import { formatWattHours, formatWatts } from "../../helpers/Format";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import { getStorageChoice, setStorageKeyValue } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
-import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
+import ChartForecastFuelPrices, {
+  PRICED_FUELS,
+} from "../base/ChartForecastFuelPrices";
 import ChartForecastSupplyDemand from "../base/ChartForecastSupplyDemand";
-import ChartForecastSupplyByFuel from "../base/ChartForecastSupplyByFuel";
+import ChartForecastSupplyByFuel, {
+  forecastFuels,
+} from "../base/ChartForecastSupplyByFuel";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartForecastStorage from "../base/ChartForecastStorage";
+import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
-import { isDesktopScreen } from "../../Globals";
+import { fuelColors, fuelDashArrays } from "../../Theme";
 
 const FORECAST_YEARS_KEY = "forecastYears";
 const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
+
+// Everything in this pane is drawn against the same months, so hovering any of it should say
+// where you are in all of it -- the whole point of the pane is that these five things move
+// together. Only the bottom chart draws the month names; the rest keep their ticks and hand
+// the height back to the plot
+const FORECAST_SYNC_KEY = "forecasts";
 
 interface BlackoutEdges {
   minute: number;
@@ -191,13 +202,15 @@ export default class Forecasts extends React.Component<Props, State> {
       forecastedTimeline[forecastedTimeline.length - 1],
     );
 
+    // Derived here rather than inside the chart, since the legend beside the chart's title has
+    // to name exactly the bands the chart draws
+    const fuels = forecastFuels(
+      getDispatchOrderedFuels(game.facilities) as FuelNameType[],
+      sampledForecastedTimeline,
+    );
+
     return (
-      <GameCard
-        className="Forecasts"
-        chromeless={isDesktopScreen()}
-        title="Forecasts"
-        id="forecastsPane"
-      >
+      <GameCard className="Forecasts" title="Forecasts" id="forecastsPane">
         <div className="scrollable">
           <Toolbar>
             <Typography variant="h6">
@@ -225,6 +238,8 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax], y: [domainMin, domainMax] }}
             startingYear={game.startingYear}
             multiyear={years > 1}
+            showXLabels={false}
+            syncKey={FORECAST_SYNC_KEY}
           />
           {blackoutTotalWh > 0 && (
             <Table size="small">
@@ -262,10 +277,19 @@ export default class Forecasts extends React.Component<Props, State> {
               </TableBody>
             </Table>
           )}
-          <br />
-          <br />
-          <Toolbar>
+          {/* Each chart's key sits in its title row rather than on a row of its own below the
+              plot, which is a chart's worth of height across the five of them */}
+          <Toolbar className="forecastSection">
             <Typography variant="h6">Supply by Fuel</Typography>
+            <ChartLegend
+              inline
+              items={[
+                ...[...fuels]
+                  .reverse()
+                  .map((f) => ({ name: f, color: fuelColors[f] })),
+                { name: "Demand", color: "", rule: true },
+              ]}
+            />
           </Toolbar>
           <ChartForecastSupplyByFuel
             height={140}
@@ -273,13 +297,13 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
             multiyear={years > 1}
-            fuels={getDispatchOrderedFuels(game.facilities) as FuelNameType[]}
+            fuels={fuels}
+            showXLabels={false}
+            syncKey={FORECAST_SYNC_KEY}
           />
           {hasStorage && (
             <div>
-              <br />
-              <br />
-              <Toolbar>
+              <Toolbar className="forecastSection">
                 <Typography variant="h6">Stored power</Typography>
               </Toolbar>
               <ChartForecastStorage
@@ -288,13 +312,21 @@ export default class Forecasts extends React.Component<Props, State> {
                 domain={{ x: [rangeMin, rangeMax] }}
                 startingYear={game.startingYear}
                 multiyear={years > 1}
+                showXLabels={false}
+                syncKey={FORECAST_SYNC_KEY}
               />
             </div>
           )}
-          <br />
-          <br />
-          <Toolbar>
+          <Toolbar className="forecastSection">
             <Typography variant="h6">Fuel Prices</Typography>
+            <ChartLegend
+              inline
+              items={PRICED_FUELS.map((f) => ({
+                name: f,
+                color: fuelColors[f],
+                dash: fuelDashArrays[f],
+              }))}
+            />
           </Toolbar>
           <ChartForecastFuelPrices
             height={140}
@@ -302,20 +334,22 @@ export default class Forecasts extends React.Component<Props, State> {
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
             multiyear={years > 1}
+            showXLabels={false}
+            syncKey={FORECAST_SYNC_KEY}
           />
-          <br />
-          <br />
-          <Toolbar>
+          <Toolbar className="forecastSection">
             <Typography variant="h6">
               Weather in {game.location.name}
             </Typography>
           </Toolbar>
+          {/* Last, so it's the one that draws the month names the whole stack is read against */}
           <ChartForecastWeather
             height={140}
             timeline={sampledForecastedTimeline}
             domain={{ x: [rangeMin, rangeMax] }}
             startingYear={game.startingYear}
             multiyear={years > 1}
+            syncKey={FORECAST_SYNC_KEY}
           />
         </div>
       </GameCard>

@@ -1,7 +1,16 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import { padRange, SPLINE, stepTicks, xAxis, yAxis } from "./UPlotHelpers";
+import {
+  AXIS_LABEL_SIZE,
+  FORECAST_AXIS_LEFT,
+  FORECAST_AXIS_RIGHT,
+  padRange,
+  SPLINE,
+  stepTicks,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
@@ -25,6 +34,8 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  /** Shares a cursor with the other charts drawn against the same months */
+  syncKey?: string;
 }
 
 interface State {
@@ -44,7 +55,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, 5 * scale, 0, 0],
+    // No right padding: unlike the charts above it, this one's right gutter is a second axis,
+    // and anything on top of that would push its plot in from where theirs end
+    padding: [5 * scale, 0, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -70,10 +83,13 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
           );
         },
       }),
+      // Sized rather than fitted, so this plot starts and ends exactly where the charts stacked
+      // above it do and the month names below it line up with all of them
       yAxis(scale, {
         grid: true,
         label: `Heat (${temperatureUnit(getState().units)})`,
         stroke: temperatureAxisColor,
+        size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
       yAxis(scale, {
@@ -81,6 +97,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         side: 1,
         label: `Wind (${speedUnit(getState().units)})`,
         stroke: windColor,
+        size: FORECAST_AXIS_RIGHT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
     ],
@@ -120,7 +137,8 @@ export default class ChartForecastWeather extends React.PureComponent<
 
   public render() {
     const units = this.context as UnitSystemType;
-    const { domain, height, timeline, startingYear, multiyear } = this.props;
+    const { domain, height, timeline, startingYear, multiyear, syncKey } =
+      this.props;
     // Downsample the data to 6 per day to make it more vague / forecast-y
     const data = timeline.filter(
       (t: TickPresentFutureType) => t.minute % 240 < TICK_MINUTES,
@@ -148,6 +166,7 @@ export default class ChartForecastWeather extends React.PureComponent<
         buildOptions={buildOptions}
         // The axis labels are baked into the options, so a change of system rebuilds the plot
         structureKey={units}
+        syncKey={syncKey}
         tooltip={tooltip}
       />
     );

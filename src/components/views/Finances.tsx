@@ -35,7 +35,6 @@ import {
   getStorageChoice,
   setStorageKeyValue,
 } from "../../LocalStorage";
-import { isDesktopScreen } from "../../Globals";
 import { generateNewTimeline } from "../../reducers/Game";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
@@ -605,12 +604,7 @@ export default class Finances extends React.Component<Props, State> {
     );
 
     return (
-      <GameCard
-        className="finances"
-        chromeless={isDesktopScreen()}
-        title="Finances"
-        id="financesPane"
-      >
+      <GameCard className="finances" title="Finances" id="financesPane">
         <div className="scrollable">
           <br />
           <Toolbar>

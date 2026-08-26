@@ -312,19 +312,26 @@ span.weak {
   vertical-align: middle;
 }
 
-// Fixed so the primary topbar and every pane header in the desktop 3-pane layout share the
-// exact same height, regardless of their differing content (icon buttons vs. plain text)
+// Tall enough for the icon buttons it carries
 $topbar_height: 56px;
 
 #topbar .MuiToolbar-root {
   min-height: $topbar_height !important;
 }
 
-// Stands in for the primary pane's topbar in the desktop 3-pane layout, so each pane is
-// identifiable without the (hidden, redundant) bottom nav. Selector needs to out-specificity
+// Never squeezed by whatever is below it, on either layout
+#appbar {
+  flex: 0 0 auto;
+}
+
+// Names a pane, since the bottom nav that would otherwise do it is hidden once all three are on
+// screen at once. One height for all of them so their contents start on the same line, whether
+// the header is plain text or carries the build buttons. Selector needs to out-specificity
 // ".base_main .MuiToolbar-root" above (also !important) or its min-height:0 wins instead
+$pane_header_height: 40px;
+
 .base_main .MuiToolbar-root.paneHeader {
-  min-height: $topbar_height !important;
+  min-height: $pane_header_height !important;
   border-bottom: $border_accent;
 }
 
@@ -488,6 +495,20 @@ $topbar_height: 56px;
   padding: 0 8px 0 55px; // line up with the plot area, past the y axis labels
   font-size: 12px;
   color: $font_color_faded;
+}
+
+// The same key, in the chart's title row instead of on a row of its own. Trailing edge, since
+// the title beside it is what the eye lands on first
+.chartLegend-inline {
+  padding: 0;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+}
+
+// Spaces one forecast chart from the one above it. The stack used to sit on pairs of <br>s,
+// which cost more height than the gap needs and more than a screenful of charts can spare
+.base_main .MuiToolbar-root.forecastSection {
+  margin-top: 12px;
 }
 
 .chartLegendItem {
@@ -954,29 +975,66 @@ $sizemap: (
 
 // ===============================================
 // Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities,
-// Finances and Forecasts can render as panes side by side instead of one screen at a time
+// Finances and Forecasts can render as panes side by side instead of one screen at a time.
+// The type scale comes down with it: the vertical space that buys is what fits the extra
+// rows and the fifth forecast chart on screen
 // ===============================================
+
+$sizemap: (
+  large: 28px,
+  medium: 16px,
+  base: 8px,
+  small: 4px,
+  tiny: 2px,
+);
+
 @media screen and (min-width: $desktop_breakpoint) {
-  // Redundant once all three nav destinations are visible at the same time as panes
+  @include styling();
+
+  // The panes don't render one at this width -- all three destinations are already on screen.
+  // Kept as a backstop for the frame between a window crossing the breakpoint and the
+  // compositor hearing about it
   #navfooter {
     display: none;
   }
 
-  .desktop-panes {
-    display: flex;
-    flex-direction: row;
-    width: 100%;
+  .desktop-layout {
     height: 100%;
+    width: 100%;
+  }
 
-    > div {
-      flex: 1 1 0;
+  // The columns themselves, and the splitter tracks between them, come from DesktopPanes --
+  // they're state, since the player can drag them
+  .desktop-panes {
+    display: grid;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .desktop-pane {
+    display: flex;
+    min-width: 0;
+    overflow: hidden;
+
+    > * {
+      flex: 1 1 auto;
       min-width: 0;
       height: 100%;
-      border-right: $border_accent;
+    }
+  }
 
-      &:last-child {
-        border-right: none;
-      }
+  .pane-splitter {
+    cursor: col-resize;
+    border-left: $border_accent;
+    background: transparent;
+    transition: background 0.15s;
+
+    &:hover,
+    &:focus-visible {
+      background: $interactive_blue;
+      border-left-color: $interactive_blue;
+      outline: none;
     }
   }
 }
