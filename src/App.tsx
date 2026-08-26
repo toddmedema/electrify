@@ -8,7 +8,7 @@ import { navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform } from "./Globals";
-import { delta } from "./reducers/User";
+import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
 import { startAutosave } from "./SaveGame";
 import { store } from "./Store";
@@ -95,7 +95,23 @@ export default function App() {
     // Returns its own unsubscribe, which was previously dropped on the floor
     const unsubscribeAuth = firebaseAppAuth.onAuthStateChanged(
       (user: User | null) => {
-        store.dispatch(delta({ uid: (user || ({} as Partial<User>)).uid }));
+        if (!user) {
+          // Signed out, or never signed in: drop the whole slice rather than only the uid, so one
+          // player's name and bests can't linger into the next player's session
+          store.dispatch(reset());
+          return;
+        }
+        // The provider's name is only a seed for the name dialog. The leaderboard name is the one
+        // claimed against users/{uid}, which is what loadProfile goes and reads
+        store.dispatch(
+          delta({
+            uid: user.uid,
+            googleDisplayName: user.displayName || undefined,
+          }),
+        );
+        store.dispatch(
+          loadProfile({ uid: user.uid, googleDisplayName: user.displayName }),
+        );
       },
     );
 

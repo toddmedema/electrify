@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { DialogType, SnackbarType, UIType } from "../Types";
+import { DialogType, SnackbarType, UIType, VictoryType } from "../Types";
 import { quit } from "./GameActions";
 
 export const initialUI: UIType = {
@@ -13,6 +13,7 @@ export const initialUI: UIType = {
     open: false,
     timeout: 6000,
   },
+  victory: null,
 };
 
 export const uiSlice = createSlice({
@@ -54,16 +55,33 @@ export const uiSlice = createSlice({
     dialogClose: (state) => {
       state.dialog = { ...initialUI.dialog };
     },
+    // The score screen for a run that just ended. Separate from dialogOpen because the victory
+    // dialog is a component rather than a title and a message: it fills in the personal best and
+    // the global rank as those resolve, which a snapshot of JSX cannot do
+    victoryOpen: (state, action: PayloadAction<VictoryType>) => {
+      state.victory = { ...action.payload };
+    },
+    victoryClose: (state) => {
+      state.victory = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
+      state.victory = null;
     });
   },
 });
 
-export const { delta, snackbarOpen, snackbarClose, dialogOpen, dialogClose } =
-  uiSlice.actions;
+export const {
+  delta,
+  snackbarOpen,
+  snackbarClose,
+  dialogOpen,
+  dialogClose,
+  victoryOpen,
+  victoryClose,
+} = uiSlice.actions;
 
 export default uiSlice.reducer;

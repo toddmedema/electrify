@@ -109,6 +109,10 @@ export interface ScoreType {
   // Timestamp on the way back in
   date: Timestamp | FieldValue;
   uid: string;
+  // The player's leaderboard name as it was when the score was set, denormalized so that
+  // rendering a board is one query rather than one plus a profile read per row. Absent on scores
+  // set before display names existed, and those fall back to Anonymous
+  displayName?: string;
   // Id of the document in the `replays` collection holding the run that set this score, when one
   // was small enough to keep. A reference rather than the replay itself, so that opening a
   // leaderboard downloads fifty scores instead of fifty replays
@@ -430,13 +434,60 @@ export interface SnackbarType {
   timeout: number;
 }
 
+/**
+ * The end of a run, which the victory dialog turns into a score screen. Everything here is known
+ * the moment the scenario ends; the rank and the score write are enrichment that lands later.
+ */
+export interface VictoryType {
+  scenarioId: number;
+  scenarioName: string;
+  difficulty: DifficultyType;
+  score: number;
+  // The per-category points behind `score`, in the order they should be listed
+  breakdown: ScoreBreakdownType;
+  endTitle?: string;
+  endMessage?: string;
+  // Whether the run counts for the leaderboard. A custom game (every one shares an id) or a
+  // replay of someone else's run gets the breakdown without a rank or a personal best
+  ranked: boolean;
+  // The player's best on this scenario BEFORE this run, read at the moment the scenario ended so
+  // that "was 640" reports the run before this one rather than the one just finished
+  previousBest?: number;
+}
+
 export interface UIType {
   dialog: DialogType;
   snackbar: SnackbarType;
+  // The score screen for a run that just ended, or null when none has. Its own slot rather than a
+  // `dialog`, because the shared dialog only holds a title and a message and this one fills
+  // itself in as async results arrive
+  victory: VictoryType | null;
+}
+
+// A player's best run on one scenario, mirrored from users/{uid}.bests so that the victory dialog
+// can compare against it without a read
+export interface BestScoreType {
+  score: number;
+  difficulty: string;
+  // Epoch ms rather than a Timestamp: this one is read back into a plain Redux slice
+  date: number;
 }
 
 export interface UserType {
   uid?: string;
+  // The leaderboard name, once one has been claimed
+  displayName?: string;
+  // The name the identity provider knows them by. Kept only to seed the name dialog -- it is
+  // never what the board shows, since it is neither unique nor within the board's charset
+  googleDisplayName?: string;
+  // Keyed by scenario id as a string, which is how it comes back out of Firestore
+  bests?: { [scenarioId: string]: BestScoreType };
+  // Set once users/{uid} has been read or created, so the UI can tell "this player has no name"
+  // apart from "we have not looked yet"
+  profileLoaded?: boolean;
+  // Whether to prompt for a display name. Set on first login, and by the Settings card's
+  // "Change name"; cleared once the dialog is answered or dismissed
+  needsDisplayName?: boolean;
 }
 
 export type TransitionClassType = "next" | "prev" | "instant" | "nav";

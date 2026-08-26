@@ -50,6 +50,13 @@ import {
 
 import numbro from "numbro";
 
+// The player's own rows, so they can find themselves without reading fifty names
+const OWN_ROW_STYLE = { fontWeight: "bold", background: "#eee" };
+
+function formatScore(score: number): string {
+  return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
+}
+
 export interface StateProps {
   game: GameType;
   uid?: string;
@@ -66,6 +73,8 @@ export interface DispatchProps {
 interface State {
   scores?: ScoreType[];
   myTopScore?: ScoreType;
+  // Tells "nobody has played this yet" apart from "the board couldn't be read"
+  boardFailed?: boolean;
   scenario: ScenarioType | null;
   location: LocationType | null;
   victoryDialogOpen?: boolean;
@@ -84,40 +93,59 @@ export default class NewGameDetails extends React.Component<Props, State> {
       scenario,
       location: getScenarioLocation(scenario) || null,
     };
-    if (props.uid) {
-      this.loadScores(props.uid);
+  }
+
+  /**
+   * The board itself, which is public -- anyone can read it, logged in or not. Seeing named
+   * strangers above you is the reason to sign up, so hiding it behind a login inverted the very
+   * incentive it exists to create.
+   */
+  private async loadBoard() {
+    const scenario = this.state.scenario;
+    if (!scenario) {
+      return;
+    }
+    try {
+      const querySnapshot = await getDocs(
+        query(
+          collection(getDb(), "scores"),
+          where("scenarioId", "==", scenario.id),
+          orderBy("score", "desc"),
+          limit(50),
+        ),
+      );
+      // Set in one go rather than once per document: fifty setStates to draw one table meant
+      // laying out a table that grew by a row each time
+      this.setState({
+        scores: querySnapshot.docs.map((doc) => doc.data() as ScoreType),
+      });
+    } catch (err) {
+      console.warn("Couldn't load the high scores: ", err);
+      this.setState({ scores: [], boardFailed: true });
     }
   }
 
-  private async loadScores(uid: string) {
-    if (this.state.scenario && uid) {
-      const db = getDb();
-      // Tracked synchronously here because React state updates are async
-      let scores: ScoreType[] = [];
-
-      let q = query(
-        collection(db, "scores"),
-        where("scenarioId", "==", this.state.scenario.id),
-        orderBy("score", "desc"),
-        limit(50),
+  /** The player's own best, which is the one row worth showing above the rest. */
+  private async loadMyBest(uid: string) {
+    const scenario = this.state.scenario;
+    if (!scenario) {
+      return;
+    }
+    try {
+      const querySnapshot = await getDocs(
+        query(
+          collection(getDb(), "scores"),
+          where("scenarioId", "==", scenario.id),
+          where("uid", "==", uid),
+          orderBy("score", "desc"),
+          limit(1),
+        ),
       );
-      let querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc) => {
-        scores = [...scores, doc.data() as ScoreType];
-        this.setState({ scores });
-      });
-
-      q = query(
-        collection(db, "scores"),
-        where("scenarioId", "==", this.state.scenario.id),
-        where("uid", "==", uid),
-        orderBy("score", "desc"),
-        limit(1),
-      );
-      querySnapshot = await getDocs(q);
       querySnapshot.forEach((doc) => {
         this.setState({ myTopScore: doc.data() as ScoreType });
       });
+    } catch (err) {
+      console.warn("Couldn't load your best score: ", err);
     }
   }
 
@@ -173,17 +201,33 @@ export default class NewGameDetails extends React.Component<Props, State> {
     );
   }
 
-  public shouldComponentUpdate(nextProps: Props) {
-    if (!this.props.uid && nextProps.uid) {
-      this.loadScores(nextProps.uid);
+  public componentDidMount() {
+    // Unconditional: the board is public, so it no longer waits on a login that may never come.
+    // It used to be kicked off from shouldComponentUpdate, which is a purity hook and not a place
+    // to start network requests from
+    this.loadBoard();
+    if (this.props.uid) {
+      this.loadMyBest(this.props.uid);
     }
-    return true;
+  }
+
+  public componentDidUpdate(prevProps: Props) {
+    // Logging in from the button below the board is what makes "your best" answerable
+    if (this.props.uid && this.props.uid !== prevProps.uid) {
+      this.loadMyBest(this.props.uid);
+    }
   }
 
   public render() {
     const { onBack, onDelta, onStart, game, uid } = this.props;
-    const { scenario, scores, myTopScore, location, victoryDialogOpen } =
-      this.state;
+    const {
+      scenario,
+      scores,
+      myTopScore,
+      location,
+      victoryDialogOpen,
+      boardFailed,
+    } = this.state;
 
     const toggleVictoryDialog = (e: React.SyntheticEvent) => {
       this.setState({ victoryDialogOpen: !victoryDialogOpen });
@@ -317,83 +361,76 @@ export default class NewGameDetails extends React.Component<Props, State> {
           <Table id="HighScores">
             <TableHead>
               <TableRow>
-                <TableCell colSpan={3}>
+                <TableCell colSpan={5}>
                   <Typography variant="h6">Global High Scores</Typography>
                 </TableCell>
               </TableRow>
-              {uid && (
-                <TableRow>
-                  <TableCell>Score</TableCell>
-                  <TableCell>Difficulty</TableCell>
-                  <TableCell padding="none">Replay</TableCell>
+              <TableRow>
+                <TableCell padding="none">#</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Score</TableCell>
+                <TableCell>Difficulty</TableCell>
+                <TableCell padding="none">Replay</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {myTopScore && (
+                <TableRow style={OWN_ROW_STYLE}>
+                  <TableCell padding="none" />
+                  <TableCell colSpan={2}>
+                    Your best: {formatScore(myTopScore.score)}
+                  </TableCell>
+                  <TableCell>{myTopScore.difficulty}</TableCell>
+                  {this.renderReplayCell(myTopScore)}
                 </TableRow>
               )}
-            </TableHead>
-            {!uid && (
-              <TableBody>
+              {!scores && (
                 <TableRow>
-                  <TableCell colSpan={3} style={{ textAlign: "center" }}>
-                    <Button variant="outlined" color="primary" onClick={login}>
-                      Log in
-                    </Button>
+                  <TableCell colSpan={5}>
                     <Typography variant="body2" color="textSecondary">
-                      To view and set high scores
+                      Loading...
                     </Typography>
                   </TableCell>
                 </TableRow>
-              </TableBody>
-            )}
-            {uid && (
-              <TableBody>
-                {myTopScore && (
-                  <TableRow style={{ fontWeight: "bold", background: "#eee" }}>
-                    <TableCell>
-                      Your best:{" "}
-                      {numbro(myTopScore.score).format({
-                        thousandSeparated: true,
-                        mantissa: 0,
-                      })}
-                    </TableCell>
-                    <TableCell>{myTopScore.difficulty}</TableCell>
-                    {this.renderReplayCell(myTopScore)}
-                  </TableRow>
-                )}
-                {!scores && (
-                  <TableRow>
-                    <TableCell colSpan={3}>
-                      <Typography variant="body2" color="textSecondary">
-                        Loading...
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {scores && scores.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3}>
-                      <Typography variant="body2" color="textSecondary">
-                        Play the scenario to set a high score
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {scores &&
-                  scores.map((score: ScoreType, i: number) => {
-                    return (
-                      <TableRow key={i}>
-                        <TableCell>
-                          {numbro(score.score).format({
-                            thousandSeparated: true,
-                            mantissa: 0,
-                          })}
-                        </TableCell>
-                        <TableCell>{score.difficulty}</TableCell>
-                        {this.renderReplayCell(score)}
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            )}
+              )}
+              {scores && scores.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <Typography variant="body2" color="textSecondary">
+                      {boardFailed
+                        ? "Couldn't load the high scores right now."
+                        : "Play the scenario to set a high score"}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {scores &&
+                scores.map((score: ScoreType, i: number) => {
+                  const mine = Boolean(uid) && score.uid === uid;
+                  return (
+                    <TableRow key={i} style={mine ? OWN_ROW_STYLE : undefined}>
+                      <TableCell padding="none">{i + 1}</TableCell>
+                      {/* Scores set before display names existed carry no name */}
+                      <TableCell>{score.displayName || "Anonymous"}</TableCell>
+                      <TableCell>{formatScore(score.score)}</TableCell>
+                      <TableCell>{score.difficulty}</TableCell>
+                      {this.renderReplayCell(score)}
+                    </TableRow>
+                  );
+                })}
+            </TableBody>
           </Table>
+          {/* Below the board rather than in place of it: the board is the reason to log in */}
+          {!uid && (
+            <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
+              <Button variant="outlined" color="primary" onClick={login}>
+                Log in
+              </Button>
+              <Typography variant="body2" color="textSecondary">
+                To set a high score under your own name
+              </Typography>
+            </div>
+          )}
         </div>
       </div>
     );
