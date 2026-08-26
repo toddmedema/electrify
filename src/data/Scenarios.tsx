@@ -431,6 +431,20 @@ export const SCENARIOS = [
             customers through chronic blackouts!
           </Typography>
         ),
+        // Same control, different shape: on a wide screen the metrics are all drawn at once
+        // rather than hidden behind a dropdown
+        desktop: {
+          content: (
+            <Typography variant="body1">
+              Click the Customers tile to plot it and see how they change over
+              time.
+              <br />
+              <br />
+              Beware, marketing too much too quickly may actually cost you
+              customers through chronic blackouts!
+            </Typography>
+          ),
+        },
       },
       {
         card: "FINANCES",

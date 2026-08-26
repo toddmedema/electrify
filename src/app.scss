@@ -933,6 +933,92 @@ $pane_header_height: 40px;
     align-items: center;
   }
 
+  // Every headline metric drawn at once, with the one on the big chart above promoted. A grid
+  // rather than a row of six, so the tiles rewrap as the pane is dragged narrower instead of
+  // being squeezed to the width of their labels
+  .metricTiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: size(small);
+    padding: size(small) size(base) 0 size(base);
+  }
+
+  .metricTile {
+    display: block;
+    padding: size(small);
+    border: 1px solid #e0e0e0; /* grey300 */
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: #fafafa; /* grey50 */
+    }
+
+    &:focus-visible {
+      outline: 2px solid $interactive_blue;
+      outline-offset: -2px;
+    }
+
+    &.selected {
+      border-color: $interactive_blue;
+      background: #e3f2fd; /* blue50 */
+    }
+  }
+
+  .metricTileLabel {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .metricTileValue {
+    font-weight: 500;
+  }
+
+  // A slider that carries tick labels needs room for the outermost ones, which otherwise hang
+  // off both ends of the pane
+  .budgetSlider {
+    padding: 0 20px;
+
+    .MuiSlider-root {
+      width: 100% !important;
+    }
+
+    .MuiSlider-markLabel {
+      font-size: 0.7rem;
+    }
+  }
+
+  // Which speed the clock is running at, said as a selection rather than as three enabled
+  // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
+  .speedToggles {
+    .MuiToggleButton-root {
+      padding: 2px 8px;
+      border-color: rgba(
+        30,
+        136,
+        229,
+        0.5
+      ); /* interactive blue, matching the buttons */
+      color: $interactive_blue;
+      font-size: 0.8rem;
+      line-height: 1.4;
+
+      &.Mui-selected {
+        background: $interactive_blue;
+        color: $bg_primary;
+
+        &:hover {
+          background: $interactive_blue;
+        }
+      }
+    }
+  }
+
   // The change column, and the facility figures that use the same two colours
   .deltaCell {
     white-space: nowrap;

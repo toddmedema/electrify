@@ -61,6 +61,9 @@ export const temperatureColor = red[500];
 // labels that name it, so the axis carrying it takes the darker shade instead
 export const temperatureAxisColor = red[800];
 export const cursorColor = grey[600]; // hover crosshair, lighter than the data it crosses
+// A trend line that is on offer rather than being read: the unselected metric tiles, which have
+// to stay legible without competing with the one promoted to the chart above them
+export const mutedSeriesColor = grey[600];
 export const windColor = fuelColors.Wind; // for weather forecasts
 
 export default createTheme({

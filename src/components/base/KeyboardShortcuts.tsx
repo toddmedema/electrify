@@ -15,6 +15,16 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["Q"], description: "Facilities tab" },
   { keys: ["W"], description: "Finances tab" },
   { keys: ["E"], description: "Forecasts tab" },
+  { keys: ["G"], description: "Build a generator" },
+  { keys: ["S"], description: "Build storage" },
+  {
+    keys: ["shift", "1-9"],
+    description: "Pause / resume that facility in the fleet",
+  },
+  {
+    keys: ["[", "]"],
+    description: "Move the selected facility up / down the dispatch order",
+  },
   { keys: ["?"], description: "Open the manual" },
 ];
 
