@@ -140,6 +140,32 @@ export function isDesktopScreen(): boolean {
   return getViewportWidth() >= 1300;
 }
 
+/**
+ * Whether the in-game cards render as panes side by side -- with the app bar, and below the
+ * desktop breakpoint the bottom nav, supplied by the layout around them -- rather than as one
+ * full-screen card carrying its own chrome.
+ *
+ * True from $abswidthmax up, which is also where the frame stops being phone-width: between
+ * there and the desktop breakpoint the layout is Facilities pinned beside whichever of Finances
+ * and Forecasts the nav is on, which is a laptop and a landscape tablet.
+ *
+ * @returns {boolean} - Returns true if the screen is wider than a phone, otherwise false.
+ */
+export function isPaneLayout(): boolean {
+  return isBigScreen();
+}
+
+/**
+ * This function checks whether there is room for a fourth column beside the three panes, which
+ * is where the event log goes -- keep in sync with $ultrawide_breakpoint in app.scss. Below
+ * this, a fourth column comes out of the width the three that carry the game are using.
+ *
+ * @returns {boolean} - Returns true if the screen width is at least 1800, otherwise false.
+ */
+export function isUltrawideScreen(): boolean {
+  return getViewportWidth() >= 1800;
+}
+
 export function getHistoryApi(): HistoryApi {
   return refs.history;
 }

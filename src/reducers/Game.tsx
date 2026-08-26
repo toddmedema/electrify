@@ -6,6 +6,7 @@ import {
   getDateFromMinute,
   getMonthYearFromMinute,
   getTimeFromTimeline,
+  MINUTES_PER_MONTH,
   summarizeHistory,
   summarizeTimeline,
   getSunriseSunset,
@@ -75,6 +76,9 @@ import {
   DateType,
   FacilityOperatingType,
   FacilityShoppingType,
+  FuelPricesType,
+  GameEventKindType,
+  GameEventType,
   LocationType,
   GameType,
   GeneratorOperatingType,
@@ -122,6 +126,98 @@ let previousMonth = "";
 // Edge-detects the blackout toast, so a sustained blackout announces itself once rather than
 // four times an hour of game time
 let previouslyInBlackout = false;
+// What the blackout currently underway has cost, so the event log can say how bad it was once
+// it's over. Reset on each edge into one; meaningless while the lights are on
+let blackoutStartMinute = 0;
+let blackoutUnservedWh = 0;
+// Last month's fuel prices, to compare this month's against. Undefined before the first
+// rollover of a run, and after resuming a save - the first month back reports no move rather
+// than inventing one against prices from whenever the game was last open
+let previousFuelPrices: FuelPricesType | undefined;
+// How much history the log keeps. Long enough to cover the run a player is likely to scroll
+// back through, short enough that it never becomes the biggest thing in a save file
+const MAX_EVENTS = 100;
+
+/**
+ * How long a blackout lasted, in whichever unit reads honestly at that length.
+ *
+ * The game simulates one day per month, so an outage that runs into a second day has already
+ * crossed a month boundary -- reporting that as "27h" reads as a bad night rather than as the
+ * quarter of a year the calendar above it just moved through.
+ */
+function blackoutLength(minutes: number): string {
+  if (minutes >= MINUTES_PER_MONTH) {
+    const months = Math.round(minutes / MINUTES_PER_MONTH);
+    return `${months} month${months === 1 ? "" : "s"}`;
+  }
+  return `${Math.max(1, Math.round(minutes / 60))}h`;
+}
+
+/**
+ * Records something that happened to the company, newest first.
+ *
+ * Only ever called from a real tick or a player action: the forecast runs the same code over
+ * months that haven't happened, and a log full of blackouts the player was never in would be
+ * worse than no log at all.
+ */
+function logGameEvent(
+  state: GameType,
+  kind: GameEventKindType,
+  message: string,
+) {
+  if (!state.eventLog) {
+    state.eventLog = [];
+  }
+  const log = state.eventLog;
+  log.unshift({
+    id: (log.length > 0 ? log[0].id : 0) + 1,
+    kind,
+    label: `${state.date.month} ${state.date.year}`,
+    message,
+  });
+  if (log.length > MAX_EVENTS) {
+    log.length = MAX_EVENTS;
+  }
+}
+
+// How far a fuel has to move in a month to be worth a line in the log. Prices wander a percent
+// or two on their own; this is the size of move that changes which plant is cheapest to run
+const FUEL_PRICE_SPIKE = 0.15;
+
+/**
+ * Logs the fuels that moved sharply this month, for the fuels the fleet actually burns.
+ *
+ * A coal spike is not news to a company running on wind, and the fuel price chart in Forecasts
+ * already draws every fuel for the player who wants them all.
+ */
+function logFuelPriceMoves(state: GameType) {
+  const prices = getFuelPricesPerMBTU(state.date, state.seed);
+  const previous = previousFuelPrices;
+  previousFuelPrices = prices;
+  if (!previous) {
+    return;
+  }
+  const burned = new Set<string>();
+  state.facilities.forEach((f: FacilityOperatingType) => {
+    const fuel = (f as Partial<GeneratorOperatingType>).fuel;
+    // Wind and sun are fuels the game names but nobody prices
+    if (fuel && previous[fuel] !== undefined && prices[fuel] !== undefined) {
+      burned.add(fuel);
+    }
+  });
+  burned.forEach((fuel: string) => {
+    const change = (prices[fuel] - previous[fuel]) / previous[fuel];
+    if (Math.abs(change) < FUEL_PRICE_SPIKE) {
+      return;
+    }
+    logGameEvent(
+      state,
+      "FUEL_PRICE",
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MBTU`,
+    );
+  });
+}
+
 const initialGame: GameType = {
   seed: newSeed(),
   scenarioId: 0,
@@ -142,6 +238,7 @@ const initialGame: GameType = {
   date: getDateFromMinute(0, 2020),
   timeline: [] as TickPresentFutureType[],
   monthlyHistory: [] as MonthlyHistoryType[],
+  eventLog: [] as GameEventType[],
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -209,6 +306,9 @@ export const gameSlice = createSlice({
       // its first rollover, which also makes an otherwise identical seed produce a different run
       previousMonth = "";
       previouslyInBlackout = false;
+      blackoutUnservedWh = 0;
+      previousFuelPrices = undefined;
+      state.eventLog = [] as GameEventType[];
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
@@ -327,6 +427,9 @@ export const gameSlice = createSlice({
       previousMonth = restored.date.month;
       const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
       previouslyInBlackout = now ? now.supplyW < now.demandW : false;
+      blackoutStartMinute = restored.date.minute;
+      blackoutUnservedWh = 0;
+      previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
@@ -435,13 +538,29 @@ export default gameSlice.reducer;
  * "the player built a plant", not two that have to be kept in step.
  */
 function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
-  state = buildFacilityHelper(state, payload.facility, payload.financed);
+  const built = payload.facility;
+  logGameEvent(
+    state,
+    "BUILD",
+    `Building ${built.name}, ${built.peakWh ? formatWattHours(built.peakWh) : formatWatts(built.peakW)}${payload.financed ? " (financed)" : ""}`,
+  );
+  state = buildFacilityHelper(state, built, payload.financed);
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
   // assigned to the parameter is discarded and the forecast would never reach state
   state.timeline = reforecastSupply(state);
 }
 
 function applySellFacility(state: GameType, id: number) {
+  const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
+  if (sold) {
+    logGameEvent(
+      state,
+      sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
+      sold.yearsToBuildLeft > 0
+        ? `Cancelled construction of ${sold.name}`
+        : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold))}`,
+    );
+  }
   // in one loop, refund cash from selling + remove from list
   state.facilities = state.facilities.filter(
     (g: GeneratorOperatingType | StorageOperatingType) => {
@@ -630,8 +749,28 @@ export function tickState(state: GameType) {
     // The pulsing top bar only tells a player who is looking at it, and by default they're
     // looking at Finances or Forecasts. Fire on the edges only, never per tick.
     const inBlackout = now.supplyW < now.demandW;
+    if (inBlackout) {
+      // What the lights being out is actually costing, in the same units the score is docked in.
+      // Accumulated per tick rather than worked out at the end, since the gap moves the whole
+      // time the blackout lasts
+      blackoutUnservedWh +=
+        ((now.demandW - now.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    }
     if (inBlackout !== previouslyInBlackout) {
       previouslyInBlackout = inBlackout;
+      if (inBlackout) {
+        blackoutStartMinute = state.date.minute;
+        blackoutUnservedWh = 0;
+        logGameEvent(state, "BLACKOUT", "Blackout: demand outran your supply");
+      } else {
+        // The toast that says this vanishes in four seconds and the pulsing bar stops the moment
+        // it's over, so without this a player who was looking elsewhere never learns what it cost
+        logGameEvent(
+          state,
+          "BLACKOUT_OVER",
+          `Blackout over after ${blackoutLength(state.date.minute - blackoutStartMinute)} - ${formatWattHours(blackoutUnservedWh)} unserved`,
+        );
+      }
       const message = inBlackout
         ? "Blackout! Demand is outrunning your supply."
         : "Blackout over - supply is meeting demand again.";
@@ -665,6 +804,7 @@ export function tickState(state: GameType) {
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
       state.timeline = generateNewTimeline(state, cash, customers);
+      logFuelPriceMoves(state);
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
@@ -999,6 +1139,7 @@ function updateSupplyFacilitiesFinances(
       f.yearsToBuildLeft = Math.max(0, f.yearsToBuildLeft - YEARS_PER_TICK);
       if (f.yearsToBuildLeft === 0 && !simulated) {
         const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
+        logGameEvent(state, "CONSTRUCTION", message);
         setTimeout(() => {
           getStore().dispatch(snackbarOpen(message));
         }, 0);
@@ -1176,6 +1317,11 @@ function updateSupplyFacilitiesFinances(
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
         principalRepayment += paymentPrincipal;
         g.loanAmountLeft -= paymentPrincipal;
+        // The last payment of a loan is the only interesting one, and nothing else on screen
+        // marks it: the interest line simply stops going down
+        if (!simulated && g.loanAmountLeft <= 0) {
+          logGameEvent(state, "LOAN", `Loan paid off: ${g.name}`);
+        }
         facilityExpenses += paymentInterest / TICKS_PER_MONTH;
       }
       // Only a real tick is a tick of this facility's life. The pre-roll frames after a month

@@ -306,7 +306,7 @@ export default class Forecasts extends React.Component<Props, State> {
               items={[
                 ...[...fuels].reverse().map((f) => ({
                   name: f,
-                  color: fuelColors[f],
+                  color: fuelColors()[f],
                   muted: !!highlightFuel && f !== highlightFuel,
                 })),
                 { name: "Demand", color: "", rule: true },
@@ -346,7 +346,7 @@ export default class Forecasts extends React.Component<Props, State> {
               inline
               items={PRICED_FUELS.map((f) => ({
                 name: f,
-                color: fuelColors[f],
+                color: fuelColors()[f],
                 dash: fuelDashArrays[f],
               }))}
             />

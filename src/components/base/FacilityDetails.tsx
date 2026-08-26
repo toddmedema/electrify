@@ -8,7 +8,7 @@ import {
   formatWattHoursOfPeak,
   formatWatts,
 } from "../../helpers/Format";
-import { fuelColors, storageColor } from "../../Theme";
+import { facilityColor } from "../../Theme";
 import {
   DateType,
   FacilityOperatingType,
@@ -107,7 +107,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const lifetime = facilityLifetime(facility);
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const isStorage = facility.peakWh > 0;
-  const accentColor = (fuel && fuelColors[fuel]) || storageColor;
+  const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
 
   const trend = fuel ? fuelPriceTrend(fuel, date, seed) : [];

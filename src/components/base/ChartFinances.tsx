@@ -3,7 +3,7 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { padRange, stepTicks, titlePlugin, xAxis, yAxis } from "./UPlotHelpers";
 import { formatMonthChartAxis } from "../../helpers/DateTime";
-import { demandColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 interface ChartData {
   month: number; // unique across years
@@ -63,13 +63,13 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     series: [
       {},
       {
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2,
         dash: [4, 4],
         points: { show: false },

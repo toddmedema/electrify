@@ -1,25 +1,84 @@
 @use "sass:map";
 
-$font_color_primary: #000000;
-$font_color_faded: #666666;
+// ===============================================
+// Palette
+//
+// Every colour is a custom property rather than a Sass value, because Sass compiles once while
+// custom properties resolve per element at paint time -- which is what lets one attribute on
+// <html> repaint the whole app. The Sass names below are aliases onto them, so the hundred or
+// so rules that already read $bg_primary go on reading that way.
+//
+// Dark is not light inverted. The greys are lifted off pure black, which vibrates against light
+// text, and every accent moves up its ramp: a colour picked for 4.5:1 against white is nowhere
+// near that against #121212. Theme.tsx does the same for the charts.
+// ===============================================
 
-$border_primary: 0.02in solid #000;
-$border_accent: 0.01in solid #666;
+:root {
+  --bg-primary: #ffffff;
+  --bg-raised: #fafafa; /* grey50 - hover, one step off the page */
+  --bg-sunken: #eceff1; /* blueGray50 - behind lists of cards */
+  --bg-selected: #e3f2fd; /* blue50 */
+  --bg-fade-start: rgba(255, 255, 255, 0);
+  --border-selected: #bbdefb; /* blue100 */
+  --border-subtle: #eeeeee; /* grey200 */
+  --border-strong: #bdbdbd; /* grey400 */
+  --border-tile: #e0e0e0; /* grey300 */
+  --font-color-primary: #000000;
+  --font-color-faded: #666666;
+  --font-color-disabled: #bdbdbd; /* grey400 */
+  --interactive-blue: #1e88e5; /* blue600 */
+  --interactive-tint: rgba(30, 136, 229, 0.5);
+  --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
+  --blackout-tint: rgba(198, 40, 40, 0.07);
+  // The two directions a number can move in. Both are the darker end of their ramp so they
+  // clear 4.5:1 on the page as text, since the arrow beside them is decoration rather than the
+  // message -- red/green alone would leave a colourblind reader with only the arrow
+  --delta-good: #2e7d32; /* green800 */
+  --delta-bad: #c62828; /* red800 */
+  --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
+  --capacity-bar: #212121; /* grey900 */
+  --shadow-ring: rgba(0, 0, 0, 0.15);
+  --tooltip-border: rgba(0, 0, 0, 0.2);
+  --cursor-line: #757575; /* grey600 */
+}
 
-$bg_primary: #ffffff;
-$bg_inactive: #222222;
-$bg_active: rgba(255, 255, 255, 0.9);
+[data-theme="dark"] {
+  --bg-primary: #121212;
+  --bg-raised: #262626;
+  --bg-sunken: #0a0a0a;
+  --bg-selected: #123048;
+  --bg-fade-start: rgba(18, 18, 18, 0);
+  --border-selected: #1c5680;
+  --border-subtle: #2c2c2c;
+  --border-strong: #5f5f5f;
+  --border-tile: #3a3a3a;
+  --font-color-primary: #e8e8e8;
+  --font-color-faded: #a3a3a3;
+  --font-color-disabled: #616161; /* grey700 */
+  --interactive-blue: #64b5f6; /* blue300 - 8:1 on the page, where blue600 is 2.6:1 */
+  --interactive-tint: rgba(100, 181, 246, 0.5);
+  --blackout-red: #ef5350; /* red400 */
+  --blackout-tint: rgba(239, 83, 80, 0.16);
+  --delta-good: #66bb6a; /* green400 */
+  --delta-bad: #ef5350; /* red400 */
+  --mark-bg: #6d4c00;
+  --capacity-bar: #e0e0e0;
+  --shadow-ring: rgba(0, 0, 0, 0.7);
+  --tooltip-border: rgba(255, 255, 255, 0.25);
+  --cursor-line: #9e9e9e; /* grey500 */
+}
 
-$font_color_dark_primary: #ffffff;
-$bg_dark_primary: #161011;
+$font_color_primary: var(--font-color-primary);
+$font_color_faded: var(--font-color-faded);
 
-$blackout_red: #c62828; /* red800 https://material-ui.com/customization/color/ - matches blackoutColor in Theme.tsx */
-$interactive_blue: #1e88e5; /* blue 600 */
-// The two directions a number can move in. Both are the darker end of their ramp so they
-// clear 4.5:1 on white as text, since the arrow beside them is decoration rather than the
-// message -- red/green alone would leave a colourblind reader with only the arrow
-$delta_good: #2e7d32; /* green800 */
-$delta_bad: #c62828; /* red800 */
+$border_accent: 0.01in solid var(--border-strong);
+
+$bg_primary: var(--bg-primary);
+
+$blackout_red: var(--blackout-red);
+$interactive_blue: var(--interactive-blue);
+$delta_good: var(--delta-good);
+$delta_bad: var(--delta-bad);
 
 // ===============================================
 // Transitional animation classes
@@ -113,6 +172,8 @@ $absmaxdimension: 1025px;
 // Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
 // isDesktopScreen() in Globals.tsx. Below this, panes render too narrow to be worth it.
 $desktop_breakpoint: 1300px;
+// And wide enough for the event log beside them -- keep in sync with isUltrawideScreen()
+$ultrawide_breakpoint: 1800px;
 
 $sizemap: (
   large: 6vmin,
@@ -139,11 +200,20 @@ html {
   width: 100%;
   height: 100%;
   background: $bg_primary;
+  // Scrollbars, form controls and anything else the browser paints for us
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
   background-color: $bg_primary;
+  // MUI colours its own components off the theme, but the plain markup between them inherits
+  // from here - and the browser default is black, which on a dark page is a blank screen
+  color: $font_color_primary;
   overflow: hidden;
   width: 100%;
   height: 100%;
@@ -188,7 +258,7 @@ body {
 .snackbar {
   .MuiSnackbarContent-root {
     background-color: $bg_primary;
-    border: 1px solid #bdbdbd; /* grey400 */
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
   }
 
@@ -422,7 +492,7 @@ $pane_header_height: 40px;
 .expandable {
   &:hover {
     cursor: pointer;
-    background: #fafafa; /* grey50 */
+    background: var(--bg-raised);
   }
   .MuiCardContent-root {
     padding-top: 0;
@@ -446,10 +516,7 @@ $pane_header_height: 40px;
 
   &:after {
     content: "";
-    background-image: linear-gradient(
-      rgba(255, 255, 255, 0),
-      rgba(255, 255, 255, 255)
-    );
+    background-image: linear-gradient(var(--bg-fade-start), var(--bg-primary));
     position: absolute;
     top: 0;
     bottom: -6px;
@@ -478,7 +545,7 @@ $pane_header_height: 40px;
   display: none;
   z-index: 10;
   padding: 2px 4px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--tooltip-border);
   border-radius: 2px;
   background: $bg_primary;
   color: $font_color_primary;
@@ -490,7 +557,7 @@ $pane_header_height: 40px;
 
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
 .uplot .u-cursor-x {
-  border-right: 1px dashed #757575;
+  border-right: 1px dashed var(--cursor-line);
 }
 
 .chartLegend {
@@ -558,7 +625,7 @@ $pane_header_height: 40px;
 
 // Completion state of each tutorial in the scenario list
 .tutorialIncomplete {
-  color: #bdbdbd; /* grey400 */
+  color: var(--font-color-disabled);
 }
 
 // How far through the 101-106 sequence the player is
@@ -570,7 +637,7 @@ $pane_header_height: 40px;
 
 // The next tutorial to play, so the sequence has one obvious entry point
 .tutorialNext {
-  border-left: 4px solid #1e88e5; /* blue600, matches primary buttons */
+  border-left: 4px solid var(--interactive-blue);
 }
 
 // Units appended to numbers in tables, de-emphasized so the number still reads first
@@ -605,10 +672,10 @@ $pane_header_height: 40px;
     display: inline-block;
     min-width: 1.6em;
     padding: 1px 5px;
-    border: 1px solid #bdbdbd; /* grey400 */
+    border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
     border-radius: 3px;
-    background: #fafafa; /* grey50 */
+    background: var(--bg-raised);
     font-family: monospace;
     font-size: 0.85em;
     line-height: 1.5;
@@ -685,7 +752,7 @@ $pane_header_height: 40px;
   .clickable-card {
     &:hover {
       cursor: pointer;
-      background: #fafafa; /* grey50 */
+      background: var(--bg-raised);
     }
   }
 
@@ -814,7 +881,7 @@ $pane_header_height: 40px;
 
     // Sticky so the player can still tell which section they're scrolling through
     .manual-group {
-      background: #eceff1; /* blueGray50, matches .cardList behind it */
+      background: var(--bg-sunken);
       line-height: 32px;
       font-weight: 500;
       text-transform: uppercase;
@@ -823,7 +890,7 @@ $pane_header_height: 40px;
     }
 
     mark {
-      background: #ffe082; /* amber200 */
+      background: var(--mark-bg);
       color: inherit;
     }
   }
@@ -843,12 +910,12 @@ $pane_header_height: 40px;
       padding: 0 size(base);
 
       &:hover {
-        background: #eeeeee; /* grey200 - grey50 on white was effectively invisible */
+        background: var(--bg-raised);
       }
 
       // WCAG 2.4.7: keyboard users need to see which entry they're on
       &:focus-visible {
-        background: #e3f2fd; /* blue50 */
+        background: var(--bg-selected);
         outline: 2px solid $interactive_blue;
         outline-offset: -2px;
       }
@@ -877,14 +944,14 @@ $pane_header_height: 40px;
   }
 
   .cardList {
-    background: #eceff1; /* blueGray50 */
+    background: var(--bg-sunken);
     padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
   }
 
   .facility {
-    border-top: 1px #eeeeee solid; /* grey200 */
+    border-top: 1px solid var(--border-subtle);
   }
 
   // The whole row selects, so it has to look like it does something before it is clicked
@@ -892,7 +959,7 @@ $pane_header_height: 40px;
     outline: none;
 
     &:hover .facility {
-      background: #fafafa; /* grey50 */
+      background: var(--bg-raised);
     }
 
     // WCAG 2.4.7 -- and the row is reachable by Tab, since it doubles as the drag handle
@@ -902,7 +969,7 @@ $pane_header_height: 40px;
     }
 
     &.selected {
-      background: #e3f2fd; /* blue50 */
+      background: var(--bg-selected);
       // Reads down the left edge of the list, so which row is open survives scrolling past
       // the details themselves
       box-shadow: inset 3px 0 0 0 $interactive_blue;
@@ -957,6 +1024,136 @@ $pane_header_height: 40px;
     align-items: center;
   }
 
+  // Every headline metric drawn at once, with the one on the big chart above promoted. A grid
+  // rather than a row of six, so the tiles rewrap as the pane is dragged narrower instead of
+  // being squeezed to the width of their labels
+  .metricTiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: size(small);
+    padding: size(small) size(base) 0 size(base);
+  }
+
+  .metricTile {
+    display: block;
+    padding: size(small);
+    border: 1px solid var(--border-tile);
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--bg-raised);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $interactive_blue;
+      outline-offset: -2px;
+    }
+
+    &.selected {
+      border-color: $interactive_blue;
+      background: var(--bg-selected);
+    }
+  }
+
+  .metricTileLabel {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .metricTileValue {
+    font-weight: 500;
+  }
+
+  // A slider that carries tick labels needs room for the outermost ones, which otherwise hang
+  // off both ends of the pane
+  .budgetSlider {
+    padding: 0 20px;
+
+    .MuiSlider-root {
+      width: 100% !important;
+    }
+
+    .MuiSlider-markLabel {
+      font-size: 0.7rem;
+    }
+  }
+
+  // Which speed the clock is running at, said as a selection rather than as three enabled
+  // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
+  .speedToggles {
+    .MuiToggleButton-root {
+      padding: 2px 8px;
+      border-color: var(--interactive-tint);
+      color: $interactive_blue;
+      font-size: 0.8rem;
+      line-height: 1.4;
+
+      &.Mui-selected {
+        background: $interactive_blue;
+        color: $bg_primary;
+
+        &:hover {
+          background: $interactive_blue;
+        }
+      }
+    }
+  }
+
+  // The run's own record of itself. A list rather than a table: the lines are one clause each,
+  // and the only column they share is when they happened
+  .eventLogList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .eventLogItem {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 0 8px;
+    align-items: start;
+    padding: size(small) size(base);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .eventLogIcon {
+    display: flex;
+    align-items: center;
+    height: 1.2em;
+    color: $font_color_faded;
+
+    .MuiSvgIcon-root {
+      font-size: 16px;
+    }
+  }
+
+  // Under the message rather than beside it: the pane is the narrowest of the four, and a date
+  // column would take a third of it to say something the eye only occasionally asks for
+  .eventLogWhen {
+    grid-column: 2;
+    font-size: 0.75rem;
+  }
+
+  // The one kind of event a player scrolls back through the log looking for
+  .eventLogItem.kind-BLACKOUT {
+    background: var(--blackout-tint);
+
+    .eventLogIcon {
+      color: $blackout_red;
+    }
+  }
+
+  .eventLogEmpty {
+    display: block;
+    padding: size(base);
+  }
+
   // The change column, and the facility figures that use the same two colours
   .deltaCell {
     white-space: nowrap;
@@ -982,8 +1179,8 @@ $pane_header_height: 40px;
   // Which money is the selected facility's, above the chart that shows the company's
   .selectedFacilitySummary {
     padding: size(small) 16px;
-    background: #e3f2fd; /* blue50 */
-    border-bottom: 1px solid #bbdefb; /* blue100 */
+    background: var(--bg-selected);
+    border-bottom: 1px solid var(--border-selected);
   }
 
   .chartLegendItem-muted {
@@ -1002,7 +1199,9 @@ $pane_header_height: 40px;
   }
 
   .outputProgressBar {
-    background: #eeeeee; /* grey200 fallback; the fuel tint is set inline per facility */
+    background: var(
+      --border-subtle
+    ); /* fallback; the fuel tint is set inline per facility */
     position: absolute;
     top: 0;
     bottom: 2px;
@@ -1018,7 +1217,7 @@ $pane_header_height: 40px;
 
     .capacityProgressBar {
       width: 12px;
-      background-color: #212121; /* grey 900 */
+      background-color: var(--capacity-bar);
       position: absolute;
       bottom: 0;
       left: 42px;
@@ -1029,7 +1228,7 @@ $pane_header_height: 40px;
       &:after {
         content: "";
         height: 39px;
-        border: 1px solid #bdbdbd; /* grey 400 */
+        border: 1px solid var(--border-strong);
         position: absolute;
         left: 0;
         right: 0;
@@ -1047,7 +1246,7 @@ $pane_header_height: 40px;
       height: 18px;
       border-radius: 50%;
       background: $bg_primary;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 0 0 1px var(--shadow-ring);
       z-index: 2;
       display: flex;
       align-items: center;
@@ -1106,6 +1305,56 @@ $sizemap: (
 }
 
 // ===============================================
+// Anything wider than a phone gets columns rather than one card at a time: two of them up to
+// $desktop_breakpoint (the fleet pinned beside whichever pane the nav is on), three above it,
+// four once there is room for the event log. The grid itself comes from DesktopPanes, since the
+// player can drag it
+// ===============================================
+
+@media screen and (min-width: $abswidthmax) {
+  .desktop-layout,
+  .pane-layout {
+    height: 100%;
+    width: 100%;
+  }
+
+  .desktop-panes {
+    display: grid;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .desktop-pane {
+    display: flex;
+    min-width: 0;
+    overflow: hidden;
+
+    > * {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 100%;
+    }
+  }
+
+  // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
+  // never changes the total width the panes have to share
+  .pane-splitter {
+    cursor: col-resize;
+    border-left: $border_accent;
+    background: transparent;
+    transition: background 0.15s;
+
+    &:hover,
+    &:focus-visible {
+      background: $interactive_blue;
+      border-left-color: $interactive_blue;
+      outline: none;
+    }
+  }
+}
+
+// ===============================================
 // Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities,
 // Finances and Forecasts can render as panes side by side instead of one screen at a time.
 // The type scale comes down with it: the vertical space that buys is what fits the extra
@@ -1130,32 +1379,6 @@ $sizemap: (
     display: none;
   }
 
-  .desktop-layout {
-    height: 100%;
-    width: 100%;
-  }
-
-  // The columns themselves, and the splitter tracks between them, come from DesktopPanes --
-  // they're state, since the player can drag them
-  .desktop-panes {
-    display: grid;
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  .desktop-pane {
-    display: flex;
-    min-width: 0;
-    overflow: hidden;
-
-    > * {
-      flex: 1 1 auto;
-      min-width: 0;
-      height: 100%;
-    }
-  }
-
   // There is a mouse now, so the row's actions can wait to be asked for -- which gives the
   // numbers in the details panel the width the buttons were holding. Anything that reveals
   // them has to include focus, or they'd be unreachable by keyboard
@@ -1168,20 +1391,6 @@ $sizemap: (
   .facilityRow:focus-within .facilityActions,
   .facilityRow.selected .facilityActions {
     opacity: 1;
-  }
-
-  .pane-splitter {
-    cursor: col-resize;
-    border-left: $border_accent;
-    background: transparent;
-    transition: background 0.15s;
-
-    &:hover,
-    &:focus-visible {
-      background: $interactive_blue;
-      border-left-color: $interactive_blue;
-      outline: none;
-    }
   }
 }
 

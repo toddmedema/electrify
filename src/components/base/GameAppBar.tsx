@@ -1,12 +1,21 @@
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import { connect } from "react-redux";
-import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  ToggleButton,
+  ToggleButtonGroup,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import FastForwardIcon from "@mui/icons-material/FastForward";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
@@ -47,6 +56,25 @@ interface SpeedOptionsProps {
   handleSpeedClose: () => void;
 }
 
+/**
+ * The speeds, in the order the clock runs them, labelled with how many times faster than SLOW
+ * each one is. Derived from the tick rate rather than written down beside it, so the labels
+ * cannot drift from what the clock actually does -- and a player picking a speed can see what
+ * they are picking rather than inferring it from the number of chevrons on an icon.
+ */
+const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
+
+function speedMultiplier(speed: SpeedType): string {
+  return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
+}
+
+const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
+  PAUSED: "pause",
+  SLOW: "slow speed",
+  NORMAL: "normal speed",
+  FAST: "fast speed",
+};
+
 // Pulled out of the component so it can be memoised on the handful of things it actually
 // depends on, rather than rebuilt on every tick along with the cash readout beside it
 function buildSpeedOptions({
@@ -58,49 +86,37 @@ function buildSpeedOptions({
   handleSpeedClose,
 }: SpeedOptionsProps): React.JSX.Element {
   if (!smallScreen) {
+    // A group of toggles rather than four icon buttons with the current one disabled: greyed
+    // out is the universal "you cannot click this", which is the opposite of "this is the one
+    // you are on". There is room out here for the multipliers too, so the speeds say how fast
+    // they are instead of being three shades of the same triangle
     return (
-      <span>
-        <IconButton
-          onClick={() => onSpeedChange("PAUSED")}
-          disabled={speed === "PAUSED"}
-          aria-label="pause"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <PauseIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("SLOW")}
-          disabled={speed === "SLOW"}
-          aria-label="slow speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <ChevronRightIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("NORMAL")}
-          disabled={speed === "NORMAL"}
-          aria-label="normal speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <PlayArrowIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("FAST")}
-          disabled={speed === "FAST"}
-          aria-label="fast speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <FastForwardIcon />
-        </IconButton>
-      </span>
+      <ToggleButtonGroup
+        className="speedToggles"
+        exclusive
+        size="small"
+        value={speed}
+        onChange={(
+          _e: React.MouseEvent<HTMLElement>,
+          next: SpeedType | null,
+        ) => {
+          // Null is the group reporting that the button already selected was clicked again.
+          // The clock is always running at some speed, so there is nothing to deselect to
+          if (next) {
+            onSpeedChange(next);
+          }
+        }}
+        aria-label="game speed"
+      >
+        <ToggleButton value="PAUSED" aria-label={SPEED_ARIA_LABELS.PAUSED}>
+          <PauseIcon fontSize="small" />
+        </ToggleButton>
+        {RUNNING_SPEEDS.map((s: SpeedType) => (
+          <ToggleButton key={s} value={s} aria-label={SPEED_ARIA_LABELS[s]}>
+            {speedMultiplier(s)}
+          </ToggleButton>
+        ))}
+      </ToggleButtonGroup>
     );
   }
 

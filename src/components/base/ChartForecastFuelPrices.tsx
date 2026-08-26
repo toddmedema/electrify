@@ -88,7 +88,7 @@ function buildOptions(showXLabels: boolean) {
     series: [
       {},
       ...PRICED_FUELS.map((f) => ({
-        stroke: fuelColors[f],
+        stroke: fuelColors()[f],
         width: 1.5,
         // Four overlapping lines are more than color alone can separate, so each
         // fuel also gets its own dash pattern

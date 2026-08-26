@@ -60,6 +60,8 @@ import {
 import { UnitsContext } from "../base/UnitsContext";
 import ChartFinances from "../base/ChartFinances";
 import GameCard from "../base/GameCard";
+import MetricTiles, { MetricTileType } from "../base/MetricTiles";
+import { isDesktopScreen } from "../../Globals";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
 
 import numbro from "numbro";
@@ -222,6 +224,23 @@ const CHART_KEYS_BY_SYSTEM: {
 
 // The metrics on offer, which no system changes - the stored choice is checked against these
 const CHART_KEY_NAMES = Object.keys(CHART_KEYS_BY_SYSTEM.metric);
+
+/**
+ * The metrics the small multiples draw, in the order they are laid out.
+ *
+ * Six rather than all eighteen: these are the ones a player steers on, and the rest are the
+ * breakdowns underneath them, which the table below already carries. Whatever is being plotted
+ * is added to the end if it is not already here, so a metric chosen from the dropdown on a
+ * narrow screen still has a tile to be un-selected from on a wide one.
+ */
+const SMALL_MULTIPLE_KEYS: DerivedHistoryKeysType[] = [
+  "profit",
+  "revenue",
+  "expenses",
+  "kgco2e",
+  "customers",
+  "cash",
+];
 
 const CHART_KEY_STORAGE_KEY = "financesChartKey";
 // Still says year, because a stored year is still one of the options and reading it back is
@@ -443,6 +462,32 @@ function getTickFromValue(v: number) {
   return Math.floor(frontNumber + exponent * 9 - 1);
 }
 
+/**
+ * Where the marketing slider draws its ticks: one per decade of spending.
+ *
+ * Every ninth tick, because that is where the leading digit rolls over and the scale gains a
+ * zero -- the nine steps in between are $1M, $2M, ... $9M, and a mark on each of them is a row
+ * of dots too fine to aim at. Zero gets one of its own, since it sits below the scale.
+ */
+function marketingMarks(maxTick: number): { value: number; label?: string }[] {
+  const marks: { value: number; label?: string }[] = [
+    { value: -1, label: "$0" },
+  ];
+  for (let tick = 0; tick <= maxTick; tick += 9) {
+    marks.push({
+      value: tick,
+      label: formatMoneyConcise(getValueFromTick(tick)),
+    });
+  }
+  return marks;
+}
+
+// The rate slider runs $0 to $0.30/kWh, so its ticks are a fixed nickel apart
+const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
+  value: rate,
+  label: formatMoneyConcise(rate),
+}));
+
 export default class Finances extends React.Component<Props, State> {
   // Context rather than a prop: shouldComponentUpdate below throttles renders against the game
   // clock, which a prop change would have to be excepted from - a context change is delivered
@@ -474,6 +519,17 @@ export default class Finances extends React.Component<Props, State> {
   // referentially stable, because that is what lets ChartFinances memoise its canvas.
   private projectionCache:
     { key: string; range: string; months: MonthlyHistoryType[] } | undefined;
+  // The tiles read the same months the chart does, one value per metric rather than one metric
+  // per month, and are rebuilt on the same terms: a month rolling over, or the range moving
+  private tileCache:
+    | {
+        chartKey: DerivedHistoryKeysType;
+        range: string;
+        historyLength: number;
+        projected: MonthlyHistoryType[];
+        tiles: MetricTileType[];
+      }
+    | undefined;
   private seriesCache:
     | {
         chartKey: DerivedHistoryKeysType;
@@ -662,6 +718,57 @@ export default class Finances extends React.Component<Props, State> {
     return series;
   }
 
+  /**
+   * One tile per headline metric: its label, its latest value and the same span of months the
+   * chart is drawing. Built from the derived months once rather than per metric, since deriving
+   * a month is the expensive half and every tile wants the same twelve.
+   */
+  private getTiles(
+    monthlyHistory: MonthlyHistoryType[],
+    projected: MonthlyHistoryType[],
+    chartKeys: { [index: string]: ChartKeyMetadataType },
+  ): MetricTileType[] {
+    const { chartKey, range } = this.state;
+    const historyLength = this.props.game.monthlyHistory.length;
+    const cached = this.tileCache;
+    if (
+      cached &&
+      cached.chartKey === chartKey &&
+      cached.range === range &&
+      cached.historyLength === historyLength &&
+      cached.projected === projected
+    ) {
+      return cached.tiles;
+    }
+
+    // game.monthlyHistory is newest first; the tiles read left to right through time
+    const months = [...monthlyHistory]
+      .reverse()
+      .concat(projected)
+      .map(deriveExpandedSummary);
+    // Whatever is plotted always has a tile, even the breakdowns that aren't headline metrics
+    const keys = SMALL_MULTIPLE_KEYS.includes(chartKey)
+      ? SMALL_MULTIPLE_KEYS
+      : [...SMALL_MULTIPLE_KEYS, chartKey];
+    const tiles = keys.map((key: DerivedHistoryKeysType) => {
+      const values = months.map((m: DerivedHistoryType) => m[key]);
+      const metadata = chartKeys[key];
+      const latest = metadata.format(values[values.length - 1] || 0);
+      return {
+        metricKey: key,
+        label: metadata.label,
+        // A number with no unit on it is a different number: "380K" of CO2e could be anything
+        value: metadata.suffix
+          ? `${latest}${metadata.suffix.startsWith("/") ? "" : " "}${metadata.suffix}`
+          : String(latest),
+        values,
+      };
+    });
+
+    this.tileCache = { chartKey, range, historyLength, projected, tiles };
+    return tiles;
+  }
+
   public render() {
     const { game, onDelta, selectedFacilityId } = this.props;
     const chartKeys = CHART_KEYS_BY_SYSTEM[this.context as UnitSystemType];
@@ -676,6 +783,9 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+    // Six sparklines need width the phone layout does not have, and the dropdown they replace is
+    // the right control at that size -- see MetricTiles
+    const smallMultiples = isDesktopScreen();
     const years = getPlayedYears(game);
 
     // A forward range still draws every month on the record behind its projection, so that the
@@ -766,33 +876,59 @@ export default class Finances extends React.Component<Props, State> {
                 <Typography color="primary" component="strong">
                   {formatMoneyConcise(game.monthlyMarketingSpend)}
                 </Typography>
-                /mo&nbsp; (+
-                {numbro(
-                  customersFromMarketingSpend(game.monthlyMarketingSpend),
-                ).format({ average: true })}{" "}
-                customers)
+                /mo&nbsp;&mdash;&nbsp;
+                {numbro(now.customers).format({ average: true })} customers
+                {game.monthlyMarketingSpend > 0 && (
+                  <>
+                    &nbsp;&rarr;&nbsp;
+                    <Typography color="primary" component="strong">
+                      {numbro(
+                        now.customers +
+                          customersFromMarketingSpend(
+                            game.monthlyMarketingSpend,
+                          ),
+                      ).format({ average: true })}
+                    </Typography>
+                    &nbsp;next month
+                  </>
+                )}
               </Typography>
             )}
             {scenario.ownership === "Investor" && (
-              <Slider
-                id="marketingSlider"
-                disabled={!!game.replayPlayback}
-                value={getTickFromValue(game.monthlyMarketingSpend)}
-                aria-labelledby="marketing monthly budget"
-                valueLabelDisplay="off"
-                min={-1}
-                step={1}
-                max={getTickFromValue(
-                  Math.max(now.cash / 12, game.monthlyMarketingSpend),
-                )}
-                onChange={(_e: Event, newTick: number | number[]) =>
-                  onDelta({
-                    monthlyMarketingSpend: getValueFromTick(
-                      Array.isArray(newTick) ? newTick[0] : newTick,
+              <div className="budgetSlider flex-newline">
+                <Slider
+                  id="marketingSlider"
+                  disabled={!!game.replayPlayback}
+                  value={getTickFromValue(game.monthlyMarketingSpend)}
+                  aria-label="Monthly marketing budget"
+                  /* On the thumb, so the budget being chosen is legible during the drag that
+                     chooses it rather than only in the line above it */
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(tick: number) =>
+                    formatMoneyConcise(getValueFromTick(tick))
+                  }
+                  getAriaValueText={(tick: number) =>
+                    `${formatMoneyConcise(getValueFromTick(tick))} per month`
+                  }
+                  marks={marketingMarks(
+                    getTickFromValue(
+                      Math.max(now.cash / 12, game.monthlyMarketingSpend),
                     ),
-                  })
-                }
-              />
+                  )}
+                  min={-1}
+                  step={1}
+                  max={getTickFromValue(
+                    Math.max(now.cash / 12, game.monthlyMarketingSpend),
+                  )}
+                  onChange={(_e: Event, newTick: number | number[]) =>
+                    onDelta({
+                      monthlyMarketingSpend: getValueFromTick(
+                        Array.isArray(newTick) ? newTick[0] : newTick,
+                      ),
+                    })
+                  }
+                />
+              </div>
             )}
             {scenario.ownership === "Public" && (
               <Typography
@@ -813,57 +949,75 @@ export default class Finances extends React.Component<Props, State> {
               </Typography>
             )}
             {scenario.ownership === "Public" && (
-              <Slider
-                id="rateSlider"
-                disabled={!!game.replayPlayback}
-                value={game.dollarsPerkWh}
-                aria-labelledby="The rate you charge for electricity generation"
-                valueLabelDisplay="off"
-                min={0}
-                step={0.01}
-                max={0.3}
-                onChange={(_e: Event, newTick: number | number[]) =>
-                  onDelta({
-                    dollarsPerkWh: Array.isArray(newTick)
-                      ? newTick[0]
-                      : newTick,
-                  })
-                }
-              />
+              <div className="budgetSlider flex-newline">
+                <Slider
+                  id="rateSlider"
+                  disabled={!!game.replayPlayback}
+                  value={game.dollarsPerkWh}
+                  aria-label="The rate you charge for electricity generation"
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(rate: number) =>
+                    `${formatMoneyConcise(rate)}/kWh`
+                  }
+                  getAriaValueText={(rate: number) =>
+                    `${formatMoneyConcise(rate)} per kilowatt hour`
+                  }
+                  marks={RATE_MARKS}
+                  min={0}
+                  step={0.01}
+                  max={0.3}
+                  onChange={(_e: Event, newTick: number | number[]) =>
+                    onDelta({
+                      dollarsPerkWh: Array.isArray(newTick)
+                        ? newTick[0]
+                        : newTick,
+                    })
+                  }
+                />
+              </div>
             )}
             <div className="flex-newline"></div>
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               Plotting{" "}
             </Typography>
+            {/* The tiles below are the picker on a wide screen, so out here the metric is a
+                label rather than a control */}
+            {smallMultiples && (
+              <Typography variant="h6" style={{ flexGrow: 0 }}>
+                {chartKeys[chartKey].label}
+              </Typography>
+            )}
             {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
-            <Select
-              id="plotMetric"
-              value={chartKey}
-              onChange={(e: SelectChangeEvent<string>) =>
-                this.setChartKey(e.target.value as DerivedHistoryKeysType)
-              }
-            >
-              {CHART_KEY_NAMES.map((key: string) => {
-                const k = chartKeys[key];
-                let label = k.label;
-                if (chartKey !== key && chartKeys[key].nesting) {
-                  // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
-                  label =
-                    new Array((chartKeys[key].nesting || 0) + 1).join(" -") +
-                    " " +
-                    label;
+            {!smallMultiples && (
+              <Select
+                id="plotMetric"
+                value={chartKey}
+                onChange={(e: SelectChangeEvent<string>) =>
+                  this.setChartKey(e.target.value as DerivedHistoryKeysType)
                 }
-                return (
-                  <MenuItem
-                    className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
-                    value={key}
-                    key={key}
-                  >
-                    {label}
-                  </MenuItem>
-                );
-              })}
-            </Select>
+              >
+                {CHART_KEY_NAMES.map((key: string) => {
+                  const k = chartKeys[key];
+                  let label = k.label;
+                  if (chartKey !== key && chartKeys[key].nesting) {
+                    // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
+                    label =
+                      new Array((chartKeys[key].nesting || 0) + 1).join(" -") +
+                      " " +
+                      label;
+                  }
+                  return (
+                    <MenuItem
+                      className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
+                      value={key}
+                      key={key}
+                    >
+                      {label}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            )}
             <Typography variant="h6" style={{ flexGrow: 0 }}>
               {" "}
               for{" "}
@@ -907,6 +1061,16 @@ export default class Finances extends React.Component<Props, State> {
             />
           ) : (
             <span />
+          )}
+          {smallMultiples && monthly.length > 0 && (
+            <MetricTiles
+              id="plotMetric"
+              tiles={this.getTiles(monthlyHistory, projectedMonths, chartKeys)}
+              selectedKey={chartKey}
+              onSelect={(key: string) =>
+                this.setChartKey(key as DerivedHistoryKeysType)
+              }
+            />
           )}
           <div
             className={`expandable ${!expanded && "notExpanded"}`}

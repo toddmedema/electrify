@@ -30,6 +30,8 @@ import {
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import EventLogContainer from "./views/EventLogContainer";
+import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
@@ -45,8 +47,13 @@ import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
 import { navigate } from "../reducers/Card";
-import { setSpeed } from "../reducers/Game";
-import { isDesktopScreen } from "../Globals";
+import {
+  reprioritizeFacility,
+  setSpeed,
+  togglePauseFacility,
+} from "../reducers/Game";
+import { snackbarOpen } from "../reducers/UI";
+import { isDesktopScreen, isPaneLayout, isUltrawideScreen } from "../Globals";
 import { store } from "../Store";
 
 // All three of these cards are shown at once side by side above the desktop breakpoint (see
@@ -54,9 +61,23 @@ import { store } from "../Store";
 // switching among them shouldn't slide/remount the pane group, since nothing visibly changes
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
+// And the same again for the two-column layout below it, where Facilities is pinned and the nav
+// swaps what is beside it -- the pinned column would otherwise slide off with the card transition
+const TABLET_PANES_KEY = "TABLET_PANES";
+
+// How many facilities the number row can reach. Nine because that is how many number keys
+// there are; a longer fleet is still reachable by mouse, and by the row actions
+const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+// Shifted, because the bare number row is the speed control and has been for far longer than
+// the fleet has had shortcuts of its own
+const facilitySlotKey = (slot: number) => `shift+${slot}`;
+
 // Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
-// both list. react-hotkeys ignores key events from inputs, so `?` still types into a text field
-const keyMap = {
+// both list -- exported so a test can hold the two against each other rather than a comment
+// asking politely. react-hotkeys ignores key events from inputs, so `?` still types into a
+// text field
+export const keyMap = {
   PAUSED: ["`", "space", "0"],
   SLOW: "1",
   NORMAL: "2",
@@ -64,8 +85,78 @@ const keyMap = {
   FACILITIES: "q",
   FINANCES: "w",
   FORECASTS: "e",
+  BUILD_GENERATOR: "g",
+  BUILD_STORAGE: "s",
+  PRIORITIZE_EARLIER: "[",
+  PRIORITIZE_LATER: "]",
   MANUAL: ["?", "shift+/"],
+  ...Object.fromEntries(
+    FACILITY_SLOTS.map((slot: number) => [
+      `TOGGLE_FACILITY_${slot}`,
+      facilitySlotKey(slot),
+    ]),
+  ),
 };
+
+/**
+ * Whether the keys that act on the game should do anything right now.
+ *
+ * The hotkeys are global, so they fire over the main menu and the manual too -- and a replay is
+ * somebody else's run, which the viewer does not get to reorder.
+ */
+function canPlay(): boolean {
+  const state = store.getState();
+  return (
+    state.game.inGame &&
+    !state.game.replayPlayback &&
+    isNavCard(state.card.name)
+  );
+}
+
+// Pausing from the keyboard offers the same undo the row's pause button does: the fleet is a
+// list of similar-looking rows, and a mistyped number is the likeliest way to reach one
+function togglePauseSlot(slot: number) {
+  if (!canPlay()) {
+    return;
+  }
+  const facility = store.getState().game.facilities[slot - 1];
+  if (!facility || facility.yearsToBuildLeft > 0) {
+    return;
+  }
+  const wasPaused = facility.paused;
+  store.dispatch(togglePauseFacility(facility.id));
+  store.dispatch(
+    snackbarOpen({
+      message: `${wasPaused ? "Resumed" : "Paused"} ${facility.name}`,
+      actionLabel: "Undo",
+      action: () => store.dispatch(togglePauseFacility(facility.id)),
+      open: true,
+      timeout: 6000,
+    }),
+  );
+}
+
+// Dispatch order is a core mechanic, and until now the only ways to change it were a drag and a
+// pair of buttons that appear on hover. These move the open row, which is the one the other two
+// panes are already reporting on
+function reprioritizeSelected(delta: number) {
+  if (!canPlay()) {
+    return;
+  }
+  const { game, ui } = store.getState();
+  const spotInList = game.facilities.findIndex(
+    (f) => f.id === ui.selectedFacilityId,
+  );
+  const destination = spotInList + delta;
+  if (
+    spotInList < 0 ||
+    destination < 0 ||
+    destination >= game.facilities.length
+  ) {
+    return;
+  }
+  store.dispatch(reprioritizeFacility({ spotInList, delta }));
+}
 
 const shortcutHandlers = {
   PAUSED: () => {
@@ -89,9 +180,29 @@ const shortcutHandlers = {
   FORECASTS: () => {
     store.dispatch(navigate("FORECASTS"));
   },
+  BUILD_GENERATOR: () => {
+    if (canPlay()) {
+      store.dispatch(
+        navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
+      );
+    }
+  },
+  BUILD_STORAGE: () => {
+    if (canPlay()) {
+      store.dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
+    }
+  },
+  PRIORITIZE_EARLIER: () => reprioritizeSelected(-1),
+  PRIORITIZE_LATER: () => reprioritizeSelected(1),
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
+  ...Object.fromEntries(
+    FACILITY_SLOTS.map((slot: number) => [
+      `TOGGLE_FACILITY_${slot}`,
+      () => togglePauseSlot(slot),
+    ]),
+  ),
 };
 
 function Tooltip(props: TooltipRenderProps): React.JSX.Element {
@@ -260,10 +371,11 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   private renderCard(): React.JSX.Element {
+    const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
     // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them.
     // Cash, the date, the speed controls and the year's progress are the game's state rather
     // than any one pane's, so they span all three columns instead of living in the first
-    if (isDesktopScreen() && isNavCard(this.props.card.name)) {
+    if (isPanes && isDesktopScreen()) {
       return (
         <div className="desktop-layout flexContainer">
           <GameAppBarContainer />
@@ -271,7 +383,32 @@ export default class Compositor extends React.Component<Props, {}> {
             <FacilitiesContainer />
             <FinancesContainer />
             <ForecastsContainer />
+            {/* An ultrawide window is otherwise three panes and a lot of nothing. Only here,
+                because below this a fourth column comes out of the three that carry the game */}
+            {isUltrawideScreen() ? <EventLogContainer /> : null}
           </DesktopPanes>
+        </div>
+      );
+    }
+    // Laptops and landscape tablets, which used to get a phone-width card floating in a sea of
+    // margin. There isn't room for three columns here, but there is for two: the fleet, which
+    // is the pane a player wants on screen while they read either of the others, pinned beside
+    // whichever of them the nav is on
+    if (isPanes) {
+      return (
+        <div className="pane-layout flexContainer">
+          <GameAppBarContainer />
+          <DesktopPanes>
+            <FacilitiesContainer />
+            {this.props.card.name === "FORECASTS" ? (
+              <ForecastsContainer />
+            ) : (
+              <FinancesContainer />
+            )}
+          </DesktopPanes>
+          {/* The panes supply no nav of their own in this layout, and it is still what
+              switches the second column */}
+          <NavigationContainer />
         </div>
       );
     }
@@ -331,10 +468,16 @@ export default class Compositor extends React.Component<Props, {}> {
     const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
       this.props;
 
-    const transitionKey =
-      isDesktopScreen() && isNavCard(this.props.card.name)
+    // The pane layouts don't slide between their own cards: on desktop nothing about the screen
+    // changes, and on two columns only the second one does -- sliding the pinned fleet off the
+    // side with it would be a lie about what just happened
+    const transitionKey = !isNavCard(this.props.card.name)
+      ? this.props.card.name
+      : isDesktopScreen()
         ? DESKTOP_PANES_KEY
-        : this.props.card.name;
+        : isPaneLayout()
+          ? TABLET_PANES_KEY
+          : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
