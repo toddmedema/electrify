@@ -4,6 +4,8 @@ import { navigate } from "../../reducers/Card";
 import { resume } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { snackbarOpen } from "../../reducers/UI";
+import { delta as userDelta, logout } from "../../reducers/User";
+import { login } from "../../Globals";
 import {
   describeSave,
   downloadSave,
@@ -19,11 +21,24 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     settings: state.settings,
     savedGame: resumable ? describeSave(resumable) : undefined,
+    loggedIn: Boolean(state.user.uid),
+    displayName: state.user.displayName,
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onLogin: () => {
+      login();
+    },
+    onLogout: () => {
+      dispatch(logout());
+    },
+    // The dialog itself lives next to the global one in Compositor, so it can also open on first
+    // login from whichever card the player happens to be on
+    onChangeName: () => {
+      dispatch(userDelta({ needsDisplayName: true }));
+    },
     onAudioChange: (v: boolean) => {
       dispatch(changeSettings({ audioEnabled: v }));
     },

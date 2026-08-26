@@ -28,6 +28,8 @@ import {
   UIType,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
+import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
 import CustomGameContainer from "./views/CustomGameContainer";
@@ -447,6 +449,10 @@ export default class Compositor extends React.Component<Props, {}> {
               : []
           }
         />
+        {/* Connected, so they still update when shouldComponentUpdate blocks this component --
+            neither is driven by the current card, and both can open over any of them */}
+        <VictoryDialogContainer />
+        <DisplayNameDialogContainer />
         <AudioContainer />
       </div>
     );

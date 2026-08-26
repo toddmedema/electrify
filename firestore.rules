@@ -1,0 +1,80 @@
+rules_version = '2';
+
+// Firestore security rules for electrify-game.
+//
+// These used to live only in the Firebase console, where a rule change was invisible to reviewers
+// and easy to forget before a deploy. They ship from the repo now:
+//
+//   firebase deploy --only firestore
+//
+// which has to run BEFORE the client bundle that depends on them, or reads fail closed.
+//
+// Accepted limitation, unchanged from before: scores are client-authoritative. Rules cannot
+// re-run a simulation, so nothing here proves a score was actually earned. If cheating on the
+// board becomes a real problem, the fix is a Cloud Function that recomputes the score from the
+// seed and the replay's action log.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Keep in sync with validateDisplayName in src/helpers/DisplayName.tsx. The client is what
+    // gives a player a useful error message; this is what makes the constraint true.
+    // matches() is anchored to the whole string, so the pattern covers the charset and rules out
+    // a leading or trailing space in one go; the second clause rules out doubled spaces.
+    function isValidDisplayName(name) {
+      return name is string
+        && name.size() >= 3
+        && name.size() <= 20
+        && name.matches('[A-Za-z0-9_-][A-Za-z0-9 _-]*[A-Za-z0-9_-]')
+        && !name.matches('.*  .*');
+    }
+
+    // A player's profile. Public: it holds a leaderboard name and per-scenario bests, nothing
+    // private. Only the player themselves may write it.
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && (!('displayName' in request.resource.data)
+            || isValidDisplayName(request.resource.data.displayName));
+      allow delete: if false;
+    }
+
+    // The uniqueness guarantee for display names, claimed by document id. `create` already fails
+    // on an existing document, so a name can only be taken once; a claim is never updated, only
+    // released by its owner when they move to a different name.
+    match /usernames/{nameLower} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Publicly readable: hiding the board from logged-out players inverts the incentive to sign
+    // up, since seeing named strangers above you is the reason to bother.
+    match /scores/{scoreId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // Renaming backfills the denormalized name onto the player's own old scores, and that is
+      // the only field a score may ever change.
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']);
+      allow delete: if false;
+    }
+
+    // The run behind a score. Immutable once written, so a replay always matches the score that
+    // points at it.
+    match /replays/{replayId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

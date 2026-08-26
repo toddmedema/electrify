@@ -6,6 +6,10 @@ import Settings, { Props } from "./Settings";
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
     settings: { units: "metric" },
+    loggedIn: false,
+    onLogin: () => undefined,
+    onLogout: () => undefined,
+    onChangeName: () => undefined,
     onAudioChange: () => undefined,
     onUnitsChange: () => undefined,
     onExportSave: () => undefined,
@@ -44,6 +48,31 @@ describe("Settings", () => {
     expect(
       screen.getByText(/need a game in progress to export/),
     ).toBeInTheDocument();
+  });
+
+  it("offers a way in when nobody is logged in", () => {
+    renderSettings();
+    expect(screen.getByText("Log in")).toBeInTheDocument();
+    expect(screen.queryByText("Log out")).not.toBeInTheDocument();
+  });
+
+  it("names the player and offers a rename once they're logged in", async () => {
+    const onChangeName = jest.fn();
+    renderSettings({ loggedIn: true, displayName: "Ada", onChangeName });
+
+    expect(screen.getByText(/On the leaderboard as Ada/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Change name"));
+    expect(onChangeName).toHaveBeenCalled();
+  });
+
+  // Logged in with no name is the state a player lands in by dismissing the first-login dialog,
+  // and it is the one that leaves their scores showing as Anonymous
+  it("prompts for a name when a logged-in player hasn't picked one", () => {
+    renderSettings({ loggedIn: true });
+    expect(
+      screen.getByText(/haven't picked a leaderboard name/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pick a name")).toBeInTheDocument();
   });
 
   it("imports whichever file the player picks, saved game or not", async () => {
