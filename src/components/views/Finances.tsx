@@ -7,13 +7,14 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableRow,
   Toolbar,
   Typography,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import { TICKS_PER_MONTH } from "../../Constants";
+import { MONTHS, TICKS_PER_MONTH } from "../../Constants";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   deriveExpandedSummary,
@@ -24,10 +25,14 @@ import {
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
-import { customersFromMarketingSpend } from "../../helpers/Financials";
+import {
+  customersFromMarketingSpend,
+  facilityLifetime,
+} from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatMoneyStable,
+  formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
 import {
@@ -40,6 +45,8 @@ import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
 import {
   DerivedHistoryKeysType,
+  DerivedHistoryType,
+  FacilityOperatingType,
   GameType,
   MonthlyHistoryType,
   UnitSystemType,
@@ -63,6 +70,12 @@ interface ChartKeyMetadataType {
   formatTable?: (n: number) => number | string; // if different than chart formatting
   suffix?: string;
   nesting?: number; // default 0 / unnested
+  /**
+   * Which direction of the change column is good news, so the arrow can be coloured. Left
+   * unset for the metrics that are neither: marketing spend is a decision rather than a
+   * result, and inflation is weather. Those get an arrow with no colour on it.
+   */
+  higherIsBetter?: boolean;
 }
 
 // Two tables rather than one built per render: the labels are the same either way, and only
@@ -73,11 +86,13 @@ function buildChartKeys(units: UnitSystemType): {
   return {
     profit: {
       label: "Profit",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
     },
     profitPerkWh: {
       label: "Unit profit",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       suffix: "/kWh",
@@ -85,11 +100,13 @@ function buildChartKeys(units: UnitSystemType): {
     },
     revenue: {
       label: "Revenue",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
     },
     revenuePerkWh: {
       label: "Unit revenue",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       suffix: "/kWh",
@@ -97,31 +114,37 @@ function buildChartKeys(units: UnitSystemType): {
     },
     supplyWh: {
       label: "Power sold",
+      higherIsBetter: true,
       format: (n: number) => `${formatWatts(n, 0)}h`,
       nesting: 1,
     },
     demandWh: {
       label: "Demand",
+      higherIsBetter: true,
       format: (n: number) => `${formatWatts(n, 0)}h`,
     },
     customers: {
       label: "Customers",
+      higherIsBetter: true,
       format: (n: number) => numbro(n).format({ average: true }),
       nesting: 1,
     },
     expenses: {
       label: "Expenses",
+      higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
     },
     expensesFuel: {
       label: "Fuel",
+      higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
     },
     expensesOM: {
       label: "Operations",
+      higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
@@ -134,29 +157,34 @@ function buildChartKeys(units: UnitSystemType): {
     },
     expensesInterest: {
       label: "Loan interest",
+      higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
     },
     interestRate: {
       label: "Interest rate",
+      higherIsBetter: false,
       format: (n: number) => `${(n * 100).toFixed(2)}%`,
       nesting: 2,
     },
     expensesCarbonFee: {
       label: "Carbon fees",
+      higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
     },
     kgco2e: {
       label: "CO2e emitted",
+      higherIsBetter: false,
       format: (n: number) => formatLargeMassValue(n, units),
       suffix: largeMassUnit(units),
       nesting: 2,
     },
     kgco2ePerMWh: {
       label: "Emissions factor",
+      higherIsBetter: false,
       format: (n: number) =>
         numbro(toDisplayMass(n, units)).format({
           thousandSeparated: true,
@@ -167,11 +195,13 @@ function buildChartKeys(units: UnitSystemType): {
     },
     netWorth: {
       label: "Net Worth",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
     },
     cash: {
       label: "Cash",
+      higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
@@ -300,6 +330,9 @@ export function projectMonths(
 
 export interface StateProps {
   game: GameType;
+  // Set from the fleet list. When it names a facility, this pane reports what that one has
+  // contributed rather than only what the company as a whole has
+  selectedFacilityId: number | null;
 }
 
 export interface DispatchProps {
@@ -319,6 +352,76 @@ interface ChartPointType {
   year: number;
   value: number;
   projected: boolean;
+}
+
+/**
+ * The change column: the month just closed, against the one before it.
+ *
+ * A month rather than the period the rest of the table is totalled over, because a period
+ * total has no honest predecessor while it is still being played -- ten months of this year
+ * against twelve of last year is a fall in everything every time. Two whole months are always
+ * the same length as each other, so the arrow only ever means what it says, and the header
+ * names them both rather than leaving the column to be read as "vs the number on its left".
+ */
+interface ComparisonType {
+  label: string;
+  current: DerivedHistoryType;
+  previous: DerivedHistoryType;
+}
+
+export function getComparison(game: GameType): ComparisonType | undefined {
+  // monthlyHistory is newest first, and only holds months that have finished
+  const [latest, previous] = game.monthlyHistory;
+  if (!latest || !previous) {
+    return undefined;
+  }
+  return {
+    label: `${MONTHS[latest.month - 1]} vs ${MONTHS[previous.month - 1]}`,
+    current: deriveExpandedSummary(latest),
+    previous: deriveExpandedSummary(previous),
+  };
+}
+
+// How small a change counts as no change. Relative, because these run from fractions of a
+// percent to hundreds of millions of dollars, and an arrow on a rounding error is noise
+const FLAT_FRACTION = 0.005;
+
+interface DeltaCellProps {
+  metadata: ChartKeyMetadataType;
+  value: number;
+  previous: number;
+}
+
+function DeltaCell(props: DeltaCellProps): React.JSX.Element {
+  const { metadata, value, previous } = props;
+  const delta = value - previous;
+  const format = metadata.formatTable || metadata.format;
+  const reference = Math.max(Math.abs(value), Math.abs(previous));
+  if (!Number.isFinite(delta) || Math.abs(delta) <= reference * FLAT_FRACTION) {
+    return (
+      <TableCell align="right" className="deltaCell flat">
+        —
+      </TableCell>
+    );
+  }
+  const up = delta > 0;
+  // Colour is the second reading of the arrow, not the only one: an expense going up and
+  // revenue going up both point up, and only one of them is good news
+  const good =
+    metadata.higherIsBetter === undefined
+      ? undefined
+      : up === metadata.higherIsBetter;
+  const tone = good === undefined ? "" : good ? " good" : " bad";
+  return (
+    <TableCell align="right" className={"deltaCell" + tone}>
+      {up ? (
+        <ArrowDropUpIcon className="deltaArrow" />
+      ) : (
+        <ArrowDropDownIcon className="deltaArrow" />
+      )}
+      {format(Math.abs(delta))}
+    </TableCell>
+  );
 }
 
 // -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
@@ -403,7 +506,13 @@ export default class Finances extends React.Component<Props, State> {
   // that does nothing, and if the clock has stopped (a scenario that has ended, a backgrounded
   // tab) it never comes round at all.
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
-    if (nextState !== this.state || nextProps.game.speed !== "FAST") {
+    if (
+      nextState !== this.state ||
+      nextProps.game.speed !== "FAST" ||
+      // Selecting a facility in the fleet list is the same kind of direct request the
+      // dropdowns below are, and gets the same exemption
+      nextProps.selectedFacilityId !== this.props.selectedFacilityId
+    ) {
       return true;
     }
     return this.throttle.due(nextProps.game.date.minute, 2);
@@ -554,7 +663,7 @@ export default class Finances extends React.Component<Props, State> {
   }
 
   public render() {
-    const { game, onDelta } = this.props;
+    const { game, onDelta, selectedFacilityId } = this.props;
     const chartKeys = CHART_KEYS_BY_SYSTEM[this.context as UnitSystemType];
     const { startingYear, timeline, date } = game;
     const { expanded, chartKey } = this.state;
@@ -602,10 +711,49 @@ export default class Finances extends React.Component<Props, State> {
     const summary = deriveExpandedSummary(
       summaryMonths.reduce(reduceHistories, { ...EMPTY_HISTORY }),
     );
+    const comparison = getComparison(game);
+
+    // What the one facility the player has open has contributed. Its share is measured
+    // against the fleet's own delivered total rather than against the company's recorded
+    // sales, so the two numbers are the same kind of thing and the shares add to 100%
+    const selectedFacility = game.facilities.find(
+      (f: FacilityOperatingType) => f.id === selectedFacilityId,
+    );
+    const selectedLifetime =
+      selectedFacility && facilityLifetime(selectedFacility);
+    const fleetWh = game.facilities.reduce(
+      (sum: number, f: FacilityOperatingType) => sum + (f.lifetimeWh || 0),
+      0,
+    );
 
     return (
       <GameCard className="finances" title="Finances" id="financesPane">
         <div className="scrollable">
+          {selectedFacility && selectedLifetime && (
+            // The other half of clicking a row in the fleet list: the stack in Forecasts
+            // says which power is this facility's, and this says which money is
+            <div className="selectedFacilitySummary">
+              <Typography variant="body2" component="div">
+                <strong>{selectedFacility.name}</strong> has delivered{" "}
+                {formatWattHours(selectedLifetime.wh)}
+                {fleetWh > 0 &&
+                  ` (${Math.round((selectedLifetime.wh / fleetWh) * 100)}% of your fleet)`}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" component="div">
+                {formatMoneyConcise(selectedLifetime.revenue)} earned,{" "}
+                {formatMoneyConcise(selectedLifetime.expenses)} spent,{" "}
+                <span
+                  className={
+                    selectedLifetime.profit < 0
+                      ? "deltaCell bad"
+                      : "deltaCell good"
+                  }
+                >
+                  {formatMoneyConcise(selectedLifetime.profit)} profit
+                </span>
+              </Typography>
+            </div>
+          )}
           <br />
           <Toolbar>
             {scenario.ownership === "Investor" && (
@@ -764,7 +912,19 @@ export default class Finances extends React.Component<Props, State> {
             className={`expandable ${!expanded && "notExpanded"}`}
             onClick={() => this.setExpand(!expanded)}
           >
-            <Table size="small">
+            <Table size="small" className="summaryTable">
+              {/* Two numbers a row rather than one: a total on its own says nothing about
+                  whether it is heading the right way, which is the question the table is
+                  actually being read for */}
+              {comparison && (
+                <TableHead>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell />
+                    <TableCell align="right">{comparison.label}</TableCell>
+                  </TableRow>
+                </TableHead>
+              )}
               <TableBody>
                 {CHART_KEY_NAMES.map((key: string) => {
                   const k = chartKeys[key];
@@ -784,6 +944,17 @@ export default class Finances extends React.Component<Props, State> {
                           </span>
                         )}
                       </TableCell>
+                      {comparison && (
+                        <DeltaCell
+                          metadata={k}
+                          value={
+                            comparison.current[key as DerivedHistoryKeysType]
+                          }
+                          previous={
+                            comparison.previous[key as DerivedHistoryKeysType]
+                          }
+                        />
+                      )}
                     </TableRow>
                   );
                 })}

@@ -7,6 +7,7 @@ import Finances, { DispatchProps, StateProps } from "./Finances";
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     game: state.game,
+    selectedFacilityId: state.ui.selectedFacilityId,
   };
 };
 

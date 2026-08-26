@@ -2,6 +2,7 @@ import {
   customersFromMarketingSpend,
   CreditInputsType,
   facilityCashBack,
+  facilityLifetime,
   getCompanyInterestRate,
   getCreditInputs,
   getCreditPremium,
@@ -356,5 +357,49 @@ describe("getCreditInputs", () => {
       aFacility({ loanAmountLeft: 1000 }),
     ]);
     expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe("facilityLifetime", () => {
+  // A megawatt hour, in the watt hours the simulation counts in
+  const MWH = 1000000;
+
+  it("reports nothing rather than a division by zero on a facility that has never run", () => {
+    const lifetime = facilityLifetime(aFacility());
+    expect(lifetime.wh).toBe(0);
+    expect(lifetime.profit).toBe(0);
+    expect(lifetime.capacityFactor).toBeUndefined();
+    expect(lifetime.costPerMWh).toBeUndefined();
+    expect(lifetime.revenuePerMWh).toBeUndefined();
+  });
+
+  it("reads the totals the simulation keeps on the facility", () => {
+    const lifetime = facilityLifetime(
+      aFacility({
+        lifetimeWh: 100 * MWH,
+        lifetimePotentialWh: 400 * MWH,
+        lifetimeRevenue: 7000,
+        lifetimeExpenses: 4500,
+      }),
+    );
+    expect(lifetime.capacityFactor).toBeCloseTo(0.25, 10);
+    expect(lifetime.costPerMWh).toBeCloseTo(45, 10);
+    expect(lifetime.revenuePerMWh).toBeCloseTo(70, 10);
+    expect(lifetime.profit).toBeCloseTo(2500, 10);
+  });
+
+  // A plant that has been switched off all year has a real capacity factor of zero, and a
+  // cost per MWh that genuinely isn't a number - those are two different answers
+  it("quotes a capacity factor for a plant that has produced nothing, but no unit cost", () => {
+    const lifetime = facilityLifetime(
+      aFacility({
+        lifetimeWh: 0,
+        lifetimePotentialWh: 400 * MWH,
+        lifetimeExpenses: 4500,
+      }),
+    );
+    expect(lifetime.capacityFactor).toBe(0);
+    expect(lifetime.costPerMWh).toBeUndefined();
+    expect(lifetime.profit).toBeCloseTo(-4500, 10);
   });
 });

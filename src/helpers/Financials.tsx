@@ -162,6 +162,44 @@ export function LCWH(
   return costPerWh;
 }
 
+/**
+ * What a facility has actually done for the company, read off the totals the simulation keeps on
+ * it. Every field is derived here rather than stored, so the only thing a save has to carry is
+ * the four running sums.
+ *
+ * capacityFactor is undefined until the plant has been online long enough to have one, and
+ * costPerMWh until it has delivered something -- a plant that has produced nothing has a cost per
+ * MWh of infinity, which is a true statement that no row should try to render.
+ */
+export interface FacilityLifetimeType {
+  wh: number;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  capacityFactor?: number; // 0 - 1
+  costPerMWh?: number;
+  revenuePerMWh?: number;
+}
+
+export function facilityLifetime(
+  f: FacilityOperatingType,
+): FacilityLifetimeType {
+  const wh = f.lifetimeWh || 0;
+  const revenue = f.lifetimeRevenue || 0;
+  const expenses = f.lifetimeExpenses || 0;
+  const potentialWh = f.lifetimePotentialWh || 0;
+  const mwh = wh / 1000000;
+  return {
+    wh,
+    revenue,
+    expenses,
+    profit: revenue - expenses,
+    capacityFactor: potentialWh > 0 ? wh / potentialWh : undefined,
+    costPerMWh: mwh > 0 ? expenses / mwh : undefined,
+    revenuePerMWh: mwh > 0 ? revenue / mwh : undefined,
+  };
+}
+
 // Returns how much cash the user recieves if they sell / cancel the facility
 export function facilityCashBack(g: FacilityOperatingType): number {
   // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet

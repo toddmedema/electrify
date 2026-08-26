@@ -25,6 +25,8 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import {
   DragDropContext,
   Draggable,
@@ -49,12 +51,16 @@ import {
   formatWattsOfPeak,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
+  game: GameType;
+  selected: boolean;
+  onSelect: (id: FacilityOperatingType["id"] | null) => void;
   // A replay is a recording of somebody else's decisions; letting the viewer make their own
   // would desync the run from the actions still queued up against it
   readOnly: boolean;
@@ -114,7 +120,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     setOpen(!open);
   };
 
-  const { facility, onTogglePause, onPause, readOnly } = props;
+  const {
+    facility,
+    game,
+    onTogglePause,
+    onPause,
+    onReprioritize,
+    onSelect,
+    readOnly,
+    selected,
+    spotInList,
+  } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
 
@@ -164,10 +180,26 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       isDragDisabled={readOnly}
     >
       {(provided, snapshot) => (
+        // Selecting is on the row rather than on a control inside it: the icon buttons were
+        // the only thing a click did anything to, which is the opposite of what a list of
+        // rows leads a mouse to expect. dragHandleProps already makes this focusable and
+        // announces it as a button, so only a read-only row - which gets none of them - has
+        // to say so itself. dnd owns Space (lift) and the arrows (move), leaving Enter free
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
+          className={selected ? "facilityRow selected" : "facilityRow"}
+          role={provided.dragHandleProps ? undefined : "button"}
+          tabIndex={provided.dragHandleProps ? undefined : 0}
+          aria-expanded={selected}
+          onClick={() => onSelect(selected ? null : facility.id)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onSelect(selected ? null : facility.id);
+            }
+          }}
           style={getDraggableStyle(
             snapshot.isDragging,
             provided.draggableProps.style,
@@ -183,55 +215,104 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 : undefined
             }
             secondaryAction={
-              <>
+              // Hidden until the row is hovered, focused or selected (desktop only - see
+              // app.scss), because a permanent cluster of buttons takes the width the numbers
+              // below want. Each one stops its click short of the row, which would otherwise
+              // read the same click as "select this facility" on the way past
+              <span className="facilityActions">
+                {!readOnly && props.listLength > 1 && (
+                  <>
+                    {/* Dispatch order is a core mechanic, and dragging was the only way to set
+                        it - undiscoverable with a mouse, and unusable once the list has
+                        scrolled. These move one place at a time, the way a drag does */}
+                    <IconButton
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onReprioritize(spotInList, -1);
+                      }}
+                      aria-label={`Move ${facility.name} earlier in the dispatch order`}
+                      disabled={spotInList === 0}
+                      edge="end"
+                      color="primary"
+                      size="small"
+                    >
+                      <KeyboardArrowUpIcon />
+                    </IconButton>
+                    <IconButton
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onReprioritize(spotInList, 1);
+                      }}
+                      aria-label={`Move ${facility.name} later in the dispatch order`}
+                      disabled={spotInList === props.listLength - 1}
+                      edge="end"
+                      color="primary"
+                      size="small"
+                    >
+                      <KeyboardArrowDownIcon />
+                    </IconButton>
+                  </>
+                )}
                 {!readOnly &&
                   !underConstruction &&
                   props.listLength > 1 &&
                   !facility.paused && (
                     <IconButton
-                      onClick={() => onPause(facility.id, facility.name)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onPause(facility.id, facility.name);
+                      }}
                       aria-label={`Pause ${facility.name}`}
                       edge="end"
                       color="primary"
-                      size="large"
+                      size="small"
                     >
                       <PauseIcon />
                     </IconButton>
                   )}
                 {!readOnly && facility.paused && (
                   <IconButton
-                    onClick={() => onTogglePause(facility.id)}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      onTogglePause(facility.id);
+                    }}
                     aria-label={`Resume ${facility.name}`}
                     edge="end"
                     color="primary"
-                    size="large"
+                    size="small"
                   >
                     <PlayIcon />
                   </IconButton>
                 )}
                 {!readOnly && !underConstruction && props.listLength > 1 && (
                   <IconButton
-                    onClick={toggleDialog}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      toggleDialog();
+                    }}
                     aria-label={`Sell ${facility.name}`}
                     edge="end"
                     color="primary"
-                    size="large"
+                    size="small"
                   >
                     <DeleteForeverIcon />
                   </IconButton>
                 )}
                 {!readOnly && underConstruction && (
                   <IconButton
-                    onClick={toggleDialog}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      toggleDialog();
+                    }}
                     aria-label={`Cancel construction of ${facility.name}`}
                     edge="end"
                     color="primary"
-                    size="large"
+                    size="small"
                   >
                     <CancelIcon />
                   </IconButton>
                 )}
-              </>
+              </span>
             }
           >
             {!readOnly && (
@@ -279,7 +360,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             </ListItemAvatar>
             <ListItemText primary={facility.name} secondary={secondaryText} />
             {open && (
-              <Dialog open onClose={toggleDialog}>
+              // Inside the row, so without this every click in the confirmation dialog also
+              // lands on the row behind it and toggles the selection
+              <Dialog
+                open
+                onClose={toggleDialog}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              >
                 <DialogTitle>
                   {underConstruction ? "Cancel construction of" : "Sell"}{" "}
                   {facility.peakWh
@@ -316,6 +403,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </Dialog>
             )}
           </ListItem>
+          {selected && (
+            <FacilityDetails
+              facility={facility}
+              date={game.date}
+              seed={game.seed}
+            />
+          )}
         </div>
       )}
     </Draggable>
@@ -324,6 +418,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 
 export interface StateProps {
   game: GameType;
+  // The row the player has open, from the UI slice rather than this component's own state:
+  // Finances and Forecasts read it too, and building a facility unmounts this pane
+  selectedFacilityId: number | null;
 }
 
 export interface DispatchProps {
@@ -332,6 +429,7 @@ export interface DispatchProps {
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
+  onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
 }
 
@@ -350,7 +448,13 @@ export default class Facilities extends React.Component<Props, {}> {
   // same render is 3.6ms, so 1 in 2 refreshes the pane four times as often and still costs less
   // per tick than the old setting did.
   public shouldComponentUpdate(nextProps: Props) {
-    if (nextProps.game.speed !== "FAST") {
+    // Opening a row is something the player just did, not something the clock did, so it
+    // goes through whatever the throttle is up to - otherwise the row waits for the next
+    // unskipped frame, and at FAST that reads as a click that missed
+    if (
+      nextProps.game.speed !== "FAST" ||
+      nextProps.selectedFacilityId !== this.props.selectedFacilityId
+    ) {
       return true;
     }
     return this.throttle.due(nextProps.game.date.minute, 2);
@@ -380,7 +484,9 @@ export default class Facilities extends React.Component<Props, {}> {
       onTogglePause,
       onPause,
       onReprioritize,
+      onSelect,
       onStorageBuild,
+      selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
     const readOnly = !!game.replayPlayback;
@@ -432,11 +538,14 @@ export default class Facilities extends React.Component<Props, {}> {
                     (g: FacilityOperatingType, i: number) => (
                       <FacilityListItem
                         facility={g}
+                        game={game}
                         key={g.id}
                         onSell={onSell}
                         onTogglePause={onTogglePause}
                         onPause={onPause}
                         onReprioritize={onReprioritize}
+                        onSelect={onSelect}
+                        selected={selectedFacilityId === g.id}
                         spotInList={i}
                         listLength={facilitiesCount}
                         readOnly={readOnly}

@@ -14,7 +14,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
-import { demandColor, fuelColors } from "../../Theme";
+import { demandColor, fuelColors, withAlpha } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -30,6 +30,12 @@ export interface Props {
   showXLabels?: boolean;
   /** Shares a cursor with the other charts drawn against the same months */
   syncKey?: string;
+  /**
+   * The one fuel to draw at full strength, with every other band faded back. Set from the
+   * facility the player has selected in the fleet list, so that clicking a coal plant says
+   * which part of the stack is theirs.
+   */
+  highlightFuel?: FuelNameType;
 }
 
 /**
@@ -68,7 +74,15 @@ interface State {
   multiyear: boolean;
 }
 
-function buildOptions(fuels: FuelNameType[], showXLabels: boolean) {
+// Faded far enough that the highlighted band is unmistakably the subject, but not so far
+// that the rest of the stack stops being readable as context
+const MUTED_BAND_ALPHA = 0.15;
+
+function buildOptions(
+  fuels: FuelNameType[],
+  showXLabels: boolean,
+  highlightFuel?: FuelNameType,
+) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
@@ -106,7 +120,10 @@ function buildOptions(fuels: FuelNameType[], showXLabels: boolean) {
     series: [
       {},
       ...fuels.map((f) => ({
-        fill: fuelColors[f],
+        fill:
+          highlightFuel && f !== highlightFuel
+            ? withAlpha(fuelColors[f], MUTED_BAND_ALPHA)
+            : fuelColors[f],
         // A hairline of background between bands keeps them apart even where two
         // fuel colors are close, since seven series can't all be far apart
         stroke: "#ffffff",
@@ -154,6 +171,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       multiyear,
       showXLabels,
       syncKey,
+      highlightFuel,
     } = this.props;
 
     // Every band needs a value at every x or the stack tears, so backfill the whole series.
@@ -205,8 +223,12 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           height={height}
           state={state}
           data={[minutes, ...stacked, demand]}
-          buildOptions={buildOptions(fuels, showXLabels !== false)}
-          structureKey={`${fuels.join(",")}|${showXLabels !== false}`}
+          buildOptions={buildOptions(
+            fuels,
+            showXLabels !== false,
+            highlightFuel,
+          )}
+          structureKey={`${fuels.join(",")}|${showXLabels !== false}|${highlightFuel || ""}`}
           syncKey={syncKey}
           tooltip={tooltip}
         />

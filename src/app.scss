@@ -15,6 +15,11 @@ $bg_dark_primary: #161011;
 
 $blackout_red: #c62828; /* red800 https://material-ui.com/customization/color/ - matches blackoutColor in Theme.tsx */
 $interactive_blue: #1e88e5; /* blue 600 */
+// The two directions a number can move in. Both are the darker end of their ramp so they
+// clear 4.5:1 on white as text, since the arrow beside them is decoration rather than the
+// message -- red/green alone would leave a colourblind reader with only the arrow
+$delta_good: #2e7d32; /* green800 */
+$delta_bad: #c62828; /* red800 */
 
 // ===============================================
 // Transitional animation classes
@@ -858,6 +863,109 @@ $pane_header_height: 40px;
     border-top: 1px #eeeeee solid; /* grey200 */
   }
 
+  // The whole row selects, so it has to look like it does something before it is clicked
+  .facilityRow {
+    outline: none;
+
+    &:hover .facility {
+      background: #fafafa; /* grey50 */
+    }
+
+    // WCAG 2.4.7 -- and the row is reachable by Tab, since it doubles as the drag handle
+    &:focus-visible .facility {
+      outline: 2px solid $interactive_blue;
+      outline-offset: -2px;
+    }
+
+    &.selected {
+      background: #e3f2fd; /* blue50 */
+      // Reads down the left edge of the list, so which row is open survives scrolling past
+      // the details themselves
+      box-shadow: inset 3px 0 0 0 $interactive_blue;
+
+      .facility {
+        border-top-color: transparent;
+      }
+    }
+  }
+
+  // What the row is worth, opened underneath it. A wrapping grid rather than fixed columns:
+  // the pane is resizable, and a stat that has to be truncated to fit is worth less than one
+  // that wraps onto the next line
+  .facilityDetails {
+    padding: size(small) 16px size(base) 56px;
+  }
+
+  .facilityStats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: size(base) size(medium);
+  }
+
+  .facilityStat {
+    min-width: 72px;
+  }
+
+  .facilityStatValue {
+    &.good {
+      color: $delta_good;
+    }
+    &.bad {
+      color: $delta_bad;
+    }
+  }
+
+  .facilityTrend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sparkline {
+    display: block;
+    overflow: visible;
+  }
+
+  // Buttons that only appear when a mouse is near them (see the desktop block below); on a
+  // touch screen there is no hover to reveal them with, so they stay put
+  .facilityActions {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  // The change column, and the facility figures that use the same two colours
+  .deltaCell {
+    white-space: nowrap;
+
+    &.good {
+      color: $delta_good;
+    }
+    &.bad {
+      color: $delta_bad;
+    }
+    &.flat {
+      color: $font_color_faded;
+    }
+  }
+
+  .deltaArrow {
+    // Sits on the text baseline rather than pushing the row taller
+    vertical-align: middle;
+    margin-right: -2px;
+    font-size: 1.1em;
+  }
+
+  // Which money is the selected facility's, above the chart that shows the company's
+  .selectedFacilitySummary {
+    padding: size(small) 16px;
+    background: #e3f2fd; /* blue50 */
+    border-bottom: 1px solid #bbdefb; /* blue100 */
+  }
+
+  .chartLegendItem-muted {
+    opacity: 0.35;
+  }
+
   .version {
     text-align: center;
     opacity: 0.7;
@@ -1022,6 +1130,20 @@ $sizemap: (
       min-width: 0;
       height: 100%;
     }
+  }
+
+  // There is a mouse now, so the row's actions can wait to be asked for -- which gives the
+  // numbers in the details panel the width the buttons were holding. Anything that reveals
+  // them has to include focus, or they'd be unreachable by keyboard
+  .facilityActions {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .facilityRow:hover .facilityActions,
+  .facilityRow:focus-within .facilityActions,
+  .facilityRow.selected .facilityActions {
+    opacity: 1;
   }
 
   .pane-splitter {

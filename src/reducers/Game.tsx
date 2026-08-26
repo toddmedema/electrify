@@ -1133,20 +1133,31 @@ function updateSupplyFacilitiesFinances(
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
   const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
+  // What one facility earns is its share of what the company actually sold, so the row can say
+  // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
+  // served total is exactly what expresses
+  const revenuePerSuppliedW = supply > 0 ? revenue / supply : 0;
   facilities.forEach((g: FacilityShoppingType) => {
+    // Everything this facility costs the company this tick, so it can be booked against the
+    // facility as well as into the company's own totals below
+    let facilityExpenses = 0;
     if (g.yearsToBuildLeft === 0) {
       if (g.paused) {
         // paused facilities only pay half of their operating costs
-        expensesOM += g.annualOperatingCost / TICKS_PER_YEAR / 2;
+        facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR / 2;
       } else {
-        expensesOM += g.annualOperatingCost / TICKS_PER_YEAR;
+        facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR;
       }
+      expensesOM += facilityExpenses;
       if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        expensesFuel += (fuelBtu * fuelPrices[g.fuel]) / 1000000;
-        kgco2e += fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
+        const facilityFuel = (fuelBtu * fuelPrices[g.fuel]) / 1000000;
+        const facilityKgco2e = fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
+        expensesFuel += facilityFuel;
+        kgco2e += facilityKgco2e;
+        facilityExpenses += facilityFuel + state.feePerKgCO2e * facilityKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -1165,10 +1176,35 @@ function updateSupplyFacilitiesFinances(
         expensesInterest += paymentInterest / TICKS_PER_MONTH;
         principalRepayment += paymentPrincipal;
         g.loanAmountLeft -= paymentPrincipal;
+        facilityExpenses += paymentInterest / TICKS_PER_MONTH;
+      }
+      // Only a real tick is a tick of this facility's life. The pre-roll frames after a month
+      // rollover and every tick of every forecast come through here too, and neither happened
+      if (!simulated) {
+        // What the supply pass above actually counted: a paused facility is still winding
+        // down, and those watts are deliberately left out of the company's supply, so
+        // crediting them here would book revenue nobody was paid for. Its potential keeps
+        // accruing though -- being switched off is exactly what a capacity factor is for
+        const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
+        g.lifetimeWh =
+          (g.lifetimeWh || 0) +
+          (deliveredW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+        g.lifetimePotentialWh =
+          (g.lifetimePotentialWh || 0) +
+          (g.peakW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+        g.lifetimeRevenue =
+          (g.lifetimeRevenue || 0) + deliveredW * revenuePerSuppliedW;
+        g.lifetimeExpenses = (g.lifetimeExpenses || 0) + facilityExpenses;
       }
     } else {
-      expensesInterest +=
+      facilityExpenses =
         getPaymentInterest(g.loanAmountLeft, g.interestRate) / TICKS_PER_MONTH;
+      expensesInterest += facilityExpenses;
+      // A half-built plant is already costing interest, and a row that only started counting on
+      // the day it switched on would hide the cheapest place to notice that
+      if (!simulated) {
+        g.lifetimeExpenses = (g.lifetimeExpenses || 0) + facilityExpenses;
+      }
     }
   });
   const expensesCarbonFee = state.feePerKgCO2e * kgco2e;

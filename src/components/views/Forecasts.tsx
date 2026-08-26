@@ -11,7 +11,12 @@ import {
   Typography,
 } from "@mui/material";
 import { TICKS_PER_YEAR } from "../../Constants";
-import { FuelNameType, GameType, TickPresentFutureType } from "../../Types";
+import {
+  FuelNameType,
+  GameType,
+  GeneratorOperatingType,
+  TickPresentFutureType,
+} from "../../Types";
 import {
   formatHour,
   getDateFromMinute,
@@ -51,6 +56,8 @@ interface BlackoutEdges {
 
 export interface StateProps {
   game: GameType;
+  // Which facility the fleet list has open, so Supply by Fuel can say which band is its
+  selectedFacilityId: number | null;
 }
 
 export interface DispatchProps {}
@@ -77,15 +84,18 @@ export default class Forecasts extends React.Component<Props, State> {
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
-    // Because forecasts are computationally intense and long term, only update when the month or state changes
+    // Because forecasts are computationally intense and long term, only update when the
+    // month or state changes -- plus when the player selects a facility, which is a direct
+    // request to re-highlight the stack and would otherwise wait for a month rollover
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
+      this.props.selectedFacilityId !== nextProps.selectedFacilityId ||
       this.state.years !== nextState.years
     );
   }
 
   public render() {
-    const { game } = this.props;
+    const { game, selectedFacilityId } = this.props;
     const { years } = this.state;
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
     if (!now) {
@@ -209,6 +219,16 @@ export default class Forecasts extends React.Component<Props, State> {
       sampledForecastedTimeline,
     );
 
+    // Storage has no band of its own in this chart, so selecting a battery highlights
+    // nothing rather than emptying the stack
+    const selected = game.facilities.find(
+      (f) => f.id === selectedFacilityId,
+    ) as Partial<GeneratorOperatingType> | undefined;
+    const highlightFuel =
+      selected && selected.fuel && fuels.indexOf(selected.fuel) > -1
+        ? selected.fuel
+        : undefined;
+
     return (
       <GameCard className="Forecasts" title="Forecasts" id="forecastsPane">
         <div className="scrollable">
@@ -284,9 +304,11 @@ export default class Forecasts extends React.Component<Props, State> {
             <ChartLegend
               inline
               items={[
-                ...[...fuels]
-                  .reverse()
-                  .map((f) => ({ name: f, color: fuelColors[f] })),
+                ...[...fuels].reverse().map((f) => ({
+                  name: f,
+                  color: fuelColors[f],
+                  muted: !!highlightFuel && f !== highlightFuel,
+                })),
                 { name: "Demand", color: "", rule: true },
               ]}
             />
@@ -300,6 +322,7 @@ export default class Forecasts extends React.Component<Props, State> {
             fuels={fuels}
             showXLabels={false}
             syncKey={FORECAST_SYNC_KEY}
+            highlightFuel={highlightFuel}
           />
           {hasStorage && (
             <div>
