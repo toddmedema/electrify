@@ -28,7 +28,9 @@ import {
   UIType,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
+import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
@@ -258,13 +260,18 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   private renderCard(): React.JSX.Element {
-    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them
+    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them.
+    // Cash, the date, the speed controls and the year's progress are the game's state rather
+    // than any one pane's, so they span all three columns instead of living in the first
     if (isDesktopScreen() && isNavCard(this.props.card.name)) {
       return (
-        <div className="desktop-panes">
-          <FacilitiesContainer />
-          <FinancesContainer />
-          <ForecastsContainer />
+        <div className="desktop-layout flexContainer">
+          <GameAppBarContainer />
+          <DesktopPanes>
+            <FacilitiesContainer />
+            <FinancesContainer />
+            <ForecastsContainer />
+          </DesktopPanes>
         </div>
       );
     }

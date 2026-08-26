@@ -1,7 +1,13 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import { stepTicks, xAxis, yAxis } from "./UPlotHelpers";
+import {
+  FORECAST_AXIS_LEFT,
+  FORECAST_AXIS_RIGHT,
+  stepTicks,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import {
   formatMinuteAsMonthAxis,
   MINUTES_PER_MONTH,
@@ -16,8 +22,39 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
-  // Bottom-to-top order of the stack, ie the order these fuels are dispatched in
+  // Bottom-to-top order of the stack, ie the order these fuels are dispatched in. Already
+  // narrowed to the fuels this forecast actually burns -- see forecastFuels, which the pane
+  // calls too so its legend and this stack can't disagree about what is in the picture
   fuels: FuelNameType[];
+  /** False where a chart below this one carries the month names for the whole stack */
+  showXLabels?: boolean;
+  /** Shares a cursor with the other charts drawn against the same months */
+  syncKey?: string;
+}
+
+/**
+ * The fuels a forecast burns, bottom to top of the stack.
+ *
+ * Anything generating in the forecast window belongs in it, even if it was built partway through
+ * and so isn't in the fleet the dispatch order was derived from.
+ */
+export function forecastFuels(
+  dispatchOrder: FuelNameType[],
+  timeline: TickPresentFutureType[],
+): FuelNameType[] {
+  const inForecast = new Set<FuelNameType>();
+  timeline.forEach((t) => {
+    Object.keys(t.supplyByFuel).forEach((f) =>
+      inForecast.add(f as FuelNameType),
+    );
+  });
+  const fuels = dispatchOrder.filter((f) => inForecast.has(f));
+  inForecast.forEach((f) => {
+    if (fuels.indexOf(f) === -1) {
+      fuels.push(f);
+    }
+  });
+  return fuels;
 }
 
 interface State {
@@ -31,11 +68,11 @@ interface State {
   multiyear: boolean;
 }
 
-function buildOptions(fuels: FuelNameType[]) {
+function buildOptions(fuels: FuelNameType[], showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, 5 * scale, 0, 0],
+    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -49,6 +86,7 @@ function buildOptions(fuels: FuelNameType[]) {
     },
     axes: [
       xAxis(scale, {
+        showLabels: showXLabels,
         splits: () => {
           const [min, max] = getState().domain.x;
           return stepTicks(min, max, MINUTES_PER_MONTH);
@@ -61,6 +99,7 @@ function buildOptions(fuels: FuelNameType[]) {
         },
       }),
       yAxis(scale, {
+        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
       }),
     ],
@@ -106,22 +145,16 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, startingYear, multiyear } = this.props;
-
-    // Anything generating in the forecast window belongs in the stack, even if it was built
-    // partway through and so isn't in the fleet the dispatch order was derived from
-    const fuelsInForecast = new Set<FuelNameType>();
-    timeline.forEach((t) => {
-      Object.keys(t.supplyByFuel).forEach((f) =>
-        fuelsInForecast.add(f as FuelNameType),
-      );
-    });
-    const fuels = this.props.fuels.filter((f) => fuelsInForecast.has(f));
-    fuelsInForecast.forEach((f) => {
-      if (fuels.indexOf(f) === -1) {
-        fuels.push(f);
-      }
-    });
+    const {
+      domain,
+      fuels,
+      height,
+      timeline,
+      startingYear,
+      multiyear,
+      showXLabels,
+      syncKey,
+    } = this.props;
 
     // Every band needs a value at every x or the stack tears, so backfill the whole series.
     // The sampled forecast repeats its first minute, and a stack lines its bands up by x, so a
@@ -172,26 +205,11 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           height={height}
           state={state}
           data={[minutes, ...stacked, demand]}
-          buildOptions={buildOptions(fuels)}
-          structureKey={fuels.join(",")}
+          buildOptions={buildOptions(fuels, showXLabels !== false)}
+          structureKey={`${fuels.join(",")}|${showXLabels !== false}`}
+          syncKey={syncKey}
           tooltip={tooltip}
         />
-        {/* Below the plot rather than floating in it, where it used to clip the data */}
-        <div className="chartLegend">
-          {[...fuels].reverse().map((f: FuelNameType) => (
-            <span key={f} className="chartLegendItem">
-              <span
-                className="chartLegendSwatch"
-                style={{ backgroundColor: fuelColors[f] }}
-              />
-              {f}
-            </span>
-          ))}
-          <span className="chartLegendItem">
-            <span className="chartLegendSwatch chartLegendSwatch-demand" />
-            Demand
-          </span>
-        </div>
       </div>
     );
   }

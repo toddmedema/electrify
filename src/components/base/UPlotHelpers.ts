@@ -15,6 +15,22 @@ import { chartTheme, withAlpha } from "../../Theme";
 
 export const DESIGN_WIDTH = 350;
 
+/**
+ * How far past its design width a chart is allowed to be blown up.
+ *
+ * The 350-wide design space was drawn for a phone, and scaling it straight to the pane means a
+ * chart in a 700px column gets 24px axis labels: "440MW" and "12am" set larger than any text
+ * around them, for no more information than they carried at 12px. Past this the pane gets the
+ * extra width as plot rather than as type -- which is also where the room for a fifth chart on
+ * screen comes from, since heights are quoted in the same space.
+ */
+const MAX_CHART_SCALE = 1.4;
+
+/** Design units to CSS pixels for a chart of `width`. */
+export function chartScale(width: number): number {
+  return Math.min(width / DESIGN_WIDTH, MAX_CHART_SCALE);
+}
+
 export const CHART_FONT_FAMILY = `Roboto, "Helvetica Neue", Helvetica, sans-serif`;
 export const TICK_LABEL_FILL = chartTheme.tickLabels.fill;
 
@@ -32,6 +48,25 @@ const LABEL_GAP = 4;
 const LABEL_EDGE_PAD = 4;
 // Victory drew legend text in its material theme's near-black rather than the axes' grey
 const LEGEND_TEXT = "#252525";
+
+/** What an axis carrying a `label` adds to its own size, in design units. */
+export const AXIS_LABEL_SIZE = 16;
+
+/**
+ * The gutters the stacked forecast charts leave either side of their plots, in design units.
+ *
+ * They read as one picture under one shared x axis, which only works if every plot starts and
+ * ends at the same place: an axis sized to its own labels would put "1.2GWh" and "$12" on
+ * different left edges, and the month labels under the bottom chart would then line up with
+ * nothing above them.
+ *
+ * Wide enough for the widest label any of them draws, since a fixed size clips rather than
+ * grows: the left is set by watt-hours ("800MWh" is as long as a niceSplits tick gets), the
+ * right by the weather chart's wind axis, whose labels are three digits at most. Both include
+ * the AXIS_LABEL_SIZE that the axes carrying a label spend on it.
+ */
+export const FORECAST_AXIS_LEFT = 60;
+export const FORECAST_AXIS_RIGHT = 48;
 
 /**
  * A font string at the chart's current scale.
@@ -53,7 +88,7 @@ export function chartFont(scale: number, sizePx = 12): string {
  * any display that isn't at 100%.
  */
 function canvasScale(u: uPlot): number {
-  return (u.width / DESIGN_WIDTH) * uPlot.pxRatio;
+  return chartScale(u.width) * uPlot.pxRatio;
 }
 
 // A context of our own to ask how wide a label will be, since axis sizes have to be settled
@@ -93,6 +128,8 @@ interface AxisOptions {
   side?: 1 | 3;
   /** Ticks, labels and axis label in one colour, to tie an axis to its series */
   stroke?: string;
+  /** x only: false keeps the baseline and ticks but drops the labels, for a shared axis */
+  showLabels?: boolean;
 }
 
 /**
@@ -141,19 +178,27 @@ function axisCommon(scale: number, o: AxisOptions) {
     border: { show: true, stroke: chartTheme.axis.stroke, width: 1 },
     label: o.label,
     labelFont: chartFont(scale),
-    labelSize: o.label ? 16 * scale : undefined,
+    labelSize: o.label ? AXIS_LABEL_SIZE * scale : undefined,
     splits: o.splits,
     values: o.values,
   };
 }
 
-/** The x axis every chart shares: black baseline, faded labels, no grid. */
+/**
+ * The x axis every chart shares: black baseline, faded labels, no grid.
+ *
+ * `showLabels: false` keeps the baseline and the tick marks but not the month names underneath,
+ * which is what a chart stacked above another chart that carries them wants -- the ticks still
+ * say where the months are, and the height the labels would have taken goes to the plot.
+ */
 export function xAxis(scale: number, o: AxisOptions): uPlot.Axis {
+  const showLabels = o.showLabels !== false;
   return {
     ...axisCommon(scale, o),
     scale: "x",
-    size: (o.size ?? 25) * scale,
+    size: (o.size ?? (showLabels ? 25 : 8)) * scale,
     gap: 2 * scale,
+    values: showLabels ? o.values : (_u, splits) => splits.map(() => ""),
   };
 }
 

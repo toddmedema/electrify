@@ -1,7 +1,7 @@
 import * as React from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
-import { DESIGN_WIDTH } from "./UPlotHelpers";
+import { chartScale } from "./UPlotHelpers";
 
 /**
  * The React shell every chart in the game sits in.
@@ -39,6 +39,12 @@ export interface UPlotChartProps<S> {
   structureKey?: string | number;
   /** One tooltip covering every series at the hovered x */
   tooltip?: (idx: number, state: S) => string;
+  /**
+   * Charts sharing this key share a cursor: hovering one puts a crosshair at the same x on all
+   * of them. Only for charts drawn against the same x scale, one above another. Numbers stay
+   * with the pointer -- five tooltips at once would cover the data they are about.
+   */
+  syncKey?: string;
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -46,19 +52,34 @@ const TOOLTIP_OFFSET = 8;
 function tooltipPlugin<S>(
   getState: () => S,
   getLabel: () => ((idx: number, state: S) => string) | undefined,
+  hoverOnly: boolean,
 ): uPlot.Plugin {
   let el: HTMLDivElement | null = null;
+  // A synced chart moves its cursor when a neighbour is hovered, which is the point -- but it
+  // should not also open a tooltip over data the pointer isn't anywhere near
+  let hovering = !hoverOnly;
   return {
     hooks: {
       init: (u: uPlot) => {
         el = document.createElement("div");
         el.className = "chartTooltip";
         u.over.appendChild(el);
+        if (hoverOnly) {
+          u.over.addEventListener("mouseenter", () => {
+            hovering = true;
+          });
+          u.over.addEventListener("mouseleave", () => {
+            hovering = false;
+            if (el) {
+              el.style.display = "none";
+            }
+          });
+        }
       },
       setCursor: (u: uPlot) => {
         const label = getLabel();
         const idx = u.cursor.idx;
-        if (!el || !label || idx == null) {
+        if (!el || !label || idx == null || !hovering) {
           if (el) {
             el.style.display = "none";
           }
@@ -83,7 +104,7 @@ function tooltipPlugin<S>(
 export default function UPlotChart<S>(
   props: UPlotChartProps<S>,
 ): React.JSX.Element {
-  const { ariaLabel, id, height, state, data, structureKey } = props;
+  const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
@@ -118,16 +139,24 @@ export default function UPlotChart<S>(
       return;
     }
     const getState = () => stateRef.current;
-    const scale = width / DESIGN_WIDTH;
+    const scale = chartScale(width);
     const built = buildRef.current({ getState, scale });
     const plot = new uPlot(
       {
         ...built,
         width,
         height: Math.max(1, Math.round((height || 300) * scale)),
+        // Only x is synced: these charts plot watts against watt-hours against dollars, so
+        // matching their y scales would line up numbers that have nothing to do with each other
+        cursor: syncKey
+          ? {
+              ...built.cursor,
+              sync: { key: syncKey, setSeries: false, scales: ["x", null] },
+            }
+          : built.cursor,
         plugins: [
           ...(built.plugins || []),
-          tooltipPlugin(getState, () => tooltipRef.current),
+          tooltipPlugin(getState, () => tooltipRef.current, !!syncKey),
         ],
       },
       dataRef.current,

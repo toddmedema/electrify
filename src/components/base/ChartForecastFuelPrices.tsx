@@ -2,7 +2,10 @@ import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
+  AXIS_LABEL_SIZE,
   dashArray,
+  FORECAST_AXIS_LEFT,
+  FORECAST_AXIS_RIGHT,
   padRange,
   SPLINE,
   stepTicks,
@@ -23,10 +26,14 @@ export interface Props {
   domain: { x: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  /** False where a chart below this one carries the month names for the whole stack */
+  showXLabels?: boolean;
+  /** Shares a cursor with the other charts drawn against the same months */
+  syncKey?: string;
 }
 
-type PricedFuelType = "Coal" | "Natural Gas" | "Oil" | "Uranium";
-const PRICED_FUELS: PricedFuelType[] = [
+export type PricedFuelType = "Coal" | "Natural Gas" | "Oil" | "Uranium";
+export const PRICED_FUELS: PricedFuelType[] = [
   "Coal",
   "Natural Gas",
   "Oil",
@@ -40,11 +47,11 @@ interface State {
   multiyear: boolean;
 }
 
-function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
-  return {
+function buildOptions(showXLabels: boolean) {
+  return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [5 * scale, 5 * scale, 0, 0],
+    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -58,6 +65,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     },
     axes: [
       xAxis(scale, {
+        showLabels: showXLabels,
         splits: () => {
           const [min, max] = getState().domain.x;
           return stepTicks(min, max, MINUTES_PER_MONTH);
@@ -72,6 +80,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       yAxis(scale, {
         grid: true,
         label: "Per MMBTU",
+        // The label sits outside the axis, so it comes out of the shared gutter too
+        size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
       }),
     ],
@@ -87,7 +97,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         paths: SPLINE,
       })),
     ],
-  };
+  });
 }
 
 function tooltip(idx: number, state: State): string {
@@ -102,7 +112,15 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
   {}
 > {
   public render() {
-    const { domain, height, timeline, startingYear, multiyear } = this.props;
+    const {
+      domain,
+      height,
+      timeline,
+      startingYear,
+      multiyear,
+      showXLabels,
+      syncKey,
+    } = this.props;
 
     const minutes = new Array<number>(timeline.length);
     // Every tick carries all four prices; the fallback is only here because the fuel prices
@@ -122,32 +140,11 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           height={height}
           state={{ prices, domain, startingYear, multiyear }}
           data={[minutes, ...prices]}
-          buildOptions={buildOptions}
+          buildOptions={buildOptions(showXLabels !== false)}
+          structureKey={String(showXLabels !== false)}
+          syncKey={syncKey}
           tooltip={tooltip}
         />
-        {/* Below the plot rather than floating in it, where it used to clip the data */}
-        <div className="chartLegend">
-          {PRICED_FUELS.map((f) => (
-            <span key={f} className="chartLegendItem">
-              <svg
-                className="chartLegendSwatch chartLegendSwatch-line"
-                viewBox="0 0 20 4"
-                aria-hidden="true"
-              >
-                <line
-                  x1="0"
-                  y1="2"
-                  x2="20"
-                  y2="2"
-                  stroke={fuelColors[f]}
-                  strokeWidth="3"
-                  strokeDasharray={fuelDashArrays[f]}
-                />
-              </svg>
-              {f}
-            </span>
-          ))}
-        </div>
       </div>
     );
   }
