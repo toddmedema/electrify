@@ -252,7 +252,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
     }
 
     return (
-      <div id="listCard">
+      <div id="listCard" className="flexContainer">
         <div id="topbar">
           <Toolbar>
             <IconButton
@@ -267,162 +267,171 @@ export default class NewGameDetails extends React.Component<Props, State> {
             <Typography variant="h6">{scenario.name}</Typography>
           </Toolbar>
         </div>
-        <div
-          style={{ textAlign: "center", margin: "20px 0", lineHeight: "30px" }}
-        >
-          Victory Conditions: {scenario.ownership}-Owned
-          <IconButton
-            onClick={toggleVictoryDialog}
-            aria-label="Victory conditions"
-            color="primary"
-            size="small"
+        <div className="scrollable">
+          <div
+            style={{
+              textAlign: "center",
+              margin: "20px 0",
+              lineHeight: "30px",
+            }}
           >
-            <InfoIcon />
-          </IconButton>
-          <br />
-          Timeframe: {scenario.startingYear} to{" "}
-          {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}
-          <br />
-          Location: {location.name}
-          <br />
-          Difficulty:&nbsp;
-          <Select
-            value={game.difficulty}
-            onChange={(e: SelectChangeEvent<DifficultyType>) =>
-              onDelta({ difficulty: e.target.value as DifficultyType })
-            }
-          >
-            {Object.keys(DIFFICULTIES).map((d: string) => {
-              return (
-                <MenuItem value={d} key={d}>
-                  <Tooltip
-                    title={DIFFICULTIES[d].description}
-                    placement="right"
-                  >
-                    <span>{d}</span>
-                  </Tooltip>
-                </MenuItem>
-              );
-            })}
-          </Select>
-        </div>
-
-        <div style={{ textAlign: "center" }}>
-          <Button
-            size="large"
-            variant="contained"
-            color="primary"
-            onClick={() => onStart(scenario.id)}
-            autoFocus
-          >
-            Play
-          </Button>
-        </div>
-
-        <Dialog open={victoryDialogOpen || false} onClose={toggleVictoryDialog}>
-          <DialogTitle>
             Victory Conditions: {scenario.ownership}-Owned
             <IconButton
-              aria-label="close"
               onClick={toggleVictoryDialog}
-              className="top-right"
-              size="large"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent>
-            <VictoryConditions
-              ownership={scenario.ownership}
-              dollarsPerkWh={scenario.dollarsPerkWh}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button
+              aria-label="Victory conditions"
               color="primary"
-              variant="contained"
-              onClick={(e: React.MouseEvent<HTMLElement>) => {
-                toggleVictoryDialog(e);
-              }}
+              size="small"
             >
-              Close
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Table id="HighScores">
-          <TableHead>
-            <TableRow>
-              <TableCell colSpan={5}>
-                <Typography variant="h6">Global High Scores</Typography>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell padding="none">#</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Score</TableCell>
-              <TableCell>Difficulty</TableCell>
-              <TableCell padding="none">Replay</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {myTopScore && (
-              <TableRow style={OWN_ROW_STYLE}>
-                <TableCell padding="none" />
-                <TableCell colSpan={2}>
-                  Your best: {formatScore(myTopScore.score)}
-                </TableCell>
-                <TableCell>{myTopScore.difficulty}</TableCell>
-                {this.renderReplayCell(myTopScore)}
-              </TableRow>
-            )}
-            {!scores && (
-              <TableRow>
-                <TableCell colSpan={5}>
-                  <Typography variant="body2" color="textSecondary">
-                    Loading...
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-            {scores && scores.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5}>
-                  <Typography variant="body2" color="textSecondary">
-                    {boardFailed
-                      ? "Couldn't load the high scores right now."
-                      : "Play the scenario to set a high score"}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-            {scores &&
-              scores.map((score: ScoreType, i: number) => {
-                const mine = Boolean(uid) && score.uid === uid;
+              <InfoIcon />
+            </IconButton>
+            <br />
+            Timeframe: {scenario.startingYear} to{" "}
+            {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}
+            <br />
+            Location: {location.name}
+            <br />
+            Difficulty:&nbsp;
+            <Select
+              value={game.difficulty}
+              onChange={(e: SelectChangeEvent<DifficultyType>) =>
+                onDelta({ difficulty: e.target.value as DifficultyType })
+              }
+            >
+              {Object.keys(DIFFICULTIES).map((d: string) => {
                 return (
-                  <TableRow key={i} style={mine ? OWN_ROW_STYLE : undefined}>
-                    <TableCell padding="none">{i + 1}</TableCell>
-                    {/* Scores set before display names existed carry no name */}
-                    <TableCell>{score.displayName || "Anonymous"}</TableCell>
-                    <TableCell>{formatScore(score.score)}</TableCell>
-                    <TableCell>{score.difficulty}</TableCell>
-                    {this.renderReplayCell(score)}
-                  </TableRow>
+                  <MenuItem value={d} key={d}>
+                    <Tooltip
+                      title={DIFFICULTIES[d].description}
+                      placement="right"
+                    >
+                      <span>{d}</span>
+                    </Tooltip>
+                  </MenuItem>
                 );
               })}
-          </TableBody>
-        </Table>
-        {/* Below the board rather than in place of it: the board is the reason to log in */}
-        {!uid && (
-          <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
-            <Button variant="outlined" color="primary" onClick={login}>
-              Log in
-            </Button>
-            <Typography variant="body2" color="textSecondary">
-              To set a high score under your own name
-            </Typography>
+            </Select>
           </div>
-        )}
+
+          <div style={{ textAlign: "center" }}>
+            <Button
+              size="large"
+              variant="contained"
+              color="primary"
+              onClick={() => onStart(scenario.id)}
+              autoFocus
+            >
+              Play
+            </Button>
+          </div>
+
+          <Dialog
+            open={victoryDialogOpen || false}
+            onClose={toggleVictoryDialog}
+          >
+            <DialogTitle>
+              Victory Conditions: {scenario.ownership}-Owned
+              <IconButton
+                aria-label="close"
+                onClick={toggleVictoryDialog}
+                className="top-right"
+                size="large"
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent>
+              <VictoryConditions
+                ownership={scenario.ownership}
+                dollarsPerkWh={scenario.dollarsPerkWh}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button
+                color="primary"
+                variant="contained"
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  toggleVictoryDialog(e);
+                }}
+              >
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Table id="HighScores">
+            <TableHead>
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <Typography variant="h6">Global High Scores</Typography>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell padding="none">#</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Score</TableCell>
+                <TableCell>Difficulty</TableCell>
+                <TableCell padding="none">Replay</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {myTopScore && (
+                <TableRow style={OWN_ROW_STYLE}>
+                  <TableCell padding="none" />
+                  <TableCell colSpan={2}>
+                    Your best: {formatScore(myTopScore.score)}
+                  </TableCell>
+                  <TableCell>{myTopScore.difficulty}</TableCell>
+                  {this.renderReplayCell(myTopScore)}
+                </TableRow>
+              )}
+              {!scores && (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <Typography variant="body2" color="textSecondary">
+                      Loading...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {scores && scores.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <Typography variant="body2" color="textSecondary">
+                      {boardFailed
+                        ? "Couldn't load the high scores right now."
+                        : "Play the scenario to set a high score"}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+              {scores &&
+                scores.map((score: ScoreType, i: number) => {
+                  const mine = Boolean(uid) && score.uid === uid;
+                  return (
+                    <TableRow key={i} style={mine ? OWN_ROW_STYLE : undefined}>
+                      <TableCell padding="none">{i + 1}</TableCell>
+                      {/* Scores set before display names existed carry no name */}
+                      <TableCell>{score.displayName || "Anonymous"}</TableCell>
+                      <TableCell>{formatScore(score.score)}</TableCell>
+                      <TableCell>{score.difficulty}</TableCell>
+                      {this.renderReplayCell(score)}
+                    </TableRow>
+                  );
+                })}
+            </TableBody>
+          </Table>
+          {/* Below the board rather than in place of it: the board is the reason to log in */}
+          {!uid && (
+            <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
+              <Button variant="outlined" color="primary" onClick={login}>
+                Log in
+              </Button>
+              <Typography variant="body2" color="textSecondary">
+                To set a high score under your own name
+              </Typography>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
