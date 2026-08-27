@@ -18,7 +18,26 @@ With Node.js installed, run the following from the root of the repository:
 npm install
 ```
 
-To use the online high score capabilities, you will need to contact an admin to get a Firebase api key.
+### Configuration
+
+Copy `.env.example` to `.env` and fill in what you need. The game runs without it -- only the
+online high scores need a key.
+
+```sh
+cp .env.example .env
+```
+
+`.env` is gitignored and must stay that way. Two rules make it safe to have around:
+
+- **`REACT_APP_*` is public.** Create-React-App compiles every variable with that prefix into the
+  JavaScript bundle, which is then served from the CDN. Never put a secret behind that prefix.
+  Everything else in the file is read by `deploy.sh` and never reaches the browser.
+- **AWS credentials don't go in it.** Use `aws configure`, which stores them in `~/.aws`, outside
+  the repository.
+
+To use the online high score capabilities, you will need to contact an admin to get a Firebase api
+key. A Firebase web API key is public by design -- what protects it is the HTTP referrer
+restriction on the key itself, not secrecy.
 
 ### Development Workflow: Serve & watch
 

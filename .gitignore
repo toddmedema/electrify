@@ -40,5 +40,12 @@ res/
 config.json
 google-services.json
 GoogleService-Info.plist
-.env.local
 .idea
+
+# Every .env file is secret here, including plain `.env` -- create-react-app's own
+# convention is that `.env` holds committed defaults, so ignoring only `.env.local`
+# leaves the file deploy.sh reads untracked by luck rather than by rule. Defaults
+# that belong in git live in deploy.sh itself; .env.example documents the keys.
+.env
+.env.*
+!.env.example
