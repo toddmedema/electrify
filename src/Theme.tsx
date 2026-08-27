@@ -74,6 +74,8 @@ interface ChartPaletteType {
   storage: string;
   demand: string;
   supply: string;
+  /** The wash under the supply line marking history vs. forecast on the Facilities chart */
+  historicFill: string;
   blackout: string;
   temperature: string;
   /** The temperature line's punch is too thin for the axis labels naming it */
@@ -100,6 +102,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     storage: blue[800],
     demand: grey[900],
     supply: blue[600],
+    historicFill: blue[50],
     blackout: red[800], // darker than red[500] so the translucent band reads on white
     temperature: red[500],
     temperatureAxis: red[800],
@@ -119,6 +122,9 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     storage: blue[300],
     demand: grey[100],
     supply: blue[300],
+    // Blue50 solid, as light uses, reads as a near-white glare on a near-black plot; a faint
+    // tint of the supply line itself keeps the wash subtle enough for both lines to read over it
+    historicFill: withAlpha(blue[300], 0.16),
     blackout: red[400],
     temperature: red[300],
     temperatureAxis: red[300],

@@ -58,7 +58,6 @@ interface State {
 }
 
 const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
-const HISTORIC_FILL = "#e3f2fd"; // blue50
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
@@ -105,7 +104,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {
         stroke: chartPalette().supply,
         width: 1.75,
-        fill: HISTORIC_FILL,
+        fill: chartPalette().historicFill,
         points: { show: false },
         spanGaps: false,
       },
