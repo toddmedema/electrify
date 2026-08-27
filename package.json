@@ -50,6 +50,7 @@
     "test": "react-scripts test",
     "sim": "node scripts/sim.js",
     "fetch-weather": "node scripts/fetch-weather.js",
+    "update-weather": "node scripts/update-weather.js",
     "eject": "react-scripts eject",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,css,scss,json}\"",

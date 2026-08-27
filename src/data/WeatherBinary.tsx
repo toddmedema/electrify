@@ -3,15 +3,15 @@ import { RawWeatherType } from "../Types";
 /**
  * Reader for the packed weather files in public/data/weather, written by scripts/fetch-weather.js.
  *
- * A location's whole record is twelve days a year for forty years - 11,520 hourly readings - and
- * as CSV that was 265KB of text to download and parse before the first frame of a game. Packed it
- * is 57KB and a single pass over a DataView, which is what makes shipping hundreds of cities
+ * A location's whole record is twelve days a year for several decades, and as CSV that would be
+ * hundreds of KB of text to download and parse before the first frame of a game. Packed it is
+ * about 66KB through 2025 and a single pass over a DataView, which is what makes hundreds of cities
  * affordable rather than a megabyte apiece.
  *
  * The layout is deliberately self-describing: the header carries the scale each field was
  * quantised with, so this file and the fetch script cannot quietly disagree about whether wind is
  * in whole kph or half kph. Anything that doesn't parse throws rather than returning a plausible
- * looking array of zeroes, because forty years of 0C is a game that runs and is simply wrong.
+ * looking array of zeroes, because decades of 0C is a game that runs and is simply wrong.
  */
 
 const MAGIC = "EWX1";

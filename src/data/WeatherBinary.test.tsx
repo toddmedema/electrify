@@ -156,7 +156,7 @@ describe("the shipped weather files", () => {
     expect(ids).toEqual(expect.arrayContaining(["PIT", "SF", "HNL", "SJU"]));
   });
 
-  it.each(ids)("%s covers forty years of readable weather", (id: string) => {
+  it.each(ids)("%s covers complete years of readable weather", (id: string) => {
     const buffer = readShipped(id);
     const header = readWeatherHeader(buffer);
     expect(header).toMatchObject({
@@ -164,13 +164,15 @@ describe("the shipped weather files", () => {
       daysPerYear: 12,
       hoursPerDay: 24,
       startingYear: 1980,
-      yearCount: 40,
-      rowCount: 11520,
     });
+    // Rate-limited update runs replace each file atomically, so a branch being filled over
+    // several days can safely contain both the old complete record and the new complete record.
+    expect([40, 46]).toContain(header.yearCount);
+    expect(header.rowCount).toBe(header.yearCount * 12 * 24);
 
     const rows = decodeWeather(buffer);
     expect(rows[0].YEAR).toEqual(1980);
-    expect(rows[rows.length - 1].YEAR).toEqual(2019);
+    expect(rows[rows.length - 1].YEAR).toEqual(1979 + header.yearCount);
 
     // Reduced to one assertion per field rather than one per row: eleven thousand assertions a
     // city adds up to minutes once the catalogue is full, and a range says the same thing

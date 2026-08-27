@@ -72,8 +72,8 @@ works.
 
 ### Add a city to play in
 
-Every location is a single file in `public/data/weather`: forty years of hourly readings for the
-twelve days a year the game actually simulates, packed into 57KB. Whichever cities have been
+Every location is a single file in `public/data/weather`: hourly readings from 1980 through 2025
+for the twelve days a year the game actually simulates, packed into about 66KB. Whichever cities have been
 downloaded are exactly the ones the custom game screen offers - `public/data/weather/index.json`
 is written by the same script and is what the picker reads.
 
@@ -93,6 +93,17 @@ API](https://open-meteo.com/en/docs/historical-weather-api), which is free and n
 rate limits to roughly ten cities an hour and twenty a day. The script paces itself against that,
 writes each city out as it finishes and skips whatever is already on disk - so filling in the rest
 of the catalogue is a matter of running it again tomorrow rather than leaving it running.
+
+To extend every existing file after another calendar year has completed, run:
+
+```sh
+npm run update-weather
+```
+
+This preserves the existing packed readings and fetches only the missing years through the last
+fully completed year. Use `npm run update-weather -- --through 2030` to choose an explicit cutoff;
+city ids and `--limit` work here too, and completed files are skipped when a rate-limited run is
+resumed.
 
 To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. An `id` ends up
 in save games and replays, so it can never be changed afterwards; everything else can.

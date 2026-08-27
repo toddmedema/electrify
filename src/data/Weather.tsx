@@ -10,7 +10,7 @@ import { decodeWeather } from "./WeatherBinary";
 // game may start -- which is why the custom game screen builds its year list off it.
 export const WEATHER_STARTING_YEAR = 1980;
 const STARTING_YEAR = WEATHER_STARTING_YEAR; // assumed to be the same for all locations
-const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
+const ENDING_YEAR = 2025; // for weather data, Dec 31st, assumed to be the same for all locations
 const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
@@ -80,7 +80,7 @@ interface MonthClimatologyType {
 }
 
 // One entry per calendar month, built once per load from whatever was loaded. Every location gets
-// its seasonality from its own forty years rather than from anything written per location here,
+// its seasonality from its own multi-decade record rather than from anything written per location here,
 // which is what makes this scale to a seventh city.
 let climatology: MonthClimatologyType[] = [];
 
@@ -208,7 +208,7 @@ export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
  * Downloads a location's record, for the browser.
  *
  * TODO download several locations at start with a 2s init delay, like loading audio (but after
- * audio) for offline play. At 57KB apiece rather than 265KB of CSV that is far cheaper than it
+ * audio) for offline play. At about 66KB apiece rather than hundreds of KB of CSV that is far cheaper than it
  * was, though at 282 catalogued locations it can no longer be all of them.
  *
  * @param callback - Called once, with the reason if the record could not be loaded. A caller that
@@ -266,7 +266,7 @@ export function initWeather(
  * Generating in order matters twice over: each forecast day is last year's same day nudged, so
  * skipping days would forecast off a day that was never written; and going one day per call, the
  * way this used to, left every lookup past the data returning DUMMY_WEATHER until the array
- * happened to catch up -- which a game loaded straight into a year past 2019 never would.
+ * happened to catch up -- which a game loaded straight into a year past the record never would.
  */
 function forecastThroughDay(seed: number, throughDay: number) {
   if (weather.length === 0) {

@@ -90,9 +90,9 @@ out to jest pointed at `SimCli.tsx`, which is named so CRA's default `testMatch`
 - **The first month is recorded on the first tick.** `previousMonth` starts empty, so a rollover
   fires immediately and a 144 month run reports 145 months. That is the real game's behavior, and
   the extra entry summarizes a full generated day, not a single tick.
-- **The seed only matters past the recorded data.** Weather runs 1980-2019 and fuel prices
-  similar; inside that window the game replays real history and every seed agrees. Scenarios
-  starting in 2020 diverge immediately.
+- **The seed only matters past the recorded data.** Weather runs 1980-2025 (fuel prices have a
+  shorter record); inside the weather window every seed agrees. Weather in scenarios starting in
+  2026 diverges immediately.
 - **A month rollover is not one simulation step.** It regenerates the timeline and pre-rolls four
   more frames against the same tick. Anything measured by diffing consecutive ticks has to skip
   rollovers, which is why the cash and energy checks only run within a month.
