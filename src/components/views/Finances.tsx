@@ -53,6 +53,7 @@ import {
 } from "../../Types";
 import {
   formatLargeMassValue,
+  formatLargeMassValueConcise,
   largeMassUnit,
   massUnit,
   toDisplayMass,
@@ -180,7 +181,8 @@ function buildChartKeys(units: UnitSystemType): {
     kgco2e: {
       label: "CO2e emitted",
       higherIsBetter: false,
-      format: (n: number) => formatLargeMassValue(n, units),
+      format: (n: number) => formatLargeMassValueConcise(n, units),
+      formatTable: (n: number) => formatLargeMassValue(n, units),
       suffix: largeMassUnit(units),
       nesting: 2,
     },
@@ -837,8 +839,46 @@ export default class Finances extends React.Component<Props, State> {
     );
 
     return (
-      <GameCard className="finances" title="Finances" id="financesPane">
+      <GameCard
+        className="finances"
+        title={smallMultiples ? undefined : "Finances"}
+        id="financesPane"
+      >
         <div className="scrollable">
+          {/* On a wide screen the tiles below already say what's plotted and pick a different
+              one, so the range is the only thing left to choose -- it moves up here with the
+              title instead of sharing a row with the sliders (see Facilities, whose build
+              buttons live in the same spot) */}
+          {smallMultiples && (
+            <Toolbar className="paneHeader">
+              <Typography variant="h6">Finances</Typography>
+              <Select
+                id="plotRange"
+                value={this.state.range}
+                onChange={(e: SelectChangeEvent<string>) =>
+                  this.setRange(e.target.value)
+                }
+                className="headerControl"
+              >
+                <MenuItem value={ALL_TIME}>All time</MenuItem>
+                <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
+                {FUTURE_YEARS.map((y: number) => {
+                  return (
+                    <MenuItem value={futureRange(y)} key={futureRange(y)}>
+                      Next {y} {y === 1 ? "year" : "years"}
+                    </MenuItem>
+                  );
+                })}
+                {years.map((y: number) => {
+                  return (
+                    <MenuItem value={String(y)} key={y}>
+                      {y}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </Toolbar>
+          )}
           {selectedFacility && selectedLifetime && (
             // The other half of clicking a row in the fleet list: the stack in Forecasts
             // says which power is this facility's, and this says which money is
@@ -976,76 +1016,76 @@ export default class Finances extends React.Component<Props, State> {
                 />
               </div>
             )}
-            <div className="flex-newline"></div>
-            <Typography variant="h6" style={{ flexGrow: 0 }}>
-              Plotting{" "}
-            </Typography>
-            {/* The tiles below are the picker on a wide screen, so out here the metric is a
-                label rather than a control */}
-            {smallMultiples && (
-              <Typography variant="h6" style={{ flexGrow: 0 }}>
-                {chartKeys[chartKey].label}
-              </Typography>
-            )}
-            {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
+            {/* On a wide screen this whole row goes away: the range moved up into the pane
+                header above, and the tiles below are the metric picker, so there is nothing
+                left here that isn't said somewhere else */}
             {!smallMultiples && (
-              <Select
-                id="plotMetric"
-                value={chartKey}
-                onChange={(e: SelectChangeEvent<string>) =>
-                  this.setChartKey(e.target.value as DerivedHistoryKeysType)
-                }
-              >
-                {CHART_KEY_NAMES.map((key: string) => {
-                  const k = chartKeys[key];
-                  let label = k.label;
-                  if (chartKey !== key && chartKeys[key].nesting) {
-                    // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
-                    label =
-                      new Array((chartKeys[key].nesting || 0) + 1).join(" -") +
-                      " " +
-                      label;
+              <>
+                <div className="flex-newline"></div>
+                <Typography variant="h6" style={{ flexGrow: 0 }}>
+                  Plotting{" "}
+                </Typography>
+                {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
+                <Select
+                  id="plotMetric"
+                  value={chartKey}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    this.setChartKey(e.target.value as DerivedHistoryKeysType)
                   }
-                  return (
-                    <MenuItem
-                      className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
-                      value={key}
-                      key={key}
-                    >
-                      {label}
-                    </MenuItem>
-                  );
-                })}
-              </Select>
+                >
+                  {CHART_KEY_NAMES.map((key: string) => {
+                    const k = chartKeys[key];
+                    let label = k.label;
+                    if (chartKey !== key && chartKeys[key].nesting) {
+                      // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
+                      label =
+                        new Array((chartKeys[key].nesting || 0) + 1).join(
+                          " -",
+                        ) +
+                        " " +
+                        label;
+                    }
+                    return (
+                      <MenuItem
+                        className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
+                        value={key}
+                        key={key}
+                      >
+                        {label}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+                <Typography variant="h6" style={{ flexGrow: 0 }}>
+                  {" "}
+                  for{" "}
+                </Typography>
+                <Select
+                  id="plotRange"
+                  value={this.state.range}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    this.setRange(e.target.value)
+                  }
+                >
+                  <MenuItem value={ALL_TIME}>All time</MenuItem>
+                  <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
+                  {FUTURE_YEARS.map((y: number) => {
+                    return (
+                      <MenuItem value={futureRange(y)} key={futureRange(y)}>
+                        Next {y} {y === 1 ? "year" : "years"}
+                      </MenuItem>
+                    );
+                  })}
+                  {years.map((y: number) => {
+                    return (
+                      <MenuItem value={String(y)} key={y}>
+                        {y}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </>
             )}
-            <Typography variant="h6" style={{ flexGrow: 0 }}>
-              {" "}
-              for{" "}
-            </Typography>
-            <Select
-              id="plotRange"
-              value={this.state.range}
-              onChange={(e: SelectChangeEvent<string>) =>
-                this.setRange(e.target.value)
-              }
-            >
-              <MenuItem value={ALL_TIME}>All time</MenuItem>
-              <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
-              {FUTURE_YEARS.map((y: number) => {
-                return (
-                  <MenuItem value={futureRange(y)} key={futureRange(y)}>
-                    Next {y} {y === 1 ? "year" : "years"}
-                  </MenuItem>
-                );
-              })}
-              {years.map((y: number) => {
-                return (
-                  <MenuItem value={String(y)} key={y}>
-                    {y}
-                  </MenuItem>
-                );
-              })}
-            </Select>
           </Toolbar>
           {monthly.length > 0 ? (
             <ChartFinances

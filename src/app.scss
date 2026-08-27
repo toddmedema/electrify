@@ -320,8 +320,12 @@ table {
   th {
     font-weight: bold !important;
   }
+  // A transparent border instead of extra padding-top: padding controls where the text sits
+  // inside its own row, and stretching only the top of that would leave the text sitting low --
+  // noticeably off-centre next to every nested row underneath it, which is symmetric. A border
+  // adds the same breathing room above the row without moving the text inside it.
   tr.bold td {
-    padding-top: 16px;
+    border-top: 10px solid transparent;
   }
 }
 
@@ -408,6 +412,12 @@ $pane_header_height: 40px;
 .base_main .MuiToolbar-root.paneHeader {
   min-height: $pane_header_height !important;
   border-bottom: $border_accent;
+}
+
+// A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
+// the flex equivalent of .manual-search, for headers with a dropdown instead of a search box
+.headerControl {
+  margin-left: auto;
 }
 
 .flex-newline {

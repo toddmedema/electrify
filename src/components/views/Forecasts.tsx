@@ -86,11 +86,16 @@ export default class Forecasts extends React.Component<Props, State> {
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
     // Because forecasts are computationally intense and long term, only update when the
     // month or state changes -- plus when the player selects a facility, which is a direct
-    // request to re-highlight the stack and would otherwise wait for a month rollover
+    // request to re-highlight the stack and would otherwise wait for a month rollover, or moves
+    // a slider that feeds the forecast (marketing spend drives customer growth, the rate drives
+    // revenue), which would otherwise sit frozen until the next month rolled over
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
       this.props.selectedFacilityId !== nextProps.selectedFacilityId ||
-      this.state.years !== nextState.years
+      this.state.years !== nextState.years ||
+      this.props.game.monthlyMarketingSpend !==
+        nextProps.game.monthlyMarketingSpend ||
+      this.props.game.dollarsPerkWh !== nextProps.game.dollarsPerkWh
     );
   }
 
@@ -230,26 +235,31 @@ export default class Forecasts extends React.Component<Props, State> {
         : undefined;
 
     return (
-      <GameCard className="Forecasts" title="Forecasts" id="forecastsPane">
+      <GameCard className="Forecasts" id="forecastsPane">
         <div className="scrollable">
+          {/* The pane's own header rather than GameCard's plain one, so the horizon picker --
+              which governs every chart in the stack below, not just the first -- sits with the
+              title instead of floating inside "Supply & Demand" (see Facilities, whose build
+              buttons live here the same way) */}
+          <Toolbar className="paneHeader">
+            <Typography variant="h6">Forecasts</Typography>
+            <Select
+              id="forecastYears"
+              value={years}
+              onChange={(e: SelectChangeEvent<number>) =>
+                this.setYears(e.target.value as number)
+              }
+              className="headerControl"
+            >
+              {FORECAST_YEARS_OPTIONS.map((y: number) => (
+                <MenuItem value={y} key={y}>
+                  {y} year{y > 1 ? "s" : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </Toolbar>
           <Toolbar>
-            <Typography variant="h6">
-              Supply & Demand
-              <Select
-                id="forecastYears"
-                value={years}
-                onChange={(e: SelectChangeEvent<number>) =>
-                  this.setYears(e.target.value as number)
-                }
-                sx={{ float: "right" }}
-              >
-                {FORECAST_YEARS_OPTIONS.map((y: number) => (
-                  <MenuItem value={y} key={y}>
-                    {y} year{y > 1 ? "s" : ""}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Typography>
+            <Typography variant="h6">Supply & Demand</Typography>
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
