@@ -288,6 +288,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       height={height}
       state={state}
       data={[minutes, supplyHistoric, supplyForecast, demand]}
+      seriesLabels={["Past supply", "Forecast supply", "Demand"]}
       buildOptions={buildOptions}
       tooltip={tooltip}
     />

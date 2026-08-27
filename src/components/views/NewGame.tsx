@@ -2,11 +2,13 @@ import * as React from "react";
 import {
   Avatar,
   Badge,
-  Button,
   Card,
+  CardActionArea,
   CardHeader,
+  Chip,
   IconButton,
   List,
+  ListSubheader,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -69,61 +71,71 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   return (
     <Card
       data-testid={`mission-row-${s.id}`}
-      className={`build-list-item clickable-card${next ? " tutorialNext" : ""}`}
-      onClick={onSelect}
+      className={`build-list-item${next ? " tutorialNext" : ""}`}
     >
-      <CardHeader
-        style={{ opacity: completed ? 0.6 : 1 }}
-        avatar={
-          <Badge
-            overlap="circular"
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            badgeContent={
-              completed ? (
-                <CheckCircleIcon
-                  data-testid={`mission-complete-${s.id}`}
-                  className="tutorialComplete"
+      <CardActionArea
+        onClick={onSelect}
+        autoFocus={next}
+        aria-label={
+          isTutorial
+            ? `${completed ? "Replay" : "Play"} ${s.name}${next ? ", recommended next" : ""}`
+            : `View ${s.name} details`
+        }
+      >
+        <CardHeader
+          avatar={
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              badgeContent={
+                completed ? (
+                  <CheckCircleIcon
+                    data-testid={`mission-complete-${s.id}`}
+                    className="tutorialComplete"
+                    color="primary"
+                    fontSize="small"
+                    titleAccess={`${s.name} completed`}
+                  />
+                ) : undefined
+              }
+            >
+              <Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />
+            </Badge>
+          }
+          title={
+            <span>
+              {s.name}
+              {next && (
+                <Chip
+                  className="recommendedChip"
+                  label="Recommended next"
+                  size="small"
                   color="primary"
-                  fontSize="small"
-                  titleAccess={`${s.name} completed`}
                 />
-              ) : undefined
-            }
-          >
-            <Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />
-          </Badge>
-        }
-        title={s.name}
-        subheader={next ? "Start here" : summary}
-        action={
-          isTutorial ? (
-            <Button
-              size="small"
-              variant={completed ? "outlined" : "contained"}
-              color="primary"
-              onClick={(e) => {
-                // The whole card is clickable too - don't start the mission twice
-                e.stopPropagation();
-                onSelect();
-              }}
-              autoFocus={next}
-            >
-              {completed ? "Replay" : "Play"}
-            </Button>
-          ) : (
-            <IconButton
-              color="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect();
-              }}
-              size="large"
-            >
-              <ArrowRightIcon />
-            </IconButton>
-          )
-        }
-      />
+              )}
+            </span>
+          }
+          subheader={
+            <span>
+              {summary}
+              {completed && (
+                <span className="missionCompleteText">Completed</span>
+              )}
+            </span>
+          }
+          action={
+            isTutorial ? (
+              <Chip
+                label={completed ? "Replay" : "Play"}
+                variant={completed ? "outlined" : "filled"}
+                color="primary"
+              />
+            ) : (
+              <ArrowRightIcon color="primary" aria-hidden />
+            )
+          }
+        />
+      </CardActionArea>
     </Card>
   );
 }
@@ -131,6 +143,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
 export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
+  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps);
 
   return (
     <div id="listCard" className="flexContainer">
@@ -145,7 +158,9 @@ export default function NewGame(props: Props): React.JSX.Element {
           >
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Missions</Typography>
+          <Typography component="h1" variant="h6">
+            Missions
+          </Typography>
           {/* Otherwise the Manual is only reachable from the title screen and the in-game
               overflow menu, so players who stop partway through never find out it exists.
               Auto margin rather than absolute positioning, so it can't sit on top of the
@@ -161,20 +176,80 @@ export default function NewGame(props: Props): React.JSX.Element {
           </IconButton>
         </Toolbar>
       </div>
-      <List dense className="scrollable cardList">
-        {SCENARIOS.map((s) => (
+      <List
+        dense
+        className="scrollable cardList"
+        aria-label="Available missions"
+      >
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Training
+          </Typography>
+          <Typography variant="caption" component="p">
+            Six short missions teach the game step by step.
+          </Typography>
+        </ListSubheader>
+        {TUTORIALS.map((s) => (
           <MissionListItem
             key={s.id}
             s={s}
             completed={ids.indexOf(s.id) !== -1}
             next={nextTutorial !== undefined && s.id === nextTutorial.id}
-            onSelect={
-              s.tutorialSteps
-                ? () => props.onTutorial(s.id)
-                : () => props.onDetails({ scenarioId: s.id })
-            }
+            onSelect={() => props.onTutorial(s.id)}
           />
         ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Scenarios
+          </Typography>
+        </ListSubheader>
+        {scenarios.map((s) => (
+          <MissionListItem
+            key={s.id}
+            s={s}
+            completed={ids.indexOf(s.id) !== -1}
+            next={false}
+            onSelect={() => props.onDetails({ scenarioId: s.id })}
+          />
+        ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Sandbox
+          </Typography>
+        </ListSubheader>
         <MissionListItem
           key={CUSTOM_SCENARIO_ID}
           s={DEFAULT_CUSTOM_SCENARIO}

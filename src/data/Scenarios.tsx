@@ -17,7 +17,7 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 1,
     endTitle: "Mission complete!",
-    endMessage: "Just a few missions to go",
+    endMessage: "You kept the grid running for a full day.",
     facilities: [
       { fuel: "Natural Gas", peakW: 410000000 },
       { fuel: "Sun", peakW: 300000000 },
@@ -30,7 +30,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "goal"]}
-            text="Earn money - don't go broke or black out."
+            text="Your goal: keep the lights on and finish with more cash."
           />
         ),
       },
@@ -40,7 +40,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Keep supply above demand - this is one average day."
+            text="Blue supply must stay above demand all day. Red means a blackout."
           />
         ),
       },
@@ -50,7 +50,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["generator"]}
-            text="Your power plants - the bar shows what each is producing."
+            text="Your plants make electricity. 351/410 MW means 351 MW now, out of 410 MW max."
           />
         ),
       },
@@ -61,7 +61,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Press play."
+            text="Tap 1× to start time."
             action={["play"]}
           />
         ),
@@ -92,8 +92,7 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage:
-      "You now know enough to run a company on Intern difficulty - or, continue missions to build your skills",
+    endMessage: "You built your first generator and put it to work.",
     facilities: [{ fuel: "Natural Gas", peakW: 500000000 }],
     tutorialSteps: [
       {
@@ -148,7 +147,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Run the year."
+            text="Tap 1× to run the year."
             action={["play"]}
           />
         ),
@@ -169,7 +168,7 @@ export const SCENARIOS = [
     durationMonths: 6,
     endTitle: "Mission complete!",
     endMessage:
-      "You now know enough to run a company on Employee difficulty - or, continue missions to build your skills",
+      "You stored spare power and used dispatch order to control the grid.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 500000000 },
       { fuel: "Coal", peakW: 480000000 },
@@ -229,7 +228,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Run it."
+            text="Tap 1× to run it."
             action={["play"]}
           />
         ),
@@ -249,8 +248,7 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 1,
     endTitle: "Mission complete!",
-    endMessage:
-      "You now know enough to run a company on Manager difficulty - or, continue missions to build your skills",
+    endMessage: "You read the books and tracked how the company makes money.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },
@@ -303,7 +301,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play", "money"]}
-            text="Run a month - watch the numbers."
+            text="Tap 1× to run a month and watch the numbers."
             action={["play"]}
           />
         ),
@@ -323,8 +321,7 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage:
-      "You now know enough to run a company on VP difficulty - or, continue missions to build your skills",
+    endMessage: "You grew your customer base while keeping demand in view.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },
@@ -390,7 +387,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Run the year."
+            text="Tap 1× to run the year."
             action={["play"]}
           />
         ),
@@ -410,7 +407,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 12,
     endTitle: "Mission complete!",
-    endMessage: `That's all we can teach you - the rest you'll have to learn by doing!`,
+    endMessage:
+      "You used forecasts to plan ahead. You're ready for a full scenario.",
     facilities: [{ fuel: "Coal", peakW: 450000000 }],
     tutorialSteps: [
       {
@@ -476,7 +474,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Run the year - the Manual (top-left menu) has the deep dives."
+            text="Tap 1× to run the year. The Manual has the deep dives."
             action={["play"]}
           />
         ),

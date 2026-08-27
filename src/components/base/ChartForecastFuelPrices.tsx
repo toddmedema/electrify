@@ -149,6 +149,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
           height={height}
           state={{ prices, minutes, domain, startingYear, multiyear }}
           data={[minutes, ...prices]}
+          seriesLabels={PRICED_FUELS}
           buildOptions={buildOptions(showXLabels !== false)}
           structureKey={String(showXLabels !== false)}
           syncKey={syncKey}

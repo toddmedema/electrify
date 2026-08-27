@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Avatar,
+  Box,
   Button,
   Card,
   CardHeader,
@@ -80,6 +81,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
     LOAN_MONTHS,
   );
   const buildable = props.generator.peakW <= props.generator.maxPeakW;
+  const financingGap = Math.max(0, downpayment - cash);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(
@@ -111,7 +113,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   // </TableRow>
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar
@@ -120,41 +122,89 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
           />
         }
         action={
-          <span>
-            <Button
-              className="buy-button"
-              size="small"
-              variant="contained"
-              color="primary"
-              onClick={toggleOpen}
-              disabled={downpayment > cash || !buildable}
-              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-            >
-              {formatMoneyConcise(generator.buildCost)}
-            </Button>
-            <Typography
-              className="action-seconday-text"
-              variant="body2"
-              color="textSecondary"
-            >
-              {Math.round(generator.yearsToBuild * 12)}mo to build
-              <br />
-              {fuelPrices[generator.fuel] ? "~" : ""}
-              {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
-              <br />
-              {kgCO2ePerMWh > 0
-                ? `${formatMass(kgCO2ePerMWh, units)} CO2e/MWh`
-                : "No CO2e"}
-            </Typography>
-          </span>
+          <Button
+            className="buy-button"
+            size="small"
+            variant="contained"
+            color="primary"
+            onClick={toggleOpen}
+            disabled={financingGap > 0 || !buildable}
+            startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+            aria-label={`Review purchase of ${generator.name}`}
+          >
+            Review
+          </Button>
         }
         title={generator.name}
         subheader={secondaryText}
       />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
+          gap: 1,
+          px: 2,
+          pb: 1.5,
+        }}
+      >
+        <GeneratorMetric
+          label="Build cost"
+          value={formatMoneyConcise(generator.buildCost)}
+        />
+        <GeneratorMetric
+          label="Build time"
+          value={`${Math.round(generator.yearsToBuild * 12)} mo`}
+        />
+        <GeneratorMetric
+          label="Operating cost"
+          value={`${formatMoneyConcise(generator.annualOperatingCost)}/yr`}
+        />
+        <GeneratorMetric
+          label="Energy cost"
+          value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+        />
+        <GeneratorMetric
+          label="Emissions"
+          value={
+            kgCO2ePerMWh > 0
+              ? `${formatMass(kgCO2ePerMWh, units)} CO2e/MWh`
+              : "No CO2e"
+          }
+        />
+      </Box>
+      {buildable && financingGap > 0 && (
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          sx={{ px: 2, pb: 1.5 }}
+        >
+          Need {formatMoneyConcise(financingGap)} more cash for the{" "}
+          {formatMoneyConcise(downpayment)} loan down payment.
+        </Typography>
       )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+      {buildable && financingGap === 0 && cash < generator.buildCost && (
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          sx={{ px: 2, pb: 1.5 }}
+        >
+          Financing available with a {formatMoneyConcise(downpayment)} down
+          payment.
+        </Typography>
+      )}
+      <IconButton
+        color="primary"
+        className="expand-icon"
+        size="small"
+        aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
+        aria-expanded={expanded}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleExpand();
+        }}
+      >
+        {expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+      </IconButton>
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
@@ -362,6 +412,31 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
         </DialogActions>
       </Dialog>
     </Card>
+  );
+}
+
+function GeneratorMetric(props: {
+  label: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <Box
+      sx={{
+        minWidth: 0,
+        p: 1,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1,
+        bgcolor: "action.hover",
+      }}
+    >
+      <Typography variant="caption" color="textSecondary" component="div">
+        {props.label}
+      </Typography>
+      <Typography variant="body2" component="div" sx={{ fontWeight: 600 }}>
+        {props.value}
+      </Typography>
+    </Box>
   );
 }
 

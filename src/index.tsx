@@ -17,6 +17,44 @@ root.render(
   </React.StrictMode>,
 );
 
+if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .then((registration) => {
+        let reloadForUpdate = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloadForUpdate) {
+            window.location.reload();
+          }
+        });
+        const offerUpdate = () => {
+          if (!registration.waiting) {
+            return;
+          }
+          store.dispatch({
+            type: "ui/snackbarOpen",
+            payload: {
+              message: "An Electrify update is ready.",
+              actionLabel: "Update",
+              action: () => {
+                reloadForUpdate = true;
+                registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+              },
+              open: true,
+              timeout: 12000,
+            },
+          });
+        };
+        offerUpdate();
+        registration.addEventListener("updatefound", () => {
+          registration.installing?.addEventListener("statechange", offerUpdate);
+        });
+      })
+      .catch((error) => console.warn("Couldn't enable offline play:", error));
+  });
+}
+
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals

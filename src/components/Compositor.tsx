@@ -33,6 +33,7 @@ import {
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import InstallAppButton from "./base/InstallAppButton";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -277,6 +278,7 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
     size,
     step,
     backProps,
+    closeProps,
     primaryProps,
     tooltipProps,
     isLastStep,
@@ -305,6 +307,9 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
         <span className="tutorialProgress">
           Step {index + 1} of {size}
         </span>
+        <Button {...closeProps} color="primary" size="small">
+          Exit tutorial
+        </Button>
         {index > 0 && !flags.hideBack && (
           <Button {...backProps} color="primary">
             Back
@@ -607,9 +612,9 @@ export default class Compositor extends React.Component<Props, {}> {
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <div className="base_main" ref={transitionNodeRef}>
+            <main className="base_main" ref={transitionNodeRef}>
               {this.renderCard()}
-            </div>
+            </main>
           </CSSTransition>
         </TransitionGroup>
         {tutorialSteps && (
@@ -628,7 +633,9 @@ export default class Compositor extends React.Component<Props, {}> {
             // disableOverlayClose prop, into this single options prop
             options={{
               beaconSize: 48,
-              overlayColor: "rgba(0, 0, 0, 0.1)",
+              // Enough separation to make the highlighted control unmistakable while keeping
+              // the surrounding dashboard legible as context for what the prompt is teaching.
+              overlayColor: "rgba(0, 0, 0, 0.38)",
               // Joyride traps Tab inside the tooltip, so Esc is the way back out for
               // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
               // those are far too easy to trigger by accident mid-walkthrough
@@ -657,6 +664,9 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
+            {ui.dialog.title.startsWith("🎉") && (
+              <InstallAppButton label="Install for later" afterMilestone />
+            )}
             {ui.dialog.secondaryAction && (
               <Button color="primary" onClick={ui.dialog.secondaryAction}>
                 {ui.dialog.secondaryLabel || "Close"}

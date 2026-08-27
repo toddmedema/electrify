@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
 import { GameType, ScenarioType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
@@ -40,16 +40,22 @@ describe("NewGame", () => {
       expect(rows[index]).toHaveTextContent(scenario.name),
     );
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
-    expect(screen.queryByText("Tutorials")).not.toBeInTheDocument();
-    expect(screen.queryByText("Scenarios")).not.toBeInTheDocument();
+    expect(screen.getByText("Training")).toBeInTheDocument();
+    expect(screen.getByText("Scenarios")).toBeInTheDocument();
+    expect(screen.getByText("Sandbox")).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Available missions" }),
+    ).toContainElement(rows[0]);
   });
 
-  it("marks the first incomplete tutorial as the starting point", () => {
+  it("highlights the first incomplete tutorial without replacing its subtitle", () => {
     recordPlayed(TUTORIALS[0].id);
     render(<NewGame {...props()} />);
 
     const next = screen.getByTestId(`mission-row-${TUTORIALS[1].id}`);
-    expect(next).toHaveTextContent("Start here");
+    expect(TUTORIALS[1].summary).toBeDefined();
+    expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
+    expect(next).not.toHaveTextContent("Start here");
     expect(next).toHaveTextContent(TUTORIALS[1].name);
     expect(next).toHaveClass("tutorialNext");
   });
@@ -78,13 +84,25 @@ describe("NewGame", () => {
     ) as ScenarioType;
     render(<NewGame {...props({ onTutorial, onDetails, onCustomGame })} />);
 
-    fireEvent.click(screen.getByTestId(`mission-row-${TUTORIALS[0].id}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${TUTORIALS[0].id}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onTutorial).toHaveBeenCalledWith(TUTORIALS[0].id);
 
-    fireEvent.click(screen.getByTestId(`mission-row-${regular.id}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${regular.id}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onDetails).toHaveBeenCalledWith({ scenarioId: regular.id });
 
-    fireEvent.click(screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onCustomGame).toHaveBeenCalled();
   });
 });

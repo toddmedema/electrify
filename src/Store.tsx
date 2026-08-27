@@ -17,7 +17,21 @@ export const store = configureStore({
     user: userReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(tutorialGateMiddleware),
+    getDefaultMiddleware({
+      // The shared dialog/snackbar layer predates this store and deliberately carries React
+      // content and click callbacks. Those values never leave the live UI state, but Redux
+      // Toolkit otherwise reports them on every simulation tick, burying actionable warnings
+      // under hundreds of identical messages. Keep serializability checks everywhere else.
+      serializableCheck: {
+        ignoredActions: ["ui/dialogOpen", "ui/snackbarOpen"],
+        ignoredPaths: [
+          "ui.dialog.message",
+          "ui.dialog.action",
+          "ui.dialog.secondaryAction",
+          "ui.snackbar.action",
+        ],
+      },
+    }).concat(tutorialGateMiddleware),
 });
 
 export type AppStore = typeof store;

@@ -146,6 +146,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
         height={height}
         state={state}
         data={[minutes, supply, demand]}
+        seriesLabels={["Supply", "Demand"]}
         buildOptions={buildOptions(showXLabels !== false)}
         structureKey={String(showXLabels !== false)}
         syncKey={syncKey}

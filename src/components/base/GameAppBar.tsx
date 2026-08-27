@@ -17,11 +17,12 @@ import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatMoneyStable } from "../../helpers/Format";
+import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
+import { change as changeSettings } from "../../reducers/Settings";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
@@ -38,6 +39,7 @@ import ConceptIcon from "./ConceptIcon";
 
 export interface StateProps {
   game: GameType;
+  audioEnabled?: boolean;
 }
 
 export interface DispatchProps {
@@ -46,6 +48,7 @@ export interface DispatchProps {
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
+  onAudioChange: (enabled: boolean) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -203,8 +206,16 @@ function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
-  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
-    props;
+  const {
+    game,
+    audioEnabled,
+    onAudioChange,
+    onManual,
+    onNextTutorial,
+    onQuit,
+    onSettings,
+    onSpeedChange,
+  } = props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -281,6 +292,14 @@ export function GameAppBar(props: Props) {
           <MenuItem onClick={onSettings}>Options</MenuItem>
           <MenuItem
             onClick={() => {
+              onAudioChange(!audioEnabled);
+              handleMenuClose();
+            }}
+          >
+            Turn sound {audioEnabled ? "off" : "on"}
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
               setScenarioDetailsOpen(true);
               handleMenuClose();
             }}
@@ -310,6 +329,8 @@ export function GameAppBar(props: Props) {
       onSettings,
       onNextTutorial,
       onQuit,
+      onAudioChange,
+      audioEnabled,
       nextTutorial,
       isReplay,
       isTutorial,
@@ -322,6 +343,16 @@ export function GameAppBar(props: Props) {
   }
 
   const inBlackout = now.supplyW < now.demandW;
+  const reservePercent =
+    now.demandW > 0
+      ? Math.max(
+          0,
+          Math.round(((now.supplyW - now.demandW) / now.demandW) * 100),
+        )
+      : 0;
+  const gridHealth = inBlackout
+    ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
+    : `Grid OK · ${reservePercent}% reserve`;
 
   return (
     <div id="appbar">
@@ -349,6 +380,18 @@ export function GameAppBar(props: Props) {
         </Toolbar>
       </div>
       <div
+        className={`gridHealth ${inBlackout ? "gridHealth-blackout" : ""}`}
+        aria-label={`Current grid status: ${gridHealth}`}
+      >
+        <strong>{gridHealth}</strong>
+        {inBlackout && <span>Resume or build generation.</span>}
+      </div>
+      <span className="srOnly" aria-live="polite">
+        {inBlackout
+          ? "Blackout. Demand is higher than supply."
+          : `Grid stable. Game speed ${speed.toLowerCase()}.`}
+      </span>
+      <div
         id="yearProgressBar"
         style={{
           width: `${date.percentOfYear * 100}%`,
@@ -365,6 +408,7 @@ export function GameAppBar(props: Props) {
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
+  audioEnabled: state.settings.audioEnabled,
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
@@ -383,6 +427,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onQuit: () => {
       dispatch(quit());
+    },
+    onAudioChange: (enabled: boolean) => {
+      dispatch(changeSettings({ audioEnabled: enabled }));
     },
   };
 };
