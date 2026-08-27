@@ -1,0 +1,28 @@
+version: 2
+
+# Pinning without an upgrade path just means being pinned to something old and
+# unpatched, so the two things this repo pins by SHA or exact version get watched here.
+#
+# The app's own dependencies in the root package.json are deliberately NOT listed: that
+# would open a weekly PR per package on a tree of ~1500. Dependabot *security* alerts
+# cover them instead, and are enabled in repository settings rather than in this file.
+updates:
+  # Every `uses:` in .github/workflows is pinned to a commit SHA. These upgrades are what
+  # keep that from meaning "pinned to last year's action".
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Firebase CLI that deploys Firestore rules, pinned exactly because it runs with a
+  # Google service-account credential in its environment.
+  - package-ecosystem: npm
+    directory: /.github/firebase-deploy
+    schedule:
+      interval: weekly
+    groups:
+      firebase-cli:
+        patterns: ["*"]

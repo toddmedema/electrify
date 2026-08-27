@@ -11,23 +11,33 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+# Third-party actions are pinned to a commit SHA rather than a tag, with the human
+# version in a trailing comment. A tag is a moving pointer that whoever owns the action
+# can repoint, and everything in this job runs within reach of deploy credentials.
+# Dependabot (.github/dependabot.yml) proposes the upgrades as reviewable PRs.
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
+      # Lets the job mint a short-lived OIDC token to exchange for an AWS role. Unused
+      # while AWS_DEPLOY_ROLE_ARN is unset; see the credential steps below.
+      id-token: write
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Images and audio live in Git LFS (see .gitattributes). Without this
           # the runner gets 130-byte pointer files, the build still succeeds, and
           # every image and sound on the site ships as a stub.
           lfs: true
+          # Nothing here pushes, so don't leave the job's token in .git/config where
+          # the build and the deploy tooling could read it.
+          persist-credentials: false
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v4.0.2
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: 24.14.0
           cache: npm
@@ -40,12 +50,28 @@ jobs:
       # The other order ships a client whose reads the deployed rules still refuse,
       # which fails closed and looks to a player like the game is broken.
       #
+      # firebase-tools is installed from .github/firebase-deploy/package-lock.json rather
+      # than fetched with `npx firebase-tools@15`, which resolved to whatever 15.x the
+      # registry served that minute -- unpinned, unreviewed, and run in the one step that
+      # holds a Google private key. It lives in its own manifest so its ~490 transitive
+      # packages stay out of every contributor's install and every PR test run.
+      - name: Install the pinned Firebase CLI
+        run: npm ci --prefix .github/firebase-deploy
+
       # Refuses to continue without the credential rather than skipping, on the same
-      # reasoning as deploy.sh's REACT_APP_FIREBASE_API_KEY check: a silent skip would
-      # leave the rules and the bundle out of step with nothing to say so.
+      # reasoning as deploy.sh's requireVars: a silent skip would leave the rules and the
+      # bundle out of step with nothing to say so.
       #
       # The secret is the JSON from Firebase Console -> Project settings ->
       # Service accounts -> Generate new private key, pasted whole.
+      #
+      # TODO: this is the last long-lived credential in the deploy. Replacing it with
+      # Workload Identity Federation (google-github-actions/auth, which writes short-lived
+      # credentials and exports GOOGLE_APPLICATION_CREDENTIALS itself) removes the private
+      # key entirely. Until then the smaller win is to bind the service account to a custom
+      # role holding only firebaserules.releases.*, firebaserules.rulesets.*,
+      # datastore.indexes.* and firebase.projects.get -- the whole surface this command
+      # touches -- rather than the project Editor role that console flow grants by default.
       - name: Deploy Firestore rules and indexes
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -61,10 +87,33 @@ jobs:
           trap 'rm -f "$key"' EXIT
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
           GOOGLE_APPLICATION_CREDENTIALS="$key" \
-            npx --yes firebase-tools@15 deploy --only firestore --non-interactive
+            .github/firebase-deploy/node_modules/.bin/firebase deploy --only firestore --non-interactive
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      # Two ways to reach AWS, and which one runs is a repository-variable change rather
+      # than a code change:
+      #
+      #   Federated (preferred). Set the AWS_DEPLOY_ROLE_ARN repository variable to a role
+      #   whose trust policy names this repo's OIDC subject
+      #   (repo:toddmedema/electrify:environment:production, so a branch or a fork cannot
+      #   assume it) and whose permissions are only what deploy.sh uses: s3:PutObject on
+      #   the two buckets' contents, s3:ListBucket on the buckets, and
+      #   cloudfront:CreateInvalidation on the one distribution. The credential it mints
+      #   expires in an hour and only this workflow can mint it. Once it works, delete the
+      #   AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets and delete the IAM user's
+      #   access key -- the improvement is only real once the old one stops working.
+      #
+      #   Static keys (legacy). A permanent credential that works from any machine on
+      #   earth, kept only until the role above exists.
+      - name: Configure AWS credentials (federated)
+        if: vars.AWS_DEPLOY_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Configure AWS credentials (static keys, legacy)
+        if: vars.AWS_DEPLOY_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -72,6 +121,8 @@ jobs:
 
       - name: Build and deploy to prod
         env:
-          # Baked into the JS bundle at build time by create-react-app.
+          # Baked into the JS bundle at build time by create-react-app. deploy.sh refuses
+          # to deploy without it, and greps the finished build for the deploy-time secrets
+          # to catch anything else that reached the bundle by mistake.
           REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
         run: ./deploy.sh ci-prod

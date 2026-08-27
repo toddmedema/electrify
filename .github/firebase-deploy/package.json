@@ -1,0 +1,9 @@
+{
+  "name": "electrify-firebase-deploy",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pins the firebase-tools tree used by the prod deploy workflow to deploy Firestore rules and indexes. Kept out of the root package.json on purpose: firebase-tools pulls in ~490 transitive packages that only the deploy job needs, and putting it there would add them to every contributor's install and to every PR test run. The deploy job runs `npm ci` here, so the version that touches a Google service-account credential is the one this lockfile pins, not whatever the registry serves that day.",
+  "dependencies": {
+    "firebase-tools": "15.28.1"
+  }
+}

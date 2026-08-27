@@ -12,15 +12,22 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default, and actions are pinned to a commit SHA rather than a tag --
+# see the note in deploy-prod.yml.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v4.0.2
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: 24.14.0
           cache: npm
@@ -55,3 +62,25 @@ jobs:
       - name: Simulation
         if: '!cancelled()'
         run: npm run sim -- --all
+
+  # GitHub's own push protection blocks a secret pushed to this repository, but it does
+  # not cover a pull request opened from a fork -- and this repo now keeps a .env
+  # (gitignored) that a contributor could commit by hand. This is that second net.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # gitleaks scans the commits the PR adds, so it needs their history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan the pull request for committed secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Report through the job's status and log rather than a PR comment: a fork PR's
+          # token is read-only, so commenting would fail on exactly the runs that matter.
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
