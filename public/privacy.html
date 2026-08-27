@@ -2,66 +2,108 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Privacy — Electrify</title>
-    <style>
-      body {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 24px;
-        font:
-          17px/1.55 system-ui,
-          sans-serif;
-        color: #202124;
-      }
-      a {
-        color: #1565c0;
-      }
-      h1,
-      h2 {
-        line-height: 1.2;
-      }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #121212;
-          color: #e8e8e8;
-        }
-        a {
-          color: #64b5f6;
-        }
-      }
-    </style>
+    <meta
+      name="description"
+      content="How Electrify stores game progress, handles optional sign-in, and uses analytics."
+    />
+    <meta name="theme-color" content="#0084f8" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/legal.css" />
   </head>
   <body>
-    <main>
-      <h1>Electrify privacy</h1>
-      <p><a href="/">Back to the game</a></p>
-      <p>
-        Electrify is playable without an account. Your current game and
-        preferences are saved in this browser on your device.
-      </p>
-      <h2>Optional online features</h2>
-      <p>
-        If you sign in with Google, Electrify receives your account identifier
-        and basic profile name so you can claim a separate public leaderboard
-        display name. Scores, that display name, and an optional replay of your
-        game actions may be stored in Firebase and shown publicly. Do not choose
-        a display name you want to keep private.
-      </p>
-      <h2>Analytics</h2>
-      <p>
-        Electrify uses aggregate usage analytics to understand which screens and
-        missions are used and where errors occur. Shared links use simple
-        campaign parameters; the game does not use fingerprinting.
-      </p>
-      <h2>Your choices</h2>
-      <p>
-        You can play without signing in, clear local game data through your
-        browser, and contact
-        <a href="mailto:todd@fabricate.io">todd@fabricate.io</a> to ask about
-        leaderboard data or deletion.
-      </p>
-      <p>Last updated: August 27, 2026.</p>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="Electrify home">
+          <img src="/images/logo.svg" alt="" width="300" height="70" />
+        </a>
+        <nav class="topnav" aria-label="Primary navigation">
+          <a href="/about.html">About</a>
+          <a href="/privacy.html" aria-current="page">Privacy</a>
+          <a class="topnav__play" href="/">Play</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero__inner">
+        <p class="eyebrow">Your data and your choices</p>
+        <h1 id="page-title">Privacy, in plain language.</h1>
+        <p class="hero__lede">
+          Play without an account. Keep your game on your device. Choose if you
+          want to join the public leaderboard.
+        </p>
+      </div>
+    </section>
+
+    <main class="page-content privacy-layout" id="main-content">
+      <article class="policy-article">
+        <p class="updated">Last updated August 27, 2026</p>
+
+        <section class="policy-section" aria-labelledby="local-data">
+          <h2 id="local-data">Your game stays in your browser</h2>
+          <p>
+            Electrify is playable without an account. Your current game and
+            preferences are saved in this browser on your device.
+          </p>
+        </section>
+
+        <section class="policy-section" aria-labelledby="online-features">
+          <h2 id="online-features">Optional online features</h2>
+          <p>
+            If you sign in with Google, Electrify receives your account
+            identifier and basic profile name so you can claim a separate public
+            leaderboard display name. Scores, that display name, and an optional
+            replay of your game actions may be stored in Firebase and shown
+            publicly. Do not choose a display name you want to keep private.
+          </p>
+        </section>
+
+        <section class="policy-section" aria-labelledby="analytics">
+          <h2 id="analytics">Analytics</h2>
+          <p>
+            Electrify uses aggregate usage analytics to understand which screens
+            and missions are used and where errors occur. Shared links use
+            simple campaign parameters; the game does not use fingerprinting.
+          </p>
+        </section>
+
+        <section class="policy-section" aria-labelledby="choices">
+          <h2 id="choices">Your choices</h2>
+          <p>
+            You can play without signing in, clear local game data through your
+            browser, and contact
+            <a href="mailto:todd@fabricate.io">todd@fabricate.io</a> to ask
+            about leaderboard data or deletion.
+          </p>
+        </section>
+      </article>
+
+      <aside class="summary-card" aria-labelledby="summary-title">
+        <h2 id="summary-title">At a glance</h2>
+        <ul class="summary-list">
+          <li>No account is required to play.</li>
+          <li>Game progress and preferences are stored on your device.</li>
+          <li>Leaderboard participation and replays are optional.</li>
+          <li>You can request deletion of leaderboard data.</li>
+        </ul>
+      </aside>
     </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>Free and open source under the MIT license.</p>
+        <nav aria-label="Footer navigation">
+          <a href="/about.html">About</a>
+          <a href="https://github.com/toddmedema/electrify">GitHub</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

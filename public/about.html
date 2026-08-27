@@ -1,339 +1,166 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Electrify: About and Contact</title>
-  <meta name="description" content="Electrify: Take Charge of the Power Market" />
-  <meta name="theme-color" content="#0084f8">
-  <link rel="icon" href="/favicon.ico">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>About and contact — Electrify</title>
+    <meta
+      name="description"
+      content="Learn how Electrify turns the power market into a free, research-backed simulation game."
+    />
+    <meta name="theme-color" content="#0084f8" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/legal.css" />
 
-  <!-- Twitter Card data -->
-  <meta name="twitter:card" content="Take Charge of the Power Market">
-  <meta name="twitter:site" content="@toddmedema">
-  <meta name="twitter:title" content="Electrify">
-  <meta name="twitter:description" content="Electrify: Take Charge of the Power Market">
-  <meta name="twitter:creator" content="@ToddMedema">
-  <meta name="twitter:image" content="https://electrifygame.com/images/icon/1024x1024.png">
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@toddmedema" />
+    <meta name="twitter:title" content="Electrify" />
+    <meta
+      name="twitter:description"
+      content="Take charge of the power market"
+    />
+    <meta name="twitter:creator" content="@ToddMedema" />
+    <meta
+      name="twitter:image"
+      content="https://electrifygame.com/images/icon/1024x1024.png"
+    />
 
-  <!-- Open Graph data -->
-  <meta property="og:title" content="Electrify: Take Charge of the Power Market" />
-  <meta property="og:type" content="article" />
-  <meta property="og:url" content="https://electrifygame.com/" />
-  <meta property="og:image" content="https://electrifygame.com/images/icon/1024x1024.png" />
-  <meta property="og:description" content="Take Charge of the Power Market" />
+    <meta
+      property="og:title"
+      content="Electrify: Take Charge of the Power Market"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://electrifygame.com/about.html" />
+    <meta
+      property="og:image"
+      content="https://electrifygame.com/images/icon/1024x1024.png"
+    />
+    <meta
+      property="og:description"
+      content="A free, research-backed simulation game about the modern electricity market."
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
 
-  <style>
-    /* Self-contained rather than pulling MUI off a CDN: this is three panels of static text, and
-       the stylesheet it needed weighed more than the page itself - plus it put a blocking request
-       to a third party in front of anything rendering on a phone. */
-    :root {
-      /* The logo's blue only clears 3.8:1 on white, so it stays on the things contrast is
-         measured differently for - borders, focus rings, washes - and anything carrying text
-         (links, the filled button) uses the darkened one at 5.2:1 */
-      --brand: #0084f8;
-      --brand-text: #0a6cc9;
-      --brand-text-hover: #084e93;
-      --brand-wash: rgba(0, 132, 248, 0.1);
-      --bg: #ffffff;
-      --bg-sunk: #f4f7fa;
-      --surface: #ffffff;
-      --border: #dfe5ec;
-      --text: #16191d;
-      --text-muted: #5a636e;
-      --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
-      --radius: 14px;
-      --maxwidth: 46rem;
-    }
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="Electrify home">
+          <img src="/images/logo.svg" alt="" width="300" height="70" />
+        </a>
+        <nav class="topnav" aria-label="Primary navigation">
+          <a href="/about.html" aria-current="page">About</a>
+          <a href="/privacy.html">Privacy</a>
+          <a class="topnav__play" href="/">Play</a>
+        </nav>
+      </div>
+    </header>
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --brand: #4ea9ff;
-        --brand-text: #7cc0ff;
-        --brand-text-hover: #a8d4ff;
-        --brand-wash: rgba(124, 192, 255, 0.12);
-        --bg: #14171b;
-        --bg-sunk: #0f1216;
-        --surface: #1c2026;
-        /* Lighter than the light theme's border is dark, because on a dark surface a button's
-           outline is the only thing separating it from the panel behind it */
-        --border: #39424e;
-        --text: #eef1f5;
-        --text-muted: #a3adba;
-        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
-      }
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-    }
-
-    html {
-      -webkit-text-size-adjust: 100%;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg-sunk);
-      color: var(--text);
-      font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      font-size: 17px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ===== Top bar ===== */
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding-top: env(safe-area-inset-top);
-    }
-
-    .topbar-inner {
-      max-width: var(--maxwidth);
-      margin: 0 auto;
-      padding-left: max(1rem, env(safe-area-inset-left));
-      padding-right: max(1rem, env(safe-area-inset-right));
-      display: flex;
-      align-items: center;
-      min-height: 3.25rem;
-    }
-
-    /* 44px tall so it clears the minimum touch target on a phone, where this is the only
-       way back to the game */
-    .back {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      min-height: 44px;
-      margin-left: -0.5rem;
-      padding: 0 0.5rem;
-      border-radius: 8px;
-      color: var(--brand-text);
-      font-weight: 500;
-      text-decoration: none;
-    }
-
-    .back:hover {
-      background: var(--brand-wash);
-    }
-
-    .back svg {
-      flex: none;
-    }
-
-    /* ===== Hero ===== */
-    .hero {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      text-align: center;
-      padding: 2.5rem 1rem 2.75rem;
-    }
-
-    .hero img {
-      width: 100%;
-      max-width: 15rem;
-      height: auto;
-      display: block;
-      margin: 0 auto 1.25rem;
-    }
-
-    .hero p {
-      max-width: 30rem;
-      margin: 0 auto;
-      color: var(--text-muted);
-    }
-
-    /* ===== Panels ===== */
-    main {
-      max-width: var(--maxwidth);
-      margin: 0 auto;
-      padding: 1.5rem max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left));
-      display: grid;
-      gap: 1.25rem;
-    }
-
-    section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 1.5rem;
-    }
-
-    h1 {
-      margin: 0 0 0.75rem;
-      font-size: 1.5rem;
-      line-height: 1.25;
-      letter-spacing: -0.01em;
-    }
-
-    section p {
-      margin: 0 0 1rem;
-    }
-
-    section p:last-child {
-      margin-bottom: 0;
-    }
-
-    a {
-      color: var(--brand-text);
-    }
-
-    a:hover {
-      color: var(--brand-text-hover);
-    }
-
-    /* ===== Buttons ===== */
-    .actions {
-      display: grid;
-      gap: 0.625rem;
-      margin-top: 1.25rem;
-    }
-
-    /* One per row on a phone, where thumbs need the width; side by side once there's room, so
-       a desktop doesn't get a stack of full-width slabs. auto-fill rather than auto-fit keeps
-       the empty column, so a panel with a single button gets a button rather than a banner */
-    @media (min-width: 33rem) {
-      .actions {
-        grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-      }
-    }
-
-    .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 0.625rem 1.125rem;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--bg);
-      color: var(--text);
-      font: inherit;
-      font-weight: 500;
-      text-align: center;
-      text-decoration: none;
-      transition:
-        background-color 120ms ease,
-        border-color 120ms ease,
-        transform 120ms ease;
-    }
-
-    .btn:hover {
-      background: var(--bg-sunk);
-      border-color: var(--brand);
-      color: var(--text);
-    }
-
-    .btn:active {
-      transform: translateY(1px);
-    }
-
-    .btn--primary {
-      background: var(--brand-text);
-      border-color: var(--brand-text);
-      color: #ffffff;
-    }
-
-    .btn--primary:hover {
-      background: var(--brand-text-hover);
-      border-color: var(--brand-text-hover);
-      color: #ffffff;
-    }
-
-    /* The dark palette lightens the blue so it reads against the page, which flips which label
-       color the filled button needs */
-    @media (prefers-color-scheme: dark) {
-      .btn--primary,
-      .btn--primary:hover {
-        color: #10161d;
-      }
-    }
-
-    :focus-visible {
-      outline: 3px solid var(--brand);
-      outline-offset: 2px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        transition: none !important;
-      }
-    }
-
-    footer {
-      max-width: var(--maxwidth);
-      margin: 0 auto;
-      padding: 0 1rem 2.5rem;
-      color: var(--text-muted);
-      font-size: 0.875rem;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div class="topbar">
-    <div class="topbar-inner">
-      <a class="back" href="/">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-          <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-        </svg>
-        Back to game
-      </a>
-    </div>
-  </div>
-
-  <div class="hero">
-    <img src="/images/logo.svg" alt="Electrify" width="300" height="70">
-    <p>Take charge of the power market.</p>
-  </div>
-
-  <main>
-    <section>
-      <h1>About Electrify</h1>
-      <p>Think RollerCoaster Tycoon, but for electricity. Electrify uses the time-honored tradition of simulation games to teach about the challenges and opportunities in the modern electricity market, including renewables and energy storage.</p>
-      <p>Electrify is built upon hundreds of hours of research into the electricity market and power generation technologies &mdash; all of the numbers are based on real electric companies and power plants. You can find all of the sources and references in <a href="https://github.com/toddmedema/electrify">the Electrify source code</a> (did we mention that Electrify is 100% free and open source?)</p>
-      <div class="actions">
-        <a class="btn btn--primary" href="/">Play Electrify</a>
-        <a class="btn" href="https://github.com/toddmedema/electrify">View the source</a>
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero__inner">
+        <p class="eyebrow">The story behind the simulation</p>
+        <h1 id="page-title">Power markets, made playable.</h1>
+        <p class="hero__lede">
+          Electrify turns the challenge of building a cleaner, reliable grid
+          into a game anyone can learn—one power plant at a time.
+        </p>
+        <div class="hero__actions">
+          <a class="button button--primary" href="/">Play Electrify</a>
+          <a class="button" href="https://github.com/toddmedema/electrify"
+            >Explore the source</a
+          >
+        </div>
       </div>
     </section>
 
-    <section>
-      <h1>Take Action</h1>
-      <p>Want to help the planet? In our research for Electrify, here are some of the most effective ways to have an impact:</p>
-      <div class="actions">
-        <a class="btn" href="https://arcadia.com/referral/?promo=todd64599">Switch to Arcadia Power</a>
-        <a class="btn" href="https://citizensclimatelobby.org/donate/">Donate to Citizen&rsquo;s Climate Lobby</a>
-        <a class="btn" href="https://medium.com/@toddmedema/how-to-invest-in-the-environment-d280f6c5f41">Tweak your investment portfolio</a>
+    <main class="page-content about-grid" id="main-content">
+      <section class="panel panel--story">
+        <span class="panel__number" aria-hidden="true">01</span>
+        <h2>A tycoon game with a purpose</h2>
+        <p>
+          Think RollerCoaster Tycoon, but for electricity. Electrify uses the
+          time-honored tradition of simulation games to teach the challenges and
+          opportunities in the modern electricity market, including renewables
+          and energy storage.
+        </p>
+        <p>
+          The game is built on hundreds of hours of research into power markets
+          and generation technologies. Its numbers are grounded in real electric
+          companies and power plants, with sources and references available in
+          <a href="https://github.com/toddmedema/electrify"
+            >the Electrify source code</a
+          >. Electrify is 100% free and open source.
+        </p>
+      </section>
+
+      <section class="panel panel--impact">
+        <span class="panel__number" aria-hidden="true">02</span>
+        <h2>Turn learning into action</h2>
+        <p>
+          A few of the practical, high-impact ideas that stood out during our
+          research:
+        </p>
+        <ul class="impact-list">
+          <li>
+            <a href="https://arcadia.com/referral/?promo=todd64599"
+              >Switch to Arcadia Power</a
+            >
+          </li>
+          <li>
+            <a href="https://citizensclimatelobby.org/donate/"
+              >Support Citizens’ Climate Lobby</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://medium.com/@toddmedema/how-to-invest-in-the-environment-d280f6c5f41"
+              >Rethink your investment portfolio</a
+            >
+          </li>
+        </ul>
+      </section>
+
+      <section class="panel panel--contact">
+        <div>
+          <span class="panel__number" aria-hidden="true">03</span>
+          <h2>Let’s build a better grid</h2>
+          <p>
+            Questions, feedback, or an idea for collaboration? We’d love to hear
+            from you.
+          </p>
+        </div>
+        <div class="panel__actions">
+          <a class="button button--primary" href="mailto:todd@fabricate.io"
+            >Send us an email</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <p>Free and open source under the MIT license.</p>
+        <nav aria-label="Footer navigation">
+          <a href="/privacy.html">Privacy</a>
+          <a href="https://github.com/toddmedema/electrify">GitHub</a>
+        </nav>
       </div>
-    </section>
+    </footer>
 
-    <section>
-      <h1>Contact Us</h1>
-      <p>Questions? Feedback? Want to collaborate? We&rsquo;d love to hear from you.</p>
-      <div class="actions">
-        <a class="btn btn--primary" href="mailto:todd@fabricate.io">Send us an email</a>
-      </div>
-    </section>
-  </main>
-
-  <footer>Electrify is free and open source, released under the MIT license.</footer>
-
-  <!-- Global site tag (gtag.js) - Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYRYY6BG1Y"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-BYRYY6BG1Y');
-  </script>
-</body>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-BYRYY6BG1Y"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        window.dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-BYRYY6BG1Y");
+    </script>
+  </body>
 </html>
