@@ -8,7 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import * as React from "react";
-import { GlobalHotKeys } from "react-hotkeys";
+import { GlobalHotKeys, configure } from "react-hotkeys";
 import {
   ACTIONS,
   EVENTS,
@@ -46,7 +46,7 @@ import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
-import { navigate } from "../reducers/Card";
+import { navigate, navigateBack } from "../reducers/Card";
 import {
   reprioritizeFacility,
   setSpeed,
@@ -73,6 +73,50 @@ const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // the fleet has had shortcuts of its own
 const facilitySlotKey = (slot: number) => `shift+${slot}`;
 
+// react-hotkeys' default ignoreEventsCondition treats every <input> as a text field and drops
+// the keydown entirely -- but the capacity sliders on the build screens and the marketing
+// spend slider in Finances are MUI Sliders, which render as a bare <input type="range">. Just
+// clicking one leaves it focused, and from then on every shortcut silently did nothing until
+// the player happened to click something else -- the "some element is pulling focus" bug.
+// These types don't take character input, so there's nothing for a shortcut key to clobber.
+// Escape is exempted outright too, so it can always back out of a screen even if focus never
+// left an actual text field.
+const NON_TEXT_INPUT_TYPES = new Set([
+  "range",
+  "checkbox",
+  "radio",
+  "button",
+  "color",
+  "submit",
+  "reset",
+  "image",
+  "file",
+]);
+configure({
+  ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      return false;
+    }
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName?.toLowerCase();
+    if (!tagName) {
+      return false;
+    }
+    if (
+      tagName === "input" &&
+      NON_TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)
+    ) {
+      return false;
+    }
+    return (
+      tagName === "input" ||
+      tagName === "select" ||
+      tagName === "textarea" ||
+      !!target?.isContentEditable
+    );
+  },
+});
+
 // Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
 // both list -- exported so a test can hold the two against each other rather than a comment
 // asking politely. react-hotkeys ignores key events from inputs, so `?` still types into a
@@ -90,6 +134,7 @@ export const keyMap = {
   PRIORITIZE_EARLIER: "[",
   PRIORITIZE_LATER: "]",
   MANUAL: ["?", "shift+/"],
+  ESCAPE: "esc",
   ...Object.fromEntries(
     FACILITY_SLOTS.map((slot: number) => [
       `TOGGLE_FACILITY_${slot}`,
@@ -201,6 +246,15 @@ const shortcutHandlers = {
   PRIORITIZE_LATER: () => reprioritizeSelected(1),
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
+  },
+  // Every screen that isn't one of the three panes (Build Generator/Storage, Manual, Settings)
+  // is reached by a "back"/"close" control rather than tab navigation, and none of them
+  // responded to Escape -- this gives all of them one, without hardcoding which cards count
+  ESCAPE: () => {
+    const { card, game } = store.getState();
+    if (game.inGame && !isNavCard(card.name)) {
+      store.dispatch(navigateBack());
+    }
   },
   ...Object.fromEntries(
     FACILITY_SLOTS.map((slot: number) => [

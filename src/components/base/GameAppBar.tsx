@@ -23,6 +23,7 @@ import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
+import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -211,6 +212,7 @@ export function GameAppBar(props: Props) {
   const [speedAnchorEl, setSpeedAnchorEl] = React.useState<HTMLElement | null>(
     null,
   );
+  const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
 
   const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
@@ -276,6 +278,14 @@ export function GameAppBar(props: Props) {
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Options</MenuItem>
+          <MenuItem
+            onClick={() => {
+              setScenarioDetailsOpen(true);
+              handleMenuClose();
+            }}
+          >
+            Scenario details
+          </MenuItem>
           <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
             Send feedback
           </MenuItem>
@@ -302,6 +312,7 @@ export function GameAppBar(props: Props) {
       nextTutorial,
       isReplay,
       isTutorial,
+      setScenarioDetailsOpen,
     ],
   );
 
@@ -332,6 +343,11 @@ export function GameAppBar(props: Props) {
         style={{
           width: `${date.percentOfYear * 100}%`,
         }}
+      />
+      <ScenarioDetailsDialog
+        open={scenarioDetailsOpen}
+        game={game}
+        onClose={() => setScenarioDetailsOpen(false)}
       />
     </div>
   );

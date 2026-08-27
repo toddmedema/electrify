@@ -26,6 +26,7 @@ import {
   formatWattHours,
 } from "../helpers/Format";
 import { arrayMove, newSeed } from "../helpers/Math";
+import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
@@ -913,31 +914,11 @@ export function tickState(state: GameType) {
 
         // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
         const summary = summarizeHistory(history);
-        const blackoutsTWh =
-          Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
-        // Scoring algorithm should also be updated in Game.tsx
-        const score: ScoreBreakdownType =
-          scenario.ownership === "Investor"
-            ? {
-                supply: Math.round(summary.supplyWh / 1000000000000),
-                netWorth: Math.round((40 * summary.netWorth) / 1000000000),
-                customers: Math.round((2 * summary.customers) / 100000),
-                emissions: Math.round((-2 * summary.kgco2e) / 1000000000),
-                blackouts: Math.round(-8 * blackoutsTWh),
-              }
-            : {
-                rate: Math.round(
-                  80 *
-                    100 *
-                    (scenario.dollarsPerkWh -
-                      summary.revenue / (summary.supplyWh / 1000)),
-                ),
-                supply: Math.round((10 * summary.supplyWh) / 1000000000000),
-                emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
-                blackouts: Math.round(-10 * blackoutsTWh),
-              };
-
-        const finalScore = Object.values(score).reduce((a, b) => a + b);
+        const score: ScoreBreakdownType = computeScoreBreakdown(
+          scenario,
+          summary,
+        );
+        const finalScore = totalScore(score);
         const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
         // For a custom game getScenario() returns state.customScenario, which belongs to the same
         // draft, so the fields the timeouts below read come out here too
