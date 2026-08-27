@@ -165,6 +165,7 @@ export default class ChartForecastWeather extends React.PureComponent<
         height={height}
         state={{ data, domain, startingYear, multiyear, units }}
         data={[minutes, temperature, wind]}
+        seriesLabels={["Temperature", "Wind speed"]}
         buildOptions={buildOptions}
         // The axis labels are baked into the options, so a change of system rebuilds the plot
         structureKey={units}

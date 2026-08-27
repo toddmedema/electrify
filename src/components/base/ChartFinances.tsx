@@ -136,6 +136,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
       height={props.height}
       state={state}
       data={[months, past, projected]}
+      seriesLabels={[`Past ${props.title}`, `Forecast ${props.title}`]}
       buildOptions={buildOptions}
       tooltip={tooltip}
     />

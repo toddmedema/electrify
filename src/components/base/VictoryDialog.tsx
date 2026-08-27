@@ -15,8 +15,13 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import numbro from "numbro";
 import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
-import { buildShareText, canShare, shareText } from "../../helpers/Share";
+import {
+  buildScoreShareContent,
+  canShare,
+  shareText,
+} from "../../helpers/Share";
 import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import InstallAppButton from "./InstallAppButton";
 
 // What each scored category is called on the score screen. The breakdown's keys differ by
 // ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
@@ -47,6 +52,7 @@ export interface StateProps {
 export interface DispatchProps {
   onClose: () => void;
   onQuit: () => void;
+  onRetry: (victory: VictoryType) => void;
   onLogin: () => void;
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
@@ -135,12 +141,13 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   }
 
   const onShare = () => {
-    const text = buildShareText({
+    const content = buildScoreShareContent({
+      scenarioId: victory.scenarioId,
       score: victory.score,
       scenarioName: victory.scenarioName,
       difficulty: victory.difficulty,
     });
-    shareText(text).then((method) => {
+    shareText(content).then((method) => {
       if (method === "cancelled") {
         return; // The player changed their mind, which is not a failure to report
       }
@@ -272,14 +279,22 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       >
         {canShare() && (
           <Button color="primary" onClick={onShare} startIcon={<ShareIcon />}>
-            Share
+            Share score
           </Button>
         )}
+        <InstallAppButton label="Install for later" afterMilestone />
         <Button color="primary" onClick={onClose}>
-          Keep playing
+          Review final grid
         </Button>
-        <Button color="primary" variant="contained" onClick={onQuit}>
-          Return to scenarios
+        <Button color="primary" onClick={onQuit}>
+          Choose scenario
+        </Button>
+        <Button
+          color="primary"
+          variant="contained"
+          onClick={() => props.onRetry(victory)}
+        >
+          Try again
         </Button>
       </DialogActions>
     </Dialog>

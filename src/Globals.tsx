@@ -111,12 +111,13 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * This function checks if the screen size is small, based on the width of the document being < 375
+ * Compact phone chrome belongs on every common phone width, not just devices narrower than an
+ * old 375px breakpoint. Larger controls also matter most on coarse-pointer devices.
  *
  * @returns {boolean} - Returns true if the screen width is less than 375, otherwise false.
  */
 export function isSmallScreen(): boolean {
-  return getViewportWidth() < 375;
+  return getViewportWidth() < 600;
 }
 
 /**

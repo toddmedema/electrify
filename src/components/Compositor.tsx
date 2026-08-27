@@ -611,9 +611,9 @@ export default class Compositor extends React.Component<Props, {}> {
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <div className="base_main" ref={transitionNodeRef}>
+            <main className="base_main" ref={transitionNodeRef}>
               {this.renderCard()}
-            </div>
+            </main>
           </CSSTransition>
         </TransitionGroup>
         {tutorialSteps && (

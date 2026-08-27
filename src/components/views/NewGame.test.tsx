@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
 import { GameType, ScenarioType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
@@ -84,13 +84,25 @@ describe("NewGame", () => {
     ) as ScenarioType;
     render(<NewGame {...props({ onTutorial, onDetails, onCustomGame })} />);
 
-    fireEvent.click(screen.getByTestId(`mission-row-${TUTORIALS[0].id}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${TUTORIALS[0].id}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onTutorial).toHaveBeenCalledWith(TUTORIALS[0].id);
 
-    fireEvent.click(screen.getByTestId(`mission-row-${regular.id}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${regular.id}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onDetails).toHaveBeenCalledWith({ scenarioId: regular.id });
 
-    fireEvent.click(screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`));
+    fireEvent.click(
+      within(screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`)).getByRole(
+        "button",
+      ),
+    );
     expect(onCustomGame).toHaveBeenCalled();
   });
 });

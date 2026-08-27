@@ -26,8 +26,9 @@
   --font-color-primary: #000000;
   --font-color-faded: #666666;
   --font-color-disabled: #bdbdbd; /* grey400 */
-  --interactive-blue: #1e88e5; /* blue600 */
-  --interactive-tint: rgba(30, 136, 229, 0.5);
+  --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
+  --interactive-tint: rgba(21, 101, 192, 0.5);
+  --focus-ring: #7b1fa2;
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
   // The two directions a number can move in. Both are the darker end of their ramp so they
@@ -57,6 +58,7 @@
   --font-color-disabled: #616161; /* grey700 */
   --interactive-blue: #64b5f6; /* blue300 - 8:1 on the page, where blue600 is 2.6:1 */
   --interactive-tint: rgba(100, 181, 246, 0.5);
+  --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
   --delta-good: #66bb6a; /* green400 */
@@ -220,9 +222,42 @@ body {
   max-width: $abswidthmax;
   margin: auto;
   padding: 0;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
+button,
+[role="button"],
+.MuiSlider-root,
+.facilityRow {
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
+  touch-action: manipulation;
+}
+
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [tabindex]
+):focus-visible {
+  outline: 3px solid var(--focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+@media (pointer: coarse) {
+  .MuiButtonBase-root,
+  .MuiButton-root,
+  .MuiIconButton-root,
+  .MuiToggleButton-root {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 // Anything wider than a phone gets the whole window: the frame's width cap - and the side
@@ -315,6 +350,18 @@ body {
   font-weight: bold;
 }
 
+.srOnly {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 table {
   margin-bottom: 16px;
   th {
@@ -397,11 +444,65 @@ $topbar_height: 56px;
 
 #topbar .MuiToolbar-root {
   min-height: $topbar_height !important;
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(16px, env(safe-area-inset-left)) !important;
+  padding-right: max(16px, env(safe-area-inset-right)) !important;
+}
+
+#navfooter {
+  box-sizing: content-box;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.MuiDialogActions-root {
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+
+.offlineBanner {
+  position: fixed;
+  top: 0;
+  left: env(safe-area-inset-left);
+  right: env(safe-area-inset-right);
+  z-index: 2000;
+  padding: max(6px, env(safe-area-inset-top)) 12px 6px;
+  background: var(--mark-bg);
+  color: $font_color_primary;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.875rem;
 }
 
 // Never squeezed by whatever is below it, on either layout
 #appbar {
   flex: 0 0 auto;
+}
+
+.gridHealth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px max(12px, env(safe-area-inset-left));
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: $font_color_primary;
+  font-size: 0.75rem;
+  text-align: center;
+
+  &.gridHealth-blackout {
+    background: var(--blackout-tint);
+    color: var(--delta-bad);
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .gridHealth {
+    justify-content: space-between;
+  }
 }
 
 // Names a pane, since the bottom nav that would otherwise do it is hidden once all three are on
@@ -478,6 +579,16 @@ $pane_header_height: 40px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   // The blackout pulse carries its color *in* the animation, so stopping it would erase the
   // blackout signal rather than freeze it - pin it to the shade the pulse peaks at instead
   .blackout-pulsing:before {
@@ -566,6 +677,23 @@ $pane_header_height: 40px;
   pointer-events: none;
 }
 
+.chartDataSummary {
+  margin: 4px 8px 10px;
+  font-size: 0.75rem;
+
+  summary {
+    width: fit-content;
+    color: $interactive_blue;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  table {
+    width: 100%;
+    margin-top: 6px;
+  }
+}
+
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
 .uplot .u-cursor-x {
   border-right: 1px dashed var(--cursor-line);
@@ -649,6 +777,34 @@ $pane_header_height: 40px;
 // The next tutorial to play, so the sequence has one obvious entry point
 .tutorialNext {
   border-left: 4px solid var(--interactive-blue);
+}
+
+.recommendedChip {
+  margin-left: 8px;
+  height: 24px !important;
+  vertical-align: middle;
+}
+
+.missionCompleteText {
+  display: block;
+  color: $font_color_primary;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.leaderboardDisclosure {
+  margin: 20px auto;
+  max-width: 760px;
+
+  summary {
+    width: fit-content;
+    margin: 0 auto 8px;
+    padding: 10px 12px;
+    color: $interactive_blue;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
 }
 
 // Units appended to numbers in tables, de-emphasized so the number still reads first
@@ -944,15 +1100,54 @@ $pane_header_height: 40px;
 
     #centeredMenu {
       position: absolute;
-      top: 40%;
+      top: 27%;
       left: 0;
       right: 0;
+      max-width: 680px;
+      margin: auto;
+
+      .gamePromise {
+        font-weight: 800;
+      }
+
+      .gameReassurance {
+        margin: 6px auto 18px;
+        color: $font_color_faded;
+      }
+
+      .mainActions {
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .discoveryActions {
+        margin-top: 2px;
+      }
 
       button {
-        display: block;
-        margin: auto;
-        margin-bottom: size(large);
+        margin: 0;
       }
+    }
+  }
+
+  .mainMenuFooter {
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  @media screen and (max-height: 700px) {
+    #logo {
+      top: 12px;
+    }
+
+    #menuCard #centeredMenu {
+      top: 23%;
+    }
+
+    #menuCard .gameReassurance {
+      margin-bottom: 8px;
     }
   }
 

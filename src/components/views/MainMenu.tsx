@@ -1,8 +1,16 @@
 import * as React from "react";
-import { Box, Button, IconButton, Stack } from "@mui/material";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
+import ShareIcon from "@mui/icons-material/Share";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import { login } from "../../Globals";
+import {
+  buildGameShareContent,
+  canShare,
+  shareText,
+} from "../../helpers/Share";
+import InstallAppButton from "../base/InstallAppButton";
 
 export interface StateProps {
   audioEnabled?: boolean;
@@ -21,7 +29,19 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
-  const startLabel = props.hasSavedGame ? "Choose a mission" : "Play";
+  const startLabel = props.hasSavedGame
+    ? "Choose a mission"
+    : "Start guided missions";
+  const [shareStatus, setShareStatus] = React.useState("");
+
+  const onShare = async () => {
+    const result = await shareText(buildGameShareContent());
+    if (result === "clipboard") {
+      setShareStatus("Game link copied. Paste it wherever you like.");
+    } else if (result === "unavailable") {
+      setShareStatus("Sharing isn't available in this browser.");
+    }
+  };
 
   return (
     <div id="menuCard">
@@ -32,27 +52,41 @@ const MainMenu = (props: Props): React.JSX.Element => {
           style={{ maxWidth: 680 }}
         ></img>
       </div>
-      <Box id="centeredMenu" style={{ top: "36%" }} sx={{ px: 3 }}>
-        {props.hasSavedGame && (
+      <Typography component="h1" className="srOnly">
+        Electrify
+      </Typography>
+      <Box id="centeredMenu" sx={{ px: 3 }}>
+        <Typography className="gamePromise" variant="h5" component="p">
+          Build power plants. Keep the lights on. Make your grid cleaner.
+        </Typography>
+        <Typography className="gameReassurance" variant="body1" component="p">
+          Learn as you play — no energy or gaming experience needed.
+        </Typography>
+        <Stack className="mainActions" spacing={1.25}>
+          {props.hasSavedGame && (
+            <Button
+              size="large"
+              variant="contained"
+              color="primary"
+              onClick={props.onContinue}
+              autoFocus={true}
+            >
+              Continue your game
+            </Button>
+          )}
           <Button
             size="large"
-            variant="contained"
+            variant={props.hasSavedGame ? "outlined" : "contained"}
             color="primary"
-            onClick={props.onContinue}
-            autoFocus={true}
+            onClick={props.onStart}
+            autoFocus={!props.hasSavedGame}
           >
-            Continue
+            {startLabel}
           </Button>
-        )}
-        <Button
-          size="large"
-          variant={props.hasSavedGame ? "outlined" : "contained"}
-          color="primary"
-          onClick={props.onStart}
-          autoFocus={!props.hasSavedGame}
-        >
-          {startLabel}
-        </Button>
+          {!props.hasSavedGame && (
+            <Typography variant="caption">Free · no account needed</Typography>
+          )}
+        </Stack>
         <Stack
           component="nav"
           aria-label="Game resources"
@@ -74,22 +108,38 @@ const MainMenu = (props: Props): React.JSX.Element => {
           </Button>
           {!props.uid && (
             <Button variant="text" color="primary" onClick={login}>
-              Log in
+              Sign in with Google
             </Button>
           )}
         </Stack>
-        {props.audioEnabled === undefined && (
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => props.onAudioChange(true)}
-            style={{ display: "inline", marginRight: "12px", marginTop: "4px" }}
-          >
-            Enable music
-          </Button>
-        )}
+        <Stack
+          className="discoveryActions"
+          direction="row"
+          useFlexGap
+          sx={{ flexWrap: "wrap", justifyContent: "center" }}
+        >
+          <InstallAppButton />
+          {canShare() && (
+            <Button color="primary" startIcon={<ShareIcon />} onClick={onShare}>
+              Share game
+            </Button>
+          )}
+          {props.audioEnabled === undefined && (
+            <Button
+              color="primary"
+              startIcon={<VolumeUpIcon />}
+              onClick={() => props.onAudioChange(true)}
+            >
+              Play with sound
+            </Button>
+          )}
+        </Stack>
+        <Typography className="srOnly" role="status" aria-live="polite">
+          {shareStatus}
+        </Typography>
       </Box>
-      <div
+      <footer
+        className="mainMenuFooter"
         style={{
           position: "absolute",
           bottom: 0,
@@ -114,7 +164,10 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           <InfoIcon />
         </IconButton>
-      </div>
+        <Button color="primary" href="/privacy.html" size="small">
+          Privacy
+        </Button>
+      </footer>
     </div>
   );
 };

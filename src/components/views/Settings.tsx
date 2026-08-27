@@ -21,6 +21,7 @@ import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts from "../base/KeyboardShortcuts";
+import InstallAppButton from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 
 export interface StateProps {
@@ -60,7 +61,7 @@ function SettingsSection({
   return (
     <Card component="section" variant="outlined" aria-labelledby={id}>
       <CardContent>
-        <Typography id={id} variant="h6" sx={{ mb: 1.5 }}>
+        <Typography id={id} component="h2" variant="h6" sx={{ mb: 1.5 }}>
           {title}
         </Typography>
         <Stack spacing={1.5} sx={{ alignItems: "flex-start" }}>
@@ -117,7 +118,9 @@ export default function Settings(props: Props): React.JSX.Element {
           >
             <ChevronLeftIcon />
           </IconButton>
-          <Typography variant="h6">Settings</Typography>
+          <Typography component="h1" variant="h6">
+            Settings
+          </Typography>
         </Toolbar>
       </div>
       <Box
@@ -159,7 +162,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 ? props.displayName
                   ? `On the leaderboard as ${props.displayName}.`
                   : "You're logged in, but haven't picked a leaderboard name yet."
-                : "Log in to put your name on the global high score board."}
+                : "Optional: sign in with Google to put a public display name and score on the leaderboard."}
             </Typography>
             <Stack
               direction="row"
@@ -190,7 +193,7 @@ export default function Settings(props: Props): React.JSX.Element {
                   color="primary"
                   onClick={props.onLogin}
                 >
-                  Log in
+                  Sign in with Google
                 </Button>
               )}
             </Stack>
@@ -248,6 +251,14 @@ export default function Settings(props: Props): React.JSX.Element {
             </Typography>
           </SettingsSection>
 
+          <SettingsSection id="app-settings" title="App">
+            <InstallAppButton />
+            <Typography variant="body2" color="textSecondary">
+              Install availability depends on your browser. Once installed,
+              Electrify opens like an app and cached game data can load offline.
+            </Typography>
+          </SettingsSection>
+
           <SettingsSection id="saved-game-settings" title="Saved Game">
             <Stack
               direction="row"
@@ -302,6 +313,9 @@ export default function Settings(props: Props): React.JSX.Element {
               >
                 GitHub
               </a>
+            </Typography>
+            <Typography>
+              <a href="/privacy.html">Privacy</a>
             </Typography>
           </Box>
         </Stack>

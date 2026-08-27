@@ -72,7 +72,7 @@ describe("Settings", () => {
 
   it("offers a way in when nobody is logged in", () => {
     renderSettings();
-    expect(screen.getByText("Log in")).toBeInTheDocument();
+    expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     expect(screen.queryByText("Log out")).not.toBeInTheDocument();
   });
 

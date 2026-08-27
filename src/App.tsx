@@ -4,12 +4,13 @@ import { Provider } from "react-redux";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
-import { navigateBack } from "./reducers/Card";
+import { navigate, navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
+import { delta as gameDelta } from "./reducers/Game";
 import { startAutosave } from "./SaveGame";
 import { store, useAppSelector } from "./Store";
 import {
@@ -19,6 +20,7 @@ import {
   setThemeMode,
 } from "./Theme";
 import { ThemeChoiceType } from "./Types";
+import { InstallPromptProvider } from "./components/base/InstallAppButton";
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -102,11 +104,33 @@ function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
   // what React warns about. Before paint, so neither of the two lands a frame late
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = mode;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
     setThemeMode(mode);
   }, [mode]);
 
   return (
     <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+  );
+}
+
+function OfflineNotice(): React.JSX.Element | null {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online ? null : (
+    <div className="offlineBanner" role="status">
+      Offline — your game stays saved on this device. Online features will
+      reconnect automatically.
+    </div>
   );
 }
 
@@ -121,6 +145,19 @@ export default function App() {
    */
   useEffect(() => {
     setupStorage(document);
+
+    // Shared score links land on the relevant challenge instead of dropping a new player at an
+    // unexplained title screen. Tutorial ids still use the guided mission list.
+    const sharedScenarioId = Number(
+      new URLSearchParams(window.location.search).get("scenario"),
+    );
+    const sharedScenario = SCENARIOS.find(
+      (scenario) => scenario.id === sharedScenarioId && !scenario.tutorialSteps,
+    );
+    if (sharedScenario) {
+      store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+      store.dispatch(navigate("NEW_GAME_DETAILS"));
+    }
 
     const onPopState = (e: PopStateEvent) => {
       store.dispatch(navigateBack());
@@ -198,9 +235,12 @@ export default function App() {
         <ThemedApp>
           {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
               settings change that did not also change the card */}
-          <UnitsProvider>
-            <CompositorContainer store={store} />
-          </UnitsProvider>
+          <InstallPromptProvider>
+            <OfflineNotice />
+            <UnitsProvider>
+              <CompositorContainer store={store} />
+            </UnitsProvider>
+          </InstallPromptProvider>
         </ThemedApp>
       </Provider>
     </StyledEngineProvider>

@@ -11,7 +11,11 @@ jest.mock("../../reducers/User", () => ({
 
 const mockShareText = jest.fn();
 jest.mock("../../helpers/Share", () => ({
-  buildShareText: () => "I scored 812 ...",
+  buildScoreShareContent: () => ({
+    title: "score",
+    text: "I scored 812 ...",
+    url: "https://electrifygame.com",
+  }),
   canShare: () => true,
   shareText: (...args: unknown[]) => mockShareText(...args),
 }));
@@ -34,6 +38,7 @@ function renderDialog(overrides: Partial<Props> = {}) {
     loggedIn: true,
     onClose: () => undefined,
     onQuit: () => undefined,
+    onRetry: () => undefined,
     onLogin: () => undefined,
     onShared: () => undefined,
     onShareFailed: () => undefined,
@@ -156,7 +161,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("clipboard");
     renderDialog({ onShared });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByText("Share score"));
     await waitFor(() => expect(onShared).toHaveBeenCalled());
     expect(onShared.mock.calls[0][1]).toBe("clipboard");
   });
@@ -168,7 +173,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("cancelled");
     renderDialog({ onShared, onShareFailed });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByText("Share score"));
     await waitFor(() => expect(mockShareText).toHaveBeenCalled());
     expect(onShared).not.toHaveBeenCalled();
     expect(onShareFailed).not.toHaveBeenCalled();
@@ -179,9 +184,9 @@ describe("VictoryDialog", () => {
     const onQuit = jest.fn();
     renderDialog({ onClose, onQuit });
 
-    await userEvent.click(screen.getByText("Keep playing"));
+    await userEvent.click(screen.getByText("Review final grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Return to scenarios"));
+    await userEvent.click(screen.getByText("Choose scenario"));
     expect(onQuit).toHaveBeenCalled();
   });
 

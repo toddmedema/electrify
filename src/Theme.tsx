@@ -115,7 +115,8 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     grid: "#ECEFF1", // VictoryTheme.material's, which these charts inherited
     tick: "#90A4AE",
     legendText: "#252525",
-    interactive: blue[600],
+    // blue600 misses 4.5:1 for the small link/button text used throughout the app.
+    interactive: blue[800],
     background: "#ffffff",
   },
   dark: {
@@ -242,9 +243,10 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiButton: {
         styleOverrides: {
           root: {
-            minHeight: 36,
+            minHeight: 40,
             fontWeight: 600,
             textTransform: "none",
+            touchAction: "manipulation",
           },
         },
       },

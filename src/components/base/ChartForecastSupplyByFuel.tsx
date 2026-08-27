@@ -231,6 +231,10 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
           height={height}
           state={state}
           data={[minutes, ...stacked, demand]}
+          seriesLabels={[
+            ...fuels.map((fuel) => `${fuel} cumulative supply`),
+            "Demand",
+          ]}
           buildOptions={buildOptions(
             fuels,
             showXLabels !== false,

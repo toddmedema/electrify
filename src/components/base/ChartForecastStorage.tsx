@@ -118,6 +118,7 @@ export default class chartForecastStorage extends React.PureComponent<
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}
         data={[minutes, stored]}
+        seriesLabels={["Stored energy"]}
         buildOptions={buildOptions(showXLabels !== false)}
         structureKey={String(showXLabels !== false)}
         syncKey={syncKey}

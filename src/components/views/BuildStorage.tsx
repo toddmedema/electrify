@@ -86,7 +86,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   // </TableRow>
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar
@@ -116,10 +116,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         title={storage.name}
         subheader={secondaryText}
       />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
-      )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+      <IconButton
+        color="primary"
+        className="expand-icon"
+        size="small"
+        aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
+        aria-expanded={expanded}
+        onClick={toggleExpand}
+      >
+        {expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+      </IconButton>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">

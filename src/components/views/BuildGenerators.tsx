@@ -113,7 +113,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   // </TableRow>
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar

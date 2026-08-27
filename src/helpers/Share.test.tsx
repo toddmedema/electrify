@@ -36,9 +36,9 @@ describe("buildShareText", () => {
 });
 
 describe("canShare", () => {
-  it("is false when the browser offers neither route", () => {
+  it("keeps a share affordance for the legacy copy fallback", () => {
     setNavigator({});
-    expect(canShare()).toBe(false);
+    expect(canShare()).toBe(true);
   });
 
   it("is true with only a clipboard", () => {
