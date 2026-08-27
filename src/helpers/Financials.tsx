@@ -7,6 +7,7 @@ import {
   DateType,
   FacilityOperatingType,
   GeneratorShoppingType,
+  LocationType,
   MonthlyHistoryType,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
@@ -143,10 +144,12 @@ export function LCWH(
   date: DateType,
   feePerKgCO2e: number,
   seed: number,
+  location?: LocationType,
 ) {
   const fuel = FUELS[g.fuel] || {};
   const fuelCostPerWh =
-    ((getFuelPricesPerMBTU(date, seed)[g.fuel] || 0) * g.btuPerWh) / 1000000;
+    ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
+    1000000;
   const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing

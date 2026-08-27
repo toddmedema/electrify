@@ -12,6 +12,7 @@ import {
   getWindCapacityFactor,
   getSolarCapacityFactor,
 } from "../helpers/Energy";
+import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -211,7 +212,7 @@ export function GENERATORS(
       annualOperatingCost: 0.04 * peakW,
       // TODO estimated 2% decline per year
       // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // TODO depends on location
+      // The location's weather record determines the capacity factor below.
       yearsToBuild: 1 + magnitude / 2,
       // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
@@ -243,7 +244,7 @@ export function GENERATORS(
       // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
       // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       // ~$13/kW/yr in 2018 - https://www.nrel.gov/docs/fy19osti/72399.pdf
-      // TODO depends on location
+      // Latitude, daylight and the location's cloud record determine the capacity factor below.
       yearsToBuild: 1 + magnitude / 3,
       // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       spinMinutes: 1,
@@ -278,10 +279,27 @@ export function GENERATORS(
     //     // TODO
     // },
     {
+      name: "Hydro",
+      fuel: "Hydro",
+      description: "Clean and dispatchable, where rivers allow",
+      available: year > 1882 && hasHydroResource(state.location),
+      buildCost: 250000000 + 2.25 * peakW,
+      // Large civil works dominate the fixed cost; regional resource availability is handled
+      // above rather than pretending a dam can be placed beside every city.
+      peakW,
+      maxPeakW: 10000000000,
+      btuPerWh: 0,
+      spinMinutes: 1,
+      annualOperatingCost: 0.015 * peakW,
+      yearsToBuild: 4 + magnitude / 2,
+      capacityFactor: 0.5,
+      lifespanYears: 80,
+    },
+    {
       name: "Geothermal",
       fuel: "Geothermal",
       description: "Consistent, but few locations",
-      available: true,
+      available: hasGeothermalResource(state.location),
       buildCost:
         (10000000 + 4 * peakW) * (1 + (countByFuel.Geothermal || 0) / 4),
       // To compensate for limited locations, cost to build increases significantly with each construction
@@ -304,29 +322,6 @@ export function GENERATORS(
       lifespanYears: 40,
       // TODO
     },
-    // {
-    //   name: 'Hydro',
-    //   fuel: 'Rain',
-    //   description: 'Clean, cheap and dispatchable - until there\'s a drought',
-    // available: true,
-    //   buildCost: 200000000,
-    // 1,458 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
-    // 100GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-
-    // $1k-5k/kW - https://www.hydro.org/waterpower/why-hydro/affordable/
-    //   peakW,
-    // maxPeakW: 10000000000,
-    // ~10GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
-    //   spinMinutes: 1,
-    //   annualOperatingCost: 1000000 * 0.4,
-    // about 0.0017/kwh in 2018 - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-    // ~40% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-    //   yearsToBuild: 4,
-    // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-    // capacityFactor: 0.43,
-    // https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
-    // },
-
     // TODO biomass
   ] as GeneratorShoppingType[];
 
@@ -341,7 +336,7 @@ export function GENERATORS(
     // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no
     // fuel prices behind it is genuinely unknown rather than zero
     g.lcWh = hasFuelPrices()
-      ? LCWH(g, state.date, state.feePerKgCO2e, state.seed)
+      ? LCWH(g, state.date, state.feePerKgCO2e, state.seed, state.location)
       : Infinity;
     return g.available;
   });
@@ -390,7 +385,7 @@ export function STORAGE(state: GameType, peakWh: number) {
     {
       name: "Pumped Hydro",
       description: "Slow to build and charge / discharge",
-      available: year > 1930, // New Milfrod plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
+      available: year > 1930 && hasHydroResource(state.location), // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.15 * peakWh,
       // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity
@@ -402,7 +397,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       peakWh,
       maxPeakWh: 20000000000,
       // 24GWh, build in 1970's - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
-      // BUT, very location dependent...
+      // Resource availability above keeps this out of regions without suitable hydro potential.
       lifespanYears: 75,
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       roundTripEfficiency: 0.8,

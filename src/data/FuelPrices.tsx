@@ -1,6 +1,7 @@
-import { DateType, FuelPricesType } from "../Types";
+import { DateType, FuelPricesType, LocationType } from "../Types";
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
+import { regionalizeFuelPrices } from "./LocationProfiles";
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
 // Sources: (all prices real / in that year's $'s, per million BTU)
@@ -361,6 +362,7 @@ function projectYear(
 export function getFuelPricesPerMBTU(
   date: DateType,
   seed: number,
+  location?: LocationType,
 ): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
     // Prices only run from EARLIEST_DATA_YEAR, so anything before that means nothing was
@@ -382,5 +384,8 @@ export function getFuelPricesPerMBTU(
       projectYear(seed, year, fuelPrices[year - 1][12]);
     }
   }
-  return fuelPrices[date.year][date.monthNumber];
+  return regionalizeFuelPrices(
+    fuelPrices[date.year][date.monthNumber],
+    location,
+  );
 }

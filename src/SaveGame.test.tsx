@@ -120,9 +120,11 @@ describe("SaveGame", () => {
     // Off the globe, which the sun model has no answer for
     expect(withLocation({ ...save.game.location, lat: 400 })).toBeNull();
     expect(withLocation({ ...save.game.location, long: "west" })).toBeNull();
+    // Arbitrary coordinates legitimately have no IANA zone; their longitude supplies an offset.
     expect(
       withLocation({ ...save.game.location, timeZone: undefined }),
-    ).toBeNull();
+    ).not.toBeNull();
+    expect(withLocation({ ...save.game.location, timeZone: 5 })).toBeNull();
     // And the real one still round trips
     expect(parseSave(save)).not.toBeNull();
   });

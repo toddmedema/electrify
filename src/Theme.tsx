@@ -37,6 +37,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     Sun: "#a87817", // 3.9:1
     Wind: "#193f79", // 10.4:1
     Geothermal: "#531834", // 13.6:1
+    Hydro: "#006b54",
   },
   dark: {
     Coal: "#d0d0d0", // 11.9:1 on #121212 - the darkest fuel has to become the lightest
@@ -46,6 +47,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     Sun: "#ffd54f", // 13.6:1
     Wind: "#64b5f6", // 8.0:1
     Geothermal: "#f48fb1", // 8.7:1
+    Hydro: "#66d9b7",
   },
 };
 

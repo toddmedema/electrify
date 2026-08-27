@@ -10,7 +10,12 @@ import {
   summarizeTimelineByMonth,
 } from "./DateTime";
 import { LOCATIONS, TICK_MINUTES, TICKS_PER_MONTH } from "../Constants";
-import { DateType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
+import {
+  DateType,
+  LocationType,
+  MonthlyHistoryType,
+  TickPresentFutureType,
+} from "../Types";
 import { SCENARIOS } from "../data/Scenarios";
 import { generateNewTimeline } from "../reducers/Game";
 import { createGame } from "../testing/Simulator";
@@ -101,6 +106,40 @@ describe("getSunriseSunset", () => {
     // Guards the assertion above from passing only because the runner happens to sit in the
     // location's own zone
     expect(typeof machineOffsetMinutes).toEqual("number");
+  });
+
+  it("derives local time from longitude when an arbitrary point has no timezone", () => {
+    const arbitrary = {
+      id: "arbitrary",
+      name: "30 degrees east",
+      lat: 0,
+      long: 30,
+    } as LocationType;
+    const { sunrise, sunset } = getSunriseSunset(january, arbitrary);
+    expect(sunrise).toBeGreaterThan(5 * 60);
+    expect(sunrise).toBeLessThan(7 * 60);
+    expect(sunset).toBeGreaterThan(17 * 60);
+    expect(sunset).toBeLessThan(19 * 60);
+  });
+
+  it("models polar day and night instead of inventing a 6am to 6pm day", () => {
+    const tromso = {
+      id: "tromso",
+      name: "Tromsø, Norway",
+      lat: 69.6492,
+      long: 18.9553,
+      timeZone: "Europe/Oslo",
+    } as LocationType;
+    expect(getSunriseSunset(january, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 0,
+      daylight: "polar-night",
+    });
+    expect(getSunriseSunset(july, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 1440,
+      daylight: "polar-day",
+    });
   });
 });
 

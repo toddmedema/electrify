@@ -47,6 +47,7 @@ import {
   DateType,
   GameType,
   GeneratorShoppingType,
+  LocationType,
   SpeedType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
@@ -61,6 +62,7 @@ interface GeneratorBuildItemProps {
   date: DateType;
   interestRate: number;
   generator: GeneratorShoppingType;
+  location: LocationType;
   seed: number;
   secondaryMetric?: string;
   onBuild: (financed: boolean) => void;
@@ -70,7 +72,11 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
   const fuel = FUELS[generator.fuel] || {};
-  const fuelPrices = getFuelPricesPerMBTU(props.date, props.seed);
+  const fuelPrices = getFuelPricesPerMBTU(
+    props.date,
+    props.seed,
+    props.location,
+  );
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
@@ -625,6 +631,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           <GeneratorBuildItem
             date={game.date}
             seed={game.seed}
+            location={game.location}
             interestRate={game.interestRate}
             generator={g}
             key={i}

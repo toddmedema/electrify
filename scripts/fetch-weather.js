@@ -157,6 +157,7 @@ function writeIndex(fetched) {
       name: displayName(city),
       region: city.region,
       country: city.country,
+      admin: city.admin,
       lat: city.lat,
       long: city.long,
       timeZone: entry.timeZone,

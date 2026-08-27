@@ -12,6 +12,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
+  Slider,
   Table,
   TableBody,
   TableCell,
@@ -33,6 +34,7 @@ import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
+import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
@@ -132,6 +134,9 @@ function inEraScenario(scenario: ScenarioType): ScenarioType {
     // Cash is quoted the same in every era, so this only catches a game stored against an
     // amount the picker no longer offers - which would otherwise render the field blank
     cash: STARTING_CASH[nearestIndex(STARTING_CASH, scenario.cash)],
+    startingCustomers:
+      scenario.startingCustomers ||
+      getStartingCustomers(getScenarioLocation(scenario)),
     dollarsPerkWh: rates[nearestIndex(rates, scenario.dollarsPerkWh)],
     feePerKgCO2e: fees[nearestIndex(fees, scenario.feePerKgCO2e * 1000)] / 1000,
   };
@@ -166,6 +171,7 @@ function technologiesFor(
     feePerKgCO2e: scenario.feePerKgCO2e,
     seed: 0,
     facilities: [],
+    location: getScenarioLocation(scenario),
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
   return [
@@ -348,7 +354,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   value={location}
                   onChange={(_e: unknown, picked: CityType | null) => {
                     if (picked) {
-                      change({ locationId: picked.id, location: picked });
+                      change({
+                        locationId: picked.id,
+                        location: picked,
+                        startingCustomers: getStartingCustomers(picked),
+                      });
                     }
                   }}
                   disableClearable
@@ -363,6 +373,36 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     />
                   )}
                 />
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Starting customers</TableCell>
+              <TableCell>
+                <Slider
+                  aria-label="Starting customers"
+                  min={100000}
+                  max={5000000}
+                  step={50000}
+                  value={
+                    scenario.startingCustomers ||
+                    getStartingCustomers(getScenarioLocation(scenario))
+                  }
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value: number) => value.toLocaleString()}
+                  onChange={(_event: Event, value: number | number[]) =>
+                    change({
+                      startingCustomers: Array.isArray(value)
+                        ? value[0]
+                        : value,
+                    })
+                  }
+                />
+                <Typography variant="caption" color="textSecondary">
+                  {(
+                    scenario.startingCustomers ||
+                    getStartingCustomers(getScenarioLocation(scenario))
+                  ).toLocaleString()}
+                </Typography>
               </TableCell>
             </TableRow>
             <TableRow>

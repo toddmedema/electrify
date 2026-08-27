@@ -34,13 +34,29 @@ export interface LocationType {
   name: string;
   lat: number;
   long: number;
-  // IANA zone, so sun times come out in the location's own local time rather than in whichever
-  // one the player's computer happens to be set to
-  timeZone: string;
+  // Curated cities carry an IANA zone. An arbitrary coordinate may not, in which case local time
+  // is derived from longitude rather than from the player's computer.
+  timeZone?: string;
+  region?: string;
+  country?: string;
+  elevation?: number;
+  // Explicit resource knowledge wins over the regional fallback. This keeps an arbitrary point
+  // honest: coordinates alone cannot tell us whether a usable river or geothermal field exists.
+  resources?: {
+    geothermal?: boolean;
+    hydro?: boolean;
+  };
 }
 
 export type FuelNameType =
-  "Coal" | "Wind" | "Sun" | "Natural Gas" | "Uranium" | "Oil";
+  | "Coal"
+  | "Wind"
+  | "Sun"
+  | "Natural Gas"
+  | "Uranium"
+  | "Oil"
+  | "Geothermal"
+  | "Hydro";
 export interface FuelPricesType {
   [index: string]: number;
   "Natural Gas": number; // $/btu
@@ -56,6 +72,8 @@ export interface FuelProductionType {
   Oil?: number; // wh
   Sun?: number; // wh
   Wind?: number; //wh
+  Geothermal?: number; // wh
+  Hydro?: number; // wh
 }
 
 export interface DifficultyMultipliersType {
@@ -405,6 +423,9 @@ export interface ScenarioType {
   seed?: number;
   startingYear: number;
   cash: number;
+  // Optional for backwards compatibility with authored and locally stored scenarios. When absent,
+  // the location profile supplies the starting grid size.
+  startingCustomers?: number;
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;

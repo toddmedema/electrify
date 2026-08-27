@@ -1,10 +1,11 @@
 import {
+  getRawSolarIrradianceWM2,
   getWeather,
   initWeatherFromRows,
   WEATHER_STARTING_YEAR,
 } from "./Weather";
 import { getDateFromMinute } from "../helpers/DateTime";
-import { RawWeatherType } from "../Types";
+import { LocationType, RawWeatherType } from "../Types";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
 // single year of data is 12 months x 24 hours. The fixture starts at 1980, the first year the
@@ -13,6 +14,46 @@ const FIXTURE_STARTING_YEAR = 1980;
 const HOURS_PER_MONTH = 24;
 const MONTHS_PER_YEAR = 12;
 const SEED = 1;
+
+describe("getRawSolarIrradianceWM2", () => {
+  const equator = {
+    id: "equator",
+    name: "Equator",
+    lat: 0,
+    long: 0,
+    timeZone: "Etc/UTC",
+  } as LocationType;
+  const highLatitude = {
+    ...equator,
+    id: "north",
+    name: "Northern",
+    lat: 60,
+  };
+
+  it("reduces peak irradiance as latitude increases", () => {
+    const juneNoon = getDateFromMinute(5 * 1440 + 12 * 60, 2020);
+    expect(getRawSolarIrradianceWM2(juneNoon, highLatitude, 0)).toBeLessThan(
+      getRawSolarIrradianceWM2(juneNoon, equator, 0),
+    );
+  });
+
+  it("keeps the sun off throughout a polar night", () => {
+    const tromso = {
+      ...highLatitude,
+      id: "tromso",
+      name: "Tromsø",
+      lat: 69.6492,
+      long: 18.9553,
+      timeZone: "Europe/Oslo",
+    };
+    expect(
+      getRawSolarIrradianceWM2(getDateFromMinute(0, 2020), tromso, 0),
+    ).toBe(0);
+    expect(
+      getRawSolarIrradianceWM2(getDateFromMinute(12 * 60, 2020), tromso, 0),
+    ).toBe(0);
+  });
+});
 
 // Several years rather than one, because everything the forecast does now is derived from the
 // spread of the loaded record: with a single year every month has a standard deviation of zero
