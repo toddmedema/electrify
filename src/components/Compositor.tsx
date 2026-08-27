@@ -277,6 +277,7 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
     size,
     step,
     backProps,
+    closeProps,
     primaryProps,
     tooltipProps,
     isLastStep,
@@ -305,6 +306,9 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
         <span className="tutorialProgress">
           Step {index + 1} of {size}
         </span>
+        <Button {...closeProps} color="primary" size="small">
+          Exit tutorial
+        </Button>
         {index > 0 && !flags.hideBack && (
           <Button {...backProps} color="primary">
             Back
@@ -628,7 +632,9 @@ export default class Compositor extends React.Component<Props, {}> {
             // disableOverlayClose prop, into this single options prop
             options={{
               beaconSize: 48,
-              overlayColor: "rgba(0, 0, 0, 0.1)",
+              // Enough separation to make the highlighted control unmistakable while keeping
+              // the surrounding dashboard legible as context for what the prompt is teaching.
+              overlayColor: "rgba(0, 0, 0, 0.38)",
               // Joyride traps Tab inside the tooltip, so Esc is the way back out for
               // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
               // those are far too easy to trigger by accident mid-walkthrough

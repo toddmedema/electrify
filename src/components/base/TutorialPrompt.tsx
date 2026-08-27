@@ -1,8 +1,8 @@
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import TouchAppIcon from "@mui/icons-material/TouchApp";
-import { Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import * as React from "react";
-import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import ConceptIcon, { CONCEPT_LABELS, ConceptNameType } from "./ConceptIcon";
 
 export interface TutorialPromptProps {
   // The idea, told in symbols: a large icon row read left to right, arrows between
@@ -19,9 +19,29 @@ export default function TutorialPrompt({
   text,
   action,
 }: TutorialPromptProps): React.JSX.Element {
+  const actionLabel = action
+    ?.map((concept) => CONCEPT_LABELS[concept].toLowerCase())
+    .join(" then ");
+
   return (
-    <div className="tutorialPrompt">
-      <div className="tutorialPromptConcepts">
+    <Stack
+      className="tutorialPrompt"
+      spacing={1.25}
+      sx={{ textAlign: "left", minWidth: 0 }}
+    >
+      <Box
+        className="tutorialPromptConcepts"
+        sx={{
+          alignSelf: "stretch",
+          borderRadius: 2,
+          bgcolor: "action.hover",
+          py: 1.25,
+          px: 1.5,
+        }}
+        aria-label={`Tutorial concepts: ${concepts
+          .map((concept) => CONCEPT_LABELS[concept])
+          .join(", ")}`}
+      >
         {concepts.map((concept, i) => (
           <React.Fragment key={i}>
             {i > 0 && (
@@ -34,16 +54,40 @@ export default function TutorialPrompt({
             <ConceptIcon concept={concept} fontSize="large" />
           </React.Fragment>
         ))}
-      </div>
-      {text && <Typography variant="body2">{text}</Typography>}
+      </Box>
+      {text && (
+        <Typography variant="body1" sx={{ lineHeight: 1.45 }}>
+          {text}
+        </Typography>
+      )}
       {action && (
-        <div className="tutorialPromptAction">
+        <Box
+          className="tutorialPromptAction"
+          role="status"
+          aria-label={`Required action: ${actionLabel}`}
+          sx={{
+            alignSelf: "stretch",
+            justifyContent: "flex-start",
+            bgcolor: "action.selected",
+            borderColor: "primary.main !important",
+          }}
+        >
           <TouchAppIcon fontSize="small" color="primary" aria-hidden />
+          <Typography
+            variant="caption"
+            component="span"
+            sx={{ fontWeight: 700, mr: 0.5 }}
+          >
+            Do this to continue:
+          </Typography>
           {action.map((concept, i) => (
             <ConceptIcon key={i} concept={concept} fontSize="small" />
           ))}
-        </div>
+          <Typography variant="caption" component="span">
+            {actionLabel}
+          </Typography>
+        </Box>
       )}
-    </div>
+    </Stack>
   );
 }

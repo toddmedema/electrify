@@ -17,7 +17,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatMoneyStable } from "../../helpers/Format";
+import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
@@ -322,6 +322,9 @@ export function GameAppBar(props: Props) {
   }
 
   const inBlackout = now.supplyW < now.demandW;
+  const marginW = now.supplyW - now.demandW;
+  const marginPercent =
+    now.demandW > 0 ? Math.round((marginW / now.demandW) * 100) : 0;
 
   return (
     <div id="appbar">
@@ -347,6 +350,31 @@ export function GameAppBar(props: Props) {
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
+      </div>
+      <div
+        className={`operatingStatusBar${inBlackout ? " isBlackout" : ""}`}
+        role="status"
+        aria-label={
+          inBlackout
+            ? `Blackout: supply is ${formatWatts(Math.abs(marginW))} short of demand`
+            : `Grid operating with a ${marginPercent} percent supply margin`
+        }
+      >
+        <span className="operatingMetric">
+          <ConceptIcon concept="supply" fontSize="small" />
+          <span className="operatingMetricLabel">Supply</span>
+          <strong>{formatWatts(now.supplyW)}</strong>
+        </span>
+        <span className="operatingMetric">
+          <ConceptIcon concept="demand" fontSize="small" />
+          <span className="operatingMetricLabel">Demand</span>
+          <strong>{formatWatts(now.demandW)}</strong>
+        </span>
+        <span className="operatingOutcome">
+          {inBlackout
+            ? `${formatWatts(Math.abs(marginW))} short`
+            : `${marginPercent >= 0 ? "+" : ""}${marginPercent}% margin`}
+        </span>
       </div>
       <div
         id="yearProgressBar"

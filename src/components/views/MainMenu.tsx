@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, IconButton } from "@mui/material";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import { login } from "../../Globals";
@@ -21,12 +21,27 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
+  const startLabel = props.hasSavedGame
+    ? "Choose a mission"
+    : "Start guided missions";
+
   return (
     <div id="menuCard">
       <div id="logo">
-        <img src="images/logo.svg" alt="Logo"></img>
+        <img
+          src="images/logo.svg"
+          alt="Electrify"
+          style={{ maxWidth: 680 }}
+        ></img>
       </div>
-      <div id="centeredMenu">
+      <Box id="centeredMenu" style={{ top: "36%" }} sx={{ px: 3 }}>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          sx={{ mb: 2, mx: "auto", maxWidth: 360 }}
+        >
+          Build a reliable, affordable, cleaner electricity grid.
+        </Typography>
         {props.hasSavedGame && (
           <Button
             size="large"
@@ -45,19 +60,33 @@ const MainMenu = (props: Props): React.JSX.Element => {
           onClick={props.onStart}
           autoFocus={!props.hasSavedGame}
         >
-          Play
+          {startLabel}
         </Button>
-        <Button variant="outlined" color="primary" onClick={props.onManual}>
-          Manual
-        </Button>
-        <Button variant="outlined" color="primary" onClick={props.onSettings}>
-          Options
-        </Button>
-        {!props.uid && (
-          <Button variant="outlined" color="primary" onClick={login}>
-            Log in
+        <Stack
+          component="nav"
+          aria-label="Game resources"
+          direction="row"
+          useFlexGap
+          sx={{
+            mx: "auto",
+            maxWidth: 440,
+            flexWrap: "wrap",
+            justifyContent: "center",
+            "& > button": { m: "0 4px 8px !important" },
+          }}
+        >
+          <Button variant="text" color="primary" onClick={props.onManual}>
+            Manual
           </Button>
-        )}
+          <Button variant="text" color="primary" onClick={props.onSettings}>
+            Options
+          </Button>
+          {!props.uid && (
+            <Button variant="text" color="primary" onClick={login}>
+              Log in
+            </Button>
+          )}
+        </Stack>
         {props.audioEnabled === undefined && (
           <Button
             variant="outlined"
@@ -68,7 +97,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
             Enable music
           </Button>
         )}
-      </div>
+      </Box>
       <div
         style={{
           position: "absolute",

@@ -30,6 +30,25 @@ function fileInput(): HTMLInputElement {
 }
 
 describe("Settings", () => {
+  it("groups controls into labeled, scannable sections", () => {
+    renderSettings();
+
+    ["Sound", "Account", "Units", "Appearance", "Saved Game"].forEach((name) =>
+      expect(screen.getByRole("region", { name })).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Music and sound effects disabled",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Measurement system" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Color theme" }),
+    ).toBeInTheDocument();
+  });
+
   it("names the saved game that Export would download", async () => {
     const onExportSave = jest.fn();
     renderSettings({ savedGame: "Rise of Renewables, 2035", onExportSave });

@@ -374,7 +374,8 @@ table {
 }
 
 span.weak {
-  font-weight: 100;
+  color: $font_color_faded;
+  font-weight: 400;
 }
 
 // Says which of the two things sharing the game UI you're looking at. Deliberately loud: the
@@ -401,6 +402,64 @@ $topbar_height: 56px;
 // Never squeezed by whatever is below it, on either layout
 #appbar {
   flex: 0 0 auto;
+}
+
+// The chart answers "what happened today"; this strip answers the more urgent question of how
+// the grid is doing right now. It stays outside the toolbar so cash/date controls remain stable
+// while the operational numbers update underneath them.
+.operatingStatusBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 30px;
+  padding: 2px 16px 4px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: $font_color_faded;
+  font-size: 0.78rem;
+
+  &.isBlackout {
+    background: var(--blackout-tint);
+
+    .operatingOutcome {
+      color: $blackout_red;
+    }
+  }
+}
+
+.operatingMetric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  strong {
+    color: $font_color_primary;
+    font-weight: 600;
+  }
+
+  .MuiSvgIcon-root {
+    font-size: 16px;
+  }
+}
+
+.operatingOutcome {
+  margin-left: auto;
+  color: $delta_good;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media screen and (max-width: 430px) {
+  .operatingStatusBar {
+    gap: 8px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .operatingMetricLabel {
+    // The icons retain accessible names and make room for all three current-state values.
+    display: none;
+  }
 }
 
 // Names a pane, since the bottom nav that would otherwise do it is hidden once all three are on

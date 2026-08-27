@@ -1,11 +1,18 @@
 import * as React from "react";
 import {
+  Box,
   Button,
+  Card,
+  CardContent,
   Checkbox,
+  FormControl,
+  FormControlLabel,
   IconButton,
+  InputLabel,
   MenuItem,
   Select,
   SelectChangeEvent,
+  Stack,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -38,6 +45,31 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
+
+interface SettingsSectionProps {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}
+
+function SettingsSection({
+  id,
+  title,
+  children,
+}: SettingsSectionProps): React.JSX.Element {
+  return (
+    <Card component="section" variant="outlined" aria-labelledby={id}>
+      <CardContent>
+        <Typography id={id} variant="h6" sx={{ mb: 1.5 }}>
+          {title}
+        </Typography>
+        <Stack spacing={1.5} sx={{ alignItems: "flex-start" }}>
+          {children}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings(props: Props): React.JSX.Element {
   // TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
@@ -88,156 +120,192 @@ export default function Settings(props: Props): React.JSX.Element {
           <Typography variant="h6">Settings</Typography>
         </Toolbar>
       </div>
-      <div
-        style={{ textAlign: "center", margin: "20px 0", lineHeight: "30px" }}
+      <Box
+        className="scrollable"
+        sx={{
+          width: "100%",
+          maxWidth: 720,
+          mx: "auto",
+          px: { xs: 2, sm: 3 },
+          py: 2,
+          boxSizing: "border-box",
+          overflowY: "auto",
+        }}
       >
-        <Checkbox
-          color="primary"
-          id="sound"
-          checked={props.settings.audioEnabled}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            props.onAudioChange(e.target.checked)
-          }
-        />
-        {props.settings.audioEnabled
-          ? "Music and sound effects enabled."
-          : "Music and sound effects disabled."}
-        <Typography variant="h6" style={{ marginTop: 24 }}>
-          Account
-        </Typography>
-        {props.loggedIn ? (
-          <div>
+        <Stack spacing={2}>
+          <SettingsSection id="sound-settings" title="Sound">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  color="primary"
+                  id="sound"
+                  checked={!!props.settings.audioEnabled}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    props.onAudioChange(e.target.checked)
+                  }
+                />
+              }
+              label={
+                props.settings.audioEnabled
+                  ? "Music and sound effects enabled"
+                  : "Music and sound effects disabled"
+              }
+            />
+          </SettingsSection>
+
+          <SettingsSection id="account-settings" title="Account">
             <Typography variant="body2" color="textSecondary">
-              {props.displayName
-                ? `On the leaderboard as ${props.displayName}.`
-                : "You're logged in, but haven't picked a leaderboard name yet."}
+              {props.loggedIn
+                ? props.displayName
+                  ? `On the leaderboard as ${props.displayName}.`
+                  : "You're logged in, but haven't picked a leaderboard name yet."
+                : "Log in to put your name on the global high score board."}
             </Typography>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={props.onChangeName}
-              style={{ margin: "0 6px" }}
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: "wrap" }}
             >
-              {props.displayName ? "Change name" : "Pick a name"}
-            </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={props.onLogout}
-              style={{ margin: "0 6px" }}
-            >
-              Log out
-            </Button>
-          </div>
-        ) : (
-          <div>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={props.onLogin}
-              style={{ margin: "0 6px" }}
-            >
-              Log in
-            </Button>
+              {props.loggedIn ? (
+                <>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={props.onChangeName}
+                  >
+                    {props.displayName ? "Change name" : "Pick a name"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={props.onLogout}
+                  >
+                    Log out
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={props.onLogin}
+                >
+                  Log in
+                </Button>
+              )}
+            </Stack>
+          </SettingsSection>
+
+          <SettingsSection id="units-settings" title="Units">
+            <FormControl fullWidth>
+              <InputLabel id="units-label">Measurement system</InputLabel>
+              <Select
+                labelId="units-label"
+                id="units"
+                label="Measurement system"
+                value={props.settings.units}
+                onChange={(e: SelectChangeEvent<UnitSystemType>) =>
+                  props.onUnitsChange(e.target.value as UnitSystemType)
+                }
+              >
+                {UNIT_SYSTEMS.map((system: UnitSystemType) => (
+                  <MenuItem value={system} key={system}>
+                    {UNIT_SYSTEM_LABELS[system]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <Typography variant="body2" color="textSecondary">
-              Log in to put your name on the global high score board.
+              {props.settings.units === "imperial"
+                ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
+                : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
             </Typography>
-          </div>
-        )}
-        <Typography variant="h6" style={{ marginTop: 24 }}>
-          Units
-        </Typography>
-        <Select
-          id="units"
-          value={props.settings.units}
-          onChange={(e: SelectChangeEvent<UnitSystemType>) =>
-            props.onUnitsChange(e.target.value as UnitSystemType)
-          }
-        >
-          {UNIT_SYSTEMS.map((system: UnitSystemType) => (
-            <MenuItem value={system} key={system}>
-              {UNIT_SYSTEM_LABELS[system]}
-            </MenuItem>
-          ))}
-        </Select>
-        <Typography variant="body2" color="textSecondary">
-          {props.settings.units === "imperial"
-            ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
-            : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
-        </Typography>
-        <Typography variant="h6" style={{ marginTop: 24 }}>
-          Appearance
-        </Typography>
-        <Select
-          id="theme"
-          value={props.settings.theme}
-          onChange={(e: SelectChangeEvent<ThemeChoiceType>) =>
-            props.onThemeChange(e.target.value as ThemeChoiceType)
-          }
-        >
-          {THEME_CHOICES.map((choice: ThemeChoiceType) => (
-            <MenuItem value={choice} key={choice}>
-              {THEME_LABELS[choice]}
-            </MenuItem>
-          ))}
-        </Select>
-        <Typography variant="body2" color="textSecondary">
-          {props.settings.theme === "system"
-            ? "Follows whatever your device is set to, and changes with it."
-            : "Sessions run long; the charts are drawn for both."}
-        </Typography>
-        <Typography variant="h6" style={{ marginTop: 24 }}>
-          Saved Game
-        </Typography>
-        <div>
-          <Button
-            variant="outlined"
-            color="primary"
-            disabled={!props.savedGame}
-            onClick={props.onExportSave}
-            style={{ margin: "0 6px" }}
-          >
-            Export
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => fileInput.current?.click()}
-            style={{ margin: "0 6px" }}
-          >
-            Import
-          </Button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="application/json,.json"
-            style={{ display: "none" }}
-            aria-label="Save game file"
-            onChange={onFileChosen}
-          />
-        </div>
-        <Typography variant="body2" color="textSecondary">
-          {props.savedGame
-            ? `Export downloads your saved game (${props.savedGame}) to keep or share. Importing one replaces it.`
-            : "You need a game in progress to export one - start a game, then come back here. You can still import a save that someone shared with you."}
-        </Typography>
-        <Typography variant="h6" style={{ marginTop: 24 }}>
-          Keyboard Shortcuts
-        </Typography>
-        <KeyboardShortcuts />
-        <Typography className="version">
-          Electrify App v{packageJson.version}
-        </Typography>
-        <Typography className="github">
-          <a
-            href="https://github.com/toddmedema/electrify"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
-        </Typography>
-      </div>
+          </SettingsSection>
+
+          <SettingsSection id="appearance-settings" title="Appearance">
+            <FormControl fullWidth>
+              <InputLabel id="theme-label">Color theme</InputLabel>
+              <Select
+                labelId="theme-label"
+                id="theme"
+                label="Color theme"
+                value={props.settings.theme}
+                onChange={(e: SelectChangeEvent<ThemeChoiceType>) =>
+                  props.onThemeChange(e.target.value as ThemeChoiceType)
+                }
+              >
+                {THEME_CHOICES.map((choice: ThemeChoiceType) => (
+                  <MenuItem value={choice} key={choice}>
+                    {THEME_LABELS[choice]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography variant="body2" color="textSecondary">
+              {props.settings.theme === "system"
+                ? "Follows whatever your device is set to, and changes with it."
+                : "Sessions run long; the charts are drawn for both."}
+            </Typography>
+          </SettingsSection>
+
+          <SettingsSection id="saved-game-settings" title="Saved Game">
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: "wrap" }}
+            >
+              <Button
+                variant="outlined"
+                color="primary"
+                disabled={!props.savedGame}
+                onClick={props.onExportSave}
+              >
+                Export
+              </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => fileInput.current?.click()}
+              >
+                Import
+              </Button>
+            </Stack>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: "none" }}
+              aria-label="Save game file"
+              onChange={onFileChosen}
+            />
+            <Typography variant="body2" color="textSecondary">
+              {props.savedGame
+                ? `Export downloads your saved game (${props.savedGame}) to keep or share. Importing one replaces it.`
+                : "You need a game in progress to export one - start a game, then come back here. You can still import a save that someone shared with you."}
+            </Typography>
+          </SettingsSection>
+
+          <SettingsSection id="keyboard-settings" title="Keyboard Shortcuts">
+            <KeyboardShortcuts />
+          </SettingsSection>
+
+          <Box component="footer" sx={{ textAlign: "center", pb: 1 }}>
+            <Typography className="version">
+              Electrify App v{packageJson.version}
+            </Typography>
+            <Typography className="github">
+              <a
+                href="https://github.com/toddmedema/electrify"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub
+              </a>
+            </Typography>
+          </Box>
+        </Stack>
+      </Box>
     </div>
   );
 }

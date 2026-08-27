@@ -7,6 +7,7 @@ import {
   CardHeader,
   IconButton,
   List,
+  ListSubheader,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -131,6 +132,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
 export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
+  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps);
 
   return (
     <div id="listCard" className="flexContainer">
@@ -161,20 +163,77 @@ export default function NewGame(props: Props): React.JSX.Element {
           </IconButton>
         </Toolbar>
       </div>
-      <List dense className="scrollable cardList">
-        {SCENARIOS.map((s) => (
+      <List
+        dense
+        className="scrollable cardList"
+        aria-label="Available missions"
+      >
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Training
+          </Typography>
+        </ListSubheader>
+        {TUTORIALS.map((s) => (
           <MissionListItem
             key={s.id}
             s={s}
             completed={ids.indexOf(s.id) !== -1}
             next={nextTutorial !== undefined && s.id === nextTutorial.id}
-            onSelect={
-              s.tutorialSteps
-                ? () => props.onTutorial(s.id)
-                : () => props.onDetails({ scenarioId: s.id })
-            }
+            onSelect={() => props.onTutorial(s.id)}
           />
         ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Scenarios
+          </Typography>
+        </ListSubheader>
+        {scenarios.map((s) => (
+          <MissionListItem
+            key={s.id}
+            s={s}
+            completed={ids.indexOf(s.id) !== -1}
+            next={false}
+            onSelect={() => props.onDetails({ scenarioId: s.id })}
+          />
+        ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Sandbox
+          </Typography>
+        </ListSubheader>
         <MissionListItem
           key={CUSTOM_SCENARIO_ID}
           s={DEFAULT_CUSTOM_SCENARIO}

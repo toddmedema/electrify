@@ -40,8 +40,12 @@ describe("NewGame", () => {
       expect(rows[index]).toHaveTextContent(scenario.name),
     );
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
-    expect(screen.queryByText("Tutorials")).not.toBeInTheDocument();
-    expect(screen.queryByText("Scenarios")).not.toBeInTheDocument();
+    expect(screen.getByText("Training")).toBeInTheDocument();
+    expect(screen.getByText("Scenarios")).toBeInTheDocument();
+    expect(screen.getByText("Sandbox")).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Available missions" }),
+    ).toContainElement(rows[0]);
   });
 
   it("marks the first incomplete tutorial as the starting point", () => {

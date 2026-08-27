@@ -1,14 +1,17 @@
 import * as React from "react";
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Skeleton,
+  Stack,
   Typography,
 } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import numbro from "numbro";
 import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
@@ -54,6 +57,24 @@ export interface Props extends StateProps, DispatchProps {}
 
 export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
+}
+
+export function summarizeChallenge(
+  breakdown: VictoryType["breakdown"],
+): string {
+  const practiced = Object.keys(breakdown)
+    .map((category) => SCORE_LABELS[category] || category)
+    .slice(0, 3);
+
+  if (practiced.length === 0) {
+    return "You completed the scenario and kept the grid moving.";
+  }
+  if (practiced.length === 1) {
+    return `You practiced managing ${practiced[0]}.`;
+  }
+
+  const last = practiced.pop();
+  return `You practiced balancing ${practiced.join(", ")} and ${last}.`;
 }
 
 /**
@@ -108,6 +129,10 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const { previousBest, breakdown, endTitle, endMessage } = victory;
   const isPersonalBest =
     previousBest === undefined || victory.score > previousBest;
+  let displayTitle = endTitle || `You've retired!`;
+  if (endTitle && /^mission complete!?$/i.test(endTitle.trim())) {
+    displayTitle = victory.scenarioName;
+  }
 
   const onShare = () => {
     const text = buildShareText({
@@ -133,19 +158,58 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       // The run is over either way; dismissing by backdrop or Esc is the same as "Keep playing"
       onClose={onClose}
       aria-labelledby="victory-title"
+      fullWidth
+      maxWidth="sm"
+      slotProps={{
+        paper: {
+          sx: {
+            overflow: "hidden",
+            backgroundImage:
+              "radial-gradient(circle at 50% -20%, rgba(255, 193, 7, 0.28), transparent 45%)",
+          },
+        },
+      }}
     >
-      <DialogTitle id="victory-title" className="iconLabel">
-        <ConceptIcon concept="goal" />
-        {endTitle || `You've retired!`}
+      <DialogTitle id="victory-title" sx={{ pb: 1.5 }}>
+        <Stack spacing={0.5} sx={{ alignItems: "center", textAlign: "center" }}>
+          <EmojiEventsIcon color="warning" sx={{ fontSize: 52 }} aria-hidden />
+          <Typography
+            variant="overline"
+            color="warning.main"
+            sx={{ fontWeight: 800, letterSpacing: "0.14em" }}
+          >
+            Mission complete
+          </Typography>
+          <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>
+            {displayTitle}
+          </Typography>
+        </Stack>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ px: { xs: 2, sm: 3 } }}>
         {endMessage && (
-          <Typography variant="body1" gutterBottom>
+          <Typography variant="body1" gutterBottom sx={{ textAlign: "center" }}>
             {endMessage}
           </Typography>
         )}
-        <Typography variant="body1">
-          Your final score is <strong>{formatScore(victory.score)}</strong>:
+        <Box
+          sx={{
+            my: 2,
+            p: 2,
+            borderRadius: 2,
+            bgcolor: "action.hover",
+            border: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Typography variant="overline" color="text.secondary">
+            What you accomplished
+          </Typography>
+          <Typography variant="body1">
+            {summarizeChallenge(breakdown)}
+          </Typography>
+        </Box>
+        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+          Final score: <strong>{formatScore(victory.score)}</strong>
         </Typography>
         <div style={{ margin: "8px 0" }}>
           {Object.keys(breakdown).map((category: string) => {
@@ -197,7 +261,15 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Typography>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions
+        sx={{
+          px: { xs: 2, sm: 3 },
+          pb: 2,
+          flexWrap: "wrap",
+          gap: 0.5,
+          "& > :not(:first-of-type)": { ml: 0 },
+        }}
+      >
         {canShare() && (
           <Button color="primary" onClick={onShare} startIcon={<ShareIcon />}>
             Share

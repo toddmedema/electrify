@@ -230,9 +230,28 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           : { default: "#ffffff", paper: "#ffffff" },
     },
     typography: {
-      fontSize: 14,
+      fontSize: 15,
       body1: {
-        lineHeight: 1.2,
+        lineHeight: 1.35,
+      },
+    },
+    shape: {
+      borderRadius: 6,
+    },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            minHeight: 36,
+            fontWeight: 600,
+            textTransform: "none",
+          },
+        },
+      },
+      MuiButtonBase: {
+        defaultProps: {
+          disableRipple: false,
+        },
       },
     },
   });

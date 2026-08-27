@@ -133,7 +133,14 @@ export default function UPlotChart<S>(
 
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
-    const measure = () => setWidth(root.clientWidth);
+    const measure = () => {
+      // Floor fractional flex widths so uPlot's explicit canvas width can never
+      // round a pixel wider than the pane that owns it.
+      const nextWidth = Math.floor(root.getBoundingClientRect().width);
+      setWidth((currentWidth) =>
+        currentWidth === nextWidth ? currentWidth : nextWidth,
+      );
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
@@ -190,5 +197,18 @@ export default function UPlotChart<S>(
     }
   });
 
-  return <div id={id} ref={rootRef} role="img" aria-label={ariaLabel} />;
+  return (
+    <div
+      id={id}
+      ref={rootRef}
+      role="img"
+      aria-label={ariaLabel}
+      style={{
+        width: "100%",
+        minWidth: 0,
+        maxWidth: "100%",
+        overflow: "hidden",
+      }}
+    />
+  );
 }

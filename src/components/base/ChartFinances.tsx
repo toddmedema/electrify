@@ -33,7 +33,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    padding: [10 * scale, 5 * scale, 0, 0],
+    // Month labels are centred on their ticks. The final tick sits on the plot edge,
+    // so reserve half a label beyond it rather than clipping its trailing characters.
+    padding: [10 * scale, 24 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
