@@ -14,6 +14,7 @@ import {
   FacilityOperatingType,
   FuelNameType,
   GeneratorOperatingType,
+  LocationType,
   StorageOperatingType,
 } from "../../Types";
 import Sparkline from "./Sparkline";
@@ -35,6 +36,7 @@ export interface Props {
   facility: FacilityOperatingType;
   date: DateType;
   seed: number;
+  location: LocationType;
 }
 
 interface StatProps {
@@ -72,6 +74,7 @@ export function fuelPriceTrend(
   fuel: FuelNameType,
   date: DateType,
   seed: number,
+  location?: LocationType,
 ): number[] {
   const months = Math.min(TREND_MONTHS, date.monthsEllapsed + 1);
   if (months < 2) {
@@ -88,6 +91,7 @@ export function fuelPriceTrend(
           monthNumber: (absolute % 12) + 1,
         } as DateType,
         seed,
+        location,
       )[fuel];
       if (price === undefined) {
         return [];
@@ -103,14 +107,14 @@ export function fuelPriceTrend(
 }
 
 export default function FacilityDetails(props: Props): React.JSX.Element {
-  const { facility, date, seed } = props;
+  const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const isStorage = facility.peakWh > 0;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
 
-  const trend = fuel ? fuelPriceTrend(fuel, date, seed) : [];
+  const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
   const trendChange =
     trend.length > 1 && trend[0] > 0
       ? trend[trend.length - 1] / trend[0] - 1

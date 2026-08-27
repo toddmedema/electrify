@@ -49,6 +49,16 @@ describe("a custom game", () => {
     expect(cash).toBeLessThan(501000000);
   });
 
+  it("starts with the customer scale selected in custom setup", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: { ...CUSTOM, startingCustomers: 250000 },
+    });
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)!.customers,
+    ).toBeCloseTo(250000, -4);
+  });
+
   it("builds the starting facilities it was given", () => {
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
@@ -116,6 +126,7 @@ describe("a custom game", () => {
       lat: 12.3456,
       long: 65.4321,
       timeZone: "Etc/UTC",
+      resources: { hydro: true },
     };
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,

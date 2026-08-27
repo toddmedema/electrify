@@ -638,6 +638,7 @@ export const DEFAULT_CUSTOM_SCENARIO = {
   ownership: "Investor",
   startingYear: 2020,
   cash: 200000000,
+  startingCustomers: 1000000,
   dollarsPerkWh: 0.07,
   durationMonths: 12 * 20,
   feePerKgCO2e: 0,

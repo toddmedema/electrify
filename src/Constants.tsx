@@ -56,6 +56,9 @@ export const LOCATIONS = {
     lat: 40.4406,
     long: -79.9959,
     timeZone: "America/New_York",
+    region: "North America",
+    country: "United States",
+    resources: { hydro: true },
   },
   SF: {
     id: "SF",
@@ -63,6 +66,9 @@ export const LOCATIONS = {
     lat: 37.7749,
     long: -122.4194,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    resources: { geothermal: true, hydro: true },
   },
   LA: {
     id: "LA",
@@ -70,6 +76,9 @@ export const LOCATIONS = {
     lat: 34.0522,
     long: -118.2437,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    resources: { geothermal: true },
   },
   // Named for where its data was read as coming from, back when it was a CSV of unknown
   // provenance. It now genuinely is the Santa Cruz Mountains: every location is fetched from
@@ -80,6 +89,9 @@ export const LOCATIONS = {
     lat: 37.1041,
     long: -122.0308,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    resources: { geothermal: true, hydro: true },
   },
   HNL: {
     id: "HNL",
@@ -87,6 +99,9 @@ export const LOCATIONS = {
     lat: 21.3099,
     long: -157.8581,
     timeZone: "Pacific/Honolulu",
+    region: "North America",
+    country: "United States",
+    resources: { geothermal: true },
   },
   SJU: {
     id: "SJU",
@@ -94,6 +109,9 @@ export const LOCATIONS = {
     lat: 18.4671,
     long: -66.1185,
     timeZone: "America/Puerto_Rico",
+    region: "North America",
+    country: "United States",
+    resources: { hydro: true },
   },
 } as { [id: string]: LocationType };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
@@ -159,6 +177,12 @@ export const FUELS = {
   },
   Oil: {
     kgCO2ePerBtu: 0.00002031, // https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references
+  },
+  Geothermal: {
+    kgCO2ePerBtu: 0,
+  },
+  Hydro: {
+    kgCO2ePerBtu: 0,
   },
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
   // 'Trash': {

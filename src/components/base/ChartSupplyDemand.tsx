@@ -159,28 +159,31 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
 
-  let sunrise = midnight + getSunriseSunset(date, location).sunrise;
-  let sunset = midnight + getSunriseSunset(date, location).sunset;
-  if (sunrise < rangeMin) {
-    sunrise =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunrise;
+  const sun = getSunriseSunset(date, location);
+  let sunTicks: number[] = [];
+  if (sun.daylight === "normal") {
+    let sunrise = midnight + sun.sunrise;
+    let sunset = midnight + sun.sunset;
+    if (sunrise < rangeMin) {
+      sunrise =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunrise;
+    }
+    if (sunset < rangeMin) {
+      sunset =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunset;
+    }
+    sunTicks = [sunrise, sunrise + (sunset - sunrise) / 2, sunset];
   }
-  if (sunset < rangeMin) {
-    sunset =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunset;
-  }
-
-  const noon = sunrise + (sunset - sunrise) / 2;
 
   // "Demand peaks in the early evening" only lands if you can read the clock off the axis
   const hourTicks = getHourTicks(rangeMin, rangeMax);
@@ -274,7 +277,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     domain: padRange(domainMin, domainMax),
     range: [rangeMin, rangeMax],
     hourTicks,
-    sunTicks: [sunrise, noon, sunset],
+    sunTicks,
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute: currentMinute === rangeMax ? null : currentMinute,
     legendItems,

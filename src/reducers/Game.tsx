@@ -192,7 +192,7 @@ const FUEL_PRICE_SPIKE = 0.15;
  * already draws every fuel for the player who wants them all.
  */
 function logFuelPriceMoves(state: GameType) {
-  const prices = getFuelPricesPerMBTU(state.date, state.seed);
+  const prices = getFuelPricesPerMBTU(state.date, state.seed, state.location);
   const previous = previousFuelPrices;
   previousFuelPrices = prices;
   if (!previous) {
@@ -1018,7 +1018,7 @@ function getDemandW(
     prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
       marketingGrowth,
   );
-  const { sunrise, sunset } = getSunriseSunset(date, game.location);
+  const sun = getSunriseSunset(date, game.location);
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
   // https://www.e-education.psu.edu/ebf200/node/151
@@ -1027,7 +1027,14 @@ function getDemandW(
   const temperatureNormalized =
     0.0035 * Math.pow(now.temperatureC, 2) - 0.035 * now.temperatureC;
   const minutesFromDarkNormalized =
-    Math.min(date.minuteOfDay - sunrise, sunset - date.minuteOfDay) / 420;
+    sun.daylight === "polar-day"
+      ? 1
+      : sun.daylight === "polar-night"
+        ? -1
+        : Math.min(
+            date.minuteOfDay - sun.sunrise,
+            sun.sunset - date.minuteOfDay,
+          ) / 420;
   const minutesFromDarkLogistics =
     1 / (1 + Math.pow(Math.E, -minutesFromDarkNormalized * 6));
   const minutesFrom9amNormalized = Math.abs(date.minuteOfDay - 540) / 120;
@@ -1072,7 +1079,7 @@ function reforecastWeatherAndPrices(
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather(date, state.seed, cumulativeMegatons);
-      const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
+      const fuelPrices = getFuelPricesPerMBTU(date, state.seed, state.location);
       return {
         ...t,
         ...fuelPrices,
@@ -1254,7 +1261,7 @@ function updateSupplyFacilitiesFinances(
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
-  const fuelPrices = getFuelPricesPerMBTU(date, state.seed);
+  const fuelPrices = getFuelPricesPerMBTU(date, state.seed, state.location);
   // What one facility earns is its share of what the company actually sold, so the row can say
   // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
   // served total is exactly what expresses

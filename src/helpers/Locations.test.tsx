@@ -95,6 +95,7 @@ describe("isValidLocationId", () => {
 describe("isValidLocation", () => {
   it("accepts a well formed location", () => {
     expect(isValidLocation(ELSEWHERE)).toBe(true);
+    expect(isValidLocation({ ...ELSEWHERE, timeZone: undefined })).toBe(true);
   });
 
   it("rejects blobs that aren't one", () => {

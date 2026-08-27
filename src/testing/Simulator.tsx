@@ -14,6 +14,7 @@ import gameReducer, {
 import { DIFFICULTIES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
+import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import {
@@ -100,7 +101,6 @@ export interface SimResultType {
   violationCount: number;
 }
 
-const DEFAULT_CUSTOMERS = 1030000; // Matches LoadingContainer, the real game's entry point
 const DEFAULT_SEED = 12345;
 
 function formatWhen(state: GameType): string {
@@ -130,6 +130,7 @@ function setUpGame(
   scenario: ScenarioType,
   options: ResolvedSimOptionsType,
 ): GameType {
+  const location = scenarioLocation(scenario);
   let state = gameReducer(undefined, start(scenario.id));
   // Chosen on the new game screen, before the game is built
   state = gameReducer(
@@ -149,8 +150,8 @@ function setUpGame(
     initGame({
       facilities: scenario.facilities,
       cash: scenario.cash,
-      customers: DEFAULT_CUSTOMERS,
-      location: scenarioLocation(scenario),
+      customers: scenario.startingCustomers || getStartingCustomers(location),
+      location,
       seed: options.seed,
     }),
   );
@@ -184,7 +185,8 @@ export function createGameFromReplay(replay: ReplayType): GameType {
     initGame({
       facilities: scenario.facilities,
       cash: scenario.cash,
-      customers: DEFAULT_CUSTOMERS,
+      customers:
+        scenario.startingCustomers || getStartingCustomers(replay.location),
       location: replay.location,
       seed: replay.seed,
     }),

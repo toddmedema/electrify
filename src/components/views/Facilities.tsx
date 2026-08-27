@@ -407,6 +407,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               facility={facility}
               date={game.date}
               seed={game.seed}
+              location={game.location}
             />
           )}
         </div>

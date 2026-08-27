@@ -133,6 +133,36 @@ describe("getFuelPricesPerMBTU", () => {
     });
   });
 
+  it("keeps the US history but applies regional fuel-price levels", () => {
+    const date = dateIn(FIXTURE_STARTING_YEAR, 6);
+    const us = getFuelPricesPerMBTU(date, SEED);
+    const europe = getFuelPricesPerMBTU(date, SEED, {
+      id: "Paris",
+      name: "Paris",
+      lat: 48.8566,
+      long: 2.3522,
+      region: "Europe",
+      country: "France",
+    });
+    expect(europe["Natural Gas"]).toBeCloseTo(us["Natural Gas"] * 3);
+    expect(europe.Coal).toBeCloseTo(us.Coal * 1.5);
+    expect(Object.isFrozen(europe)).toBe(true);
+  });
+
+  it("makes coal cheaper in Australia and Indonesia", () => {
+    const date = dateIn(FIXTURE_STARTING_YEAR, 6);
+    const us = getFuelPricesPerMBTU(date, SEED);
+    const australia = getFuelPricesPerMBTU(date, SEED, {
+      id: "Sydney",
+      name: "Sydney",
+      lat: -33.8688,
+      long: 151.2093,
+      region: "Oceania",
+      country: "Australia",
+    });
+    expect(australia.Coal).toBeCloseTo(us.Coal * 0.6);
+  });
+
   it("projects prices past the end of the data", () => {
     const projected = pricesIn(FIXTURE_ENDING_YEAR + 3, 6);
     Object.values(projected).forEach((price: number) => {

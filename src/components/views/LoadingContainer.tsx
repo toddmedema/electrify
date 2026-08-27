@@ -4,6 +4,7 @@ import { logEvent } from "../../Globals";
 import { initEconomy } from "../../data/Economy";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
+import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { getScenario } from "../../data/Scenarios";
 import { initGame, loaded, delta } from "../../reducers/Game";
@@ -100,7 +101,8 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
             initGame({
               facilities: scenario.facilities,
               cash: scenario.cash,
-              customers: 1030000,
+              customers:
+                scenario.startingCustomers || getStartingCustomers(location),
               location,
               // A replay has to run on the seed it was recorded with. Otherwise only the custom
               // game screen sets one; every authored scenario leaves it undefined and draws a

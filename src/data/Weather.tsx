@@ -359,9 +359,15 @@ export function getRawSolarIrradianceWM2(
   location: LocationType,
   cloudCoverPercent: number,
 ) {
-  let irradiance = EQUATOR_RADIANCE; //* (1 - 0.007 * Math.abs(lat)); // w/m2 - redundant with day length bell curve?
+  // Day length alone does not capture how much atmosphere the lower high-latitude sun crosses.
+  // Keep the original simple 0.7%/degree approximation, now that locations span the globe.
+  let irradiance = EQUATOR_RADIANCE * (1 - 0.007 * Math.abs(location.lat));
   irradiance *= 1 - cloudCoverPercent / 400; // Very cloudy days = 25% reduction
-  const { sunrise, sunset } = getSunriseSunset(date, location);
+  const sun = getSunriseSunset(date, location);
+  if (sun.daylight === "polar-night") {
+    return 0;
+  }
+  const { sunrise, sunset } = sun;
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
       date.minuteOfDay - sunrise,
