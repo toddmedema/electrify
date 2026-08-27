@@ -8,7 +8,15 @@ import {
 } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
-import { quit, tickState } from "./Game";
+import {
+  loaded,
+  quit,
+  resume,
+  setSpeed,
+  tick as tickAction,
+  tickState,
+} from "./Game";
+import { TICK_MS } from "../Constants";
 import { GameType, ScenarioType } from "../Types";
 
 /**
@@ -35,6 +43,41 @@ function tick(state: GameType): GameType {
   return produce(state, (draft: GameType) => {
     tickState(draft);
   });
+}
+
+/**
+ * Hands a part-played run to the real store and lets its own tick loop carry it to `untilMonth`.
+ *
+ * produce() above is the cheap way to cover ground, but it isn't a dispatch: everything the tick
+ * reducer is forbidden from doing while Redux is inside it - reading the store back, most of all -
+ * looks perfectly fine there. The last month of a run is where the end of scenario triggers live,
+ * so that's the stretch worth paying for.
+ */
+function playOutOnTheStore(state: GameType, untilMonth: number) {
+  // The loop paces itself off the wall clock, which stands still inside a synchronous test - so
+  // the clock is what gets driven here, one tick's worth per dispatch
+  let wallClockMs = 0;
+  const now = jest
+    .spyOn(performance, "now")
+    .mockImplementation(() => wallClockMs);
+  try {
+    getStore().dispatch(resume(state));
+    getStore().dispatch(loaded()); // Marks the game live, the way the loading screen does
+    getStore().dispatch(setSpeed("FAST"));
+    // Bounded so that a tick loop which stops advancing fails the assertion below rather than
+    // hanging the suite
+    for (
+      let i = 0;
+      i < 10000 && getStore().getState().game.date.monthsEllapsed < untilMonth;
+      i++
+    ) {
+      wallClockMs += TICK_MS.FAST * 2;
+      getStore().dispatch(tickAction());
+    }
+  } finally {
+    now.mockRestore();
+  }
+  expect(getStore().getState().game.date.monthsEllapsed).toBe(untilMonth);
 }
 
 describe("ending a scenario from inside the reducer", () => {
@@ -72,6 +115,33 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory?.ranked).toBe(false);
     // Opening the score screen stops the clock, the way any other dialog does
     expect(getStore().getState().game.speed).toBe("PAUSED");
+  });
+
+  /**
+   * The freeze this guards against: the reducer read the player's previous best straight off the
+   * store, which Redux refuses to do while a reducer is running. The throw came out of the tick
+   * loop's own setTimeout, so nothing rescheduled it and nothing opened the dialog - the game
+   * stopped dead on the last month of every run, score screen and all.
+   */
+  it("keeps the clock alive through the end of a scored run", () => {
+    getStore().dispatch(quit());
+    const scenario = SCENARIOS.find(
+      (s: ScenarioType) => s.id === 100,
+    ) as ScenarioType;
+    const duration = scenario.durationMonths as number;
+    let state = createGame({ scenarioId: scenario.id });
+    // Cheap up to the second to last month, then the store drives the one that ends the run
+    while (state.date.monthsEllapsed < duration - 1) {
+      state = tick(state);
+    }
+    playOutOnTheStore(state, duration);
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).not.toBeNull();
+    expect(victory?.scenarioName).toBe(scenario.name);
+    // An authored scenario is the case that reads the previous best and submits a score
+    expect(victory?.ranked).toBe(true);
   });
 
   it("goes bankrupt without reading the revoked draft", () => {
