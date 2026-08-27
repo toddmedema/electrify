@@ -48,12 +48,14 @@ describe("NewGame", () => {
     ).toContainElement(rows[0]);
   });
 
-  it("marks the first incomplete tutorial as the starting point", () => {
+  it("highlights the first incomplete tutorial without replacing its subtitle", () => {
     recordPlayed(TUTORIALS[0].id);
     render(<NewGame {...props()} />);
 
     const next = screen.getByTestId(`mission-row-${TUTORIALS[1].id}`);
-    expect(next).toHaveTextContent("Start here");
+    expect(TUTORIALS[1].summary).toBeDefined();
+    expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
+    expect(next).not.toHaveTextContent("Start here");
     expect(next).toHaveTextContent(TUTORIALS[1].name);
     expect(next).toHaveClass("tutorialNext");
   });

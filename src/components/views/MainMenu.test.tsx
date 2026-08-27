@@ -18,13 +18,11 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
-  it("sets the expectation that a new game begins with guided missions", async () => {
+  it("starts a new game from the primary Play action", async () => {
     const onStart = jest.fn();
     render(<MainMenu {...props({ onStart })} />);
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Start guided missions" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
   });

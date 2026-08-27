@@ -95,7 +95,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
           </Badge>
         }
         title={s.name}
-        subheader={next ? "Start here" : summary}
+        subheader={summary}
         action={
           isTutorial ? (
             <Button

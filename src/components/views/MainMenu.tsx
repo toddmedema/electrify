@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Button, IconButton, Stack } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
 import { login } from "../../Globals";
@@ -21,9 +21,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
-  const startLabel = props.hasSavedGame
-    ? "Choose a mission"
-    : "Start guided missions";
+  const startLabel = props.hasSavedGame ? "Choose a mission" : "Play";
 
   return (
     <div id="menuCard">
@@ -35,13 +33,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
         ></img>
       </div>
       <Box id="centeredMenu" style={{ top: "36%" }} sx={{ px: 3 }}>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ mb: 2, mx: "auto", maxWidth: 360 }}
-        >
-          Build a reliable, affordable, cleaner electricity grid.
-        </Typography>
         {props.hasSavedGame && (
           <Button
             size="large"
