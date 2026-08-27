@@ -10,6 +10,7 @@ import {
 } from "./UPlotHelpers";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
@@ -68,6 +69,7 @@ interface State {
   // Each fuel's own output at each x, ie before it is stacked, for the tooltip to report
   byFuel: number[][];
   demand: number[];
+  minutes: number[];
   domain: Props["domain"];
   maxY: number;
   startingYear: number;
@@ -145,7 +147,12 @@ function buildOptions(
 }
 
 function tooltip(idx: number, state: State): string {
+  const header = formatMinuteAsTooltipHeader(
+    state.minutes[idx],
+    state.startingYear,
+  );
   return [
+    header,
     ...state.fuels
       .map(
         (f: FuelNameType, i: number) =>
@@ -210,6 +217,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       fuels,
       byFuel,
       demand,
+      minutes,
       domain,
       maxY,
       startingYear,

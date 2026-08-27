@@ -14,6 +14,7 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 import {
+  formatHour,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
@@ -55,6 +56,7 @@ interface State {
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
   legendItems: LegendItem[];
+  startingYear: number;
 }
 
 const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
@@ -135,7 +137,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const time = formatHour(getDateFromMinute(d.minute, state.startingYear));
+  return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
 // TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
@@ -275,6 +278,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute: currentMinute === rangeMax ? null : currentMinute,
     legendItems,
+    startingYear,
   };
 
   return (

@@ -14,6 +14,7 @@ import {
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
@@ -100,7 +101,8 @@ function buildOptions(showXLabels: boolean) {
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders

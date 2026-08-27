@@ -15,6 +15,7 @@ import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
@@ -122,7 +123,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 
 function tooltip(idx: number, state: State): string {
   const d = state.data[idx];
-  return `Temperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}`;
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  return `${header}\nTemperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders.

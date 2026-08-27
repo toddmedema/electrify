@@ -237,6 +237,18 @@ export function formatHour(date: DateType): string {
   return time.toLocaleString("en-US", { hour: "numeric", hour12: true });
 }
 
+/**
+ * "Jan 2030, 4 PM" -- the header line every tooltip on a minute-based chart leads with, matching
+ * the month/year/time the app bar shows for the current instant.
+ */
+export function formatMinuteAsTooltipHeader(
+  minute: number,
+  startingYear: number,
+): string {
+  const date = getDateFromMinute(minute, startingYear);
+  return `${date.month} ${date.year}, ${formatHour(date)}`;
+}
+
 // Faster subset of getDateFromMinute
 export function getMonthYearFromMinute(minute: number, startingYear: number) {
   const dayOfGame = Math.floor(minute / 1440);
