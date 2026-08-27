@@ -4,6 +4,7 @@ import { registerStore } from "./StoreRegistry";
 import cardReducer from "./reducers/Card";
 import gameReducer from "./reducers/Game";
 import settingsReducer from "./reducers/Settings";
+import { tutorialGateMiddleware } from "./reducers/Tutorial";
 import uiReducer from "./reducers/UI";
 import userReducer from "./reducers/User";
 
@@ -15,6 +16,8 @@ export const store = configureStore({
     ui: uiReducer,
     user: userReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(tutorialGateMiddleware),
 });
 
 export type AppStore = typeof store;

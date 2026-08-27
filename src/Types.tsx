@@ -354,6 +354,16 @@ export interface TutorialStepType {
   onNext?: () => Redux.Action;
   target: string;
   content: React.JSX.Element;
+  // Present = the step is action-gated ("play, don't tell"): the tooltip shows a "do it"
+  // affordance instead of a Next button, and the walkthrough advances the moment this
+  // returns true. Evaluated after every dispatch - including every tick - so keep it to
+  // cheap field reads. Tutorial scenarios have fixed authored starting states, so
+  // predicates are absolute (e.g. facilities.length >= 2), never relative to step entry
+  advanceOn?: (state: AppStateType) => boolean;
+  // Gate for deeds that leave no distinguishable state behind (a drag re-order, a pause
+  // toggle): advance when an action with one of these types is dispatched. Either gate
+  // field alone makes the step gated; both may be combined (OR)
+  advanceOnAction?: string | string[];
   // Above the desktop breakpoint the bottom nav is hidden and Facilities / Finances /
   // Forecasts render side by side, so a step whose target lives in that nav - or whose
   // selector matches more than one pane - needs a different target there, and usually
@@ -362,6 +372,20 @@ export interface TutorialStepType {
     target: string;
     content?: React.JSX.Element;
   };
+}
+
+export function isGatedStep(step: TutorialStepType): boolean {
+  return !!(step.advanceOn || step.advanceOnAction);
+}
+
+// A walkthrough moving between two steps. Both ends are named because Back and Next need
+// telling apart: a step's onNext only applies to leaving it forwards
+export interface TutorialStepChangeType {
+  fromStep: number;
+  toStep: number;
+  tutorialSteps: TutorialStepType[] | undefined;
+  scenarioId: number;
+  currentCard: CardNameType;
 }
 
 export interface ScenarioType {
