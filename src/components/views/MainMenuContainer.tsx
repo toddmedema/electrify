@@ -17,7 +17,7 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onAudioChange: (v: boolean) => {
       dispatch(changeSettings({ audioEnabled: v }));

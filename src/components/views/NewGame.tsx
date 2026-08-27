@@ -68,6 +68,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
     );
   return (
     <Card
+      data-testid={`mission-row-${s.id}`}
       className={`build-list-item clickable-card${next ? " tutorialNext" : ""}`}
       onClick={onSelect}
     >
@@ -80,6 +81,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
             badgeContent={
               completed ? (
                 <CheckCircleIcon
+                  data-testid={`mission-complete-${s.id}`}
                   className="tutorialComplete"
                   color="primary"
                   fontSize="small"

@@ -189,9 +189,9 @@ describe("finishing a tutorial", () => {
     expect(dialog.notCancellable).toBe(true);
   });
 
-  it("leads with the next tutorial and keeps the main menu as the way out", () => {
+  it("leads with the next mission and keeps the main menu as the way out", () => {
     const dialog = finishTutorial();
-    expect(dialog.actionLabel).toBe("Next tutorial");
+    expect(dialog.actionLabel).toBe("Next mission");
     expect(dialog.secondaryLabel).toBe("Main menu");
   });
 
