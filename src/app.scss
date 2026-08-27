@@ -1088,7 +1088,7 @@ $pane_header_height: 40px;
   // buttons and one greyed-out one - disabled reads as "you can't have this", not "you're on it"
   .speedToggles {
     .MuiToggleButton-root {
-      padding: 2px 8px;
+      padding: 4px 10px;
       border-color: var(--interactive-tint);
       color: $interactive_blue;
       font-size: 0.8rem;
