@@ -17,7 +17,7 @@ import { buildShareText, canShare, shareText } from "../../helpers/Share";
 // What each scored category is called on the score screen. The breakdown's keys differ by
 // ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
 // with new categories shows up here as soon as it scores them, in the order they were scored.
-const SCORE_LABELS: { [key: string]: string } = {
+export const SCORE_LABELS: { [key: string]: string } = {
   supply: "electricity supplied",
   netWorth: "final net worth",
   customers: "final customers",
@@ -42,7 +42,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-function formatScore(score: number): string {
+export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }
 

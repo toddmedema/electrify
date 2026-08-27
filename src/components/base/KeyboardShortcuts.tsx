@@ -26,6 +26,7 @@ export const SHORTCUTS: ShortcutType[] = [
     description: "Move the selected facility up / down the dispatch order",
   },
   { keys: ["?"], description: "Open the manual" },
+  { keys: ["Esc"], description: "Close the current screen" },
 ];
 
 // The shortcuts render as a component rather than as plain markup, so the manual's search has
