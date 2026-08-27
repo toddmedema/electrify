@@ -33,6 +33,7 @@ import {
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import InstallAppButton from "./base/InstallAppButton";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -663,6 +664,9 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
+            {ui.dialog.title.startsWith("🎉") && (
+              <InstallAppButton label="Install for later" afterMilestone />
+            )}
             {ui.dialog.secondaryAction && (
               <Button color="primary" onClick={ui.dialog.secondaryAction}>
                 {ui.dialog.secondaryLabel || "Close"}
