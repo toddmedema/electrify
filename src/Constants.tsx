@@ -58,6 +58,7 @@ export const LOCATIONS = {
     timeZone: "America/New_York",
     region: "North America",
     country: "United States",
+    admin: "PA",
     resources: { hydro: true },
   },
   SF: {
@@ -68,6 +69,7 @@ export const LOCATIONS = {
     timeZone: "America/Los_Angeles",
     region: "North America",
     country: "United States",
+    admin: "CA",
     resources: { geothermal: true, hydro: true },
   },
   LA: {
@@ -78,6 +80,7 @@ export const LOCATIONS = {
     timeZone: "America/Los_Angeles",
     region: "North America",
     country: "United States",
+    admin: "CA",
     resources: { geothermal: true },
   },
   // Named for where its data was read as coming from, back when it was a CSV of unknown
@@ -91,6 +94,7 @@ export const LOCATIONS = {
     timeZone: "America/Los_Angeles",
     region: "North America",
     country: "United States",
+    admin: "CA",
     resources: { geothermal: true, hydro: true },
   },
   HNL: {
@@ -101,6 +105,7 @@ export const LOCATIONS = {
     timeZone: "Pacific/Honolulu",
     region: "North America",
     country: "United States",
+    admin: "HI",
     resources: { geothermal: true },
   },
   SJU: {
@@ -111,9 +116,10 @@ export const LOCATIONS = {
     timeZone: "America/Puerto_Rico",
     region: "North America",
     country: "United States",
+    admin: "Puerto Rico",
     resources: { hydro: true },
   },
-} as { [id: string]: LocationType };
+} as { [id: string]: LocationType & { admin?: string } };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 

@@ -18,6 +18,7 @@ import { isValidLocation } from "../helpers/Locations";
 export interface CityType extends LocationType {
   region: string;
   country?: string;
+  admin?: string;
   elevation?: number;
 }
 

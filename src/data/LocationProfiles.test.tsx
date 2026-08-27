@@ -9,7 +9,8 @@ const location = (
   country: string,
   region: string,
   resources?: LocationType["resources"],
-): LocationType => ({
+  admin?: string,
+): LocationType & { admin?: string } => ({
   id: country.replace(/\W/g, ""),
   name: country,
   lat: 0,
@@ -17,6 +18,7 @@ const location = (
   country,
   region,
   resources,
+  admin,
 });
 
 describe("location profiles", () => {
@@ -40,5 +42,30 @@ describe("location profiles", () => {
     });
     expect(hasGeothermalResource(dry)).toBe(false);
     expect(hasHydroResource(dry)).toBe(false);
+  });
+
+  it("profiles US resources by state instead of treating the whole country alike", () => {
+    const california = location(
+      "United States",
+      "North America",
+      undefined,
+      "CA",
+    );
+    const ohio = location("United States", "North America", undefined, "OH");
+    expect(hasHydroResource(california)).toBe(true);
+    expect(hasGeothermalResource(california)).toBe(true);
+    expect(hasHydroResource(ohio)).toBe(false);
+    expect(hasGeothermalResource(ohio)).toBe(false);
+  });
+
+  it("still lets a city override its US state profile", () => {
+    const local = location(
+      "United States",
+      "North America",
+      { geothermal: true, hydro: false },
+      "NY",
+    );
+    expect(hasGeothermalResource(local)).toBe(true);
+    expect(hasHydroResource(local)).toBe(false);
   });
 });

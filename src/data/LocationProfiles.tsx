@@ -77,6 +77,61 @@ const HYDRO_COUNTRIES = new Set([
   "Venezuela",
 ]);
 
+// A country-wide US fallback would make hydro available almost everywhere. Use state profiles
+// instead: these states generated at least 1 TWh of conventional hydro in 2024 (EIA table 3.14),
+// a deliberately material threshold that excludes small producers such as Ohio (0.468 TWh).
+// https://www.eia.gov/electricity/annual/table.php?t=epa_03_14.html
+const US_HYDRO_STATES = new Set([
+  "AK",
+  "AL",
+  "AR",
+  "AZ",
+  "CA",
+  "CO",
+  "GA",
+  "ID",
+  "IA",
+  "KY",
+  "ME",
+  "MI",
+  "MO",
+  "MT",
+  "NC",
+  "ND",
+  "NE",
+  "NH",
+  "NV",
+  "NY",
+  "OK",
+  "OR",
+  "PA",
+  "SC",
+  "SD",
+  "TN",
+  "VA",
+  "VT",
+  "WA",
+  "WI",
+  "WV",
+  "WY",
+]);
+
+// The seven states with utility-scale geothermal generation in 2025.
+// https://www.eia.gov/energyexplained/geothermal/use-of-geothermal-energy.php
+const US_GEOTHERMAL_STATES = new Set([
+  "CA",
+  "HI",
+  "ID",
+  "NM",
+  "NV",
+  "OR",
+  "UT",
+]);
+
+function stateFor(location?: LocationType): string | undefined {
+  return (location as (LocationType & { admin?: string }) | undefined)?.admin;
+}
+
 function multipliersFor(location?: LocationType): FuelMultipliers {
   const regional =
     (location?.region && REGION_FUEL_MULTIPLIERS[location.region]) || US_PRICES;
@@ -135,12 +190,20 @@ export function hasGeothermalResource(location?: LocationType): boolean {
   if (location?.resources?.geothermal !== undefined) {
     return location.resources.geothermal;
   }
+  if (location?.country === "United States") {
+    const state = stateFor(location);
+    return !!state && US_GEOTHERMAL_STATES.has(state);
+  }
   return !!location?.country && GEOTHERMAL_COUNTRIES.has(location.country);
 }
 
 export function hasHydroResource(location?: LocationType): boolean {
   if (location?.resources?.hydro !== undefined) {
     return location.resources.hydro;
+  }
+  if (location?.country === "United States") {
+    const state = stateFor(location);
+    return !!state && US_HYDRO_STATES.has(state);
   }
   return !!location?.country && HYDRO_COUNTRIES.has(location.country);
 }

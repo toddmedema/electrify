@@ -51,6 +51,7 @@ const REMOTE = {
       id: "Berlin",
       name: "Berlin, Germany",
       region: "Europe",
+      admin: "BE",
       lat: 52.52,
       long: 13.405,
       timeZone: "Europe/Berlin",
@@ -93,6 +94,9 @@ describe("getCities", () => {
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
     const africa = getCities().filter((c: CityType) => c.region === "Africa");
     expect(africa.map((c: CityType) => c.name)).toEqual(["Nairobi, Kenya"]);
+    expect(getCities().find((c: CityType) => c.id === "Berlin")?.admin).toBe(
+      "BE",
+    );
   });
 
   it("downloads the index once however many screens ask for it", async () => {
@@ -138,6 +142,9 @@ describe("the bundled locations", () => {
     const shipped = index.cities[id];
     expect(shipped).toBeDefined();
     expect(shipped.name).toEqual(bundled.name);
+    expect(shipped.admin).toEqual(
+      (bundled as LocationType & { admin?: string }).admin,
+    );
     expect(shipped.timeZone).toEqual(bundled.timeZone);
     expect(shipped.lat).toBeCloseTo(bundled.lat, 3);
     expect(shipped.long).toBeCloseTo(bundled.long, 3);
