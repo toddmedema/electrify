@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BottomNavigation, BottomNavigationAction } from "@mui/material";
+import { Badge, BottomNavigation, BottomNavigationAction } from "@mui/material";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
 import HistoryIcon from "@mui/icons-material/History";
@@ -17,6 +17,10 @@ export interface Props extends StateProps {}
 export default function Navigation() {
   const dispatch = useAppDispatch();
   const cardName = useAppSelector(selectCardName);
+  const unreadEvents = useAppSelector((state) => {
+    const latest = state.game.eventLog?.[0]?.id || 0;
+    return latest > (state.game.eventLogReadThroughId || 0);
+  });
   return (
     <BottomNavigation
       id="navfooter"
@@ -48,7 +52,11 @@ export default function Navigation() {
         id="eventsNav"
         label="Events"
         value="EVENTS"
-        icon={<HistoryIcon />}
+        icon={
+          <Badge color="primary" variant="dot" invisible={!unreadEvents}>
+            <HistoryIcon />
+          </Badge>
+        }
       />
     </BottomNavigation>
   );

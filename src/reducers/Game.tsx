@@ -30,6 +30,11 @@ import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
+import {
+  activeWorldEventEffects,
+  resolveWorldEvent,
+  WORLD_EVENT_DEFINITIONS,
+} from "../data/WorldEvents";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
 import {
   dialogOpen,
@@ -78,7 +83,9 @@ import {
   FacilityOperatingType,
   FacilityShoppingType,
   FuelPricesType,
+  FuelNameType,
   GameEventKindType,
+  GameEventImportanceType,
   GameEventType,
   LocationType,
   GameType,
@@ -91,6 +98,7 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
+  CardNameType,
 } from "../Types";
 
 interface BuildFacilityAction {
@@ -165,7 +173,19 @@ function logGameEvent(
   state: GameType,
   kind: GameEventKindType,
   message: string,
-) {
+  options: {
+    importance?: GameEventImportanceType;
+    actionTarget?: CardNameType;
+    reportedKey?: string;
+    pause?: boolean;
+  } = {},
+): boolean {
+  if (
+    options.reportedKey &&
+    (state.reportedEventKeys || []).includes(options.reportedKey)
+  ) {
+    return false;
+  }
   if (!state.eventLog) {
     state.eventLog = [];
   }
@@ -175,10 +195,22 @@ function logGameEvent(
     kind,
     label: `${state.date.month} ${state.date.year}`,
     message,
+    importance: options.importance,
+    actionTarget: options.actionTarget,
   });
+  if (options.reportedKey) {
+    state.reportedEventKeys = state.reportedEventKeys || [];
+    state.reportedEventKeys.push(options.reportedKey);
+  }
   if (log.length > MAX_EVENTS) {
     log.length = MAX_EVENTS;
   }
+  // An important event creates a decision point. Replays remain passive records, and an already
+  // paused player stays deliberately paused rather than acquiring a speed to restore later.
+  if (options.pause && !state.replayPlayback) {
+    state.speed = "PAUSED";
+  }
+  return true;
 }
 
 // How far a fuel has to move in a month to be worth a line in the log. Prices wander a percent
@@ -192,7 +224,7 @@ const FUEL_PRICE_SPIKE = 0.15;
  * already draws every fuel for the player who wants them all.
  */
 function logFuelPriceMoves(state: GameType) {
-  const prices = getFuelPricesPerMBTU(state.date, state.seed, state.location);
+  const prices = getEffectiveFuelPrices(state.date, state);
   const previous = previousFuelPrices;
   previousFuelPrices = prices;
   if (!previous) {
@@ -217,6 +249,175 @@ function logFuelPriceMoves(state: GameType) {
       `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MBTU`,
     );
   });
+}
+
+const HOURS_PER_YEAR = 8760;
+const WH_PER_MWH = 1000000;
+const FUEL_CROSSOVER_MINIMUM_DIFFERENCE = 1;
+
+/** All-in operating cost at expected annual output, excluding financing and sunk build cost. */
+function generatorCostPerMWh(
+  generator: GeneratorOperatingType,
+  prices: FuelPricesType,
+  feePerKgCO2e: number,
+): number | undefined {
+  if (
+    generator.yearsToBuildLeft > 0 ||
+    generator.peakW <= 0 ||
+    generator.capacityFactor <= 0
+  ) {
+    return undefined;
+  }
+  const annualMWh =
+    (generator.peakW * generator.capacityFactor * HOURS_PER_YEAR) / WH_PER_MWH;
+  const fuelPrice = prices[generator.fuel];
+  const fuelCost =
+    generator.btuPerWh > 0 && fuelPrice !== undefined
+      ? generator.btuPerWh * fuelPrice
+      : 0;
+  const carbonCost =
+    generator.btuPerWh *
+    WH_PER_MWH *
+    (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
+    feePerKgCO2e;
+  return generator.annualOperatingCost / annualMWh + fuelCost + carbonCost;
+}
+
+function currentFuelCosts(
+  state: GameType,
+): Partial<Record<FuelNameType, number>> {
+  const costs: Partial<Record<FuelNameType, number>> = {};
+  const prices = getEffectiveFuelPrices(state.date, state);
+  state.facilities.forEach((facility: FacilityOperatingType) => {
+    const generator = facility as Partial<GeneratorOperatingType>;
+    if (!generator.fuel) {
+      return;
+    }
+    const cost = generatorCostPerMWh(
+      facility as GeneratorOperatingType,
+      prices,
+      state.feePerKgCO2e,
+    );
+    if (cost === undefined) {
+      return;
+    }
+    // A fuel can have several plants. The cheapest one is the one dispatch order can actually
+    // choose at the margin, and avoids plant size turning the comparison into an average.
+    costs[generator.fuel] = Math.min(costs[generator.fuel] ?? Infinity, cost);
+  });
+  return costs;
+}
+
+/** Reports only the first cheaper-to-dearer ordering change for each fuel in a run. */
+export function logFuelCrossovers(state: GameType) {
+  const current = currentFuelCosts(state);
+  const previous = state.fuelCostSnapshot;
+  state.fuelCostSnapshot = current;
+  if (!previous) {
+    return;
+  }
+  (Object.entries(current) as [FuelNameType, number][]).forEach(
+    ([fuel, cost]) => {
+      if (cost === undefined || (FUELS[fuel]?.kgCO2ePerBtu || 0) <= 0) {
+        return;
+      }
+      const previousCost = previous[fuel];
+      if (previousCost === undefined) {
+        return;
+      }
+      const crossed = (Object.entries(current) as [FuelNameType, number][])
+        .filter(([otherFuel, otherCost]) => {
+          const previousOther = previous[otherFuel];
+          return (
+            otherFuel !== fuel &&
+            otherCost !== undefined &&
+            previousOther !== undefined &&
+            previousCost <= previousOther &&
+            cost - otherCost >= FUEL_CROSSOVER_MINIMUM_DIFFERENCE
+          );
+        })
+        // If one fuel passed several in the same month, name the cheapest comparator: that is
+        // the clearest dispatch consequence and the largest gap the player can act on.
+        .sort((a, b) => a[1] - b[1])[0];
+      if (!crossed || crossed[1] === undefined) {
+        return;
+      }
+      const otherFuel = crossed[0];
+      logGameEvent(
+        state,
+        "FUEL_CROSSOVER",
+        `${fuel} is now more expensive than ${otherFuel}: ${formatMoneyConcise(cost)}/MWh vs ${formatMoneyConcise(crossed[1])}/MWh`,
+        {
+          importance: "NOTABLE",
+          actionTarget: "FACILITIES",
+          reportedKey: `fuel-crossover:${fuel}`,
+          pause: true,
+        },
+      );
+    },
+  );
+}
+
+const MAX_WORLD_EVENT_CHECKS = 2400;
+
+/** Starts/ends authored events before this month's forecast is built. */
+function updateWorldEvents(state: GameType) {
+  state.worldEvents = state.worldEvents || { active: [], checkedKeys: [] };
+  state.worldEvents.active = state.worldEvents.active.filter(
+    (event) => event.endsMinute > state.date.minute,
+  );
+  WORLD_EVENT_DEFINITIONS.forEach((definition) => {
+    const resolved = resolveWorldEvent(definition, {
+      seed: state.seed,
+      date: state.date,
+      location: state.location,
+    });
+    if (state.worldEvents!.checkedKeys.includes(resolved.checkedKey)) {
+      return;
+    }
+    state.worldEvents!.checkedKeys.push(resolved.checkedKey);
+    if (resolved.occurrence) {
+      state.worldEvents!.active.push(resolved.occurrence);
+      logGameEvent(
+        state,
+        resolved.occurrence.kind,
+        resolved.occurrence.message,
+        {
+          importance: resolved.occurrence.importance,
+          actionTarget: resolved.occurrence.actionTarget,
+          reportedKey: `world-event:${resolved.occurrence.key}`,
+          pause: resolved.occurrence.importance === "CRITICAL",
+        },
+      );
+    }
+  });
+  if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.checkedKeys.splice(
+      0,
+      state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
+}
+
+function getEffectiveFuelPrices(
+  date: DateType,
+  state: GameType,
+): FuelPricesType {
+  const prices = getFuelPricesPerMBTU(date, state.seed, state.location);
+  const multipliers = activeWorldEventEffects(
+    state.worldEvents?.active,
+    date.minute,
+  ).fuelPriceMultipliers;
+  if (!multipliers) {
+    return prices;
+  }
+  const effective = { ...prices };
+  Object.entries(multipliers).forEach(([fuel, multiplier]) => {
+    if (multiplier !== undefined && effective[fuel] !== undefined) {
+      effective[fuel] *= multiplier;
+    }
+  });
+  return effective;
 }
 
 const initialGame: GameType = {
@@ -310,6 +511,10 @@ export const gameSlice = createSlice({
       blackoutUnservedWh = 0;
       previousFuelPrices = undefined;
       state.eventLog = [] as GameEventType[];
+      state.reportedEventKeys = [];
+      state.eventLogReadThroughId = 0;
+      state.worldEvents = { active: [], checkedKeys: [] };
+      state.fuelCostSnapshot = undefined;
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
@@ -383,6 +588,9 @@ export const gameSlice = createSlice({
         );
       }
       state.timeline = reforecastSupply(state);
+      // Establish the comparison before time moves. A fleet that was already dearer on day one
+      // has not crossed anything; the first monthly ordering change is the event.
+      state.fuelCostSnapshot = currentFuelCosts(state);
       // Anything the player did before the clock first moved -- setting a rate or a marketing
       // budget on the way in. tickState picks up everything after this
       applyPendingReplayActions(state);
@@ -409,6 +617,9 @@ export const gameSlice = createSlice({
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       state.speed = action.payload;
       ensureTicking(state);
+    },
+    markEventsRead: (state) => {
+      state.eventLogReadThroughId = state.eventLog?.[0]?.id || 0;
     },
   },
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
@@ -522,6 +733,7 @@ export const {
   togglePauseFacility,
   reprioritizeFacility,
   setSpeed,
+  markEventsRead,
 } = gameSlice.actions;
 
 // Re-exported so that everything still imports the game's actions from one place
@@ -804,8 +1016,10 @@ export function tickState(state: GameType) {
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
+      updateWorldEvents(state);
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state);
+      logFuelCrossovers(state);
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
       for (let i = 0; i < 4; i++) {
@@ -1049,7 +1263,11 @@ function getDemandW(
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
-  return demandMultiple * now.customers;
+  const effects = activeWorldEventEffects(
+    game.worldEvents?.active,
+    date.minute,
+  );
+  return demandMultiple * now.customers * (effects.demandMultiplier || 1);
 }
 
 const KG_PER_MEGATON = 1000000000;
@@ -1079,7 +1297,11 @@ function reforecastWeatherAndPrices(
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather(date, state.seed, cumulativeMegatons);
-      const fuelPrices = getFuelPricesPerMBTU(date, state.seed, state.location);
+      const fuelPrices = getEffectiveFuelPrices(date, state);
+      const effects = activeWorldEventEffects(
+        state.worldEvents?.active,
+        date.minute,
+      );
       return {
         ...t,
         ...fuelPrices,
@@ -1089,7 +1311,7 @@ function reforecastWeatherAndPrices(
           weather.CLOUD_PCT,
         ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
-        temperatureC: weather.TEMP_C,
+        temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
         storedWh: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
@@ -1261,7 +1483,7 @@ function updateSupplyFacilitiesFinances(
   let principalRepayment = 0;
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
-  const fuelPrices = getFuelPricesPerMBTU(date, state.seed, state.location);
+  const fuelPrices = getEffectiveFuelPrices(date, state);
   // What one facility earns is its share of what the company actually sold, so the row can say
   // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
   // served total is exactly what expresses

@@ -41,6 +41,7 @@ export const RANDOM_STREAM = {
   fuelPrices: 2, // normalAt only
   economy: 3, // randomAt only
   weatherShape: 4, // randomAt only -- which recorded day a forecast borrows its shape from
+  worldEvents: 5, // randomAt only -- discrete occurrences and each occurrence's attributes
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript

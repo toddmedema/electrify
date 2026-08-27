@@ -436,6 +436,38 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        target: "#speedChangeButtons",
+        advanceOn: (s: AppStateType) =>
+          (s.game.eventLog || []).some((event) => event.kind === "BLACKOUT"),
+        content: (
+          <TutorialPrompt
+            concepts={["play", "blackout"]}
+            text="Tap 1× and let the forecasted blackout begin."
+            action={["play"]}
+          />
+        ),
+      },
+      {
+        card: "EVENTS",
+        target: ".eventLogItem",
+        content: (
+          <TutorialPrompt
+            concepts={["time", "blackout"]}
+            text="This dated event explains what changed. Fuel cost crossovers appear here too, and only interrupt you the first time each fuel crosses."
+          />
+        ),
+        desktop: {
+          target: "#eventsPane",
+          content: (
+            <TutorialPrompt
+              concepts={["time", "blackout"]}
+              text="This pane keeps dated explanations of important changes. Fuel cost crossovers appear here too, and only interrupt you the first time each fuel crosses."
+            />
+          ),
+        },
+      },
+      {
+        card: "FACILITIES",
         target: ".facility",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.every((f) => !f.paused),

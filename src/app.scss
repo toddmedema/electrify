@@ -1456,6 +1456,25 @@ $pane_header_height: 40px;
     align-items: start;
     padding: size(small) size(base);
     border-bottom: 1px solid var(--border-subtle);
+
+    &.actionable {
+      cursor: pointer;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--interactive-tint);
+        outline: none;
+      }
+    }
+
+    &.importance-NOTABLE {
+      border-left: 3px solid $interactive_blue;
+    }
+
+    &.importance-CRITICAL {
+      border-left: 3px solid $blackout_red;
+      background: var(--blackout-tint);
+    }
   }
 
   .eventLogIcon {

@@ -1,9 +1,15 @@
 import cloneDeep from "lodash.clonedeep";
-import gameReducer, { buildFacility, sellFacility, tickState } from "./Game";
+import gameReducer, {
+  buildFacility,
+  logFuelCrossovers,
+  sellFacility,
+  tickState,
+} from "./Game";
 import { GENERATORS } from "../data/Facilities";
 import { createGame } from "../testing/Simulator";
 import {
   FacilityOperatingType,
+  FuelNameType,
   GameEventType,
   GameType,
   GeneratorShoppingType,
@@ -123,5 +129,48 @@ describe("the event log", () => {
     const dark = ticked(pauseEverything(createGame({ scenarioId: 100 })), 400);
     const log = dark.eventLog || [];
     expect(log.length).toBeLessThanOrEqual(100);
+  });
+
+  it("reports a fuel cost crossover only once for the fuel that became dearer", () => {
+    const scenario = {
+      id: 9991,
+      name: "Crossover fixture",
+      icon: "coal",
+      locationId: "SF",
+      ownership: "Investor" as const,
+      startingYear: 2020,
+      cash: 500000000,
+      feePerKgCO2e: 0,
+      dollarsPerkWh: 0.1,
+      durationMonths: 24,
+      facilities: [
+        { fuel: "Coal" as const, peakW: 300000000 },
+        { fuel: "Natural Gas" as const, peakW: 300000000 },
+      ],
+    };
+    const game = createGame({ scenarioId: scenario.id, scenario, seed: 2468 });
+    const costs = game.fuelCostSnapshot || {};
+    const ordered: FuelNameType[] = ["Coal", "Natural Gas"];
+    ordered.sort((a, b) => (costs[b] || 0) - (costs[a] || 0));
+    const dearer = ordered[0];
+    const cheaper = ordered[1];
+    expect((costs[dearer] || 0) - (costs[cheaper] || 0)).toBeGreaterThan(1);
+
+    // Reverse the prior ordering so today's deterministic prices form a real crossing edge.
+    game.fuelCostSnapshot = { [dearer]: 1, [cheaper]: 1000 };
+    game.speed = "FAST";
+    logFuelCrossovers(game);
+    expect(kinds(game)).toContain("FUEL_CROSSOVER");
+    expect(messages(game)[0]).toContain(`${dearer} is now more expensive`);
+    expect(game.eventLog?.[0].importance).toEqual("NOTABLE");
+    expect(game.eventLog?.[0].actionTarget).toEqual("FACILITIES");
+    expect(game.speed).toEqual("PAUSED");
+
+    // Even after recreating the same edge, the persistent per-fuel key suppresses it.
+    game.fuelCostSnapshot = { [dearer]: 1, [cheaper]: 1000 };
+    logFuelCrossovers(game);
+    expect(
+      kinds(game).filter((kind) => kind === "FUEL_CROSSOVER"),
+    ).toHaveLength(1);
   });
 });

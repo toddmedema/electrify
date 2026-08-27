@@ -21,16 +21,23 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
   SELL: "money",
   LOAN: "finances",
   FUEL_PRICE: "fuel",
+  FUEL_CROSSOVER: "fuel",
 };
 
 export interface StateProps {
   events: GameEventType[];
 }
 
-export interface Props extends StateProps {}
+export interface DispatchProps {
+  onOpen: () => void;
+  onSelect: (event: GameEventType) => void;
+}
+
+export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
-  const { events } = props;
+  const { events, onOpen, onSelect } = props;
+  React.useEffect(() => onOpen(), [onOpen]);
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
@@ -46,7 +53,22 @@ export default function EventLog(props: Props): React.JSX.Element {
         )}
         <ul className="eventLogList">
           {events.map((event: GameEventType) => (
-            <li className={`eventLogItem kind-${event.kind}`} key={event.id}>
+            <li
+              className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+              key={event.id}
+              onClick={() => onSelect(event)}
+              onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                if (
+                  event.actionTarget &&
+                  (e.key === "Enter" || e.key === " ")
+                ) {
+                  e.preventDefault();
+                  onSelect(event);
+                }
+              }}
+              role={event.actionTarget ? "button" : undefined}
+              tabIndex={event.actionTarget ? 0 : undefined}
+            >
               <span className="eventLogIcon">
                 <ConceptIcon
                   concept={KIND_CONCEPTS[event.kind]}

@@ -486,7 +486,11 @@ export default class Compositor extends React.Component<Props, {}> {
           <DesktopPanes>
             <FacilitiesContainer />
             <FinancesContainer />
-            <ForecastsContainer />
+            {this.props.card.name === "EVENTS" && !isUltrawideScreen() ? (
+              <EventLogContainer />
+            ) : (
+              <ForecastsContainer />
+            )}
             {/* An ultrawide window is otherwise three panes and a lot of nothing. Only here,
                 because below this a fourth column comes out of the three that carry the game */}
             {isUltrawideScreen() ? <EventLogContainer /> : null}
