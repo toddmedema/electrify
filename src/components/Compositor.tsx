@@ -7,6 +7,7 @@ import {
   Snackbar,
   Typography,
 } from "@mui/material";
+import TouchAppIcon from "@mui/icons-material/TouchApp";
 import * as React from "react";
 import { GlobalHotKeys, configure } from "react-hotkeys";
 import {
@@ -24,8 +25,10 @@ import {
   CardType,
   SettingsType,
   TransitionClassType,
+  TutorialStepChangeType,
   TutorialStepType,
   UIType,
+  isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
@@ -279,6 +282,10 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
     isLastStep,
   } = props;
   const isString = typeof step.content === "string";
+  // Presentation flags baked in by stepsForViewport: a gated step has no Next button -
+  // doing the highlighted deed is what advances it - and Back is hidden next to a gate,
+  // since backing into a satisfied one would instantly re-advance
+  const flags = (step.data || {}) as { gated?: boolean; hideBack?: boolean };
   // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
   // without one screen readers announce an anonymous dialog
   return (
@@ -298,14 +305,23 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
         <span className="tutorialProgress">
           Step {index + 1} of {size}
         </span>
-        {index > 0 && (
+        {index > 0 && !flags.hideBack && (
           <Button {...backProps} color="primary">
             Back
           </Button>
         )}
-        <Button {...primaryProps} variant="contained" color="primary">
-          {isLastStep ? "Play" : "Next"}
-        </Button>
+        {flags.gated ? (
+          <span
+            className="tutorialDoIt"
+            aria-label="Do the highlighted action to continue"
+          >
+            <TouchAppIcon color="primary" />
+          </span>
+        ) : (
+          <Button {...primaryProps} variant="contained" color="primary">
+            {isLastStep ? "Play" : "Next"}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -321,15 +337,9 @@ export interface StateProps {
   tutorialSteps?: TutorialStepType[];
 }
 
-// A walkthrough moving between two steps. Both ends are named because Back and Next need
-// telling apart: a step's onNext only applies to leaving it forwards
-export interface TutorialStepChangeType {
-  fromStep: number;
-  toStep: number;
-  tutorialSteps: TutorialStepType[] | undefined;
-  scenarioId: number;
-  currentCard: CardNameType;
-}
+// Moved to Types so the tutorial gate middleware can share it without a component import;
+// re-exported here for existing consumers
+export type { TutorialStepChangeType } from "../Types";
 
 export interface DispatchProps {
   closeDialog: () => void;
@@ -375,9 +385,24 @@ export default class Compositor extends React.Component<Props, {}> {
     if (cache && cache.source === steps && cache.desktop === desktop) {
       return cache.resolved;
     }
-    const resolved = steps.map((step) => {
-      const { desktop: override, ...rest } = step;
-      return (desktop && override ? { ...rest, ...override } : rest) as Step;
+    const resolved = steps.map((step, i) => {
+      // The gate fields and onNext are engine concerns; Joyride only needs the
+      // presentation, plus flags telling the tooltip which buttons make sense here
+      const {
+        desktop: override,
+        advanceOn: _advanceOn,
+        advanceOnAction: _advanceOnAction,
+        onNext: _onNext,
+        ...rest
+      } = step;
+      const merged = desktop && override ? { ...rest, ...override } : rest;
+      return {
+        ...merged,
+        data: {
+          gated: isGatedStep(step),
+          hideBack: isGatedStep(step) || (i > 0 && isGatedStep(steps[i - 1])),
+        },
+      } as Step;
     });
     this.stepsCache = { source: steps, desktop, resolved };
     return resolved;
@@ -406,6 +431,17 @@ export default class Compositor extends React.Component<Props, {}> {
     // scenario list. Has to come first, since closing also reports STEP_AFTER
     if (action === ACTIONS.CLOSE) {
       this.props.onTutorialEnd(this.props.tutorialSteps);
+      return;
+    }
+    // A gated step advances only by its deed. Skipping it on a missing target would wave
+    // the player past the very thing the step exists to make them do - and the deed itself
+    // often removes the target for a frame (buying closes the build screen), which Joyride
+    // reports as TARGET_NOT_FOUND while the gate middleware is already landing the next step
+    const current =
+      this.props.tutorialStep >= 0 && this.props.tutorialSteps
+        ? this.props.tutorialSteps[this.props.tutorialStep]
+        : undefined;
+    if (type === EVENTS.TARGET_NOT_FOUND && current && isGatedStep(current)) {
       return;
     }
     const advancingEvents: string[] = [

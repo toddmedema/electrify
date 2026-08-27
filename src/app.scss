@@ -820,6 +820,55 @@ $pane_header_height: 40px;
       opacity: 0.6;
       font-size: 0.85em;
     }
+
+    // Stands in for the Next button on action-gated steps: doing the highlighted thing is
+    // what advances, so the affordance pulses instead of being clickable
+    .tutorialDoIt {
+      display: inline-flex;
+      align-items: center;
+      padding: size(tiny);
+      animation: tutorialDoItPulse 1.5s ease-in-out infinite;
+    }
+  }
+
+  // Icon-led step content: symbols on top, one confirming line of text, and for gated
+  // steps a "do this" chip naming the deed in the same symbols
+  .tutorialPrompt {
+    text-align: center;
+
+    .tutorialPromptConcepts {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: size(small);
+      margin-bottom: size(small);
+    }
+
+    .tutorialPromptArrow {
+      opacity: 0.5;
+    }
+
+    .tutorialPromptAction {
+      display: inline-flex;
+      align-items: center;
+      gap: size(tiny);
+      margin-top: size(small);
+      padding: size(tiny) size(small);
+      border: 1px solid var(--border-strong);
+      border-radius: 100px;
+    }
+  }
+
+  @keyframes tutorialDoItPulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.25);
+      opacity: 1;
+    }
   }
 
   // ===============================================

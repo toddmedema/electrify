@@ -1,22 +1,17 @@
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
 import { delta, quit } from "../reducers/Game";
+import { changeTutorialStep } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
-import { recordScenarioPlayed } from "../LocalStorage";
 import { getScenario } from "../data/Scenarios";
-import { navigate } from "../reducers/Card";
 import {
   AppStateType,
   ScenarioType,
   TransitionClassType,
+  TutorialStepChangeType,
   TutorialStepType,
 } from "../Types";
-import Compositor, {
-  DispatchProps,
-  isNavCard,
-  StateProps,
-  TutorialStepChangeType,
-} from "./Compositor";
+import Compositor, { DispatchProps, isNavCard, StateProps } from "./Compositor";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   let transition: TransitionClassType = "next";
@@ -57,53 +52,10 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     closeSnackbar(): void {
       dispatch(snackbarClose());
     },
-    onTutorialStep({
-      fromStep,
-      toStep,
-      tutorialSteps,
-      scenarioId,
-      currentCard,
-    }: TutorialStepChangeType): void {
-      const steps = tutorialSteps || [];
-
-      // Only leaving a step forwards runs its one-way side effects - Back has no way to undo
-      // them, and replaying the previous step's would fire an effect nobody triggered
-      const leaving = toStep > fromStep ? steps[fromStep] : undefined;
-      if (leaving && leaving.onNext) {
-        dispatch(leaving.onNext());
-      }
-
-      // Steps declare the card their target lives on, and every step change navigates there
-      // regardless of direction. Otherwise Back leaves the player on whatever card the
-      // forward step navigated to, where Joyride can't find the target and shows no tooltip
-      const destination = steps[toStep] && steps[toStep].card;
-      if (destination) {
-        const name =
-          typeof destination === "string" ? destination : destination.name;
-        if (name !== currentCard) {
-          dispatch(navigate(destination));
-        }
-      }
-
-      dispatch(delta({ tutorialStep: toStep }));
-
-      if (toStep < steps.length) {
-        return;
-      }
-
-      // Finishing the walkthrough is what counts as doing the tutorial - the rest of the
-      // scenario is optional practice, and requiring it meant a checkmark cost up to four
-      // minutes of watching the sim run
-      recordScenarioPlayed(scenarioId);
-      dispatch(
-        snackbarOpen({
-          message: "Walkthrough complete - keep practicing, or move on",
-          actionLabel: "Tutorials",
-          action: () => dispatch(quit({ toScenarioList: true })),
-          open: true,
-          timeout: 6000,
-        }),
-      );
+    onTutorialStep(change: TutorialStepChangeType): void {
+      // Shared with the gate middleware, so a tooltip button and a satisfied gate fire
+      // identical side effects
+      changeTutorialStep(dispatch, change);
     },
     onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
       // Past the last step, which is how a finished walkthrough is represented too
@@ -112,9 +64,8 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       // a paused scenario with no idea what happened - so say so, and offer the way out
       dispatch(
         snackbarOpen({
-          message:
-            "Walkthrough closed - keep playing, or pick another tutorial",
-          actionLabel: "Tutorials",
+          message: "Walkthrough closed - keep playing, or pick another mission",
+          actionLabel: "Missions",
           action: () => dispatch(quit({ toScenarioList: true })),
           open: true,
           timeout: 6000,

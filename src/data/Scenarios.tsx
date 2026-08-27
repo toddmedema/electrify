@@ -1,13 +1,14 @@
-import { Typography } from "@mui/material";
 import * as React from "react";
 
-import { setSpeed } from "../reducers/Game";
-import { ScenarioType } from "../Types";
+import TutorialPrompt from "../components/base/TutorialPrompt";
+import { AppStateType, ScenarioType } from "../Types";
 
 export const SCENARIOS = [
   {
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "101: Electricity",
+    name: "Mission 1: Electricity",
+    icon: "solar",
+    summary: "Meet your grid",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
@@ -15,8 +16,8 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 1,
-    endTitle: "Tutorial complete!",
-    endMessage: "Just a few tutorials to go",
+    endTitle: "Mission complete!",
+    endMessage: "Just a few missions to go",
     facilities: [
       { fuel: "Natural Gas", peakW: 410000000 },
       { fuel: "Sun", peakW: 300000000 },
@@ -27,76 +28,62 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#topbar",
         content: (
-          <Typography variant="body1">
-            Welcome! You're the new CEO of a regional power generation company.
-            <br />
-            <br />
-            Your goal: Make as much money as possible. You lose if you run out
-            of cash or cause too many blackouts.
-          </Typography>
+          <TutorialPrompt
+            concepts={["money", "goal"]}
+            text="Earn money - don't go broke or black out."
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: "#chartSupplyDemand",
         content: (
-          <Typography variant="body1">
-            Make money by supplying demand for electricity, measured in
-            Megawatts (MW).
-            <br />
-            <br />
-            This graph represents an <strong>average day</strong> for the month.
-            <br />
-            <br />
-            Demand is driven by a variety of factors, including the weather and
-            how many customers you have.
-          </Typography>
-        ),
-      },
-      {
-        card: "FACILITIES",
-        target: "#chartSupplyDemand",
-        content: (
-          <Typography variant="body1">
-            Your generators automatically spin up to meet demand as best they
-            can.
-            <br />
-            <br />
-            If you don't supply enough power, you'll cause blackouts that cost
-            you customers.
-          </Typography>
+          <TutorialPrompt
+            concepts={["supply", "demand"]}
+            text="Keep supply above demand - this is one average day."
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: ".facility",
         content: (
-          <Typography variant="body1">
-            Your facilities indicate how much power they're currently
-            producting.
-            <br />
-            <br />
-            For example, your solar plant isn't producing because it's night
-            time, so your natural gas is picking up the slack.
-          </Typography>
+          <TutorialPrompt
+            concepts={["generator"]}
+            text="Your power plants - the bar shows what each is producing."
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: "#speedChangeButtons",
-        onNext: () => setSpeed("SLOW"),
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            This tutorial will run for 1 month. See how demand and your supply
-            changes over that time!
-          </Typography>
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Press play."
+            action={["play"]}
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#chartSupplyDemand",
+        advanceOn: (s: AppStateType) => s.game.date.minute >= 1440,
+        content: (
+          <TutorialPrompt
+            concepts={["weather", "time"]}
+            text="Watch one full day go by."
+          />
         ),
       },
     ],
   },
   {
     id: 1, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "102: Generators",
+    name: "Mission 2: Generators",
+    icon: "natural gas",
+    summary: "Build a generator",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
@@ -104,99 +91,75 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
-    endTitle: "Tutorial complete!",
+    endTitle: "Mission complete!",
     endMessage:
-      "You now know enough to run a company on Intern difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on Intern difficulty - or, continue missions to build your skills",
     facilities: [{ fuel: "Natural Gas", peakW: 500000000 }],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: ".button-buildGenerator",
+        advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
         content: (
-          <Typography variant="body1">
-            Build generators to produce additional electricity when you're
-            having blackouts - or in anticipation of future growth.
-          </Typography>
-        ),
-      },
-      {
-        card: { name: "BUILD_GENERATORS", dontRemember: true },
-        target: "#peak-output",
-        content: (
-          <Typography variant="body1">
-            Slide to change the size of generator you want to build.
-          </Typography>
-        ),
-      },
-      {
-        card: { name: "BUILD_GENERATORS", dontRemember: true },
-        target: "#sort",
-        content: (
-          <Typography variant="body1">Sort by different properties.</Typography>
-        ),
-      },
-      {
-        card: { name: "BUILD_GENERATORS", dontRemember: true },
-        target: ".action-seconday-text",
-        content: (
-          <Typography variant="body1">
-            See how long it will take to build, the total cost of electricity
-            across its lifetime, and how much greenhouse gas it releases per
-            unit generated.
-          </Typography>
+          <TutorialPrompt
+            concepts={["build", "generator"]}
+            text="Open the generator shop."
+            action={["build"]}
+          />
         ),
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".build-list-item",
         content: (
-          <Typography variant="body1">
-            Click on a generator to see more detailed information.
-          </Typography>
+          <TutorialPrompt
+            concepts={["money", "time", "fuel"]}
+            text="Compare cost, build time and fuel."
+          />
         ),
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".buy-button",
+        advanceOn: (s: AppStateType) => s.game.facilities.length >= 2,
         content: (
-          <Typography variant="body1">
-            Click on the price to buy it, either in cash or with a loan.
-            <br />
-            <br />A loan's interest rate depends on the economy and on your
-            company's own finances - and once you sign, that rate is fixed for
-            the life of the loan.
-          </Typography>
+          <TutorialPrompt
+            concepts={["buy", "generator"]}
+            text="Buy one - cash or loan."
+            action={["buy"]}
+          />
         ),
       },
       {
-        card: { name: "BUILD_GENERATORS", dontRemember: true },
-        target: "#close-button",
+        card: "FACILITIES",
+        target: ".facility",
         content: (
-          <Typography variant="body1">
-            Tap X to close the buy screen.
-          </Typography>
+          <TutorialPrompt
+            concepts={["construction", "time"]}
+            text="It's being built."
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: "#speedChangeButtons",
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            Start the game by unpausing it. Hotkeys are in a row: `/1/2/3. Space
-            and 0 also pause.
-            <br />
-            <br />
-            This tutorial will run for 1 year. Try building different types of
-            generators!
-          </Typography>
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Run the year."
+            action={["play"]}
+          />
         ),
       },
     ],
   },
   {
     id: 2, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "103: Storage",
+    name: "Mission 3: Storage",
+    icon: "battery",
+    summary: "Store energy for later",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
@@ -204,9 +167,9 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 6,
-    endTitle: "Tutorial complete!",
+    endTitle: "Mission complete!",
     endMessage:
-      "You now know enough to run a company on Employee difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on Employee difficulty - or, continue missions to build your skills",
     facilities: [
       { name: "Pumped Hydro", peakWh: 500000000 },
       { fuel: "Coal", peakW: 480000000 },
@@ -216,77 +179,68 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: ".button-buildStorage",
+        advanceOn: (s: AppStateType) => s.card.name === "BUILD_STORAGE",
         content: (
-          <Typography variant="body1">
-            When you're getting blackouts, generators aren't your only option.
-            <br />
-            <br />
-            If you have power at other times of day, it's often cheaper to store
-            that energy than build more generators.
-          </Typography>
+          <TutorialPrompt
+            concepts={["build", "storage"]}
+            text="Storage banks spare power for when you need it - open the storage shop."
+            action={["build"]}
+          />
         ),
       },
       {
         card: { name: "BUILD_STORAGE", dontRemember: true },
         target: ".build-list-item",
+        advanceOn: (s: AppStateType) => s.game.facilities.length >= 3,
         content: (
-          <Typography variant="body1">
-            Moving the slider changes their capacity and peak output.
-          </Typography>
-        ),
-      },
-      {
-        card: { name: "BUILD_STORAGE", dontRemember: true },
-        target: "#close-button",
-        content: (
-          <Typography variant="body1">
-            Tap X to close the build screen.
-          </Typography>
+          <TutorialPrompt
+            concepts={["buy", "storage"]}
+            text="Buy one."
+            action={["buy"]}
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: ".capacityProgressBar",
         content: (
-          <Typography variant="body1">
-            Like generators, the horizontal bar indicates how much electricity
-            it's outputting.
-            <br />
-            <br />
-            In addition, storage units have a vertical bar indicating how much
-            energy is stored.
-          </Typography>
+          <TutorialPrompt
+            concepts={["storage"]}
+            text="The vertical bar is how much energy it holds."
+          />
         ),
       },
       {
         card: "FACILITIES",
         target: ".facility",
+        advanceOnAction: "game/reprioritizeFacility",
         content: (
-          <Typography variant="body1">
-            Hold and drag to re-order your generators and storage.
-            <br />
-            <br />
-            Generators at the top produce first and only charge storage below
-            them.
-          </Typography>
+          <TutorialPrompt
+            concepts={["reorder"]}
+            text="Drag to re-order - the top runs first and charges storage below it."
+            action={["reorder"]}
+          />
         ),
       },
       {
         card: "FACILITIES",
-        target: ".facility",
-        onNext: () => setSpeed("SLOW"),
+        target: "#speedChangeButtons",
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            This tutorial will run for 6 months. Try changing the order of
-            storage and generators to see how it affects their output!
-          </Typography>
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Run it."
+            action={["play"]}
+          />
         ),
       },
     ],
   },
   {
     id: 4, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "104: Finances",
+    name: "Mission 4: Finances",
+    icon: "coal",
+    summary: "Read the books",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
@@ -294,9 +248,9 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 1,
-    endTitle: "Tutorial complete!",
+    endTitle: "Mission complete!",
     endMessage:
-      "You now know enough to run a company on Manager difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on Manager difficulty - or, continue missions to build your skills",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },
@@ -307,18 +261,18 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#financesNav",
         content: (
-          <Typography variant="body1">
-            To run a profitable business, you'll need to understand the Finances
-            tab. (Hotkey: W)
-          </Typography>
+          <TutorialPrompt
+            concepts={["finances", "money"]}
+            text="Your money lives in the Finances tab."
+          />
         ),
         desktop: {
           target: "#financesPane",
           content: (
-            <Typography variant="body1">
-              To run a profitable business, you'll need to understand the
-              Finances pane.
-            </Typography>
+            <TutorialPrompt
+              concepts={["finances", "money"]}
+              text="Your money lives in the Finances pane."
+            />
           ),
         },
       },
@@ -326,54 +280,41 @@ export const SCENARIOS = [
         card: "FINANCES",
         target: "#chartFinances",
         content: (
-          <Typography variant="body1">
-            You can plot a variety of metrics by changing the dropdowns above
-            the chart. You can also plot previous years to analyze long term
-            strategies.
-          </Typography>
+          <TutorialPrompt
+            concepts={["forecast", "money"]}
+            text="Chart any metric, any year."
+          />
         ),
       },
       {
         card: "FINANCES",
         target: ".MuiTable-root",
         content: (
-          <Typography variant="body1">
-            The table shows you the high level numbers for your business for the
-            selected year. Click on the table to get a more detailed breakdown
-            of the numbers, and click it again to collapse it.
-          </Typography>
-        ),
-      },
-      {
-        card: "FINANCES",
-        target: ".MuiTable-root",
-        content: (
-          <Typography variant="body1">
-            The expanded table includes your <strong>interest rate</strong> -
-            what a new loan would cost you today. It moves with the economy, and
-            with how healthy your own books look.
-            <br />
-            <br />
-            Both it and inflation can be charted, like any other metric.
-          </Typography>
+          <TutorialPrompt
+            concepts={["finances"]}
+            text="Tap the table to expand it - including your loan interest rate."
+          />
         ),
       },
       {
         card: "FINANCES",
         target: "#speedChangeButtons",
-        onNext: () => setSpeed("SLOW"),
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            This tutorial will run for 1 month - try playing around with the
-            chart.
-          </Typography>
+          <TutorialPrompt
+            concepts={["play", "money"]}
+            text="Run a month - watch the numbers."
+            action={["play"]}
+          />
         ),
       },
     ],
   },
   {
     id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "105: Marketing",
+    name: "Mission 5: Marketing",
+    icon: "wind",
+    summary: "Grow your customers",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2019,
@@ -381,9 +322,9 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
-    endTitle: "Tutorial complete!",
+    endTitle: "Mission complete!",
     endMessage:
-      "You now know enough to run a company on VP difficulty - or, continue tutorials to build your skills",
+      "You now know enough to run a company on VP difficulty - or, continue missions to build your skills",
     facilities: [
       { name: "Pumped Hydro", peakWh: 1000000000 },
       { fuel: "Coal", peakW: 600000000 },
@@ -394,75 +335,73 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#financesNav",
         content: (
-          <Typography variant="body1">
-            When you have spare capacity, you can use marketing to grow your
-            business by heading to the "Finances" tab. (Hotkey: W)
-          </Typography>
+          <TutorialPrompt
+            concepts={["marketing", "customers"]}
+            text="Marketing lives in the Finances tab."
+          />
         ),
         desktop: {
           target: "#financesPane",
           content: (
-            <Typography variant="body1">
-              When you have spare capacity, you can use marketing to grow your
-              business - look for it in the Finances pane.
-            </Typography>
+            <TutorialPrompt
+              concepts={["marketing", "customers"]}
+              text="Marketing lives in the Finances pane."
+            />
           ),
         },
       },
       {
         card: "FINANCES",
         target: "#marketingSlider",
+        advanceOn: (s: AppStateType) => s.game.monthlyMarketingSpend > 0,
         content: (
-          <Typography variant="body1">
-            Slide to increase your marketing budget, growing your customer base
-            and demand.
-          </Typography>
+          <TutorialPrompt
+            concepts={["marketing", "customers"]}
+            text="Raise the marketing budget."
+            action={["marketing"]}
+          />
         ),
       },
       {
         card: "FINANCES",
         target: "#plotMetric",
         content: (
-          <Typography variant="body1">
-            Change the graph to plot Customers to see how they change over time.
-            <br />
-            <br />
-            Beware, marketing too much too quickly may actually cost you
-            customers through chronic blackouts!
-          </Typography>
+          <TutorialPrompt
+            concepts={["customers", "forecast"]}
+            text="Plot Customers to watch them grow - but grow too fast and blackouts will cost you them."
+          />
         ),
         // Same control, different shape: on a wide screen the metrics are all drawn at once
         // rather than hidden behind a dropdown
         desktop: {
+          target: "#plotMetric",
           content: (
-            <Typography variant="body1">
-              Click the Customers tile to plot it and see how they change over
-              time.
-              <br />
-              <br />
-              Beware, marketing too much too quickly may actually cost you
-              customers through chronic blackouts!
-            </Typography>
+            <TutorialPrompt
+              concepts={["customers", "forecast"]}
+              text="Click the Customers tile to watch them grow - but grow too fast and blackouts will cost you them."
+            />
           ),
         },
       },
       {
         card: "FINANCES",
         target: "#speedChangeButtons",
-        onNext: () => setSpeed("SLOW"),
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            This tutorial will run for 1 year - see how changing your marketing
-            budget changes your demand.
-          </Typography>
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Run the year."
+            action={["play"]}
+          />
         ),
       },
     ],
   },
-
   {
     id: 5, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "106: Forecasting",
+    name: "Mission 6: Forecasting",
+    icon: "geothermal",
+    summary: "See what's coming",
     locationId: "SF",
     ownership: "Investor",
     startingYear: 2020,
@@ -470,87 +409,76 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.07,
     durationMonths: 12,
-    endTitle: "Tutorial complete!",
+    endTitle: "Mission complete!",
     endMessage: `That's all we can teach you - the rest you'll have to learn by doing!`,
     facilities: [{ fuel: "Coal", peakW: 450000000 }],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: "#forecastsNav",
+        target: ".facility",
+        advanceOnAction: "game/togglePauseFacility",
         content: (
-          <Typography variant="body1">
-            To truly succeed, you'll need to plan ahead - let's check out the
-            Forecasts tab. (Hotkey: E)
-          </Typography>
+          <TutorialPrompt
+            concepts={["pause", "generator"]}
+            text="Pause your only plant - see what the future thinks."
+            action={["pause"]}
+          />
         ),
-        desktop: {
-          target: "#forecastsPane",
-          content: (
-            <Typography variant="body1">
-              To truly succeed, you'll need to plan ahead - let's check out the
-              Forecasts pane.
-            </Typography>
-          ),
-        },
       },
       {
         card: "FORECASTS",
         target: "#chartForecastSupplyDemand",
         content: (
-          <Typography variant="body1">
-            This chart shows forecasted supply and demand over the next year -
-            including any upcoming blackouts. Try pausing a generator to see how
-            it affects your ability to meet demand.
-          </Typography>
+          <TutorialPrompt
+            concepts={["forecast", "blackout"]}
+            text="Blackouts ahead - forecasts show the year to come."
+          />
         ),
       },
       {
-        card: "FORECASTS",
-        target: "#chartForecastSupplyByFuel",
+        card: "FACILITIES",
+        target: ".facility",
+        advanceOn: (s: AppStateType) =>
+          s.game.facilities.every((f) => !f.paused),
         content: (
-          <Typography variant="body1">
-            This chart shows what fuels are supplying your electricity. Try
-            dragging to re-order your facilities to see how it affects your fuel
-            consumption.
-          </Typography>
+          <TutorialPrompt
+            concepts={["play", "generator"]}
+            text="Turn it back on."
+            action={["play"]}
+          />
         ),
       },
       {
         card: "FORECASTS",
         target: "#chartForecastFuelPrices",
         content: (
-          <Typography variant="body1">
-            This chart shows forecasted fuel prices, based on real data. Fuel
-            prices can change suddenly and significantly, affecting the
-            profitability of your fuel-based generators.
-          </Typography>
+          <TutorialPrompt
+            concepts={["fuel", "money"]}
+            text="Fuel prices move - and move your profits with them."
+          />
         ),
       },
       {
         card: "FORECASTS",
         target: "#chartForecastWeather",
         content: (
-          <Typography variant="body1">
-            This chart shows forecasted weather, which affects demand (such as
-            heating and air conditioning) - and the output of solar and wind
-            generators.
-          </Typography>
+          <TutorialPrompt
+            concepts={["weather", "demand"]}
+            text="Weather drives demand - and solar and wind output."
+          />
         ),
       },
       {
         card: "FORECASTS",
         target: "#speedChangeButtons",
-        onNext: () => setSpeed("FAST"),
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <Typography variant="body1">
-            To learn more about concepts, select "Manual" from the top left
-            menu.
-            <br />
-            <br />
-            This tutorial will run for 1 year so that you can see how the
-            forecasts change over time.
-          </Typography>
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Run the year - the Manual (top-left menu) has the deep dives."
+            action={["play"]}
+          />
         ),
       },
     ],
@@ -659,7 +587,7 @@ export const SCENARIOS = [
   // TODO more public-ownership scenarios, such as in LA or Nebraska
 ] as ScenarioType[];
 
-// The numbered 101-106 walkthroughs, in the order a new player should work through them
+// The opening missions, in the order a new player should work through them
 export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);
 
 /**
