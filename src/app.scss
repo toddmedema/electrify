@@ -951,6 +951,16 @@ $pane_header_height: 40px;
     & > div {
       flex: 0 1 auto;
     }
+
+    // The app bar and bottom nav are fixed chrome, not scrollable content -- only .scrollable
+    // (the pane's own body) should give up height when a pane overflows the card. Without this,
+    // a tall pane (e.g. Finances' expandable table) lets the flexbox shrink algorithm eat into
+    // BottomNavigation's automatic minimum size instead, which undercuts its real 56px height
+    // and left the nav a different height depending which pane happened to overflow.
+    & > #appbar,
+    & > #navfooter {
+      flex-shrink: 0;
+    }
   }
 
   .cardList {
