@@ -56,13 +56,17 @@ const MainMenu = (props: Props): React.JSX.Element => {
         Electrify
       </Typography>
       <Box id="centeredMenu" sx={{ px: 3 }}>
-        <Typography className="gamePromise" variant="h5" component="p">
-          Build power plants. Keep the lights on. Make your grid cleaner.
+        <Typography className="gameSubtitle" variant="body1" component="p">
+          Build power plants, keep the lights on, and clean up the grid — learn
+          as you play.
         </Typography>
-        <Typography className="gameReassurance" variant="body1" component="p">
-          Learn as you play — no energy or gaming experience needed.
-        </Typography>
-        <Stack className="mainActions" spacing={1.25}>
+        <Stack
+          component="section"
+          aria-label="Primary actions"
+          className="mainActions"
+          spacing={1.25}
+          useFlexGap
+        >
           {props.hasSavedGame && (
             <Button
               size="large"

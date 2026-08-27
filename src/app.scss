@@ -1134,12 +1134,8 @@ $pane_header_height: 40px;
       max-width: 680px;
       margin: auto;
 
-      .gamePromise {
-        font-weight: 800;
-      }
-
-      .gameReassurance {
-        margin: 6px auto 18px;
+      .gameSubtitle {
+        margin: 0 auto 18px;
         color: $font_color_faded;
       }
 
@@ -1174,7 +1170,7 @@ $pane_header_height: 40px;
       top: 23%;
     }
 
-    #menuCard .gameReassurance {
+    #menuCard .gameSubtitle {
       margin-bottom: 8px;
     }
   }

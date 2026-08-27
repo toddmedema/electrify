@@ -18,6 +18,15 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
+  it("shows a single, compact game subtitle", () => {
+    render(<MainMenu {...props()} />);
+
+    expect(
+      screen.getByText(/Build power plants, keep the lights on/i),
+    ).toHaveClass("gameSubtitle", "MuiTypography-body1");
+    expect(screen.queryByText(/no energy or gaming experience/i)).toBeNull();
+  });
+
   it("starts a new game from the primary guided-missions action", async () => {
     const onStart = jest.fn();
     render(<MainMenu {...props({ onStart })} />);
@@ -41,5 +50,8 @@ describe("MainMenu", () => {
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
+      { gap: "10px" },
+    );
   });
 });
