@@ -129,6 +129,7 @@ export const keyMap = {
   FACILITIES: "q",
   FINANCES: "w",
   FORECASTS: "e",
+  EVENTS: "r",
   BUILD_GENERATOR: "g",
   BUILD_STORAGE: "s",
   PRIORITIZE_EARLIER: "[",
@@ -229,6 +230,9 @@ const shortcutHandlers = {
   },
   FORECASTS: () => {
     store.dispatch(navigate("FORECASTS"));
+  },
+  EVENTS: () => {
+    store.dispatch(navigate("EVENTS"));
   },
   BUILD_GENERATOR: () => {
     if (canPlay()) {
@@ -461,6 +465,8 @@ export default class Compositor extends React.Component<Props, {}> {
             <FacilitiesContainer />
             {this.props.card.name === "FORECASTS" ? (
               <ForecastsContainer />
+            ) : this.props.card.name === "EVENTS" ? (
+              <EventLogContainer />
             ) : (
               <FinancesContainer />
             )}
@@ -480,6 +486,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <FinancesContainer />;
       case "FORECASTS":
         return <ForecastsContainer />;
+      case "EVENTS":
+        return <EventLogContainer />;
       case "FACILITIES":
         return <FacilitiesContainer />;
       case "SETTINGS":

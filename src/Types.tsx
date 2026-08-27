@@ -72,6 +72,7 @@ export type CardNameType =
   | "FACILITIES"
   | "FINANCES"
   | "FORECASTS"
+  | "EVENTS"
   | "LOADING"
   | "MAIN_MENU"
   | "NEW_GAME"

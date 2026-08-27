@@ -170,6 +170,7 @@ export const NAV_CARDS = [
   "FACILITIES",
   "FINANCES",
   "FORECASTS",
+  "EVENTS",
 ] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;

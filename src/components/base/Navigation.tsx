@@ -2,6 +2,7 @@ import * as React from "react";
 import { BottomNavigation, BottomNavigationAction } from "@mui/material";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
+import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
 import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType } from "../../Types";
@@ -42,6 +43,12 @@ export default function Navigation() {
         label="Forecasts"
         value="FORECASTS"
         icon={<InsertChartIcon />}
+      />
+      <BottomNavigationAction
+        id="eventsNav"
+        label="Events"
+        value="EVENTS"
+        icon={<HistoryIcon />}
       />
     </BottomNavigation>
   );
