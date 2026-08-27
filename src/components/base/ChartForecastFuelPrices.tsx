@@ -14,6 +14,7 @@ import {
 } from "./UPlotHelpers";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatMoneyStable } from "../../helpers/Format";
@@ -42,6 +43,7 @@ export const PRICED_FUELS: PricedFuelType[] = [
 
 interface State {
   prices: number[][];
+  minutes: number[];
   domain: Props["domain"];
   startingYear: number;
   multiyear: boolean;
@@ -101,9 +103,16 @@ function buildOptions(showXLabels: boolean) {
 }
 
 function tooltip(idx: number, state: State): string {
-  return PRICED_FUELS.map(
-    (f, i) => `${f}: ${formatMoneyStable(state.prices[i][idx])}`,
-  ).join("\n");
+  const header = formatMinuteAsTooltipHeader(
+    state.minutes[idx],
+    state.startingYear,
+  );
+  return [
+    header,
+    ...PRICED_FUELS.map(
+      (f, i) => `${f}: ${formatMoneyStable(state.prices[i][idx])}`,
+    ),
+  ].join("\n");
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -138,7 +147,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
         <UPlotChart<State>
           ariaLabel="Chart of forecasted fuel prices"
           height={height}
-          state={{ prices, domain, startingYear, multiyear }}
+          state={{ prices, minutes, domain, startingYear, multiyear }}
           data={[minutes, ...prices]}
           buildOptions={buildOptions(showXLabels !== false)}
           structureKey={String(showXLabels !== false)}

@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { padRange, stepTicks, titlePlugin, xAxis, yAxis } from "./UPlotHelpers";
 import { formatMonthChartAxis } from "../../helpers/DateTime";
+import { MONTHS } from "../../Constants";
 import { chartPalette } from "../../Theme";
 
 interface ChartData {
@@ -81,7 +82,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 }
 
 function tooltip(idx: number, state: State): string {
-  return state.format(state.timeline[idx].value).toString();
+  const d = state.timeline[idx];
+  const monthName = MONTHS[(d.month - 1) % 12];
+  return `${monthName} ${d.year}\n${state.format(d.value)}`;
 }
 
 const ChartFinances = (props: Props): React.JSX.Element => {
