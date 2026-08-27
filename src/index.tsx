@@ -4,7 +4,6 @@ import { Provider } from "react-redux";
 import { store } from "./Store";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
-import { watchForServiceWorkerUpdates } from "./ServiceWorker";
 import "./app.scss";
 
 const container = document.getElementById("root")!;
@@ -22,14 +21,6 @@ if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/service-worker.js")
-      .then((registration) => {
-        watchForServiceWorkerUpdates(
-          navigator.serviceWorker,
-          registration,
-          store.dispatch,
-          () => window.location.reload(),
-        );
-      })
       .catch((error) => console.warn("Couldn't enable offline play:", error));
   });
 }
