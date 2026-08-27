@@ -20,7 +20,7 @@ import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
 import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
-import { getNextTutorial } from "../../data/Scenarios";
+import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 
@@ -40,6 +40,7 @@ export interface StateProps {
 
 export interface DispatchProps {
   onManual: () => void;
+  onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
@@ -200,7 +201,8 @@ function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
-  const { game, onManual, onNextTutorial, onQuit, onSpeedChange } = props;
+  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
+    props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -220,6 +222,10 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
+  // A tutorial's progress isn't worth resuming, so its menu item stays "Quit" - only a real run
+  // gets the "Save & Quit" reminder that leaving keeps it around to come back to
+  const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
+    ?.tutorialSteps;
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
@@ -269,6 +275,7 @@ export function GameAppBar(props: Props) {
           onClose={handleMenuClose}
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
+          <MenuItem onClick={onSettings}>Options</MenuItem>
           <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
             Send feedback
           </MenuItem>
@@ -280,13 +287,22 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={onQuit}>
-            {isReplay ? "Exit replay" : "Quit"}
+            {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
           </MenuItem>
         </Menu>
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuAnchorEl, onManual, onNextTutorial, onQuit, nextTutorial, isReplay],
+    [
+      menuAnchorEl,
+      onManual,
+      onSettings,
+      onNextTutorial,
+      onQuit,
+      nextTutorial,
+      isReplay,
+      isTutorial,
+    ],
   );
 
   if (!game.inGame || !now) {
@@ -329,6 +345,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onSettings: () => {
+      dispatch(navigate("SETTINGS"));
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));
