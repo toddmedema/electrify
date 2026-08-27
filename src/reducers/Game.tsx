@@ -950,32 +950,14 @@ export function tickState(state: GameType) {
         const isTutorial = Boolean(scenario.tutorialSteps);
         // Read out here with everything else the timeouts need, rather than from inside them
         const nextTutorial = getNextTutorial(scoredScenarioId);
-        // Read now rather than inside the timeout, so that "was 640" reports the run before this
-        // one: submitHighscore below overwrites it the moment its write lands
-        const previousBest =
-          getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
 
         // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
         // and rules the player gave themselves - would be scored against each other as if they
         // were the same scenario
-        if (!scenario.tutorialSteps && ranked) {
-          // Pulled out of the draft here rather than inside the timeout, which runs after the
-          // reducer has returned and revoked it
-          const replay = serializeReplay(state);
-          setTimeout(
-            () =>
-              getStore().dispatch(
-                submitHighscore({
-                  score: finalScore,
-                  scoreBreakdown: score, // For analytics purposes only
-                  scenarioId: scoredScenarioId,
-                  difficulty,
-                  replay,
-                }),
-              ),
-            1,
-          );
-        }
+        const submitsScore = !scenario.tutorialSteps && ranked;
+        // Pulled out of the draft here rather than inside the timeout, which runs after the
+        // reducer has returned and revoked it
+        const replay = submitsScore ? serializeReplay(state) : undefined;
 
         if (!isReplay) {
           logEvent("scenario_end", {
@@ -1000,6 +982,13 @@ export function tickState(state: GameType) {
               }),
             );
           }
+          // Read here rather than up in the reducer: store.getState() throws while a reducer is
+          // running, and this sat in tickState, so the throw came out of the tick loop's own
+          // setTimeout - nothing rescheduled the loop and nothing opened a dialog, and the game
+          // stopped dead on the last month of every run. Still read before the submit below, so
+          // that "was 640" reports the run before this one rather than the one that just finished
+          const previousBest =
+            getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
           // Only the numbers: the breakdown, the personal best and the rank are base/VictoryDialog's
           // to render, so that the parts which arrive over the network can fill themselves in
           getStore().dispatch(
@@ -1015,6 +1004,17 @@ export function tickState(state: GameType) {
               previousBest,
             }),
           );
+          if (submitsScore) {
+            getStore().dispatch(
+              submitHighscore({
+                score: finalScore,
+                scoreBreakdown: score, // For analytics purposes only
+                scenarioId: scoredScenarioId,
+                difficulty,
+                replay,
+              }),
+            );
+          }
         }, 1);
       }
     }
