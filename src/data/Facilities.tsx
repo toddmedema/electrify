@@ -2,12 +2,7 @@ import { LCWH } from "../helpers/Financials";
 import { hasFuelPrices } from "./FuelPrices";
 import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
-import {
-  FacilityOperatingType,
-  GameType,
-  GeneratorShoppingType,
-  StorageShoppingType,
-} from "../Types";
+import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
   getWindCapacityFactor,
   getSolarCapacityFactor,
@@ -47,14 +42,12 @@ export function GENERATORS(
   const year = state.date.year;
 
   // only needed as a temporary hack for geothermal until https://github.com/toddmedema/electrify/issues/86 done
-  const countByFuel = state.facilities.reduce(
-    (acc: { [index: string]: number }, f: FacilityOperatingType) => {
-      if (f.fuel) {
-        acc[f.fuel] = (acc[f.fuel] || 0) + 1;
-      }
-      return acc;
-    },
-    {} as { [index: string]: number },
+  const conventionalGeothermalCount = state.facilities.filter(
+    (f) => f.name === "Geothermal",
+  ).length;
+  const enhancedGeothermalCostPerW = Math.max(
+    3,
+    5.5 * Math.pow(3 / 5.5, (year - 2028) / 7),
   );
 
   // Calculate intermittent generator capacity factors (here instead of passed in, since may eventually have different capacity factors
@@ -300,8 +293,7 @@ export function GENERATORS(
       fuel: "Geothermal",
       description: "Consistent, but few locations",
       available: hasGeothermalResource(state.location),
-      buildCost:
-        (10000000 + 4 * peakW) * (1 + (countByFuel.Geothermal || 0) / 4),
+      buildCost: (10000000 + 4 * peakW) * (1 + conventionalGeothermalCount / 4),
       // To compensate for limited locations, cost to build increases significantly with each construction
       // Future ideas: new tech in ~2000 opened up more locations at a slightly higher cost
       // Have multiplier be based on totalPeakWByFuel instead, so that you don't suffer as much from building many smaller plants
@@ -321,6 +313,23 @@ export function GENERATORS(
       // But technically availabe up to 90% of the time - https://www.energy.gov/eere/geothermal/geothermal-faqs
       lifespanYears: 40,
       // TODO
+    },
+    {
+      name: "Enhanced Geothermal",
+      fuel: "Geothermal",
+      description: "Clean, firm power nearly anywhere",
+      available: year >= 2030,
+      buildCost: enhancedGeothermalCostPerW * peakW,
+      // Fervo's $5.5/W Phase II estimate in 2028 declines to its $3/W long-term target
+      // in 2035, then stays at that floor.
+      peakW,
+      maxPeakW: 500000000,
+      btuPerWh: 0,
+      annualOperatingCost: 0.16 * peakW,
+      yearsToBuild: 3 + magnitude / 4,
+      spinMinutes: 1,
+      capacityFactor: 0.83,
+      lifespanYears: 30,
     },
     // TODO biomass
   ] as GeneratorShoppingType[];
