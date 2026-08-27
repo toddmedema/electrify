@@ -446,7 +446,10 @@ export type GameEventKindType =
   | "BUILD"
   | "SELL"
   | "LOAN"
-  | "FUEL_PRICE";
+  | "FUEL_PRICE"
+  | "FUEL_CROSSOVER";
+
+export type GameEventImportanceType = "ROUTINE" | "NOTABLE" | "CRITICAL";
 
 /**
  * One line of the company's history.
@@ -462,6 +465,34 @@ export interface GameEventType {
   // When it happened, as the game clock read it at the time ("Mar 2024")
   label: string;
   message: string;
+  // Most entries are passive history. Important entries can interrupt the clock, stand out in
+  // the log and take the player to the screen where the consequence can be investigated.
+  importance?: GameEventImportanceType;
+  actionTarget?: CardNameType;
+}
+
+export interface WorldEventEffectsType {
+  fuelPriceMultipliers?: Partial<FuelPricesType>;
+  temperatureOffsetC?: number;
+  demandMultiplier?: number;
+}
+
+/** One deterministic, time-bounded occurrence created by the world-event engine. */
+export interface ActiveWorldEventType {
+  // Definition id plus location/date, stable across a replay of the same run
+  key: string;
+  definitionId: string;
+  startsMinute: number;
+  endsMinute: number;
+  attributes: Record<string, string | number>;
+  effects: WorldEventEffectsType;
+}
+
+export interface WorldEventStateType {
+  active: ActiveWorldEventType[];
+  // A bounded record of month/definition checks prevents a save resumed in the same month from
+  // drawing (and announcing) the same occurrence twice.
+  checkedKeys: string[];
 }
 
 export interface GameType {
@@ -491,6 +522,13 @@ export interface GameType {
   // Newest first, capped at MAX_EVENTS. Optional because a save written before the log existed
   // has none, and an empty log and a missing one mean the same thing to everything that reads it
   eventLog?: GameEventType[];
+  // Keys outlive the capped event log: a once-per-run lesson must not repeat just because its
+  // original row was the 101st one and fell off the visible history.
+  reportedEventKeys?: string[];
+  eventLogReadThroughId?: number;
+  // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
+  fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
+  worldEvents?: WorldEventStateType;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is

@@ -15,6 +15,7 @@ function renderAppBar(overrides: Partial<Props> = {}) {
     game: { ...game, inGame: true },
     audioEnabled: true,
     onAudioChange: () => undefined,
+    onEvents: () => undefined,
     onManual: () => undefined,
     onNextTutorial: () => undefined,
     onQuit: () => undefined,

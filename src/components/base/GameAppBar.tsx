@@ -40,6 +40,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onEvents: () => void;
   onManual: () => void;
   onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
@@ -114,6 +115,7 @@ export function GameAppBar(props: Props) {
     game,
     audioEnabled,
     onAudioChange,
+    onEvents,
     onManual,
     onNextTutorial,
     onQuit,
@@ -141,6 +143,8 @@ export function GameAppBar(props: Props) {
   // gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
     ?.tutorialSteps;
+  const hasUnreadEvents =
+    (game.eventLog?.[0]?.id || 0) > (game.eventLogReadThroughId || 0);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
@@ -183,6 +187,9 @@ export function GameAppBar(props: Props) {
           open={Boolean(menuAnchorEl)}
           onClose={handleMenuClose}
         >
+          <MenuItem onClick={onEvents}>
+            Events{hasUnreadEvents ? " •" : ""}
+          </MenuItem>
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Options</MenuItem>
           <MenuItem
@@ -220,6 +227,8 @@ export function GameAppBar(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       menuAnchorEl,
+      onEvents,
+      hasUnreadEvents,
       onManual,
       onSettings,
       onNextTutorial,
@@ -310,6 +319,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onEvents: () => {
+      dispatch(navigate("EVENTS"));
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
