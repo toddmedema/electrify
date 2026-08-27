@@ -1,6 +1,6 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { navigate } from "../../reducers/Card";
+import { navigateBack } from "../../reducers/Card";
 import { resume } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { snackbarOpen } from "../../reducers/UI";
@@ -75,8 +75,10 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         );
       });
     },
+    // Mirrors Manual: Options can now be reached mid-game too, so back has to return wherever
+    // the player came from rather than always dropping them at the main menu
     onBack: () => {
-      dispatch(navigate("MAIN_MENU"));
+      dispatch(navigateBack());
     },
   };
 };
