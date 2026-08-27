@@ -708,7 +708,7 @@ function tutorialCompleteDialog({
           </span>
         )}
         <strong>
-          {completed} of {TUTORIALS.length} tutorials complete
+          {completed} of {TUTORIALS.length} missions complete
         </strong>
         {nextTutorial && (
           <span>
@@ -723,7 +723,7 @@ function tutorialCompleteDialog({
     notCancellable: true,
     secondaryLabel: "Main menu",
     secondaryAction: () => getStore().dispatch(quit()),
-    actionLabel: nextTutorial ? "Next tutorial" : "Back to tutorials",
+    actionLabel: nextTutorial ? "Next mission" : "Back to missions",
     action: () =>
       nextTutorial
         ? startTutorial(getStore().dispatch, nextTutorial.id)
@@ -957,7 +957,7 @@ export function tickState(state: GameType) {
           if (isTutorial) {
             return getStore().dispatch(
               tutorialCompleteDialog({
-                title: endTitle || "Tutorial complete!",
+                title: endTitle || "Mission complete!",
                 message: endMessage,
                 nextTutorial,
               }),

@@ -158,7 +158,7 @@ export const SCENARIOS = [
   {
     id: 2, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Mission 3: Storage",
-    icon: "battery",
+    icon: "pumped hydro",
     summary: "Store energy for later",
     locationId: "SF",
     ownership: "Investor",
