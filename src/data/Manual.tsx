@@ -2,6 +2,7 @@ import * as React from "react";
 import KeyboardShortcuts, {
   SHORTCUTS_SEARCH_TEXT,
 } from "../components/base/KeyboardShortcuts";
+import ConceptLegend from "../components/base/ConceptLegend";
 import { useUnits } from "../components/base/UnitsContext";
 import {
   formatLargeMassApprox,
@@ -60,6 +61,7 @@ export const MANUAL_ENTRY = {
   RATES: "Rates",
   ROUND_TRIP_EFFICIENCY: "Round-trip Efficiency",
   SCORE: "Score",
+  SYMBOLS: "Symbol Guide",
   TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
 } as const;
 
@@ -169,6 +171,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           something expensive that starts quickly. The rest of this manual
           explains the terms you'll meet along the way.
         </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.SYMBOLS,
+    group: "Gameplay",
+    keywords:
+      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast marketing fuel weather danger goal",
+    entry: (
+      <div>
+        <p>
+          These symbols mean the same thing in missions, controls, events and
+          results. Learn one once, then follow it everywhere.
+        </p>
+        <ConceptLegend />
       </div>
     ),
   },

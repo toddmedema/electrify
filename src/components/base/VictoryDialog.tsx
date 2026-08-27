@@ -13,6 +13,7 @@ import numbro from "numbro";
 import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
 import { buildShareText, canShare, shareText } from "../../helpers/Share";
+import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
 
 // What each scored category is called on the score screen. The breakdown's keys differ by
 // ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
@@ -24,6 +25,15 @@ export const SCORE_LABELS: { [key: string]: string } = {
   rate: "electric rates",
   emissions: "emissions",
   blackouts: "blackouts",
+};
+
+const SCORE_CONCEPTS: { [key: string]: ConceptNameType | undefined } = {
+  supply: "supply",
+  netWorth: "money",
+  customers: "customers",
+  rate: "money",
+  emissions: "danger",
+  blackouts: "blackout",
 };
 
 export interface StateProps {
@@ -124,7 +134,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       onClose={onClose}
       aria-labelledby="victory-title"
     >
-      <DialogTitle id="victory-title">
+      <DialogTitle id="victory-title" className="iconLabel">
+        <ConceptIcon concept="goal" />
         {endTitle || `You've retired!`}
       </DialogTitle>
       <DialogContent>
@@ -137,12 +148,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           Your final score is <strong>{formatScore(victory.score)}</strong>:
         </Typography>
         <div style={{ margin: "8px 0" }}>
-          {Object.keys(breakdown).map((category: string) => (
-            <div key={category}>
-              {breakdown[category]} pts from{" "}
-              {SCORE_LABELS[category] || category}
-            </div>
-          ))}
+          {Object.keys(breakdown).map((category: string) => {
+            const concept = SCORE_CONCEPTS[category];
+            return (
+              <div key={category} className="scoreBreakdownRow">
+                {concept && <ConceptIcon concept={concept} fontSize="small" />}
+                {breakdown[category]} pts from{" "}
+                {SCORE_LABELS[category] || category}
+              </div>
+            );
+          })}
         </div>
         {ranked && loggedIn && (
           <Typography variant="body1" style={{ marginTop: 12 }}>
