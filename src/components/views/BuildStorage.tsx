@@ -38,6 +38,7 @@ import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
+import ConceptIcon from "../base/ConceptIcon";
 import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
@@ -101,6 +102,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               color="primary"
               onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
               {formatMoneyConcise(storage.buildCost)}
             </Button>
@@ -236,6 +238,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               props.onBuild(false);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
@@ -246,6 +249,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               props.onBuild(true);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan
           </Button>
@@ -335,7 +339,11 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
         <Typography variant="h6">
-          {formatMoneyStable(cash)} <span className="weak">Build Storage</span>
+          {formatMoneyStable(cash)}{" "}
+          <span className="weak gameStatusValue">
+            <ConceptIcon concept="storage" fontSize="small" />
+            Build Storage
+          </span>
         </Typography>
         {game.speed !== "PAUSED" && (
           <IconButton

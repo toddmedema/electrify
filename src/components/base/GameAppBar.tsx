@@ -24,6 +24,7 @@ import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import { AppStateType, GameType, SpeedType } from "../../Types";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
+import ConceptIcon from "./ConceptIcon";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -327,12 +328,21 @@ export function GameAppBar(props: Props) {
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
-          <Typography variant="h6">
-            {formatMoneyStable(now.cash)}&nbsp;
-            <span className="weak">
+          <Typography variant="h6" className="gameStatus">
+            <span className="gameStatusValue">
+              <ConceptIcon concept="money" fontSize="small" />
+              {formatMoneyStable(now.cash)}
+            </span>
+            <span className="weak gameStatusValue">
+              <ConceptIcon concept="time" fontSize="small" />
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
+            {inBlackout && (
+              <span className="gameStatusBlackout">
+                <ConceptIcon concept="blackout" fontSize="small" />
+              </span>
+            )}
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>

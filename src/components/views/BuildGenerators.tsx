@@ -53,6 +53,7 @@ import { MANUAL_ENTRY } from "../../data/Manual";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
+import ConceptIcon from "../base/ConceptIcon";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -127,6 +128,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               color="primary"
               onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
               {formatMoneyConcise(generator.buildCost)}
             </Button>
@@ -342,6 +344,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               props.onBuild(false);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
@@ -352,6 +355,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               props.onBuild(true);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan
           </Button>
@@ -457,7 +461,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       <Toolbar className="bottomBorder">
         <Typography variant="h6">
           {formatMoneyStable(cash)}{" "}
-          <span className="weak">Build Generator</span>
+          <span className="weak gameStatusValue">
+            <ConceptIcon concept="generator" fontSize="small" />
+            Build Generator
+          </span>
         </Typography>
         {game.speed !== "PAUSED" && (
           <IconButton

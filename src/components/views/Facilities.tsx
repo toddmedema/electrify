@@ -15,13 +15,9 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import PauseIcon from "@mui/icons-material/Pause";
-import PlayIcon from "@mui/icons-material/PlayArrow";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import BoltIcon from "@mui/icons-material/Bolt";
-import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -53,6 +49,7 @@ import {
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
+import ConceptIcon from "../base/ConceptIcon";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
@@ -89,9 +86,9 @@ function activityIcon(activity: FacilityActivityType, color: string) {
   const style = { color };
   switch (activity) {
     case "BUILDING":
-      return <HourglassEmptyIcon style={style} />;
+      return <ConceptIcon concept="construction" style={style} />;
     case "PAUSED":
-      return <PauseIcon style={style} />;
+      return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
       return <PowerSettingsNewIcon style={style} />;
     case "CHARGING":
@@ -99,7 +96,7 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "DISCHARGING":
       return <ArrowDownwardIcon style={style} />;
     default:
-      return <BoltIcon style={style} />;
+      return <ConceptIcon concept="supply" style={style} />;
   }
 }
 
@@ -267,7 +264,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       color="primary"
                       size="small"
                     >
-                      <PauseIcon />
+                      <ConceptIcon concept="pause" />
                     </IconButton>
                   )}
                 {!readOnly && facility.paused && (
@@ -281,7 +278,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     color="primary"
                     size="small"
                   >
-                    <PlayIcon />
+                    <ConceptIcon concept="play" />
                   </IconButton>
                 )}
                 {!readOnly && !underConstruction && props.listLength > 1 && (
@@ -507,6 +504,7 @@ export default class Facilities extends React.Component<Props, {}> {
                 color="primary"
                 onClick={onGeneratorBuild}
                 className="button-buildGenerator"
+                startIcon={<ConceptIcon concept="generator" fontSize="small" />}
               >
                 + Generator
               </Button>
@@ -517,6 +515,7 @@ export default class Facilities extends React.Component<Props, {}> {
                 color="primary"
                 onClick={onStorageBuild}
                 className="button-buildStorage"
+                startIcon={<ConceptIcon concept="storage" fontSize="small" />}
               >
                 + Storage
               </Button>

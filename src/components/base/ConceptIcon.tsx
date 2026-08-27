@@ -46,6 +46,30 @@ export type ConceptNameType =
   | "danger"
   | "goal";
 
+export const CONCEPT_NAMES: ConceptNameType[] = [
+  "money",
+  "supply",
+  "demand",
+  "blackout",
+  "customers",
+  "generator",
+  "storage",
+  "build",
+  "buy",
+  "reorder",
+  "pause",
+  "play",
+  "time",
+  "construction",
+  "finances",
+  "forecast",
+  "marketing",
+  "fuel",
+  "weather",
+  "danger",
+  "goal",
+];
+
 // The one place each concept gets its spoken/read name - and the seed of a future
 // localization catalog, since screen readers are the only consumer of these words
 export const CONCEPT_LABELS: Record<ConceptNameType, string> = {
@@ -113,11 +137,13 @@ const IMG_SIZES = { small: 20, medium: 24, large: 35 };
 export interface ConceptIconProps {
   concept: ConceptNameType;
   fontSize?: "small" | "medium" | "large";
+  style?: React.CSSProperties;
 }
 
 export default function ConceptIcon({
   concept,
   fontSize = "medium",
+  style,
 }: ConceptIconProps): React.JSX.Element {
   const label = CONCEPT_LABELS[concept];
   if (concept === "storage") {
@@ -126,8 +152,10 @@ export default function ConceptIcon({
       <img
         src="/images/battery.svg"
         alt={label}
+        aria-label={label}
+        data-concept={concept}
         className="conceptIcon"
-        style={{ width: px, height: px }}
+        style={{ width: px, height: px, ...style }}
       />
     );
   }
@@ -135,9 +163,11 @@ export default function ConceptIcon({
   return (
     <Icon
       className="conceptIcon"
-      titleAccess={label}
+      aria-label={label}
+      data-concept={concept}
       fontSize={fontSize}
       color={CONCEPT_COLORS[concept]}
+      style={style}
     />
   );
 }

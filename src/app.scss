@@ -759,6 +759,53 @@ $pane_header_height: 40px;
 
 // For things that use size() / get recalulcated on larger displays
 @mixin styling() {
+  // The vocabulary introduced by the missions stays attached to the same concepts in the live
+  // interface. Text remains beside it for first-time recognition and screen magnification.
+  .gameStatus,
+  .gameStatusValue,
+  .gameStatusBlackout,
+  .iconLabel,
+  .scoreBreakdownRow {
+    display: flex;
+    align-items: center;
+  }
+
+  .gameStatus {
+    gap: size(small);
+    min-width: 0;
+  }
+
+  .gameStatusValue,
+  .iconLabel,
+  .scoreBreakdownRow {
+    gap: size(tiny);
+  }
+
+  .gameStatusBlackout {
+    color: $blackout_red;
+  }
+
+  .scoreBreakdownRow {
+    min-height: 24px;
+  }
+
+  .conceptLegend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: size(small);
+    margin-top: size(base);
+  }
+
+  .conceptLegendItem {
+    display: flex;
+    align-items: center;
+    gap: size(small);
+    padding: size(small);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    background: var(--bg-raised);
+  }
+
   .clickable-card {
     &:hover {
       cursor: pointer;
