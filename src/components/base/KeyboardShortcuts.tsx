@@ -15,6 +15,7 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["Q"], description: "Facilities tab" },
   { keys: ["W"], description: "Finances tab" },
   { keys: ["E"], description: "Forecasts tab" },
+  { keys: ["R"], description: "Events tab" },
   { keys: ["G"], description: "Build a generator" },
   { keys: ["S"], description: "Build storage" },
   {
