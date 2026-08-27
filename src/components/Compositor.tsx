@@ -159,7 +159,12 @@ function reprioritizeSelected(delta: number) {
 }
 
 const shortcutHandlers = {
-  PAUSED: () => {
+  // Space is one of this handler's own keys, and the browser's default action for it is to
+  // scroll the page -- which fires alongside the pause because react-hotkeys doesn't call
+  // preventDefault for you. Only this binding needs it: the other two (`` ` `` and `0`) have no
+  // native behaviour of their own
+  PAUSED: (e?: KeyboardEvent) => {
+    e?.preventDefault();
     store.dispatch(setSpeed("PAUSED"));
   },
   SLOW: () => {

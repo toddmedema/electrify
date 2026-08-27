@@ -102,6 +102,20 @@ export function formatLargeMassValue(
   });
 }
 
+/**
+ * The same value as formatLargeMassValue, but rounded to K/M/etc rather than spelled out to the
+ * kilogram - for the chart and its sparkline tile, which have room for three or four characters
+ * and not the seven a full tonne count runs to.
+ */
+export function formatLargeMassValueConcise(
+  kg: number,
+  units: UnitSystemType,
+): string {
+  return numbro(toDisplayLargeMass(kg, units))
+    .format({ average: true, totalLength: 3, trimMantissa: true })
+    .toUpperCase();
+}
+
 export function formatLargeMass(kg: number, units: UnitSystemType): string {
   return `${formatLargeMassValue(kg, units)} ${largeMassUnit(units)}`;
 }
