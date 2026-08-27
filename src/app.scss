@@ -444,9 +444,37 @@ $topbar_height: 56px;
 
 #topbar .MuiToolbar-root {
   min-height: $topbar_height !important;
+  flex-wrap: nowrap;
   padding-top: env(safe-area-inset-top);
   padding-left: max(16px, env(safe-area-inset-left)) !important;
   padding-right: max(16px, env(safe-area-inset-right)) !important;
+}
+
+// Four direct speed choices still fit beside the live status at phone width. The currency and
+// date already name their concepts in text, so their duplicate glyphs are omitted in the
+// component and the remaining chrome tightens just enough for a 320px viewport.
+@media screen and (max-width: 599px) {
+  #topbar .MuiToolbar-root {
+    padding-left: max(4px, env(safe-area-inset-left)) !important;
+    padding-right: max(4px, env(safe-area-inset-right)) !important;
+  }
+
+  #topbar .gameMenuButton {
+    margin-left: 0;
+    padding: 10px;
+  }
+
+  #topbar .gameStatus {
+    flex: 1 1 auto;
+    overflow: hidden;
+    gap: 2px;
+    font-size: clamp(0.65rem, 3.2vw, 0.875rem);
+    white-space: nowrap;
+  }
+
+  #speedChangeButtons {
+    flex: 0 0 auto;
+  }
 }
 
 #navfooter {
