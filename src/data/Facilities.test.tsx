@@ -50,6 +50,107 @@ const newYork: LocationType = {
   offshore: true,
 };
 
+function generatorAt(
+  year: number,
+  name: string,
+  peakW: number,
+  location: LocationType = france,
+) {
+  return GENERATORS(stateAt(location, year), peakW, [], []).find(
+    (generator) => generator.name === name,
+  );
+}
+
+describe("current facility economics", () => {
+  it.each([
+    ["Coal", 2023, 650000000, 4.103],
+    ["Nuclear", 2023, 2156000000, 7.861],
+    ["Natural Gas", 2023, 419000000, 0.836],
+    ["Oil", 2023, 3000000, 1.248],
+    ["Wind", 2024, 200000000, 1.041],
+    ["Solar", 2024, 150000000, 0.691],
+    ["Hydro", 2024, 100000000, 2.267],
+    ["Geothermal", 2024, 50000000, 4.015],
+  ])(
+    "prices a reference-sized %s plant at its published benchmark",
+    (name, year, peakW, dollarsPerW) => {
+      const location =
+        name === "Hydro" || name === "Geothermal" ? iceland : france;
+      expect(
+        generatorAt(year as number, name as string, peakW as number, location)
+          ?.buildCost,
+      ).toBeCloseTo((peakW as number) * (dollarsPerW as number), -2);
+    },
+  );
+
+  it("uses the latest battery cost, duration, life, and augmentation O&M", () => {
+    const battery = STORAGE(stateAt(france, 2024), 600000000).find(
+      (facility) => facility.name === "Battery",
+    );
+
+    expect(battery).toMatchObject({
+      peakW: 150000000,
+      lifespanYears: 20,
+      annualOperatingCost: 6000000,
+      roundTripEfficiency: 0.85,
+    });
+    expect(battery?.buildCost).toBeCloseTo(115210000, -2);
+    expect(battery?.yearsToBuild).toBeCloseTo(1.5, 2);
+  });
+
+  it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {
+    const pumpedHydro = STORAGE(stateAt(iceland, 2024), 1000000000).find(
+      (facility) => facility.name === "Pumped Hydro",
+    );
+
+    expect(pumpedHydro).toMatchObject({
+      peakW: 100000000,
+      annualOperatingCost: 1900000,
+      roundTripEfficiency: 0.8,
+    });
+    expect(pumpedHydro?.buildCost).toBeCloseTo(333900000, -2);
+  });
+});
+
+describe("real technology cost trends", () => {
+  it.each(["Wind", "Solar"])(
+    "models the observed 2020-2024 decline for %s",
+    (name) => {
+      const peakW = name === "Wind" ? 200000000 : 150000000;
+      expect(generatorAt(2024, name, peakW)?.buildCost).toBeLessThan(
+        generatorAt(2020, name, peakW)?.buildCost as number,
+      );
+    },
+  );
+
+  it("models falling battery costs and rising nuclear costs", () => {
+    const battery2020 = STORAGE(stateAt(france, 2020), 600000000).find(
+      (facility) => facility.name === "Battery",
+    );
+    const battery2024 = STORAGE(stateAt(france, 2024), 600000000).find(
+      (facility) => facility.name === "Battery",
+    );
+
+    expect(battery2024?.buildCost).toBeLessThan(
+      battery2020?.buildCost as number,
+    );
+    expect(generatorAt(2023, "Nuclear", 2156000000)?.buildCost).toBeGreaterThan(
+      generatorAt(2019, "Nuclear", 2156000000)?.buildCost as number,
+    );
+  });
+
+  it("floors wind and solar at the end of the published 2029 outlook", () => {
+    for (const [name, peakW] of [
+      ["Wind", 200000000],
+      ["Solar", 150000000],
+    ] as const) {
+      expect(generatorAt(2050, name, peakW)?.buildCost).toBe(
+        generatorAt(2029, name, peakW)?.buildCost,
+      );
+    }
+  });
+});
+
 describe("location-aware facilities", () => {
   it("offers geothermal and hydro in a resource-rich region", () => {
     const state = stateAt(iceland);
