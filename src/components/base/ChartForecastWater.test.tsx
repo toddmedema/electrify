@@ -1,7 +1,9 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import { TickPresentFutureType } from "../../Types";
-import ChartForecastWater from "./ChartForecastWater";
+import ChartForecastWater, {
+  formatReservoirAxisValue,
+} from "./ChartForecastWater";
 
 function tick(minute: number, scale: number): TickPresentFutureType {
   return {
@@ -28,4 +30,10 @@ it("makes precipitation, snowpack, and reservoir level readable without the canv
   expect(chart).toHaveAccessibleName(/Precipitation:/);
   expect(chart).toHaveAccessibleName(/Snowpack:/);
   expect(chart).toHaveAccessibleName(/Reservoir:/);
+});
+
+it("formats reservoir ticks as gigawatt-hour values without repeating the unit", () => {
+  expect(
+    [0, 20e9, 100e9, 1e12].map((value) => formatReservoirAxisValue(value)),
+  ).toEqual(["0", "20", "100", "1,000"]);
 });

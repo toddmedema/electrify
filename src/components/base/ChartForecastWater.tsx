@@ -17,7 +17,7 @@ import {
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
+import { formatWattHours, formatWattsInUnit } from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 
 export interface Props {
@@ -38,6 +38,11 @@ interface State {
 }
 
 const RESERVOIR_SCALE = "reservoir";
+const GIGAWATT = { suffix: "G", divisor: 1e9 };
+
+export function formatReservoirAxisValue(value: number): string {
+  return formatWattsInUnit(value, GIGAWATT).replace(/GW$/, "");
+}
 
 function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
@@ -81,11 +86,10 @@ function buildOptions(showXLabels: boolean) {
       yAxis(scale, {
         scale: RESERVOIR_SCALE,
         side: 1,
-        label: "Reservoir",
+        label: "Reservoir (GWh)",
         stroke: chartPalette().reservoir,
         size: FORECAST_AXIS_RIGHT - AXIS_LABEL_SIZE,
-        values: (_u, splits) =>
-          splits.map((v) => formatWattHoursAxis(v, splits)),
+        values: (_u, splits) => splits.map((v) => formatReservoirAxisValue(v)),
       }),
     ],
     series: [
