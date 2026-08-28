@@ -234,7 +234,18 @@ button,
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
+}
+
+button,
+[role="button"],
+.facilityRow {
   touch-action: manipulation;
+}
+
+// A slider owns horizontal drags. Allowing browser panning here cancels the pointer stream on
+// touch devices, often while the player is still moving the thumb.
+.MuiSlider-root {
+  touch-action: none;
 }
 
 :where(
