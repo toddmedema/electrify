@@ -1,7 +1,10 @@
 import {
   CreditInputsType,
+  degradedLifetimeYears,
   facilityCashBack,
+  facilityEquivalentCycles,
   facilityLifetime,
+  facilityOutputFactor,
   getCompanyInterestRate,
   getCreditInputs,
   getCreditPremium,
@@ -170,6 +173,24 @@ describe("LCWH", () => {
     expect(LCWH(generator, date, 0, SEED)).toBeCloseTo(
       (200000000 + 4000000 * 25) / totalWh,
       12,
+    );
+  });
+
+  it("includes compounding output degradation in a lifetime quote", () => {
+    const degrading = { ...generator, annualOutputDegradation: 0.005 };
+    const productiveYears = degradedLifetimeYears(25, 0.005);
+    const totalWh =
+      generator.peakW *
+      productiveYears *
+      HOURS_PER_YEAR_REAL *
+      generator.capacityFactor;
+
+    expect(LCWH(degrading, date, 0, SEED)).toBeCloseTo(
+      (generator.buildCost + generator.annualOperatingCost * 25) / totalWh,
+      12,
+    );
+    expect(LCWH(degrading, date, 0, SEED)).toBeGreaterThan(
+      LCWH(generator, date, 0, SEED),
     );
   });
 
@@ -370,5 +391,40 @@ describe("facilityLifetime", () => {
     expect(lifetime.capacityFactor).toBe(0);
     expect(lifetime.costPerMWh).toBeUndefined();
     expect(lifetime.profit).toBeCloseTo(-4500, 10);
+  });
+});
+
+describe("facility aging", () => {
+  const minute = (years: number) => years * DAYS_PER_YEAR * 24 * 60;
+
+  it("compounds solar output loss to about ten percent after twenty years", () => {
+    const solar = aFacility({ annualOutputDegradation: 0.005 });
+    expect(facilityOutputFactor(solar, minute(20))).toBeCloseTo(
+      Math.pow(0.995, 20),
+      10,
+    );
+    expect(facilityOutputFactor(solar, minute(20))).toBeCloseTo(0.905, 3);
+  });
+
+  it("leaves technologies without an evidence-backed decline at nameplate", () => {
+    expect(facilityOutputFactor(aFacility(), minute(60))).toBe(1);
+  });
+
+  it("gives legacy solar saves a degradation default", () => {
+    const legacySolar = aFacility({ fuel: "Sun" });
+    expect(legacySolar.annualOutputDegradation).toBeUndefined();
+    expect(facilityOutputFactor(legacySolar, minute(20))).toBeCloseTo(
+      Math.pow(0.995, 20),
+      10,
+    );
+  });
+
+  it("derives battery equivalent full cycles from discharged energy", () => {
+    const battery = aFacility({
+      peakWh: 4000000,
+      lifetimeWh: 10000000,
+    });
+    expect(facilityEquivalentCycles(battery)).toBeCloseTo(2.5, 10);
+    expect(facilityEquivalentCycles(aFacility())).toBeUndefined();
   });
 });

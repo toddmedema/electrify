@@ -515,8 +515,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.05,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Coal", peakW: 300000000 },
-      { fuel: "Natural Gas", peakW: 200000000 },
+      { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
+      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
     ],
   },
   {
@@ -531,7 +531,7 @@ export const SCENARIOS = [
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.03,
     durationMonths: 12 * 20,
-    facilities: [{ fuel: "Coal", peakW: 500000000 }],
+    facilities: [{ fuel: "Coal", peakW: 500000000, initialAgeYears: 25 }],
   },
   {
     id: 105, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -546,9 +546,9 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Oil", peakW: 450000000 },
-      { fuel: "Wind", peakW: 150000000 },
-      { fuel: "Sun", peakW: 50000000 },
+      { fuel: "Oil", peakW: 450000000, initialAgeYears: 20 },
+      { fuel: "Wind", peakW: 150000000, initialAgeYears: 8 },
+      { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
     ],
   },
   {
@@ -564,8 +564,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.02,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Oil", peakW: 100000000 },
-      { fuel: "Uranium", peakW: 400000000 },
+      { fuel: "Oil", peakW: 100000000, initialAgeYears: 20 },
+      { fuel: "Uranium", peakW: 400000000, initialAgeYears: 15 },
     ],
   },
   {
@@ -581,9 +581,9 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.05,
     durationMonths: 12 * 20,
     facilities: [
-      { fuel: "Oil", peakW: 220000000 },
-      { fuel: "Natural Gas", peakW: 200000000 },
-      { fuel: "Coal", peakW: 100000000 },
+      { fuel: "Oil", peakW: 220000000, initialAgeYears: 25 },
+      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      { fuel: "Coal", peakW: 100000000, initialAgeYears: 30 },
     ],
   },
   {
@@ -599,8 +599,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.025,
     durationMonths: 12 * 20,
     facilities: [
-      { fuel: "Coal", peakW: 200000000 },
-      { fuel: "Coal", peakW: 300000000 },
+      { fuel: "Coal", peakW: 200000000, initialAgeYears: 25 },
+      { fuel: "Coal", peakW: 300000000, initialAgeYears: 10 },
     ],
   },
   // TODO more public-ownership scenarios, such as in LA or Nebraska

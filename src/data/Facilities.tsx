@@ -345,6 +345,9 @@ export function GENERATORS(
       // EIA AEO2025 reference lead time is 21 months for a 200MW plant.
       spinMinutes: 1,
       capacityFactor: windCapacityFactor,
+      // Older fleets lose output faster than modern projects. Rounded from the 0.53% and 0.17%
+      // annual declines measured across 917 U.S. wind plants.
+      annualOutputDegradation: windAnnualOutputDegradation(year),
       // 37% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 25,
@@ -400,6 +403,9 @@ export function GENERATORS(
       // EIA AEO2025 reference lead time is 36 months for a 150MW plant.
       spinMinutes: 1,
       capacityFactor: solarCapacityFactor,
+      // A rounded central case: NREL's 2024 ATB spans 0.7%/yr baseline to 0.5%/yr moderate
+      // improvement (and 0.2%/yr advanced).
+      annualOutputDegradation: 0.005,
       // 26% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 35,
@@ -509,6 +515,11 @@ export function GENERATORS(
   });
 
   return generators;
+}
+
+/** Rounded vintage cohorts from LBNL's U.S. wind-plant performance study. */
+export function windAnnualOutputDegradation(commissioningYear: number): number {
+  return commissioningYear < 2008 ? 0.005 : 0.002;
 }
 
 export function STORAGE(state: GameType, peakWh: number) {

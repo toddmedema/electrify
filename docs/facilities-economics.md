@@ -143,6 +143,40 @@ not distinguish. Actual plants can outlive these economic lives after refurbishm
 the game needs one reference life for predictable resale rather than trying to price future major
 overhauls.
 
+## Operating age and performance degradation
+
+The simulation now distinguishes three aging effects that were previously easy to conflate:
+
+1. **Asset age and value.** Every operating facility has a commissioning minute and an economic
+   design life. Age already reduced resale value linearly; scenario authors can now set
+   `initialAgeYears` for inherited fleets, and the facility detail panel shows age against design
+   life. Reaching design life does not automatically close a plant.
+2. **Renewable output.** Solar output compounds down by 0.5% per operating year. Onshore wind uses
+   0.5% for pre-2008 vintages and 0.2% for newer vintages, rounded from the 0.53% and 0.17% annual
+   performance declines measured across 917 U.S. plants. Offshore wind remains unchanged because
+   the evidence is less settled and its model already applies an explicit availability/loss factor.
+3. **Battery use.** Battery capacity remains constant. Its existing $10/kWh-year O&M assumption
+   includes augmentation for roughly 1.5% annual capacity loss, so reducing usable capacity as well
+   would charge for degradation twice. The facility panel instead reports equivalent full cycles
+   as cumulative discharged energy divided by original energy capacity, against the existing
+   7,300-cycle design-life assumption.
+
+At 0.5% annual degradation, solar retains `0.995^20 = 90.5%` of its original output after 20
+years—about a 9.5% loss, not 20%. Weather and curtailment still vary actual production around that
+aged maximum. The build screen's lifetime cost integrates the same compounding output curve, while
+annual O&M remains flat; fuel and carbon costs continue to scale only with energy actually produced.
+
+Scenario starting ages are deliberately authored rather than inferred from technology or scenario
+year. The narrative scenarios now begin with mixed-age inherited fleets; tutorials keep new assets
+so their introductory economics and controls remain predictable. Existing saves without a
+commissioning timestamp still begin their age clock on the first real tick, and saves without a
+degradation field use the modern solar or wind default from the day they resume.
+
+The next fidelity step is intentionally separate: starts and equivalent operating hours for thermal
+plants, start costs for natural gas, maintenance/refurbishment decisions, and wear-driven outage
+risk. Adding an arbitrary fossil output penalty now would duplicate mechanisms that should instead
+depend on duty cycle, starts, and maintenance history.
+
 ## Commercial technology review
 
 No additional facility type is added in this pass:
@@ -174,5 +208,7 @@ No additional facility type is added in this pass:
 - [NREL, Update to Enhanced Geothermal System Resource Potential Estimate](https://docs.nrel.gov/docs/fy17osti/66428.pdf)
 - [DOE, Hydropower Basics](https://www.energy.gov/cmei/water/hydropower-basics)
 - [EIA, age and license extensions of U.S. nuclear plants](https://www.eia.gov/tools/faqs/faq.php?id=228&t=1)
+- [NREL 2024 ATB, utility-scale PV degradation assumptions](https://atb.nrel.gov/electricity/2024/utility-scale_pv)
+- [Lawrence Berkeley National Laboratory, U.S. wind-plant performance with age](https://emp.lbl.gov/publications/how-does-wind-project-performance)
 - [BLS, annual CPI-U indexes](https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm)
 - [DOE, Long-Duration Energy Storage portfolio](https://www.energy.gov/cmei/oced/long-duration-energy-storage)

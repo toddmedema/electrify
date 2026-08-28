@@ -371,6 +371,10 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   fuel: FuelNameType;
   maxPeakW: number; // Maximum size the technology is currently buildable
   capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
+  // Fraction of nameplate output permanently lost each operating year. Optional because most
+  // generator types do not have a well-supported secular output decline, and because older saves
+  // predate the field.
+  annualOutputDegradation?: number;
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
   // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
@@ -473,8 +477,13 @@ export interface ScenarioType {
   endTitle?: string;
   endMessage?: string;
   feePerKgCO2e: number;
-  facilities: Array<Partial<FacilityShoppingType>>;
+  facilities: ScenarioFacilityType[];
 }
+
+/** An authored starting asset may already have spent years in service when a scenario opens. */
+export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
+  initialAgeYears?: number;
+};
 
 /**
  * What kind of thing happened, which is all the event log's icons and colours are keyed off.

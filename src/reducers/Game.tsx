@@ -17,6 +17,7 @@ import {
   getCreditPremium,
   getMonthlyPayment,
   getPaymentInterest,
+  facilityOutputFactor,
 } from "../helpers/Financials";
 import { getInflationRate, getPrimeRate } from "../data/Economy";
 import {
@@ -60,6 +61,7 @@ import {
 } from "./UI";
 import { navigate, navigateBack } from "./Card";
 import {
+  DAYS_PER_YEAR,
   DIFFICULTIES,
   DOWNPAYMENT_PERCENT,
   FUELS,
@@ -78,7 +80,11 @@ import {
   OUTSKIRTS_WIND_MULTIPLIER,
   LOCATIONS,
 } from "../Constants";
-import { GENERATORS, STORAGE } from "../data/Facilities";
+import {
+  GENERATORS,
+  STORAGE,
+  windAnnualOutputDegradation,
+} from "../data/Facilities";
 import { getViableLocationsRemaining } from "../data/FacilitySites";
 import { logEvent } from "../Globals";
 import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
@@ -106,6 +112,7 @@ import {
   GameType,
   GeneratorOperatingType,
   MonthlyHistoryType,
+  ScenarioFacilityType,
   ScenarioType,
   ScoreBreakdownType,
   SpeedType,
@@ -128,7 +135,7 @@ interface ReprioritizeFacilityAction {
 }
 
 interface NewGameAction {
-  facilities: Array<Partial<FacilityShoppingType>>;
+  facilities: ScenarioFacilityType[];
   cash: number;
   customers: number;
   location: LocationType;
@@ -558,33 +565,42 @@ export const gameSlice = createSlice({
       state.location = a.location;
       state.timeline = generateNewTimeline(state, a.cash, a.customers);
 
-      a.facilities.forEach((search: Partial<FacilityShoppingType>) => {
+      a.facilities.forEach((search: ScenarioFacilityType) => {
+        // Age is scenario metadata rather than a catalog property, so exclude it from the exact
+        // technology match and pass it to the completed operating asset separately.
+        const { initialAgeYears = 0, ...facilitySearch } = search;
         const generator = GENERATORS(
           state,
-          search.peakW || 1000000,
+          facilitySearch.peakW || 1000000,
           [],
           [],
         ).find((g: FacilityShoppingType) => {
           if (g.viableLocationsRemaining === 0) {
             return false;
           }
-          for (const property in search) {
-            if (g[property] !== search[property]) {
+          for (const property in facilitySearch) {
+            if (g[property] !== facilitySearch[property]) {
               return false;
             }
           }
           return true;
         });
         if (generator) {
-          state = buildFacilityHelper(state, generator, false, true);
+          state = buildFacilityHelper(
+            state,
+            generator,
+            false,
+            true,
+            initialAgeYears,
+          );
         } else {
-          const storage = STORAGE(state, search.peakWh || 1000000).find(
+          const storage = STORAGE(state, facilitySearch.peakWh || 1000000).find(
             (g: FacilityShoppingType) => {
               if (g.viableLocationsRemaining === 0) {
                 return false;
               }
-              for (const property in search) {
-                if (g[property] !== search[property]) {
+              for (const property in facilitySearch) {
+                if (g[property] !== facilitySearch[property]) {
                   return false;
                 }
               }
@@ -592,7 +608,13 @@ export const gameSlice = createSlice({
             },
           );
           if (storage) {
-            state = buildFacilityHelper(state, storage, false, true);
+            state = buildFacilityHelper(
+              state,
+              storage,
+              false,
+              true,
+              initialAgeYears,
+            );
           } else {
             // A spec that matches nothing used to vanish without a trace, which is a rough way to
             // find out that the technology you picked wasn't invented yet in the year you started
@@ -1515,6 +1537,7 @@ function updateSupplyFacilitiesFinances(
   let hydroMandatedReleaseW = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     let dispatchPeakW = g.peakW;
+    const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
     const storage = !!g.peakWh && g.yearsToBuildLeft === 0;
@@ -1592,10 +1615,10 @@ function updateSupplyFacilitiesFinances(
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
-            g.currentW = g.peakW * solarOutputFactor;
+            g.currentW = g.peakW * outputFactor * solarOutputFactor;
             break;
           case "Wind":
-            g.currentW = g.peakW * windOutputFactor;
+            g.currentW = g.peakW * outputFactor * windOutputFactor;
             break;
           case "Offshore Wind":
             g.currentW = g.peakW * offshoreWindOutputFactor;
@@ -1970,6 +1993,7 @@ function buildFacilityHelper(
   g: FacilityShoppingType,
   financed: boolean,
   newGame = false,
+  initialAgeYears = 0,
 ): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
@@ -2002,6 +2026,15 @@ function buildFacilityHelper(
     }
     const facility = {
       ...g,
+      // A scenario's catalog is priced in its starting year, but an inherited wind farm belongs
+      // to its commissioning vintage and should use that cohort's observed degradation rate.
+      ...(newGame && g.fuel === "Wind"
+        ? {
+            annualOutputDegradation: windAnnualOutputDegradation(
+              state.date.year - initialAgeYears,
+            ),
+          }
+        : {}),
       ...financing,
       id:
         state.facilities.reduce(
@@ -2011,7 +2044,9 @@ function buildFacilityHelper(
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
       minuteCreated: state.date.minute,
-      minuteOperational: newGame ? state.date.minute : undefined,
+      minuteOperational: newGame
+        ? state.date.minute - initialAgeYears * DAYS_PER_YEAR * 24 * 60
+        : undefined,
     } as FacilityOperatingType;
     if (g.fuel === "Hydro" && g.reservoirCapacityWh) {
       // A completed dam starts at a neutral mid-pool. New construction carries this initial
