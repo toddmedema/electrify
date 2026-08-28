@@ -41,10 +41,92 @@ function offshoreEraMultiple(year: number): number {
     : 1.82 * Math.pow(2, (2010 - year) / 15);
 }
 
-// TODO additional sources of information
-// BASE DATE: 2018
-// Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
-// LCOE across many fuel types - https://www.eia.gov/outlooks/aeo/pdf/electricity_generation.pdf
+// EIA's 2020 capital-cost study is in 2019 dollars and its AEO 2025 study is in 2023
+// dollars. IRENA's renewable-cost snapshots are in 2020 and 2024 dollars. Normalize the
+// older observations before treating what remains as a technology trend. The ratios are
+// annual-average CPI-U from BLS, not the game's inflation: that is applied separately below.
+const CPI_2019_TO_2023 = 304.702 / 255.657;
+const CPI_2020_TO_2024 = 313.689 / 258.811;
+
+/** Exponential interpolation between two real-cost observations, held flat outside them. */
+function costBetween(
+  year: number,
+  fromYear: number,
+  fromCost: number,
+  toYear: number,
+  toCost: number,
+): number {
+  const boundedYear = Math.max(fromYear, Math.min(toYear, year));
+  return (
+    fromCost *
+    Math.pow(toCost / fromCost, (boundedYear - fromYear) / (toYear - fromYear))
+  );
+}
+
+/**
+ * Preserve the game's useful economies of scale while making the cited reference plant land on
+ * its published overnight cost. A quarter fixed / three-quarters variable is also how the old
+ * facility estimates were decomposed, but this makes that assumption explicit and consistent.
+ */
+function scaledBuildCost(
+  costPerW: number,
+  referencePeakW: number,
+  peakW: number,
+): number {
+  return costPerW * (0.25 * referencePeakW + 0.75 * peakW);
+}
+
+/** Fold variable non-fuel O&M into the annual expense the simulation knows how to charge. */
+function annualOperatingCost(
+  peakW: number,
+  capacityFactor: number,
+  fixedDollarsPerKWYear: number,
+  variableDollarsPerMWh: number,
+): number {
+  const dollarsPerKWYear =
+    fixedDollarsPerKWYear + variableDollarsPerMWh * 8.76 * capacityFactor;
+  return (dollarsPerKWYear / 1000) * peakW;
+}
+
+function windCostPerW(year: number): number {
+  const cost2020 = 1.355 * CPI_2020_TO_2024;
+  if (year < 2020) {
+    // Preserve the established long-run historical learning curve, but anchor it to IRENA's
+    // inflation-normalized 2020 observation.
+    return cost2020 * Math.pow(3, (2020 - year) / 40);
+  }
+  if (year <= 2024) {
+    return costBetween(year, 2020, cost2020, 2024, 1.041);
+  }
+  // IRENA's five-year outlook reaches $861/kW; stop there instead of allowing an exponential
+  // learning curve to make mature wind farms approach zero cost in long games.
+  return costBetween(year, 2024, 1.041, 2029, 0.861);
+}
+
+function solarCostPerW(year: number): number {
+  const cost2020 = 0.883 * CPI_2020_TO_2024;
+  if (year < 2020) {
+    return cost2020 * Math.pow(2, (2020 - year) / 8);
+  }
+  if (year <= 2024) {
+    return costBetween(year, 2020, cost2020, 2024, 0.691);
+  }
+  // IRENA's five-year outlook reaches $388/kW.
+  return costBetween(year, 2024, 0.691, 2029, 0.388);
+}
+
+function hydroCostPerW(year: number): number {
+  return costBetween(year, 2020, 1.87 * CPI_2020_TO_2024, 2024, 2.267);
+}
+
+function geothermalCostPerW(year: number): number {
+  return costBetween(year, 2020, 4.468 * CPI_2020_TO_2024, 2024, 4.015);
+}
+
+function batteryCostPerWh(year: number): number {
+  return costBetween(year, 2020, 0.345 * CPI_2020_TO_2024, 2024, 0.192);
+}
+
 export function GENERATORS(
   state: GameType,
   peakW: number,
@@ -79,100 +161,93 @@ export function GENERATORS(
       fuel: "Coal",
       description: "On-demand but dirty and slow",
       available: true, // Coal was first type of electric plant
-      buildCost: 376000000 + 2.6 * peakW, // TODO update to factor in cost growth over time (this is 2008 cost)
-      // ~$3500/kw in 2008 - https://schlissel-technical.com/docs/reports_35.pdf
-      // $3,500 to $5,000 in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // 591 plants in the US in 2019 - https://docs.google.com/spreadsheets/d/1JKJJa-jwK6YpkEQKP2bcENHR2yoS40ur8baQnIXHtIU/edit#gid=0
-      // With 254,332 MW capacity - https://docs.google.com/spreadsheets/d/1W-gobEQugqTR_PP0iczJCrdaR-vYkJ0DzztSsCJXuKw/edit#gid=0
-      // Thus 2019 avg plant is 430 MW and cost $1.5b
-      // 1/4 fixed = $376m, 3/4 variable = $2.6/w
+      buildCost: scaledBuildCost(
+        costBetween(year, 2019, 3.676 * CPI_2019_TO_2023, 2023, 4.103),
+        650000000,
+        peakW,
+      ),
+      // EIA AEO2025 reference: 650MW ultra-supercritical coal, $4,103/kW in 2023$.
+      // The inflation-normalized AEO2020 equivalent was $4,381/kW, a 6% real decline.
+      // https://www.eia.gov/analysis/studies/powerplants/capitalcost/
       peakW,
       maxPeakW: 6000000000,
       // ~6GW, start in the late 90's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
-      btuPerWh: 10.5,
-      // steady, increasing ~0.1%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
-      // Can be 20% lower depending on tech https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+      btuPerWh: 8.638,
+      // AEO2025 net nominal heat rate, Btu/kWh expressed as Btu/Wh.
       spinMinutes: 360,
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
-      annualOperatingCost: 0.05 * peakW * Math.pow(1.01, year - 2018),
-      // ~$0.007 -> 0.01/kwh 2008->18, +4%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-      // ~$0.05/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      yearsToBuild: 3 + magnitude / 3,
-      // 4 years avg https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      annualOperatingCost: annualOperatingCost(peakW, 0.68, 61.6, 6.4),
+      yearsToBuild: 4 + magnitude / 3,
+      // AEO2025 reference lead time is 60 months and operating life is 40 years.
       capacityFactor: 0.68,
       // 66% = Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
       // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-      lifespanYears: 50,
-      // https://www.fool.com/investing/2018/06/18/could-us-retire-most-coal-fired-power-plants-2040.aspx
+      lifespanYears: 40,
     },
     {
       name: "Nuclear",
       fuel: "Uranium",
       description: "On-demand and clean, but very slow",
       available: year > 1956, // First full scale plant was Calder Hall in 1956
-      buildCost: 1500000000 + 4.5 * peakW,
-      // $6,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // 98 reactors with 100GW of capacity - https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States
-      // Thus 2019 avg plant is ~1GW and cost $6b
-      // 1/4 fixed = $1.5b, 3/4 variable = $4.5/w
+      buildCost: scaledBuildCost(
+        costBetween(year, 2019, 6.041 * CPI_2019_TO_2023, 2023, 7.861),
+        2156000000,
+        peakW,
+      ),
+      // EIA AEO2025 reference: two brownfield AP1000s, $7,861/kW in 2023$,
+      // 9% above the inflation-normalized AEO2020 estimate.
       peakW,
       maxPeakW: 8000000000,
       // ~8GW, built in the 80's - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Nuclear
-      btuPerWh: 10.5,
-      // steady - https://www.eia.gov/electricity/annual/html/epa_08_01.html
+      btuPerWh: 10.608,
       spinMinutes: 600,
-      annualOperatingCost: 0.1 * peakW,
-      // ~$0.016 -> 0168/kwh 2008->18, +0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-      // ~$0.1/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      yearsToBuild: 5 + magnitude / 4,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      annualOperatingCost: annualOperatingCost(peakW, 0.93, 156.2, 2.52),
+      yearsToBuild: 6 + magnitude / 3,
+      // AEO2025 reference lead time is 84 months and operating life is 40 years.
       capacityFactor: 0.93,
       // 93% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-      lifespanYears: 80,
-      // https://www.scientificamerican.com/article/nuclear-power-plant-aging-reactor-replacement-/
+      lifespanYears: 40,
     },
     {
       name: "Natural Gas",
       fuel: "Natural Gas",
       description: "On-demand, faster and cleaner than coal",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
-      buildCost: 71000000 + 0.75 * peakW,
-      // ~$1,000/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls and still in 2019 https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // 1,854 plants in 2018 - https://www.eia.gov/electricity/annual/html/epa_04_01.html
-      // 528GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-      // Thus 2018/9 avg plant is 284MW and cost $284M
-      // 1/4 fixed = $71m, 3/4 variable = $0.75/w
+      buildCost: scaledBuildCost(
+        costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
+        419000000,
+        peakW,
+      ),
+      // H-class simple-cycle gas best matches this facility's fast-start gameplay role. EIA's
+      // AEO2025 reference is $836/kW, nearly flat in real terms from AEO2020.
       peakW,
       maxPeakW: 6000000000,
       // ~6GW, build in the late 80's - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
-      btuPerWh: 7.8,
-      // steadily declining ~0.5%/yr - https://www.eia.gov/electricity/annual/html/epa_08_01.html
-      // varies by up to 40% based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+      btuPerWh: 9.142,
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW,
-      // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-      // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // varies by up to 3x based on tech - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      yearsToBuild: 2 + magnitude / 3,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      yearsToBuild: 2.46 + magnitude / 3,
       capacityFactor: 0.45,
       // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       // 55% = max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
-      lifespanYears: 30,
-      // TODO
+      lifespanYears: 40,
     },
     {
       name: "Oil",
       fuel: "Oil",
       description: "Fast but dirty",
       available: true,
-      buildCost: 4500000 + 1.35 * peakW,
-      // ~$1,800/kw in 2019 https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // 3,647 plants in 2018, 37GW capacity - https://www.eia.gov/electricity/annual/html/epa_04_03.html
-      // Thus 2018 avg plant is 10MW and cost $18M
-      // 1/4 fixed = $4.5m, 3/4 variable = $1.35/w
+      buildCost: scaledBuildCost(
+        costBetween(year, 2019, 1.8 * CPI_2019_TO_2023, 2023, 1.248),
+        3000000,
+        peakW,
+      ),
+      // EIA-860's capacity-weighted 2023 cost for newly installed internal-combustion generators
+      // was $1,248/kW. The prime-mover benchmark is used because EIA no longer defines a new
+      // utility-scale petroleum reference plant.
+      // https://www.eia.gov/electricity/generatorcosts/
       peakW,
       maxPeakW: 6000000000,
       // ~6GW, build in 2007 - https://www.power-technology.com/features/feature-giga-projects-the-worlds-biggest-thermal-power-plants/
@@ -207,24 +282,23 @@ export function GENERATORS(
       fuel: "Wind",
       description: "Windiest at spring and fall evenings",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
-      buildCost: 43000000 + 1.4 * peakW * Math.pow(3, (2020 - year) / 40),
-      // ~$1,900/kw in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // ~$1,600/kw in 2019 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // 95GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-      // Added in 2017: 64 generators, 5.8GW total - https://www.eia.gov/electricity/generatorcosts/
-      // Thus 2017 new avg plant is 90MW and cost $172m
-      // 1/4 fixed = $43m, 3/4 variable = $1.4/w
-      // Went from ~$5/w in 1980 to ~$1.5/w in 2018, about 1/3 in 40 years - https://newscenter.lbl.gov/2019/08/26/report-confirms-wind-technology-advancements-continue-to-drive-down-the-cost-of-wind-energy/
+      buildCost: scaledBuildCost(windCostPerW(year), 200000000, peakW),
+      // IRENA global installed cost fell from inflation-normalized $1,642/kW in 2020 to
+      // $1,041/kW in 2024. Its outlook reaches $861/kW in 2029.
+      // https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024
       peakW,
       maxPeakW: 1500000000,
       // ~1.5GW, except one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.04 * peakW,
-      // TODO estimated 2% decline per year
-      // ~$0.04/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+      annualOperatingCost: annualOperatingCost(
+        peakW,
+        windCapacityFactor,
+        33.06,
+        0,
+      ),
       // The location's weather record determines the capacity factor below.
-      yearsToBuild: 1 + magnitude / 2,
-      // 3 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 1 + magnitude / 3,
+      // EIA AEO2025 reference lead time is 21 months for a 200MW plant.
       spinMinutes: 1,
       capacityFactor: windCapacityFactor,
       // 37% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
@@ -263,32 +337,28 @@ export function GENERATORS(
       fuel: "Sun",
       description: "Sunniest at summer noon",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
-      buildCost: 3900000 + 1.275 * peakW * Math.pow(2, (2020 - year) / 8),
-      // ~$1,700/kw in 2020 for fixed tilt - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // 36GW capacity in 2019 - https://www.publicpower.org/system/files/documents/67-America%27s%20Electricity%20Generation%20Capacity%202019_final2.pdf
-      // Added in 2017: 541 generators, 5GW total - https://www.eia.gov/electricity/generatorcosts/
-      // Thus 2017 new avg plant is 9.2MW and cost $15.6m
-      // 1/4 fixed = $3.9m, 3/4 variable = $1.275/w
-      // Cost curve over time, went from ~8x ($13.6/w) to ~1x ($1.7/w) from 1995 to 2020, so halving ~8 years - https://sites.lafayette.edu/egrs352-sp14-pv/technology/history-of-pv-technology/
+      buildCost: scaledBuildCost(solarCostPerW(year), 150000000, peakW),
+      // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
+      // $691/kW in 2024. Its outlook reaches $388/kW in 2029.
       peakW,
       maxPeakW: year < 2000 ? 100000000 : 2000000000,
       // 2000: 100MW - https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       // 2019: ~2GW - https://en.wikipedia.org/wiki/List_of_largest_power_stations
       btuPerWh: 0,
-      annualOperatingCost: 0.025 * peakW,
-      // TODO estimated 2% decline per year
-      // ~$0.023/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
-      // ~$0.025/wy in 2018 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      // ~$13/kW/yr in 2018 - https://www.nrel.gov/docs/fy19osti/72399.pdf
+      annualOperatingCost: annualOperatingCost(
+        peakW,
+        solarCapacityFactor,
+        20.23,
+        0,
+      ),
       // Latitude, daylight and the location's cloud record determine the capacity factor below.
-      yearsToBuild: 1 + magnitude / 3,
-      // 2 years - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      yearsToBuild: 2.27 + magnitude / 3,
+      // EIA AEO2025 reference lead time is 36 months for a 150MW plant.
       spinMinutes: 1,
       capacityFactor: solarCapacityFactor,
       // 26% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
-      lifespanYears: 30,
-      // https://energyinformative.org/lifespan-solar-panels/
+      lifespanYears: 35,
     },
     // {
     //   // as of 2018 very limited location options for these, and only two in the world are >20MW
@@ -319,41 +389,40 @@ export function GENERATORS(
       fuel: "Hydro",
       description: "Clean and dispatchable, where rivers allow",
       available: year > 1882 && hasHydroResource(state.location),
-      buildCost: 250000000 + 2.25 * peakW,
-      // Large civil works dominate the fixed cost; regional resource availability is handled
-      // above rather than pretending a dam can be placed beside every city.
+      buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
+      // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
+      // 2024 at $2,267/kW. Regional resource availability is handled above.
       peakW,
       maxPeakW: 10000000000,
       btuPerWh: 0,
       spinMinutes: 1,
-      annualOperatingCost: 0.015 * peakW,
-      yearsToBuild: 4 + magnitude / 2,
-      capacityFactor: 0.5,
-      lifespanYears: 80,
+      annualOperatingCost: annualOperatingCost(peakW, 0.48, 33.54, 0),
+      yearsToBuild: 5 + magnitude / 2,
+      capacityFactor: 0.48,
+      lifespanYears: 50,
     },
     {
       name: "Geothermal",
       fuel: "Geothermal",
       description: "Consistent, but few locations",
       available: hasGeothermalResource(state.location),
-      buildCost: (10000000 + 4 * peakW) * (1 + conventionalGeothermalCount / 4),
+      buildCost:
+        scaledBuildCost(geothermalCostPerW(year), 50000000, peakW) *
+        (1 + conventionalGeothermalCount / 4),
       // To compensate for limited locations, cost to build increases significantly with each construction
       // Future ideas: new tech in ~2000 opened up more locations at a slightly higher cost
       // Have multiplier be based on totalPeakWByFuel instead, so that you don't suffer as much from building many smaller plants
-      // 2008: $10M fixed costs, $2-5/w total on 50MW project https://en.wikipedia.org/wiki/Geothermal_power#Economics
-      // 2023: Total cost ~$2.7/w https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      // IRENA global installed cost fell from inflation-normalized $5,415/kW in 2020 to
+      // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
       maxPeakW: 800000000,
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
-      annualOperatingCost: 0.11 * peakW,
-      // ~$0.11/wy in 2023 - https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
-      yearsToBuild: 4,
-      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      annualOperatingCost: annualOperatingCost(peakW, 0.88, 150.6, 0),
+      yearsToBuild: 3,
+      // EIA AEO2025 reference lead time is 36 months and operating life is 40 years.
       spinMinutes: 1,
-      capacityFactor: 0.9,
-      // Only utilized about 70% of the time - https://en.wikipedia.org/wiki/Electricity_sector_of_the_United_States#Renewable_energy
-      // But technically availabe up to 90% of the time - https://www.energy.gov/eere/geothermal/geothermal-faqs
+      capacityFactor: 0.88,
       lifespanYears: 40,
       // TODO
     },
@@ -406,11 +475,12 @@ export function STORAGE(state: GameType, peakWh: number) {
       name: "Battery",
       description: "Fast to build and charge / discharge",
       available: year > 2008, // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
-      buildCost: 10000 + 0.4 * peakWh,
-      // ~$400/kWh in 2016, drops 60% by 2030 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-      // Also, Tesla grid-scale batteries around $400/kWh in 2019 - https://cleantechnica.com/2019/11/24/what-a-108-26-per-kwh-battery-pack-would-mean-for-tesla/
-      peakW: 0.8 * peakWh,
-      // ~0.8x c rating - https://www.tesla.com/blog/tesla-powerpack-enable-large-scale-sustainable-energy-south-australia?redirect=no
+      buildCost: 10000 + batteryCostPerWh(year) * peakWh,
+      // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
+      // cost reached $192/kWh in 2024, a 54% real decline after CPI normalization.
+      peakW: 0.25 * peakWh,
+      // Four-hour duration is now the representative utility-scale configuration in both NREL
+      // ATB and EIA AEO2025, replacing the old Powerpack-derived 1.25-hour assumption.
       peakWh,
       maxPeakWh:
         (year < 2021 ? 200000000 : 600000000) * Math.pow(2, (year - 2018) / 4),
@@ -419,31 +489,26 @@ export function STORAGE(state: GameType, peakWh: number) {
       // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
       // ~2MWh in 2014, 1MWh before that
       // So roughly doubling in max capacity every 4 years after 2018, but a big step function in 2021
-      lifespanYears: 15,
-      // https://www.nrel.gov/docs/fy19osti/73222.pdf
+      lifespanYears: 20,
+      // EIA AEO2025 assumes 7,300 equivalent cycles over 20 years.
       roundTripEfficiency: 0.85,
       // https://www.nrel.gov/docs/fy19osti/73222.pdf
       hourlyLoss: 0.0001,
       // TODO #'s
       // TODO implement mechanic
-      annualOperatingCost: 0.002 * peakWh,
-      // ~$3/kWh of capacity, assuming 100% load factor - https://www.nrel.gov/docs/fy19osti/73222.pdf
-      // ~$2/kWh at a more realistic 50% load factor
-      // LCOE ~$500/MWh served in 2016 - https://www.greentechmedia.com/articles/read/report-levelized-cost-of-energy-for-lithium-ion-batteries-bnef
-      yearsToBuild: 0.2 + magnitude / 3,
-      // Took Tesla ~6 months to build 120MWh of capacity - https://en.wikipedia.org/wiki/Hornsdale_Power_Reserve
+      annualOperatingCost: 0.01 * peakWh,
+      // EIA's $10/kWh-year includes augmentation for about 1.5% annual degradation.
+      yearsToBuild: 0.57 + magnitude / 3,
+      // EIA reference total lead time is 18 months for 600MWh.
       spinMinutes: 1,
     },
     {
       name: "Pumped Hydro",
       description: "Slow to build and charge / discharge",
       available: year > 1930 && hasHydroResource(state.location), // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
-      buildCost: 2000000 + 0.15 * peakWh,
-      // Large fixed costs, smallest plants are around 10MW - https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
-      // Most seem to be around 100-1000MW - https://web.archive.org/web/20121007084413/http://www.renewableenergyworld.com/rea/news/article/2010/10/worldwide-pumped-storage-activity
-      // ~$50/kWh in 2017 - https://www.irena.org/-/media/Files/IRENA/Agency/Publication/2017/Oct/IRENA_Electricity_Storage_Costs_2017_Summary.pdf
-      // ~$350-800/kW in 2000, thus about 1,600 in 2018 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
-      // ~$1,700-2500/kW in 2018 - https://www.hydro.org/wp-content/uploads/2018/04/2018-NHA-Pumped-Storage-Report.pdf
+      buildCost: 2000000 + 0.3319 * peakWh,
+      // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
+      // duration, the midpoint is $332/kWh; costs are held flat because the technology is mature.
       peakW: 0.1 * peakWh,
       // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
       peakWh,
@@ -457,9 +522,8 @@ export function STORAGE(state: GameType, peakWh: number) {
       hourlyLoss: 0.001,
       // TODO #'s
       // TODO implement mechanic
-      annualOperatingCost: 0.01 * 0.15 * peakWh,
-      // ~$5/kw in 2000, so about $10 in 2018 - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
-      // (multiplied by the peakWh -> W rate)
+      annualOperatingCost: 0.0019 * peakWh,
+      // NREL 2024 ATB fixed O&M is $19/kW-year, or $1.90/kWh-year at ten hours.
       yearsToBuild: 6 + magnitude,
       // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
       spinMinutes: 10,
