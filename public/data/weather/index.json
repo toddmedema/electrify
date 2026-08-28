@@ -13,7 +13,7 @@
       "timeZone": "America/New_York",
       "elevation": 236,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "SF": {
       "id": "SF",
@@ -25,7 +25,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 18,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "LA": {
       "id": "LA",
@@ -37,7 +37,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 91,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "CAMountains": {
       "id": "CAMountains",
@@ -49,7 +49,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 219,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "HNL": {
       "id": "HNL",
@@ -61,7 +61,7 @@
       "timeZone": "Pacific/Honolulu",
       "elevation": 9,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "SJU": {
       "id": "SJU",
@@ -73,7 +73,7 @@
       "timeZone": "America/Puerto_Rico",
       "elevation": 37,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "NewYork": {
       "id": "NewYork",
@@ -85,7 +85,7 @@
       "timeZone": "America/New_York",
       "elevation": 32,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Chicago": {
       "id": "Chicago",
@@ -97,7 +97,7 @@
       "timeZone": "America/Chicago",
       "elevation": 241,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Houston": {
       "id": "Houston",
@@ -109,7 +109,7 @@
       "timeZone": "America/Chicago",
       "elevation": 20,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Phoenix": {
       "id": "Phoenix",
@@ -121,7 +121,7 @@
       "timeZone": "America/Phoenix",
       "elevation": 333,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Philadelphia": {
       "id": "Philadelphia",
@@ -133,7 +133,7 @@
       "timeZone": "America/New_York",
       "elevation": 32,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "SanAntonio": {
       "id": "SanAntonio",
@@ -145,7 +145,7 @@
       "timeZone": "America/Chicago",
       "elevation": 203,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "SanDiego": {
       "id": "SanDiego",
@@ -157,7 +157,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 20,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Dallas": {
       "id": "Dallas",
@@ -169,7 +169,7 @@
       "timeZone": "America/Chicago",
       "elevation": 137,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Austin": {
       "id": "Austin",
@@ -181,7 +181,7 @@
       "timeZone": "America/Chicago",
       "elevation": 157,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Jacksonville": {
       "id": "Jacksonville",
@@ -193,7 +193,7 @@
       "timeZone": "America/New_York",
       "elevation": 6,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Columbus": {
       "id": "Columbus",
@@ -205,7 +205,7 @@
       "timeZone": "America/New_York",
       "elevation": 227,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Indianapolis": {
       "id": "Indianapolis",
@@ -217,7 +217,7 @@
       "timeZone": "America/Indiana/Indianapolis",
       "elevation": 214,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Charlotte": {
       "id": "Charlotte",
@@ -229,7 +229,7 @@
       "timeZone": "America/New_York",
       "elevation": 254,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Seattle": {
       "id": "Seattle",
@@ -241,7 +241,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 59,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Denver": {
       "id": "Denver",
@@ -253,7 +253,7 @@
       "timeZone": "America/Denver",
       "elevation": 1599,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Boston": {
       "id": "Boston",
@@ -265,7 +265,7 @@
       "timeZone": "America/New_York",
       "elevation": 9,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Detroit": {
       "id": "Detroit",
@@ -277,7 +277,7 @@
       "timeZone": "America/Detroit",
       "elevation": 182,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Nashville": {
       "id": "Nashville",
@@ -289,7 +289,7 @@
       "timeZone": "America/Chicago",
       "elevation": 159,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Portland": {
       "id": "Portland",
@@ -301,7 +301,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 25,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "LasVegas": {
       "id": "LasVegas",
@@ -313,7 +313,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 620,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Memphis": {
       "id": "Memphis",
@@ -325,7 +325,7 @@
       "timeZone": "America/Chicago",
       "elevation": 84,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Baltimore": {
       "id": "Baltimore",
@@ -337,7 +337,7 @@
       "timeZone": "America/New_York",
       "elevation": 29,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Milwaukee": {
       "id": "Milwaukee",
@@ -349,7 +349,7 @@
       "timeZone": "America/Chicago",
       "elevation": 189,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Albuquerque": {
       "id": "Albuquerque",
@@ -361,7 +361,7 @@
       "timeZone": "America/Denver",
       "elevation": 1515,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Tucson": {
       "id": "Tucson",
@@ -373,7 +373,7 @@
       "timeZone": "America/Phoenix",
       "elevation": 722,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Fresno": {
       "id": "Fresno",
@@ -385,7 +385,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 91,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Sacramento": {
       "id": "Sacramento",
@@ -397,7 +397,7 @@
       "timeZone": "America/Los_Angeles",
       "elevation": 22,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "KansasCity": {
       "id": "KansasCity",
@@ -409,7 +409,7 @@
       "timeZone": "America/Chicago",
       "elevation": 280,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Atlanta": {
       "id": "Atlanta",
@@ -421,7 +421,7 @@
       "timeZone": "America/New_York",
       "elevation": 327,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Miami": {
       "id": "Miami",
@@ -433,7 +433,7 @@
       "timeZone": "America/New_York",
       "elevation": 5,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Minneapolis": {
       "id": "Minneapolis",
@@ -444,6 +444,198 @@
       "long": -93.265,
       "timeZone": "America/Chicago",
       "elevation": 253,
+      "startingYear": 1980,
+      "endingYear": 2019
+    },
+    "NewOrleans": {
+      "id": "NewOrleans",
+      "name": "New Orleans, LA",
+      "region": "North America",
+      "country": "United States",
+      "lat": 29.9511,
+      "long": -90.0715,
+      "timeZone": "America/Chicago",
+      "elevation": 19,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "SaltLakeCity": {
+      "id": "SaltLakeCity",
+      "name": "Salt Lake City, UT",
+      "region": "North America",
+      "country": "United States",
+      "lat": 40.7608,
+      "long": -111.891,
+      "timeZone": "America/Denver",
+      "elevation": 1302,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Anchorage": {
+      "id": "Anchorage",
+      "name": "Anchorage, AK",
+      "region": "North America",
+      "country": "United States",
+      "lat": 61.2181,
+      "long": -149.9003,
+      "timeZone": "America/Anchorage",
+      "elevation": 34,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Fairbanks": {
+      "id": "Fairbanks",
+      "name": "Fairbanks, AK",
+      "region": "North America",
+      "country": "United States",
+      "lat": 64.8378,
+      "long": -147.7164,
+      "timeZone": "America/Anchorage",
+      "elevation": 135,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "StLouis": {
+      "id": "StLouis",
+      "name": "St. Louis, MO",
+      "region": "North America",
+      "country": "United States",
+      "lat": 38.627,
+      "long": -90.1994,
+      "timeZone": "America/Chicago",
+      "elevation": 145,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Cleveland": {
+      "id": "Cleveland",
+      "name": "Cleveland, OH",
+      "region": "North America",
+      "country": "United States",
+      "lat": 41.4993,
+      "long": -81.6944,
+      "timeZone": "America/New_York",
+      "elevation": 202,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Buffalo": {
+      "id": "Buffalo",
+      "name": "Buffalo, NY",
+      "region": "North America",
+      "country": "United States",
+      "lat": 42.8864,
+      "long": -78.8784,
+      "timeZone": "America/New_York",
+      "elevation": 180,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Toronto": {
+      "id": "Toronto",
+      "name": "Toronto, ON",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 43.6532,
+      "long": -79.3832,
+      "timeZone": "America/Toronto",
+      "elevation": 99,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Montreal": {
+      "id": "Montreal",
+      "name": "Montreal, QC",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 45.5017,
+      "long": -73.5673,
+      "timeZone": "America/Toronto",
+      "elevation": 76,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Vancouver": {
+      "id": "Vancouver",
+      "name": "Vancouver, BC",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 49.2827,
+      "long": -123.1207,
+      "timeZone": "America/Vancouver",
+      "elevation": 40,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Calgary": {
+      "id": "Calgary",
+      "name": "Calgary, AB",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 51.0447,
+      "long": -114.0719,
+      "timeZone": "America/Edmonton",
+      "elevation": 1051,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Winnipeg": {
+      "id": "Winnipeg",
+      "name": "Winnipeg, MB",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 49.8951,
+      "long": -97.1384,
+      "timeZone": "America/Winnipeg",
+      "elevation": 232,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Halifax": {
+      "id": "Halifax",
+      "name": "Halifax, NS",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 44.6488,
+      "long": -63.5752,
+      "timeZone": "America/Halifax",
+      "elevation": 26,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Yellowknife": {
+      "id": "Yellowknife",
+      "name": "Yellowknife, NT",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 62.454,
+      "long": -114.3718,
+      "timeZone": "America/Edmonton",
+      "elevation": 192,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Iqaluit": {
+      "id": "Iqaluit",
+      "name": "Iqaluit, NU",
+      "region": "North America",
+      "country": "Canada",
+      "lat": 63.7467,
+      "long": -68.517,
+      "timeZone": "America/Iqaluit",
+      "elevation": 17,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "MexicoCity": {
+      "id": "MexicoCity",
+      "name": "Mexico City, Mexico",
+      "region": "North America",
+      "country": "Mexico",
+      "lat": 19.4326,
+      "long": -99.1332,
+      "timeZone": "America/Mexico_City",
+      "elevation": 2230,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -457,7 +649,7 @@
       "timeZone": "Europe/London",
       "elevation": 16,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Paris": {
       "id": "Paris",
@@ -469,7 +661,7 @@
       "timeZone": "Europe/Paris",
       "elevation": 36,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Berlin": {
       "id": "Berlin",
@@ -481,7 +673,7 @@
       "timeZone": "Europe/Berlin",
       "elevation": 37,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     },
     "Reykjavik": {
       "id": "Reykjavik",
@@ -493,7 +685,7 @@
       "timeZone": "Atlantic/Reykjavik",
       "elevation": 7,
       "startingYear": 1980,
-      "endingYear": 2025
+      "endingYear": 2019
     }
   }
 }
