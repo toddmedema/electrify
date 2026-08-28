@@ -209,12 +209,7 @@ export const FUELS = {
   // },
 } as { [fuel: string]: FuelType };
 
-export const NAV_CARDS = [
-  "FACILITIES",
-  "FINANCES",
-  "FORECASTS",
-  "EVENTS",
-] as CardNameType[];
+export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click

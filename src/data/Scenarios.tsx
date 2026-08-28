@@ -257,25 +257,25 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: "#financesNav",
+        target: "#insightsNav",
         content: (
           <TutorialPrompt
             concepts={["finances", "money"]}
-            text="Your money lives in the Finances tab."
+            text="Your money lives in Insights."
           />
         ),
         desktop: {
-          target: "#financesPane",
+          target: "#insightsPane",
           content: (
             <TutorialPrompt
               concepts={["finances", "money"]}
-              text="Your money lives in the Finances pane."
+              text="Your money lives in the Insights pane."
             />
           ),
         },
       },
       {
-        card: "FINANCES",
+        card: "INSIGHTS",
         target: "#chartFinances",
         content: (
           <TutorialPrompt
@@ -285,17 +285,17 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FINANCES",
-        target: ".MuiTable-root",
+        card: "INSIGHTS",
+        target: ".insightsLayerControls",
         content: (
           <TutorialPrompt
             concepts={["finances"]}
-            text="Tap the table to expand it - including your loan interest rate."
+            text="Choose presets or Layers to decide which questions this view answers."
           />
         ),
       },
       {
-        card: "FINANCES",
+        card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
@@ -330,25 +330,25 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: "#financesNav",
+        target: "#insightsNav",
         content: (
           <TutorialPrompt
             concepts={["rate", "customers"]}
-            text="Your electricity rate lives in the Finances tab."
+            text="Your electricity rate lives in Insights."
           />
         ),
         desktop: {
-          target: "#financesPane",
+          target: "#insightsPane",
           content: (
             <TutorialPrompt
               concepts={["rate", "customers"]}
-              text="Your electricity rate lives in the Finances pane."
+              text="Your electricity rate lives in the Insights pane."
             />
           ),
         },
       },
       {
-        card: "FINANCES",
+        card: "INSIGHTS",
         target: "#rateSlider",
         advanceOn: (s: AppStateType) => s.game.dollarsPerkWh < 0.07,
         content: (
@@ -360,28 +360,17 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FINANCES",
-        target: "#plotMetric",
+        card: "INSIGHTS",
+        target: "#chartInsightsCustomers",
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
-            text="Plot Customers to watch them grow - but grow too fast and blackouts will cost you them."
+            text="The Customers layer shows growth beside the grid consequences."
           />
         ),
-        // Same control, different shape: on a wide screen the metrics are all drawn at once
-        // rather than hidden behind a dropdown
-        desktop: {
-          target: "#plotMetric",
-          content: (
-            <TutorialPrompt
-              concepts={["customers", "forecast"]}
-              text="Click the Customers tile to watch them grow - but grow too fast and blackouts will cost you them."
-            />
-          ),
-        },
       },
       {
-        card: "FINANCES",
+        card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
@@ -425,7 +414,7 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FORECASTS",
+        card: "INSIGHTS",
         target: "#chartForecastSupplyDemand",
         content: (
           <TutorialPrompt
@@ -480,7 +469,7 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FORECASTS",
+        card: "INSIGHTS",
         target: "#chartForecastFuelPrices",
         content: (
           <TutorialPrompt
@@ -490,7 +479,7 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FORECASTS",
+        card: "INSIGHTS",
         target: "#chartForecastWeather",
         content: (
           <TutorialPrompt
@@ -500,7 +489,7 @@ export const SCENARIOS = [
         ),
       },
       {
-        card: "FORECASTS",
+        card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (

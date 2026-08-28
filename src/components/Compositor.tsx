@@ -42,8 +42,7 @@ import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
 import CustomGameContainer from "./views/CustomGameContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
-import FinancesContainer from "./views/FinancesContainer";
-import ForecastsContainer from "./views/ForecastsContainer";
+import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
 import ManualContainer from "./views/ManualContainer";
@@ -60,9 +59,8 @@ import { snackbarOpen } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout, isUltrawideScreen } from "../Globals";
 import { store } from "../Store";
 
-// All three of these cards are shown at once side by side above the desktop breakpoint (see
-// isDesktopScreen / $desktop_breakpoint), so they share one stable transition key there --
-// switching among them shouldn't slide/remount the pane group, since nothing visibly changes
+// The in-game cards share one stable transition key above the desktop breakpoint. Facilities
+// and Insights stay mounted while Events replaces Insights, or joins it on an ultrawide screen.
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
 // And the same again for the two-column layout below it, where Facilities is pinned and the nav
@@ -131,8 +129,7 @@ export const keyMap = {
   NORMAL: "2",
   FAST: "3",
   FACILITIES: "q",
-  FINANCES: "w",
-  FORECASTS: "e",
+  INSIGHTS: ["w", "e"],
   EVENTS: "r",
   BUILD_GENERATOR: "g",
   BUILD_STORAGE: "s",
@@ -229,11 +226,8 @@ const shortcutHandlers = {
   FACILITIES: () => {
     store.dispatch(navigate("FACILITIES"));
   },
-  FINANCES: () => {
-    store.dispatch(navigate("FINANCES"));
-  },
-  FORECASTS: () => {
-    store.dispatch(navigate("FORECASTS"));
+  INSIGHTS: () => {
+    store.dispatch(navigate("INSIGHTS"));
   },
   EVENTS: () => {
     store.dispatch(navigate("EVENTS"));
@@ -508,20 +502,18 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): React.JSX.Element {
     const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
-    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them.
-    // Cash, the date, the speed controls and the year's progress are the game's state rather
-    // than any one pane's, so they span all three columns instead of living in the first
+    // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
+    // instead of splitting the width between separate Finance and Forecast chart columns.
     if (isPanes && isDesktopScreen()) {
       return (
         <div className="desktop-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            <FinancesContainer />
             {this.props.card.name === "EVENTS" && !isUltrawideScreen() ? (
               <EventLogContainer />
             ) : (
-              <ForecastsContainer />
+              <InsightsContainer />
             )}
             {/* An ultrawide window is otherwise three panes and a lot of nothing. Only here,
                 because below this a fourth column comes out of the three that carry the game */}
@@ -530,22 +522,17 @@ export default class Compositor extends React.Component<Props, {}> {
         </div>
       );
     }
-    // Laptops and landscape tablets, which used to get a phone-width card floating in a sea of
-    // margin. There isn't room for three columns here, but there is for two: the fleet, which
-    // is the pane a player wants on screen while they read either of the others, pinned beside
-    // whichever of them the nav is on
+    // Laptops and landscape tablets keep the fleet pinned beside Insights or Events.
     if (isPanes) {
       return (
         <div className="pane-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            {this.props.card.name === "FORECASTS" ? (
-              <ForecastsContainer />
-            ) : this.props.card.name === "EVENTS" ? (
+            {this.props.card.name === "EVENTS" ? (
               <EventLogContainer />
             ) : (
-              <FinancesContainer />
+              <InsightsContainer />
             )}
           </DesktopPanes>
           {/* The panes supply no nav of their own in this layout, and it is still what
@@ -559,10 +546,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <BuildGeneratorsContainer />;
       case "BUILD_STORAGE":
         return <BuildStorageContainer />;
+      case "INSIGHTS":
       case "FINANCES":
-        return <FinancesContainer />;
       case "FORECASTS":
-        return <ForecastsContainer />;
+        return <InsightsContainer />;
       case "EVENTS":
         return <EventLogContainer />;
       case "FACILITIES":

@@ -131,9 +131,8 @@ export function isBigScreen(): boolean {
 }
 
 /**
- * This function checks if the screen is wide enough to show Facilities, Finances and Forecasts
- * side by side instead of one at a time -- keep in sync with $desktop_breakpoint in app.scss.
- * Below this, panes render too narrow to be worth splitting into three columns.
+ * This function checks if the screen is wide enough to show Facilities and Insights side by
+ * side without the bottom navigation -- keep in sync with $desktop_breakpoint in app.scss.
  *
  * @returns {boolean} - Returns true if the screen width is at least 1300, otherwise false.
  */
@@ -147,8 +146,8 @@ export function isDesktopScreen(): boolean {
  * full-screen card carrying its own chrome.
  *
  * True from $abswidthmax up, which is also where the frame stops being phone-width: between
- * there and the desktop breakpoint the layout is Facilities pinned beside whichever of Finances
- * and Forecasts the nav is on, which is a laptop and a landscape tablet.
+ * there and the desktop breakpoint the layout is Facilities pinned beside Insights or Events,
+ * which is a laptop and a landscape tablet.
  *
  * @returns {boolean} - Returns true if the screen is wider than a phone, otherwise false.
  */

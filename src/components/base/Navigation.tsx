@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Badge, BottomNavigation, BottomNavigationAction } from "@mui/material";
-import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
 import HistoryIcon from "@mui/icons-material/History";
 import InsertChartIcon from "@mui/icons-material/InsertChart";
@@ -20,9 +19,14 @@ export default function Navigation() {
   const cardName = useAppSelector(selectCardName);
   const paneLayout = isPaneLayout();
   // Facilities is always the left pane at this width. If a resize lands here while that was
-  // the active phone tab, Finances is the second pane actually being shown.
+  // the active phone tab, Insights is the second pane actually being shown. The two old values
+  // are aliases for saved sessions from before the screens were consolidated.
   const selectedCard =
-    paneLayout && cardName === "FACILITIES" ? "FINANCES" : cardName;
+    cardName === "FINANCES" || cardName === "FORECASTS"
+      ? "INSIGHTS"
+      : paneLayout && cardName === "FACILITIES"
+        ? "INSIGHTS"
+        : cardName;
   const unreadEvents = useAppSelector((state) => {
     const latest = state.game.eventLog?.[0]?.id || 0;
     return latest > (state.game.eventLogReadThroughId || 0);
@@ -45,15 +49,9 @@ export default function Navigation() {
         />
       )}
       <BottomNavigationAction
-        id="financesNav"
-        label="Finances"
-        value="FINANCES"
-        icon={<AttachMoneyIcon />}
-      />
-      <BottomNavigationAction
-        id="forecastsNav"
-        label="Forecasts"
-        value="FORECASTS"
+        id="insightsNav"
+        label="Insights"
+        value="INSIGHTS"
         icon={<InsertChartIcon />}
       />
       <BottomNavigationAction
