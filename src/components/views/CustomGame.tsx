@@ -32,6 +32,7 @@ import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
+import { getViableLocationCount } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
@@ -271,9 +272,18 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
+  const usedSites = new Map<string, number>();
   const unavailable = scenario.facilities.filter(
-    (f: Partial<FacilityShoppingType>) =>
-      !technologies.some((t) => t.name === facilityName(f)),
+    (f: Partial<FacilityShoppingType>) => {
+      const name = facilityName(f);
+      if (!technologies.some((t) => t.name === name)) {
+        return true;
+      }
+      const used = (usedSites.get(name) || 0) + 1;
+      usedSites.set(name, used);
+      const sites = getViableLocationCount(location, name);
+      return sites !== undefined && used > sites;
+    },
   );
 
   const change = (delta: Partial<ScenarioType>) => {
@@ -606,9 +616,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </Typography>
         {unavailable.length > 0 && (
           <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>
-            {unavailable.map(facilityName).join(", ")} can't be built in{" "}
-            {scenario.startingYear} - remove{" "}
-            {unavailable.length === 1 ? "it" : "them"} or pick a later year.
+            {unavailable.map(facilityName).join(", ")} can't be built with this
+            location and year, or exceeds the number of viable sites. Remove{" "}
+            {unavailable.length === 1 ? "it" : "them"} or change the setup.
           </Typography>
         )}
 

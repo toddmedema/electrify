@@ -8,9 +8,12 @@ import {
   getWindCapacityFactor,
   getSolarCapacityFactor,
 } from "../helpers/Energy";
-import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
 import { hasOffshoreWind } from "./Weather";
 import { HYDRO_TARGET_CAPACITY_FACTOR, hydroSizing } from "../helpers/Hydro";
+import {
+  getViableLocationCount,
+  getViableLocationsRemaining,
+} from "./FacilitySites";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -138,13 +141,21 @@ export function GENERATORS(
   const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
 
-  // only needed as a temporary hack for geothermal until https://github.com/toddmedema/electrify/issues/86 done
-  const conventionalGeothermalCount = state.facilities.filter(
-    (f) => f.name === "Geothermal",
-  ).length;
-  const conventionalHydroCount = state.facilities.filter(
-    (f) => f.name === "Hydro",
-  ).length;
+  const hydroLocations = getViableLocationCount(state.location, "Hydro");
+  const hydroLocationsRemaining = getViableLocationsRemaining(
+    state.location,
+    state.facilities,
+    "Hydro",
+  );
+  const geothermalLocations = getViableLocationCount(
+    state.location,
+    "Geothermal",
+  );
+  const geothermalLocationsRemaining = getViableLocationsRemaining(
+    state.location,
+    state.facilities,
+    "Geothermal",
+  );
   const enhancedGeothermalCostPerW = Math.max(
     3,
     5.5 * Math.pow(3 / 5.5, (year - 2028) / 7),
@@ -421,13 +432,12 @@ export function GENERATORS(
       name: "Hydro",
       fuel: "Hydro",
       description: "Clean and dispatchable, where rivers allow",
-      available: year > 1882 && hasHydroResource(state.location),
-      buildCost:
-        scaledBuildCost(hydroCostPerW(year), 100000000, peakW) *
-        (1 + conventionalHydroCount / 3),
+      available: year > 1882 && (hydroLocations || 0) > 0,
+      buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
-      // 2024 at $2,267/kW. Regional resource availability is handled above.
+      // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
+      viableLocationsRemaining: hydroLocationsRemaining,
       maxPeakW: 10000000000,
       btuPerWh: 0,
       spinMinutes: 1,
@@ -446,16 +456,12 @@ export function GENERATORS(
       name: "Geothermal",
       fuel: "Geothermal",
       description: "Consistent, but few locations",
-      available: hasGeothermalResource(state.location),
-      buildCost:
-        scaledBuildCost(geothermalCostPerW(year), 50000000, peakW) *
-        (1 + conventionalGeothermalCount / 4),
-      // To compensate for limited locations, cost to build increases significantly with each construction
-      // Future ideas: new tech in ~2000 opened up more locations at a slightly higher cost
-      // Have multiplier be based on totalPeakWByFuel instead, so that you don't suffer as much from building many smaller plants
+      available: (geothermalLocations || 0) > 0,
+      buildCost: scaledBuildCost(geothermalCostPerW(year), 50000000, peakW),
       // IRENA global installed cost fell from inflation-normalized $5,415/kW in 2020 to
       // $4,015/kW in 2024, although its small project sample makes this series volatile.
       peakW,
+      viableLocationsRemaining: geothermalLocationsRemaining,
       maxPeakW: 800000000,
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
@@ -509,6 +515,15 @@ export function STORAGE(state: GameType, peakWh: number) {
   // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const magnitude = Math.log10(peakWh) - 6;
   const year = state.date.year;
+  const pumpedHydroLocations = getViableLocationCount(
+    state.location,
+    "Pumped Hydro",
+  );
+  const pumpedHydroLocationsRemaining = getViableLocationsRemaining(
+    state.location,
+    state.facilities,
+    "Pumped Hydro",
+  );
 
   let storage = [
     {
@@ -545,11 +560,12 @@ export function STORAGE(state: GameType, peakWh: number) {
     {
       name: "Pumped Hydro",
       description: "Slow to build and charge / discharge",
-      available: year > 1930 && hasHydroResource(state.location), // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
+      available: year > 1930 && (pumpedHydroLocations || 0) > 0, // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
       // duration, the midpoint is $332/kWh; costs are held flat because the technology is mature.
       peakW: 0.1 * peakWh,
+      viableLocationsRemaining: pumpedHydroLocationsRemaining,
       // Around 1/5th to 1/20th for larger projects - https://en.wikipedia.org/wiki/List_of_pumped-storage_hydroelectric_power_stations
       peakWh,
       maxPeakWh: 20000000000,

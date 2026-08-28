@@ -79,6 +79,7 @@ import {
   LOCATIONS,
 } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
+import { getViableLocationsRemaining } from "../data/FacilitySites";
 import { logEvent } from "../Globals";
 import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
 import {
@@ -564,6 +565,9 @@ export const gameSlice = createSlice({
           [],
           [],
         ).find((g: FacilityShoppingType) => {
+          if (g.viableLocationsRemaining === 0) {
+            return false;
+          }
           for (const property in search) {
             if (g[property] !== search[property]) {
               return false;
@@ -576,6 +580,9 @@ export const gameSlice = createSlice({
         } else {
           const storage = STORAGE(state, search.peakWh || 1000000).find(
             (g: FacilityShoppingType) => {
+              if (g.viableLocationsRemaining === 0) {
+                return false;
+              }
               for (const property in search) {
                 if (g[property] !== search[property]) {
                   return false;
@@ -776,6 +783,16 @@ export default gameSlice.reducer;
  */
 function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   const built = payload.facility;
+  const viableLocationsRemaining = getViableLocationsRemaining(
+    state.location,
+    state.facilities,
+    built.name,
+  );
+  // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
+  // a stale dialog or replay action from claiming one more site after the last one was used.
+  if (viableLocationsRemaining !== undefined && viableLocationsRemaining <= 0) {
+    return;
+  }
   logGameEvent(
     state,
     "BUILD",

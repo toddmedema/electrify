@@ -393,6 +393,9 @@ interface SharedShoppingType {
   annualOperatingCost: number;
   // all costs should be in that year's $ / not account for inflation when possible
   peakW: number;
+  // Present only for technologies whose geography imposes a finite number of project sites.
+  // Includes projects under construction because choosing to build has already claimed the site.
+  viableLocationsRemaining?: number;
   lifespanYears: number;
   yearsToBuild: number;
 }

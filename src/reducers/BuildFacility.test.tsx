@@ -83,6 +83,25 @@ describe("buildFacility", () => {
     ).toEqual(pastBefore);
   });
 
+  it("rejects a stale purchase after the last viable site has been claimed", () => {
+    let state = createGame({ scenarioId: 103 });
+    const hydro = GENERATORS(state, 50000000, [20], [500]).find(
+      (g: GeneratorShoppingType) => g.name === "Hydro",
+    );
+    expect(hydro?.viableLocationsRemaining).toBe(3);
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      state = gameReducer(
+        state,
+        buildFacility({ facility: hydro!, financed: true }),
+      );
+    }
+
+    expect(
+      state.facilities.filter((facility) => facility.name === "Hydro"),
+    ).toHaveLength(3);
+  });
+
   it("keeps a long cash forecast finite when hydro finishes construction", () => {
     const before = createGame({ scenarioId: 103 });
     const hydro = GENERATORS(before, 50000000, [20], [500]).find(
