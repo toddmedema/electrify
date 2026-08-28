@@ -7,8 +7,10 @@ import gameReducer, {
   buildFacility,
   delta,
   initGame,
+  hasChronicBlackouts,
   start,
   startReplay,
+  sellFacility,
   tickState,
 } from "../reducers/Game";
 import { DIFFICULTIES } from "../Constants";
@@ -38,6 +40,12 @@ import { loadSimData } from "./SimData";
 
 export type StrategyType = "none" | "keepUp";
 
+export interface InitialBuildType {
+  name: string;
+  peakW: number;
+  financed: boolean;
+}
+
 /**
  * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
  * back to the menu; a headless run that quietly simulated the wrong city would just print a
@@ -65,6 +73,9 @@ export interface SimOptionsType {
   dollarsPerkWh?: number;
   monthlyMarketingSpend?: number;
   strategy?: StrategyType;
+  initialBuild?: InitialBuildType;
+  sellFacilityId?: number;
+  sellAtMonth?: number;
 }
 
 export interface ResolvedSimOptionsType {
@@ -75,6 +86,9 @@ export interface ResolvedSimOptionsType {
   dollarsPerkWh: number | null; // null = left at the scenario's own rate
   monthlyMarketingSpend: number;
   strategy: StrategyType;
+  initialBuild: InitialBuildType | null;
+  sellFacilityId: number | null;
+  sellAtMonth: number;
 }
 
 export interface BuildRecordType {
@@ -93,6 +107,10 @@ export interface SimResultType {
   finalNetWorth: number;
   wentBankrupt: boolean;
   bankruptAtMonth: number | null;
+  wasFired: boolean;
+  firedAtMonth: number | null;
+  outcome: "completed" | "bankrupt" | "fired";
+  actionCount: number;
   builds: BuildRecordType[];
   // Mean fill level of the storage fleet across the run, 0 - 1, or null with no storage built
   averageStateOfCharge: number | null;
@@ -159,6 +177,35 @@ function setUpGame(
   // the rate on the Finances screen would
   if (options.dollarsPerkWh !== null) {
     state = gameReducer(state, delta({ dollarsPerkWh: options.dollarsPerkWh }));
+  }
+  if (options.initialBuild) {
+    const build = GENERATORS(
+      state,
+      options.initialBuild.peakW,
+      state.timeline.map((tick) => tick.windKph),
+      state.timeline.map((tick) => tick.solarIrradianceWM2),
+      state.timeline
+        .map((tick) => tick.windOffshoreKph)
+        .filter((wind): wind is number => wind !== undefined),
+    ).find(
+      (facility) =>
+        facility.available && facility.name === options.initialBuild?.name,
+    );
+    if (!build) {
+      throw new Error(
+        `Cannot build ${options.initialBuild.name} in ${scenario.name}`,
+      );
+    }
+    state = gameReducer(
+      state,
+      buildFacility({
+        facility: build,
+        financed: options.initialBuild.financed,
+      }),
+    );
+  }
+  if (options.sellFacilityId !== null && options.sellAtMonth === 0) {
+    state = gameReducer(state, sellFacility(options.sellFacilityId));
   }
   // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
   return cloneDeep(state);
@@ -256,6 +303,9 @@ function resolveOptions(
       options.dollarsPerkWh === undefined ? null : options.dollarsPerkWh,
     monthlyMarketingSpend: options.monthlyMarketingSpend || 0,
     strategy: options.strategy || "none",
+    initialBuild: options.initialBuild || null,
+    sellFacilityId: options.sellFacilityId ?? null,
+    sellAtMonth: options.sellAtMonth || 0,
   };
 }
 
@@ -270,11 +320,27 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   let state = setUpGame(scenario, resolved);
 
   const collector = new InvariantCollector();
-  const builds: BuildRecordType[] = [];
+  const initialBuild = resolved.initialBuild
+    ? state.facilities.find(
+        (facility) =>
+          facility.name === resolved.initialBuild?.name &&
+          facility.yearsToBuildLeft > 0,
+      )
+    : undefined;
+  const builds: BuildRecordType[] = initialBuild
+    ? [
+        {
+          month: 0,
+          name: initialBuild.name,
+          buildCost: initialBuild.buildCost,
+        },
+      ]
+    : [];
   let stateOfChargeSum = 0;
   let stateOfChargeTicks = 0;
   let ticks = 0;
   let bankruptAtMonth: number | null = null;
+  let firedAtMonth: number | null = null;
   let previousMonthCount = state.monthlyHistory.length;
   let prevTick: TickPresentFutureType | null = null;
   let justBuilt = false;
@@ -282,7 +348,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
-  // monthsEllapsed reaching the scenario duration, or negative cash at a month rollover.
+  // monthsEllapsed reaching the scenario duration, negative cash, or chronic blackouts.
   while (state.date.monthsEllapsed < resolved.months) {
     tickState(state);
     ticks++;
@@ -326,6 +392,21 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       break; // The real game forces a restart here, so anything past it isn't a reachable state
     }
 
+    if (hasChronicBlackouts(state.monthlyHistory)) {
+      firedAtMonth = state.date.monthsEllapsed;
+      break;
+    }
+
+    if (
+      resolved.sellFacilityId !== null &&
+      resolved.sellAtMonth > 0 &&
+      state.date.monthsEllapsed === resolved.sellAtMonth
+    ) {
+      state = cloneDeep(
+        gameReducer(state, sellFacility(resolved.sellFacilityId)),
+      );
+    }
+
     if (resolved.strategy === "keepUp") {
       const toBuild = pickFacilityToBuild(state, state.monthlyHistory[0]);
       if (toBuild) {
@@ -358,6 +439,15 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     finalNetWorth: lastTick ? lastTick.netWorth : 0,
     wentBankrupt: bankruptAtMonth !== null,
     bankruptAtMonth,
+    wasFired: firedAtMonth !== null,
+    firedAtMonth,
+    outcome:
+      bankruptAtMonth !== null
+        ? "bankrupt"
+        : firedAtMonth !== null
+          ? "fired"
+          : "completed",
+    actionCount: state.replayLog?.length || 0,
     builds,
     averageStateOfCharge: stateOfChargeTicks
       ? stateOfChargeSum / stateOfChargeTicks

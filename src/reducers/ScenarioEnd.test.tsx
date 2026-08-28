@@ -10,6 +10,7 @@ import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
 import {
   loaded,
+  hasChronicBlackouts,
   quit,
   resume,
   setSpeed,
@@ -226,6 +227,16 @@ describe("ending a scenario from inside the reducer", () => {
       { ...blackoutMonth, month: 2 },
       { ...blackoutMonth, month: 1 },
     ];
+    expect(
+      hasChronicBlackouts([
+        { ...blackoutMonth, month: 4, supplyWh: 100 },
+        ...state.monthlyHistory,
+      ]),
+    ).toBe(false);
+    state.facilities.forEach((facility) => {
+      facility.paused = true;
+      facility.currentW = 0;
+    });
 
     playOutOnTheStore(state, 1);
     jest.runOnlyPendingTimers();

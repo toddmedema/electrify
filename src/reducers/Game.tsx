@@ -1125,13 +1125,7 @@ export function tickState(state: GameType) {
         }, 1);
       };
 
-      const chronicBlackouts =
-        history[1] &&
-        history[2] &&
-        history[3] &&
-        history[1].supplyWh < history[1].demandWh * 0.9 &&
-        history[2].supplyWh < history[2].demandWh * 0.9 &&
-        history[3].supplyWh < history[3].demandWh * 0.9;
+      const chronicBlackouts = hasChronicBlackouts(history);
       const failure =
         now.cash < 0
           ? ({ outcome: "bankrupt", title: "Bankrupt!" } as const)
@@ -1239,6 +1233,14 @@ export function tickState(state: GameType) {
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
   applyPendingReplayActions(state);
+}
+
+/** The same three completed-month firing rule used by the game and headless playtests. */
+export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
+  return (
+    history.length >= 3 &&
+    history.slice(0, 3).every((month) => month.supplyWh < month.demandWh * 0.9)
+  );
 }
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
