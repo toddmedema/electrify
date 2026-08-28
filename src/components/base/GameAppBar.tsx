@@ -16,10 +16,9 @@ import { TICKS_PER_HOUR, TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
+import { isBigScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
-import { change as changeSettings } from "../../reducers/Settings";
 import {
   AppStateType,
   FacilityOperatingType,
@@ -42,17 +41,14 @@ import ConceptIcon from "./ConceptIcon";
 
 export interface StateProps {
   game: GameType;
-  audioEnabled?: boolean;
 }
 
 export interface DispatchProps {
-  onEvents: () => void;
   onManual: () => void;
   onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
-  onAudioChange: (enabled: boolean) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -150,17 +146,8 @@ function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
-  const {
-    game,
-    audioEnabled,
-    onAudioChange,
-    onEvents,
-    onManual,
-    onNextTutorial,
-    onQuit,
-    onSettings,
-    onSpeedChange,
-  } = props;
+  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
+    props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
@@ -168,7 +155,6 @@ export function GameAppBar(props: Props) {
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
 
-  const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
   const speed = game.speed;
   // Watching somebody else's run rather than playing your own. The speed controls stay live --
@@ -182,9 +168,6 @@ export function GameAppBar(props: Props) {
   // gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
     ?.tutorialSteps;
-  const hasUnreadEvents =
-    (game.eventLog?.[0]?.id || 0) > (game.eventLogReadThroughId || 0);
-
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
@@ -226,19 +209,8 @@ export function GameAppBar(props: Props) {
           open={Boolean(menuAnchorEl)}
           onClose={handleMenuClose}
         >
-          <MenuItem onClick={onEvents}>
-            Events{hasUnreadEvents ? " •" : ""}
-          </MenuItem>
           <MenuItem onClick={onManual}>Manual</MenuItem>
           <MenuItem onClick={onSettings}>Options</MenuItem>
-          <MenuItem
-            onClick={() => {
-              onAudioChange(!audioEnabled);
-              handleMenuClose();
-            }}
-          >
-            Turn sound {audioEnabled ? "off" : "on"}
-          </MenuItem>
           <MenuItem
             onClick={() => {
               setScenarioDetailsOpen(true);
@@ -266,14 +238,10 @@ export function GameAppBar(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       menuAnchorEl,
-      onEvents,
-      hasUnreadEvents,
       onManual,
       onSettings,
       onNextTutorial,
       onQuit,
-      onAudioChange,
-      audioEnabled,
       nextTutorial,
       isReplay,
       isTutorial,
@@ -298,11 +266,9 @@ export function GameAppBar(props: Props) {
           {menu}
           <Typography variant="h6" className="gameStatus">
             <span className="gameStatusValue">
-              {!smallScreen && <ConceptIcon concept="money" fontSize="small" />}
               {formatMoneyStable(now.cash)}
             </span>
             <span className="weak gameStatusValue">
-              {!smallScreen && <ConceptIcon concept="time" fontSize="small" />}
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
@@ -345,16 +311,12 @@ export function GameAppBar(props: Props) {
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
-  audioEnabled: state.settings.audioEnabled,
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));
-    },
-    onEvents: () => {
-      dispatch(navigate("EVENTS"));
     },
     onSettings: () => {
       dispatch(navigate("SETTINGS"));
@@ -367,9 +329,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onQuit: () => {
       dispatch(quit());
-    },
-    onAudioChange: (enabled: boolean) => {
-      dispatch(changeSettings({ audioEnabled: enabled }));
     },
   };
 };
