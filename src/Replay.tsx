@@ -29,9 +29,10 @@ import {
  */
 
 // Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
+// 3 adds offshore wind weather and generation; an older replay would simulate a different grid.
 // 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
 // where it is played, so there is no safe way to migrate one.
-export const REPLAY_VERSION = 2;
+export const REPLAY_VERSION = 3;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

@@ -65,6 +65,8 @@ export function isValidLocation(value: unknown): value is LocationType {
     (location.elevation === undefined ||
       (typeof location.elevation === "number" &&
         Number.isFinite(location.elevation))) &&
+    (location.offshore === undefined ||
+      typeof location.offshore === "boolean") &&
     (location.resources === undefined ||
       (typeof location.resources === "object" &&
         location.resources !== null &&

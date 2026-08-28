@@ -1,5 +1,7 @@
 import {
   getDispatchOrderedFuels,
+  getOffshoreWindCapacityFactor,
+  getOffshoreWindOutputFactor,
   getSolarOutputFactor,
   getWindOutputFactor,
   getSolarCapacityFactor,
@@ -29,6 +31,20 @@ describe("getWindOutputFactor", () => {
     // Doubling the wind more than doubles what comes out, until it flattens off at rated
     expect(getWindOutputFactor(40)).toBeGreaterThan(2 * result);
     expect(getWindOutputFactor(80)).toEqual(1);
+  });
+});
+
+describe("getOffshoreWindOutputFactor", () => {
+  it("uses the shared cut-in and cut-out curve", () => {
+    expect(getOffshoreWindOutputFactor(2)).toEqual(0);
+    expect(getOffshoreWindOutputFactor(100)).toEqual(0);
+  });
+
+  it("turns a real offshore surface reading into stronger output", () => {
+    expect(getOffshoreWindOutputFactor(20)).toBeGreaterThan(
+      getWindOutputFactor(20),
+    );
+    expect(getOffshoreWindOutputFactor(40)).toBeCloseTo(0.85);
   });
 });
 
@@ -70,6 +86,15 @@ describe("getWindCapacityFactor", () => {
   });
 });
 
+describe("getOffshoreWindCapacityFactor", () => {
+  it("averages the offshore output curve", () => {
+    expect(getOffshoreWindCapacityFactor([])).toEqual(0);
+    expect(getOffshoreWindCapacityFactor([20, 40])).toBeCloseTo(
+      (getOffshoreWindOutputFactor(20) + getOffshoreWindOutputFactor(40)) / 2,
+    );
+  });
+});
+
 describe("getSolarCapacityFactor", () => {
   it("should correctly handle empty case", () => {
     const irradiancesWM2: number[] = [];
@@ -99,10 +124,17 @@ describe("getDispatchOrderedFuels", () => {
     const result = getDispatchOrderedFuels([
       { fuel: "Coal" },
       { fuel: "Wind" },
+      { fuel: "Offshore Wind" },
       { fuel: "Natural Gas" },
       { fuel: "Sun" },
     ]);
-    expect(result).toEqual(["Sun", "Wind", "Coal", "Natural Gas"]);
+    expect(result).toEqual([
+      "Sun",
+      "Wind",
+      "Offshore Wind",
+      "Coal",
+      "Natural Gas",
+    ]);
   });
 
   it("should skip storage, which has no fuel", () => {

@@ -40,6 +40,8 @@ export interface LocationType {
   region?: string;
   country?: string;
   elevation?: number;
+  // Whether the loaded weather record includes a curated offshore wind site for this location.
+  offshore?: boolean;
   // Explicit resource knowledge wins over the regional fallback. This keeps an arbitrary point
   // honest: coordinates alone cannot tell us whether a usable river or geothermal field exists.
   resources?: {
@@ -51,6 +53,7 @@ export interface LocationType {
 export type FuelNameType =
   | "Coal"
   | "Wind"
+  | "Offshore Wind"
   | "Sun"
   | "Natural Gas"
   | "Uranium"
@@ -72,6 +75,7 @@ export interface FuelProductionType {
   Oil?: number; // wh
   Sun?: number; // wh
   Wind?: number; //wh
+  "Offshore Wind"?: number; // wh
   Geothermal?: number; // wh
   Hydro?: number; // wh
 }
@@ -214,6 +218,8 @@ export interface RawWeatherType {
   TEMP_C: number;
   CLOUD_PCT: number; // 0 - 100
   WIND_KPH: number;
+  // Present only in v2 weather files whose catalogue entry has an offshore sampling point.
+  WIND_OFFSHORE_KPH?: number;
   // Recorded and carried through the forecast, but nothing simulates it yet: hydro inflow, snow
   // sitting on panels and the cooling water a thermal plant needs are all downstream of having it
   PRECIP_MM: number; // in that hour
@@ -227,6 +233,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     demandW: number; // Watts
     solarIrradianceWM2: number;
     windKph: number;
+    windOffshoreKph?: number;
     temperatureC: number;
     storedWh: number;
     supplyByFuel: FuelProductionType;

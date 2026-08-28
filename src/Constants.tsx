@@ -70,6 +70,7 @@ export const LOCATIONS = {
     region: "North America",
     country: "United States",
     admin: "CA",
+    offshore: true,
     resources: { geothermal: true, hydro: true },
   },
   LA: {
@@ -81,6 +82,7 @@ export const LOCATIONS = {
     region: "North America",
     country: "United States",
     admin: "CA",
+    offshore: true,
     resources: { geothermal: true },
   },
   // Named for where its data was read as coming from, back when it was a CSV of unknown
@@ -106,6 +108,7 @@ export const LOCATIONS = {
     region: "North America",
     country: "United States",
     admin: "HI",
+    offshore: true,
     resources: { geothermal: true },
   },
   SJU: {
@@ -117,6 +120,7 @@ export const LOCATIONS = {
     region: "North America",
     country: "United States",
     admin: "Puerto Rico",
+    offshore: true,
     resources: { hydro: true },
   },
 } as { [id: string]: LocationType & { admin?: string } };

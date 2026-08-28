@@ -28,7 +28,11 @@ import {
 import { arrayMove, newSeed } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
-import { getSolarOutputFactor, getWindOutputFactor } from "../helpers/Energy";
+import {
+  getOffshoreWindOutputFactor,
+  getSolarOutputFactor,
+  getWindOutputFactor,
+} from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
   activeWorldEventEffects,
@@ -1302,7 +1306,7 @@ function reforecastWeatherAndPrices(
         state.worldEvents?.active,
         date.minute,
       );
-      return {
+      const forecast = {
         ...t,
         ...fuelPrices,
         solarIrradianceWM2: getRawSolarIrradianceWM2(
@@ -1315,6 +1319,12 @@ function reforecastWeatherAndPrices(
         storedWh: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
+      if (weather.WIND_OFFSHORE_KPH === undefined) {
+        delete forecast.windOffshoreKph;
+      } else {
+        forecast.windOffshoreKph = weather.WIND_OFFSHORE_KPH;
+      }
+      return forecast;
     }
     return t;
   });
@@ -1358,6 +1368,9 @@ function updateSupplyFacilitiesFinances(
   });
 
   const windOutputFactor = getWindOutputFactor(now.windKph);
+  const offshoreWindOutputFactor = getOffshoreWindOutputFactor(
+    now.windOffshoreKph || 0,
+  );
   const solarOutputFactor = getSolarOutputFactor(
     now.solarIrradianceWM2,
     now.temperatureC,
@@ -1402,6 +1415,9 @@ function updateSupplyFacilitiesFinances(
             break;
           case "Wind":
             g.currentW = g.peakW * windOutputFactor;
+            break;
+          case "Offshore Wind":
+            g.currentW = g.peakW * offshoreWindOutputFactor;
             break;
           default: // on-demand produces up to demand + reserve margin
             if (targetW > g.currentW || i < indexOfLastUnchargedBattery) {
