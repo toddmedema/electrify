@@ -53,6 +53,7 @@ function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
 }
 
 function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
+  const initialBuildName = process.env.SIM_BUILD;
   return {
     difficulty: (process.env.SIM_DIFFICULTY as DifficultyType) || undefined,
     months: envNumber("SIM_MONTHS"),
@@ -60,6 +61,15 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
     dollarsPerkWh: envNumber("SIM_RATE"),
     monthlyMarketingSpend: envNumber("SIM_MARKETING"),
     strategy: (process.env.SIM_STRATEGY as StrategyType) || undefined,
+    initialBuild: initialBuildName
+      ? {
+          name: initialBuildName,
+          peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000,
+          financed: process.env.SIM_FINANCE === "1",
+        }
+      : undefined,
+    sellFacilityId: envNumber("SIM_SELL_ID"),
+    sellAtMonth: envNumber("SIM_SELL_MONTH"),
   };
 }
 
@@ -84,9 +94,12 @@ function runSweep() {
     const demandWh = result.months.reduce((a, m) => a + m.demandWh, 0);
     const supplyWh = result.months.reduce((a, m) => a + m.supplyWh, 0);
     const cash = result.finalCash;
-    const outcome = result.wentBankrupt
-      ? `bankrupt @ month ${result.bankruptAtMonth}`
-      : "survived";
+    const outcome =
+      result.outcome === "bankrupt"
+        ? `bankrupt @ month ${result.bankruptAtMonth}`
+        : result.outcome === "fired"
+          ? `fired @ month ${result.firedAtMonth}`
+          : "completed";
     write(
       "  " +
         scenario.name.slice(0, 25).padEnd(26) +

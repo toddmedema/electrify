@@ -173,6 +173,83 @@ describe("simulation determinism", () => {
 });
 
 describe("simulation economics", () => {
+  // Reproducible, UI-legal playthroughs found by the CEO playtest agents. Investor scenarios use
+  // facility actions only; the one rate change belongs to the Public scenario and is checked below.
+  const CEO_WINNING_PLAYS = {
+    100: {
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 150000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 37,
+    },
+    101: { sellFacilityId: 1 },
+    102: {
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 200000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    },
+    103: {
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 400000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    },
+    104: { dollarsPerkWh: 0.08 },
+    105: {
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 300000000,
+        financed: true,
+      },
+    },
+  } as const;
+  const CEO_ACTION_COUNTS = {
+    100: 2,
+    101: 1,
+    102: 2,
+    103: 2,
+    104: 1,
+    105: 1,
+  } as Record<number, number>;
+
+  SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+    (scenario) => {
+      it(`requires player input to win "${scenario.name}" on CEO`, () => {
+        const passive = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+        });
+        expectNoViolations(passive);
+        expect(passive.actionCount).toBe(0);
+        expect(passive.outcome).not.toBe("completed");
+
+        const play =
+          CEO_WINNING_PLAYS[scenario.id as keyof typeof CEO_WINNING_PLAYS];
+        expect(
+          !("dollarsPerkWh" in play) || scenario.ownership === "Public",
+        ).toBe(true);
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+        });
+        expectNoViolations(active);
+        expect(active.actionCount).toBe(CEO_ACTION_COUNTS[scenario.id]);
+        expect(active.outcome).toBe("completed");
+      });
+    },
+  );
+
   it("bills every customer it supplies at the going rate", () => {
     const result = runSimulation({
       scenarioId: 101,

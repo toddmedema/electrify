@@ -198,6 +198,9 @@ describe("a custom game", () => {
         // its first quarter -- which is what this test caught when the escalation went in.
         dollarsPerkWh: 1.1,
         feePerKgCO2e: 530 / 1000,
+        // Enough firm capacity that this weather-projection test is not cut short by the real
+        // game's chronic-blackout firing rule, which the simulator also enforces.
+        facilities: [{ name: "Natural Gas", peakW: 500000000 }],
       } as ScenarioType,
     });
 

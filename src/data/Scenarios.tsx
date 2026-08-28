@@ -523,7 +523,7 @@ export const SCENARIOS = [
     startingYear: 2020,
     cash: 330000000,
     feePerKgCO2e: 50 / 1000,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.05,
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Coal", peakW: 300000000 },
@@ -540,7 +540,7 @@ export const SCENARIOS = [
     startingYear: 2006,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.03,
     durationMonths: 12 * 20,
     facilities: [{ fuel: "Coal", peakW: 500000000 }],
   },
@@ -572,7 +572,7 @@ export const SCENARIOS = [
     startingYear: 2002,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.02,
     durationMonths: 12 * 12,
     facilities: [
       { fuel: "Oil", peakW: 100000000 },
@@ -589,7 +589,7 @@ export const SCENARIOS = [
     startingYear: 2000,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.05,
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Oil", peakW: 220000000 },
@@ -607,7 +607,7 @@ export const SCENARIOS = [
     startingYear: 1980,
     cash: 198000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.025,
     durationMonths: 12 * 20,
     facilities: [
       { fuel: "Coal", peakW: 200000000 },
