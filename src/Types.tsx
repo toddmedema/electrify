@@ -52,6 +52,7 @@ export interface LocationType {
 
 export type FuelNameType =
   | "Coal"
+  | "Biomass"
   | "Wind"
   | "Offshore Wind"
   | "Sun"
@@ -62,6 +63,7 @@ export type FuelNameType =
   | "Hydro";
 export interface FuelPricesType {
   [index: string]: number;
+  Biomass: number; // $/btu
   "Natural Gas": number; // $/btu
   Coal: number; // $/btu
   Uranium: number; // $/btu
@@ -69,6 +71,7 @@ export interface FuelPricesType {
 }
 export interface FuelProductionType {
   [index: string]: number | undefined;
+  Biomass?: number; // wh
   "Natural Gas"?: number; // wh
   Coal?: number; // wh
   Uranium?: number; // wh
