@@ -875,15 +875,24 @@ $pane_header_height: 40px;
 
 // The leaderboard on the scenario details screen. The rank and replay columns used to be
 // padding="none", which put the rank digits hard against x=0 -- on a desktop window that is the
-// window edge, so they read as clipped. They still need to stay narrow, so they get a small
-// gutter instead of none, and 1% width so the browser shrinks them to their content and spends
-// the leftover on the name.
+// window edge, so they read as clipped. The outer cells provide the screen-edge gutters rather
+// than the table, keeping each row's border full width. The outer columns still need to stay
+// narrow, so 1% width makes the browser shrink them to their content and spend the leftover on
+// the name.
 #HighScores {
   max-width: $abswidthmax;
   margin: 0 auto;
 
   .MuiTableCell-root {
     padding: 6px;
+  }
+
+  .MuiTableCell-root:first-child {
+    padding-left: 16px;
+  }
+
+  .MuiTableCell-root:last-child {
+    padding-right: 16px;
   }
 
   .rank,
