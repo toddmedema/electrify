@@ -3,6 +3,7 @@ import {
   getWeather,
   hasOffshoreWind,
   initWeatherFromRows,
+  weatherFilePath,
   WEATHER_STARTING_YEAR,
 } from "./Weather";
 import { getDateFromMinute } from "../helpers/DateTime";
@@ -15,6 +16,15 @@ const FIXTURE_STARTING_YEAR = 1980;
 const HOURS_PER_MONTH = 24;
 const MONTHS_PER_YEAR = 12;
 const SEED = 1;
+
+describe("weatherFilePath", () => {
+  it("keeps v1 URLs stable and gives offshore v2 data its own URL", () => {
+    expect(weatherFilePath({ id: "PIT" })).toBe("/data/weather/PIT.bin");
+    expect(weatherFilePath({ id: "SJU", offshore: true })).toBe(
+      "/data/weather/SJU.v2.bin",
+    );
+  });
+});
 
 describe("getRawSolarIrradianceWM2", () => {
   const equator = {

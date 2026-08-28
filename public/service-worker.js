@@ -1,4 +1,7 @@
-const CACHE_VERSION = "electrify-v1";
+// v1 may contain v2 weather data cached at the legacy URL from the offshore-wind deploy. Rotating
+// the cache removes that incompatible response so an older open client can fetch the restored v1
+// compatibility asset.
+const CACHE_VERSION = "electrify-v2";
 const APP_SHELL = [
   "/",
   "/manifest.json",

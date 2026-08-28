@@ -238,6 +238,17 @@ export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
 }
 
 /**
+ * A new binary layout must get a new URL. Deploys replace static assets before every open client
+ * has replaced its JavaScript, so changing a file in place can hand an old decoder a new layout.
+ * The original URL remains the v1 compatibility asset for locations upgraded to offshore wind.
+ */
+export function weatherFilePath(
+  location: Pick<LocationType, "id" | "offshore">,
+): string {
+  return `/data/weather/${location.id}${location.offshore ? ".v2" : ""}.bin`;
+}
+
+/**
  * Downloads a location's record, for the browser.
  *
  * TODO download several locations at start with a 2s init delay, like loading audio (but after
@@ -249,9 +260,10 @@ export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
  *   year 0C and still, which runs perfectly well and is not a game anyone meant to play.
  */
 export function initWeather(
-  location: string,
+  location: Pick<LocationType, "id" | "offshore">,
   callback?: (failure?: string) => void,
 ) {
+  const locationId = location.id;
   // Reset immediately, so a failed load can't be played on the last game's weather. The
   // climatology goes with it: leaving the last location's monthly means behind would let
   // applyClimateForcing bend a reading against a city it never came from.
@@ -270,12 +282,14 @@ export function initWeather(
       callback(failure);
     }
   };
-  if (!isValidLocationId(location)) {
+  if (!isValidLocationId(locationId)) {
     // A location id is now any string rather than a checked union, and it arrives here from a
     // saved game or a replay document on its way into a URL
-    return done(`"${location}" is not a location id weather can be loaded for`);
+    return done(
+      `"${locationId}" is not a location id weather can be loaded for`,
+    );
   }
-  fetch(`/data/weather/${location}.bin`)
+  fetch(weatherFilePath(location))
     .then((response: Response) => {
       if (!response.ok) {
         throw new Error(`${response.status} fetching the weather file`);
@@ -286,11 +300,11 @@ export function initWeather(
       if (generation !== loadGeneration) {
         return; // A later load is already the one that counts; don't overwrite its rows
       }
-      initWeatherFromBinary(location, buffer);
+      initWeatherFromBinary(locationId, buffer);
       done();
     })
     .catch((e: Error) => {
-      done(`Could not load the weather for ${location}: ${e.message}`);
+      done(`Could not load the weather for ${locationId}: ${e.message}`);
     });
 }
 

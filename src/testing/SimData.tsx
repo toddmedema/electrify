@@ -3,7 +3,7 @@ import * as path from "path";
 import { LOCATIONS } from "../Constants";
 import { initEconomyFromCsv } from "../data/Economy";
 import { initFuelPricesFromCsv } from "../data/FuelPrices";
-import { initWeatherFromBinary } from "../data/Weather";
+import { initWeatherFromBinary, weatherFilePath } from "../data/Weather";
 import { getLocation, isValidLocationId } from "../helpers/Locations";
 import { LocationIdType, LocationType } from "../Types";
 
@@ -53,7 +53,11 @@ export function loadSimData(locationId: LocationIdType) {
   if (!isValidLocationId(locationId)) {
     throw new Error(`Invalid location id "${locationId}"`);
   }
-  const file = path.join(DATA_DIR, "weather", `${locationId}.bin`);
+  const location = getSimLocation(locationId);
+  const file = path.join(
+    DATA_DIR,
+    weatherFilePath(location || { id: locationId }).replace(/^\/data\//, ""),
+  );
   if (!fs.existsSync(file)) {
     throw new Error(
       `No weather data for "${locationId}" - run: node scripts/fetch-weather.js ${locationId}`,

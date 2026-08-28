@@ -16,8 +16,10 @@ const HEADER_BYTES = 16;
 const BASE_BYTES_PER_ROW = 5;
 const OFFSHORE_BYTES_PER_ROW = 6;
 
-function readShipped(id: string): ArrayBuffer {
-  const bytes = fs.readFileSync(path.join(DATA_DIR, `${id}.bin`));
+function readShipped(id: string, offshore = false): ArrayBuffer {
+  const bytes = fs.readFileSync(
+    path.join(DATA_DIR, `${id}${offshore ? ".v2" : ""}.bin`),
+  );
   return bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
@@ -209,7 +211,9 @@ describe("the shipped weather files", () => {
   ];
   const ids = fs
     .readdirSync(DATA_DIR)
-    .filter((file: string) => file.endsWith(".bin"))
+    .filter(
+      (file: string) => file.endsWith(".bin") && !file.endsWith(".v2.bin"),
+    )
     .map((file: string) => file.replace(".bin", ""));
 
   it("ships at least the locations the authored scenarios are played in", () => {
@@ -228,19 +232,17 @@ describe("the shipped weather files", () => {
   });
 
   it.each(ids)("%s covers forty years of readable weather", (id: string) => {
-    const buffer = readShipped(id);
+    const offshore = offshoreIds.includes(id);
+    const buffer = readShipped(id, offshore);
     const header = readWeatherHeader(buffer);
-    expect([1, 2]).toContain(header.version);
-    expect(header.version).toBeGreaterThanOrEqual(
-      offshoreIds.includes(id) ? 2 : 1,
-    );
+    expect(header.version).toBe(offshore ? 2 : 1);
     expect(header).toMatchObject({
       daysPerYear: 12,
       hoursPerDay: 24,
       startingYear: 1980,
       yearCount: 40,
       rowCount: 11520,
-      offshore: offshoreIds.includes(id),
+      offshore,
     });
 
     const rows = decodeWeather(buffer);
@@ -278,11 +280,16 @@ describe("the shipped weather files", () => {
   });
 
   it.each(offshoreIds)("%s has a usable offshore wind resource", (id) => {
-    const speeds = decodeWeather(readShipped(id)).map(
+    const speeds = decodeWeather(readShipped(id, true)).map(
       (row) => row.WIND_OFFSHORE_KPH as number,
     );
     const capacityFactor = getOffshoreWindCapacityFactor(speeds);
     expect(capacityFactor).toBeGreaterThan(0.2);
     expect(capacityFactor).toBeLessThan(0.7);
+  });
+
+  it.each(offshoreIds)("%s keeps a v1 asset for older clients", (id) => {
+    const header = readWeatherHeader(readShipped(id));
+    expect(header).toMatchObject({ version: 1, offshore: false });
   });
 });

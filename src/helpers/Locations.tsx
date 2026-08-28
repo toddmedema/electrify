@@ -32,7 +32,7 @@ export function getScenarioLocation(
 /**
  * Whether an id is safe to build a weather file path out of.
  *
- * The id goes straight into `/data/weather/<id>.bin` (and into a filesystem path headless), and
+ * The id goes into `/data/weather/<id>[.v2].bin` (and into a filesystem path headless), and
  * it now arrives from a saved game, a replay document or local storage rather than from a union
  * the compiler checked - so `../` has to be ruled out before it gets there.
  */

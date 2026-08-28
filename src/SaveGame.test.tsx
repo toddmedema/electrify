@@ -113,7 +113,7 @@ describe("SaveGame", () => {
       parseSave({ ...save, game: { ...save.game, location } });
     expect(withLocation(undefined)).toBeNull();
     expect(withLocation({})).toBeNull();
-    // Straight into `/data/weather/<id>.bin`
+    // Straight into `/data/weather/<id>[.v2].bin`
     expect(
       withLocation({ ...save.game.location, id: "../../secrets" }),
     ).toBeNull();
