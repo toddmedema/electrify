@@ -116,16 +116,17 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         title={storage.name}
         subheader={secondaryText}
       />
-      <IconButton
+      <Button
         color="primary"
-        className="expand-icon"
+        className="expand-details"
         size="small"
         aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
         aria-expanded={expanded}
+        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
         onClick={toggleExpand}
       >
-        {expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-      </IconButton>
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">

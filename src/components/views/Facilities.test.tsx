@@ -23,8 +23,7 @@ jest.mock("../base/GameCard", () => ({
 const user = userEvent.setup({ delay: null });
 
 function playedGame(ticks: number): GameType {
-  // Carbon Fee, which starts with two generators - a fleet of one hides every row action, since
-  // there is nothing to reorder it against and nothing to fall back on if it is paused or sold
+  // Carbon Fee, which starts with two generators.
   const state = createGame({ scenarioId: 100 });
   for (let i = 0; i < ticks; i++) {
     tickState(state);
@@ -33,6 +32,7 @@ function playedGame(ticks: number): GameType {
 }
 
 interface Handlers {
+  onPause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
 }
@@ -42,6 +42,7 @@ function renderFacilities(
   selectedFacilityId: number | null,
 ): Handlers {
   const handlers: Handlers = {
+    onPause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
   };
@@ -53,7 +54,7 @@ function renderFacilities(
       onStorageBuild={() => undefined}
       onSell={() => undefined}
       onTogglePause={() => undefined}
-      onPause={() => undefined}
+      onPause={handlers.onPause}
       onReprioritize={handlers.onReprioritize}
       onSelect={handlers.onSelect}
     />,
@@ -143,6 +144,15 @@ describe("the fleet list", () => {
       ),
     );
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("can pause the only facility in a fleet", async () => {
+    const onePlant = createGame({ scenarioId: 5 });
+    const { onPause } = renderFacilities(onePlant, null);
+    const facility = onePlant.facilities[0];
+
+    await user.click(screen.getByLabelText(`Pause ${facility.name}`));
+    expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
   });
 
   it("hides the player's controls while a replay is being watched", () => {

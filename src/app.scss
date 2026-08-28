@@ -472,6 +472,14 @@ $topbar_height: 56px;
     white-space: nowrap;
   }
 
+  // Modern large phones have room to make the two most important readouts substantially easier
+  // to scan. Keep the compressed scale below 360px, where the four speed controls need it.
+  @media screen and (min-width: 360px) {
+    #topbar .gameStatus {
+      font-size: clamp(0.95rem, 4vw, 1.125rem);
+    }
+  }
+
   #speedChangeButtons {
     flex: 0 0 auto;
   }
@@ -807,19 +815,6 @@ $pane_header_height: 40px;
   border-left: 4px solid var(--interactive-blue);
 }
 
-.recommendedChip {
-  margin-left: 8px;
-  height: 24px !important;
-  vertical-align: middle;
-}
-
-.missionCompleteText {
-  display: block;
-  color: $font_color_primary;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
 .leaderboardDisclosure {
   margin: 20px auto;
   max-width: 760px;
@@ -1024,11 +1019,11 @@ $pane_header_height: 40px;
     }
   }
 
-  .expand-icon {
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translatex(-50%);
+  .expand-details.MuiButton-root {
+    width: calc(100% - 32px);
+    margin: 0 16px size(small);
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
   }
 
   #tutorial-tooltip {

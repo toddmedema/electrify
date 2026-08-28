@@ -250,23 +250,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </IconButton>
                   </>
                 )}
-                {!readOnly &&
-                  !underConstruction &&
-                  props.listLength > 1 &&
-                  !facility.paused && (
-                    <IconButton
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onPause(facility.id, facility.name);
-                      }}
-                      aria-label={`Pause ${facility.name}`}
-                      edge="end"
-                      color="primary"
-                      size="small"
-                    >
-                      <ConceptIcon concept="pause" />
-                    </IconButton>
-                  )}
+                {!readOnly && !underConstruction && !facility.paused && (
+                  <IconButton
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      onPause(facility.id, facility.name);
+                    }}
+                    aria-label={`Pause ${facility.name}`}
+                    edge="end"
+                    color="primary"
+                    size="small"
+                  >
+                    <ConceptIcon concept="pause" />
+                  </IconButton>
+                )}
                 {!readOnly && facility.paused && (
                   <IconButton
                     onClick={(e: React.MouseEvent) => {

@@ -37,7 +37,12 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
   const { events, onOpen, onSelect } = props;
-  React.useEffect(() => onOpen(), [onOpen]);
+  // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
+  // so the expression-bodied form returned an object here; React later tried to call that object
+  // while unmounting this phone-only pane and crashed the app to a blank screen.
+  React.useEffect(() => {
+    onOpen();
+  }, [onOpen]);
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
