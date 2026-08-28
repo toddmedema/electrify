@@ -99,6 +99,31 @@ describe("a custom game", () => {
     expect(offshore.currentW).toBeLessThanOrEqual(offshore.peakW);
   });
 
+  it("runs a biomass starting facility with finite fuel costs and emissions", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2019,
+        facilities: [{ name: "Biomass", peakW: 50000000 }],
+      },
+    });
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    expect(state.facilities[0]).toMatchObject({
+      name: "Biomass",
+      fuel: "Biomass",
+      peakW: 50000000,
+      yearsToBuildLeft: 0,
+    });
+    expect(now.supplyByFuel.Biomass).toBeGreaterThan(0);
+    expect(now.expensesFuel).toBeGreaterThan(0);
+    expect(now.kgco2e).toBeGreaterThan(0);
+    expect(Number.isFinite(now.cash)).toBe(true);
+    expect(Number.isFinite(now.expensesFuel)).toBe(true);
+    expect(Number.isFinite(now.kgco2e)).toBe(true);
+  });
+
   it("runs on the seed the player pinned, and replays identically from it", () => {
     const first = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,

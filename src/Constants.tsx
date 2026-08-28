@@ -179,6 +179,12 @@ export const FUELS = {
   Coal: {
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
+  Biomass: {
+    // 195 lb CO2/MMBtu for biomass, converted to kg/Btu. This is direct combustion CO2:
+    // net biogenic emissions depend on the feedstock and regrowth and cannot be assumed zero.
+    // https://www.eia.gov/outlooks/capitalcost/pdf/updated_capcost.pdf
+    kgCO2ePerBtu: 0.000088451,
+  },
   "Natural Gas": {
     kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },

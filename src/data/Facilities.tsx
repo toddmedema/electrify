@@ -189,6 +189,35 @@ export function GENERATORS(
       lifespanYears: 30,
       // TODO
     },
+    {
+      name: "Biomass",
+      fuel: "Biomass",
+      description: "Renewable and dispatchable, but fuel-hungry",
+      available: true,
+      // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
+      // to the table's 2018 base with CPI-U (251.107 / 321.943), then split into the same
+      // one-quarter fixed / three-quarter variable shape used by the other thermal plants, so
+      // small biomass plants retain the real technology's poor economies of scale.
+      // https://www.eia.gov/outlooks/aeo/assumptions/pdf/EMM_Assumptions.pdf
+      // https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm
+      buildCost: 47217644 + 2.833059 * peakW,
+      peakW,
+      // DOE's project-screening guidance describes 10-50 MW as the economic range; larger
+      // fleets can still be assembled as several plants with separate feedstock logistics.
+      // https://www.energy.gov/indianenergy/transcript-may-2019-tribal-energy-webinar-series-initial-scoping-energy-projects-back
+      maxPeakW: 50000000,
+      btuPerWh: 13.3,
+      spinMinutes: 240,
+      // EIA gives $154.26/kW-year fixed plus $5.93/MWh variable O&M in 2025 dollars. The engine
+      // has one annual O&M field, so both are converted to 2018 dollars and variable O&M is
+      // annualized at the observed 60.2% capacity factor.
+      annualOperatingCost: 0.14471 * peakW,
+      yearsToBuild: 5,
+      // 2022 U.S. "other biomass" fleet average; wood was 57.9% in the same table.
+      // https://www.eia.gov/electricity/annual/table.php?t=epa_04_08_b.html
+      capacityFactor: 0.602,
+      lifespanYears: 30,
+    },
     // {
     //   name: 'Trash Incinerator',
     //   fuel: 'Trash',
@@ -374,7 +403,6 @@ export function GENERATORS(
       capacityFactor: 0.83,
       lifespanYears: 30,
     },
-    // TODO biomass
   ] as GeneratorShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers
