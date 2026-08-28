@@ -17,7 +17,8 @@ import {
   tickState,
 } from "./Game";
 import { TICK_MS } from "../Constants";
-import { GameType, ScenarioType } from "../Types";
+import { GameType, MonthlyHistoryType, ScenarioType } from "../Types";
+import * as User from "./User";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -81,8 +82,13 @@ function playOutOnTheStore(state: GameType, untilMonth: number) {
 }
 
 describe("ending a scenario from inside the reducer", () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
 
   it("survives to the end of the term without reading the revoked draft", () => {
     const scenario = customScenario({ durationMonths: 2 });
@@ -157,6 +163,87 @@ describe("ending a scenario from inside the reducer", () => {
     }
     expect(state.monthlyHistory[0].cash).toBeLessThan(0);
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
+  });
+
+  it("shows and submits a score after bankruptcy", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const scenario = SCENARIOS.find(
+      (s: ScenarioType) => s.id === 100,
+    ) as ScenarioType;
+    const state = createGame({
+      scenarioId: scenario.id,
+      monthlyMarketingSpend: 1000000000,
+    });
+
+    playOutOnTheStore(state, 1);
+    expect(getStore().getState().game.monthlyHistory[0].cash).toBeLessThan(0);
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toEqual(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        outcome: "bankrupt",
+        ranked: true,
+      }),
+    );
+    expect(submitHighscore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        score: victory?.score,
+      }),
+    );
+  });
+
+  it("shows and submits a score after the player is fired", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const scenario = SCENARIOS.find(
+      (s: ScenarioType) => s.id === 100,
+    ) as ScenarioType;
+    const state = createGame({ scenarioId: scenario.id });
+    const blackoutMonth: MonthlyHistoryType = {
+      year: scenario.startingYear,
+      month: 0,
+      supplyWh: 1,
+      demandWh: 100,
+      cash: scenario.cash,
+      customers: 100,
+      netWorth: scenario.cash,
+      revenue: 1,
+      expensesFuel: 0,
+      expensesOM: 0,
+      expensesCarbonFee: 0,
+      expensesInterest: 0,
+      expensesMarketing: 0,
+      kgco2e: 0,
+      interestRate: 0.05,
+      inflationRate: 0.02,
+    };
+    state.monthlyHistory = [
+      { ...blackoutMonth, month: 3 },
+      { ...blackoutMonth, month: 2 },
+      { ...blackoutMonth, month: 1 },
+    ];
+
+    playOutOnTheStore(state, 1);
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toEqual(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        outcome: "fired",
+        ranked: true,
+      }),
+    );
+    expect(submitHighscore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        score: victory?.score,
+      }),
+    );
   });
 });
 

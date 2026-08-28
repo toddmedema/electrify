@@ -607,6 +607,9 @@ export interface VictoryType {
   // The player's best on this scenario BEFORE this run, read at the moment the scenario ended so
   // that "was 640" reports the run before this one rather than the one just finished
   previousBest?: number;
+  // A failed run still earns and submits a score, but the score screen must not celebrate it as a
+  // completed mission or let the terminal game resume and submit the same run again
+  outcome?: "completed" | "bankrupt" | "fired";
 }
 
 export interface UIType {

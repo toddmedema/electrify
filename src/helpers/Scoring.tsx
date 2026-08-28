@@ -11,6 +11,13 @@ export function computeScoreBreakdown(
 ): ScoreBreakdownType {
   const blackoutsTWh =
     Math.max(0, summary.demandWh - summary.supplyWh) / 1000000000000;
+  // A public utility that fails before supplying any electricity still needs a valid final score.
+  // Its effective rate is unknowable, so leave that category neutral instead of dividing 0 / 0
+  // and sending NaN to the score screen and Firestore.
+  const effectiveRate =
+    summary.supplyWh > 0
+      ? summary.revenue / (summary.supplyWh / 1000)
+      : scenario.dollarsPerkWh;
   return scenario.ownership === "Investor"
     ? {
         supply: Math.round(summary.supplyWh / 1000000000000),
@@ -20,12 +27,7 @@ export function computeScoreBreakdown(
         blackouts: Math.round(-8 * blackoutsTWh),
       }
     : {
-        rate: Math.round(
-          80 *
-            100 *
-            (scenario.dollarsPerkWh -
-              summary.revenue / (summary.supplyWh / 1000)),
-        ),
+        rate: Math.round(80 * 100 * (scenario.dollarsPerkWh - effectiveRate)),
         supply: Math.round((10 * summary.supplyWh) / 1000000000000),
         emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
         blackouts: Math.round(-10 * blackoutsTWh),
