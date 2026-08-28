@@ -123,11 +123,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           sx={{ flexWrap: "wrap", justifyContent: "center" }}
         >
           <InstallAppButton />
-          {canShare() && (
-            <Button color="primary" startIcon={<ShareIcon />} onClick={onShare}>
-              Share game
-            </Button>
-          )}
           {props.audioEnabled === undefined && (
             <Button
               color="primary"
@@ -152,6 +147,16 @@ const MainMenu = (props: Props): React.JSX.Element => {
           opacity: 0.7,
         }}
       >
+        {canShare() && (
+          <IconButton
+            color="primary"
+            onClick={onShare}
+            aria-label="Share Electrify"
+            size="large"
+          >
+            <ShareIcon />
+          </IconButton>
+        )}
         <IconButton
           color="primary"
           href="mailto:todd@fabricate.io"

@@ -815,19 +815,9 @@ $pane_header_height: 40px;
   border-left: 4px solid var(--interactive-blue);
 }
 
-.leaderboardDisclosure {
+.leaderboard {
   margin: 20px auto;
   max-width: 760px;
-
-  summary {
-    width: fit-content;
-    margin: 0 auto 8px;
-    padding: 10px 12px;
-    color: $interactive_blue;
-    font-weight: 700;
-    cursor: pointer;
-    touch-action: manipulation;
-  }
 }
 
 // Units appended to numbers in tables, de-emphasized so the number still reads first

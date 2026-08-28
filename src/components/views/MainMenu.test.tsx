@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 
@@ -53,5 +53,16 @@ describe("MainMenu", () => {
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
       { gap: "10px" },
     );
+  });
+
+  it("keeps sharing as a compact footer icon", () => {
+    render(<MainMenu {...props()} />);
+
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("button", {
+        name: "Share Electrify",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share game" })).toBeNull();
   });
 });
