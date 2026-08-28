@@ -184,8 +184,7 @@ export function formatReport(
   lines.push(
     `  Expenses         ${formatMoneyConcise(derived.expenses)}  ` +
       `[fuel ${formatMoneyConcise(summary.expensesFuel)} · O&M ${formatMoneyConcise(summary.expensesOM)} · ` +
-      `interest ${formatMoneyConcise(summary.expensesInterest)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee)} · ` +
-      `marketing ${formatMoneyConcise(summary.expensesMarketing)}]`,
+      `interest ${formatMoneyConcise(summary.expensesInterest)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee)}]`,
   );
   lines.push(`  Profit           ${formatMoneyConcise(derived.profit)}`);
   lines.push(

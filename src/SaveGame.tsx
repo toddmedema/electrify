@@ -25,11 +25,12 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
+// 5: investor customers respond to rate history and a finite market instead of marketing spend.
 // 4: conventional hydro carries a reservoir water balance and storage applies hourly losses.
 // 3: timeline rows may carry offshore wind, which changes the output of an offshore fleet.
 // 2: facilities carry the rate their loan was signed at, and the game carries the rate a new one
 // would cost. A version 1 save has neither, and a loan with no rate cannot be repaid.
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SaveGameType {
   version: number;
@@ -74,6 +75,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
+    typeof game.customerMarketSize !== "number" ||
+    !Number.isFinite(game.customerMarketSize) ||
+    game.customerMarketSize <= 0 ||
+    typeof game.customerRate !== "number" ||
+    !Number.isFinite(game.customerRate) ||
+    game.customerRate < 0 ||
     // Checked in full rather than trusted, the same way decodeReplay checks a replay's: the
     // location's id becomes the path of the weather file the loading screen fetches, and its
     // lat/long and time zone drive the sun model. A save is hand-editable too

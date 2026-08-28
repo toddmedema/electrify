@@ -74,6 +74,13 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
+  it("rejects a current-version save without customer-market state", () => {
+    const save = serializeSave(game);
+    const withoutMarket = { ...save.game } as Partial<GameType>;
+    delete withoutMarket.customerMarketSize;
+    expect(parseSave({ ...save, game: withoutMarket })).toBeNull();
+  });
+
   it("ignores corrupt JSON", () => {
     window.localStorage.setItem(SAVE_KEY, "{not json");
     expect(readSave()).toBeNull();

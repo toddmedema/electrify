@@ -310,7 +310,7 @@ export const SCENARIOS = [
   },
   {
     id: 3, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "Mission 5: Marketing",
+    name: "Mission 5: Pricing",
     icon: "wind",
     summary: "Grow your customers",
     locationId: "SF",
@@ -333,29 +333,29 @@ export const SCENARIOS = [
         target: "#financesNav",
         content: (
           <TutorialPrompt
-            concepts={["marketing", "customers"]}
-            text="Marketing lives in the Finances tab."
+            concepts={["rate", "customers"]}
+            text="Your electricity rate lives in the Finances tab."
           />
         ),
         desktop: {
           target: "#financesPane",
           content: (
             <TutorialPrompt
-              concepts={["marketing", "customers"]}
-              text="Marketing lives in the Finances pane."
+              concepts={["rate", "customers"]}
+              text="Your electricity rate lives in the Finances pane."
             />
           ),
         },
       },
       {
         card: "FINANCES",
-        target: "#marketingSlider",
-        advanceOn: (s: AppStateType) => s.game.monthlyMarketingSpend > 0,
+        target: "#rateSlider",
+        advanceOn: (s: AppStateType) => s.game.dollarsPerkWh < 0.07,
         content: (
           <TutorialPrompt
-            concepts={["marketing", "customers"]}
-            text="Raise the marketing budget."
-            action={["marketing"]}
+            concepts={["rate", "customers"]}
+            text="Lower the rate below market to win customers."
+            action={["rate"]}
           />
         ),
       },

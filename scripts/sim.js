@@ -18,7 +18,6 @@ const FLAGS = {
   "--months": "SIM_MONTHS",
   "--seed": "SIM_SEED",
   "--strategy": "SIM_STRATEGY",
-  "--marketing": "SIM_MARKETING",
   "--rate": "SIM_RATE",
   "--build": "SIM_BUILD",
   "--build-mw": "SIM_BUILD_MW",
@@ -47,7 +46,6 @@ Runs the game's simulation headlessly and reports what happened.
   --months <n>           Override the scenario's own duration
   --seed <n>             Pin the run's randomness (default 12345)
   --strategy <name>      none (default) or keepUp, which buys generators when short on supply
-  --marketing <dollars>  Monthly marketing spend (default 0)
   --rate <dollars>       $/kWh charged to customers (default: whatever a real game starts at)
   --build <name>         Build one generator immediately (a real recorded player action)
   --build-mw <n>         Size for --build in MW (default 300)

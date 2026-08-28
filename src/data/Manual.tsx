@@ -51,7 +51,7 @@ export const MANUAL_ENTRY = {
   BTU: "BTU and MMBTU",
   CAPACITY_FACTOR: "Capacity Factor",
   CARBON_FEE: "Carbon Fee",
-  CUSTOMERS: "Customers, Demand & Marketing",
+  CUSTOMERS: "Customers, Demand & Pricing",
   EMISSIONS: "Emissions and CO2e",
   FORECASTS: "Forecasts",
   HYDROPOWER: "Hydropower & Reservoirs",
@@ -158,8 +158,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           <strong>Finances</strong> shows where the money went, and is where you
-          set marketing spend (which buys customers) and, in public-ownership
-          scenarios, the rate you charge.
+          set the rate you charge. In investor-owned scenarios that rate also
+          determines whether customers choose you or a competitor.
         </p>
         <p>
           <strong>Forecasts</strong> projects all of that forward so you can see
@@ -179,7 +179,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SYMBOLS,
     group: "Gameplay",
     keywords:
-      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast marketing fuel weather danger goal",
+      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather danger goal",
     entry: (
       <div>
         <p>
@@ -369,11 +369,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           sourceUrl="https://www.eia.gov/todayinenergy/detail.php?id=10211"
         />
         <p>
-          Like in real life, you as a company can spend money on marketing to
-          acquire more customers (you exist as one of many electricity
-          generation companies customers can select from). Your customer base
-          also naturally grows or shrinks depending on if you provide them good
-          service (i.e. few blackouts).
+          In investor-owned scenarios, you compete with other electricity
+          companies for a finite market. Charge less than the market rate and
+          customers gradually switch to you; charge more and they gradually
+          leave. They react to several months of bills rather than a single rate
+          change. Your customer base also naturally grows or shrinks depending
+          on whether you provide good service, including avoiding blackouts.
         </p>
         <p>
           Load changes continuously as people turn stuff on and off, as
@@ -611,9 +612,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           per kWh depending on the state.
         </p>
         <p>
-          In <strong>investor-owned</strong> scenarios the rate is fixed by the
-          regulator and you can't change it, so the only lever you have on
-          revenue is supplying more energy to more customers.
+          In <strong>investor-owned</strong> scenarios you compete for
+          customers. The market rate begins at the scenario's advertised rate
+          and rises with inflation. Charge below it to gain market share or
+          above it to earn more from each customer while accepting that some
+          will leave. Switching takes several months, and the available market
+          is finite.
         </p>
         <p>
           In <strong>public-owned</strong> scenarios you set the rate yourself

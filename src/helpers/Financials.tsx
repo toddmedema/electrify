@@ -239,8 +239,3 @@ export function facilityCashBack(
   // down payment/equity because the outstanding loan is settled at the same time.
   return g.buildCost - g.loanAmountLeft;
 }
-
-// CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
-export function customersFromMarketingSpend(spend: number) {
-  return Math.floor(spend / (100 + spend / 1000000));
-}

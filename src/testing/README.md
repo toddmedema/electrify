@@ -59,7 +59,7 @@ code rather than a vibe.
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends
-of the difficulty range, marketing spend, and a run that builds on credit. It also pins down
+of the difficulty range, customer price competition, and a run that builds on credit. It also pins down
 determinism and a few economic identities (revenue really is rate times kilowatt hours, the carbon
 fee really is proportional to emissions).
 

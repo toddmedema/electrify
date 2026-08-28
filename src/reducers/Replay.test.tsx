@@ -54,10 +54,10 @@ function playAScriptedGame(): GameType {
   );
 
   runMonths(state, 2);
-  state = dispatch(state, delta({ monthlyMarketingSpend: 40000 }));
+  state = dispatch(state, delta({ dollarsPerkWh: 0.06 }));
   // Two deltas in the same minute: the sliders fire one of these per pixel dragged, and only the
   // last matters, so the recorder merges them
-  state = dispatch(state, delta({ monthlyMarketingSpend: 60000 }));
+  state = dispatch(state, delta({ dollarsPerkWh: 0.065 }));
 
   runMonths(state, 2);
   state = dispatch(state, togglePauseFacility(state.facilities[0].id));
@@ -105,7 +105,7 @@ describe("recording a run", () => {
   it("merges the deltas fired within one minute into the value that stuck", () => {
     const deltas = played.replayLog!.filter((a) => a.type === "delta");
     expect(deltas.length).toBe(1);
-    expect(deltas[0].payload).toEqual({ monthlyMarketingSpend: 60000 });
+    expect(deltas[0].payload).toEqual({ dollarsPerkWh: 0.065 });
   });
 
   it("stamps each action with a tick boundary inside the run", () => {

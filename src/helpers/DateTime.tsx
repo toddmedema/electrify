@@ -31,7 +31,6 @@ export const EMPTY_HISTORY = {
   expensesOM: 0,
   expensesCarbonFee: 0,
   expensesInterest: 0,
-  expensesMarketing: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
@@ -48,7 +47,6 @@ export function reduceHistories(
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
-  acc.expensesMarketing += t.expensesMarketing;
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
   acc.cash = t.cash;
@@ -67,11 +65,7 @@ export function deriveExpandedSummary(
   s: MonthlyHistoryType,
 ): DerivedHistoryType {
   const expenses =
-    s.expensesFuel +
-    s.expensesOM +
-    s.expensesMarketing +
-    s.expensesCarbonFee +
-    s.expensesInterest;
+    s.expensesFuel + s.expensesOM + s.expensesCarbonFee + s.expensesInterest;
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
     ...s,
@@ -103,7 +97,6 @@ function accumulateTick(
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;
-  summary.expensesMarketing += t.expensesMarketing;
   summary.expensesCarbonFee += t.expensesCarbonFee;
   summary.expensesInterest += t.expensesInterest;
   summary.cash = t.cash;

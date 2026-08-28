@@ -44,13 +44,13 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "storageLossWh",
   "cash",
   "customers",
+  "customerRate",
   "netWorth",
   "revenue",
   "expensesFuel",
   "expensesOM",
   "expensesCarbonFee",
   "expensesInterest",
-  "expensesMarketing",
   "kgco2e",
   "interestRate",
   "inflationRate",
@@ -77,7 +77,6 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "expensesOM",
   "expensesCarbonFee",
   "expensesInterest",
-  "expensesMarketing",
   "kgco2e",
   // A lender can quote any rate it likes, but never a negative one
   "interestRate",
@@ -94,7 +93,6 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "expensesOM",
   "expensesCarbonFee",
   "expensesInterest",
-  "expensesMarketing",
   "kgco2e",
   "interestRate",
   "inflationRate",
@@ -202,8 +200,7 @@ export function checkTick(
       now.expensesFuel +
       now.expensesOM +
       now.expensesCarbonFee +
-      now.expensesInterest +
-      now.expensesMarketing;
+      now.expensesInterest;
     const maxPrincipal = state.facilities.reduce(
       (acc: number, f: FacilityOperatingType) =>
         acc +

@@ -18,6 +18,8 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     scenarioId: 101, // Rise of Renewables
     seed: 31337,
     startingYear: 2020,
+    customerMarketSize: 2_000_000,
+    customerRate: 0.07,
     location: LOCATIONS.PIT,
     date: { minute: 1000, year: 2035, month: 6 },
     facilities: [],

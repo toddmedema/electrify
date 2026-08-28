@@ -12,7 +12,6 @@ import {
   getSunriseSunset,
 } from "../helpers/DateTime";
 import {
-  customersFromMarketingSpend,
   facilityCashBack,
   getCreditInputs,
   getCreditPremium,
@@ -20,6 +19,13 @@ import {
   getPaymentInterest,
 } from "../helpers/Financials";
 import { getInflationRate, getPrimeRate } from "../data/Economy";
+import {
+  CUSTOMER_MARKET_MULTIPLIER,
+  customerMarketSizeAt,
+  getMarketRate,
+  nextCustomerCount,
+  updateCustomerRate,
+} from "../helpers/Customers";
 import {
   formatMoneyConcise,
   formatWatts,
@@ -438,7 +444,8 @@ const initialGame: GameType = {
   inGame: false,
   feePerKgCO2e: 0, // Start on easy mode
   dollarsPerkWh: 0.07,
-  monthlyMarketingSpend: 0,
+  customerMarketSize: 0,
+  customerRate: 0.07,
   // Placeholders until initGame prices the company against the year it actually starts in. The
   // new game screens read these before any economic data has been loaded.
   interestRate: INTEREST_RATE_YEARLY,
@@ -545,6 +552,8 @@ export const gameSlice = createSlice({
       // The rate the scenario advertises on the new game screen, and the rate Public scenarios are
       // scored against, so the game has to actually start there rather than at the slice default
       state.dollarsPerkWh = scenario.dollarsPerkWh;
+      state.customerRate = scenario.dollarsPerkWh;
+      state.customerMarketSize = a.customers * CUSTOMER_MARKET_MULTIPLIER;
       state.location = a.location;
       state.timeline = generateNewTimeline(state, a.cash, a.customers);
 
@@ -606,8 +615,8 @@ export const gameSlice = createSlice({
       // Establish the comparison before time moves. A fleet that was already dearer on day one
       // has not crossed anything; the first monthly ordering change is the event.
       state.fuelCostSnapshot = currentFuelCosts(state);
-      // Anything the player did before the clock first moved -- setting a rate or a marketing
-      // budget on the way in. tickState picks up everything after this
+      // Anything the player did before the clock first moved -- setting a rate on the way in.
+      // tickState picks up everything after this
       applyPendingReplayActions(state);
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
@@ -1020,6 +1029,7 @@ export function tickState(state: GameType) {
       previousMonth = state.date.month;
       const history = state.monthlyHistory;
       const { cash, customers } = now;
+      state.customerRate = now.customerRate;
 
       // Record final history for the month, then generate the new timeline
       history.unshift(summarizeTimeline(state.timeline, state.startingYear));
@@ -1254,19 +1264,32 @@ export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
   );
 }
 
-// Simplified customer forecast, assumes no blackouts since supply calculation depends on demand (circular depedency)
+// Simplified customer forecast, assumes no blackouts since supply calculation depends on demand
+// (circular dependency). The supply pass repeats the calculation with reliability attrition.
 function getDemandW(
   date: DateType,
   game: GameType,
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
 ) {
-  const marketingGrowth =
-    customersFromMarketingSpend(game.monthlyMarketingSpend) / TICKS_PER_MONTH;
-  now.customers = Math.round(
-    prev.customers * (1 + ORGANIC_GROWTH_MAX_ANNUAL / TICKS_PER_YEAR) +
-      marketingGrowth,
+  const scenario =
+    getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+  now.customerRate = updateCustomerRate(
+    prev.customerRate || game.customerRate,
+    game.dollarsPerkWh,
   );
+  now.customers = nextCustomerCount({
+    customers: prev.customers,
+    customerRate: now.customerRate,
+    marketRate: getMarketRate(
+      scenario.dollarsPerkWh,
+      date,
+      game.startingYear,
+      game.seed,
+    ),
+    marketSize: customerMarketSizeAt(game.customerMarketSize, now.minute),
+    ownership: scenario.ownership,
+  });
   const sun = getSunriseSunset(date, game.location);
 
   // https://www.eia.gov/todayinenergy/detail.php?id=830
@@ -1747,7 +1770,6 @@ function updateSupplyFacilitiesFinances(
     }
   });
   const expensesCarbonFee = state.feePerKgCO2e * kgco2e;
-  const expensesMarketing = state.monthlyMarketingSpend / TICKS_PER_MONTH;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough
@@ -1759,13 +1781,23 @@ function updateSupplyFacilitiesFinances(
   const organicGrowthRate =
     ORGANIC_GROWTH_MAX_ANNUAL -
     difficulty.blackoutPenalty * percentDemandUnfulfilled;
-  const marketingGrowth =
-    customersFromMarketingSpend(state.monthlyMarketingSpend) / TICKS_PER_MONTH;
+  const scenario =
+    getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
 
   // Save new financial info
-  now.customers = Math.round(
-    prev.customers * (1 + organicGrowthRate / TICKS_PER_YEAR) + marketingGrowth,
-  );
+  now.customers = nextCustomerCount({
+    customers: prev.customers,
+    customerRate: now.customerRate,
+    marketRate: getMarketRate(
+      scenario.dollarsPerkWh,
+      tickDate,
+      state.startingYear,
+      state.seed,
+    ),
+    marketSize: customerMarketSizeAt(state.customerMarketSize, now.minute),
+    ownership: scenario.ownership,
+    organicGrowthRate,
+  });
   now.cash = Math.round(
     prev.cash +
       revenue -
@@ -1773,7 +1805,6 @@ function updateSupplyFacilitiesFinances(
       expensesFuel -
       expensesCarbonFee -
       expensesInterest -
-      expensesMarketing -
       principalRepayment,
   );
   now.netWorth = getNetWorth(facilities, now.cash, now.minute);
@@ -1782,7 +1813,6 @@ function updateSupplyFacilitiesFinances(
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
   now.expensesInterest = expensesInterest;
-  now.expensesMarketing = expensesMarketing;
   now.kgco2e = kgco2e;
   // Deliberately this tick's own month rather than `date`, which is the month the game is
   // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
@@ -1856,6 +1886,9 @@ export function generateNewTimeline(
   // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
   // was the same number recomputed for every one of up to a year's worth of ticks
   const netWorth = getNetWorth(state.facilities, cash, state.date.minute);
+  const currentCustomerRate =
+    getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
+      ?.customerRate || readOnlyState.customerRate;
   for (let i = 0; i < ticks; i++) {
     state.timeline[i] = {
       minute: state.date.minute + i * TICK_MINUTES,
@@ -1866,13 +1899,13 @@ export function generateNewTimeline(
       temperatureC: 0,
       cash,
       customers,
+      customerRate: currentCustomerRate,
       netWorth,
       revenue: 0,
       expensesFuel: 0,
       expensesOM: 0,
       expensesCarbonFee: 0,
       expensesInterest: 0,
-      expensesMarketing: 0,
       kgco2e: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
       interestRate: 0,
