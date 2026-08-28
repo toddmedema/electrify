@@ -490,6 +490,25 @@ const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
   label: formatMoneyConcise(rate),
 }));
 
+/**
+ * The useful part of the marketing forecast is its change, not its resulting total. At large
+ * customer counts, formatting both totals compactly can turn `1m -> 1m` and hide the effect.
+ */
+export function formatMarketingCustomerGrowth(
+  marketingSpend: number,
+  customers: number,
+): string {
+  const gained = customersFromMarketingSpend(marketingSpend);
+  const formattedGain = numbro(gained).format({
+    average: true,
+    mantissa: 1,
+    trimMantissa: true,
+  });
+  const percent =
+    customers > 0 ? ` (+${((gained / customers) * 100).toFixed(1)}%)` : "";
+  return `+${formattedGain}${percent}`;
+}
+
 export default class Finances extends React.Component<Props, State> {
   // Context rather than a prop: shouldComponentUpdate below throttles renders against the game
   // clock, which a prop change would have to be excepted from - a context change is delivered
@@ -922,12 +941,10 @@ export default class Finances extends React.Component<Props, State> {
                   <>
                     &nbsp;&rarr;&nbsp;
                     <Typography color="primary" component="strong">
-                      {numbro(
-                        now.customers +
-                          customersFromMarketingSpend(
-                            game.monthlyMarketingSpend,
-                          ),
-                      ).format({ average: true })}
+                      {formatMarketingCustomerGrowth(
+                        game.monthlyMarketingSpend,
+                        now.customers,
+                      )}
                     </Typography>
                     &nbsp;next month
                   </>
