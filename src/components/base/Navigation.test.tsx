@@ -35,6 +35,7 @@ describe("Navigation", () => {
     renderNavigation();
 
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Insights" })).toBeVisible();
   });
 });

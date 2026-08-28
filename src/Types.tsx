@@ -99,6 +99,8 @@ export type CardNameType =
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
   | "FACILITIES"
+  | "INSIGHTS"
+  // Kept as navigation aliases for old saved/tutorial state; new UI routes both to Insights.
   | "FINANCES"
   | "FORECASTS"
   | "EVENTS"
@@ -422,8 +424,8 @@ export interface TutorialStepType {
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)
   advanceOnAction?: string | string[];
-  // Above the desktop breakpoint the bottom nav is hidden and Facilities / Finances /
-  // Forecasts render side by side, so a step whose target lives in that nav - or whose
+  // Above the desktop breakpoint the bottom nav is hidden and Facilities / Insights render
+  // side by side, so a step whose target lives in that nav - or whose
   // selector matches more than one pane - needs a different target there, and usually
   // different wording too, since there are no tabs left to switch between
   desktop?: {
@@ -653,7 +655,7 @@ export interface UIType {
   snackbar: SnackbarType;
   // The facility the player has clicked in the fleet list, or null for none. UI rather than game
   // state: it changes nothing about the simulation, and it is read by all three panes -- the
-  // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Finances reports what
+  // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Insights reports what
   // it has earned. Cleared when the run ends, or when the facility is sold out from under it
   selectedFacilityId: number | null;
   // The score screen for a run that just ended, or null when none has. Its own slot rather than a

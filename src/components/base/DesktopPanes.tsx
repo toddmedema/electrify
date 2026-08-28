@@ -5,13 +5,11 @@ import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
  * The desktop column layout: the panes side by side, with a splitter the player can drag
  * between each neighbouring pair.
  *
- * The three panes want different amounts of room -- Facilities is a list of short rows, Finances
- * is a two-column table of text, Forecasts is a stack of charts -- so equal thirds waste the
- * screen on one and cramp the others. Below are the starting weights; whatever the player drags
- * them to is remembered, since a column layout is the sort of thing people set once.
+ * Facilities is a list of short rows while Insights is a chart workbench, so equal columns waste
+ * room on one and cramp the other. Whatever the player drags them to is remembered.
  */
 
-const WEIGHTS_KEY = "desktopPaneWeights";
+const WEIGHTS_KEY = "desktopPaneWeightsInsights";
 
 // A layout is only meaningful for the number of panes it was dragged with, and the same window
 // can be showing two of them (a laptop), three (a desktop) or four (an ultrawide) over an
@@ -20,9 +18,11 @@ function weightsKey(count: number): string {
   return count === 3 ? WEIGHTS_KEY : `${WEIGHTS_KEY}${count}`;
 }
 
-// Facilities needs the least width, Finances and Forecasts the most, and the event log is a
-// column of short lines that only ever gets the room left over
-const DEFAULT_WEIGHTS = [1, 1.15, 1.15, 0.75];
+// Facilities needs the least width, Insights the most, and the optional event log gets the rest.
+const DEFAULT_WEIGHTS_BY_COUNT: Record<number, number[]> = {
+  2: [1, 2],
+  3: [1, 2, 0.8],
+};
 
 // A pane narrower than this stops being readable, so a drag can't push one past it
 const MIN_PANE_PX = 240;
@@ -43,7 +43,7 @@ function isUsableWeights(value: unknown, count: number): value is number[] {
 }
 
 function defaultWeights(count: number): number[] {
-  return DEFAULT_WEIGHTS.slice(0, count);
+  return DEFAULT_WEIGHTS_BY_COUNT[count] || new Array(count).fill(1);
 }
 
 function loadWeights(count: number): number[] {

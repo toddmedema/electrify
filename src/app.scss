@@ -565,6 +565,106 @@ $pane_header_height: 40px;
   margin-left: auto;
 }
 
+.insightsHeader {
+  gap: 8px;
+
+  .headerControl {
+    min-width: 132px;
+  }
+
+  .insightsPreset {
+    min-width: 138px;
+  }
+}
+
+.insightsLayerPanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: $border_accent;
+  background: var(--bg-raised);
+}
+
+.insightsLayerGroup {
+  display: flex;
+  flex-direction: column;
+
+  .MuiFormControlLabel-root {
+    margin-right: 0;
+  }
+}
+
+.insightsLevers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 4px 12px 8px;
+  border-bottom: $border_accent;
+
+  .budgetSlider {
+    width: 100%;
+  }
+}
+
+.insightsTracks {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.insightsTrack {
+  padding-bottom: 8px;
+  border-bottom: $border_accent;
+}
+
+.base_main .MuiToolbar-root.insightsTrackHeader {
+  min-height: 38px;
+  padding-right: 8px;
+}
+
+.insightsTrackActions {
+  display: flex;
+  margin-left: auto;
+}
+
+.insightsWarning {
+  margin: 0 12px 8px;
+  color: var(--delta-bad);
+}
+
+.insightsSummaryTable {
+  width: 100%;
+}
+
+.insightsEmpty {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+@media screen and (max-width: 700px) {
+  .base_main .MuiToolbar-root.insightsHeader {
+    min-height: auto !important;
+    flex-wrap: wrap;
+    padding-top: 4px;
+    padding-bottom: 4px;
+
+    .headerControl {
+      margin-left: 0;
+    }
+  }
+
+  .insightsHeader > h6 {
+    width: 100%;
+  }
+
+  .insightsHeader .MuiSelect-root,
+  .insightsHeader .MuiButton-root {
+    flex: 1 1 120px;
+  }
+}
+
 .flex-newline {
   flex-basis: 100%;
 }
@@ -1715,8 +1815,8 @@ $sizemap: (
 }
 
 // ===============================================
-// Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities,
-// Finances and Forecasts can render as panes side by side instead of one screen at a time.
+// Above $desktop_breakpoint, let the app grow past the phone-width frame so Facilities and
+// Insights can render as panes side by side instead of one screen at a time.
 // The type scale comes down with it: the vertical space that buys is what fits the extra
 // rows and the fifth forecast chart on screen
 // ===============================================
