@@ -41,6 +41,11 @@ import {
 } from "../data/WorldEvents";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
 import {
+  getHydroConditions,
+  HYDRO_DEADPOOL_FRACTION,
+  mandatedReleaseFraction,
+} from "../helpers/Hydro";
+import {
   dialogOpen,
   dialogClose,
   snackbarOpen,
@@ -582,6 +587,12 @@ export const gameSlice = createSlice({
         }
       });
 
+      // The first blank timeline is created before the authored fleet is resolved. Hydrology is
+      // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
+      // may exist; otherwise its first forecast has zero inflow for every month.
+      if (state.facilities.some((facility) => facility.fuel === "Hydro")) {
+        state.timeline = reforecastWeatherAndPrices(state, 0);
+      }
       // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
       for (let i = 0; i < 4; i++) {
         updateSupplyFacilitiesFinances(
@@ -1315,6 +1326,14 @@ function reforecastWeatherAndPrices(
   state: GameType,
   cumulativeMegatons: number,
 ): TickPresentFutureType[] {
+  const hasHydro = state.facilities.some(
+    (facility) => facility.fuel === "Hydro",
+  );
+  const watershedId = state.location.watershedId || state.location.id;
+  const hydrologyByMonth = new Map<
+    string,
+    ReturnType<typeof getHydroConditions>
+  >();
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
@@ -1324,6 +1343,25 @@ function reforecastWeatherAndPrices(
         state.worldEvents?.active,
         date.minute,
       );
+      const hydroKey = `${date.year}-${date.monthNumber}`;
+      let hydrology = hydrologyByMonth.get(hydroKey);
+      if (!hydrology) {
+        hydrology = hasHydro
+          ? getHydroConditions(
+              date,
+              state.seed,
+              cumulativeMegatons,
+              watershedId,
+            )
+          : {
+              precipitationMm: 0,
+              snowpackMm: 0,
+              runoffMm: 0,
+              rainMm: 0,
+              meltMm: 0,
+            };
+        hydrologyByMonth.set(hydroKey, hydrology);
+      }
       const forecast = {
         ...t,
         ...fuelPrices,
@@ -1335,6 +1373,14 @@ function reforecastWeatherAndPrices(
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
         storedWh: 0,
+        precipitationMm: hydrology.precipitationMm,
+        snowpackMm: hydrology.snowpackMm,
+        hydroRunoffMm: hydrology.runoffMm,
+        hydroReservoirWh: 0,
+        hydroReservoirCapacityWh: 0,
+        hydroSpillWh: 0,
+        hydroMandatedReleaseW: 0,
+        storageLossWh: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
       if (weather.WIND_OFFSHORE_KPH === undefined) {
@@ -1369,6 +1415,7 @@ function updateSupplyFacilitiesFinances(
   simulated?: boolean,
 ) {
   const { facilities, date } = state;
+  const tickDate = getDateFromMinute(now.minute, state.startingYear);
   const difficulty = DIFFICULTIES[state.difficulty];
 
   // Update facility construction status
@@ -1419,12 +1466,78 @@ function updateSupplyFacilitiesFinances(
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
   let storedWh = 0;
+  let storageLossWh = 0;
+  let hydroReservoirWh = 0;
+  let hydroReservoirCapacityWh = 0;
+  let hydroSpillWh = 0;
+  let hydroMandatedReleaseW = 0;
   facilities.forEach((g: FacilityOperatingType, i: number) => {
+    let dispatchPeakW = g.peakW;
+    let mandatedW = 0;
+    const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
+    const storage = !!g.peakWh && g.yearsToBuildLeft === 0;
+    if (hydro && g.yearsToBuildLeft === 0) {
+      const capacityWh = g.reservoirCapacityWh || 0;
+      const inflowWh =
+        ((g.hydroWhPerMm || 0) * now.hydroRunoffMm) / TICKS_PER_MONTH;
+      const beforeSpill = (g.reservoirWh ?? capacityWh / 2) + inflowWh;
+      const spillWh = Math.max(0, beforeSpill - capacityWh);
+      g.reservoirWh = Math.min(capacityWh, beforeSpill);
+      g.hydroLastInflowWh = inflowWh;
+      g.hydroLastSpillWh = spillWh;
+      hydroSpillWh += spillWh;
+
+      const requiredReleaseWh = Math.min(
+        g.reservoirWh,
+        ((g.hydroMeanMonthlyInflowWh || 0) *
+          mandatedReleaseFraction(tickDate.monthNumber)) /
+          TICKS_PER_MONTH,
+      );
+      const deadpoolWh = capacityWh * HYDRO_DEADPOOL_FRACTION;
+      const turbineWaterWh = Math.max(0, g.reservoirWh - deadpoolWh);
+      if (!g.paused && turbineWaterWh > 0) {
+        const turbineMandatedWh = Math.min(requiredReleaseWh, turbineWaterWh);
+        const bypassWh = requiredReleaseWh - turbineMandatedWh;
+        g.reservoirWh = Math.max(0, g.reservoirWh - bypassWh);
+        mandatedW = Math.min(
+          g.peakW,
+          (turbineMandatedWh * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS,
+        );
+        dispatchPeakW = Math.min(
+          g.peakW,
+          (turbineWaterWh * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS,
+        );
+        g.hydroLastMandatedReleaseWh = requiredReleaseWh;
+        g.hydroLastBypassWh = bypassWh;
+      } else {
+        // Water rights remain binding while a plant is paused or below minimum power pool; the
+        // release bypasses the turbine and earns no electricity.
+        dispatchPeakW = 0;
+        g.reservoirWh = Math.max(0, g.reservoirWh - requiredReleaseWh);
+        g.hydroLastMandatedReleaseWh = requiredReleaseWh;
+        g.hydroLastBypassWh = requiredReleaseWh;
+      }
+    }
+    if (storage) {
+      // Storage leaks even while paused: pausing controls grid dispatch, not battery
+      // self-discharge or water evaporating from a pumped-hydro upper reservoir.
+      const lossWh =
+        g.currentWh * (1 - Math.pow(1 - g.hourlyLoss, 1 / TICKS_PER_HOUR));
+      g.currentWh = Math.max(0, g.currentWh - lossWh);
+      storageLossWh += lossWh;
+    }
     if (g.paused) {
       g.currentW = Math.max(
         0,
         g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
       ); // ramp down
+      if (storage) {
+        storedWh += g.currentWh;
+      }
+      if (hydro && g.yearsToBuildLeft === 0) {
+        hydroReservoirWh += g.reservoirWh || 0;
+        hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
+      }
       return;
     }
     if (g.yearsToBuildLeft === 0) {
@@ -1434,6 +1547,7 @@ function updateSupplyFacilitiesFinances(
           0,
           now.demandW * (1 + RESERVE_MARGIN) - supply,
         );
+        const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
             g.currentW = g.peakW * solarOutputFactor;
@@ -1445,7 +1559,10 @@ function updateSupplyFacilitiesFinances(
             g.currentW = g.peakW * offshoreWindOutputFactor;
             break;
           default: // on-demand produces up to demand + reserve margin
-            if (targetW > g.currentW || i < indexOfLastUnchargedBattery) {
+            if (
+              requiredTargetW > g.currentW ||
+              i < indexOfLastUnchargedBattery
+            ) {
               // spinning up
               // If there's a battery to charge after me, output as much as possible to charge it beyond demand
               if (
@@ -1454,28 +1571,37 @@ function updateSupplyFacilitiesFinances(
               ) {
                 g.currentW = Math.min(
                   now.demandW + totalChargeNeeded - charge,
-                  g.peakW,
+                  dispatchPeakW,
                   g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
                 );
               } else {
                 // Otherwise just try to fulfill demand + reserve margin
                 g.currentW = Math.min(
-                  g.peakW,
-                  targetW,
+                  dispatchPeakW,
+                  requiredTargetW,
                   g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
                 );
               }
             } else {
-              g.currentW = Math.max(
-                0,
-                targetW,
-                g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
+              g.currentW = Math.min(
+                dispatchPeakW,
+                Math.max(
+                  0,
+                  requiredTargetW,
+                  g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
+                ),
               );
             }
             break;
         }
         supply += g.currentW;
         supplyByFuel[g.fuel] = (supplyByFuel[g.fuel] || 0) + g.currentW;
+        if (hydro) {
+          const generatedWh =
+            (g.currentW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+          g.reservoirWh = Math.max(0, (g.reservoirWh || 0) - generatedWh);
+          hydroMandatedReleaseW += Math.min(g.currentW, mandatedW);
+        }
       }
       if (g.peakWh) {
         // Capable of storing electricity
@@ -1503,11 +1629,20 @@ function updateSupplyFacilitiesFinances(
         }
         storedWh += g.currentWh;
       }
+      if (hydro) {
+        hydroReservoirWh += g.reservoirWh || 0;
+        hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
+      }
     }
   });
   now.supplyW = supply;
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
+  now.storageLossWh = storageLossWh;
+  now.hydroReservoirWh = hydroReservoirWh;
+  now.hydroReservoirCapacityWh = hydroReservoirCapacityWh;
+  now.hydroSpillWh = hydroSpillWh;
+  now.hydroMandatedReleaseW = hydroMandatedReleaseW;
 
   // Update finances
   // TODO have starting dollarsPerkWh rate by location, based on historic prices (not as fulfilling) - or at least use to double check
@@ -1745,6 +1880,14 @@ export function generateNewTimeline(
       // Initialised anyway so a tick is a complete TickPresentFutureType the moment it exists,
       // rather than one that happens to be patched up before anything reads it.
       storedWh: 0,
+      precipitationMm: 0,
+      snowpackMm: 0,
+      hydroRunoffMm: 0,
+      hydroReservoirWh: 0,
+      hydroReservoirCapacityWh: 0,
+      hydroSpillWh: 0,
+      hydroMandatedReleaseW: 0,
+      storageLossWh: 0,
       supplyByFuel: {} as FuelProductionType,
       // Asserted because FuelPricesType carries a `[index: string]: number` index signature,
       // which a fresh object literal with a non-number field cannot satisfy. Same reason
@@ -1818,6 +1961,15 @@ function buildFacilityHelper(
       minuteCreated: state.date.minute,
       minuteOperational: newGame ? state.date.minute : undefined,
     } as FacilityOperatingType;
+    if (g.fuel === "Hydro" && g.reservoirCapacityWh) {
+      // A completed dam starts at a neutral mid-pool. New construction carries this initial
+      // value until commissioning rather than conjuring five years of unobserved inflow.
+      facility.reservoirWh = g.reservoirCapacityWh / 2;
+      facility.hydroLastInflowWh = 0;
+      facility.hydroLastSpillWh = 0;
+      facility.hydroLastMandatedReleaseWh = 0;
+      facility.hydroLastBypassWh = 0;
+    }
     if (g.peakWh) {
       facility.currentWh = 0;
       state.facilities.push(facility); // add storage to bottom so that it's on by default

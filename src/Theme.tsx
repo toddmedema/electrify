@@ -89,6 +89,9 @@ interface ChartPaletteType {
   temperatureAxis: string;
   wind: string;
   offshoreWind: string;
+  precipitation: string;
+  snowpack: string;
+  reservoir: string;
   /** Hover crosshair, lighter than the data it crosses */
   cursor: string;
   /** A trend line on offer rather than being read: the unselected metric tiles */
@@ -117,6 +120,9 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
     offshoreWind: FUEL_COLORS.light["Offshore Wind"],
+    precipitation: blue[400],
+    snowpack: "#6d4c9a",
+    reservoir: FUEL_COLORS.light.Hydro,
     cursor: grey[600],
     muted: grey[600],
     axis: "black",
@@ -140,6 +146,9 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     temperatureAxis: red[300],
     wind: FUEL_COLORS.dark.Wind,
     offshoreWind: FUEL_COLORS.dark["Offshore Wind"],
+    precipitation: blue[300],
+    snowpack: "#ce93d8",
+    reservoir: FUEL_COLORS.dark.Hydro,
     cursor: grey[500],
     muted: grey[500],
     axis: grey[300],

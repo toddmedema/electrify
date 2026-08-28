@@ -165,6 +165,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
   } else if (facility.peakWh) {
     secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
+  } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
+    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)}, reservoir ${formatWattHoursOfPeak(facility.reservoirWh || 0, facility.reservoirCapacityWh)}`;
   } else {
     secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
   }

@@ -40,6 +40,10 @@ export interface LocationType {
   region?: string;
   country?: string;
   elevation?: number;
+  // A curated upstream record used by conventional hydro. Locations without one use their own
+  // precipitation, which keeps arbitrary custom locations playable without inventing a basin.
+  watershedId?: LocationIdType;
+  watershedName?: string;
   // Whether the loaded weather record includes a curated offshore wind site for this location.
   offshore?: boolean;
   // Explicit resource knowledge wins over the regional fallback. This keeps an arbitrary point
@@ -223,8 +227,8 @@ export interface RawWeatherType {
   WIND_KPH: number;
   // Present only in v2 weather files whose catalogue entry has an offshore sampling point.
   WIND_OFFSHORE_KPH?: number;
-  // Recorded and carried through the forecast, but nothing simulates it yet: hydro inflow, snow
-  // sitting on panels and the cooling water a thermal plant needs are all downstream of having it
+  // Hydro turns this into watershed snowpack, runoff and reservoir inflow. Other downstream
+  // effects such as snow sitting on panels and thermal-plant cooling water remain out of scope.
   PRECIP_MM: number; // in that hour
 }
 
@@ -239,6 +243,14 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     windOffshoreKph?: number;
     temperatureC: number;
     storedWh: number;
+    precipitationMm: number; // Representative month's total over the hydro watershed
+    snowpackMm: number; // Snow-water equivalent remaining in that watershed
+    hydroRunoffMm: number; // Rain plus snowmelt available after catchment losses this month
+    hydroReservoirWh: number; // Conventional-hydro reservoir energy, separate from storage
+    hydroReservoirCapacityWh: number;
+    hydroSpillWh: number; // Water above reservoir capacity lost during this tick
+    hydroMandatedReleaseW: number; // Must-run water-rights flow through turbines
+    storageLossWh: number; // Self-discharge / evaporation during this simulated tick
     supplyByFuel: FuelProductionType;
   };
 
@@ -296,6 +308,11 @@ export interface GeneratorOperatingType
   // load; the first real tick establishes their remaining lifetime from that point onward.
   minuteOperational?: number;
   paused: boolean;
+  reservoirWh?: number;
+  hydroLastInflowWh?: number;
+  hydroLastSpillWh?: number;
+  hydroLastMandatedReleaseWh?: number;
+  hydroLastBypassWh?: number;
 }
 
 export interface StorageOperatingType
@@ -353,6 +370,11 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
+  // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
+  // long-run inflow lands on capacityFactor without flattening wet and dry years.
+  reservoirCapacityWh?: number;
+  hydroWhPerMm?: number;
+  hydroMeanMonthlyInflowWh?: number;
 }
 
 interface SharedShoppingType {

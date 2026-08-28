@@ -89,7 +89,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       reportProgress("Loading weather and market data…");
       try {
         await Promise.all([
-          callbackLoad((done) => initWeather(location.id, done)),
+          callbackLoad((done) => initWeather(location, done)),
           callbackLoad(initFuelPrices),
           callbackLoad(initEconomy),
         ]);

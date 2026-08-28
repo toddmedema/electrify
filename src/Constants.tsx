@@ -59,6 +59,8 @@ export const LOCATIONS = {
     region: "North America",
     country: "United States",
     admin: "PA",
+    watershedId: "AlleghenyUpper",
+    watershedName: "Upper Allegheny watershed",
     resources: { hydro: true },
   },
   SF: {
@@ -71,6 +73,8 @@ export const LOCATIONS = {
     country: "United States",
     admin: "CA",
     offshore: true,
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
     resources: { geothermal: true, hydro: true },
   },
   LA: {
@@ -85,18 +89,18 @@ export const LOCATIONS = {
     offshore: true,
     resources: { geothermal: true },
   },
-  // Named for where its data was read as coming from, back when it was a CSV of unknown
-  // provenance. It now genuinely is the Santa Cruz Mountains: every location is fetched from
-  // these coordinates, so the name and the weather can no longer disagree
+  // Echo Summit stands in for the snow-fed Sierra headwaters supplying California hydro.
   CAMountains: {
     id: "CAMountains",
-    name: "Santa Cruz Mountains, CA",
-    lat: 37.1041,
-    long: -122.0308,
+    name: "Echo Summit, CA",
+    lat: 38.93,
+    long: -120.03,
     timeZone: "America/Los_Angeles",
     region: "North America",
     country: "United States",
     admin: "CA",
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
     resources: { geothermal: true, hydro: true },
   },
   HNL: {

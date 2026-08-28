@@ -2,7 +2,7 @@ import { SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { createGame, runSimulation, SimResultType } from "./Simulator";
 import { loadSimData } from "./SimData";
-import { TICKS_PER_MONTH } from "../Constants";
+import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -169,6 +169,71 @@ describe("simulation determinism", () => {
     const first = runSimulation(options);
     runSimulation({ scenarioId: 104, months: 12, seed: 999 });
     expect(runSimulation(options).months).toEqual(first.months);
+  });
+});
+
+describe("hydro dispatch", () => {
+  const scenario: ScenarioType = {
+    id: 9999,
+    name: "Hydro test basin",
+    icon: "hydro",
+    locationId: "SF",
+    location: LOCATIONS.SF,
+    ownership: "Public",
+    startingYear: 2002,
+    cash: 500_000_000,
+    startingCustomers: 250_000,
+    feePerKgCO2e: 0,
+    dollarsPerkWh: 0.1,
+    durationMonths: 24,
+    facilities: [{ fuel: "Hydro", peakW: 150_000_000 }],
+  };
+
+  function hydroGame() {
+    return createGame({ scenarioId: scenario.id, scenario });
+  }
+
+  it("holds the water-balance invariants across wet and dry seasons", () => {
+    expectNoViolations(
+      runSimulation({ scenarioId: scenario.id, scenario, months: 24 }),
+    );
+  });
+
+  it("turns water-rights flow into must-run power above the dead pool", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.hydroMandatedReleaseW).toBeGreaterThan(0);
+    expect(now.supplyByFuel.Hydro).toBeGreaterThanOrEqual(
+      now.hydroMandatedReleaseW,
+    );
+    expect(hydro.reservoirWh).toBeLessThan(hydro.reservoirCapacityWh!);
+  });
+
+  it("stops producing below minimum power pool while required releases continue", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh! * 0.05;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
+  });
+
+  it("keeps paused reservoirs visible while required releases bypass the turbine", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.paused = true;
+    const before = hydro.reservoirWh!;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(now.hydroReservoirWh).toBe(hydro.reservoirWh);
+    expect(now.hydroReservoirCapacityWh).toBe(hydro.reservoirCapacityWh);
+    expect(hydro.reservoirWh).not.toBe(before);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
   });
 });
 
