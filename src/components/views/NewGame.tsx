@@ -78,7 +78,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         autoFocus={next}
         aria-label={
           isTutorial
-            ? `${completed ? "Replay" : "Play"} ${s.name}${next ? ", recommended next" : ""}`
+            ? `${completed ? "Replay" : "Play"} ${s.name}`
             : `View ${s.name} details`
         }
       >
@@ -102,27 +102,8 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
               <Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />
             </Badge>
           }
-          title={
-            <span>
-              {s.name}
-              {next && (
-                <Chip
-                  className="recommendedChip"
-                  label="Recommended next"
-                  size="small"
-                  color="primary"
-                />
-              )}
-            </span>
-          }
-          subheader={
-            <span>
-              {summary}
-              {completed && (
-                <span className="missionCompleteText">Completed</span>
-              )}
-            </span>
-          }
+          title={<span>{s.name}</span>}
+          subheader={<span>{summary}</span>}
           action={
             isTutorial ? (
               <Chip

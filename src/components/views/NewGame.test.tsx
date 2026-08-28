@@ -56,8 +56,12 @@ describe("NewGame", () => {
     expect(TUTORIALS[1].summary).toBeDefined();
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
     expect(next).not.toHaveTextContent("Start here");
+    expect(next).not.toHaveTextContent("Recommended next");
     expect(next).toHaveTextContent(TUTORIALS[1].name);
     expect(next).toHaveClass("tutorialNext");
+    expect(within(next).getByRole("button")).toHaveAccessibleName(
+      `Play ${TUTORIALS[1].name}`,
+    );
   });
 
   it("shows completion badges for tutorials and regular missions", () => {
@@ -73,6 +77,7 @@ describe("NewGame", () => {
     expect(
       screen.getByTestId(`mission-complete-${regular.id}`),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Completed")).toBeNull();
   });
 
   it("starts tutorials directly and opens details for regular missions", () => {

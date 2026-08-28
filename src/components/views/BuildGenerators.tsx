@@ -172,9 +172,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
         <GeneratorMetric
           label="Emissions"
           value={
-            kgCO2ePerMWh > 0
-              ? `${formatMass(kgCO2ePerMWh, units)} CO2e/MWh`
-              : "No CO2e"
+            kgCO2ePerMWh > 0 ? `${formatMass(kgCO2ePerMWh, units)}/MWh` : "None"
           }
         />
       </Box>
@@ -188,29 +186,20 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
           {formatMoneyConcise(downpayment)} loan down payment.
         </Typography>
       )}
-      {buildable && financingGap === 0 && cash < generator.buildCost && (
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          sx={{ px: 2, pb: 1.5 }}
-        >
-          Financing available with a {formatMoneyConcise(downpayment)} down
-          payment.
-        </Typography>
-      )}
-      <IconButton
+      <Button
         color="primary"
-        className="expand-icon"
+        className="expand-details"
         size="small"
         aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
         aria-expanded={expanded}
+        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
         onClick={(event) => {
           event.stopPropagation();
           toggleExpand();
         }}
       >
-        {expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-      </IconButton>
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
@@ -318,7 +307,9 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
-                  {formatMass(kgCO2ePerMWh, units)} CO2e/MWh
+                  {kgCO2ePerMWh > 0
+                    ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+                    : "None"}
                 </TableCell>
               </TableRow>
             </TableBody>
