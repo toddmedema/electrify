@@ -361,6 +361,7 @@ export function isNavCard(name: CardNameType) {
 
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+  private tutorialScrollTimeout: ReturnType<typeof setTimeout> | undefined;
   private stepsCache:
     | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
     | undefined;
@@ -423,11 +424,42 @@ export default class Compositor extends React.Component<Props, {}> {
 
   public componentDidMount() {
     window.addEventListener("resize", this.handleResize);
+    this.scrollTutorialTargetIntoView();
+  }
+
+  public componentDidUpdate(prevProps: Props) {
+    if (
+      prevProps.tutorialStep !== this.props.tutorialStep ||
+      prevProps.card.name !== this.props.card.name
+    ) {
+      this.scrollTutorialTargetIntoView();
+    }
   }
 
   public componentWillUnmount() {
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
+    clearTimeout(this.tutorialScrollTimeout);
+  }
+
+  /** Joyride scrolling hangs inside card panes, so move their real scroll container ourselves. */
+  private scrollTutorialTargetIntoView() {
+    clearTimeout(this.tutorialScrollTimeout);
+    this.tutorialScrollTimeout = setTimeout(() => {
+      const steps = this.props.tutorialSteps;
+      const index = this.props.tutorialStep;
+      if (!steps || index < 0 || index >= steps.length) {
+        return;
+      }
+      const target = this.stepsForViewport(steps)[index]?.target;
+      if (typeof target !== "string") {
+        return;
+      }
+      const element = document.querySelector(target);
+      if (element && typeof element.scrollIntoView === "function") {
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    }, 50);
   }
 
   public handleJoyrideCallback = (data: EventData) => {
@@ -693,7 +725,7 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <Snackbar
-          className="snackbar"
+          className={`snackbar ${isNavCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}

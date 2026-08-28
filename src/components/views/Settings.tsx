@@ -2,8 +2,6 @@ import * as React from "react";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Checkbox,
   FormControl,
   FormControlLabel,
@@ -21,7 +19,7 @@ import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts from "../base/KeyboardShortcuts";
-import InstallAppButton from "../base/InstallAppButton";
+import InstallAppButton, { useIsInstalledApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
 
@@ -60,20 +58,39 @@ function SettingsSection({
   children,
 }: SettingsSectionProps): React.JSX.Element {
   return (
-    <Card component="section" variant="outlined" aria-labelledby={id}>
-      <CardContent>
-        <Typography id={id} component="h2" variant="h6" sx={{ mb: 1.5 }}>
-          {title}
-        </Typography>
-        <Stack spacing={1.5} sx={{ alignItems: "flex-start" }}>
-          {children}
-        </Stack>
-      </CardContent>
-    </Card>
+    <Box
+      component="section"
+      aria-labelledby={id}
+      sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "88px minmax(0, 1fr)",
+          sm: "160px minmax(0, 1fr)",
+        },
+        gap: { xs: 1.5, sm: 2 },
+        alignItems: "start",
+        py: 1.25,
+        borderBottom: 1,
+        borderColor: "divider",
+      }}
+    >
+      <Typography
+        id={id}
+        component="h2"
+        variant="subtitle2"
+        sx={{ pt: 0.75, fontWeight: 700 }}
+      >
+        {title}
+      </Typography>
+      <Stack spacing={0.75} sx={{ alignItems: "flex-start", minWidth: 0 }}>
+        {children}
+      </Stack>
+    </Box>
   );
 }
 
 export default function Settings(props: Props): React.JSX.Element {
+  const installedApp = useIsInstalledApp();
   // TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
   // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
 
@@ -131,12 +148,12 @@ export default function Settings(props: Props): React.JSX.Element {
           maxWidth: 720,
           mx: "auto",
           px: { xs: 2, sm: 3 },
-          py: 2,
+          py: 0.5,
           boxSizing: "border-box",
           overflowY: "auto",
         }}
       >
-        <Stack spacing={2}>
+        <Stack spacing={0}>
           <SettingsSection id="sound-settings" title="Sound">
             <FormControlLabel
               control={
@@ -252,13 +269,16 @@ export default function Settings(props: Props): React.JSX.Element {
             </Typography>
           </SettingsSection>
 
-          <SettingsSection id="app-settings" title="App">
-            <InstallAppButton />
-            <Typography variant="body2" color="textSecondary">
-              Install availability depends on your browser. Once installed,
-              Electrify opens like an app and cached game data can load offline.
-            </Typography>
-          </SettingsSection>
+          {!installedApp && (
+            <SettingsSection id="app-settings" title="App">
+              <InstallAppButton />
+              <Typography variant="body2" color="textSecondary">
+                Install availability depends on your browser. Once installed,
+                Electrify opens like an app and caches every location for
+                offline play.
+              </Typography>
+            </SettingsSection>
+          )}
 
           <SettingsSection id="saved-game-settings" title="Saved Game">
             <Stack
@@ -302,11 +322,17 @@ export default function Settings(props: Props): React.JSX.Element {
             <KeyboardShortcuts />
           </SettingsSection>
 
-          <Box component="footer" sx={{ textAlign: "center", pb: 1 }}>
-            <Typography className="version">
+          <Stack
+            component="footer"
+            direction="row"
+            spacing={2}
+            useFlexGap
+            sx={{ justifyContent: "center", flexWrap: "wrap", py: 1.5 }}
+          >
+            <Typography variant="caption">
               Electrify App v{packageJson.version}
             </Typography>
-            <Typography className="github">
+            <Typography variant="caption">
               <a
                 href="https://github.com/toddmedema/electrify"
                 target="_blank"
@@ -315,7 +341,7 @@ export default function Settings(props: Props): React.JSX.Element {
                 GitHub
               </a>
             </Typography>
-            <Typography>
+            <Typography variant="caption">
               <a href="/privacy.html">Privacy</a>
             </Typography>
             <Button
@@ -336,7 +362,7 @@ export default function Settings(props: Props): React.JSX.Element {
             >
               Clear cache
             </Button>
-          </Box>
+          </Stack>
         </Stack>
       </Box>
     </div>

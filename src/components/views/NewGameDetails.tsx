@@ -433,9 +433,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     sx={{ fontWeight: "bold", bgcolor: "action.selected" }}
                   >
                     <TableCell className="rank" />
-                    <TableCell colSpan={2}>
-                      Your best: {formatScore(myTopScore.score)}
-                    </TableCell>
+                    <TableCell>Your best</TableCell>
+                    <TableCell>{formatScore(myTopScore.score)}</TableCell>
                     {this.renderReplayCell(myTopScore)}
                   </TableRow>
                 )}

@@ -104,7 +104,7 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["build", "generator"]}
             text="Open the generator shop."
-            action={["build"]}
+            action={["generator"]}
           />
         ),
       },
@@ -183,7 +183,7 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["build", "storage"]}
             text="Storage banks spare power for when you need it - open the storage shop."
-            action={["build"]}
+            action={["storage"]}
           />
         ),
       },

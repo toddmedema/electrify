@@ -373,7 +373,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <DialogContent>
                   <DialogContentText>
                     You will receive{" "}
-                    {formatMoneyConcise(facilityCashBack(facility))}
+                    {formatMoneyConcise(
+                      facilityCashBack(facility, game.date.minute),
+                    )}
                     {facility.loanAmountLeft > 0
                       ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
                       : ""}

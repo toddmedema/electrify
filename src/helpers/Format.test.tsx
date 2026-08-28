@@ -121,6 +121,14 @@ describe("money formatting of values that are not numbers", () => {
     expect(formatMoneyStable(1500000)).toEqual("$1.50M");
   });
 
+  it("does not promote an amount before it reaches the next tier", () => {
+    expect(formatMoneyConcise(700000000)).toEqual("$700M");
+    expect(formatMoneyStable(700000000)).toEqual("$700M");
+    expect(formatMoneyConcise(999000000)).toEqual("$999M");
+    expect(formatMoneyConcise(999999999)).toEqual("$999M");
+    expect(formatMoneyConcise(1000000000)).toEqual("$1B");
+  });
+
   it("shows a dash rather than a word for a value it cannot express", () => {
     [Infinity, -Infinity, NaN].forEach((value) => {
       expect(formatMoneyConcise(value)).toEqual(NO_ESTIMATE);

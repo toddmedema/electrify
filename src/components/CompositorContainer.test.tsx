@@ -237,6 +237,22 @@ describe("walkthrough steps", () => {
     expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
   });
 
+  it("uses the same symbols as the generator and storage buttons it highlights", () => {
+    const actionOf = (step: TutorialStepType) =>
+      React.isValidElement<{ action?: string[] }>(step.content)
+        ? step.content.props.action
+        : undefined;
+    const generatorStep = walkthrough("Mission 2: Generators").find(
+      (step) => step.target === ".button-buildGenerator",
+    )!;
+    const storageStep = walkthrough("Mission 3: Storage").find(
+      (step) => step.target === ".button-buildStorage",
+    )!;
+
+    expect(actionOf(generatorStep)).toEqual(["generator"]);
+    expect(actionOf(storageStep)).toEqual(["storage"]);
+  });
+
   tutorials.forEach((scenario) => {
     const steps = scenario.tutorialSteps as TutorialStepType[];
 

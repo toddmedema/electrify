@@ -75,6 +75,40 @@ midpoint of NREL's $2,205-$4,434/kW closed-loop site range), equivalent to $332/
 Fixed O&M becomes $19/kW-year. NREL projects no cost or efficiency improvement for this mature
 technology.
 
+## Lifetimes and depreciation
+
+Facility resale value now follows straight-line physical depreciation from commercial operation:
+`build cost × max(0, 1 - operating age / lifespan)`. Construction time is not asset age. Cancelling
+construction returns the cash-funded portion of the purchase and closes any construction loan;
+selling an operating facility returns its depreciated gross value after settling the remaining
+loan. A fully depreciated asset may still operate, but has no resale value.
+
+These are technology-specific operating lives, not tax schedules. Tax depreciation (for example,
+five-year MACRS for several renewable technologies) is an accounting convention and would make a
+poor proxy for the physical value the player can sell:
+
+| Facility            |     Life | Basis                                                            |
+| ------------------- | -------: | ---------------------------------------------------------------- |
+| Coal                | 40 years | EIA AEO2025 standardized plant operating life                    |
+| Nuclear             | 40 years | EIA AEO2025 new-build economic operating life                    |
+| Natural gas         | 40 years | EIA AEO2025 H-class simple-cycle operating life                  |
+| Oil                 | 30 years | NREL technology-comparison economic life for combustion turbines |
+| Onshore wind        | 25 years | EIA AEO2025 large-plant operating life                           |
+| Offshore wind       | 25 years | EIA AEO2025 fixed-bottom operating life                          |
+| Solar PV            | 35 years | EIA AEO2025 single-axis PV operating life                        |
+| Hydropower          | 50 years | EIA AEO2025 reference operating life                             |
+| Geothermal          | 40 years | EIA AEO2025 dual-flash operating life                            |
+| Enhanced geothermal | 30 years | NREL EGS resource and plant-life assumption                      |
+| Lithium-ion battery | 20 years | EIA AEO2025 7,300-cycle service life                             |
+| Pumped hydro        | 75 years | Midpoint of DOE's typical 65-85 year hydropower range            |
+
+The EIA study is the most internally consistent current primary source because it specifies life,
+lead time, plant configuration, and cost together. DOE/NREL sources fill the technologies it does
+not distinguish. Actual plants can outlive these economic lives after refurbishment—DOE notes
+65-85 years as typical for hydropower, and the NRC can license nuclear units out to 80 years—but
+the game needs one reference life for predictable resale rather than trying to price future major
+overhauls.
+
 ## Commercial technology review
 
 No additional facility type is added in this pass:
@@ -99,5 +133,9 @@ No additional facility type is added in this pass:
 - [IRENA, Renewable Power Generation Costs in 2020](https://www.irena.org/Publications/2021/Jun/Renewable-Power-Costs-in-2020)
 - [NREL, Cost Projections for Utility-Scale Battery Storage: 2021 Update](https://docs.nrel.gov/docs/fy21osti/79236.pdf)
 - [NREL, 2024 Annual Technology Baseline: Pumped Storage Hydropower](https://atb.nrel.gov/electricity/2024b/pumped_storage_hydropower)
+- [NREL, Cost and Performance Data for Power Generation Technologies](https://docs.nrel.gov/docs/fy11osti/48595.pdf)
+- [NREL, Update to Enhanced Geothermal System Resource Potential Estimate](https://docs.nrel.gov/docs/fy17osti/66428.pdf)
+- [DOE, Hydropower Basics](https://www.energy.gov/cmei/water/hydropower-basics)
+- [EIA, age and license extensions of U.S. nuclear plants](https://www.eia.gov/tools/faqs/faq.php?id=228&t=1)
 - [BLS, annual CPI-U indexes](https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm)
 - [DOE, Long-Duration Energy Storage portfolio](https://www.energy.gov/cmei/oced/long-duration-energy-storage)

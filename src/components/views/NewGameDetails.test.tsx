@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { GameType } from "../../Types";
 import NewGameDetails, { Props } from "./NewGameDetails";
 
@@ -71,5 +71,20 @@ describe("NewGameDetails leaderboard", () => {
     await waitFor(() =>
       expect(mockWhere).toHaveBeenCalledWith("difficulty", "==", "CEO"),
     );
+  });
+
+  it("puts the player's best score in the score column", async () => {
+    mockGetDocs.mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({
+      docs: [{ data: () => ({ score: 432, uid: "player" }) }],
+    });
+
+    render(<NewGameDetails {...props({ uid: "player" })} />);
+
+    await screen.findByText("Your best");
+    const row = screen.getByRole("row", { name: /Your best 432/ });
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[1]).toHaveTextContent("Your best");
+    expect(cells[2]).toHaveTextContent("432");
+    expect(cells[1]).not.toHaveTextContent("432");
   });
 });

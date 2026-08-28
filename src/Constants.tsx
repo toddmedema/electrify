@@ -140,7 +140,6 @@ export const TICK_MS = {
 export const INFLATION = 0.03;
 export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% 2018 -> 2019, and that's with some marketing spending
 export const RESERVE_MARGIN = 0.05;
-export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;

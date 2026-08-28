@@ -42,20 +42,54 @@ export function formatMoneyStable(i: number): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
-  return (
-    "$" + numbro(i).format({ average: true, totalLength: 3 }).toUpperCase()
-  );
+  return "$" + formatMoneyAmount(i, false);
 }
 
 export function formatMoneyConcise(i: number): string {
   if (!Number.isFinite(i)) {
     return NO_ESTIMATE;
   }
+  return "$" + formatMoneyAmount(i, true);
+}
+
+interface MoneyUnitType {
+  suffix: string;
+  divisor: number;
+}
+
+const MONEY_UNITS: MoneyUnitType[] = [
+  { suffix: "T", divisor: 1e12 },
+  { suffix: "B", divisor: 1e9 },
+  { suffix: "M", divisor: 1e6 },
+  { suffix: "k", divisor: 1e3 },
+  { suffix: "", divisor: 1 },
+];
+
+/**
+ * Pick units from the amount itself, never from the formatter's desired character count. That
+ * keeps $700M as $700M instead of promoting it to $0.70B; a suffix only changes once the amount
+ * actually reaches one of the next unit.
+ */
+function formatMoneyAmount(i: number, trimMantissa: boolean): string {
+  const abs = Math.abs(i);
+  const unit =
+    MONEY_UNITS.find((candidate) => abs >= candidate.divisor) ||
+    MONEY_UNITS[MONEY_UNITS.length - 1];
+  let scaled = i / unit.divisor;
+  const scaledAbs = Math.abs(scaled);
+  // Rounding 999.9M to 1,000M would violate the chosen tier even though the source value is still
+  // below $1B. At that narrow boundary, truncate to the largest valid whole value for the tier.
+  if (scaledAbs >= 999.5 && unit.divisor > 1) {
+    scaled = Math.sign(scaled) * 999;
+  }
+  const displayAbs = Math.abs(scaled);
+  const mantissa = displayAbs < 10 ? 2 : displayAbs < 100 ? 1 : 0;
   return (
-    "$" +
-    numbro(i)
-      .format({ average: true, totalLength: 3, trimMantissa: true })
-      .toUpperCase()
+    numbro(scaled).format({
+      mantissa,
+      trimMantissa,
+      thousandSeparated: false,
+    }) + unit.suffix
   );
 }
 
