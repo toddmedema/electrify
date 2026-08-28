@@ -1520,7 +1520,12 @@ function updateSupplyFacilitiesFinances(
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *
           GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-        const facilityFuel = (fuelBtu * fuelPrices[g.fuel]) / 1000000;
+        // Hydro and geothermal carry a zero-emission FUELS entry so carbon accounting can name
+        // them, but they do not buy a fuel and therefore have no entry in the price table. In
+        // JavaScript even zero times undefined is NaN; the first operating tick after construction
+        // used to feed that through expenses into cash, where saving or charting exposed it as
+        // null. An unpriced resource costs zero here, matching generatorCostPerMWh above.
+        const facilityFuel = (fuelBtu * (fuelPrices[g.fuel] ?? 0)) / 1000000;
         const facilityKgco2e = fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
