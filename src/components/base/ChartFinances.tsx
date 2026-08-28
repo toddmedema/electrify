@@ -42,6 +42,27 @@ interface State {
   startingYear?: number;
 }
 
+/**
+ * Finances normally plots one x unit per month. Insights converts those points to game minutes
+ * so its cursor can line up with the forecast charts, and must convert the tick unit with them.
+ */
+export function financeXTicks(
+  range: [number, number],
+  minuteScale: boolean,
+): number[] {
+  return stepTicks(range[0], range[1], minuteScale ? MINUTES_PER_MONTH : 1);
+}
+
+/** Convert the finance series' absolute month index to the minute scale used by Insights. */
+export function financeXValue(
+  point: Pick<ChartData, "month">,
+  startingYear?: number,
+): number {
+  return startingYear === undefined
+    ? point.month
+    : (point.month - startingYear * 12 - 1) * MINUTES_PER_MONTH;
+}
+
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
     width: 0, // set by UPlotChart
@@ -63,8 +84,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     axes: [
       xAxis(scale, {
         splits: () => {
-          const [min, max] = getState().range;
-          return stepTicks(min, max, 1);
+          const state = getState();
+          return financeXTicks(state.range, state.startingYear !== undefined);
         },
         values: (_u, splits) => {
           const s = getState();
@@ -111,10 +132,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
   let domainMin = 0;
   let domainMax = 0;
   const minuteScale = props.startingYear !== undefined;
-  const xValue = (d: ChartData) =>
-    minuteScale
-      ? ((d.year - props.startingYear!) * 12 + d.month - 1) * MINUTES_PER_MONTH
-      : d.month;
+  const xValue = (d: ChartData) => financeXValue(d, props.startingYear);
   const firstX = xValue(props.timeline[0]);
   const lastX = xValue(props.timeline[props.timeline.length - 1]);
   const defaultSpan = minuteScale ? 11 * MINUTES_PER_MONTH : 11;
