@@ -103,6 +103,7 @@ import {
   FuelProductionType,
   ReplayActionType,
   CardNameType,
+  VictoryType,
 } from "../Types";
 
 interface BuildFacilityAction {
@@ -1041,155 +1042,61 @@ export function tickState(state: GameType) {
       const scenarioId = state.scenarioId;
       // A replay reaches every one of these the same way the original run did, and must set off
       // none of their side effects: it is not a played game, it has no score of its own to
-      // submit, and the save it would clear belongs to whoever is watching. The dialogs still
-      // show, since a replay ending with "Bankrupt!" is the point of watching it
+      // submit, and the save it would clear belongs to whoever is watching. Its end screen still
+      // shows, since a replay ending with "Bankrupt!" is the point of watching it
       const isReplay = !!state.replayPlayback;
+      const scenario =
+        getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      const isTutorial = Boolean(scenario.tutorialSteps);
+      // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
+      // and rules the player gave themselves - would be scored against each other as if they
+      // were the same scenario. Replays likewise belong to the original player, not the viewer.
+      const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
 
-      // Failure: Bankrupt
-      if (now.cash < 0) {
+      /**
+       * All non-tutorial endings use one scoring path. In particular, bankruptcy and firing used
+       * to open a plain message and skip both the score screen and submitHighscore entirely.
+       * Everything captured by the timeout is copied out of the Immer draft before it is revoked.
+       */
+      const finishScoredRun = (
+        summary: MonthlyHistoryType,
+        outcome: NonNullable<VictoryType["outcome"]>,
+        endTitle?: string,
+        endMessage?: string | (() => string),
+      ) => {
+        const score: ScoreBreakdownType = computeScoreBreakdown(
+          scenario,
+          summary,
+        );
+        const finalScore = totalScore(score);
+        const difficulty = state.difficulty;
+        const { id: scoredScenarioId, name: scenarioName } = scenario;
+        const submitsScore = ranked;
+        const replay = submitsScore ? serializeReplay(state) : undefined;
+
         if (!isReplay) {
           logEvent("scenario_end", {
-            id: scenarioId,
-            type: "bankrupt",
-            difficulty: state.difficulty,
+            id: scoredScenarioId,
+            type:
+              outcome === "completed"
+                ? "win"
+                : outcome === "fired"
+                  ? "blackouts"
+                  : "bankrupt",
+            difficulty,
+            score: finalScore,
           });
         }
-        const summary = summarizeHistory(history);
         setTimeout(() => {
           // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
           // as this returns and would write the run straight back
           if (!isReplay) {
             clearSaveFor(scenarioId);
           }
-          const finished = getStore().getState().game;
-          getStore().dispatch(
-            dialogOpen({
-              title: "Bankrupt!",
-              message: `You've run out of money.
-                You survived for ${finished.date.year - finished.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`,
-              open: true,
-              notCancellable: true,
-              actionLabel: "Try again",
-              action: () => getStore().dispatch(quit({ toScenarioList: true })),
-            }),
-          );
-        }, 1);
-      }
-
-      // Failure: Too many blackouts
-      if (
-        history[1] &&
-        history[2] &&
-        history[3] &&
-        history[1].supplyWh < history[1].demandWh * 0.9 &&
-        history[2].supplyWh < history[2].demandWh * 0.9 &&
-        history[3].supplyWh < history[3].demandWh * 0.9
-      ) {
-        if (!isReplay) {
-          logEvent("scenario_end", {
-            id: scenarioId,
-            type: "blackouts",
-            difficulty: state.difficulty,
-          });
-        }
-        const summary = summarizeHistory(history);
-        setTimeout(() => {
-          if (!isReplay) {
-            clearSaveFor(scenarioId);
-          }
-          const finished = getStore().getState().game;
-          getStore().dispatch(
-            dialogOpen({
-              title: "Fired!",
-              message: `You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office.
-                You survived for ${finished.date.year - finished.startingYear} years,
-                earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`,
-              open: true,
-              notCancellable: true,
-              actionLabel: "Try again",
-              action: () => getStore().dispatch(quit({ toScenarioList: true })),
-            }),
-          );
-        }, 1);
-      }
-
-      const scenario =
-        getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
-
-      // Success: Survived duration
-      if (state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)) {
-        // Every custom game shares one id, so recording it would light up a completion marker for
-        // a scenario nobody authored, and its score belongs to nothing comparable
-        const ranked = scenario.id !== CUSTOM_SCENARIO_ID && !isReplay;
-        if (ranked) {
-          // Tutorials are already marked played once their walkthrough ends, so this is a
-          // no-op for the ones the player sat all the way through
-          recordScenarioPlayed(scenarioId);
-        }
-
-        // Calculate score - This is also described in the manual; if I update the algorithm, update the manual too!
-        const summary = summarizeHistory(history);
-        const score: ScoreBreakdownType = computeScoreBreakdown(
-          scenario,
-          summary,
-        );
-        const finalScore = totalScore(score);
-        const difficulty = state.difficulty; // pulling out of state for functions running inside of setTimeout
-        // For a custom game getScenario() returns state.customScenario, which belongs to the same
-        // draft, so the fields the timeouts below read come out here too
-        const {
-          id: scoredScenarioId,
-          name: scenarioName,
-          endTitle,
-          endMessage,
-        } = scenario;
-        const isTutorial = Boolean(scenario.tutorialSteps);
-        // Read out here with everything else the timeouts need, rather than from inside them
-        const nextTutorial = getNextTutorial(scoredScenarioId);
-
-        // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
-        // and rules the player gave themselves - would be scored against each other as if they
-        // were the same scenario
-        const submitsScore = !scenario.tutorialSteps && ranked;
-        // Pulled out of the draft here rather than inside the timeout, which runs after the
-        // reducer has returned and revoked it
-        const replay = submitsScore ? serializeReplay(state) : undefined;
-
-        if (!isReplay) {
-          logEvent("scenario_end", {
-            id: scoredScenarioId,
-            type: "win",
-            difficulty,
-            score: finalScore,
-          });
-        }
-        setTimeout(() => {
-          // The scenario is over even if the player takes "Keep playing"; autosave simply writes a
-          // fresh save at the next month rollover if they do
-          if (!isReplay) {
-            clearSaveFor(scenarioId);
-          }
-          if (isTutorial) {
-            return getStore().dispatch(
-              tutorialCompleteDialog({
-                title: endTitle || "Mission complete!",
-                message: endMessage,
-                nextTutorial,
-              }),
-            );
-          }
-          // Read here rather than up in the reducer: store.getState() throws while a reducer is
-          // running, and this sat in tickState, so the throw came out of the tick loop's own
-          // setTimeout - nothing rescheduled the loop and nothing opened a dialog, and the game
-          // stopped dead on the last month of every run. Still read before the submit below, so
-          // that "was 640" reports the run before this one rather than the one that just finished
+          // Read before the submit below, so "was 640" means the run before this one rather than
+          // the one that just finished. getState() cannot be called while the reducer is running.
           const previousBest =
             getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
-          // Only the numbers: the breakdown, the personal best and the rank are base/VictoryDialog's
-          // to render, so that the parts which arrive over the network can fill themselves in
           getStore().dispatch(
             victoryOpen({
               scenarioId: scoredScenarioId,
@@ -1198,9 +1105,11 @@ export function tickState(state: GameType) {
               score: finalScore,
               breakdown: score,
               endTitle,
-              endMessage,
+              endMessage:
+                typeof endMessage === "function" ? endMessage() : endMessage,
               ranked,
               previousBest,
+              outcome,
             }),
           );
           if (submitsScore) {
@@ -1215,6 +1124,116 @@ export function tickState(state: GameType) {
             );
           }
         }, 1);
+      };
+
+      const chronicBlackouts =
+        history[1] &&
+        history[2] &&
+        history[3] &&
+        history[1].supplyWh < history[1].demandWh * 0.9 &&
+        history[2].supplyWh < history[2].demandWh * 0.9 &&
+        history[3].supplyWh < history[3].demandWh * 0.9;
+      const failure =
+        now.cash < 0
+          ? ({ outcome: "bankrupt", title: "Bankrupt!" } as const)
+          : chronicBlackouts
+            ? ({ outcome: "fired", title: "Fired!" } as const)
+            : undefined;
+
+      if (failure) {
+        const summary = summarizeHistory(history);
+        const yearsSurvived = state.date.year - state.startingYear;
+        const failureMessage = () =>
+          `${
+            failure.outcome === "bankrupt"
+              ? "You've run out of money."
+              : "You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office."
+          }
+                You survived for ${yearsSurvived} years,
+                earned ${formatMoneyConcise(summary.revenue)} in revenue
+                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`;
+
+        // Tutorials are intentionally unscored even when completed, so retain their guided
+        // failure dialog rather than putting one tutorial attempt on the global leaderboard.
+        if (isTutorial) {
+          if (!isReplay) {
+            logEvent("scenario_end", {
+              id: scenarioId,
+              type: failure.outcome === "fired" ? "blackouts" : "bankrupt",
+              difficulty: state.difficulty,
+            });
+          }
+          setTimeout(() => {
+            if (!isReplay) {
+              clearSaveFor(scenarioId);
+            }
+            getStore().dispatch(
+              dialogOpen({
+                title: failure.title,
+                message: failureMessage(),
+                open: true,
+                notCancellable: true,
+                actionLabel: "Try again",
+                action: () =>
+                  getStore().dispatch(quit({ toScenarioList: true })),
+              }),
+            );
+          }, 1);
+        } else {
+          finishScoredRun(
+            summary,
+            failure.outcome,
+            failure.title,
+            failureMessage,
+          );
+        }
+      } else if (
+        state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)
+      ) {
+        // Success: Survived duration
+        // Every custom game shares one id, so recording it would light up a completion marker for
+        // a scenario nobody authored, and its score belongs to nothing comparable
+        if (ranked) {
+          // Tutorials are already marked played once their walkthrough ends, so this is a
+          // no-op for the ones the player sat all the way through
+          recordScenarioPlayed(scenarioId);
+        }
+
+        const summary = summarizeHistory(history);
+        if (isTutorial) {
+          const score = computeScoreBreakdown(scenario, summary);
+          const finalScore = totalScore(score);
+          const { id: scoredScenarioId, endTitle, endMessage } = scenario;
+          const difficulty = state.difficulty;
+          const nextTutorial = getNextTutorial(scoredScenarioId);
+          if (!isReplay) {
+            logEvent("scenario_end", {
+              id: scoredScenarioId,
+              type: "win",
+              difficulty,
+              score: finalScore,
+            });
+          }
+          setTimeout(() => {
+            if (!isReplay) {
+              clearSaveFor(scenarioId);
+            }
+            return getStore().dispatch(
+              tutorialCompleteDialog({
+                title: endTitle || "Mission complete!",
+                message: endMessage,
+                nextTutorial,
+              }),
+            );
+          }, 1);
+        } else {
+          finishScoredRun(
+            summary,
+            "completed",
+            scenario.endTitle,
+            scenario.endMessage,
+          );
+        }
       }
     }
   }

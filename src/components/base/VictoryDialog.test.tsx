@@ -190,6 +190,25 @@ describe("VictoryDialog", () => {
     expect(onQuit).toHaveBeenCalled();
   });
 
+  it.each([
+    ["bankrupt", "Bankrupt!"],
+    ["fired", "Fired!"],
+  ] as const)(
+    "shows a %s score without letting the terminal run resume",
+    async (outcome, title) => {
+      const onClose = jest.fn();
+      renderDialog({ victory: aVictory({ outcome }), onClose });
+
+      expect(screen.getByText("Run ended")).toBeInTheDocument();
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(screen.getByText("How you scored")).toBeInTheDocument();
+      expect(screen.getByText(/Final score/)).toBeInTheDocument();
+      expect(screen.queryByText("Review final grid")).not.toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      expect(onClose).not.toHaveBeenCalled();
+    },
+  );
+
   it("uses the scenario's own ending when it has one", () => {
     renderDialog({
       victory: aVictory({

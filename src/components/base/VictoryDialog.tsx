@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import numbro from "numbro";
 import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
@@ -133,10 +134,17 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   }
 
   const { previousBest, breakdown, endTitle, endMessage } = victory;
+  const failed = victory.outcome === "bankrupt" || victory.outcome === "fired";
   const isPersonalBest =
     previousBest === undefined || victory.score > previousBest;
-  let displayTitle = endTitle || `You've retired!`;
-  if (endTitle && /^mission complete!?$/i.test(endTitle.trim())) {
+  let displayTitle =
+    endTitle ||
+    (victory.outcome === "bankrupt"
+      ? "Bankrupt!"
+      : victory.outcome === "fired"
+        ? "Fired!"
+        : `You've retired!`);
+  if (!failed && endTitle && /^mission complete!?$/i.test(endTitle.trim())) {
     displayTitle = victory.scenarioName;
   }
 
@@ -163,7 +171,9 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     <Dialog
       open={true}
       // The run is over either way; dismissing by backdrop or Esc is the same as "Keep playing"
-      onClose={onClose}
+      // only after a completed term. A failed run is terminal and would fail and submit again on
+      // the next month if it could resume.
+      onClose={failed ? undefined : onClose}
       aria-labelledby="victory-title"
       fullWidth
       maxWidth="sm"
@@ -171,21 +181,34 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         paper: {
           sx: {
             overflow: "hidden",
-            backgroundImage:
-              "radial-gradient(circle at 50% -20%, rgba(255, 193, 7, 0.28), transparent 45%)",
+            backgroundImage: failed
+              ? "radial-gradient(circle at 50% -20%, rgba(211, 47, 47, 0.2), transparent 45%)"
+              : "radial-gradient(circle at 50% -20%, rgba(255, 193, 7, 0.28), transparent 45%)",
           },
         },
       }}
     >
       <DialogTitle id="victory-title" sx={{ pb: 1.5 }}>
         <Stack spacing={0.5} sx={{ alignItems: "center", textAlign: "center" }}>
-          <EmojiEventsIcon color="warning" sx={{ fontSize: 52 }} aria-hidden />
+          {failed ? (
+            <ReportProblemOutlinedIcon
+              color="error"
+              sx={{ fontSize: 52 }}
+              aria-hidden
+            />
+          ) : (
+            <EmojiEventsIcon
+              color="warning"
+              sx={{ fontSize: 52 }}
+              aria-hidden
+            />
+          )}
           <Typography
             variant="overline"
-            color="warning.main"
+            color={failed ? "error.main" : "warning.main"}
             sx={{ fontWeight: 800, letterSpacing: "0.14em" }}
           >
-            Mission complete
+            {failed ? "Run ended" : "Mission complete"}
           </Typography>
           <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>
             {displayTitle}
@@ -209,7 +232,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           }}
         >
           <Typography variant="overline" color="text.secondary">
-            What you accomplished
+            {failed ? "How you scored" : "What you accomplished"}
           </Typography>
           <Typography variant="body1">
             {summarizeChallenge(breakdown)}
@@ -283,9 +306,11 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Button>
         )}
         <InstallAppButton label="Install for later" afterMilestone />
-        <Button color="primary" onClick={onClose}>
-          Review final grid
-        </Button>
+        {!failed && (
+          <Button color="primary" onClick={onClose}>
+            Review final grid
+          </Button>
+        )}
         <Button color="primary" onClick={onQuit}>
           Choose scenario
         </Button>
