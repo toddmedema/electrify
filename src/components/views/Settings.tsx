@@ -21,6 +21,7 @@ import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
 import KeyboardShortcuts from "../base/KeyboardShortcuts";
 import InstallAppButton, { useIsInstalledApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
+import { clearAppCache } from "../../helpers/Cache";
 
 export interface StateProps {
   settings: SettingsType;
@@ -343,6 +344,24 @@ export default function Settings(props: Props): React.JSX.Element {
             <Typography variant="caption">
               <a href="/privacy.html">Privacy</a>
             </Typography>
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => void clearAppCache()}
+              sx={{
+                color: "text.secondary",
+                display: "block",
+                fontSize: "0.75rem",
+                minWidth: 0,
+                mx: "auto",
+                mt: 0.5,
+                opacity: 0.75,
+                px: 0.5,
+                textTransform: "none",
+              }}
+            >
+              Clear cache
+            </Button>
           </Stack>
         </Stack>
       </Box>

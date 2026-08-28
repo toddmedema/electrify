@@ -137,17 +137,19 @@ describe("getCities", () => {
 describe("the bundled locations", () => {
   const index = JSON.parse(fs.readFileSync(INDEX_FILE, "utf8"));
 
-  it.each(Object.keys(LOCATIONS))("%s matches the shipped index", (id) => {
-    const bundled = LOCATIONS[id] as LocationType;
-    const shipped = index.cities[id];
-    expect(shipped).toBeDefined();
-    expect(shipped.name).toEqual(bundled.name);
-    expect(shipped.admin).toEqual(
-      (bundled as LocationType & { admin?: string }).admin,
-    );
-    expect(shipped.timeZone).toEqual(bundled.timeZone);
-    expect(shipped.lat).toBeCloseTo(bundled.lat, 3);
-    expect(shipped.long).toBeCloseTo(bundled.long, 3);
-    expect(shipped.offshore).toEqual(bundled.offshore);
+  it("keeps every bundled location in sync with the shipped index", () => {
+    Object.keys(LOCATIONS).forEach((id) => {
+      const bundled = LOCATIONS[id] as LocationType;
+      const shipped = index.cities[id];
+      expect(shipped).toBeDefined();
+      expect(shipped.name).toEqual(bundled.name);
+      expect(shipped.admin).toEqual(
+        (bundled as LocationType & { admin?: string }).admin,
+      );
+      expect(shipped.timeZone).toEqual(bundled.timeZone);
+      expect(shipped.lat).toBeCloseTo(bundled.lat, 3);
+      expect(shipped.long).toBeCloseTo(bundled.long, 3);
+      expect(shipped.offshore).toEqual(bundled.offshore);
+    });
   });
 });

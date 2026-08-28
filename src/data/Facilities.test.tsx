@@ -278,3 +278,33 @@ describe("offshore wind", () => {
     expect(cost2010).toBeGreaterThan(cost2023);
   });
 });
+
+describe("biomass", () => {
+  it("offers a priced, dispatchable 50 MW reference plant", () => {
+    const generator = GENERATORS(stateAt(france, 2019), 50000000, [], []).find(
+      (candidate) => candidate.name === "Biomass",
+    );
+
+    expect(generator).toMatchObject({
+      fuel: "Biomass",
+      annualOperatingCost: 7235500,
+      btuPerWh: 13.3,
+      capacityFactor: 0.602,
+      maxPeakW: 50000000,
+      spinMinutes: 240,
+      yearsToBuild: 5,
+      lifespanYears: 30,
+    });
+    expect(generator?.buildCost).toBe(188870594);
+  });
+
+  it("is available in every location", () => {
+    [iceland, france].forEach((location) => {
+      expect(
+        GENERATORS(stateAt(location, 1980), 10000000, [], []).some(
+          (generator) => generator.name === "Biomass",
+        ),
+      ).toBe(true);
+    });
+  });
+});

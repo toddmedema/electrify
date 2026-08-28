@@ -33,8 +33,10 @@ export interface Props {
   syncKey?: string;
 }
 
-export type PricedFuelType = "Coal" | "Natural Gas" | "Oil" | "Uranium";
+export type PricedFuelType =
+  "Biomass" | "Coal" | "Natural Gas" | "Oil" | "Uranium";
 export const PRICED_FUELS: PricedFuelType[] = [
+  "Biomass",
   "Coal",
   "Natural Gas",
   "Oil",
@@ -92,7 +94,7 @@ function buildOptions(showXLabels: boolean) {
       ...PRICED_FUELS.map((f) => ({
         stroke: fuelColors()[f],
         width: 1.5,
-        // Four overlapping lines are more than color alone can separate, so each
+        // Five overlapping lines are more than color alone can separate, so each
         // fuel also gets its own dash pattern
         dash: dashArray(fuelDashArrays[f]),
         points: { show: false },
@@ -132,7 +134,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
     } = this.props;
 
     const minutes = new Array<number>(timeline.length);
-    // Every tick carries all four prices; the fallback is only here because the fuel prices
+    // Every tick carries all five prices; the fallback is only here because the fuel prices
     // are optional on the tick type
     const prices = PRICED_FUELS.map(() => new Array<number>(timeline.length));
     timeline.forEach((t: TickPresentFutureType, i: number) => {

@@ -21,7 +21,7 @@ import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
  * four lines on one chart be told apart.
  */
 
-// Seven series can never all clear WCAG's 3:1 non-text contrast against each other - the
+// Nine series can never all clear WCAG's 3:1 non-text contrast against each other - the
 // luminance ladder runs out at about four - so these are tuned for two things that are achievable:
 // every fuel clears 3:1 against the plot area, and the pairs that share a line chart
 // (the four priced fuels) are spread as far apart in luminance as that constraint allows.
@@ -31,6 +31,7 @@ import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
 const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
   light: {
     Coal: "#1a1a1a", // 17.4:1 on white
+    Biomass: "#356b20",
     Uranium: "#0f5b63", // 7.8:1
     Oil: "#ac4e13", // 5.5:1
     "Natural Gas": "#bb79e6", // 3.0:1
@@ -42,6 +43,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
   },
   dark: {
     Coal: "#d0d0d0", // 11.9:1 on #121212 - the darkest fuel has to become the lightest
+    Biomass: "#9ccc65",
     Uranium: "#4dd0e1", // 9.9:1
     Oil: "#ffa726", // 10.6:1
     "Natural Gas": "#ce93d8", // 7.7:1
@@ -68,6 +70,7 @@ export function facilityColor(fuel?: FuelNameType): string {
 // a dash pattern reads the same on either palette.
 export const fuelDashArrays = {
   Coal: undefined, // solid
+  Biomass: "12,3",
   "Natural Gas": "6,3",
   Oil: "2,3",
   Uranium: "9,3,2,3",

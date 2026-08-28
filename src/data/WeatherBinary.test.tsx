@@ -227,42 +227,44 @@ describe("the shipped weather files", () => {
     expect(listed).toEqual([...offshoreIds].sort());
   });
 
-  it.each(ids)("%s covers forty years of readable weather", (id: string) => {
-    const buffer = readShipped(id);
-    const header = readWeatherHeader(buffer);
-    expect([1, 2]).toContain(header.version);
-    expect(header.version).toBeGreaterThanOrEqual(
-      offshoreIds.includes(id) ? 2 : 1,
-    );
-    expect(header).toMatchObject({
-      daysPerYear: 12,
-      hoursPerDay: 24,
-      startingYear: 1980,
-      yearCount: 40,
-      rowCount: 11520,
-      offshore: offshoreIds.includes(id),
+  it("covers every shipped location with forty years of readable weather", () => {
+    ids.forEach((id: string) => {
+      const buffer = readShipped(id);
+      const header = readWeatherHeader(buffer);
+      expect([1, 2]).toContain(header.version);
+      expect(header.version).toBeGreaterThanOrEqual(
+        offshoreIds.includes(id) ? 2 : 1,
+      );
+      expect(header).toMatchObject({
+        daysPerYear: 12,
+        hoursPerDay: 24,
+        startingYear: 1980,
+        yearCount: 40,
+        rowCount: 11520,
+        offshore: offshoreIds.includes(id),
+      });
+
+      const rows = decodeWeather(buffer);
+      expect(rows[0].YEAR).toEqual(1980);
+      expect(rows[rows.length - 1].YEAR).toEqual(2019);
+
+      // Reduced to one assertion per field rather than one per row: eleven thousand assertions a
+      // city adds up to minutes once the catalogue is full, and a range says the same thing
+      const range = (field: keyof RawWeatherType) => {
+        const values = rows
+          .map((row: RawWeatherType) => row[field])
+          .filter((value): value is number => value !== undefined);
+        return { min: Math.min(...values), max: Math.max(...values) };
+      };
+      // Deliberately generous: these are the bounds that catch a byte order or a scale being
+      // wrong, not a claim about any particular city's climate
+      expect(range("TEMP_C").min).toBeGreaterThan(-80);
+      expect(range("TEMP_C").max).toBeLessThan(60);
+      expect(range("CLOUD_PCT").min).toBeGreaterThanOrEqual(0);
+      expect(range("CLOUD_PCT").max).toBeLessThanOrEqual(100);
+      expect(range("WIND_KPH").min).toBeGreaterThanOrEqual(0);
+      expect(range("PRECIP_MM").min).toBeGreaterThanOrEqual(0);
     });
-
-    const rows = decodeWeather(buffer);
-    expect(rows[0].YEAR).toEqual(1980);
-    expect(rows[rows.length - 1].YEAR).toEqual(2019);
-
-    // Reduced to one assertion per field rather than one per row: eleven thousand assertions a
-    // city adds up to minutes once the catalogue is full, and a range says the same thing
-    const range = (field: keyof RawWeatherType) => {
-      const values = rows
-        .map((row: RawWeatherType) => row[field])
-        .filter((value): value is number => value !== undefined);
-      return { min: Math.min(...values), max: Math.max(...values) };
-    };
-    // Deliberately generous: these are the bounds that catch a byte order or a scale being
-    // wrong, not a claim about any particular city's climate
-    expect(range("TEMP_C").min).toBeGreaterThan(-80);
-    expect(range("TEMP_C").max).toBeLessThan(60);
-    expect(range("CLOUD_PCT").min).toBeGreaterThanOrEqual(0);
-    expect(range("CLOUD_PCT").max).toBeLessThanOrEqual(100);
-    expect(range("WIND_KPH").min).toBeGreaterThanOrEqual(0);
-    expect(range("PRECIP_MM").min).toBeGreaterThanOrEqual(0);
   });
 
   it("puts Pittsburgh's rows in season order", () => {
