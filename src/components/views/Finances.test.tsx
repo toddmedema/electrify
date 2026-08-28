@@ -2,7 +2,12 @@ import * as React from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
-import Finances, { getComparison, parseRange, projectMonths } from "./Finances";
+import Finances, {
+  formatMarketingCustomerGrowth,
+  getComparison,
+  parseRange,
+  projectMonths,
+} from "./Finances";
 import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
@@ -94,6 +99,18 @@ function renderFinances(
     />,
   );
 }
+
+describe("the marketing forecast", () => {
+  it("shows customer growth as a delta and percent when compact totals would look equal", () => {
+    expect(formatMarketingCustomerGrowth(1000000, 1000000)).toEqual(
+      "+9.9k (+1.0%)",
+    );
+  });
+
+  it("omits an undefined growth percent when there are no existing customers", () => {
+    expect(formatMarketingCustomerGrowth(1000000, 0)).toEqual("+9.9k");
+  });
+});
 
 describe("the Finances chart selectors", () => {
   // Two years in, so that the period select has past years to offer and each one covers a
