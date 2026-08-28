@@ -1,7 +1,16 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Settings, { Props } from "./Settings";
+import { clearAppCache } from "../../helpers/Cache";
+
+jest.mock("../../helpers/Cache", () => ({
+  clearAppCache: jest.fn(async () => undefined),
+}));
+
+const mockedClearAppCache = clearAppCache as jest.MockedFunction<
+  typeof clearAppCache
+>;
 
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
@@ -105,5 +114,19 @@ describe("Settings", () => {
 
     // Picking the same file again still counts, for the player who went and fixed a bad one
     expect(fileInput().value).toBe("");
+  });
+
+  it("offers a subtle cache reset at the bottom", async () => {
+    renderSettings();
+
+    const button = screen.getByRole("button", { name: "Clear cache" });
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("button", {
+        name: "Clear cache",
+      }),
+    ).toBe(button);
+    await userEvent.click(button);
+
+    expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
   });
 });
