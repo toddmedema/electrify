@@ -7,11 +7,13 @@ import ConceptIcon, {
 } from "./ConceptIcon";
 
 describe("ConceptIcon", () => {
-  it.each(CONCEPT_NAMES)("gives %s its shared accessible label", (concept) => {
-    const view = render(<ConceptIcon concept={concept} />);
-    const icon = screen.getByLabelText(CONCEPT_LABELS[concept]);
-    expect(icon).toHaveAttribute("data-concept", concept);
-    view.unmount();
+  it("gives every concept its shared accessible label", () => {
+    CONCEPT_NAMES.forEach((concept) => {
+      const view = render(<ConceptIcon concept={concept} />);
+      const icon = screen.getByLabelText(CONCEPT_LABELS[concept]);
+      expect(icon).toHaveAttribute("data-concept", concept);
+      view.unmount();
+    });
   });
 
   it("keeps the vocabulary list and label catalog in sync", () => {

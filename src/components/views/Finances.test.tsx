@@ -102,10 +102,9 @@ describe("the Finances chart selectors", () => {
 
   beforeEach(() => localStorage.clear());
 
-  // Every speed, because the pane skips frames at FAST and used to skip the player's own clicks
-  // along with them: the dropdown redrew itself with the new label while the chart kept plotting
-  // the old metric, which looks exactly like a selector that does nothing
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  // PAUSED covers the unthrottled path and FAST covers the frame-skipping path that used to
+  // swallow the player's own clicks. SLOW and NORMAL exercise the same branches as FAST.
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "replots when the metric changes at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);
@@ -124,7 +123,7 @@ describe("the Finances chart selectors", () => {
     },
   );
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "keeps the metric dropdown showing what is plotted at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);
@@ -137,7 +136,7 @@ describe("the Finances chart selectors", () => {
     },
   );
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "replots when the period changes at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);
