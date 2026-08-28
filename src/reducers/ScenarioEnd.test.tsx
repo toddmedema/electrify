@@ -152,12 +152,12 @@ describe("ending a scenario from inside the reducer", () => {
   });
 
   it("goes bankrupt without reading the revoked draft", () => {
-    // No cash and a marketing budget far past what the fleet earns: it is under within a month
+    // No cash and free electricity: operating the fleet puts it under within a month
     const scenario = customScenario({ cash: 0, durationMonths: 12 * 20 });
     let state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
       scenario,
-      monthlyMarketingSpend: 1000000000,
+      dollarsPerkWh: 0,
     });
     while (state.date.monthsEllapsed < 2) {
       state = tick(state);
@@ -172,9 +172,11 @@ describe("ending a scenario from inside the reducer", () => {
     const scenario = SCENARIOS.find(
       (s: ScenarioType) => s.id === 100,
     ) as ScenarioType;
-    const state = createGame({
-      scenarioId: scenario.id,
-      monthlyMarketingSpend: 1000000000,
+    const state = createGame({ scenarioId: scenario.id });
+    // Start the month already overdrawn so this test reaches the bankruptcy path without relying
+    // on the removed marketing expense as an artificial cash drain.
+    state.timeline.forEach((tick) => {
+      tick.cash = -1;
     });
 
     playOutOnTheStore(state, 1);
@@ -217,7 +219,6 @@ describe("ending a scenario from inside the reducer", () => {
       expensesOM: 0,
       expensesCarbonFee: 0,
       expensesInterest: 0,
-      expensesMarketing: 0,
       kgco2e: 0,
       interestRate: 0.05,
       inflationRate: 0.02,

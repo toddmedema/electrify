@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
 import Finances, {
-  formatMarketingCustomerGrowth,
+  formatCustomerChange,
   getComparison,
   parseRange,
   projectMonths,
@@ -27,6 +27,10 @@ jest.mock("../base/GameCard", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+}));
+jest.mock("../base/ManualLink", () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 /**
@@ -100,15 +104,25 @@ function renderFinances(
   );
 }
 
-describe("the marketing forecast", () => {
+describe("the customer forecast", () => {
   it("shows customer growth as a delta and percent when compact totals would look equal", () => {
-    expect(formatMarketingCustomerGrowth(1000000, 1000000)).toEqual(
-      "+9.9k (+1.0%)",
-    );
+    expect(formatCustomerChange(9900, 1000000)).toEqual("+9.9k (+1.0%)");
   });
 
-  it("omits an undefined growth percent when there are no existing customers", () => {
-    expect(formatMarketingCustomerGrowth(1000000, 0)).toEqual("+9.9k");
+  it("formats losses and omits an undefined percent with no existing customers", () => {
+    expect(formatCustomerChange(-9900, 1000000)).toEqual("-9.9k (-1.0%)");
+    expect(formatCustomerChange(9900, 0)).toEqual("+9.9k");
+  });
+
+  it("shows investor players the market benchmark and a rate control", () => {
+    renderFinances(createGame({ scenarioId: 101 }), "PAUSED");
+    expect(
+      screen.getByRole("slider", {
+        name: "The rate you charge for electricity generation",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/market \$/)).toBeInTheDocument();
+    cleanup();
   });
 });
 

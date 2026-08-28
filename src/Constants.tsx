@@ -142,7 +142,7 @@ export const TICK_MS = {
 // Fallbacks for the screens that run before any economic data has been loaded, and the anchor
 // the projected cycles rest near. The played game reads its rates from data/Economy instead.
 export const INFLATION = 0.03;
-export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% 2018 -> 2019, and that's with some marketing spending
+export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const RESERVE_MARGIN = 0.05;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;

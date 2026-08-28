@@ -59,7 +59,6 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
     months: envNumber("SIM_MONTHS"),
     seed: envNumber("SIM_SEED"),
     dollarsPerkWh: envNumber("SIM_RATE"),
-    monthlyMarketingSpend: envNumber("SIM_MARKETING"),
     strategy: (process.env.SIM_STRATEGY as StrategyType) || undefined,
     initialBuild: initialBuildName
       ? {

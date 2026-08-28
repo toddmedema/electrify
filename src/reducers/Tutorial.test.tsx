@@ -20,7 +20,7 @@ function informational(card: "FACILITIES" | "FINANCES" = "FACILITIES") {
 
 function initialState(
   steps: TutorialStepType[],
-  options: { marketingSpend?: number; tutorialStep?: number } = {},
+  options: { rate?: number; tutorialStep?: number } = {},
 ): AppStateType {
   const init = { type: "test/init" };
   return {
@@ -35,7 +35,7 @@ function initialState(
         ...DEFAULT_CUSTOM_SCENARIO,
         tutorialSteps: steps,
       },
-      monthlyMarketingSpend: options.marketingSpend || 0,
+      dollarsPerkWh: options.rate ?? 0.07,
       tutorialStep: options.tutorialStep || 0,
     },
     settings: settingsReducer(undefined, init),
@@ -51,7 +51,7 @@ function reducer(
   if (action.type === "test/satisfy-predicate") {
     return {
       ...state,
-      game: { ...state.game, monthlyMarketingSpend: 1 },
+      game: { ...state.game, dollarsPerkWh: 0.06 },
     };
   }
   if (action.type === "game/delta") {
@@ -91,7 +91,7 @@ function reducer(
 
 function tutorialStore(
   steps: TutorialStepType[],
-  options?: { marketingSpend?: number; tutorialStep?: number },
+  options?: { rate?: number; tutorialStep?: number },
 ) {
   return configureStore({
     reducer,
@@ -112,7 +112,7 @@ describe("tutorialGateMiddleware", () => {
     const steps: TutorialStepType[] = [
       {
         ...informational(),
-        advanceOn: (state) => state.game.monthlyMarketingSpend > 0,
+        advanceOn: (state) => state.game.dollarsPerkWh < 0.07,
       },
       informational("FINANCES"),
     ];
@@ -143,11 +143,11 @@ describe("tutorialGateMiddleware", () => {
       { ...informational(), advanceOnAction: "test/do-it" },
       {
         ...informational(),
-        advanceOn: (state) => state.game.monthlyMarketingSpend > 0,
+        advanceOn: (state) => state.game.dollarsPerkWh < 0.07,
       },
       informational(),
     ];
-    const store = tutorialStore(steps, { marketingSpend: 1 });
+    const store = tutorialStore(steps, { rate: 0.06 });
 
     store.dispatch({ type: "test/do-it" });
 

@@ -2,7 +2,6 @@ import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import BoltIcon from "@mui/icons-material/Bolt";
 import BuildIcon from "@mui/icons-material/Build";
-import CampaignIcon from "@mui/icons-material/Campaign";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import FactoryIcon from "@mui/icons-material/Factory";
@@ -13,6 +12,7 @@ import LocalGasStationIcon from "@mui/icons-material/LocalGasStation";
 import PauseCircleIcon from "@mui/icons-material/PauseCircle";
 import PeopleIcon from "@mui/icons-material/People";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PriceChangeIcon from "@mui/icons-material/PriceChange";
 import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
@@ -40,7 +40,7 @@ export type ConceptNameType =
   | "construction"
   | "finances"
   | "forecast"
-  | "marketing"
+  | "rate"
   | "fuel"
   | "weather"
   | "danger"
@@ -63,7 +63,7 @@ export const CONCEPT_NAMES: ConceptNameType[] = [
   "construction",
   "finances",
   "forecast",
-  "marketing",
+  "rate",
   "fuel",
   "weather",
   "danger",
@@ -89,7 +89,7 @@ export const CONCEPT_LABELS: Record<ConceptNameType, string> = {
   construction: "Under construction",
   finances: "Finances",
   forecast: "Forecast",
-  marketing: "Marketing",
+  rate: "Electricity rate",
   fuel: "Fuel",
   weather: "Weather",
   danger: "Danger",
@@ -116,7 +116,7 @@ const CONCEPT_ICONS: Record<
   construction: ConstructionIcon,
   finances: AccountBalanceIcon,
   forecast: QueryStatsIcon,
-  marketing: CampaignIcon,
+  rate: PriceChangeIcon,
   fuel: LocalGasStationIcon,
   weather: WbSunnyIcon,
   danger: WarningIcon,

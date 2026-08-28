@@ -19,7 +19,6 @@ it("gives a public utility that supplied no electricity a finite score", () => {
     expensesOM: 0,
     expensesCarbonFee: 0,
     expensesInterest: 0,
-    expensesMarketing: 0,
     kgco2e: 0,
     interestRate: 0.05,
     inflationRate: 0.02,

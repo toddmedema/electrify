@@ -81,13 +81,11 @@ describe("simulation invariants", () => {
     });
   });
 
-  it("holds while spending on marketing", () => {
-    expectNoViolations(
-      runSimulation({
-        scenarioId: 101,
-        months: MONTHS,
-        monthlyMarketingSpend: 5000000,
-      }),
+  it("holds while gaining and losing customers through price competition", () => {
+    [0.01, 0.2].forEach((dollarsPerkWh) =>
+      expectNoViolations(
+        runSimulation({ scenarioId: 101, months: MONTHS, dollarsPerkWh }),
+      ),
     );
   });
 
@@ -252,6 +250,7 @@ describe("simulation economics", () => {
     },
     101: { sellFacilityId: 1 },
     102: {
+      dollarsPerkWh: 0.034,
       initialBuild: {
         name: "Natural Gas",
         peakW: 200000000,
@@ -261,6 +260,7 @@ describe("simulation economics", () => {
       sellAtMonth: 39,
     },
     103: {
+      dollarsPerkWh: 0.039,
       initialBuild: {
         name: "Natural Gas",
         peakW: 400000000,
@@ -271,6 +271,7 @@ describe("simulation economics", () => {
     },
     104: { dollarsPerkWh: 0.08 },
     105: {
+      dollarsPerkWh: 0.08,
       initialBuild: {
         name: "Natural Gas",
         peakW: 300000000,
@@ -281,10 +282,10 @@ describe("simulation economics", () => {
   const CEO_ACTION_COUNTS = {
     100: 2,
     101: 1,
-    102: 2,
-    103: 2,
+    102: 3,
+    103: 3,
     104: 1,
-    105: 1,
+    105: 2,
   } as Record<number, number>;
 
   SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
@@ -300,9 +301,6 @@ describe("simulation economics", () => {
 
         const play =
           CEO_WINNING_PLAYS[scenario.id as keyof typeof CEO_WINNING_PLAYS];
-        expect(
-          !("dollarsPerkWh" in play) || scenario.ownership === "Public",
-        ).toBe(true);
         const active = runSimulation({
           scenarioId: scenario.id,
           difficulty: "CEO",
@@ -351,6 +349,23 @@ describe("simulation economics", () => {
     const revenue = (r: SimResultType) =>
       r.months.reduce((a, m) => a + m.revenue, 0);
     expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
+  });
+
+  it("moves investor customers toward a cheaper utility and away from a dearer one", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 101, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.05)).toBeGreaterThan(customersAt(0.07));
+    expect(customersAt(0.07)).toBeGreaterThan(customersAt(0.1));
+  });
+
+  it("keeps public customer growth independent of the rate", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 104, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.02)).toBe(customersAt(0.2));
   });
 
   /**

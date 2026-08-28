@@ -163,7 +163,6 @@ describe("summarizeTimeline", () => {
           expensesOM: 0,
           expensesCarbonFee: 0,
           expensesInterest: 0,
-          expensesMarketing: 0,
           kgco2e: 0,
           interestRate: 0.04 + i / 1000,
           inflationRate: 0.02,

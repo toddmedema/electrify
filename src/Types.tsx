@@ -251,6 +251,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     hydroSpillWh: number; // Water above reservoir capacity lost during this tick
     hydroMandatedReleaseW: number; // Must-run water-rights flow through turbines
     storageLossWh: number; // Self-discharge / evaporation during this simulated tick
+    // The exponentially smoothed bill customers respond to, rather than the slider's latest value
+    customerRate: number;
     supplyByFuel: FuelProductionType;
   };
 
@@ -280,7 +282,6 @@ interface HistoryForecastShared {
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-  expensesMarketing: number; // total
   kgco2e: number; // total
   // Point in time rather than totals: what a new loan would cost, and what prices were doing,
   // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
@@ -543,7 +544,10 @@ export interface GameType {
   inGame: boolean;
   feePerKgCO2e: number;
   dollarsPerkWh: number;
-  monthlyMarketingSpend: number;
+  // Customer price competition starts from the scenario's rate and half of this addressable pool.
+  // customerRate is the three-month bill average carried between monthly forecast windows.
+  customerMarketSize: number;
+  customerRate: number;
   // What a loan signed right now would cost, and the multiplier on prime that gets there.
   // Both recomputed once a month. The premium is kept separately so that a forecast can price
   // future months against where prime is heading while holding the company's own creditworthiness

@@ -1,5 +1,4 @@
 import {
-  customersFromMarketingSpend,
   CreditInputsType,
   facilityCashBack,
   facilityLifetime,
@@ -139,29 +138,6 @@ describe("facilityCashBack", () => {
         facilityCashBack(aFacility({ yearsToBuildLeft })),
       ).toBeLessThanOrEqual(1000000);
     });
-  });
-});
-
-describe("customersFromMarketingSpend", () => {
-  it("signs up nobody for nothing", () => {
-    expect(customersFromMarketingSpend(0)).toBe(0);
-  });
-
-  it("returns a whole number of customers", () => {
-    expect(Number.isInteger(customersFromMarketingSpend(1234567))).toBe(true);
-  });
-
-  it("wins more customers the more is spent", () => {
-    expect(customersFromMarketingSpend(1000000)).toBeGreaterThan(
-      customersFromMarketingSpend(100000),
-    );
-  });
-
-  it("costs more per customer as spend grows", () => {
-    // The acquisition cost rises with spend, so the last dollar buys less than the first
-    const costPer = (spend: number) =>
-      spend / customersFromMarketingSpend(spend);
-    expect(costPer(10000000)).toBeGreaterThan(costPer(100000));
   });
 });
 
@@ -320,7 +296,6 @@ describe("getCreditInputs", () => {
       expensesOM: 0,
       expensesCarbonFee: 0,
       expensesInterest: 0,
-      expensesMarketing: 0,
       supplyWh: 1000,
     }) as never;
 

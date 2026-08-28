@@ -29,10 +29,12 @@ import {
  */
 
 // Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
+// 4 replaces investor marketing with price-driven customer switching; older replays would grow a
+// different customer base even if they contain no explicit marketing action.
 // 3 adds offshore wind weather and generation; an older replay would simulate a different grid.
 // 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
 // where it is played, so there is no safe way to migrate one.
-export const REPLAY_VERSION = 3;
+export const REPLAY_VERSION = 4;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -53,10 +55,7 @@ export const MAX_REPLAY_BYTES = 800000;
 // Only the fields of a `delta` that change how the simulation runs. Everything else the action
 // carries -- the tutorial step, the custom scenario, the difficulty picked before the game began
 // -- either doesn't affect the sim or is already in the replay header.
-export const RECORDED_DELTA_KEYS = [
-  "dollarsPerkWh",
-  "monthlyMarketingSpend",
-] as const;
+export const RECORDED_DELTA_KEYS = ["dollarsPerkWh"] as const;
 
 export type RecordedDeltaType = Partial<
   Pick<GameType, (typeof RECORDED_DELTA_KEYS)[number]>
@@ -77,22 +76,17 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
 export function recordedDelta(
   payload: Partial<GameType>,
 ): RecordedDeltaType | null {
-  const recorded: RecordedDeltaType = {};
-  let any = false;
-  RECORDED_DELTA_KEYS.forEach((key) => {
-    if (payload[key] !== undefined) {
-      recorded[key] = payload[key];
-      any = true;
-    }
-  });
-  return any ? recorded : null;
+  const rate = payload.dollarsPerkWh;
+  return typeof rate === "number" && Number.isFinite(rate) && rate >= 0
+    ? { dollarsPerkWh: rate }
+    : null;
 }
 
 /**
  * Appends an action to the run's log, if the run is being recorded at all.
  *
- * Consecutive deltas within the same game minute are merged rather than appended: the rate and
- * marketing sliders fire an action per pixel dragged, and since nothing reads either value until
+ * Consecutive deltas within the same game minute are merged rather than appended: the rate slider
+ * fires an action per pixel dragged, and since nothing reads the intermediate values until
  * the next tick, only the one the player let go on ever mattered. Merging is exact, and it's the
  * difference between a few dozen entries and a few thousand.
  */

@@ -71,7 +71,6 @@ export interface SimOptionsType {
   months?: number; // Defaults to the scenario's own duration
   seed?: number;
   dollarsPerkWh?: number;
-  monthlyMarketingSpend?: number;
   strategy?: StrategyType;
   initialBuild?: InitialBuildType;
   sellFacilityId?: number;
@@ -84,7 +83,6 @@ export interface ResolvedSimOptionsType {
   months: number;
   seed: number;
   dollarsPerkWh: number | null; // null = left at the scenario's own rate
-  monthlyMarketingSpend: number;
   strategy: StrategyType;
   initialBuild: InitialBuildType | null;
   sellFacilityId: number | null;
@@ -155,7 +153,6 @@ function setUpGame(
     state,
     delta({
       difficulty: options.difficulty,
-      monthlyMarketingSpend: options.monthlyMarketingSpend,
       // A scenario that isn't in SCENARIOS can only be found again through the slice, which is
       // exactly what the custom game screen does before it starts a game
       customScenario: SCENARIOS.some((s: ScenarioType) => s.id === scenario.id)
@@ -301,7 +298,6 @@ function resolveOptions(
           : DEFAULT_SEED,
     dollarsPerkWh:
       options.dollarsPerkWh === undefined ? null : options.dollarsPerkWh,
-    monthlyMarketingSpend: options.monthlyMarketingSpend || 0,
     strategy: options.strategy || "none",
     initialBuild: options.initialBuild || null,
     sellFacilityId: options.sellFacilityId ?? null,

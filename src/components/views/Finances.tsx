@@ -14,21 +14,24 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import { MONTHS, TICKS_PER_MONTH } from "../../Constants";
+import { MONTHS, TICK_MINUTES, TICKS_PER_MONTH } from "../../Constants";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
+  getDateFromMinute,
   getTimeFromTimeline,
   reduceHistories,
   summarizeHistory,
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
+import { facilityLifetime } from "../../helpers/Financials";
 import {
-  customersFromMarketingSpend,
-  facilityLifetime,
-} from "../../helpers/Financials";
+  customerMarketSizeAt,
+  getMarketRate,
+  projectCustomerChange,
+} from "../../helpers/Customers";
 import {
   formatMoneyConcise,
   formatMoneyStable,
@@ -75,8 +78,8 @@ interface ChartKeyMetadataType {
   nesting?: number; // default 0 / unnested
   /**
    * Which direction of the change column is good news, so the arrow can be coloured. Left
-   * unset for the metrics that are neither: marketing spend is a decision rather than a
-   * result, and inflation is weather. Those get an arrow with no colour on it.
+   * unset for metrics such as inflation that are neither good nor bad. Those get an arrow with no
+   * colour on it.
    */
   higherIsBetter?: boolean;
 }
@@ -148,12 +151,6 @@ function buildChartKeys(units: UnitSystemType): {
     expensesOM: {
       label: "Operations",
       higherIsBetter: false,
-      format: formatMoneyConcise,
-      formatTable: formatMoneyStable,
-      nesting: 1,
-    },
-    expensesMarketing: {
-      label: "Marketing",
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
@@ -445,45 +442,6 @@ function DeltaCell(props: DeltaCellProps): React.JSX.Element {
   );
 }
 
-// -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
-function getValueFromTick(tick: number) {
-  if (tick === -1) {
-    return 0;
-  }
-  const exponent = Math.floor(tick / 9) + 5;
-  const frontNumber = (tick % 9) + 1;
-  return Math.round(frontNumber * Math.pow(10, exponent));
-}
-
-function getTickFromValue(v: number) {
-  if (v === 0) {
-    return -1;
-  }
-  const exponent = Math.floor(Math.log10(v)) - 5;
-  const frontNumber = +v.toString().charAt(0);
-  return Math.floor(frontNumber + exponent * 9 - 1);
-}
-
-/**
- * Where the marketing slider draws its ticks: one per decade of spending.
- *
- * Every ninth tick, because that is where the leading digit rolls over and the scale gains a
- * zero -- the nine steps in between are $1M, $2M, ... $9M, and a mark on each of them is a row
- * of dots too fine to aim at. Zero gets one of its own, since it sits below the scale.
- */
-function marketingMarks(maxTick: number): { value: number; label?: string }[] {
-  const marks: { value: number; label?: string }[] = [
-    { value: -1, label: "$0" },
-  ];
-  for (let tick = 0; tick <= maxTick; tick += 9) {
-    marks.push({
-      value: tick,
-      label: formatMoneyConcise(getValueFromTick(tick)),
-    });
-  }
-  return marks;
-}
-
 // The rate slider runs $0 to $0.30/kWh, so its ticks are a fixed nickel apart
 const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
   value: rate,
@@ -491,22 +449,23 @@ const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
 }));
 
 /**
- * The useful part of the marketing forecast is its change, not its resulting total. At large
+ * The useful part of the customer forecast is its change, not its resulting total. At large
  * customer counts, formatting both totals compactly can turn `1m -> 1m` and hide the effect.
  */
-export function formatMarketingCustomerGrowth(
-  marketingSpend: number,
+export function formatCustomerChange(
+  change: number,
   customers: number,
 ): string {
-  const gained = customersFromMarketingSpend(marketingSpend);
-  const formattedGain = numbro(gained).format({
+  const formattedChange = numbro(Math.abs(change)).format({
     average: true,
     mantissa: 1,
     trimMantissa: true,
   });
   const percent =
-    customers > 0 ? ` (+${((gained / customers) * 100).toFixed(1)}%)` : "";
-  return `+${formattedGain}${percent}`;
+    customers > 0
+      ? ` (${change >= 0 ? "+" : "-"}${((Math.abs(change) / customers) * 100).toFixed(1)}%)`
+      : "";
+  return `${change >= 0 ? "+" : "-"}${formattedChange}${percent}`;
 }
 
 export default class Finances extends React.Component<Props, State> {
@@ -561,8 +520,8 @@ export default class Finances extends React.Component<Props, State> {
       }
     | undefined;
 
-  // Rebuilding a twenty-year projection costs ~120ms, and the marketing and rate sliders change
-  // one of its inputs on every pointer move. Drawing from the previous projection while the
+  // Rebuilding a twenty-year projection costs ~120ms, and the rate slider changes one of its
+  // inputs on every pointer move. Drawing from the previous projection while the
   // player is still dragging keeps the slider smooth, and the trailing timer below makes sure
   // the chart catches up with wherever they let go.
   private static readonly PROJECTION_THROTTLE_MS = 250;
@@ -646,7 +605,6 @@ export default class Finances extends React.Component<Props, State> {
       this.state.range,
       date.monthsEllapsed,
       game.monthlyHistory.length,
-      game.monthlyMarketingSpend,
       game.dollarsPerkWh,
       game.facilities.map((f) => `${f.id}${f.paused ? "p" : ""}`).join(","),
     ].join("|");
@@ -804,6 +762,43 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+    const marketRate = getMarketRate(
+      scenario.dollarsPerkWh,
+      date,
+      startingYear,
+      game.seed,
+    );
+    const customerChange = projectCustomerChange({
+      customers: now.customers,
+      customerRate: now.customerRate || game.customerRate || game.dollarsPerkWh,
+      currentRate: game.dollarsPerkWh,
+      marketRateAt: (tick: number) =>
+        getMarketRate(
+          scenario.dollarsPerkWh,
+          getDateFromMinute(date.minute + tick * TICK_MINUTES, startingYear),
+          startingYear,
+          game.seed,
+        ),
+      marketSizeAt: (tick: number) =>
+        customerMarketSizeAt(
+          game.customerMarketSize || now.customers * 2,
+          date.minute + tick * TICK_MINUTES,
+        ),
+      ownership: scenario.ownership,
+    });
+    const investorRateMax = Math.max(
+      0.05,
+      Math.ceil(marketRate * 200) / 100,
+      game.dollarsPerkWh,
+    );
+    const investorRateMarks = [
+      { value: 0, label: "$0" },
+      {
+        value: marketRate,
+        label: `${formatMoneyConcise(marketRate)} market`,
+      },
+      { value: investorRateMax, label: formatMoneyConcise(investorRateMax) },
+    ];
     // Six sparklines need width the phone layout does not have, and the dropdown they replace is
     // the right control at that size -- see MetricTiles
     const smallMultiples = isDesktopScreen();
@@ -925,114 +920,64 @@ export default class Finances extends React.Component<Props, State> {
           )}
           <br />
           <Toolbar>
-            {scenario.ownership === "Investor" && (
-              <Typography
-                className="flex-newline"
-                variant="body2"
-                color="textSecondary"
-              >
-                Marketing:&nbsp;
-                <Typography color="primary" component="strong">
-                  {formatMoneyConcise(game.monthlyMarketingSpend)}
-                </Typography>
-                /mo&nbsp;&mdash;&nbsp;
-                {numbro(now.customers).format({ average: true })} customers
-                {game.monthlyMarketingSpend > 0 && (
-                  <>
-                    &nbsp;&rarr;&nbsp;
-                    <Typography color="primary" component="strong">
-                      {formatMarketingCustomerGrowth(
-                        game.monthlyMarketingSpend,
-                        now.customers,
-                      )}
-                    </Typography>
-                    &nbsp;next month
-                  </>
-                )}
+            <Typography
+              className="flex-newline"
+              variant="body2"
+              color="textSecondary"
+            >
+              Electricity Rate
+              <ManualLink
+                entry={MANUAL_ENTRY.RATES}
+                label="electricity rates"
+              />
+              :&nbsp;
+              <Typography color="primary" component="strong">
+                {formatMoneyConcise(game.dollarsPerkWh)}
               </Typography>
-            )}
-            {scenario.ownership === "Investor" && (
-              <div className="budgetSlider flex-newline">
-                <Slider
-                  id="marketingSlider"
-                  disabled={!!game.replayPlayback}
-                  value={getTickFromValue(game.monthlyMarketingSpend)}
-                  aria-label="Monthly marketing budget"
-                  /* On the thumb, so the budget being chosen is legible during the drag that
-                     chooses it rather than only in the line above it */
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(tick: number) =>
-                    formatMoneyConcise(getValueFromTick(tick))
-                  }
-                  getAriaValueText={(tick: number) =>
-                    `${formatMoneyConcise(getValueFromTick(tick))} per month`
-                  }
-                  marks={marketingMarks(
-                    getTickFromValue(
-                      Math.max(now.cash / 12, game.monthlyMarketingSpend),
-                    ),
-                  )}
-                  min={-1}
-                  step={1}
-                  max={getTickFromValue(
-                    Math.max(now.cash / 12, game.monthlyMarketingSpend),
-                  )}
-                  onChange={(_e: Event, newTick: number | number[]) =>
-                    onDelta({
-                      monthlyMarketingSpend: getValueFromTick(
-                        Array.isArray(newTick) ? newTick[0] : newTick,
-                      ),
-                    })
-                  }
-                />
-              </div>
-            )}
-            {scenario.ownership === "Public" && (
-              <Typography
-                className="flex-newline"
-                variant="body2"
-                color="textSecondary"
-              >
-                Electricity Rate
-                <ManualLink
-                  entry={MANUAL_ENTRY.RATES}
-                  label="electricity rates"
-                />
-                :&nbsp;
-                <Typography color="primary" component="strong">
-                  {formatMoneyConcise(game.dollarsPerkWh)}
-                </Typography>
-                /kWh
-              </Typography>
-            )}
-            {scenario.ownership === "Public" && (
-              <div className="budgetSlider flex-newline">
-                <Slider
-                  id="rateSlider"
-                  disabled={!!game.replayPlayback}
-                  value={game.dollarsPerkWh}
-                  aria-label="The rate you charge for electricity generation"
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(rate: number) =>
-                    `${formatMoneyConcise(rate)}/kWh`
-                  }
-                  getAriaValueText={(rate: number) =>
-                    `${formatMoneyConcise(rate)} per kilowatt hour`
-                  }
-                  marks={RATE_MARKS}
-                  min={0}
-                  step={0.01}
-                  max={0.3}
-                  onChange={(_e: Event, newTick: number | number[]) =>
-                    onDelta({
-                      dollarsPerkWh: Array.isArray(newTick)
-                        ? newTick[0]
-                        : newTick,
-                    })
-                  }
-                />
-              </div>
-            )}
+              /kWh
+              {scenario.ownership === "Investor" && (
+                <>
+                  &nbsp;&mdash;&nbsp;market {formatMoneyConcise(marketRate)}/kWh
+                  &nbsp;&mdash;&nbsp;
+                  {numbro(now.customers).format({ average: true })} customers,
+                  projected&nbsp;
+                  <Typography color="primary" component="strong">
+                    {formatCustomerChange(customerChange, now.customers)}
+                  </Typography>
+                  &nbsp;next month
+                </>
+              )}
+            </Typography>
+            <div className="budgetSlider flex-newline">
+              <Slider
+                id="rateSlider"
+                disabled={!!game.replayPlayback}
+                value={game.dollarsPerkWh}
+                aria-label="The rate you charge for electricity generation"
+                valueLabelDisplay="auto"
+                valueLabelFormat={(rate: number) =>
+                  `${formatMoneyConcise(rate)}/kWh`
+                }
+                getAriaValueText={(rate: number) =>
+                  `${formatMoneyConcise(rate)} per kilowatt hour`
+                }
+                marks={
+                  scenario.ownership === "Investor"
+                    ? investorRateMarks
+                    : RATE_MARKS
+                }
+                min={0}
+                step={scenario.ownership === "Investor" ? 0.001 : 0.01}
+                max={scenario.ownership === "Investor" ? investorRateMax : 0.3}
+                onChange={(_e: Event, newTick: number | number[]) =>
+                  onDelta({
+                    dollarsPerkWh: Array.isArray(newTick)
+                      ? newTick[0]
+                      : newTick,
+                  })
+                }
+              />
+            </div>
             {/* On a wide screen this whole row goes away: the range moved up into the pane
                 header above, and the tiles below are the metric picker, so there is nothing
                 left here that isn't said somewhere else */}

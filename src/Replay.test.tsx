@@ -38,9 +38,9 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
 
 describe("recordedDelta", () => {
   it("keeps the fields the simulation reads", () => {
-    expect(
-      recordedDelta({ dollarsPerkWh: 0.11, monthlyMarketingSpend: 5000 }),
-    ).toEqual({ dollarsPerkWh: 0.11, monthlyMarketingSpend: 5000 });
+    expect(recordedDelta({ dollarsPerkWh: 0.11 })).toEqual({
+      dollarsPerkWh: 0.11,
+    });
   });
 
   it("ignores a delta that changes nothing about the run", () => {
@@ -48,6 +48,11 @@ describe("recordedDelta", () => {
     // scenario, the difficulty picked before the game began
     expect(recordedDelta({ tutorialStep: 3 })).toBeNull();
     expect(recordedDelta({ difficulty: "CEO" })).toBeNull();
+  });
+
+  it("rejects an invalid rate from an untrusted replay", () => {
+    expect(recordedDelta({ dollarsPerkWh: Number.NaN })).toBeNull();
+    expect(recordedDelta({ dollarsPerkWh: -0.01 })).toBeNull();
   });
 });
 
@@ -81,12 +86,11 @@ describe("recordReplayAction", () => {
     const game = aGame(60, []);
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.1 });
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.2 });
-    recordReplayAction(game, "delta", { monthlyMarketingSpend: 100 });
     expect(game.replayLog).toEqual([
       {
         minute: 60,
         type: "delta",
-        payload: { dollarsPerkWh: 0.2, monthlyMarketingSpend: 100 },
+        payload: { dollarsPerkWh: 0.2 },
       },
     ]);
   });

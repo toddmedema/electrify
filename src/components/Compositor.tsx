@@ -78,8 +78,8 @@ const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const facilitySlotKey = (slot: number) => `shift+${slot}`;
 
 // react-hotkeys' default ignoreEventsCondition treats every <input> as a text field and drops
-// the keydown entirely -- but the capacity sliders on the build screens and the marketing
-// spend slider in Finances are MUI Sliders, which render as a bare <input type="range">. Just
+// the keydown entirely -- but the capacity sliders on the build screens and the rate slider in
+// Finances are MUI Sliders, which render as a bare <input type="range">. Just
 // clicking one leaves it focused, and from then on every shortcut silently did nothing until
 // the player happened to click something else -- the "some element is pulling focus" bug.
 // These types don't take character input, so there's nothing for a shortcut key to clobber.

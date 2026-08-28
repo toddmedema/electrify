@@ -88,14 +88,12 @@ export default class Forecasts extends React.Component<Props, State> {
     // Because forecasts are computationally intense and long term, only update when the
     // month or state changes -- plus when the player selects a facility, which is a direct
     // request to re-highlight the stack and would otherwise wait for a month rollover, or moves
-    // a slider that feeds the forecast (marketing spend drives customer growth, the rate drives
-    // revenue), which would otherwise sit frozen until the next month rolled over
+    // the rate slider, which drives both customer growth and revenue and would otherwise sit
+    // frozen until the next month rolled over
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
       this.props.selectedFacilityId !== nextProps.selectedFacilityId ||
       this.state.years !== nextState.years ||
-      this.props.game.monthlyMarketingSpend !==
-        nextProps.game.monthlyMarketingSpend ||
       this.props.game.dollarsPerkWh !== nextProps.game.dollarsPerkWh
     );
   }
