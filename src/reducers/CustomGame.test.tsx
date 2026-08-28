@@ -1,6 +1,7 @@
 import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { facilityAgeYears, facilityOutputFactor } from "../helpers/Financials";
 import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame, runSimulation } from "../testing/Simulator";
 import {
@@ -78,6 +79,25 @@ describe("a custom game", () => {
       expect(f.yearsToBuildLeft).toBe(0);
       expect(f.loanAmountLeft).toBe(0);
     });
+  });
+
+  it("commissions an authored starting facility at its supplied age", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2020,
+        facilities: [{ fuel: "Sun", peakW: 100000000, initialAgeYears: 20 }],
+      },
+    });
+    const solar = state.facilities[0];
+
+    expect(facilityAgeYears(solar, state.date.minute)).toBeCloseTo(20, 10);
+    expect(facilityOutputFactor(solar, state.date.minute)).toBeCloseTo(
+      Math.pow(0.995, 20),
+      10,
+    );
+    expect(solar.currentW).toBeLessThan(solar.peakW);
   });
 
   it("dispatches an offshore wind starting facility from offshore weather", () => {

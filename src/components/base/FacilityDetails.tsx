@@ -1,7 +1,12 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
-import { facilityLifetime } from "../../helpers/Financials";
+import {
+  facilityAgeYears,
+  facilityEquivalentCycles,
+  facilityLifetime,
+  facilityOutputFactor,
+} from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatWattHours,
@@ -114,6 +119,9 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
+  const ageYears = facilityAgeYears(facility, date.minute);
+  const outputFactor = facilityOutputFactor(facility, date.minute);
+  const equivalentCycles = facilityEquivalentCycles(facility);
 
   const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
   const trendChange =
@@ -130,16 +138,22 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={`${Math.ceil(facility.yearsToBuildLeft * 12)} months`}
           />
         ) : (
-          <Stat
-            // Capacity factor is the generator's word for it; a battery isn't producing
-            // anything, it's being used or it isn't
-            label={isStorage ? "Utilization" : "Capacity factor"}
-            value={
-              lifetime.capacityFactor === undefined
-                ? "—"
-                : percent(lifetime.capacityFactor)
-            }
-          />
+          <>
+            <Stat
+              label="Age / design life"
+              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
+            />
+            <Stat
+              // Capacity factor is the generator's word for it; a battery isn't producing
+              // anything, it's being used or it isn't
+              label={isStorage ? "Utilization" : "Capacity factor"}
+              value={
+                lifetime.capacityFactor === undefined
+                  ? "—"
+                  : percent(lifetime.capacityFactor)
+              }
+            />
+          </>
         )}
         <Stat
           label="Cost"
@@ -170,6 +184,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               facility.currentWh,
               (facility as StorageOperatingType).peakWh,
             )}
+          />
+        )}
+        {facility.name === "Battery" && equivalentCycles !== undefined && (
+          <Stat
+            label="Equivalent cycles"
+            value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
           />
         )}
         {isHydro && (
@@ -203,6 +223,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {!isStorage && (
           <Stat label="Nameplate" value={formatWatts(facility.peakW)} />
+        )}
+        {!isStorage && outputFactor < 1 && (
+          <Stat
+            label="Effective max"
+            value={`${formatWatts(facility.peakW * outputFactor)} · ${percent(outputFactor)} health`}
+          />
         )}
         {facility.loanAmountLeft > 0 && (
           <Stat

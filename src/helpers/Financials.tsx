@@ -151,14 +151,37 @@ export function LCWH(
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
   // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money
   // formatters render that as a dash.
+  const productiveYears = degradedLifetimeYears(
+    g.lifespanYears,
+    g.annualOutputDegradation || 0,
+  );
   const totalWh =
-    g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
+    g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh =
     (g.buildCost +
       g.annualOperatingCost * g.lifespanYears +
       (fuelCostPerWh + carbonCostPerWh) * totalWh) /
     totalWh;
   return costPerWh;
+}
+
+/**
+ * Nameplate-equivalent years delivered across a design life with compounding annual decline.
+ * Runtime degradation is continuous in operating age, so the lifetime quote integrates the same
+ * curve instead of approximating it with beginning- or end-of-year steps.
+ */
+export function degradedLifetimeYears(
+  lifespanYears: number,
+  annualOutputDegradation: number,
+): number {
+  if (annualOutputDegradation <= 0) {
+    return lifespanYears;
+  }
+  if (annualOutputDegradation >= 1) {
+    return 0;
+  }
+  const retention = 1 - annualOutputDegradation;
+  return (Math.pow(retention, lifespanYears) - 1) / Math.log(retention);
 }
 
 /**
@@ -212,6 +235,36 @@ export function facilityAgeYears(
         0,
         (currentMinute - g.minuteOperational) / MINUTES_PER_GAME_YEAR,
       );
+}
+
+/** Current output capability after permanent age-related degradation. */
+export function facilityOutputFactor(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  // Current facilities carry their researched rate. Legacy saves do not, so apply the modern
+  // defaults rather than making old solar and wind immune to aging from the day they resume.
+  const annualDegradation =
+    g.annualOutputDegradation ??
+    (g.fuel === "Sun" ? 0.005 : g.fuel === "Wind" ? 0.002 : 0);
+  if (annualDegradation <= 0) {
+    return 1;
+  }
+  return Math.pow(
+    Math.max(0, 1 - annualDegradation),
+    facilityAgeYears(g, currentMinute),
+  );
+}
+
+/**
+ * Storage lifetimeWh already counts discharge only, which is the industry convention for an
+ * equivalent full cycle. Deriving the counter keeps old saves compatible and avoids a second
+ * running total that could drift out of sync.
+ */
+export function facilityEquivalentCycles(
+  g: FacilityOperatingType,
+): number | undefined {
+  return g.peakWh > 0 ? (g.lifetimeWh || 0) / g.peakWh : undefined;
 }
 
 // Returns how much cash the user receives if they sell / cancel the facility. Construction
