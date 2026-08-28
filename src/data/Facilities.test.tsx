@@ -1,16 +1,25 @@
 import { GENERATORS, STORAGE } from "./Facilities";
 import { getDateFromMinute } from "../helpers/DateTime";
-import { GameType, LocationType } from "../Types";
+import { FacilityOperatingType, GameType, LocationType } from "../Types";
 
-function stateAt(location: LocationType): GameType {
+function stateAt(
+  location: LocationType,
+  year = 2020,
+  facilities: FacilityOperatingType[] = [],
+): GameType {
   return {
-    date: getDateFromMinute(0, 2020),
-    difficulty: "Employee",
+    date: getDateFromMinute(0, year),
+    startingYear: year,
+    difficulty: "CEO",
     feePerKgCO2e: 0,
     seed: 1,
-    facilities: [],
+    facilities,
     location,
   } as unknown as GameType;
+}
+
+function geothermalFacility(name: string): FacilityOperatingType {
+  return { name, fuel: "Geothermal" } as FacilityOperatingType;
 }
 
 const iceland: LocationType = {
@@ -48,5 +57,76 @@ describe("location-aware facilities", () => {
     expect(fuels).not.toContain("Geothermal");
     expect(fuels).not.toContain("Hydro");
     expect(storage).not.toContain("Pumped Hydro");
+  });
+});
+
+describe("enhanced geothermal", () => {
+  const generatorAt = (
+    location: LocationType,
+    year: number,
+    name: string,
+    facilities: FacilityOperatingType[] = [],
+  ) =>
+    GENERATORS(stateAt(location, year, facilities), 100000000, [], []).find(
+      (generator) => generator.name === name,
+    );
+
+  it("unlocks in 2030 in locations without conventional geothermal", () => {
+    expect(generatorAt(france, 2029, "Enhanced Geothermal")).toBeUndefined();
+    expect(generatorAt(france, 2030, "Geothermal")).toBeUndefined();
+    expect(generatorAt(france, 2030, "Enhanced Geothermal")).toBeDefined();
+  });
+
+  it("offers both geothermal technologies in resource-rich locations", () => {
+    const names = GENERATORS(stateAt(iceland, 2030), 100000000, [], []).map(
+      (generator) => generator.name,
+    );
+
+    expect(names).toContain("Geothermal");
+    expect(names).toContain("Enhanced Geothermal");
+  });
+
+  it("does not make enhanced geothermal more expensive as its fleet grows", () => {
+    const baseline = generatorAt(france, 2030, "Enhanced Geothermal");
+    const withExistingEnhanced = generatorAt(
+      france,
+      2030,
+      "Enhanced Geothermal",
+      [
+        geothermalFacility("Enhanced Geothermal"),
+        geothermalFacility("Enhanced Geothermal"),
+      ],
+    );
+
+    expect(withExistingEnhanced?.buildCost).toBe(baseline?.buildCost);
+  });
+
+  it("only counts conventional plants for conventional geothermal scarcity", () => {
+    const baseline = generatorAt(iceland, 2030, "Geothermal");
+    const withEnhanced = generatorAt(iceland, 2030, "Geothermal", [
+      geothermalFacility("Enhanced Geothermal"),
+    ]);
+    const withConventional = generatorAt(iceland, 2030, "Geothermal", [
+      geothermalFacility("Geothermal"),
+    ]);
+
+    expect(withEnhanced?.buildCost).toBe(baseline?.buildCost);
+    expect(withConventional?.buildCost).toBe(
+      (baseline?.buildCost as number) * 1.25,
+    );
+  });
+
+  it("uses the 2030 cost and performance assumptions", () => {
+    const generator = generatorAt(france, 2030, "Enhanced Geothermal");
+
+    expect(generator).toMatchObject({
+      fuel: "Geothermal",
+      annualOperatingCost: 16000000,
+      capacityFactor: 0.83,
+      maxPeakW: 500000000,
+      yearsToBuild: 3.5,
+      lifespanYears: 30,
+    });
+    expect(generator?.buildCost).toBeCloseTo(463000000, -6);
   });
 });
