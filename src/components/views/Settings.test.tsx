@@ -106,4 +106,25 @@ describe("Settings", () => {
     // Picking the same file again still counts, for the player who went and fixed a bad one
     expect(fileInput().value).toBe("");
   });
+
+  it("hides installation controls when already running as an installed app", () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = jest.fn().mockReturnValue({
+      matches: true,
+      media: "(display-mode: standalone)",
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    });
+
+    renderSettings();
+
+    expect(
+      screen.queryByRole("region", { name: "App" }),
+    ).not.toBeInTheDocument();
+    window.matchMedia = originalMatchMedia;
+  });
 });

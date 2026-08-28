@@ -38,6 +38,10 @@ const InstallContext = React.createContext<InstallContextType>({
   snooze: () => undefined,
 });
 
+export function useIsInstalledApp(): boolean {
+  return React.useContext(InstallContext).installed || standalone();
+}
+
 const INSTALL_SNOOZE_KEY = "installPromptSnoozedAt";
 const INSTALL_VISITS_KEY = "installVisits";
 const INSTALL_VISIT_COUNTED_KEY = "installVisitCounted";

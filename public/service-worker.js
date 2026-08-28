@@ -1,13 +1,52 @@
-const CACHE_VERSION = "electrify-v1";
+const CACHE_VERSION = "electrify-v2";
+const WEATHER_INDEX = "/data/weather/index.json";
+const MARKET_DATA = ["/data/FuelPricesRaw.csv", "/data/EconomyRaw.csv"];
 const APP_SHELL = [
   "/",
   "/manifest.json",
   "/images/logo.svg",
   "/images/icon/192x192.png",
   "/images/icon/512x512.png",
-  "/data/FuelPricesRaw.csv",
-  "/data/EconomyRaw.csv",
+  WEATHER_INDEX,
+  ...MARKET_DATA,
 ];
+
+async function fetchAndCache(cache, url) {
+  const response = await fetch(url, { cache: "no-cache" });
+  if (!response.ok) {
+    throw new Error(`${response.status} fetching ${url}`);
+  }
+  await cache.put(url, response.clone());
+  return response;
+}
+
+/**
+ * An installed app asks for this after launch has gone idle. Compare the catalog first: an
+ * unchanged one only fills holes, while a changed catalog refreshes every location because its
+ * update date means the packed records may have changed in place.
+ */
+async function syncOfflineData() {
+  const cache = await caches.open(CACHE_VERSION);
+  const cachedIndex = await cache.match(WEATHER_INDEX);
+  const cachedText = cachedIndex ? await cachedIndex.clone().text() : "";
+  const indexResponse = await fetchAndCache(cache, WEATHER_INDEX);
+  const indexText = await indexResponse.clone().text();
+  const index = JSON.parse(indexText);
+  const weatherUrls = Object.keys(index.cities || {}).map(
+    (id) => `/data/weather/${id}.bin`,
+  );
+  const cachedUrls = new Set(
+    (await cache.keys()).map((request) => new URL(request.url).pathname),
+  );
+  const weatherToFetch =
+    cachedText !== indexText
+      ? weatherUrls
+      : weatherUrls.filter((url) => !cachedUrls.has(url));
+
+  await Promise.allSettled(
+    [...MARKET_DATA, ...weatherToFetch].map((url) => fetchAndCache(cache, url)),
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -28,6 +67,12 @@ self.addEventListener("activate", (event) => {
       )
       .then(() => self.clients.claim()),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SYNC_OFFLINE_DATA") {
+    event.waitUntil(syncOfflineData());
+  }
 });
 
 self.addEventListener("fetch", (event) => {

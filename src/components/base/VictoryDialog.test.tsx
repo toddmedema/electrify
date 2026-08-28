@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import VictoryDialog, { Props, summarizeChallenge } from "./VictoryDialog";
+import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
 
 const mockFetchGlobalRank = jest.fn();
@@ -72,21 +72,7 @@ describe("VictoryDialog", () => {
       screen.getByText(/800 pts from electricity supplied/),
     ).toBeInTheDocument();
     expect(screen.getByText(/-18 pts from blackouts/)).toBeInTheDocument();
-    expect(screen.getByText("What you accomplished")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "You practiced balancing electricity supplied, emissions and blackouts.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("summarizes whichever scoring categories a scenario provides", () => {
-    expect(summarizeChallenge({ customers: 100 })).toBe(
-      "You practiced managing final customers.",
-    );
-    expect(summarizeChallenge({})).toBe(
-      "You completed the scenario and kept the grid moving.",
-    );
+    expect(screen.queryByText("What you accomplished")).not.toBeInTheDocument();
   });
 
   it("uses the scenario name instead of repeating a generic completion title", () => {
@@ -201,7 +187,7 @@ describe("VictoryDialog", () => {
 
       expect(screen.getByText("Run ended")).toBeInTheDocument();
       expect(screen.getByText(title)).toBeInTheDocument();
-      expect(screen.getByText("How you scored")).toBeInTheDocument();
+      expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
       expect(screen.getByText(/Final score/)).toBeInTheDocument();
       expect(screen.queryByText("Review final grid")).not.toBeInTheDocument();
       await userEvent.keyboard("{Escape}");

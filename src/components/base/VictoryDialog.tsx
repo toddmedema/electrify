@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  Box,
   Button,
   Dialog,
   DialogActions,
@@ -64,24 +63,6 @@ export interface Props extends StateProps, DispatchProps {}
 
 export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
-}
-
-export function summarizeChallenge(
-  breakdown: VictoryType["breakdown"],
-): string {
-  const practiced = Object.keys(breakdown)
-    .map((category) => SCORE_LABELS[category] || category)
-    .slice(0, 3);
-
-  if (practiced.length === 0) {
-    return "You completed the scenario and kept the grid moving.";
-  }
-  if (practiced.length === 1) {
-    return `You practiced managing ${practiced[0]}.`;
-  }
-
-  const last = practiced.pop();
-  return `You practiced balancing ${practiced.join(", ")} and ${last}.`;
 }
 
 /**
@@ -221,23 +202,6 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             {endMessage}
           </Typography>
         )}
-        <Box
-          sx={{
-            my: 2,
-            p: 2,
-            borderRadius: 2,
-            bgcolor: "action.hover",
-            border: 1,
-            borderColor: "divider",
-          }}
-        >
-          <Typography variant="overline" color="text.secondary">
-            {failed ? "How you scored" : "What you accomplished"}
-          </Typography>
-          <Typography variant="body1">
-            {summarizeChallenge(breakdown)}
-          </Typography>
-        </Box>
         <Typography variant="body1" sx={{ fontWeight: 600 }}>
           Final score: <strong>{formatScore(victory.score)}</strong>
         </Typography>

@@ -289,6 +289,9 @@ export interface GeneratorOperatingType
   currentW: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
+  // Set when construction completes. Optional so saves made before depreciation existed still
+  // load; the first real tick establishes their remaining lifetime from that point onward.
+  minuteOperational?: number;
   paused: boolean;
 }
 
@@ -298,6 +301,7 @@ export interface StorageOperatingType
   currentWh: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
+  minuteOperational?: number;
 }
 
 /**

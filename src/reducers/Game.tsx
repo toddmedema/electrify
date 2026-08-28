@@ -53,7 +53,6 @@ import {
   DOWNPAYMENT_PERCENT,
   FUELS,
   GAME_TO_REAL_YEARS,
-  GENERATOR_SELL_MULTIPLIER,
   INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
   ORGANIC_GROWTH_MAX_ANNUAL,
@@ -776,7 +775,7 @@ function applySellFacility(state: GameType, id: number) {
       sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
       sold.yearsToBuildLeft > 0
         ? `Cancelled construction of ${sold.name}`
-        : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold))}`,
+        : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
     );
   }
   // in one loop, refund cash from selling + remove from list
@@ -785,7 +784,7 @@ function applySellFacility(state: GameType, id: number) {
       if (g.id === id) {
         const now = getTimeFromTimeline(state.date.minute, state.timeline);
         if (now) {
-          now.cash += facilityCashBack(g);
+          now.cash += facilityCashBack(g, state.date.minute);
         }
         return false;
       }
@@ -1376,13 +1375,20 @@ function updateSupplyFacilitiesFinances(
   facilities.forEach((f: FacilityOperatingType) => {
     if (f.yearsToBuildLeft > 0) {
       f.yearsToBuildLeft = Math.max(0, f.yearsToBuildLeft - YEARS_PER_TICK);
-      if (f.yearsToBuildLeft === 0 && !simulated) {
-        const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
-        logGameEvent(state, "CONSTRUCTION", message);
-        setTimeout(() => {
-          getStore().dispatch(snackbarOpen(message));
-        }, 0);
+      if (f.yearsToBuildLeft === 0) {
+        f.minuteOperational = now.minute;
+        if (!simulated) {
+          const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
+          logGameEvent(state, "CONSTRUCTION", message);
+          setTimeout(() => {
+            getStore().dispatch(snackbarOpen(message));
+          }, 0);
+        }
       }
+    } else if (f.minuteOperational === undefined && !simulated) {
+      // A save from before depreciation has no commissioning timestamp. Start its clock now
+      // rather than guessing that every inherited plant is already worn out.
+      f.minuteOperational = now.minute;
     }
   });
 
@@ -1633,7 +1639,7 @@ function updateSupplyFacilitiesFinances(
       expensesMarketing -
       principalRepayment,
   );
-  now.netWorth = getNetWorth(facilities, now.cash);
+  now.netWorth = getNetWorth(facilities, now.cash, now.minute);
   now.revenue = revenue;
   now.expensesOM = expensesOM;
   now.expensesFuel = expensesFuel;
@@ -1664,10 +1670,25 @@ function reforecastSupply(
   // its end-of-horizon state -- resuming a paused nuclear plant snapped straight to full output
   // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
   const newState = { ...state, facilities: cloneDeep(state.facilities) };
+  const current = getTimeFromTimeline(state.date.minute, state.timeline);
+  const currentCash = current?.cash;
+  const currentCustomers = current?.customers;
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       t = updateSupplyFacilitiesFinances(newState, prev, { ...t }, simulated);
+      // The current tick already happened. Reforecast its supply against the player's action,
+      // but keep the transaction and customer balance that caused this reforecast. Otherwise
+      // rebuilding from the previous tick erases a purchase refund (and, symmetrically, a cost).
+      if (t.minute === state.date.minute) {
+        if (currentCash !== undefined) {
+          t.cash = currentCash;
+        }
+        if (currentCustomers !== undefined) {
+          t.customers = currentCustomers;
+        }
+        t.netWorth = getNetWorth(newState.facilities, t.cash, t.minute);
+      }
     }
     prev = t;
     return t;
@@ -1697,7 +1718,7 @@ export function generateNewTimeline(
   );
   // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
   // was the same number recomputed for every one of up to a year's worth of ticks
-  const netWorth = getNetWorth(state.facilities, cash);
+  const netWorth = getNetWorth(state.facilities, cash, state.date.minute);
   for (let i = 0; i < ticks; i++) {
     state.timeline[i] = {
       minute: state.date.minute + i * TICK_MINUTES,
@@ -1795,6 +1816,7 @@ function buildFacilityHelper(
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
       minuteCreated: state.date.minute,
+      minuteOperational: newGame ? state.date.minute : undefined,
     } as FacilityOperatingType;
     if (g.peakWh) {
       facility.currentWh = 0;
@@ -1807,17 +1829,17 @@ function buildFacilityHelper(
   return state;
 }
 
-// TODO account for generator current value better - get rid of SELL_MULTIPLIER everywhere and depreciate buildCost over time
 function getNetWorth(
   facilities: FacilityOperatingType[],
   cash: number,
+  currentMinute: number,
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
-    if (g.yearsToBuildLeft === 0) {
-      netWorth += g.buildCost * GENERATOR_SELL_MULTIPLIER - g.loanAmountLeft;
-    } else {
+    if (g.yearsToBuildLeft > 0) {
       netWorth += g.buildCost * DOWNPAYMENT_PERCENT;
+    } else {
+      netWorth += facilityCashBack(g, currentMinute);
     }
   });
   return netWorth;

@@ -12,11 +12,7 @@ import {
   MAX_CREDIT_POINTS,
   LCWH,
 } from "./Financials";
-import {
-  GENERATOR_SELL_MULTIPLIER,
-  HOURS_PER_YEAR_REAL,
-  LOAN_MONTHS,
-} from "../Constants";
+import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL, LOAN_MONTHS } from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -31,6 +27,9 @@ function aFacility(
     loanAmountLeft: 0,
     yearsToBuild: 4,
     yearsToBuildLeft: 0,
+    lifespanYears: 40,
+    minuteCreated: 0,
+    minuteOperational: 0,
     ...overrides,
   } as FacilityOperatingType;
 }
@@ -102,39 +101,34 @@ describe("facilityCashBack", () => {
     ).toBe(1000000);
   });
 
-  it("takes the sell multiplier off a finished facility", () => {
-    expect(facilityCashBack(aFacility())).toBeCloseTo(
-      1000000 * (1 - GENERATOR_SELL_MULTIPLIER),
-      6,
-    );
+  it("starts a finished facility at its full unfinanced value", () => {
+    expect(facilityCashBack(aFacility())).toBe(1000000);
   });
 
-  it("pays back less the further construction has progressed", () => {
-    // 2.5% and 5% of a four year build
-    const early = facilityCashBack(aFacility({ yearsToBuildLeft: 3.9 }));
-    const later = facilityCashBack(aFacility({ yearsToBuildLeft: 3.8 }));
-    expect(early).toBeGreaterThan(later);
-    expect(later).toBeGreaterThan(facilityCashBack(aFacility()));
+  it("depreciates linearly over the facility's own lifespan", () => {
+    const minute = (years: number) => years * DAYS_PER_YEAR * 24 * 60;
+    expect(facilityCashBack(aFacility(), minute(20))).toBeCloseTo(500000, 6);
+    expect(facilityCashBack(aFacility(), minute(40))).toBe(0);
+    expect(facilityCashBack(aFacility(), minute(60))).toBe(0);
   });
 
-  /**
-   * The taper is sqrt(percentBuilt * 10), capped at 1, so it reaches the full penalty at 10% built
-   * and everything past that refunds the same. Worth knowing before reading the "refund slightly
-   * more if construction isn't complete" comment as a smooth curve across the whole build.
-   */
-  it("charges the full penalty from 10% built onwards", () => {
-    const tenPercent = facilityCashBack(aFacility({ yearsToBuildLeft: 3.6 }));
-    expect(tenPercent).toBeCloseTo(facilityCashBack(aFacility()), 6);
-    expect(facilityCashBack(aFacility({ yearsToBuildLeft: 0.5 }))).toBeCloseTo(
-      facilityCashBack(aFacility()),
-      6,
-    );
+  it("uses a conservative life for a legacy save with no lifespan", () => {
+    const currentMinute = 15 * DAYS_PER_YEAR * 24 * 60;
+    expect(
+      facilityCashBack(aFacility({ lifespanYears: undefined }), currentMinute),
+    ).toBeCloseTo(500000, 6);
+  });
+
+  it("refunds the same committed equity throughout construction", () => {
+    [0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
+      expect(facilityCashBack(aFacility({ yearsToBuildLeft }))).toBe(1000000);
+    });
   });
 
   it("nets out what is still owed on the loan", () => {
     const owed = 400000;
     expect(facilityCashBack(aFacility({ loanAmountLeft: owed }))).toBeCloseTo(
-      (1000000 - owed) * (1 - GENERATOR_SELL_MULTIPLIER),
+      1000000 - owed,
       6,
     );
   });

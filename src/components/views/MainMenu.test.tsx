@@ -27,15 +27,23 @@ describe("MainMenu", () => {
     expect(screen.queryByText(/no energy or gaming experience/i)).toBeNull();
   });
 
-  it("starts a new game from the primary guided-missions action", async () => {
+  it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
     render(<MainMenu {...props({ onStart })} />);
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Start guided missions" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
+  });
+
+  it("only advertises account-free play before sign-in", () => {
+    const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
+    expect(screen.getByText("Free · no account needed")).toBeInTheDocument();
+
+    rerender(<MainMenu {...props({ uid: "player" })} />);
+    expect(
+      screen.queryByText("Free · no account needed"),
+    ).not.toBeInTheDocument();
   });
 
   it("prioritizes continuing a save while offering mission selection", () => {

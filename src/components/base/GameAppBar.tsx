@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
-import { TICK_MS } from "../../Constants";
+import { TICKS_PER_HOUR, TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
@@ -20,7 +20,13 @@ import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
 import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
-import { AppStateType, GameType, SpeedType } from "../../Types";
+import {
+  AppStateType,
+  FacilityOperatingType,
+  GameType,
+  SpeedType,
+  TickPresentFutureType,
+} from "../../Types";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 
@@ -66,6 +72,39 @@ const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
 
 function speedMultiplier(speed: SpeedType): string {
   return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
+}
+
+const WEATHER_DRIVEN_FUELS = new Set(["Sun", "Wind", "Offshore Wind"]);
+
+/** Capacity that could serve demand now, rather than the deliberately dispatched output. */
+export function reserveCapacityW(
+  game: GameType,
+  now: TickPresentFutureType,
+): number {
+  const available = game.facilities.reduce(
+    (total: number, facility: FacilityOperatingType) => {
+      if (facility.paused || facility.yearsToBuildLeft > 0) {
+        return total;
+      }
+      if (facility.peakWh) {
+        return (
+          total +
+          Math.min(
+            facility.peakW,
+            Math.max(0, facility.currentWh) * TICKS_PER_HOUR,
+          )
+        );
+      }
+      return (
+        total +
+        (WEATHER_DRIVEN_FUELS.has(facility.fuel)
+          ? Math.max(0, facility.currentW)
+          : facility.peakW)
+      );
+    },
+    0,
+  );
+  return available - now.demandW;
 }
 
 const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
@@ -247,16 +286,10 @@ export function GameAppBar(props: Props) {
   }
 
   const inBlackout = now.supplyW < now.demandW;
-  const reservePercent =
-    now.demandW > 0
-      ? Math.max(
-          0,
-          Math.round(((now.supplyW - now.demandW) / now.demandW) * 100),
-        )
-      : 0;
+  const reserveW = Math.max(0, reserveCapacityW(game, now));
   const gridHealth = inBlackout
     ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
-    : `Grid OK · ${reservePercent}% reserve`;
+    : `Grid OK · ${formatWatts(reserveW)} reserve`;
 
   return (
     <div id="appbar">

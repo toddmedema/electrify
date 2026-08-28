@@ -29,9 +29,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
-  const startLabel = props.hasSavedGame
-    ? "Choose a mission"
-    : "Start guided missions";
+  const startLabel = props.hasSavedGame ? "Choose a mission" : "Play";
   const [shareStatus, setShareStatus] = React.useState("");
 
   const onShare = async () => {
@@ -87,7 +85,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             {startLabel}
           </Button>
-          {!props.hasSavedGame && (
+          {!props.hasSavedGame && !props.uid && (
             <Typography variant="caption">Free · no account needed</Typography>
           )}
         </Stack>

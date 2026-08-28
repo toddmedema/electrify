@@ -302,6 +302,12 @@ button,
   }
 }
 
+@media screen and (max-width: ($desktop_breakpoint - 1px)) {
+  .snackbar-above-nav {
+    bottom: calc(56px + env(safe-area-inset-bottom) + 8px) !important;
+  }
+}
+
 .draggable-indicator {
   position: absolute;
   left: -4px;
@@ -520,13 +526,14 @@ $topbar_height: 56px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 24px;
-  padding: 2px max(12px, env(safe-area-inset-left));
+  min-height: 18px;
+  padding: 0 max(12px, env(safe-area-inset-left));
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-raised);
   color: $font_color_primary;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 18px;
   text-align: center;
 
   &.gridHealth-blackout {
@@ -607,7 +614,7 @@ $pane_header_height: 40px;
   }
 
   #yearProgressBar {
-    margin-top: -5px;
+    margin-top: 0;
     height: 2px;
     background: $font_color_faded;
     z-index: 100;
@@ -691,6 +698,9 @@ $pane_header_height: 40px;
   .scrollable {
     flex: 1 1 auto !important;
     overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 0;
+    max-width: 100%;
   }
 }
 

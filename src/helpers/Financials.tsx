@@ -1,8 +1,4 @@
-import {
-  FUELS,
-  GENERATOR_SELL_MULTIPLIER,
-  HOURS_PER_YEAR_REAL,
-} from "../Constants";
+import { DAYS_PER_YEAR, FUELS, HOURS_PER_YEAR_REAL } from "../Constants";
 import {
   DateType,
   FacilityOperatingType,
@@ -203,16 +199,45 @@ export function facilityLifetime(
   };
 }
 
-// Returns how much cash the user recieves if they sell / cancel the facility
-export function facilityCashBack(g: FacilityOperatingType): number {
-  // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
-  // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
-  const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
-  const lostFromSelling =
-    (g.buildCost - g.loanAmountLeft) *
-    GENERATOR_SELL_MULTIPLIER *
-    Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
-  return g.buildCost - lostFromSelling - g.loanAmountLeft;
+const MINUTES_PER_GAME_YEAR = DAYS_PER_YEAR * 24 * 60;
+
+/** The time a completed facility has spent operating, excluding its construction period. */
+export function facilityAgeYears(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  return g.minuteOperational === undefined
+    ? 0
+    : Math.max(
+        0,
+        (currentMinute - g.minuteOperational) / MINUTES_PER_GAME_YEAR,
+      );
+}
+
+// Returns how much cash the user receives if they sell / cancel the facility. Construction
+// refunds committed equity; an operating asset depreciates linearly to zero over the
+// technology-specific life in Facilities.tsx. Any outstanding loan is settled on sale.
+export function facilityCashBack(
+  g: FacilityOperatingType,
+  currentMinute = g.minuteOperational ?? g.minuteCreated,
+): number {
+  if (g.yearsToBuildLeft === 0) {
+    // Saves from before technology-specific lives were added do not have this field. Thirty years
+    // is the conservative common economic-life assumption; the facility's researched value wins
+    // for every new game and save written by current code.
+    const lifespanYears =
+      Number.isFinite(g.lifespanYears) && g.lifespanYears > 0
+        ? g.lifespanYears
+        : 30;
+    const remainingLife = Math.max(
+      0,
+      1 - facilityAgeYears(g, currentMinute) / lifespanYears,
+    );
+    return g.buildCost * remainingLife - g.loanAmountLeft;
+  }
+  // Cancellation unwinds the committed purchase. For a financed build this returns only the
+  // down payment/equity because the outstanding loan is settled at the same time.
+  return g.buildCost - g.loanAmountLeft;
 }
 
 // CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
