@@ -75,6 +75,40 @@ midpoint of NREL's $2,205-$4,434/kW closed-loop site range), equivalent to $332/
 Fixed O&M becomes $19/kW-year. NREL projects no cost or efficiency improvement for this mature
 technology.
 
+## Finite project locations
+
+Conventional hydro, conventional geothermal, and pumped hydro now expose and enforce a count of
+viable locations. A project claims its location as soon as construction begins; cancelling or
+selling removes the project from the fleet and makes the location available again. Enhanced
+geothermal is deliberately not limited because its purpose in the model is to open resources that
+conventional hydrothermal geography cannot.
+
+Pumped hydro has its own location inventory rather than inheriting conventional hydro's river
+profile. The facility is modeled as closed-loop storage, so elevation separation and room for two
+reservoirs matter more than river flow:
+
+- For U.S. cities, counts are the optimized, non-overlapping 10-hour systems in NREL's 2022
+  national closed-loop resource assessment whose reservoir-pair midpoint is within 250 km of the
+  city. The assessment starts with 30-meter terrain data, removes protected land, critical habitat,
+  urban areas, wetlands, existing waterways and water bodies, then pairs reservoirs and selects a
+  least-cost non-overlapping set. It reports 14,846 technical-potential systems nationwide.
+- For London, Paris, Berlin, and Reykjavik, counts are the site points in ANU's unprotected global
+  greenfield 2 GWh / 6 hour layer within the same 250 km radius. That is the atlas class closest to
+  the game's utility-scale project. ANU requires at least 100 m of head, a slope of at least 1:20,
+  a reservoir volume of at least 1 GL, and a water-to-rock ratio of at least 3.
+- The radius is a game boundary: each city represents a regional utility, not a municipal service
+  polygon. The source studies describe technical potential, not construction-ready projects. Both
+  explicitly warn that individual sites still need geological, environmental, ownership,
+  transmission, and commercial review.
+
+Conventional hydro and geothermal do not yet have equivalent site-by-site global data in the game.
+Their former scarcity curves implied a three-site hydro and four-site geothermal scale; those are
+now explicit gameplay caps. The old linear price increases have been removed. A hard count already
+models scarcity, while a generic multiplier charged the same penalty regardless of plant size or
+actual site quality. If site-quality decline is added later, it should use source cost ranks or a
+regional supply curve—especially for pumped hydro, whose assessed site costs span widely—rather
+than restore the artificial per-project multiplier.
+
 ## Lifetimes and depreciation
 
 Facility resale value now follows straight-line physical depreciation from commercial operation:
@@ -133,6 +167,9 @@ No additional facility type is added in this pass:
 - [IRENA, Renewable Power Generation Costs in 2020](https://www.irena.org/Publications/2021/Jun/Renewable-Power-Costs-in-2020)
 - [NREL, Cost Projections for Utility-Scale Battery Storage: 2021 Update](https://docs.nrel.gov/docs/fy21osti/79236.pdf)
 - [NREL, 2024 Annual Technology Baseline: Pumped Storage Hydropower](https://atb.nrel.gov/electricity/2024b/pumped_storage_hydropower)
+- [NREL, Closed-Loop Pumped Storage Hydropower Resource Assessment for the United States](https://www.nrel.gov/docs/fy22osti/81277.pdf)
+- [NREL/OEDI, U.S. closed-loop pumped-storage site dataset](https://data.openei.org/submissions/5711)
+- [ANU, Global Greenfield Pumped Hydro Energy Storage Atlas](https://re100.eng.anu.edu.au/global/)
 - [NREL, Cost and Performance Data for Power Generation Technologies](https://docs.nrel.gov/docs/fy11osti/48595.pdf)
 - [NREL, Update to Enhanced Geothermal System Resource Potential Estimate](https://docs.nrel.gov/docs/fy17osti/66428.pdf)
 - [DOE, Hydropower Basics](https://www.energy.gov/cmei/water/hydropower-basics)

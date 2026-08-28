@@ -107,6 +107,7 @@ describe("current facility economics", () => {
       peakW: 100000000,
       annualOperatingCost: 1900000,
       roundTripEfficiency: 0.8,
+      viableLocationsRemaining: 648,
     });
     expect(pumpedHydro?.buildCost).toBeCloseTo(333900000, -2);
   });
@@ -170,7 +171,7 @@ describe("location-aware facilities", () => {
     expect(storage).not.toContain("Pumped Hydro");
   });
 
-  it("makes each additional conventional hydro site more expensive", () => {
+  it("uses an explicit conventional hydro site limit without changing its benchmark cost", () => {
     const baseline = GENERATORS(stateAt(iceland, 2024), 100000000, [], []).find(
       (generator) => generator.name === "Hydro",
     );
@@ -183,8 +184,10 @@ describe("location-aware facilities", () => {
       [],
     ).find((generator) => generator.name === "Hydro");
 
+    expect(baseline?.viableLocationsRemaining).toBe(3);
+    expect(withExisting?.viableLocationsRemaining).toBe(2);
     expect(withExisting?.buildCost).toBeCloseTo(
-      (baseline?.buildCost as number) * (4 / 3),
+      baseline?.buildCost as number,
       -2,
     );
   });
@@ -231,7 +234,7 @@ describe("enhanced geothermal", () => {
     expect(withExistingEnhanced?.buildCost).toBe(baseline?.buildCost);
   });
 
-  it("only counts conventional plants for conventional geothermal scarcity", () => {
+  it("only counts conventional plants against conventional geothermal sites", () => {
     const baseline = generatorAt(iceland, 2030, "Geothermal");
     const withEnhanced = generatorAt(iceland, 2030, "Geothermal", [
       geothermalFacility("Enhanced Geothermal"),
@@ -241,9 +244,10 @@ describe("enhanced geothermal", () => {
     ]);
 
     expect(withEnhanced?.buildCost).toBe(baseline?.buildCost);
-    expect(withConventional?.buildCost).toBe(
-      (baseline?.buildCost as number) * 1.25,
-    );
+    expect(withConventional?.buildCost).toBe(baseline?.buildCost);
+    expect(baseline?.viableLocationsRemaining).toBe(4);
+    expect(withEnhanced?.viableLocationsRemaining).toBe(4);
+    expect(withConventional?.viableLocationsRemaining).toBe(3);
   });
 
   it("uses the 2030 cost and performance assumptions", () => {

@@ -86,14 +86,18 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
     props.interestRate,
     LOAN_MONTHS,
   );
-  const buildable = props.generator.peakW <= props.generator.maxPeakW;
+  const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
+  const siteBuildable = props.generator.viableLocationsRemaining !== 0;
+  const buildable = sizeBuildable && siteBuildable;
   const financingGap = Math.max(0, downpayment - cash);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
-  const secondaryText = buildable ? (
+  const secondaryText = !siteBuildable ? (
+    "No viable locations remaining."
+  ) : sizeBuildable ? (
     generator.description
   ) : (
     <div>
@@ -287,6 +291,19 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   {generator.lifespanYears} years
                 </TableCell>
               </TableRow>
+              {generator.viableLocationsRemaining !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Number of viable locations remaining
+                    <Typography variant="body2" color="textSecondary">
+                      Each project uses one suitable site
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {generator.viableLocationsRemaining}
+                  </TableCell>
+                </TableRow>
+              )}
               {props.secondaryMetric !== "yearsToBuild" && (
                 <TableRow>
                   <TableCell>Time to build</TableCell>

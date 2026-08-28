@@ -59,8 +59,12 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.interestRate,
     LOAN_MONTHS,
   );
-  const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const secondaryText = buildable ? (
+  const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
+  const siteBuildable = props.storage.viableLocationsRemaining !== 0;
+  const buildable = sizeBuildable && siteBuildable;
+  const secondaryText = !siteBuildable ? (
+    "No viable locations remaining."
+  ) : sizeBuildable ? (
     storage.description
   ) : (
     <div>
@@ -166,6 +170,19 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
+              {storage.viableLocationsRemaining !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Number of viable locations remaining
+                    <Typography variant="body2" color="textSecondary">
+                      Each project uses one suitable site
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {storage.viableLocationsRemaining}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
