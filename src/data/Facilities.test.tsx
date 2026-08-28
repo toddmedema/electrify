@@ -40,6 +40,16 @@ const france: LocationType = {
   country: "France",
 };
 
+const newYork: LocationType = {
+  id: "NewYork",
+  name: "New York, NY",
+  lat: 40.7128,
+  long: -74.006,
+  region: "North America",
+  country: "United States",
+  offshore: true,
+};
+
 describe("location-aware facilities", () => {
   it("offers geothermal and hydro in a resource-rich region", () => {
     const state = stateAt(iceland);
@@ -128,5 +138,42 @@ describe("enhanced geothermal", () => {
       lifespanYears: 30,
     });
     expect(generator?.buildCost).toBeCloseTo(463000000, -6);
+  });
+});
+
+describe("offshore wind", () => {
+  const generatorAt = (
+    location: LocationType,
+    year: number,
+    peakW = 900000000,
+  ) =>
+    GENERATORS(stateAt(location, year), peakW, [], [], [27]).find(
+      (generator) => generator.name === "Offshore Wind",
+    );
+
+  it("unlocks after Vindeby only where offshore weather exists", () => {
+    expect(generatorAt(newYork, 1991)).toBeUndefined();
+    expect(generatorAt(newYork, 2000)).toBeDefined();
+    expect(generatorAt(france, 2023)).toBeUndefined();
+  });
+
+  it("matches the 2023 EIA reference plant assumptions", () => {
+    const generator = generatorAt(newYork, 2023);
+    expect(generator).toMatchObject({
+      fuel: "Offshore Wind",
+      annualOperatingCost: 138600000,
+      maxPeakW: 1500000000,
+      lifespanYears: 25,
+    });
+    expect((generator?.buildCost as number) / 900000).toBeCloseTo(3689, -1);
+    expect(generator?.capacityFactor).toBeGreaterThan(0.4);
+  });
+
+  it("peaks in cost around 2010 instead of rising monotonically backwards", () => {
+    const cost2000 = generatorAt(newYork, 2000)?.buildCost as number;
+    const cost2010 = generatorAt(newYork, 2010)?.buildCost as number;
+    const cost2023 = generatorAt(newYork, 2023)?.buildCost as number;
+    expect(cost2010).toBeGreaterThan(cost2000);
+    expect(cost2010).toBeGreaterThan(cost2023);
   });
 });

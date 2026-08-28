@@ -5,9 +5,10 @@
  * src/data/WeatherBinary.tsx for the decoder that has to agree with encodeWeather below.
  *
  * The game only simulates DAYS_PER_MONTH = 1, so a location's entire record is twelve days a year
- * for forty years: 11,520 hourly readings, 57KB packed. That is also why this fetches one day per
- * month rather than the whole forty years - the archive API is billed by location-days, and the
- * days that are never simulated would cost thirty times as much as the ones that are.
+ * for forty years: 11,520 hourly readings, 57KB packed, or 69KB with offshore wind. That is also
+ * why this fetches one day per month rather than the whole forty years - the archive API is billed
+ * by location-days, and the days that are never simulated would cost thirty times as much as the
+ * ones that are.
  *
  * Rate limits are the binding constraint, not bandwidth. Open-Meteo's free tier allows roughly
  * 600 location-days a minute, 5,000 an hour and 10,000 a day, and one city costs 480 - so a run
@@ -42,12 +43,14 @@ const HOURS_PER_DAY = 24;
 // back with 23 or 25 readings instead of 24.
 const SAMPLE_DAY = 15;
 
-// The binary layout, version 1. The scales are written into the header rather than agreed with
+// The binary layout, version 2. The scales are written into the header rather than agreed with
 // the decoder in a comment, so this file and src/data/WeatherBinary.tsx cannot drift apart.
 const MAGIC = "EWX1";
-const VERSION = 1;
+const VERSION = 2;
 const HEADER_BYTES = 16;
-const BYTES_PER_ROW = 5;
+const BASE_BYTES_PER_ROW = 5;
+const OFFSHORE_BYTES_PER_ROW = 6;
+const FLAG_OFFSHORE_WIND = 1;
 const TEMP_SCALE = 10; // int16 tenths of a degree C
 const WIND_SCALE = 2; // uint8 half kph, so up to 127.5kph
 const PRECIP_SCALE = 5; // uint8 fifths of a mm, so up to 51mm in an hour
@@ -130,6 +133,22 @@ function binaryPath(id) {
   return path.join(OUT_DIR, `${id}.bin`);
 }
 
+function hasRequiredWeather(city) {
+  const file = binaryPath(city.id);
+  if (!fs.existsSync(file)) {
+    return false;
+  }
+  if (!city.offshore) {
+    return true;
+  }
+  const header = fs.readFileSync(file).subarray(0, HEADER_BYTES);
+  return (
+    header.length === HEADER_BYTES &&
+    header.readUInt8(4) >= 2 &&
+    (header.readUInt8(15) & FLAG_OFFSHORE_WIND) !== 0
+  );
+}
+
 function readIndex() {
   try {
     return JSON.parse(fs.readFileSync(INDEX_FILE, "utf8"));
@@ -162,6 +181,7 @@ function writeIndex(fetched) {
       long: city.long,
       timeZone: entry.timeZone,
       elevation: entry.elevation,
+      ...(city.offshore ? { offshore: true } : {}),
       startingYear: STARTING_YEAR,
       endingYear: ENDING_YEAR,
     };
@@ -313,29 +333,37 @@ function clamp(value, min, max) {
 
 /**
  * Packs the rows into the file the game downloads: a 16 byte header describing the layout, then
- * one 5 byte row per hour, oldest first.
+ * one 5 or 6 byte row per hour, oldest first.
  *
  * The scales are the whole trick. Temperature keeps a tenth of a degree in an int16 because the
  * demand curve reads it directly; cloud cover is already a percentage; wind lands in half kph
  * steps and precipitation in fifths of a millimetre, both far finer than anything the simulation
- * can tell apart. 57KB a location, against 265KB of CSV, and no parser on the loading screen.
+ * can tell apart. 57-69KB a location, against 265KB of CSV, and no parser on the loading screen.
  */
 function encodeWeather(rows) {
-  const buffer = Buffer.alloc(HEADER_BYTES + rows.length * BYTES_PER_ROW);
+  const offshore = rows.every((row) => typeof row.windOffshoreKph === "number");
+  if (
+    !offshore &&
+    rows.some((row) => typeof row.windOffshoreKph === "number")
+  ) {
+    throw new Error("Offshore wind is present for only part of a weather file");
+  }
+  const bytesPerRow = offshore ? OFFSHORE_BYTES_PER_ROW : BASE_BYTES_PER_ROW;
+  const buffer = Buffer.alloc(HEADER_BYTES + rows.length * bytesPerRow);
   buffer.write(MAGIC, 0, "ascii");
   buffer.writeUInt8(VERSION, 4);
   buffer.writeUInt8(MONTHS_PER_YEAR, 5); // days per year, one per month
   buffer.writeUInt8(HOURS_PER_DAY, 6);
-  buffer.writeUInt8(BYTES_PER_ROW, 7);
+  buffer.writeUInt8(bytesPerRow, 7);
   buffer.writeUInt16LE(STARTING_YEAR, 8);
   buffer.writeUInt16LE(ENDING_YEAR - STARTING_YEAR + 1, 10);
   buffer.writeUInt8(TEMP_SCALE, 12);
   buffer.writeUInt8(WIND_SCALE, 13);
   buffer.writeUInt8(PRECIP_SCALE, 14);
-  buffer.writeUInt8(0, 15); // reserved
+  buffer.writeUInt8(offshore ? FLAG_OFFSHORE_WIND : 0, 15);
 
   rows.forEach((row, index) => {
-    const at = HEADER_BYTES + index * BYTES_PER_ROW;
+    const at = HEADER_BYTES + index * bytesPerRow;
     buffer.writeInt16LE(
       clamp(Math.round(row.tempC * TEMP_SCALE), -32768, 32767),
       at,
@@ -349,6 +377,14 @@ function encodeWeather(rows) {
       clamp(Math.round(row.precipMm * PRECIP_SCALE), 0, 255),
       at + 4,
     );
+    if (offshore) {
+      // Half-kph uint8 clips at 127.5kph. That is already well beyond the turbine's cut-out
+      // speed at hub height, so a clipped storm and the true storm both produce zero.
+      buffer.writeUInt8(
+        clamp(Math.round(row.windOffshoreKph * WIND_SCALE), 0, 255),
+        at + 5,
+      );
+    }
   });
   return buffer;
 }
@@ -362,55 +398,103 @@ function encodeWeather(rows) {
 async function fetchBatch(batch) {
   const rows = new Map(batch.map((city) => [city.id, []]));
   const meta = new Map();
+  const points = batch.flatMap((city) => [
+    { city, id: city.id, lat: city.lat, long: city.long, offshore: false },
+    ...(city.offshore
+      ? [
+          {
+            city,
+            id: `${city.id} offshore`,
+            lat: city.offshore.lat,
+            long: city.offshore.long,
+            offshore: true,
+          },
+        ]
+      : []),
+  ]);
 
   for (let year = STARTING_YEAR; year <= ENDING_YEAR; year++) {
     for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
-      for (let at = 0; at < batch.length; at += LOCATIONS_PER_REQUEST) {
-        const slice = batch.slice(at, at + LOCATIONS_PER_REQUEST);
+      const daily = new Map();
+      for (let at = 0; at < points.length; at += LOCATIONS_PER_REQUEST) {
+        const slice = points.slice(at, at + LOCATIONS_PER_REQUEST);
         const results = await fetchDay(slice, year, month);
         if (results.length !== slice.length) {
           throw new Error(
             `Asked for ${slice.length} locations and got ${results.length} back`,
           );
         }
-        slice.forEach((city, index) => {
+        slice.forEach((point, index) => {
           const result = results[index];
           const date = `${year}-${month}`;
+          if (point.offshore) {
+            const windOffshore = readField(
+              result.hourly,
+              "wind_speed_10m",
+              point.id,
+              date,
+            );
+            daily.set(point.city.id, {
+              ...daily.get(point.city.id),
+              windOffshore,
+            });
+            return;
+          }
           const temp = readField(
             result.hourly,
             "temperature_2m",
-            city.id,
+            point.id,
             date,
           );
           const wind = readField(
             result.hourly,
             "wind_speed_10m",
-            city.id,
+            point.id,
             date,
           );
-          const cloud = readField(result.hourly, "cloud_cover", city.id, date);
+          const cloud = readField(result.hourly, "cloud_cover", point.id, date);
           const precip = readField(
             result.hourly,
             "precipitation",
-            city.id,
+            point.id,
             date,
           );
-          for (let hour = 0; hour < HOURS_PER_DAY; hour++) {
-            rows.get(city.id).push({
-              tempC: temp[hour],
-              windKph: wind[hour],
-              cloudPct: cloud[hour],
-              precipMm: precip[hour],
-            });
-          }
-          if (!meta.has(city.id)) {
-            meta.set(city.id, {
+          daily.set(point.city.id, {
+            ...daily.get(point.city.id),
+            temp,
+            wind,
+            cloud,
+            precip,
+          });
+          if (!meta.has(point.city.id)) {
+            meta.set(point.city.id, {
               timeZone: result.timezone,
               elevation: result.elevation,
             });
           }
         });
       }
+      batch.forEach((city) => {
+        const reading = daily.get(city.id);
+        if (
+          !reading ||
+          !reading.temp ||
+          (city.offshore && !reading.windOffshore)
+        ) {
+          throw new Error(
+            `${city.id} ${year}-${month}: incomplete weather response`,
+          );
+        }
+        for (let hour = 0; hour < HOURS_PER_DAY; hour++) {
+          rows.get(city.id).push({
+            tempC: reading.temp[hour],
+            windKph: reading.wind[hour],
+            windOffshoreKph: reading.windOffshore?.[hour],
+            cloudPct: reading.cloud[hour],
+            precipMm: reading.precip[hour],
+          });
+        }
+      });
     }
     if ((year - STARTING_YEAR + 1) % 10 === 0) {
       log(`  through ${year}`);
@@ -438,7 +522,11 @@ function summarise(id, rows) {
   return (
     `${rows.length} rows, ${mean("tempC").toFixed(1)}C ` +
     `(Jan ${janMean.toFixed(1)}, Jul ${julMean.toFixed(1)}), ` +
-    `${mean("windKph").toFixed(1)}kph, ${mean("cloudPct").toFixed(0)}% cloud, ` +
+    `${mean("windKph").toFixed(1)}kph onshore` +
+    (rows[0].windOffshoreKph === undefined
+      ? ", "
+      : `, ${mean("windOffshoreKph").toFixed(1)}kph offshore, `) +
+    `${mean("cloudPct").toFixed(0)}% cloud, ` +
     `${(mean("precipMm") * 24 * 365).toFixed(0)}mm/yr`
   );
 }
@@ -454,11 +542,7 @@ async function main() {
     }
   });
 
-  const have = new Set(
-    catalogue
-      .filter((city) => fs.existsSync(binaryPath(city.id)))
-      .map((c) => c.id),
-  );
+  const have = new Set(catalogue.filter(hasRequiredWeather).map((c) => c.id));
 
   if (options.list) {
     log(`${have.size} of ${catalogue.length} cities have weather data`);

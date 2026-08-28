@@ -1,6 +1,7 @@
 import {
   getRawSolarIrradianceWM2,
   getWeather,
+  hasOffshoreWind,
   initWeatherFromRows,
   WEATHER_STARTING_YEAR,
 } from "./Weather";
@@ -92,13 +93,14 @@ function fixtureRow(
   yearIndex: number,
   month: number,
   hour: number,
+  offshore = false,
 ): RawWeatherType {
   const wave = yearWave(yearIndex);
   // Amplitude varies by year so that the hour to hour shape genuinely differs between the
   // historic days a forecast can borrow from, which is what makes the resampling observable
   const diurnal =
     (5 + 2 * wave) * Math.sin((2 * Math.PI * (hour - 6)) / HOURS_PER_MONTH);
-  return {
+  const row: RawWeatherType = {
     YEAR: FIXTURE_STARTING_YEAR + yearIndex,
     MONTH: month,
     // A full sine over the 24 hours, so the diurnal swing cancels out of a daily mean and each
@@ -111,14 +113,21 @@ function fixtureRow(
     WIND_KPH: Math.max(0, monthlyWindKph(month) + 0.2 * diurnal + 1.5 * wave),
     PRECIP_MM: precipMm(month, hour),
   };
+  if (offshore) {
+    row.WIND_OFFSHORE_KPH = Math.max(
+      0,
+      22 + 5 * winterness(month) + 0.35 * diurnal + 2 * wave,
+    );
+  }
+  return row;
 }
 
-function fixtureRows(): RawWeatherType[] {
+function fixtureRows(offshore = false): RawWeatherType[] {
   const rows: RawWeatherType[] = [];
   for (let yearIndex = 0; yearIndex < FIXTURE_YEARS; yearIndex++) {
     for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
       for (let hour = 0; hour < HOURS_PER_MONTH; hour++) {
-        rows.push(fixtureRow(yearIndex, month, hour));
+        rows.push(fixtureRow(yearIndex, month, hour, offshore));
       }
     }
   }
@@ -194,6 +203,38 @@ describe("getWeather", () => {
 
   it("returns the current hour's reading exactly, on the hour", () => {
     expect(getWeather(dateAt(3, 10), SEED)).toEqual(fixtureRow(0, 3, 10));
+  });
+
+  it("forecasts offshore wind without changing established weather draws", () => {
+    const coastal: LocationType = {
+      id: "NewYork",
+      name: "New York, NY",
+      lat: 40.7128,
+      long: -74.006,
+      offshore: true,
+    };
+    const date = dateAt(monthIndex(FIXTURE_YEARS + 3, 4), 13, 20);
+    initWeatherFromRows("NewYork", fixtureRows());
+    const before = getWeather(date, 8675309);
+    expect(hasOffshoreWind()).toBe(false);
+    expect(hasOffshoreWind(coastal)).toBe(false);
+
+    initWeatherFromRows("NewYork", fixtureRows(true));
+    const after = getWeather(date, 8675309);
+    expect(hasOffshoreWind()).toBe(true);
+    expect(hasOffshoreWind(coastal)).toBe(true);
+    expect(after.WIND_OFFSHORE_KPH).toBeGreaterThan(0);
+    expect({
+      TEMP_C: after.TEMP_C,
+      CLOUD_PCT: after.CLOUD_PCT,
+      WIND_KPH: after.WIND_KPH,
+      PRECIP_MM: after.PRECIP_MM,
+    }).toEqual({
+      TEMP_C: before.TEMP_C,
+      CLOUD_PCT: before.CLOUD_PCT,
+      WIND_KPH: before.WIND_KPH,
+      PRECIP_MM: before.PRECIP_MM,
+    });
   });
 
   // A forecast day is last year's same day nudged, so with less than a year loaded forecastDay

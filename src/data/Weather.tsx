@@ -15,7 +15,8 @@ const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 const MONTHS_PER_YEAR = 12;
-// One normal each for temperature, wind and cloud cover. The uniform that picks which recorded
+// One normal each for temperature, wind and cloud cover. Offshore wind uses its own stream, so
+// adding it cannot shift any of these three established draws. The uniform that picks which recorded
 // day a forecast borrows its shape from is addressed by day index on a stream of its own, since
 // normalAt and randomAt cannot share one (see RANDOM_STREAM).
 // (kept a literal rather than FORECAST_FIELDS.length, which is declared further down this file)
@@ -44,6 +45,7 @@ const MAX_VARIANCE_GAIN = 0.35;
 
 // Ordered oldest first
 let weather: RawWeatherType[] = [];
+let loadedLocation: string | undefined;
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,
@@ -53,17 +55,45 @@ const DUMMY_WEATHER = {
   PRECIP_MM: 0,
 };
 
-// The three fields that are forecast, and the physical floor and ceiling each one has to respect
+// The fields that are forecast, and the physical floor and ceiling each one has to respect
 // whatever the data says. Keyed this way so climatology, the forecast and the emissions coupling
-// can all walk the same three fields rather than repeating themselves three times over.
+// can all walk the same fields rather than repeating themselves for each one.
 const FORECAST_FIELDS = ["TEMP_C", "CLOUD_PCT", "WIND_KPH"] as const;
-type ForecastFieldType = (typeof FORECAST_FIELDS)[number];
+const OFFSHORE_FIELD = "WIND_OFFSHORE_KPH" as const;
+type ForecastFieldType =
+  (typeof FORECAST_FIELDS)[number] | typeof OFFSHORE_FIELD;
 const PHYSICAL_BOUNDS: Record<ForecastFieldType, { min: number; max: number }> =
   {
     TEMP_C: { min: -60, max: 60 },
     CLOUD_PCT: { min: 0, max: 100 },
     WIND_KPH: { min: 0, max: Infinity },
+    WIND_OFFSHORE_KPH: { min: 0, max: Infinity },
   };
+
+function activeForecastFields(): readonly ForecastFieldType[] {
+  return hasOffshoreWind()
+    ? [...FORECAST_FIELDS, OFFSHORE_FIELD]
+    : FORECAST_FIELDS;
+}
+
+/**
+ * Whether offshore wind can safely be offered for a location.
+ *
+ * Before that location is loaded, its catalogue flag drives the build picker. Once its file has
+ * been decoded, the column itself is the safety net, so a stale index cannot offer a generator
+ * whose output the simulation cannot calculate.
+ */
+export function hasOffshoreWind(location?: LocationType): boolean {
+  const decoded =
+    weather.length > 0 && weather[0].WIND_OFFSHORE_KPH !== undefined;
+  if (!location) {
+    return decoded;
+  }
+  if (location.offshore !== true) {
+    return false;
+  }
+  return loadedLocation === location.id ? decoded : true;
+}
 
 interface FieldStatsType {
   mean: number; // Of the daily mean, across every year that has this month
@@ -81,7 +111,7 @@ interface MonthClimatologyType {
 
 // One entry per calendar month, built once per load from whatever was loaded. Every location gets
 // its seasonality from its own forty years rather than from anything written per location here,
-// which is what makes this scale to a seventh city.
+// which is what makes this scale with the weather catalogue.
 let climatology: MonthClimatologyType[] = [];
 
 // Bumped by every initWeather call, so an earlier download that lands after a later one can tell
@@ -97,7 +127,7 @@ function monthSlotOf(dayIndex: number): number {
 function dailyMean(row: number, field: ForecastFieldType): number {
   let total = 0;
   for (let hour = 0; hour < ROWS_PER_DAY; hour++) {
-    total += weather[row + hour][field];
+    total += weather[row + hour][field] as number;
   }
   return total / ROWS_PER_DAY;
 }
@@ -116,15 +146,16 @@ function buildClimatology() {
   // no-loop-func stays satisfied -- the same reason resetFuelPrices empties in place
   const months: MonthClimatologyType[] = [];
   const rows = weather;
+  const fields = activeForecastFields();
   const loadedDays = Math.floor(rows.length / ROWS_PER_DAY);
   const dailyMeans: number[][][] = [];
   for (let slot = 0; slot < MONTHS_PER_YEAR; slot++) {
     const stats = {} as Record<ForecastFieldType, FieldStatsType>;
-    FORECAST_FIELDS.forEach((field) => {
+    fields.forEach((field) => {
       stats[field] = { mean: 0, sd: 0, min: Infinity, max: -Infinity };
     });
     months.push({ historicRows: [], stats });
-    dailyMeans.push(FORECAST_FIELDS.map(() => []));
+    dailyMeans.push(fields.map(() => []));
   }
 
   for (let day = 0; day < loadedDays; day++) {
@@ -132,11 +163,11 @@ function buildClimatology() {
     const month = months[slot];
     const row = day * ROWS_PER_DAY;
     month.historicRows.push(row);
-    FORECAST_FIELDS.forEach((field, fieldIndex) => {
+    fields.forEach((field, fieldIndex) => {
       dailyMeans[slot][fieldIndex].push(dailyMean(row, field));
       const stats = month.stats[field];
       for (let hour = 0; hour < ROWS_PER_DAY; hour++) {
-        const value = rows[row + hour][field];
+        const value = rows[row + hour][field] as number;
         stats.min = Math.min(stats.min, value);
         stats.max = Math.max(stats.max, value);
       }
@@ -144,7 +175,7 @@ function buildClimatology() {
   }
 
   months.forEach((month, slot) => {
-    FORECAST_FIELDS.forEach((field, fieldIndex) => {
+    fields.forEach((field, fieldIndex) => {
       const samples = dailyMeans[slot][fieldIndex];
       const stats = month.stats[field];
       if (samples.length === 0) {
@@ -182,11 +213,13 @@ export function initWeatherFromRows(
   if (rows.length < ROWS_PER_YEAR) {
     weather = [];
     climatology = [];
+    loadedLocation = undefined;
     throw new Error(
       `Weather data for ${location} holds ${rows.length} rows, and a forecast needs at least the ${ROWS_PER_YEAR} of one year`,
     );
   }
   weather = rows; // replaced rather than appended to, so a second game doesn't inherit the first's
+  loadedLocation = location;
   if (weather.length < EXPECTED_ROWS) {
     console.warn(
       `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
@@ -208,7 +241,7 @@ export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
  * Downloads a location's record, for the browser.
  *
  * TODO download several locations at start with a 2s init delay, like loading audio (but after
- * audio) for offline play. At 57KB apiece rather than 265KB of CSV that is far cheaper than it
+ * audio) for offline play. At 57-69KB apiece rather than 265KB of CSV that is far cheaper than it
  * was, though at 282 catalogued locations it can no longer be all of them.
  *
  * @param callback - Called once, with the reason if the record could not be loaded. A caller that
@@ -224,6 +257,7 @@ export function initWeather(
   // applyClimateForcing bend a reading against a city it never came from.
   weather = [];
   climatology = [];
+  loadedLocation = undefined;
   // Two loads can be in flight at once -- backing out of the loading screen and picking somewhere
   // else -- and without this the slower one wins simply by finishing last, handing the player a
   // game played somewhere they didn't choose
@@ -284,7 +318,7 @@ function forecastThroughDay(seed: number, throughDay: number) {
 
 /**
  * @param cumulativeMegatons - Greenhouse gas the player has emitted so far, in megatons of CO2e,
- *   which warms the temperature and widens the spread of all three fields. Defaults to zero, the
+ *   which warms the temperature and widens the spread of every forecast field. Defaults to zero, the
  *   weather the location's own record describes.
  */
 export function getWeather(
@@ -321,7 +355,7 @@ export function getWeather(
   );
   const nextPerc = minuteOfHour / 60;
   const prevPerc = 1 - nextPerc;
-  return {
+  const blended: RawWeatherType = {
     // The blended reading is stamped with the hour it starts in, not the one it is heading towards
     YEAR: prev.YEAR,
     MONTH: prev.MONTH,
@@ -330,6 +364,14 @@ export function getWeather(
     WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
     PRECIP_MM: prev.PRECIP_MM * prevPerc + next.PRECIP_MM * nextPerc,
   };
+  if (
+    prev.WIND_OFFSHORE_KPH !== undefined &&
+    next.WIND_OFFSHORE_KPH !== undefined
+  ) {
+    blended.WIND_OFFSHORE_KPH =
+      prev.WIND_OFFSHORE_KPH * prevPerc + next.WIND_OFFSHORE_KPH * nextPerc;
+  }
+  return blended;
 }
 
 // TODO verify that it's returning reasonably accurate values per location and season
@@ -413,6 +455,7 @@ function forecastDay(seed: number, dayIndex: number) {
   const month = climatology[slot];
   const previousYearRow = (dayIndex - DAYS_PER_YEAR) * ROWS_PER_DAY;
   const draw = dayIndex * DRAWS_PER_FORECAST_DAY;
+  const fields = activeForecastFields();
 
   // A real day of this same month, whose hour to hour shape this day borrows. Addressed by day
   // index on its own stream: a uniform drawn from the anomalies' stream would land on one of the
@@ -431,14 +474,20 @@ function forecastDay(seed: number, dayIndex: number) {
   const shockScale = Math.sqrt(1 - Math.pow(ANOMALY_PERSISTENCE, 2));
   const anomaly = {} as Record<ForecastFieldType, number>;
   const shapeMean = {} as Record<ForecastFieldType, number>;
-  FORECAST_FIELDS.forEach((field, fieldIndex) => {
+  fields.forEach((field, fieldIndex) => {
     const stats = month.stats[field];
     const previousAnomaly = dailyMean(previousYearRow, field) - stats.mean;
     anomaly[field] =
       ANOMALY_PERSISTENCE * previousAnomaly +
       stats.sd *
         shockScale *
-        normalAt(seed, RANDOM_STREAM.weather, draw + fieldIndex);
+        normalAt(
+          seed,
+          field === OFFSHORE_FIELD
+            ? RANDOM_STREAM.weatherOffshore
+            : RANDOM_STREAM.weather,
+          field === OFFSHORE_FIELD ? dayIndex : draw + fieldIndex,
+        );
     shapeMean[field] = dailyMean(shapeRow, field);
   });
 
@@ -450,18 +499,20 @@ function forecastDay(seed: number, dayIndex: number) {
       YEAR: previous.YEAR + 1,
       MONTH: previous.MONTH,
       // Precipitation is taken from the borrowed day whole, rather than being given an anomaly of
-      // its own like the three fields below. Rain is mostly zeroes with a long tail rather than
+      // its own like the forecast fields below. Rain is mostly zeroes with a long tail rather than
       // anything a normal distribution describes, so a real wet or dry day of the right month is
       // a better forecast than a mean plus a shock - and it costs no draw, which is what keeps
       // adding it from shifting every temperature and wind number that came before it.
       PRECIP_MM: shape.PRECIP_MM,
     } as RawWeatherType;
-    FORECAST_FIELDS.forEach((field) => {
+    fields.forEach((field) => {
       const stats = month.stats[field];
       // The shape day contributes only its within-day departure from its own average, so none of
       // its year comes along with it
       forecast[field] = clampToField(
-        stats.mean + anomaly[field] + (shape[field] - shapeMean[field]),
+        stats.mean +
+          anomaly[field] +
+          ((shape[field] as number) - shapeMean[field]),
         field,
         stats,
       );
@@ -515,13 +566,16 @@ function applyClimateForcing(
     MONTH: reading.MONTH,
     PRECIP_MM: reading.PRECIP_MM,
   } as RawWeatherType;
-  FORECAST_FIELDS.forEach((field) => {
+  activeForecastFields().forEach((field) => {
     const { mean } = month.stats[field];
     const physical = PHYSICAL_BOUNDS[field];
     const bias = field === "TEMP_C" ? warmingC : 0;
     forced[field] = Math.min(
       physical.max,
-      Math.max(physical.min, mean + (reading[field] - mean) * spread + bias),
+      Math.max(
+        physical.min,
+        mean + ((reading[field] as number) - mean) * spread + bias,
+      ),
     );
   });
   return forced;

@@ -500,12 +500,16 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     TICKS_PER_YEAR * 3, // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
   );
   const windSpeeds = forecastedTimeline.map((w) => w.windKph);
+  const offshoreWindSpeeds = forecastedTimeline.flatMap((w) =>
+    w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
+  );
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
   const generators = GENERATORS(
     game,
     getW(sliderTick),
     windSpeeds,
     solarIrradiances,
+    offshoreWindSpeeds,
   ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
 
   const onSlider = (_event: Event, newValue: number | number[]) => {

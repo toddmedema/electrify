@@ -222,6 +222,7 @@ function pickFacilityToBuild(
     peakW,
     [now.windKph],
     [now.solarIrradianceWM2],
+    now.windOffshoreKph === undefined ? [] : [now.windOffshoreKph],
   )
     .filter(
       (g: GeneratorShoppingType) =>

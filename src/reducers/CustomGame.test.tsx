@@ -80,6 +80,25 @@ describe("a custom game", () => {
     });
   });
 
+  it("dispatches an offshore wind starting facility from offshore weather", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        locationId: "SF",
+        startingYear: 2020,
+        facilities: [{ name: "Offshore Wind", peakW: 500000000 }],
+      },
+    });
+    const offshore = state.facilities[0];
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    expect(offshore.name).toBe("Offshore Wind");
+    expect(now.windOffshoreKph).toBeGreaterThan(0);
+    expect(offshore.currentW).toBeGreaterThan(0);
+    expect(offshore.currentW).toBeLessThanOrEqual(offshore.peakW);
+  });
+
   it("runs on the seed the player pinned, and replays identically from it", () => {
     const first = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,

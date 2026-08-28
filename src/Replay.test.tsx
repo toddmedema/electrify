@@ -158,7 +158,7 @@ describe("decodeReplay", () => {
   });
 
   // A scenario id no longer says where a run was played, so a replay without a location has
-  // nowhere to be re-simulated -- which is the whole reason REPLAY_VERSION went to 2
+  // nowhere to be re-simulated -- which is why location first bumped the replay schema
   it("ignores a replay that doesn't say where it was played", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.location;

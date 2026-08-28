@@ -36,6 +36,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     "Natural Gas": "#bb79e6", // 3.0:1
     Sun: "#a87817", // 3.9:1
     Wind: "#193f79", // 10.4:1
+    "Offshore Wind": "#0097a7", // 3.5:1 on white, 3.0:1 against Wind
     Geothermal: "#531834", // 13.6:1
     Hydro: "#006b54",
   },
@@ -46,6 +47,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     "Natural Gas": "#ce93d8", // 7.7:1
     Sun: "#ffd54f", // 13.6:1
     Wind: "#64b5f6", // 8.0:1
+    "Offshore Wind": "#006e75", // 3.1:1 on #121212, 2.7:1 against Wind
     Geothermal: "#f48fb1", // 8.7:1
     Hydro: "#66d9b7",
   },
@@ -83,6 +85,7 @@ interface ChartPaletteType {
   /** The temperature line's punch is too thin for the axis labels naming it */
   temperatureAxis: string;
   wind: string;
+  offshoreWind: string;
   /** Hover crosshair, lighter than the data it crosses */
   cursor: string;
   /** A trend line on offer rather than being read: the unselected metric tiles */
@@ -110,6 +113,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     temperatureAxis: red[800],
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
+    offshoreWind: FUEL_COLORS.light["Offshore Wind"],
     cursor: grey[600],
     muted: grey[600],
     axis: "black",
@@ -132,6 +136,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     temperature: red[300],
     temperatureAxis: red[300],
     wind: FUEL_COLORS.dark.Wind,
+    offshoreWind: FUEL_COLORS.dark["Offshore Wind"],
     cursor: grey[500],
     muted: grey[500],
     axis: grey[300],

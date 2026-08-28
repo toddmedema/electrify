@@ -148,5 +148,6 @@ describe("the bundled locations", () => {
     expect(shipped.timeZone).toEqual(bundled.timeZone);
     expect(shipped.lat).toBeCloseTo(bundled.lat, 3);
     expect(shipped.long).toBeCloseTo(bundled.long, 3);
+    expect(shipped.offshore).toEqual(bundled.offshore);
   });
 });

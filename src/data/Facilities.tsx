@@ -4,10 +4,12 @@ import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
+  getOffshoreWindCapacityFactor,
   getWindCapacityFactor,
   getSolarCapacityFactor,
 } from "../helpers/Energy";
 import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
+import { hasOffshoreWind } from "./Weather";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -28,6 +30,17 @@ function getCostInflation(state: GameType): number {
     : 1;
 }
 
+// Offshore wind is the only technology here whose real costs rose before learning won: projects
+// moved into deeper water and farther from shore, taking European capex from about EUR1.5m/MW in
+// 2000 to EUR4m/MW in 2010. IRENA's global average then fell from $5,409/kW in 2010 to $2,800/kW
+// in 2023. Peak the curve in 2010 and floor its early side so tiny first-generation farms do not
+// become a historical bargain.
+function offshoreEraMultiple(year: number): number {
+  return year <= 2010
+    ? Math.max(1.64, 1.82 * Math.pow(2, (year - 2010) / 9))
+    : 1.82 * Math.pow(2, (2010 - year) / 15);
+}
+
 // TODO additional sources of information
 // BASE DATE: 2018
 // Generator construction cost changes over time - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table2.xls
@@ -37,6 +50,7 @@ export function GENERATORS(
   peakW: number,
   windSpeedsKph: number[],
   irradiancesWM2: number[],
+  offshoreWindSpeedsKph: number[] = [],
 ) {
   const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -53,6 +67,9 @@ export function GENERATORS(
   // Calculate intermittent generator capacity factors (here instead of passed in, since may eventually have different capacity factors
   // for different generator techs for the same resource, e.g. onshore vs offshore wind or fixed vs tracking solar)
   const windCapacityFactor = getWindCapacityFactor(windSpeedsKph);
+  const offshoreWindCapacityFactor = getOffshoreWindCapacityFactor(
+    offshoreWindSpeedsKph,
+  );
   const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
 
   let generators = [
@@ -214,6 +231,32 @@ export function GENERATORS(
       // ~25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 25,
       // http://insideenergy.org/2016/09/09/where-do-wind-turbines-go-to-die/
+    },
+    {
+      name: "Offshore Wind",
+      fuel: "Offshore Wind",
+      description: "Steadier and stronger than onshore, at a price",
+      available: year > 1991 && hasOffshoreWind(state.location),
+      // Vindeby, Denmark, was the first offshore wind farm, at 4.95MW in 1991:
+      // https://en.wikipedia.org/wiki/Vindeby_Offshore_Wind_Farm
+      buildCost: 830000000 + 2.77 * peakW * offshoreEraMultiple(year),
+      // EIA/Sargent & Lundy's 2023 fixed-bottom reference is $3,689/kW for 900MW. One
+      // quarter fixed and three quarters variable makes small farms appropriately expensive.
+      // https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf
+      peakW,
+      maxPeakW: Math.min(
+        1500000000,
+        5000000 * Math.pow(2, (year - 1991) / 3.5),
+      ),
+      // Largest projects roughly doubled every 3.5 years from Vindeby through Hornsea, then
+      // levelled near 1.5GW; Dogger Bank's 3.6GW is three separately phased farms.
+      // https://en.wikipedia.org/wiki/List_of_offshore_wind_farms
+      btuPerWh: 0,
+      annualOperatingCost: 0.154 * peakW,
+      yearsToBuild: 3 + magnitude / 3,
+      spinMinutes: 1,
+      capacityFactor: offshoreWindCapacityFactor,
+      lifespanYears: 25,
     },
     {
       name: "Solar",
