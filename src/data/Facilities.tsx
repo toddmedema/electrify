@@ -10,6 +10,7 @@ import {
 } from "../helpers/Energy";
 import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
 import { hasOffshoreWind } from "./Weather";
+import { HYDRO_TARGET_CAPACITY_FACTOR, hydroSizing } from "../helpers/Hydro";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -140,6 +141,9 @@ export function GENERATORS(
   // only needed as a temporary hack for geothermal until https://github.com/toddmedema/electrify/issues/86 done
   const conventionalGeothermalCount = state.facilities.filter(
     (f) => f.name === "Geothermal",
+  ).length;
+  const conventionalHydroCount = state.facilities.filter(
+    (f) => f.name === "Hydro",
   ).length;
   const enhancedGeothermalCostPerW = Math.max(
     3,
@@ -418,17 +422,25 @@ export function GENERATORS(
       fuel: "Hydro",
       description: "Clean and dispatchable, where rivers allow",
       available: year > 1882 && hasHydroResource(state.location),
-      buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
+      buildCost:
+        scaledBuildCost(hydroCostPerW(year), 100000000, peakW) *
+        (1 + conventionalHydroCount / 3),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
       // 2024 at $2,267/kW. Regional resource availability is handled above.
       peakW,
       maxPeakW: 10000000000,
       btuPerWh: 0,
       spinMinutes: 1,
-      annualOperatingCost: annualOperatingCost(peakW, 0.48, 33.54, 0),
+      annualOperatingCost: annualOperatingCost(
+        peakW,
+        HYDRO_TARGET_CAPACITY_FACTOR,
+        33.54,
+        0,
+      ),
       yearsToBuild: 5 + magnitude / 2,
-      capacityFactor: 0.48,
+      capacityFactor: HYDRO_TARGET_CAPACITY_FACTOR,
       lifespanYears: 50,
+      ...hydroSizing(peakW, state.location.watershedId || state.location.id),
     },
     {
       name: "Geothermal",

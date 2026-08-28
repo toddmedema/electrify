@@ -1,4 +1,8 @@
-import { TICKS_PER_HOUR, TICKS_PER_MONTH } from "../Constants";
+import {
+  GAME_TO_REAL_YEARS,
+  TICKS_PER_HOUR,
+  TICKS_PER_MONTH,
+} from "../Constants";
 import {
   FacilityOperatingType,
   GameType,
@@ -30,6 +34,14 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "windKph",
   "temperatureC",
   "storedWh",
+  "precipitationMm",
+  "snowpackMm",
+  "hydroRunoffMm",
+  "hydroReservoirWh",
+  "hydroReservoirCapacityWh",
+  "hydroSpillWh",
+  "hydroMandatedReleaseW",
+  "storageLossWh",
   "cash",
   "customers",
   "netWorth",
@@ -51,6 +63,14 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "solarIrradianceWM2",
   "windKph",
   "storedWh",
+  "precipitationMm",
+  "snowpackMm",
+  "hydroRunoffMm",
+  "hydroReservoirWh",
+  "hydroReservoirCapacityWh",
+  "hydroSpillWh",
+  "hydroMandatedReleaseW",
+  "storageLossWh",
   "customers",
   "revenue",
   "expensesFuel",
@@ -254,6 +274,26 @@ export function checkTick(
       }
     }
 
+    if (f.fuel === "Hydro" && f.reservoirCapacityWh) {
+      const reservoirWh = f.reservoirWh;
+      if (!isFinite_(reservoirWh)) {
+        collector.add(
+          "hydro reservoir is finite",
+          when,
+          `${label} reservoirWh = ${reservoirWh}`,
+        );
+      } else if (
+        reservoirWh < 0 ||
+        reservoirWh > f.reservoirCapacityWh * (1 + RELATIVE_TOLERANCE)
+      ) {
+        collector.add(
+          "hydro reservoir stays within 0..capacity",
+          when,
+          `${label} reservoirWh = ${Math.round(reservoirWh)} vs capacity ${Math.round(f.reservoirCapacityWh)}`,
+        );
+      }
+    }
+
     if (f.yearsToBuildLeft < 0 || !isFinite_(f.yearsToBuildLeft)) {
       collector.add(
         "construction time remaining is non-negative",
@@ -277,6 +317,7 @@ export function checkTick(
 
   if (prev) {
     checkStorageEnergyBalance(collector, state, prev, now, when);
+    checkHydroEnergyBalance(collector, state, prev, now, when);
   }
 }
 
@@ -346,15 +387,57 @@ function checkStorageEnergyBalance(
   }
 
   const actualDelta = now.storedWh - prev.storedWh;
+  const expectedDelta = netChargedWh - now.storageLossWh;
   const tolerance =
-    Math.max(Math.abs(netChargedWh), Math.abs(actualDelta)) *
+    Math.max(Math.abs(expectedDelta), Math.abs(actualDelta)) *
       RELATIVE_TOLERANCE +
     1;
-  if (Math.abs(actualDelta - netChargedWh) > tolerance) {
+  if (Math.abs(actualDelta - expectedDelta) > tolerance) {
     collector.add(
       "stored energy moves by exactly what was charged or discharged",
       when,
-      `storedWh moved ${Math.round(actualDelta)}Wh but facilities charged ${Math.round(netChargedWh)}Wh`,
+      `storedWh moved ${Math.round(actualDelta)}Wh but charge minus losses was ${Math.round(expectedDelta)}Wh`,
+    );
+  }
+}
+
+function checkHydroEnergyBalance(
+  collector: InvariantCollector,
+  state: GameType,
+  prev: TickPresentFutureType,
+  now: TickPresentFutureType,
+  when: string,
+) {
+  const hydro = state.facilities.filter(
+    (f) => f.fuel === "Hydro" && f.yearsToBuildLeft === 0,
+  );
+  if (hydro.length === 0 || prev.hydroReservoirCapacityWh <= 0) {
+    return;
+  }
+  const inflowWh = hydro.reduce(
+    (total, f) => total + (f.hydroLastInflowWh || 0),
+    0,
+  );
+  const bypassWh = hydro.reduce(
+    (total, f) => total + (f.hydroLastBypassWh || 0),
+    0,
+  );
+  // The tick's fuel breakdown is the authoritative delivered output. A paused generator retains
+  // a ramping currentW internally but is deliberately excluded from supply, so summing facility
+  // fields would charge its reservoir for electricity the grid never received.
+  const generatedWh =
+    ((now.supplyByFuel.Hydro || 0) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  const expectedDelta = inflowWh - now.hydroSpillWh - bypassWh - generatedWh;
+  const actualDelta = now.hydroReservoirWh - prev.hydroReservoirWh;
+  const tolerance =
+    Math.max(Math.abs(expectedDelta), Math.abs(actualDelta)) *
+      RELATIVE_TOLERANCE +
+    1;
+  if (Math.abs(actualDelta - expectedDelta) > tolerance) {
+    collector.add(
+      "hydro inflow, generation, releases and spill balance the reservoir",
+      when,
+      `reservoir moved ${Math.round(actualDelta)}Wh but water balance was ${Math.round(expectedDelta)}Wh (in ${Math.round(inflowWh)}, generated ${Math.round(generatedWh)}, bypass ${Math.round(bypassWh)}, spill ${Math.round(now.hydroSpillWh)})`,
     );
   }
 }

@@ -113,6 +113,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const isStorage = facility.peakWh > 0;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
 
   const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
   const trendChange =
@@ -169,6 +170,27 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               facility.currentWh,
               (facility as StorageOperatingType).peakWh,
             )}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Reservoir"
+            value={formatWattHoursOfPeak(
+              facility.reservoirWh || 0,
+              facility.reservoirCapacityWh || 0,
+            )}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Last inflow"
+            value={formatWattHours(facility.hydroLastInflowWh || 0)}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Last spill"
+            value={formatWattHours(facility.hydroLastSpillWh || 0)}
           />
         )}
         {isStorage && (

@@ -25,10 +25,11 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
+// 4: conventional hydro carries a reservoir water balance and storage applies hourly losses.
 // 3: timeline rows may carry offshore wind, which changes the output of an offshore fleet.
 // 2: facilities carry the rate their loan was signed at, and the game carries the rate a new one
 // would cost. A version 1 save has neither, and a loan with no rate cannot be repaid.
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveGameType {
   version: number;

@@ -116,14 +116,11 @@ function requireScenarios() {
 const result = spawnSync(
   process.execPath,
   [
-    path.resolve(
-      __dirname,
-      "..",
-      "node_modules",
-      "react-scripts",
-      "bin",
-      "react-scripts.js",
-    ),
+    // Let Node walk parent module directories. A git worktree may have only CRA's local cache in
+    // its own node_modules while sharing the repository's installed dependencies one level up.
+    require.resolve("react-scripts/bin/react-scripts.js", {
+      paths: [path.resolve(__dirname, "..")],
+    }),
     "test",
     "--watchAll=false",
     "--testMatch",

@@ -140,7 +140,7 @@ export function createGame(options: SimOptionsType): GameType {
     options.scenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
     SCENARIOS[0];
-  loadSimData(scenarioLocation(scenario).id);
+  loadSimData(scenarioLocation(scenario));
   return setUpGame(scenario, resolveOptions(scenario, options));
 }
 
@@ -225,7 +225,7 @@ export function createGameFromReplay(replay: ReplayType): GameType {
     SCENARIOS[0];
   // The replay's own location, not the scenario's: that is the whole point of recording it, and
   // it is also what the loading screen uses in the browser
-  loadSimData(replay.location.id);
+  loadSimData(replay.location);
   let state = gameReducer(undefined, startReplay(replay));
   state = gameReducer(
     state,
@@ -316,7 +316,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     SCENARIOS[0];
   const resolved = resolveOptions(scenario, options);
 
-  loadSimData(scenarioLocation(scenario).id);
+  loadSimData(scenarioLocation(scenario));
   let state = setUpGame(scenario, resolved);
 
   const collector = new InvariantCollector();

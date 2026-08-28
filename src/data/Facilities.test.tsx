@@ -169,6 +169,25 @@ describe("location-aware facilities", () => {
     expect(fuels).not.toContain("Hydro");
     expect(storage).not.toContain("Pumped Hydro");
   });
+
+  it("makes each additional conventional hydro site more expensive", () => {
+    const baseline = GENERATORS(stateAt(iceland, 2024), 100000000, [], []).find(
+      (generator) => generator.name === "Hydro",
+    );
+    const withExisting = GENERATORS(
+      stateAt(iceland, 2024, [
+        { name: "Hydro", fuel: "Hydro" } as FacilityOperatingType,
+      ]),
+      100000000,
+      [],
+      [],
+    ).find((generator) => generator.name === "Hydro");
+
+    expect(withExisting?.buildCost).toBeCloseTo(
+      (baseline?.buildCost as number) * (4 / 3),
+      -2,
+    );
+  });
 });
 
 describe("enhanced geothermal", () => {

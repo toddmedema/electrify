@@ -54,6 +54,7 @@ export const MANUAL_ENTRY = {
   CUSTOMERS: "Customers, Demand & Marketing",
   EMISSIONS: "Emissions and CO2e",
   FORECASTS: "Forecasts",
+  HYDROPOWER: "Hydropower & Reservoirs",
   INTEREST_RATES: "Interest Rates & Inflation",
   KEYBOARD_SHORTCUTS: "Keyboard Shortcuts",
   PRIORITIZING_GENERATORS: "Prioritizing Generators",
@@ -308,6 +309,44 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     ),
   },
   {
+    title: MANUAL_ENTRY.HYDROPOWER,
+    group: "Physics & Units",
+    keywords:
+      "hydro rain precipitation watershed snow snowpack melt runoff dam reservoir spill drought deadpool minimum power pool water rights irrigation municipal must run",
+    entry: (
+      <div>
+        <p>
+          Conventional hydro is dispatchable, but it is not an unlimited
+          generator. Rain and melting snow create runoff in the upstream
+          watershed, runoff fills the plant's reservoir, and every MWh the
+          turbines generate draws that reservoir down. Water above the dam's
+          capacity spills and cannot be recovered; a drought can empty it.
+        </p>
+        <p>
+          The <strong>Water</strong> forecast appears once you own conventional
+          hydro. It plots monthly precipitation, snow-water equivalent and the
+          fleet's reservoir level together. Cold months can store precipitation
+          as snow instead of immediate runoff, then release it during a warm
+          melt. Warming from your fleet's cumulative emissions shifts that
+          timing and reduces the standing snowpack.
+        </p>
+        <p>
+          Reservoirs also serve farms, cities, ecosystems and cultural uses.
+          Those <strong>water rights</strong> create a seasonal minimum release.
+          When the pool is high enough, that water becomes must-run generation
+          even if demand is low. Below the dead-pool floor the plant cannot
+          produce power, but required water can still bypass its turbines.
+        </p>
+        <p>
+          Pumped Hydro is different: Electrify models it as closed-loop storage,
+          so it only returns electricity previously used to pump water uphill.
+          It does not receive rain or river inflow, and evaporation slowly
+          reduces its stored energy.
+        </p>
+      </div>
+    ),
+  },
+  {
     // Credit to https://www.e-education.psu.edu/ebf200/node/151
     title: MANUAL_ENTRY.CUSTOMERS,
     group: "Gameplay",
@@ -424,9 +463,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           watch this chart before committing to a decades-long build.
         </p>
         <p>
-          <strong>Weather</strong> projects temperature and sunlight for your
+          <strong>Weather</strong> projects temperature and wind for your
           region. It drives demand (heating and air conditioning) as well as the
-          output of your solar and wind generators.
+          output of your solar and wind generators. Once you own hydro, a
+          separate <strong>Water</strong> chart shows watershed precipitation,
+          snowpack and reservoir level.
         </p>
         <p>
           Forecasts assume you make no further changes, so treat them as "what

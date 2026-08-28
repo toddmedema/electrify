@@ -65,6 +65,10 @@ export function isValidLocation(value: unknown): value is LocationType {
     (location.elevation === undefined ||
       (typeof location.elevation === "number" &&
         Number.isFinite(location.elevation))) &&
+    (location.watershedId === undefined ||
+      isValidLocationId(location.watershedId)) &&
+    (location.watershedName === undefined ||
+      typeof location.watershedName === "string") &&
     (location.offshore === undefined ||
       typeof location.offshore === "boolean") &&
     (location.resources === undefined ||
