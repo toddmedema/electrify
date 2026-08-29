@@ -98,6 +98,15 @@ describe("current facility economics", () => {
     expect(battery?.yearsToBuild).toBeCloseTo(1.5, 2);
   });
 
+  it("scales natural-gas start maintenance from EIA's 419 MW reference", () => {
+    expect(generatorAt(2023, "Natural Gas", 419000000)?.costPerStart).toBe(
+      23100,
+    );
+    expect(
+      generatorAt(2023, "Natural Gas", 100000000)?.costPerStart,
+    ).toBeCloseTo((23100 * 100) / 419, 8);
+  });
+
   it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {
     const pumpedHydro = STORAGE(stateAt(iceland, 2024), 1000000000).find(
       (facility) => facility.name === "Pumped Hydro",

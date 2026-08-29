@@ -18,6 +18,7 @@ import {
   getMonthlyPayment,
   getPaymentInterest,
   facilityOutputFactor,
+  estimatedAnnualOperatingCost,
 } from "../helpers/Financials";
 import { getInflationRate, getPrimeRate } from "../data/Economy";
 import {
@@ -300,7 +301,9 @@ function generatorCostPerMWh(
     WH_PER_MWH *
     (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
     feePerKgCO2e;
-  return generator.annualOperatingCost / annualMWh + fuelCost + carbonCost;
+  return (
+    estimatedAnnualOperatingCost(generator) / annualMWh + fuelCost + carbonCost
+  );
 }
 
 function currentFuelCosts(
@@ -619,6 +622,7 @@ export const gameSlice = createSlice({
           state,
           state.timeline[0],
           state.timeline[0],
+          true,
           true,
         );
       }
@@ -1080,6 +1084,7 @@ export function tickState(state: GameType) {
           state.timeline[0],
           state.timeline[0],
           true,
+          true,
         );
       }
 
@@ -1473,6 +1478,7 @@ function updateSupplyFacilitiesFinances(
   prev: TickPresentFutureType,
   now: TickPresentFutureType,
   simulated?: boolean,
+  preRoll?: boolean,
 ) {
   const { facilities, date } = state;
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
@@ -1531,7 +1537,12 @@ function updateSupplyFacilitiesFinances(
   let hydroReservoirCapacityWh = 0;
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
+  const startedFacilityIds = new Set<number>();
   facilities.forEach((g: FacilityOperatingType, i: number) => {
+    const previousW = g.currentW;
+    const previouslyGenerating = simulated
+      ? previousW > 0
+      : (g.generatingLastRealTick ?? previousW > 0);
     let dispatchPeakW = g.peakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
@@ -1599,6 +1610,9 @@ function updateSupplyFacilitiesFinances(
         hydroReservoirWh += g.reservoirWh || 0;
         hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
       }
+      if (!simulated && g.costPerStart !== undefined) {
+        g.generatingLastRealTick = g.currentW > 0;
+      }
       return;
     }
     if (g.yearsToBuildLeft === 0) {
@@ -1663,6 +1677,17 @@ function updateSupplyFacilitiesFinances(
           g.reservoirWh = Math.max(0, (g.reservoirWh || 0) - generatedWh);
           hydroMandatedReleaseW += Math.min(g.currentW, mandatedW);
         }
+        if (
+          g.costPerStart !== undefined &&
+          !preRoll &&
+          !previouslyGenerating &&
+          g.currentW > 0
+        ) {
+          startedFacilityIds.add(g.id);
+        }
+        if (!simulated && g.costPerStart !== undefined) {
+          g.generatingLastRealTick = g.currentW > 0;
+        }
       }
       if (g.peakWh) {
         // Capable of storing electricity
@@ -1725,7 +1750,7 @@ function updateSupplyFacilitiesFinances(
   // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
   // served total is exactly what expresses
   const revenuePerSuppliedW = supply > 0 ? revenue / supply : 0;
-  facilities.forEach((g: FacilityShoppingType) => {
+  facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
     let facilityExpenses = 0;
@@ -1735,6 +1760,12 @@ function updateSupplyFacilitiesFinances(
         facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR / 2;
       } else {
         facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR;
+      }
+      const started = startedFacilityIds.has(g.id);
+      if (started) {
+        // One simulated day stands for the average month. The visible off-to-on edge therefore
+        // represents the same daily start repeated throughout that month.
+        facilityExpenses += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
       expensesOM += facilityExpenses;
       if (g.fuel && FUELS[g.fuel]) {
@@ -1789,6 +1820,9 @@ function updateSupplyFacilitiesFinances(
           (g.peakW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
         g.lifetimeRevenue += deliveredW * revenuePerSuppliedW;
         g.lifetimeExpenses += facilityExpenses;
+        if (started) {
+          g.lifetimeStarts = (g.lifetimeStarts || 0) + GAME_TO_REAL_YEARS;
+        }
       }
     } else {
       facilityExpenses =
@@ -2045,12 +2079,15 @@ function buildFacilityHelper(
       lifetimePotentialWh: 0,
       lifetimeRevenue: 0,
       lifetimeExpenses: 0,
+      lifetimeStarts: 0,
       id:
         state.facilities.reduce(
           (max: number, f: FacilityOperatingType) => (max > f.id ? max : f.id),
           0,
         ) + 1,
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
+      generatingLastRealTick:
+        g.costPerStart !== undefined && newGame && g.peakWh === undefined,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
       minuteCreated: state.date.minute,
       minuteOperational: newGame

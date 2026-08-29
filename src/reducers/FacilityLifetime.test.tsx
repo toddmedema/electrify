@@ -4,7 +4,11 @@ import gameReducer, {
   tickState,
   togglePauseFacility,
 } from "./Game";
-import { TICKS_PER_DAY, TICKS_PER_MONTH } from "../Constants";
+import {
+  GAME_TO_REAL_YEARS,
+  TICKS_PER_DAY,
+  TICKS_PER_MONTH,
+} from "../Constants";
 import { facilityLifetime } from "../helpers/Financials";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
@@ -32,6 +36,7 @@ function totals(f: FacilityOperatingType) {
     potentialWh: f.lifetimePotentialWh,
     revenue: f.lifetimeRevenue,
     expenses: f.lifetimeExpenses,
+    starts: f.lifetimeStarts,
   };
 }
 
@@ -121,5 +126,38 @@ describe("per-facility lifetime totals", () => {
     );
 
     expect(after.facilities.map(totals)).toEqual(before);
+  });
+
+  it("charges gas maintenance once on a real off-to-on edge", () => {
+    const state = createGame({ scenarioId: 104, difficulty: "CEO" });
+    const gas = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Natural Gas",
+    ) as FacilityOperatingType;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.btuPerWh = 0;
+      facility.currentW = 0;
+      facility.paused = facility.id !== gas.id;
+    });
+    gas.generatingLastRealTick = false;
+    gas.lifetimeStarts = 0;
+    const openingExpenses = gas.lifetimeExpenses;
+    const expectedStartCost = (gas.costPerStart || 0) * GAME_TO_REAL_YEARS;
+
+    tickState(state);
+
+    expect(gas.currentW).toBeGreaterThan(0);
+    expect(gas.lifetimeStarts).toBeCloseTo(GAME_TO_REAL_YEARS, 10);
+    expect(gas.lifetimeExpenses - openingExpenses).toBeCloseTo(
+      expectedStartCost,
+      6,
+    );
+
+    const afterStart = totals(gas);
+    tickState(state);
+    expect(totals(gas)).toMatchObject({
+      expenses: afterStart.expenses,
+      starts: afterStart.starts,
+    });
   });
 });

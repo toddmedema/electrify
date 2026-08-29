@@ -5,6 +5,7 @@ import {
   facilityEquivalentCycles,
   facilityLifetime,
   facilityOutputFactor,
+  estimatedAnnualOperatingCost,
   getCompanyInterestRate,
   getCreditInputs,
   getCreditPremium,
@@ -188,6 +189,25 @@ describe("LCWH", () => {
     );
     expect(LCWH(degrading, date, 0, SEED)).toBeGreaterThan(
       LCWH(generator, date, 0, SEED),
+    );
+  });
+
+  it("quotes start maintenance at one start per day", () => {
+    const peaker = {
+      ...generator,
+      annualOperatingCost: 4926635.52,
+      costPerStart: 23100,
+    };
+    expect(estimatedAnnualOperatingCost(peaker)).toBeCloseTo(13358135.52, 2);
+
+    const totalWh =
+      peaker.peakW *
+      peaker.lifespanYears *
+      HOURS_PER_YEAR_REAL *
+      peaker.capacityFactor;
+    expect(LCWH(peaker, date, 0, SEED)).toBeCloseTo(
+      (peaker.buildCost + 13358135.52 * peaker.lifespanYears) / totalWh,
+      12,
     );
   });
 
