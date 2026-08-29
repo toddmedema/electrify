@@ -628,6 +628,11 @@ $pane_header_height: 40px;
   }
 }
 
+.insightsHistoryNotice {
+  padding: 8px 16px;
+  border-bottom: $border_accent;
+}
+
 .insightsTracks {
   width: 100%;
   max-width: 960px;
