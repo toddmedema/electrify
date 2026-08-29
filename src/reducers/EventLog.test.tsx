@@ -96,7 +96,7 @@ describe("the event log", () => {
     const built = cloneDeep(
       gameReducer(
         game,
-        buildFacility({ facility: generator!, financed: false }),
+        buildFacility({ facility: generator!, financed: true }),
       ),
     );
     expect(kinds(built)[0]).toEqual("BUILD");

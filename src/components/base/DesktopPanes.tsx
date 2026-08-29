@@ -192,6 +192,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
   // never changes the total width the panes have to share
   const sized =
     weights.length === panes.length ? weights : loadWeights(panes.length);
+  const totalWeight = sized.reduce((sum, weight) => sum + weight, 0);
   const template = sized.map((w) => `${w}fr`).join(` ${SPLITTER_PX}px `);
 
   return (
@@ -208,6 +209,13 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
               role="separator"
               aria-orientation="vertical"
               aria-label={`Resize pane ${i} and pane ${i + 1}`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(
+                (sized.slice(0, i).reduce((sum, weight) => sum + weight, 0) /
+                  totalWeight) *
+                  100,
+              )}
               tabIndex={0}
               onPointerDown={onPointerDown(i - 1)}
               onPointerMove={onPointerMove}

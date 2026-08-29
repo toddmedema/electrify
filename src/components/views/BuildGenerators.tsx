@@ -130,6 +130,7 @@ export function GeneratorBuildItem(
   );
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
   const loanAmount = props.generator.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(
@@ -163,8 +164,27 @@ export function GeneratorBuildItem(
   };
 
   const toggleOpen = (e: React.SyntheticEvent) => {
-    setOpen(!open);
+    setOpen((wasOpen: boolean) => {
+      if (!wasOpen) {
+        purchaseSubmitted.current = false;
+      }
+      return !wasOpen;
+    });
     e.stopPropagation();
+  };
+
+  const submitPurchase = (
+    financed: boolean,
+    e: React.MouseEvent<HTMLElement>,
+  ) => {
+    // A double-click dispatches two click events before the closing dialog has necessarily
+    // unmounted. The ref closes that tiny window synchronously.
+    if (purchaseSubmitted.current) {
+      return;
+    }
+    purchaseSubmitted.current = true;
+    props.onBuild(financed);
+    toggleOpen(e);
   };
 
   return (
@@ -183,6 +203,7 @@ export function GeneratorBuildItem(
                 size="small"
                 variant={props.compared ? "contained" : "outlined"}
                 aria-pressed={props.compared}
+                aria-label={`Compare ${generator.name}`}
                 disabled={props.compareDisabled && !props.compared}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -607,10 +628,9 @@ export function GeneratorBuildItem(
             color="primary"
             disabled={cash < generator.buildCost}
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(false);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(false, e)
+            }
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
@@ -618,10 +638,9 @@ export function GeneratorBuildItem(
           <Button
             color="primary"
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(true);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(true, e)
+            }
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan

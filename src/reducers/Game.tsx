@@ -812,6 +812,15 @@ function matchesFacilitySearch(
 
 function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   const built = payload.facility;
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  const amountDue = payload.financed
+    ? built.buildCost * DOWNPAYMENT_PERCENT
+    : built.buildCost;
+  // The dialog's quote can be stale by the time an action lands (or a replay/import can be
+  // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
+  if (!now || now.cash < amountDue) {
+    return;
+  }
   const viableLocationsRemaining = getViableLocationsRemaining(
     state.location,
     state.facilities,
@@ -1273,46 +1282,40 @@ export function tickState(state: GameType) {
 
         const summary = summarizeHistory(history);
         if (isTutorial) {
-          const score = computeScoreBreakdown(scenario, summary);
-          const finalScore = totalScore(score);
-          const { id: scoredScenarioId, endTitle, endMessage } = scenario;
-          const difficulty = state.difficulty;
-          const nextTutorial = getNextTutorial(scoredScenarioId);
           const capstoneIndex =
             scenario.tutorialSteps?.findIndex((step) => step.capstone) ?? -1;
-          const endingMinute = state.date.minute;
-          if (!isReplay) {
-            logEvent("scenario_end", {
-              id: scoredScenarioId,
-              type: "win",
-              difficulty,
-              score: finalScore,
-            });
-          }
-          setTimeout(() => {
-            const live = getStore().getState().game;
-            // Entering a capstone rebuilds the same scenario from minute zero. A completion
-            // callback queued by the final tick of the guided run must not celebrate over that
-            // freshly authored checkpoint merely because both runs share a scenario id.
-            if (
-              capstoneIndex >= 0 &&
-              live.scenarioId === scenarioId &&
-              live.tutorialStep === capstoneIndex &&
-              live.date.minute < endingMinute
-            ) {
-              return;
-            }
+          if (capstoneIndex >= 0) {
+            // Reaching the authored time limit is not the same as completing the mission. A
+            // player can start the clock before reading the walkthrough; pause here so they can
+            // finish the objectives and enter the capstone, which rebuilds its own checkpoint.
+            state.speed = "PAUSED";
+          } else {
+            const score = computeScoreBreakdown(scenario, summary);
+            const finalScore = totalScore(score);
+            const { id: scoredScenarioId, endTitle, endMessage } = scenario;
+            const difficulty = state.difficulty;
+            const nextTutorial = getNextTutorial(scoredScenarioId);
             if (!isReplay) {
-              clearSaveFor(scenarioId);
+              logEvent("scenario_end", {
+                id: scoredScenarioId,
+                type: "win",
+                difficulty,
+                score: finalScore,
+              });
             }
-            return getStore().dispatch(
-              tutorialCompleteDialog({
-                title: endTitle || "Mission complete!",
-                message: endMessage,
-                nextTutorial,
-              }),
-            );
-          }, 1);
+            setTimeout(() => {
+              if (!isReplay) {
+                clearSaveFor(scenarioId);
+              }
+              return getStore().dispatch(
+                tutorialCompleteDialog({
+                  title: endTitle || "Mission complete!",
+                  message: endMessage,
+                  nextTutorial,
+                }),
+              );
+            }, 1);
+          }
         } else {
           finishScoredRun(
             summary,

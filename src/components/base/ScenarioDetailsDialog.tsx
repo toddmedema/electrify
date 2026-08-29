@@ -43,9 +43,13 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
       : null;
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-labelledby="scenario-details-title"
+    >
       <DialogTitle>
-        {scenario.name}
+        <span id="scenario-details-title">{scenario.name}</span>
         <IconButton
           aria-label="close"
           onClick={onClose}

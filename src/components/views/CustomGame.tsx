@@ -140,6 +140,7 @@ function technologiesFor(
   // Only the fields those two read; a full game state doesn't exist yet at setup time
   const state = {
     date: getDateFromMinute(0, scenario.startingYear),
+    startingYear: scenario.startingYear,
     difficulty,
     feePerKgCO2e: scenario.feePerKgCO2e,
     seed: 0,
@@ -352,12 +353,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   disableClearable
                   autoHighlight
                   openOnFocus
-                  sx={{ minWidth: 200 }}
+                  sx={{ minWidth: 0, width: "100%" }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       variant="standard"
                       placeholder="Search cities"
+                      slotProps={{
+                        ...params.slotProps,
+                        htmlInput: {
+                          ...params.slotProps.htmlInput,
+                          "aria-label": "Location",
+                        },
+                      }}
                     />
                   )}
                 />
@@ -398,6 +406,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="startingYear"
+                  inputProps={{ "aria-label": "Starting year" }}
                   value={scenario.startingYear}
                   onChange={(e: SelectChangeEvent<number>) =>
                     changeStartingYear(Number(e.target.value))
@@ -418,6 +427,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="duration"
+                  inputProps={{ "aria-label": "Duration" }}
                   value={scenario.durationMonths}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ durationMonths: Number(e.target.value) })
@@ -448,6 +458,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="ownership"
+                  inputProps={{ "aria-label": "Ownership" }}
                   value={scenario.ownership}
                   onChange={(e: SelectChangeEvent<ScenarioType["ownership"]>) =>
                     change({
@@ -465,6 +476,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="cash"
+                  inputProps={{ "aria-label": "Starting cash" }}
                   value={scenario.cash}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ cash: Number(e.target.value) })
@@ -485,6 +497,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="dollarsPerkWh"
+                  inputProps={{ "aria-label": "Electricity rate" }}
                   value={scenario.dollarsPerkWh}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ dollarsPerkWh: Number(e.target.value) })
@@ -515,6 +528,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="feePerKgCO2e"
+                  inputProps={{ "aria-label": "Carbon fee" }}
                   value={scenario.feePerKgCO2e}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ feePerKgCO2e: Number(e.target.value) })
@@ -539,6 +553,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     on the scenario details screen */}
                 <Select
                   id="difficulty"
+                  inputProps={{ "aria-label": "Difficulty" }}
                   value={game.difficulty}
                   onChange={(e: SelectChangeEvent<DifficultyType>) =>
                     onDelta({ difficulty: e.target.value as DifficultyType })
@@ -568,6 +583,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   id="seed"
                   variant="standard"
                   placeholder="Random"
+                  slotProps={{ htmlInput: { "aria-label": "Seed" } }}
                   value={scenario.seed === undefined ? "" : scenario.seed}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const digits = e.target.value.replace(/[^0-9]/g, "");
@@ -623,9 +639,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
           },
         )}
 
-        <div style={{ padding: "8px", textAlign: "center" }}>
+        <div className="customFacilityPicker">
           <Select
             id="addFacilityName"
+            inputProps={{ "aria-label": "Facility type" }}
             displayEmpty
             value={adding ? adding.name : ""}
             onChange={(e: SelectChangeEvent<string>) => {
@@ -655,9 +672,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
               );
             })}
           </Select>
-          &nbsp;
           <Select
             id="addFacilitySize"
+            inputProps={{ "aria-label": "Facility size" }}
             value={sizes.indexOf(addSize) === -1 ? sizes[0] : addSize}
             disabled={!adding}
             onChange={(e: SelectChangeEvent<number>) =>
@@ -690,7 +707,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
             color="primary"
             disabled={unavailable.length > 0}
             onClick={() => onStart(scenario)}
-            autoFocus
           >
             Play
           </Button>

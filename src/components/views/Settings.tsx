@@ -63,6 +63,7 @@ function SettingsSection({
   return (
     <Box
       component="section"
+      className="settingsSection"
       aria-labelledby={id}
       sx={{
         display: "grid",
@@ -106,13 +107,21 @@ export default function Settings(props: Props): React.JSX.Element {
       props.onImportSave(file);
     }
   };
+  const onBack = () => {
+    props.onBack();
+    // Card transitions replace the button that opened Settings. Once the previous card is back,
+    // return keyboard users to its stable replacement instead of leaving focus on <body>.
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>("[data-settings-trigger]")?.focus();
+    }, 350);
+  };
 
   return (
     <div className="flexContainer" id="gameCard">
       <div id="topbar">
         <Toolbar>
           <IconButton
-            onClick={props.onBack}
+            onClick={onBack}
             aria-label="back"
             edge="start"
             color="primary"

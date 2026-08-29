@@ -105,6 +105,19 @@ describe("buildFacility", () => {
     });
   });
 
+  it("rejects a stale purchase when current cash no longer covers it", () => {
+    const before = createGame({ scenarioId: 103 });
+    const generator = aGeneratorToBuild(before);
+    getTimeFromTimeline(before.date.minute, before.timeline)!.cash = 0;
+
+    const after = gameReducer(
+      before,
+      buildFacility({ facility: generator, financed: true }),
+    );
+
+    expect(after.facilities).toHaveLength(before.facilities.length);
+  });
+
   it("keeps a long cash forecast finite when hydro finishes construction", () => {
     const before = createGame({ scenarioId: 103 });
     const hydro = GENERATORS(before, 50000000, [20], [500]).find(

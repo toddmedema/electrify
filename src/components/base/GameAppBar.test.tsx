@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
 import { GameAppBar, Props, reserveCapacityW } from "./GameAppBar";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
@@ -91,5 +91,33 @@ describe("GameAppBar", () => {
     expect(screen.queryByRole("menuitem", { name: /events/i })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: /turn sound/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "Options" })).toBeVisible();
+  });
+
+  it("gives the scenario dialog only the scenario name", () => {
+    renderAppBar();
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Scenario details" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Rise of Renewables" }),
+    ).toBeVisible();
+  });
+
+  it("returns focus to the primary action after Save & Quit", () => {
+    jest.useFakeTimers();
+    const target = document.createElement("button");
+    target.dataset.mainAction = "";
+    document.body.appendChild(target);
+    const onQuit = jest.fn();
+    renderAppBar({ onQuit });
+
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save & Quit" }));
+    act(() => jest.advanceTimersByTime(350));
+
+    expect(onQuit).toHaveBeenCalled();
+    expect(target).toHaveFocus();
+    target.remove();
+    jest.useRealTimers();
   });
 });

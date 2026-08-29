@@ -186,8 +186,9 @@ $absmaxdimension: 1025px;
 // Wide enough to show Facilities/Finances/Forecasts side by side -- keep in sync with
 // isDesktopScreen() in Globals.tsx. Below this, panes render too narrow to be worth it.
 $desktop_breakpoint: 1300px;
-// And wide enough for the event log beside them -- keep in sync with isUltrawideScreen()
-$ultrawide_breakpoint: 1800px;
+// Below this, the default two-pane split makes a facility row narrower than its data and controls.
+// Keep in sync with isPaneLayout() in Globals.tsx.
+$pane_breakpoint: 1024px;
 
 $sizemap: (
   large: 6vmin,
@@ -278,8 +279,8 @@ button,
   .MuiButton-root,
   .MuiIconButton-root,
   .MuiToggleButton-root {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 44px !important;
+    min-height: 44px !important;
   }
 }
 
@@ -487,6 +488,10 @@ $topbar_height: 56px;
   #topbar .gameMenuButton {
     margin-left: 0;
     padding: 10px;
+  }
+
+  #topbar .MuiIconButton-edgeStart {
+    margin-left: 0;
   }
 
   #topbar .gameStatus {
@@ -1667,6 +1672,10 @@ html[data-theme="dark"] .uplot {
   }
 
   .mainMenuFooter {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
     box-sizing: border-box;
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -1684,6 +1693,36 @@ html[data-theme="dark"] .uplot {
 
     #menuCard .gameSubtitle {
       margin-bottom: 8px;
+    }
+  }
+
+  @media screen and (max-height: 450px) {
+    #menuCard {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    #logo {
+      position: static;
+      flex: 0 0 auto;
+      padding: 8px 24px 0;
+
+      img {
+        max-height: 72px;
+      }
+    }
+
+    #menuCard #centeredMenu {
+      position: static;
+      flex: 0 0 auto;
+      margin: 0 auto;
+    }
+
+    .mainMenuFooter {
+      position: static;
+      flex: 0 0 auto;
+      margin-top: auto;
     }
   }
 
@@ -1771,6 +1810,16 @@ html[data-theme="dark"] .uplot {
     tr {
       height: 60px;
     }
+  }
+
+  .customFacilityPicker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+    text-align: center;
   }
 
   #gameCard {
@@ -2129,6 +2178,75 @@ html[data-theme="dark"] .uplot {
 
 @include styling();
 
+// A 320px phone cannot fit the setup's longest row label beside a useful city picker. Stack each
+// label over its control at that last narrow breakpoint, and let build-card actions take a second
+// row instead of pushing titles and buttons past the viewport edge.
+@media screen and (max-width: 359px) {
+  #gameSetupTable {
+    width: 100%;
+    margin: 8px 0;
+    table-layout: fixed;
+
+    tr {
+      display: grid;
+      height: auto;
+      padding: 6px 0;
+    }
+
+    .MuiTableCell-root {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      padding: 3px 12px;
+      border-bottom: 0;
+    }
+
+    .MuiInputBase-root,
+    .MuiAutocomplete-root {
+      width: 100%;
+      min-width: 0 !important;
+      max-width: 100%;
+    }
+  }
+
+  .settingsSection {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 4px !important;
+
+    .shortcuts {
+      width: 100%;
+      margin: 0;
+
+      td {
+        padding: 4px;
+      }
+    }
+  }
+
+  .build-list-item .MuiCardHeader-root {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-action {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      width: 100%;
+      margin: 8px 0 0 !important;
+
+      & > span,
+      .MuiStack-root {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+    }
+  }
+}
+
 // A mission objective is game chrome, not a modal: it stays out of the bottom navigation,
 // leaves the whole grid interactive and collapses to one progress-marked concept.
 .tutorialHud {
@@ -2347,13 +2465,12 @@ $sizemap: (
 }
 
 // ===============================================
-// Anything wider than a phone gets columns rather than one card at a time: two of them up to
-// $desktop_breakpoint (the fleet pinned beside whichever pane the nav is on), three above it,
-// four once there is room for the event log. The grid itself comes from DesktopPanes, since the
-// player can drag it
+// Landscape tablets and wider screens get columns rather than one card at a time: two up to
+// $desktop_breakpoint (the fleet pinned beside whichever pane the nav is on), and all three
+// destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
 // ===============================================
 
-@media screen and (min-width: $abswidthmax) {
+@media screen and (min-width: $pane_breakpoint) {
   .desktop-layout,
   .pane-layout {
     height: 100%;

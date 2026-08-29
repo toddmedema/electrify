@@ -67,6 +67,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           {props.hasSavedGame && (
             <Button
+              data-main-action
               size="large"
               variant="contained"
               color="primary"
@@ -76,6 +77,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
             </Button>
           )}
           <Button
+            data-main-action
             size="large"
             variant={props.hasSavedGame ? "outlined" : "contained"}
             color="primary"
@@ -103,7 +105,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
           <Button variant="text" color="primary" onClick={props.onManual}>
             Manual
           </Button>
-          <Button variant="text" color="primary" onClick={props.onSettings}>
+          <Button
+            data-settings-trigger
+            variant="text"
+            color="primary"
+            onClick={props.onSettings}
+          >
             Options
           </Button>
           {!props.uid && (
@@ -136,10 +143,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <footer
         className="mainMenuFooter"
         style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
           opacity: 0.7,
         }}
       >

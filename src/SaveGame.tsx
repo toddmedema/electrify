@@ -217,15 +217,17 @@ export function startAutosave(
   // the subscriber sees it, so flushing on the way out needs the state as it was, not as it is.
   let live: GameType | undefined;
   let savedYear = -1;
-  // What was actually written, so the flush below can tell whether anything has happened since
-  let savedMinute = -1;
+  // The exact Redux snapshot that was written. Time is not enough to identify a change: while
+  // paused, a player can still build, sell, reorder, change rates, or pause a facility without
+  // advancing the minute.
+  let saved: GameType | undefined;
   // A full disk fails every year; saying so once is a warning, saying so every year is a bug
   let warnedAboutFailure = false;
 
   const write = (game: GameType) => {
     if (writeSave(game)) {
       savedYear = game.date.year;
-      savedMinute = game.date.minute;
+      saved = game;
     } else if (!warnedAboutFailure) {
       warnedAboutFailure = true;
       store.dispatch(
@@ -244,7 +246,7 @@ export function startAutosave(
    * back from the dead.
    */
   const flush = () => {
-    if (!live || live.date.minute === savedMinute) {
+    if (!live || live === saved) {
       return;
     }
     if (readSave()?.game.scenarioId !== live.scenarioId) {
@@ -270,7 +272,7 @@ export function startAutosave(
       // A game just started or resumed, and nothing of it is written yet. Saving immediately is
       // what lets the flush above treat a missing save as "the scenario ended".
       savedYear = -1;
-      savedMinute = -1;
+      saved = undefined;
     }
     live = game;
     if (game.date.year !== savedYear) {
