@@ -157,7 +157,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
         )}
         <IconButton
           color="primary"
-          href="mailto:todd@fabricate.io"
+          href="/about.html#feedback"
           aria-label="Send feedback"
           size="large"
         >

@@ -123,18 +123,35 @@
         </ul>
       </section>
 
-      <section class="panel panel--contact">
-        <div>
+      <section class="panel panel--contact" id="feedback">
+        <div class="panel__intro">
           <span class="panel__number" aria-hidden="true">03</span>
-          <h2>Let’s build a better grid</h2>
+          <h2 id="feedback-title">Help us build a better grid</h2>
           <p>
-            Questions, feedback, or an idea for collaboration? We’d love to hear
-            from you.
+            Found a bug, have an idea, or want to tell us what worked? Send it
+            straight to the Electrify team—no email app required.
+          </p>
+          <p class="feedback-privacy">
+            Your feedback is submitted through Google Forms. Only include
+            contact details if you would like a reply.
           </p>
         </div>
-        <div class="panel__actions">
-          <a class="button button--primary" href="mailto:todd@fabricate.io"
-            >Send us an email</a
+        <div class="feedback-form">
+          <iframe
+            src="https://docs.google.com/forms/d/e/1FAIpQLSdQIq1zDnyGCgDVzLq9WmHVVP9l3K6QLWufVvrhPM20EUa6ug/viewform?embedded=true"
+            title="Electrify feedback form"
+            loading="lazy"
+          >
+            <a href="https://forms.gle/nSpkVzcFcXMQMMgb9"
+              >Open the Electrify feedback form</a
+            >
+          </iframe>
+          <a
+            class="feedback-form__fallback"
+            href="https://forms.gle/nSpkVzcFcXMQMMgb9"
+            target="_blank"
+            rel="noreferrer"
+            >Open the form in a new tab</a
           >
         </div>
       </section>

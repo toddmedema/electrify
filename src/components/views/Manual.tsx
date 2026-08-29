@@ -35,7 +35,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-const FEEDBACK_EMAIL = "mailto:todd@fabricate.io";
+const FEEDBACK_URL = "/about.html#feedback";
 
 // Pinned first, then by group in the order the groups are declared, then alphabetically. Sorted
 // once here rather than on every keystroke
@@ -320,7 +320,7 @@ export default function Manual(props: Props): React.JSX.Element {
               No entries match "{searchTerm}".
             </Typography>
             <Typography variant="body2">
-              Think it belongs in here? <a href={FEEDBACK_EMAIL}>Let us know</a>
+              Think it belongs in here? <a href={FEEDBACK_URL}>Let us know</a>
               .
             </Typography>
           </div>
