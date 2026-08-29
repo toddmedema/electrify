@@ -32,6 +32,10 @@ function aFacility(
     lifespanYears: 40,
     minuteCreated: 0,
     minuteOperational: 0,
+    lifetimeWh: 0,
+    lifetimePotentialWh: 0,
+    lifetimeRevenue: 0,
+    lifetimeExpenses: 0,
     ...overrides,
   } as FacilityOperatingType;
 }
@@ -112,13 +116,6 @@ describe("facilityCashBack", () => {
     expect(facilityCashBack(aFacility(), minute(20))).toBeCloseTo(500000, 6);
     expect(facilityCashBack(aFacility(), minute(40))).toBe(0);
     expect(facilityCashBack(aFacility(), minute(60))).toBe(0);
-  });
-
-  it("uses a conservative life for a legacy save with no lifespan", () => {
-    const currentMinute = 15 * DAYS_PER_YEAR * 24 * 60;
-    expect(
-      facilityCashBack(aFacility({ lifespanYears: undefined }), currentMinute),
-    ).toBeCloseTo(500000, 6);
   });
 
   it("refunds the same committed equity throughout construction", () => {
@@ -408,15 +405,6 @@ describe("facility aging", () => {
 
   it("leaves technologies without an evidence-backed decline at nameplate", () => {
     expect(facilityOutputFactor(aFacility(), minute(60))).toBe(1);
-  });
-
-  it("gives legacy solar saves a degradation default", () => {
-    const legacySolar = aFacility({ fuel: "Sun" });
-    expect(legacySolar.annualOutputDegradation).toBeUndefined();
-    expect(facilityOutputFactor(legacySolar, minute(20))).toBeCloseTo(
-      Math.pow(0.995, 20),
-      10,
-    );
   });
 
   it("derives battery equivalent full cycles from discharged energy", () => {

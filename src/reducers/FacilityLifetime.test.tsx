@@ -70,8 +70,7 @@ describe("per-facility lifetime totals", () => {
   it("never books more than one company's revenue across the fleet", () => {
     const booked = (state: GameType) =>
       state.facilities.reduce(
-        (sum: number, f: FacilityOperatingType) =>
-          sum + (f.lifetimeRevenue || 0),
+        (sum: number, f: FacilityOperatingType) => sum + f.lifetimeRevenue,
         0,
       );
 

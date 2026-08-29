@@ -547,8 +547,6 @@ export default class Compositor extends React.Component<Props, {}> {
       case "BUILD_STORAGE":
         return <BuildStorageContainer />;
       case "INSIGHTS":
-      case "FINANCES":
-      case "FORECASTS":
         return <InsightsContainer />;
       case "EVENTS":
         return <EventLogContainer />;

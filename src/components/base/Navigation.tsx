@@ -19,17 +19,12 @@ export default function Navigation() {
   const cardName = useAppSelector(selectCardName);
   const paneLayout = isPaneLayout();
   // Facilities is always the left pane at this width. If a resize lands here while that was
-  // the active phone tab, Insights is the second pane actually being shown. The two old values
-  // are aliases for saved sessions from before the screens were consolidated.
+  // the active phone tab, Insights is the second pane actually being shown.
   const selectedCard =
-    cardName === "FINANCES" || cardName === "FORECASTS"
-      ? "INSIGHTS"
-      : paneLayout && cardName === "FACILITIES"
-        ? "INSIGHTS"
-        : cardName;
+    paneLayout && cardName === "FACILITIES" ? "INSIGHTS" : cardName;
   const unreadEvents = useAppSelector((state) => {
-    const latest = state.game.eventLog?.[0]?.id || 0;
-    return latest > (state.game.eventLogReadThroughId || 0);
+    const latest = state.game.eventLog[0]?.id || 0;
+    return latest > state.game.eventLogReadThroughId;
   });
   return (
     <BottomNavigation

@@ -100,9 +100,6 @@ export type CardNameType =
   | "BUILD_STORAGE"
   | "FACILITIES"
   | "INSIGHTS"
-  // Kept as navigation aliases for old saved/tutorial state; new UI routes both to Insights.
-  | "FINANCES"
-  | "FORECASTS"
   | "EVENTS"
   | "LOADING"
   | "MAIN_MENU"
@@ -307,8 +304,7 @@ export interface GeneratorOperatingType
   currentW: number;
   yearsToBuildLeft: number;
   minuteCreated: number; // That the user clicked buy, not construction complete
-  // Set when construction completes. Optional so saves made before depreciation existed still
-  // load; the first real tick establishes their remaining lifetime from that point onward.
+  // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
   paused: boolean;
   reservoirWh?: number;
@@ -332,19 +328,15 @@ export interface StorageOperatingType
  * earning its keep rather than only what it cost to build. Accumulated per tick by
  * updateSupplyFacilitiesFinances, and only while the game is really ticking -- a forecast runs
  * against a deep clone of the fleet and throws the clone away, so its ticks never land here.
- *
- * Every field is optional because a save written before these existed has none of them, and a
- * fleet resumed from one should keep playing rather than start reporting NaN. Read them through
- * helpers/Financials' facilityLifetime, which is where the zero defaults live.
  */
 export interface LifetimeTotals {
-  lifetimeWh?: number; // Delivered to the grid. Storage counts discharge only, not charging
+  lifetimeWh: number; // Delivered to the grid. Storage counts discharge only, not charging
   // What it could have delivered running flat out over the same span, ie the denominator of its
   // capacity factor. Accrues from the moment construction finishes, so pauses and idle hours
   // count against it the way they do for a real plant
-  lifetimePotentialWh?: number;
-  lifetimeRevenue?: number; // Its pro-rata share of what the company sold
-  lifetimeExpenses?: number; // Its own fuel, O&M, carbon fees and loan interest
+  lifetimePotentialWh: number;
+  lifetimeRevenue: number; // Its pro-rata share of what the company sold
+  lifetimeExpenses: number; // Its own fuel, O&M, carbon fees and loan interest
 }
 
 interface LoanInfo {
@@ -372,8 +364,7 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   maxPeakW: number; // Maximum size the technology is currently buildable
   capacityFactor: number; // 0 - 1, percent of theoretical output actually produced across a year
   // Fraction of nameplate output permanently lost each operating year. Optional because most
-  // generator types do not have a well-supported secular output decline, and because older saves
-  // predate the field.
+  // generator types do not have a well-supported secular output decline.
   annualOutputDegradation?: number;
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
@@ -469,8 +460,7 @@ export interface ScenarioType {
   seed?: number;
   startingYear: number;
   cash: number;
-  // Optional for backwards compatibility with authored and locally stored scenarios. When absent,
-  // the location profile supplies the starting grid size.
+  // When absent, the location profile supplies the starting grid size.
   startingCustomers?: number;
   dollarsPerkWh: number;
   durationMonths: number;
@@ -573,21 +563,20 @@ export interface GameType {
   startingYear: number;
   timeline: TickPresentFutureType[]; // anything before currentMinute is history, anything after is a forecast
   monthlyHistory: MonthlyHistoryType[]; // live updated; for calculation simplicity, 0 = most recent (prepend new entries)
-  // Newest first, capped at MAX_EVENTS. Optional because a save written before the log existed
-  // has none, and an empty log and a missing one mean the same thing to everything that reads it
-  eventLog?: GameEventType[];
+  // Newest first, capped at MAX_EVENTS.
+  eventLog: GameEventType[];
   // Keys outlive the capped event log: a once-per-run lesson must not repeat just because its
   // original row was the 101st one and fell off the visible history.
-  reportedEventKeys?: string[];
-  eventLogReadThroughId?: number;
+  reportedEventKeys: string[];
+  eventLogReadThroughId: number;
   // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
-  worldEvents?: WorldEventStateType;
+  worldEvents: WorldEventStateType;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
-  // being watched, after resuming a save from before replays existed, or once a run has grown
-  // past MAX_REPLAY_ACTIONS. Persisted with the rest of the slice, so a replay survives a reload
+  // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the
+  // slice, so a replay survives a reload.
   replayLog?: ReplayActionType[];
   // Set only while watching a replay. Doubles as the "this is a replay" flag: player controls are
   // hidden, nothing is autosaved, and no score is submitted while it's here

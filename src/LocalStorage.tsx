@@ -114,10 +114,7 @@ const CUSTOM_GAME_KEY = "customGame";
 // rather than back at the defaults. Unlike a save, this is only the setup, never a game in
 // progress - see SaveGame for the latter
 export function getCustomScenario(fallback: ScenarioType): ScenarioType {
-  const stored = getStorageJson<Partial<ScenarioType>>(CUSTOM_GAME_KEY, {});
-  // A config written by an older version can be missing fields the screen now expects, and
-  // spreading over the defaults is cheaper than versioning something this small
-  return { ...fallback, ...stored };
+  return getStorageJson<ScenarioType>(CUSTOM_GAME_KEY, fallback);
 }
 
 export function recordCustomScenario(scenario: ScenarioType) {
