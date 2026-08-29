@@ -11,6 +11,8 @@ it("gives a public utility that supplied no electricity a finite score", () => {
     month: 1,
     supplyWh: 0,
     demandWh: 1000000000000,
+    deliveredWhByFuel: {},
+    peakDemandW: 1000000000000,
     cash: -1,
     customers: 100,
     netWorth: 0,

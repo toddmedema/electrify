@@ -38,6 +38,7 @@ import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildConsequenceMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
+import { buildStorySnapshot } from "../helpers/Story";
 import {
   getAirborneWindOutputFactor,
   getAirborneWindReferenceKph,
@@ -48,9 +49,9 @@ import {
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import {
-  activeWorldEventEffects,
-  resolveWorldEvent,
-  WORLD_EVENT_DEFINITIONS,
+  combineStoryEffects,
+  resolveStoryAtDate,
+  STORY_ARC_DEFINITIONS,
 } from "../data/WorldEvents";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
 import {
@@ -324,7 +325,7 @@ function currentFuelCosts(
     const cost = generatorCostPerMWh(
       facility as GeneratorOperatingType,
       prices,
-      state.feePerKgCO2e,
+      effectiveCarbonFee(state.date, state),
     );
     if (cost === undefined) {
       return;
@@ -393,30 +394,35 @@ function updateWorldEvents(state: GameType) {
   state.worldEvents.active = state.worldEvents.active.filter(
     (event) => event.endsMinute > state.date.minute,
   );
-  WORLD_EVENT_DEFINITIONS.forEach((definition) => {
-    const resolved = resolveWorldEvent(definition, {
-      seed: state.seed,
-      date: state.date,
-      location: state.location,
-    });
-    if (state.worldEvents.checkedKeys.includes(resolved.checkedKey)) {
+  if (
+    !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
+  ) {
+    return;
+  }
+  const resolved = resolveStoryAtDate({
+    seed: state.seed,
+    scenarioId: state.scenarioId,
+    difficulty: state.difficulty,
+    date: state.date,
+    location: state.location,
+    snapshot: buildStorySnapshot(
+      state.monthlyHistory,
+      state.facilities,
+      state.date.minute,
+    ),
+  });
+  resolved.occurrences.forEach((occurrence) => {
+    if (state.worldEvents.checkedKeys.includes(occurrence.key)) {
       return;
     }
-    state.worldEvents.checkedKeys.push(resolved.checkedKey);
-    if (resolved.occurrence) {
-      state.worldEvents.active.push(resolved.occurrence);
-      logGameEvent(
-        state,
-        resolved.occurrence.kind,
-        resolved.occurrence.message,
-        {
-          importance: resolved.occurrence.importance,
-          actionTarget: resolved.occurrence.actionTarget,
-          reportedKey: `world-event:${resolved.occurrence.key}`,
-          pause: resolved.occurrence.importance === "CRITICAL",
-        },
-      );
-    }
+    state.worldEvents.checkedKeys.push(occurrence.key);
+    state.worldEvents.active.push(occurrence);
+    logGameEvent(state, occurrence.kind, occurrence.message, {
+      importance: occurrence.importance,
+      actionTarget: occurrence.actionTarget,
+      reportedKey: occurrence.key,
+      pause: occurrence.importance === "CRITICAL",
+    });
   });
   if (state.worldEvents.checkedKeys.length > MAX_WORLD_EVENT_CHECKS) {
     state.worldEvents.checkedKeys.splice(
@@ -426,15 +432,46 @@ function updateWorldEvents(state: GameType) {
   }
 }
 
+/**
+ * Scheduled effects for any simulated date. Persisted live occurrences win over a newly resolved
+ * copy, which is what preserves facility IDs and other onset-time attributes after they are drawn.
+ */
+function storyEffectsAt(date: DateType, state: GameType) {
+  const persisted = state.worldEvents.active.filter(
+    (event) =>
+      date.minute >= event.startsMinute && date.minute < event.endsMinute,
+  );
+  if (
+    !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
+  ) {
+    return combineStoryEffects(persisted);
+  }
+  const persistedKeys = new Set(persisted.map((event) => event.key));
+  const scheduled = resolveStoryAtDate({
+    seed: state.seed,
+    scenarioId: state.scenarioId,
+    difficulty: state.difficulty,
+    date,
+    location: state.location,
+    snapshot: buildStorySnapshot(
+      state.monthlyHistory,
+      state.facilities,
+      state.date.minute,
+    ),
+  }).active.filter((event) => !persistedKeys.has(event.key));
+  return combineStoryEffects([...persisted, ...scheduled]);
+}
+
+function effectiveCarbonFee(date: DateType, state: GameType): number {
+  return storyEffectsAt(date, state).carbonFeePerKgCO2e ?? state.feePerKgCO2e;
+}
+
 function getEffectiveFuelPrices(
   date: DateType,
   state: GameType,
 ): FuelPricesType {
   const prices = getFuelPricesPerMBTU(date, state.seed, state.location);
-  const multipliers = activeWorldEventEffects(
-    state.worldEvents.active,
-    date.minute,
-  ).fuelPriceMultipliers;
+  const multipliers = storyEffectsAt(date, state).fuelPriceMultipliers;
   if (!multipliers) {
     return prices;
   }
@@ -1397,7 +1434,7 @@ function getDemandW(
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
-  const effects = activeWorldEventEffects(game.worldEvents.active, date.minute);
+  const effects = storyEffectsAt(date, game);
   const baselineDemandW =
     demandMultiple * now.customers * (effects.demandMultiplier || 1);
   now.demandByType = demandByTypeAt(
@@ -1448,10 +1485,7 @@ function reforecastWeatherAndPrices(
       const date = getDateFromMinute(t.minute, state.startingYear);
       const weather = getWeather(date, state.seed, cumulativeMegatons);
       const fuelPrices = getEffectiveFuelPrices(date, state);
-      const effects = activeWorldEventEffects(
-        state.worldEvents.active,
-        date.minute,
-      );
+      const effects = storyEffectsAt(date, state);
       const hydroKey = `${date.year}-${date.monthNumber}`;
       let hydrology = hydrologyByMonth.get(hydroKey);
       if (!hydrology) {
@@ -1535,7 +1569,13 @@ function minimumStableOperatingCost(
     ((minimumW * (generator.btuPerWh || 0)) / TICKS_PER_HOUR) *
     GAME_TO_REAL_YEARS;
   const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
-  const carbonCost = fuelBtu * fuel.kgCO2ePerBtu * state.feePerKgCO2e;
+  const carbonCost =
+    fuelBtu *
+    fuel.kgCO2ePerBtu *
+    effectiveCarbonFee(
+      getDateFromMinute(tick.minute, state.startingYear),
+      state,
+    );
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -1902,7 +1942,8 @@ function updateSupplyFacilitiesFinances(
         const facilityKgco2e = fuelBtu * FUELS[g.fuel].kgCO2ePerBtu;
         expensesFuel += facilityFuel;
         kgco2e += facilityKgco2e;
-        facilityExpenses += facilityFuel + state.feePerKgCO2e * facilityKgco2e;
+        facilityExpenses +=
+          facilityFuel + effectiveCarbonFee(tickDate, state) * facilityKgco2e;
       }
       if (g.loanAmountLeft > 0) {
         const paymentInterest = getPaymentInterest(
@@ -1955,7 +1996,7 @@ function updateSupplyFacilitiesFinances(
       }
     }
   });
-  const expensesCarbonFee = state.feePerKgCO2e * kgco2e;
+  const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * kgco2e;
 
   // Customers
   // Demand is the customer count times a multiple, so a run that blacks out for long enough
@@ -2090,7 +2131,10 @@ export function generateNewTimeline(
   const state = {
     ...readOnlyState,
     facilities: cloneDeep(readOnlyState.facilities),
-    monthlyHistory: [] as MonthlyHistoryType[],
+    // Story checkpoints only need the trailing year, and scheduled forecast effects resolve from
+    // the same immutable facts as live play. Keeping twelve entries is cheap and avoids a second
+    // forecast-only narrative state.
+    monthlyHistory: readOnlyState.monthlyHistory.slice(0, 12),
     timeline: new Array(ticks) as TickPresentFutureType[],
   };
   const cumulativeMegatons = getCumulativeMegatons(

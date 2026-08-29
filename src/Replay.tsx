@@ -28,8 +28,22 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// This is the initial release schema. Increment it for breaking post-release changes.
-export const REPLAY_VERSION = 1;
+// v2 corresponds to the story-enabled simulation/history schema. Older actions cannot reproduce
+// the same monthly facts and are rejected rather than partially migrated.
+export const REPLAY_VERSION = 2;
+
+export function replayVersionError(raw: unknown): string | undefined {
+  if (typeof raw !== "object" || raw === null) {
+    return undefined;
+  }
+  const version = (raw as { version?: unknown }).version;
+  if (typeof version !== "number" || version === REPLAY_VERSION) {
+    return undefined;
+  }
+  return version < REPLAY_VERSION
+    ? "That replay was created by an older simulation version and can't be played."
+    : "That replay was created by a newer simulation version and can't be played.";
+}
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

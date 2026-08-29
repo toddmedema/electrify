@@ -277,7 +277,11 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     dispatchTargetWByFacility: Record<number, number>;
   };
 
-export type DerivedHistoryKeysType = keyof DerivedHistoryType;
+export type DerivedHistoryKeysType = {
+  [Key in keyof DerivedHistoryType]: DerivedHistoryType[Key] extends number
+    ? Key
+    : never;
+}[keyof DerivedHistoryType];
 export interface DerivedHistoryType extends MonthlyHistoryType {
   profit: number;
   profitPerkWh: number;
@@ -292,6 +296,10 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   month: number;
   supplyWh: number; // total
   demandWh: number; // total
+  // Persisted simulation facts used by story checkpoints. These are deliberately raw totals,
+  // not narrative classifications such as "reliable" or "gas-heavy".
+  deliveredWhByFuel: FuelProductionType;
+  peakDemandW: number;
 }
 
 interface HistoryForecastShared {
@@ -598,9 +606,35 @@ export interface GameEventType {
 }
 
 export interface WorldEventEffectsType {
-  fuelPriceMultipliers?: Partial<FuelPricesType>;
+  fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
   demandMultiplier?: number;
+  // An override rather than a multiplier. Content validation rejects overlapping policy phases.
+  carbonFeePerKgCO2e?: number;
+  buildCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  operatingCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  facilityOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  facilityOutputMultipliersById?: Record<string, number>;
+}
+
+/** Pure simulation summary exposed to authored story phases. */
+export interface StorySnapshotType {
+  deliveredWhByFuel12m: Partial<Record<FuelNameType, number>>;
+  demandWh12m: number;
+  unservedWh12m: number;
+  netIncome12m: number;
+  peakDemandW12m: number;
+  firmPeakW: number;
+  storagePeakW: number;
+  storagePeakWh: number;
+  facilities: Array<{
+    id: number;
+    name: string;
+    fuel?: FuelNameType;
+    ageYears: number;
+    peakW: number;
+    operational: boolean;
+  }>;
 }
 
 /** One deterministic, time-bounded occurrence created by the world-event engine. */

@@ -1,5 +1,10 @@
 import { getScenario } from "./data/Scenarios";
-import { parseSave, readSave, SaveGameType } from "./SaveGame";
+import {
+  parseSave,
+  readSave,
+  SaveGameType,
+  saveVersionError,
+} from "./SaveGame";
 import { ScenarioType } from "./Types";
 
 /**
@@ -100,6 +105,10 @@ export async function readSaveFile(file: File): Promise<ImportedSaveType> {
     parsed = JSON.parse(text);
   } catch (_err) {
     return { error: "That file isn't an Electrify save game." };
+  }
+  const versionError = saveVersionError(parsed);
+  if (versionError) {
+    return { error: versionError };
   }
   const save = parseSave(parsed);
   if (!save) {
