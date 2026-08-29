@@ -37,6 +37,13 @@ jest.mock("../base/ChartForecastFuelPrices", () => ({
 }));
 jest.mock("../base/ChartForecastDemandByType", () => ({
   __esModule: true,
+  demandTypesBySizeAtStart: () => [
+    "Residential",
+    "Commercial",
+    "Industrial",
+    "Transportation",
+    "Data centers",
+  ],
   default: ({ syncKey }: ChartMockProps) => (
     <div role="img" data-chart="demand-by-type" data-sync-key={syncKey} />
   ),
@@ -103,14 +110,68 @@ async function choosePreset(label: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines unique layers and useful presets", () => {
+  it("defines five distinct, purpose-ordered presets", () => {
     expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
       INSIGHT_LAYERS.length,
     );
-    expect(INSIGHT_PRESETS.reliability.layers).toContain("supplyDemand");
-    expect(INSIGHT_PRESETS.reliability.layers).toContain("demandByType");
-    expect(INSIGHT_PRESETS.profitability.layers).toContain("profit");
+    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
+    expect(INSIGHT_PRESETS.overview.layers).toEqual([
+      "supplyDemand",
+      "cash",
+      "profit",
+      "customers",
+      "emissions",
+    ]);
+    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
+      "supplyDemand",
+      "supplyByFuel",
+      "storage",
+      "weather",
+      "water",
+    ]);
+    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
+      "profit",
+      "cash",
+      "revenue",
+      "expenses",
+      "fuelPrices",
+    ]);
+    expect(INSIGHT_PRESETS.growth.layers).toEqual([
+      "customers",
+      "demandByType",
+      "supplyDemand",
+      "revenue",
+      "profit",
+    ]);
+    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
+      "emissions",
+      "supplyByFuel",
+      "supplyDemand",
+      "fuelPrices",
+      "profit",
+    ]);
     expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
+  });
+
+  it("starts new players on the five-chart overview in priority order", () => {
+    renderInsights();
+
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Overview");
+    const headings = screen.getAllByRole("heading", { level: 6 });
+    const expected = [
+      "Insights",
+      "Supply & Demand",
+      "Cash",
+      "Profit",
+      "Customers",
+      "CO2e Emitted",
+    ];
+    expect(headings).toHaveLength(expected.length);
+    expected.forEach((label, index) =>
+      expect(headings[index]).toHaveTextContent(label),
+    );
   });
 
   it("keeps tutorial targets visible without duplicating stored layers", () => {
@@ -140,15 +201,15 @@ describe("Insights layers", () => {
   it("persists custom visibility and ordering across a remount", async () => {
     const view = renderInsights();
     await user.click(screen.getByRole("button", { name: /Layers/ }));
-    await user.click(screen.getByRole("checkbox", { name: "Profit" }));
-    await user.click(screen.getByRole("button", { name: "Move Profit up" }));
+    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(screen.getByRole("button", { name: "Move Revenue up" }));
 
     const stored = JSON.parse(localStorage.getItem("insightsLayers") || "[]");
-    expect(stored).toContain("profit");
+    expect(stored).toContain("revenue");
     view.unmount();
 
     renderInsights();
-    expect(screen.getByText("Profit", { selector: "h6" })).toBeVisible();
+    expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Custom");

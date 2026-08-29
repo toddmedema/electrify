@@ -26,6 +26,8 @@ export interface Props {
   height?: number;
   timeline: TickPresentFutureType[];
   domain: { x: [number, number] };
+  /** Shared with the DOM legend so both surfaces always present the same ranking. */
+  displayTypes?: readonly DemandTypeNameType[];
   startingYear: number;
   multiyear: boolean;
   showXLabels?: boolean;
@@ -34,6 +36,7 @@ export interface Props {
 
 interface State {
   byType: DemandByTypeType[];
+  displayTypes: readonly DemandTypeNameType[];
   minutes: number[];
   domain: Props["domain"];
   maxY: number;
@@ -96,15 +99,6 @@ function buildOptions(showXLabels: boolean) {
   });
 }
 
-function tooltip(idx: number, state: State): string {
-  return [
-    formatMinuteAsTooltipHeader(state.minutes[idx], state.startingYear),
-    ...DEMAND_TYPES.map(
-      (type) => `${type}: ${formatWatts(state.byType[idx][type])}`,
-    ).reverse(),
-  ].join("\n");
-}
-
 const EMPTY_BREAKDOWN: DemandByTypeType = {
   Residential: 0,
   Commercial: 0,
@@ -113,6 +107,46 @@ const EMPTY_BREAKDOWN: DemandByTypeType = {
   "Data centers": 0,
 };
 
+/**
+ * A stable ranking for the whole visible range. Reordering under the pointer would make the
+ * legend and stacked chart hard to follow, so the first plotted instant owns the ordering.
+ */
+export function demandTypesBySizeAtStart(
+  timeline: TickPresentFutureType[],
+  startMinute: number,
+): DemandTypeNameType[] {
+  const firstVisible =
+    timeline.find((tick) => tick.minute >= startMinute) ||
+    timeline[timeline.length - 1];
+  const breakdown = firstVisible?.demandByType || EMPTY_BREAKDOWN;
+  return [...DEMAND_TYPES].sort(
+    (a, b) =>
+      breakdown[b] - breakdown[a] ||
+      DEMAND_TYPES.indexOf(a) - DEMAND_TYPES.indexOf(b),
+  );
+}
+
+export function formatDemandTypeTooltip(
+  minute: number,
+  breakdown: DemandByTypeType,
+  startingYear: number,
+  displayTypes: readonly DemandTypeNameType[],
+): string {
+  return [
+    formatMinuteAsTooltipHeader(minute, startingYear),
+    ...displayTypes.map((type) => `${type}: ${formatWatts(breakdown[type])}`),
+  ].join("\n");
+}
+
+function tooltip(idx: number, state: State): string {
+  return formatDemandTypeTooltip(
+    state.minutes[idx],
+    state.byType[idx],
+    state.startingYear,
+    state.displayTypes,
+  );
+}
+
 export default class ChartForecastDemandByType extends React.PureComponent<
   Props,
   {}
@@ -120,6 +154,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
   public render() {
     const {
       domain,
+      displayTypes,
       height,
       timeline,
       startingYear,
@@ -152,6 +187,8 @@ export default class ChartForecastDemandByType extends React.PureComponent<
     const maxY = Math.max(...running, 0);
     const state: State = {
       byType,
+      displayTypes:
+        displayTypes || demandTypesBySizeAtStart(timeline, domain.x[0]),
       minutes,
       domain,
       maxY,
