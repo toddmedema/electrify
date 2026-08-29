@@ -4,6 +4,7 @@ import { GameType } from "../../Types";
 import NewGameDetails, { Props } from "./NewGameDetails";
 
 const mockGetDocs = jest.fn();
+const mockPrefetchScenarioData = jest.fn();
 const mockWhere = jest.fn((field: string, op: string, value: unknown) => ({
   field,
   op,
@@ -27,6 +28,11 @@ jest.mock("../../Globals", () => ({
   login: jest.fn(),
 }));
 
+jest.mock("../../helpers/OfflineData", () => ({
+  prefetchScenarioData: (...args: unknown[]) =>
+    mockPrefetchScenarioData(...args),
+}));
+
 function game(difficulty: GameType["difficulty"]): GameType {
   return { scenarioId: 100, difficulty } as GameType;
 }
@@ -46,7 +52,17 @@ function props(overrides: Partial<Props> = {}): Props {
 describe("NewGameDetails leaderboard", () => {
   beforeEach(() => {
     mockGetDocs.mockResolvedValue({ docs: [] });
+    mockPrefetchScenarioData.mockClear();
     mockWhere.mockClear();
+  });
+
+  it("prefetches the scenario data while the player reads its details", async () => {
+    render(<NewGameDetails {...props()} />);
+
+    expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "SF" }),
+    );
+    await screen.findByText("Play the scenario to set a high score");
   });
 
   it("is always visible and follows the selected difficulty", async () => {

@@ -38,6 +38,7 @@ import { DIFFICULTIES } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
+import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
   DifficultyType,
@@ -225,6 +226,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   public componentDidMount() {
+    if (this.state.location) {
+      void prefetchScenarioData(this.state.location);
+    }
     // Unconditional: the board is public, so it no longer waits on a login that may never come.
     // It used to be kicked off from shouldComponentUpdate, which is a purity hook and not a place
     // to start network requests from

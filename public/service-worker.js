@@ -10,14 +10,62 @@ const APP_SHELL = [
   WEATHER_INDEX,
   ...MARKET_DATA,
 ];
+const LOCATION_ID = /^[A-Za-z0-9_-]{1,32}$/;
+const inFlightFetches = new Map();
+
+function absoluteUrl(request) {
+  return new URL(
+    typeof request === "string" ? request : request.url,
+    self.location.origin,
+  ).href;
+}
 
 async function fetchAndCache(cache, url) {
-  const response = await fetch(url, { cache: "no-cache" });
-  if (!response.ok) {
-    throw new Error(`${response.status} fetching ${url}`);
+  const key = absoluteUrl(url);
+  let pending = inFlightFetches.get(key);
+  if (!pending) {
+    pending = fetch(url, { cache: "no-cache" }).then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`${response.status} fetching ${key}`);
+      }
+      try {
+        await cache.put(url, response.clone());
+      } catch {
+        // A full or unavailable cache must not turn a successful network response into a failed
+        // game load. Prefetching is best-effort; the caller can still use the downloaded response.
+      }
+      return response;
+    });
+    inFlightFetches.set(key, pending);
   }
-  await cache.put(url, response.clone());
-  return response;
+
+  try {
+    return (await pending).clone();
+  } finally {
+    if (inFlightFetches.get(key) === pending) {
+      inFlightFetches.delete(key);
+    }
+  }
+}
+
+/** Fill any holes for one scenario without refreshing data that is already available offline. */
+async function cacheScenarioData(locationIds) {
+  const weatherUrls = Array.isArray(locationIds)
+    ? [...new Set(locationIds)]
+        .filter((id) => typeof id === "string" && LOCATION_ID.test(id))
+        .map((id) => `/data/weather/${id}.bin`)
+    : [];
+  const urls = [...MARKET_DATA, ...weatherUrls];
+  const cache = await caches.open(CACHE_VERSION);
+  const missing = (
+    await Promise.all(
+      urls.map(async (url) => ({ url, cached: await cache.match(url) })),
+    )
+  )
+    .filter(({ cached }) => !cached)
+    .map(({ url }) => url);
+
+  await Promise.allSettled(missing.map((url) => fetchAndCache(cache, url)));
 }
 
 /**
@@ -72,6 +120,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SYNC_OFFLINE_DATA") {
     event.waitUntil(syncOfflineData());
+  } else if (event.data?.type === "CACHE_SCENARIO_DATA") {
+    event.waitUntil(cacheScenarioData(event.data.locationIds));
   }
 });
 
@@ -100,17 +150,13 @@ self.addEventListener("fetch", (event) => {
 
   if (/\/data\/weather\/.*\.bin$/.test(url.pathname)) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const copy = response.clone();
-            caches
-              .open(CACHE_VERSION)
-              .then((cache) => cache.put(request, copy));
-            return response;
-          }),
-      ),
+      caches.match(request).then(async (cached) => {
+        if (cached) {
+          return cached;
+        }
+        const cache = await caches.open(CACHE_VERSION);
+        return fetchAndCache(cache, request);
+      }),
     );
     return;
   }
