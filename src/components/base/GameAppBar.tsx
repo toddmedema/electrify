@@ -70,7 +70,12 @@ function speedMultiplier(speed: SpeedType): string {
   return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
 }
 
-const WEATHER_DRIVEN_FUELS = new Set(["Sun", "Wind", "Offshore Wind"]);
+const WEATHER_DRIVEN_FUELS = new Set([
+  "Sun",
+  "Wind",
+  "Offshore Wind",
+  "Airborne Wind",
+]);
 
 /** Capacity that could serve demand now, rather than the deliberately dispatched output. */
 export function reserveCapacityW(

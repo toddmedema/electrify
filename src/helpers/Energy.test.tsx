@@ -1,4 +1,7 @@
 import {
+  getAirborneWindCapacityFactor,
+  getAirborneWindOutputFactor,
+  getAirborneWindReferenceKph,
   getDispatchOrderedFuels,
   getOffshoreWindCapacityFactor,
   getOffshoreWindOutputFactor,
@@ -7,6 +10,34 @@ import {
   getSolarCapacityFactor,
   getWindCapacityFactor,
 } from "./Energy";
+
+describe("Airborne Wind", () => {
+  it("derives the 100m reference speed directly from raw 10m wind", () => {
+    expect(getAirborneWindReferenceKph(36)).toBeCloseTo(57.056, 3);
+  });
+
+  it("uses its own cut-in, rated, and severe-weather cut-out curve", () => {
+    const kph = (metresPerSecond: number) => metresPerSecond * 3.6;
+    expect(getAirborneWindOutputFactor(kph(5.9))).toBe(0);
+    expect(getAirborneWindOutputFactor(kph(6))).toBe(0);
+    expect(getAirborneWindOutputFactor(kph(8.5))).toBeCloseTo(0.444, 3);
+    expect(getAirborneWindOutputFactor(kph(11))).toBeCloseTo(0.888, 3);
+    expect(getAirborneWindOutputFactor(kph(20))).toBeCloseTo(0.888, 3);
+    expect(getAirborneWindOutputFactor(kph(20.1))).toBe(0);
+    expect(getAirborneWindOutputFactor(kph(100))).toBe(0);
+  });
+
+  it("averages the same output helper used by live dispatch", () => {
+    const speeds = [5, 8.5, 11].map((windMS) => windMS * 3.6);
+    expect(getAirborneWindCapacityFactor([])).toBe(0);
+    expect(getAirborneWindCapacityFactor(speeds)).toBeCloseTo(
+      speeds.reduce(
+        (total, speed) => total + getAirborneWindOutputFactor(speed),
+        0,
+      ) / speeds.length,
+    );
+  });
+});
 
 // The argument is the wind at the site in kph, and the turbine sees a fraction of it - so the
 // speeds that matter to the power curve are several times the ones quoted in m/s below
@@ -125,6 +156,7 @@ describe("getDispatchOrderedFuels", () => {
       { fuel: "Coal" },
       { fuel: "Wind" },
       { fuel: "Offshore Wind" },
+      { fuel: "Airborne Wind" },
       { fuel: "Natural Gas" },
       { fuel: "Sun" },
     ]);
@@ -132,6 +164,7 @@ describe("getDispatchOrderedFuels", () => {
       "Sun",
       "Wind",
       "Offshore Wind",
+      "Airborne Wind",
       "Coal",
       "Natural Gas",
     ]);

@@ -82,6 +82,28 @@ describe("recordReplayAction", () => {
     ).toBe(100);
   });
 
+  it("round-trips an Airborne Wind build action", () => {
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: {
+            facility: {
+              name: "Airborne Wind",
+              fuel: "Airborne Wind",
+              peakW: 1200000,
+            },
+            financed: true,
+          },
+        },
+      ],
+    });
+    expect(
+      decodeReplay(JSON.parse(JSON.stringify(encodeReplay(replay)))),
+    ).toEqual(replay);
+  });
+
   it("merges deltas fired within one minute", () => {
     const game = aGame(60, []);
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.1 });

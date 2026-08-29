@@ -59,6 +59,7 @@ export type FuelNameType =
   | "Biomass"
   | "Wind"
   | "Offshore Wind"
+  | "Airborne Wind"
   | "Sun"
   | "Natural Gas"
   | "Uranium"
@@ -83,6 +84,7 @@ export interface FuelProductionType {
   Sun?: number; // wh
   Wind?: number; //wh
   "Offshore Wind"?: number; // wh
+  "Airborne Wind"?: number; // wh
   Geothermal?: number; // wh
   Hydro?: number; // wh
 }
@@ -253,6 +255,9 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     solarIrradianceWM2: number;
     windKph: number;
     windOffshoreKph?: number;
+    // Wind at the Airborne Wind curve's 100m reference height. Kept separate from windKph,
+    // whose legacy onshore siting multiplier is already baked in.
+    windAirborneKph: number;
     temperatureC: number;
     storedWh: number;
     precipitationMm: number; // Representative month's total over the hydro watershed

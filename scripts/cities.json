@@ -126,6 +126,7 @@
     { "id": "Rotterdam", "city": "Rotterdam", "country": "Netherlands", "region": "Europe", "lat": 51.9244, "long": 4.4777 },
     { "id": "Brussels", "city": "Brussels", "country": "Belgium", "region": "Europe", "lat": 50.8503, "long": 4.3517 },
     { "id": "Copenhagen", "city": "Copenhagen", "country": "Denmark", "region": "Europe", "lat": 55.6761, "long": 12.5683 },
+    { "id": "Lista", "city": "Lista", "country": "Norway", "region": "Europe", "lat": 58.109, "long": 6.567, "hidden": true },
     { "id": "Oslo", "city": "Oslo", "country": "Norway", "region": "Europe", "lat": 59.9139, "long": 10.7522 },
     { "id": "Bergen", "city": "Bergen", "country": "Norway", "region": "Europe", "lat": 60.3913, "long": 5.3221 },
     { "id": "Tromso", "city": "Tromso", "country": "Norway", "region": "Europe", "lat": 69.6492, "long": 18.9553 },
