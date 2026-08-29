@@ -16,6 +16,21 @@ interface Note {
 }
 
 const MIN_GAIN = 0.0001;
+// Blackout edges can flap several times a second near the supply/demand boundary. Treat start and
+// recovery as one channel: announce the first edge immediately, then at most one settled state
+// every ten seconds. A trailing cue means a short blackout still eventually says power is back.
+export const GRID_EFFECT_COOLDOWN_MS = 10_000;
+
+const EFFECT_COOLDOWNS_MS: Partial<Record<SoundEffectType, number>> = {
+  BUILD_COMMITTED: 750,
+  CONSTRUCTION_COMPLETE: 2_000,
+  VICTORY: 5_000,
+  FAILURE: 5_000,
+};
+
+function isGridEffect(effect: SoundEffectType): boolean {
+  return effect === "BLACKOUT" || effect === "POWER_RESTORED";
+}
 
 /**
  * Small synthesized cues rather than six more files to download before the game can start.
@@ -29,6 +44,11 @@ export class SoundEffects {
   private readonly output: GainNode;
   private paused = false;
   private volume = 1;
+  private lastPlayedAt: Partial<Record<SoundEffectType, number>> = {};
+  private lastGridEffect: SoundEffectType | null = null;
+  private lastGridPlayedAt: number | null = null;
+  private pendingGridEffect: SoundEffectType | null = null;
+  private gridTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(context: AudioContext) {
     this.context = context;
@@ -39,6 +59,9 @@ export class SoundEffects {
 
   public setVolume(volume: number) {
     this.volume = Math.min(1, Math.max(0, volume));
+    if (this.volume === 0) {
+      this.clearPendingGridEffect();
+    }
     this.applyVolume();
   }
 
@@ -46,6 +69,7 @@ export class SoundEffects {
     this.paused = true;
     // The master switch and page visibility both come through here. Silence a cue already in
     // flight as well as preventing the next one.
+    this.clearPendingGridEffect(true);
     this.applyVolume();
   }
 
@@ -58,6 +82,79 @@ export class SoundEffects {
     if (this.paused || this.volume === 0) {
       return;
     }
+    if (isGridEffect(effect)) {
+      this.playGridEffect(effect);
+      return;
+    }
+    const now = Date.now();
+    const cooldown = EFFECT_COOLDOWNS_MS[effect] || 0;
+    const lastPlayed = this.lastPlayedAt[effect];
+    if (lastPlayed !== undefined && now - lastPlayed < cooldown) {
+      return;
+    }
+    this.lastPlayedAt[effect] = now;
+    this.playNow(effect);
+  }
+
+  /**
+   * A leading-and-trailing throttle for the two edges of one grid state.
+   *
+   * If the grid goes dark, recovers and goes dark again inside the window, the pending recovery
+   * is discarded because the audible state is still correct. If it stays recovered, one recovery
+   * cue plays at the end of the window. Either way, this channel produces at most one cue per 10s.
+   */
+  private playGridEffect(effect: SoundEffectType) {
+    const now = Date.now();
+    if (
+      this.lastGridPlayedAt === null ||
+      now - this.lastGridPlayedAt >= GRID_EFFECT_COOLDOWN_MS
+    ) {
+      this.clearPendingGridEffect();
+      this.lastGridEffect = effect;
+      this.lastGridPlayedAt = now;
+      this.playNow(effect);
+      return;
+    }
+
+    // Only a state different from the last audible one needs a trailing correction.
+    this.pendingGridEffect = effect === this.lastGridEffect ? null : effect;
+    if (this.gridTimer) {
+      return;
+    }
+    const remaining = GRID_EFFECT_COOLDOWN_MS - (now - this.lastGridPlayedAt);
+    this.gridTimer = setTimeout(() => this.flushPendingGridEffect(), remaining);
+  }
+
+  private flushPendingGridEffect() {
+    this.gridTimer = null;
+    const effect = this.pendingGridEffect;
+    this.pendingGridEffect = null;
+    if (
+      !effect ||
+      effect === this.lastGridEffect ||
+      this.paused ||
+      this.volume === 0
+    ) {
+      return;
+    }
+    this.lastGridEffect = effect;
+    this.lastGridPlayedAt = Date.now();
+    this.playNow(effect);
+  }
+
+  private clearPendingGridEffect(resetHistory = false) {
+    if (this.gridTimer) {
+      clearTimeout(this.gridTimer);
+      this.gridTimer = null;
+    }
+    this.pendingGridEffect = null;
+    if (resetHistory) {
+      this.lastGridEffect = null;
+      this.lastGridPlayedAt = null;
+    }
+  }
+
+  private playNow(effect: SoundEffectType) {
     // A cue follows a player action often enough to unlock a suspended mobile AudioContext. For
     // automatic cues, resume() is harmless and lets the next gesture restore the context.
     if (this.context.state === "suspended") {
