@@ -87,6 +87,16 @@ export interface FuelProductionType {
   Hydro?: number; // wh
 }
 
+/** The five high-level end-use groups used by the demand model and its stacked chart. */
+export type DemandTypeNameType =
+  | "Residential"
+  | "Commercial"
+  | "Industrial"
+  | "Transportation"
+  | "Data centers";
+
+export type DemandByTypeType = Record<DemandTypeNameType, number>;
+
 export interface DifficultyMultipliersType {
   buildCost: number;
   expensesOM: number;
@@ -237,6 +247,9 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     minute: number;
     supplyW: number; // Watts
     demandW: number; // Watts
+    // Components sum to demandW. Kept on forecast ticks so Insights can explain what is driving
+    // load without bloating the long-lived monthly history in saves.
+    demandByType: DemandByTypeType;
     solarIrradianceWM2: number;
     windKph: number;
     windOffshoreKph?: number;

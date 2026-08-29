@@ -41,6 +41,7 @@ import {
   getWindOutputFactor,
 } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
+import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import {
   activeWorldEventEffects,
   resolveWorldEvent,
@@ -1353,7 +1354,18 @@ function getDemandW(
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
   const effects = activeWorldEventEffects(game.worldEvents.active, date.minute);
-  return demandMultiple * now.customers * (effects.demandMultiplier || 1);
+  const baselineDemandW =
+    demandMultiple * now.customers * (effects.demandMultiplier || 1);
+  now.demandByType = demandByTypeAt(
+    baselineDemandW,
+    date,
+    game.startingYear,
+    game.location,
+  );
+  return DEMAND_TYPES.reduce(
+    (total, type) => total + now.demandByType[type],
+    0,
+  );
 }
 
 const KG_PER_MEGATON = 1000000000;
@@ -1919,6 +1931,13 @@ export function generateNewTimeline(
       minute: state.date.minute + i * TICK_MINUTES,
       supplyW: 0,
       demandW: 0,
+      demandByType: {
+        Residential: 0,
+        Commercial: 0,
+        Industrial: 0,
+        Transportation: 0,
+        "Data centers": 0,
+      },
       solarIrradianceWM2: 0,
       windKph: 0,
       temperatureC: 0,

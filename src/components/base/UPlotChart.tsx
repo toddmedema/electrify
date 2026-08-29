@@ -34,6 +34,8 @@ export interface UPlotChartProps<S> {
   /** Everything the option callbacks and plugins need, recomputed every render */
   state: S;
   data: uPlot.AlignedData;
+  /** Optional unstacked values for the accessible summary when the canvas needs cumulative data. */
+  summaryData?: uPlot.AlignedData;
   /** Called once per plot. Width and height are filled in by this component. */
   buildOptions: (ctx: BuildContext<S>) => uPlot.Options;
   /** Change to force a rebuild, eg when the number of series changes */
@@ -116,20 +118,23 @@ export default function UPlotChart<S>(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
   );
-  const seriesSummary = data.slice(1).map((series, index) => {
-    const values = Array.from(series).filter(
-      (value): value is number => typeof value === "number" && isFinite(value),
-    );
-    const first = values[0] || 0;
-    const latest = values[values.length - 1] || 0;
-    return {
-      label: props.seriesLabels?.[index] || `Series ${index + 1}`,
-      latest,
-      minimum: values.length ? Math.min(...values) : 0,
-      maximum: values.length ? Math.max(...values) : 0,
-      trend: latest > first ? "up" : latest < first ? "down" : "flat",
-    };
-  });
+  const seriesSummary = (props.summaryData || data)
+    .slice(1)
+    .map((series, index) => {
+      const values = Array.from(series).filter(
+        (value): value is number =>
+          typeof value === "number" && isFinite(value),
+      );
+      const first = values[0] || 0;
+      const latest = values[values.length - 1] || 0;
+      return {
+        label: props.seriesLabels?.[index] || `Series ${index + 1}`,
+        latest,
+        minimum: values.length ? Math.min(...values) : 0,
+        maximum: values.length ? Math.max(...values) : 0,
+        trend: latest > first ? "up" : latest < first ? "down" : "flat",
+      };
+    });
   const accessibleLabel = `${ariaLabel}. ${seriesSummary
     .map(
       (series) =>

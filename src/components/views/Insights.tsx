@@ -64,7 +64,14 @@ import {
 } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
-import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
+import { DEMAND_TYPES } from "../../data/DemandProfiles";
+import {
+  chartPalette,
+  demandTypeColors,
+  fuelColors,
+  fuelDashArrays,
+} from "../../Theme";
+import ChartForecastDemandByType from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
 import ChartForecastFuelPrices, {
   PRICED_FUELS,
@@ -85,6 +92,7 @@ export type InsightRange = "current" | "next1" | "next5" | "next10" | "next20";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "demandByType"
   | "supplyByFuel"
   | "storage"
   | "fuelPrices"
@@ -109,6 +117,7 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  { id: "demandByType", label: "Demand by Load Type", group: "Grid" },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
     id: "storage",
@@ -142,7 +151,13 @@ export const INSIGHT_PRESETS: Record<
 > = {
   reliability: {
     label: "Reliability",
-    layers: ["supplyDemand", "supplyByFuel", "storage", "weather"],
+    layers: [
+      "supplyDemand",
+      "demandByType",
+      "supplyByFuel",
+      "storage",
+      "weather",
+    ],
   },
   profitability: {
     label: "Profitability",
@@ -154,7 +169,7 @@ export const INSIGHT_PRESETS: Record<
   },
   growth: {
     label: "Growth",
-    layers: ["customers", "supplyDemand", "revenue", "profit"],
+    layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
   },
   decarbonization: {
     label: "Decarbonization",
@@ -759,6 +774,26 @@ export default class Insights extends React.Component<Props, State> {
                   {formatWatts(projection.largestBlackout.peakW)}
                 </Typography>
               )}
+            </>
+          );
+          break;
+        case "demandByType":
+          body = (
+            <>
+              <ChartLegend
+                items={DEMAND_TYPES.map((type) => ({
+                  name: type,
+                  color: demandTypeColors()[type],
+                }))}
+              />
+              <ChartForecastDemandByType
+                height={140}
+                timeline={projection.sampled}
+                domain={{ x: projection.domain.x }}
+                startingYear={game.startingYear}
+                multiyear={multiyear}
+                syncKey={SYNC_KEY}
+              />
             </>
           );
           break;
