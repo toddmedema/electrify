@@ -118,6 +118,14 @@ describe("ending a scenario from inside the reducer", () => {
     expect(victory).not.toBeNull();
     expect(victory?.scenarioName).toBe("A Test Run");
     expect(Object.keys(victory?.breakdown || {}).length).toBeGreaterThan(0);
+    expect(victory?.debrief).toEqual(
+      expect.objectContaining({
+        startingFleet: expect.any(Array),
+        finalFleet: expect.any(Array),
+        reliability: expect.any(Number),
+        highlights: expect.any(Array),
+      }),
+    );
     // Every custom game shares one id, so its score belongs to nothing comparable
     expect(victory?.ranked).toBe(false);
     // Opening the score screen stops the clock, the way any other dialog does

@@ -48,6 +48,15 @@ describe("NewGame", () => {
     ).toContainElement(rows[0]);
   });
 
+  it("turns scored scenarios into visual postcards of their starting fleets", () => {
+    render(<NewGame {...props()} />);
+    expect(
+      screen.getByRole("img", {
+        name: "Carbon Fee starting grid: Coal, Natural Gas",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("highlights the first incomplete tutorial without replacing its subtitle", () => {
     recordPlayed(TUTORIALS[0].id);
     render(<NewGame {...props()} />);

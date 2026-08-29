@@ -3,6 +3,9 @@ import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
 import { setSpeed } from "../../reducers/Game";
 import { buildFacility } from "../../reducers/Game";
+import { selectFacility, snackbarOpen } from "../../reducers/UI";
+import { getStore } from "../../StoreRegistry";
+import { buildConsequenceMessage } from "../../helpers/BuildConsequences";
 import { AppStateType, SpeedType, StorageShoppingType } from "../../Types";
 import BuildStorage, { DispatchProps, StateProps } from "./BuildStorage";
 
@@ -18,7 +21,27 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("FACILITIES"));
     },
     onBuildStorage: (facility: StorageShoppingType, financed: boolean) => {
+      const beforeIds = new Set(
+        getStore()
+          .getState()
+          .game.facilities.map((candidate) => candidate.id),
+      );
       dispatch(buildFacility({ facility, financed }));
+      const built = getStore()
+        .getState()
+        .game.facilities.find((candidate) => !beforeIds.has(candidate.id));
+      if (built) {
+        dispatch(selectFacility(built.id));
+        dispatch(
+          snackbarOpen({
+            message: buildConsequenceMessage(facility, financed),
+            open: true,
+            timeout: 8000,
+            actionLabel: "Events",
+            action: () => dispatch(navigate("EVENTS")),
+          }),
+        );
+      }
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));

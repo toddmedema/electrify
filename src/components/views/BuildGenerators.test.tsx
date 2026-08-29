@@ -2,7 +2,10 @@ import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
-import { GeneratorBuildItem } from "./BuildGenerators";
+import BuildGenerators, {
+  GeneratorBuildItem,
+  generatorRole,
+} from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
 
@@ -27,6 +30,8 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
 
   expect(screen.getByText("Est. O&M (1 start/day)")).toBeInTheDocument();
   expect(screen.getByText("$13.4M/yr")).toBeInTheDocument();
+  expect(screen.getByText("Flexible power")).toBeInTheDocument();
+  expect(screen.getByText(/typical output/)).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
   );
@@ -46,6 +51,15 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
       name: /Estimated O&M.*Base O&M plus one start\/day.*\$13\.4M\/yr/,
     }),
   ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+  );
+  const impact = screen.getByRole("region", { name: "Expected impact" });
+  expect(impact).toHaveTextContent("What changes");
+  expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent("Online in");
+  expect(impact).toHaveTextContent("Typical supply");
 });
 
 it("shows Coal's physical and representative-day start charges", () => {
@@ -121,4 +135,33 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
+});
+
+it("describes clean variable generation as a strategic role", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+  const solar = GENERATORS(game, 200000000, [], []).find(
+    (candidate) => candidate.name === "Solar",
+  )!;
+  expect(generatorRole(solar)).toEqual(
+    expect.objectContaining({ label: "Clean, weather-led" }),
+  );
+});
+
+it("pins up to three current-grid choices into a comparison tray", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+      onSpeedChange={jest.fn()}
+    />,
+  );
+
+  const compare = screen.getAllByRole("button", { name: "Compare" });
+  fireEvent.click(compare[0]);
+  fireEvent.click(compare[1]);
+  expect(
+    screen.getByRole("region", { name: "Generator comparison" }),
+  ).toHaveTextContent("Comparing 2/3");
 });

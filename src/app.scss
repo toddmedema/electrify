@@ -781,6 +781,87 @@ $pane_header_height: 40px;
   padding: 0 !important;
 }
 
+.decisionImpact {
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--border-selected);
+  background: var(--bg-selected);
+
+  & > .MuiTypography-overline {
+    font-weight: 800;
+    letter-spacing: 0.1em;
+  }
+}
+
+.decisionImpactFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.decisionImpactFact {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-tile);
+  border-radius: 7px;
+  background: var(--bg-primary);
+}
+
+.generatorDecisionLead {
+  display: grid;
+  gap: 4px;
+  padding: 0 16px 12px;
+}
+
+.generatorComparison {
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border-selected);
+  background: var(--bg-selected);
+}
+
+.generatorComparisonHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.generatorComparisonChoices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.generatorComparisonChoice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--border-tile);
+  border-radius: 7px;
+  background: var(--bg-primary);
+
+  img {
+    grid-row: 1 / span 3;
+    width: 34px;
+    height: 34px;
+  }
+
+  .MuiTypography-root {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .decisionImpactFacts,
+  .generatorComparisonChoices {
+    grid-template-columns: 1fr;
+  }
+}
+
 // Facility rows paint an .outputProgressBar behind their contents, so both the text and the
 // action buttons have to be lifted over it - and they have to be lifted by the same amount, or
 // the full-width text block would cover the left edge of the buttons and eat their clicks.
@@ -982,9 +1063,224 @@ html[data-theme="dark"] .uplot {
   border-left: 4px solid var(--interactive-blue);
 }
 
+// Authored scenarios share one limited-palette art grammar. The real starting fleet supplies the
+// foreground drawings, so the postcard stays honest to the scenario without a bespoke bitmap.
+.scenarioArtwork {
+  --scene-a: #0d47a1;
+  --scene-b: #26a69a;
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(4, 12, 24, 0.05), rgba(4, 12, 24, 0.58)),
+    linear-gradient(135deg, var(--scene-a), var(--scene-b));
+  isolation: isolate;
+
+  &.tone-transition {
+    --scene-a: #0d47a1;
+    --scene-b: #f9a825;
+  }
+
+  &.tone-boom {
+    --scene-a: #4a148c;
+    --scene-b: #ef6c00;
+  }
+
+  &.tone-island {
+    --scene-a: #006064;
+    --scene-b: #29b6f6;
+  }
+
+  &.tone-innovation {
+    --scene-a: #283593;
+    --scene-b: #00acc1;
+  }
+
+  &.tone-storm {
+    --scene-a: #263238;
+    --scene-b: #546e7a;
+  }
+
+  &.tone-legacy {
+    --scene-a: #212121;
+    --scene-b: #8d4b20;
+  }
+}
+
+.scenarioArtworkSun {
+  position: absolute;
+  top: 18%;
+  right: 14%;
+  width: 64px;
+  height: 64px;
+  border: 2px solid rgba(255, 255, 255, 0.62);
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px rgba(255, 255, 255, 0.07);
+}
+
+.scenarioArtworkGrid {
+  position: absolute;
+  inset: 52% -8% -15%;
+  opacity: 0.38;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+  background-size: 30px 24px;
+  transform: perspective(160px) rotateX(46deg);
+}
+
+.scenarioArtworkMark {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  width: 116px;
+  height: 116px;
+  opacity: 0.3;
+  filter: grayscale(1) brightness(3);
+}
+
+.scenarioArtworkFleet {
+  position: absolute;
+  z-index: 1;
+  right: 22px;
+  bottom: 18px;
+  left: 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+
+  img {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.scenarioArtwork.compact {
+  width: 112px;
+  min-height: 72px;
+  border-radius: 7px;
+
+  .scenarioArtworkSun {
+    top: 12px;
+    right: 14px;
+    width: 24px;
+    height: 24px;
+    box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.07);
+  }
+
+  .scenarioArtworkMark {
+    top: 8px;
+    left: 8px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .scenarioArtworkFleet {
+    right: 8px;
+    bottom: 7px;
+    left: 8px;
+    gap: 3px;
+
+    img {
+      width: 27px;
+      height: 27px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+.scenarioPostcardHeader {
+  align-items: stretch !important;
+
+  .MuiCardHeader-avatar {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.scenarioDossier {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 24px;
+  max-width: 1040px;
+  margin: 24px auto;
+  padding: 0 20px;
+}
+
+.scenarioDossierCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scenarioBriefingFacts {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.scenarioBriefingFact,
+.scenarioTarget {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-tile);
+  border-radius: 8px;
+  background: var(--bg-raised);
+
+  .MuiTypography-overline {
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+  }
+}
+
+.scenarioTarget {
+  border-color: var(--border-selected);
+  background: var(--bg-selected);
+}
+
+.scenarioStartControls {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
 .leaderboard {
   margin: 20px auto;
   max-width: 760px;
+}
+
+.leaderboardToggle {
+  text-align: center;
+  padding: 4px 0 12px;
+}
+
+@media (max-width: 760px) {
+  .scenarioDossier {
+    display: block;
+    padding: 0 12px;
+  }
+
+  .scenarioDossier > .scenarioArtwork {
+    min-height: 170px;
+    margin-bottom: 16px;
+  }
+
+  .scenarioPostcard .MuiCardHeader-root {
+    padding: 10px 8px;
+  }
+
+  .scenarioArtwork.compact {
+    width: 82px;
+    min-height: 62px;
+  }
 }
 
 // Units appended to numbers in tables, de-emphasized so the number still reads first
@@ -1100,6 +1396,122 @@ html[data-theme="dark"] .uplot {
     outline: 2px solid $interactive_blue;
     outline-offset: 2px;
     border-radius: 2px;
+  }
+}
+
+.victoryDebrief {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border-tile);
+  border-radius: 10px;
+  background: var(--bg-raised);
+
+  & > h3 {
+    font-weight: 800;
+  }
+}
+
+.victoryFleetComparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.victoryFleetMix h4 {
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.victoryFleetBar {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--bg-sunken);
+
+  span {
+    min-width: 3px;
+  }
+
+  .empty {
+    width: 100%;
+    background: repeating-linear-gradient(
+      135deg,
+      var(--border-tile),
+      var(--border-tile) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+  }
+}
+
+.victoryFleetLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 4px;
+  color: $font_color_faded;
+  font-size: 0.72rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+}
+
+.victoryDebriefStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 7px;
+
+  & > div {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 7px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 7px;
+    background: var(--bg-primary);
+  }
+
+  .conceptIcon {
+    grid-row: 1 / span 2;
+  }
+}
+
+.victoryHighlights {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 7px;
+  }
+
+  li span span {
+    display: block;
+  }
+}
+
+@media (max-width: 520px) {
+  .victoryFleetComparison {
+    grid-template-columns: 1fr;
   }
 }
 
