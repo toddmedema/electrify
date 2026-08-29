@@ -171,7 +171,9 @@ function axisCommon(scale: number, o: AxisOptions) {
           show: true,
           stroke: palette.grid,
           width: 1,
-          dash: [10 * scale, 5 * scale],
+          // The long Victory-era dash reads busy on a stack of charts. A quiet solid rule is
+          // easier to scan and lets the series remain the only high-contrast strokes.
+          dash: [],
         }
       : { show: false },
     ticks: {
@@ -411,7 +413,7 @@ export function titlePlugin(
         const scale = canvasScale(u);
         u.ctx.save();
         u.ctx.font = chartFont(scale, 14);
-        u.ctx.fillStyle = chartPalette().axis;
+        u.ctx.fillStyle = chartPalette().legendText;
         u.ctx.textAlign = "center";
         u.ctx.textBaseline = "middle";
         u.ctx.fillText(title, u.bbox.left + u.bbox.width / 2, designY * scale);

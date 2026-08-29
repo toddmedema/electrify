@@ -10,7 +10,7 @@
 //
 // Dark is not light inverted. The greys are lifted off pure black, which vibrates against light
 // text, and every accent moves up its ramp: a colour picked for 4.5:1 against white is nowhere
-// near that against #121212. Theme.tsx does the same for the charts.
+// near that against the dark surfaces. Theme.tsx does the same for the charts.
 // ===============================================
 
 :root {
@@ -40,24 +40,31 @@
   --capacity-bar: #212121; /* grey900 */
   --shadow-ring: rgba(0, 0, 0, 0.15);
   --tooltip-border: rgba(0, 0, 0, 0.2);
+  --tooltip-bg: rgba(255, 255, 255, 0.96);
+  --tooltip-shadow: rgba(15, 23, 42, 0.16);
   --cursor-line: #757575; /* grey600 */
+  --chart-surface: #ffffff;
+  --chart-edge: rgba(15, 23, 42, 0.08);
+  --chart-shadow: rgba(15, 23, 42, 0.08);
 }
 
 [data-theme="dark"] {
-  --bg-primary: #121212;
-  --bg-raised: #262626;
-  --bg-sunken: #0a0a0a;
-  --bg-selected: #123048;
-  --bg-fade-start: rgba(18, 18, 18, 0);
-  --border-selected: #1c5680;
-  --border-subtle: #2c2c2c;
-  --border-strong: #5f5f5f;
-  --border-tile: #3a3a3a;
-  --font-color-primary: #e8e8e8;
-  --font-color-faded: #a3a3a3;
-  --font-color-disabled: #616161; /* grey700 */
-  --interactive-blue: #64b5f6; /* blue300 - 8:1 on the page, where blue600 is 2.6:1 */
-  --interactive-tint: rgba(100, 181, 246, 0.5);
+  // A cool charcoal ladder separates page, panels and interactions without relying on heavy
+  // shadows. The slight blue bias also harmonises with the supply/interactive accent.
+  --bg-primary: #0b1016;
+  --bg-raised: #18212b;
+  --bg-sunken: #070a0f;
+  --bg-selected: #132f46;
+  --bg-fade-start: rgba(11, 16, 22, 0);
+  --border-selected: #285f86;
+  --border-subtle: #202b38;
+  --border-strong: #48586b;
+  --border-tile: #2b3948;
+  --font-color-primary: #e6edf5;
+  --font-color-faded: #9aa9ba;
+  --font-color-disabled: #627083;
+  --interactive-blue: #6ab8f7;
+  --interactive-tint: rgba(106, 184, 247, 0.42);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
@@ -65,9 +72,14 @@
   --delta-bad: #ef5350; /* red400 */
   --mark-bg: #6d4c00;
   --capacity-bar: #e0e0e0;
-  --shadow-ring: rgba(0, 0, 0, 0.7);
-  --tooltip-border: rgba(255, 255, 255, 0.25);
-  --cursor-line: #9e9e9e; /* grey500 */
+  --shadow-ring: rgba(0, 0, 0, 0.72);
+  --tooltip-border: rgba(148, 163, 184, 0.24);
+  --tooltip-bg: rgba(17, 24, 32, 0.94);
+  --tooltip-shadow: rgba(0, 0, 0, 0.45);
+  --cursor-line: rgba(106, 184, 247, 0.55);
+  --chart-surface: #0f161f;
+  --chart-edge: rgba(148, 163, 184, 0.16);
+  --chart-shadow: rgba(0, 0, 0, 0.28);
 }
 
 $font_color_primary: var(--font-color-primary);
@@ -837,15 +849,29 @@ $pane_header_height: 40px;
   position: absolute;
   display: none;
   z-index: 10;
-  padding: 2px 4px;
+  padding: 7px 9px;
   border: 1px solid var(--tooltip-border);
-  border-radius: 2px;
-  background: $bg_primary;
+  border-radius: 8px;
+  background: var(--tooltip-bg);
+  box-shadow: 0 8px 24px var(--tooltip-shadow);
   color: $font_color_primary;
-  font-size: 12px;
-  line-height: 1.2;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
   white-space: pre;
   pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+
+// The canvas is transparent, so one quiet surface behind it frames the axes and plot together.
+// Inset shadow behaves like a border without changing uPlot's measured width.
+html[data-theme="dark"] .uplot {
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--chart-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--chart-edge),
+    0 8px 22px -16px var(--chart-shadow);
 }
 
 .chartDataSummary {
@@ -869,15 +895,18 @@ $pane_header_height: 40px;
 
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
 .uplot .u-cursor-x {
-  border-right: 1px dashed var(--cursor-line);
+  border-right: 1px solid var(--cursor-line);
 }
 
 .chartLegend {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 12px;
+  gap: 4px 14px;
   padding: 0 8px 0 55px; // line up with the plot area, past the y axis labels
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
   color: $font_color_faded;
 }
 
@@ -898,15 +927,16 @@ $pane_header_height: 40px;
 .chartLegendItem {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   white-space: nowrap;
 }
 
 .chartLegendSwatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 4px;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  margin-right: 0;
+  border-radius: 50%;
 }
 
 // The demand overlay is a dashed line rather than a filled band, so its key looks like one
