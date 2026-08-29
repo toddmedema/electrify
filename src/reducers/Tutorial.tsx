@@ -52,6 +52,18 @@ export function changeTutorialStep(
   }
 
   const entering = steps[toStep];
+  // Steps declare the card their target lives on, and every step change navigates there
+  // regardless of direction. Otherwise Back leaves the player on whatever card the
+  // forward step navigated to, where the objective's target treatment cannot find its control
+  const destination = entering?.card;
+  if (destination) {
+    const name =
+      typeof destination === "string" ? destination : destination.name;
+    if (name !== currentCard) {
+      dispatch(navigate(destination));
+    }
+  }
+
   if (toStep > fromStep && entering?.capstone) {
     restartTutorialAtStep(dispatch, scenarioId, toStep);
     return;
@@ -61,18 +73,6 @@ export function changeTutorialStep(
   // player can read it instead of letting the scenario clock race on to its separate end dialog.
   if (toStep > fromStep && leaving?.capstone) {
     dispatch(setSpeed("PAUSED"));
-  }
-
-  // Steps declare the card their target lives on, and every step change navigates there
-  // regardless of direction. Otherwise Back leaves the player on whatever card the
-  // forward step navigated to, where the objective's target treatment cannot find its control
-  const destination = steps[toStep] && steps[toStep].card;
-  if (destination) {
-    const name =
-      typeof destination === "string" ? destination : destination.name;
-    if (name !== currentCard) {
-      dispatch(navigate(destination));
-    }
   }
 
   dispatch(delta({ tutorialStep: toStep }));
