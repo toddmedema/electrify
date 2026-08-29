@@ -10,6 +10,7 @@ import {
   limit,
 } from "firebase/firestore";
 import {
+  Box,
   Button,
   IconButton,
   MenuItem,
@@ -27,6 +28,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Stack,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CloseIcon from "@mui/icons-material/Close";
@@ -34,6 +36,8 @@ import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditions from "../base/VictoryConditions";
+import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
+import ScenarioArtwork from "../base/ScenarioArtwork";
 import { DIFFICULTIES } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
@@ -86,9 +90,28 @@ interface State {
   victoryDialogOpen?: boolean;
   // The replay currently being fetched, so its row can show a spinner instead of the play button
   loadingReplayId?: string;
+  leaderboardExpanded?: boolean;
 }
 
 export interface Props extends StateProps, DispatchProps {}
+
+function BriefingFact(props: {
+  concept: ConceptNameType;
+  label: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="scenarioBriefingFact">
+      <ConceptIcon concept={props.concept} fontSize="small" />
+      <div>
+        <Typography variant="overline" component="div">
+          {props.label}
+        </Typography>
+        <Typography variant="body2">{props.children}</Typography>
+      </div>
+    </div>
+  );
+}
 
 export default class NewGameDetails extends React.Component<Props, State> {
   private boardRequestId = 0;
@@ -264,6 +287,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       location,
       victoryDialogOpen,
       boardFailed,
+      leaderboardExpanded,
     } = this.state;
 
     const toggleVictoryDialog = (e: React.SyntheticEvent) => {
@@ -288,6 +312,18 @@ export default class NewGameDetails extends React.Component<Props, State> {
       );
     }
 
+    const briefing = scenario.briefing || {
+      fantasy: scenario.summary || scenario.name,
+      objective: "Keep the lights on and finish the term.",
+      constraint: `${scenario.ownership}-owned scoring rewards a balanced grid.`,
+      threat: "Blackouts and insolvency can end the run early.",
+      target: "A reliable grid and a healthy company.",
+    };
+    const endYear =
+      scenario.startingYear + Math.floor(scenario.durationMonths / 12);
+    const visibleScores =
+      scores && !leaderboardExpanded ? scores.slice(0, 3) : scores;
+
     return (
       <div id="listCard" className="flexContainer">
         <div id="topbar">
@@ -307,78 +343,106 @@ export default class NewGameDetails extends React.Component<Props, State> {
           </Toolbar>
         </div>
         <div className="scrollable">
-          <div
-            style={{
-              textAlign: "center",
-              margin: "20px 0",
-              lineHeight: "30px",
-            }}
+          <section
+            className="scenarioDossier"
+            aria-labelledby="scenario-fantasy"
           >
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 800 }}>
-              Your challenge
-            </Typography>
-            <Typography sx={{ maxWidth: 560, mx: "auto", mb: 1 }}>
-              {scenario.summary}
-            </Typography>
-            Goal: keep the lights on, protect your finances, and meet the{" "}
-            {scenario.ownership.toLowerCase()}-owned scoring targets
-            <IconButton
-              onClick={toggleVictoryDialog}
-              aria-label="Victory conditions"
-              color="primary"
-              size="small"
-            >
-              <InfoIcon />
-            </IconButton>
-            <br />
-            <strong>Length:</strong> {scenario.durationMonths / 12} years (
-            {scenario.startingYear} to{" "}
-            {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}
-            )<br />
-            <strong>Location:</strong> {location.name}
-            <br />
-            <strong>Difficulty:</strong>&nbsp;
-            <Select
-              value={game.difficulty}
-              onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                onDelta({ difficulty: e.target.value as DifficultyType })
-              }
-            >
-              {Object.keys(DIFFICULTIES).map((d: string) => {
-                return (
-                  <MenuItem value={d} key={d}>
-                    <Tooltip
-                      title={DIFFICULTIES[d].description}
-                      placement="right"
-                    >
-                      <span>
-                        {DIFFICULTY_LABELS[d]} ({d})
-                      </span>
-                    </Tooltip>
-                  </MenuItem>
-                );
-              })}
-            </Select>
-            <Typography
-              variant="body2"
-              color="textSecondary"
-              sx={{ maxWidth: 560, mx: "auto", mt: 1 }}
-            >
-              {DIFFICULTIES[game.difficulty].description}
-            </Typography>
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <Button
-              size="large"
-              variant="contained"
-              color="primary"
-              onClick={() => onStart(scenario.id)}
-              autoFocus
-            >
-              Start {scenario.name}
-            </Button>
-          </div>
+            <ScenarioArtwork scenario={scenario} />
+            <div className="scenarioDossierCopy">
+              <Typography variant="overline" component="div">
+                {location.name} · {scenario.startingYear}-{endYear} ·{" "}
+                {scenario.durationMonths / 12} years
+              </Typography>
+              <Typography
+                id="scenario-fantasy"
+                variant="h4"
+                component="h2"
+                sx={{ fontWeight: 800, lineHeight: 1.1 }}
+              >
+                {briefing.fantasy}
+              </Typography>
+              <Typography variant="body1" color="textSecondary">
+                {scenario.summary}
+              </Typography>
+              <div className="scenarioBriefingFacts">
+                <BriefingFact concept="goal" label="Objective">
+                  {briefing.objective}
+                </BriefingFact>
+                <BriefingFact concept="finances" label="Constraint">
+                  {briefing.constraint}
+                </BriefingFact>
+                <BriefingFact concept="danger" label="Threat">
+                  {briefing.threat}
+                </BriefingFact>
+              </div>
+              <Box className="scenarioTarget">
+                <ConceptIcon concept="supply" fontSize="small" />
+                <div>
+                  <Typography variant="overline" component="div">
+                    Winning looks like
+                  </Typography>
+                  <Typography variant="body2">{briefing.target}</Typography>
+                </div>
+                <IconButton
+                  onClick={toggleVictoryDialog}
+                  aria-label="Victory conditions"
+                  color="primary"
+                  size="small"
+                >
+                  <InfoIcon />
+                </IconButton>
+              </Box>
+              <Stack
+                className="scenarioStartControls"
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                sx={{ alignItems: { xs: "stretch", sm: "center" } }}
+              >
+                <div>
+                  <Typography variant="caption" component="div">
+                    Difficulty
+                  </Typography>
+                  <Select
+                    value={game.difficulty}
+                    size="small"
+                    onChange={(e: SelectChangeEvent<DifficultyType>) =>
+                      onDelta({ difficulty: e.target.value as DifficultyType })
+                    }
+                  >
+                    {Object.keys(DIFFICULTIES).map((d: string) => (
+                      <MenuItem value={d} key={d}>
+                        <Tooltip
+                          title={DIFFICULTIES[d].description}
+                          placement="right"
+                        >
+                          <span>
+                            {DIFFICULTY_LABELS[d]} ({d})
+                          </span>
+                        </Tooltip>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </div>
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  sx={{ flex: 1 }}
+                >
+                  {DIFFICULTIES[game.difficulty].description}
+                </Typography>
+                <Button
+                  size="large"
+                  variant="contained"
+                  color="primary"
+                  onClick={() => onStart(scenario.id)}
+                  autoFocus
+                  startIcon={<PlayCircleIcon />}
+                >
+                  Start mission
+                </Button>
+              </Stack>
+            </div>
+          </section>
 
           <Dialog
             open={victoryDialogOpen || false}
@@ -462,8 +526,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     </TableCell>
                   </TableRow>
                 )}
-                {scores &&
-                  scores.map((score: ScoreType, i: number) => {
+                {visibleScores &&
+                  visibleScores.map((score: ScoreType, i: number) => {
                     const mine = Boolean(uid) && score.uid === uid;
                     return (
                       <TableRow
@@ -486,6 +550,20 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   })}
               </TableBody>
             </Table>
+            {scores && scores.length > 3 && (
+              <div className="leaderboardToggle">
+                <Button
+                  size="small"
+                  onClick={() =>
+                    this.setState({ leaderboardExpanded: !leaderboardExpanded })
+                  }
+                >
+                  {leaderboardExpanded
+                    ? "Show top 3"
+                    : `View all ${scores.length} scores`}
+                </Button>
+              </div>
+            )}
           </div>
           {/* Below the board rather than in place of it: the board is the reason to log in */}
           {!uid && (

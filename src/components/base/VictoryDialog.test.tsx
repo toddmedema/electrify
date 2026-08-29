@@ -82,6 +82,48 @@ describe("VictoryDialog", () => {
     expect(screen.getAllByText(/Mission complete/i)).toHaveLength(1);
   });
 
+  it("shows how the fleet and company changed over the run", () => {
+    renderDialog({
+      victory: aVictory({
+        debrief: {
+          startingFleet: [
+            { fuel: "Coal", watts: 300000000 },
+            { fuel: "Natural Gas", watts: 200000000 },
+          ],
+          finalFleet: [
+            { fuel: "Sun", watts: 400000000 },
+            { fuel: "Natural Gas", watts: 200000000 },
+          ],
+          startingCash: 330000000,
+          finalCash: 510000000,
+          finalCustomers: 1200000,
+          reliability: 0.998,
+          unservedWh: 1000000000,
+          kgco2e: 2000000000,
+          highlights: [
+            {
+              kind: "CONSTRUCTION",
+              label: "Jan 2028",
+              message: "Construction complete: Solar",
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(screen.getByText("The story of your grid")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /Coal 300MW, Natural Gas 200MW/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /Sun 400MW, Natural Gas 200MW/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("99.8%")).toBeInTheDocument();
+    expect(
+      screen.getByText("Construction complete: Solar"),
+    ).toBeInTheDocument();
+  });
+
   it("fills in the global rank once it resolves", async () => {
     mockFetchGlobalRank.mockResolvedValue(4);
     renderDialog();

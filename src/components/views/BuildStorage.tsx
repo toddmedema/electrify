@@ -32,6 +32,7 @@ import { getMonthlyPayment } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatMoneyStable,
+  formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
 import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
@@ -39,6 +40,7 @@ import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
 import ConceptIcon from "../base/ConceptIcon";
+import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import {
   getBuildAvailability,
   ViableLocationsRow,
@@ -188,6 +190,34 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </IconButton>
         </DialogTitle>
         <DialogContent className="noPadding">
+          <DecisionImpactPreview
+            facts={[
+              {
+                concept: "money",
+                label: "Cash purchase",
+                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
+                detail: `Loan: ${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - downpayment)}, then ${formatMoneyConcise(monthlyPayment)}/mo`,
+              },
+              {
+                concept: "time",
+                label: "Online in",
+                value: `${Math.round(storage.yearsToBuild * 12)} months`,
+                detail:
+                  "Grid flexibility does not change until construction finishes.",
+              },
+              {
+                concept: "storage",
+                label: "Grid flexibility",
+                value: `+${formatWattHours(storage.peakWh)} storage`,
+                detail: `${formatWatts(storage.peakW)} maximum charge or discharge`,
+              },
+              {
+                concept: "supply",
+                label: "Round-trip efficiency",
+                value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
+              },
+            ]}
+          />
           <TableContainer>
             <Table size="small">
               <TableBody>

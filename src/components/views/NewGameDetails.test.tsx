@@ -1,5 +1,6 @@
 import * as React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { GameType } from "../../Types";
 import NewGameDetails, { Props } from "./NewGameDetails";
 
@@ -65,6 +66,22 @@ describe("NewGameDetails leaderboard", () => {
     await screen.findByText("Play the scenario to set a high score");
   });
 
+  it("leads with the scenario fantasy, stakes, and target", async () => {
+    render(<NewGameDetails {...props()} />);
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Lead a legacy utility through a clean-energy transition.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Objective")).toBeInTheDocument();
+    expect(screen.getByText("Constraint")).toBeInTheDocument();
+    expect(screen.getByText("Threat")).toBeInTheDocument();
+    expect(screen.getByText("Winning looks like")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start mission" })).toBeVisible();
+    await screen.findByText("Play the scenario to set a high score");
+  });
+
   it("is always visible and follows the selected difficulty", async () => {
     const { rerender } = render(<NewGameDetails {...props()} />);
 
@@ -102,5 +119,25 @@ describe("NewGameDetails leaderboard", () => {
     expect(cells[1]).toHaveTextContent("Your best");
     expect(cells[2]).toHaveTextContent("432");
     expect(cells[1]).not.toHaveTextContent("432");
+  });
+
+  it("keeps the leaderboard secondary until the player asks for all rows", async () => {
+    mockGetDocs.mockResolvedValue({
+      docs: Array.from({ length: 5 }, (_, index) => ({
+        data: () => ({
+          score: 500 - index,
+          displayName: `Player ${index + 1}`,
+        }),
+      })),
+    });
+    render(<NewGameDetails {...props()} />);
+
+    await screen.findByText("Player 3");
+    expect(screen.queryByText("Player 4")).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "View all 5 scores" }),
+    );
+    expect(screen.getByText("Player 4")).toBeInTheDocument();
+    expect(screen.getByText("Player 5")).toBeInTheDocument();
   });
 });

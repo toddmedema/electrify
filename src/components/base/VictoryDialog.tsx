@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Skeleton,
   Stack,
   Typography,
@@ -13,7 +14,12 @@ import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import numbro from "numbro";
-import { VictoryType } from "../../Types";
+import {
+  GameEventKindType,
+  VictoryDebriefType,
+  VictoryFleetCapacityType,
+  VictoryType,
+} from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
 import {
   buildScoreShareContent,
@@ -22,6 +28,14 @@ import {
 } from "../../helpers/Share";
 import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
 import InstallAppButton from "./InstallAppButton";
+import { fuelColors } from "../../Theme";
+import {
+  formatMoneyConcise,
+  formatWattHours,
+  formatWatts,
+} from "../../helpers/Format";
+import { formatLargeMass } from "../../helpers/Units";
+import { useUnits } from "./UnitsContext";
 
 // What each scored category is called on the score screen. The breakdown's keys differ by
 // ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
@@ -63,6 +77,151 @@ export interface Props extends StateProps, DispatchProps {}
 
 export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
+}
+
+const EVENT_CONCEPTS: Record<GameEventKindType, ConceptNameType> = {
+  BLACKOUT: "blackout",
+  BLACKOUT_OVER: "supply",
+  CONSTRUCTION: "construction",
+  BUILD: "build",
+  SELL: "money",
+  LOAN: "finances",
+  FUEL_PRICE: "fuel",
+  FUEL_CROSSOVER: "fuel",
+};
+
+function FleetMix(props: {
+  title: string;
+  fleet: VictoryFleetCapacityType[];
+}): React.JSX.Element {
+  const total = props.fleet.reduce((sum, item) => sum + item.watts, 0);
+  const label =
+    props.fleet.length > 0
+      ? props.fleet
+          .map((item) => `${item.fuel} ${formatWatts(item.watts)}`)
+          .join(", ")
+      : "No operational generation";
+  const colors = fuelColors();
+  return (
+    <div className="victoryFleetMix">
+      <Typography variant="overline" component="h4">
+        {props.title}
+      </Typography>
+      <div className="victoryFleetBar" role="img" aria-label={label}>
+        {props.fleet.map((item) => (
+          <span
+            key={item.fuel}
+            style={{
+              flexGrow: item.watts,
+              backgroundColor: colors[item.fuel],
+            }}
+          />
+        ))}
+        {total === 0 && <span className="empty" />}
+      </div>
+      <div className="victoryFleetLegend">
+        {props.fleet.map((item) => (
+          <span key={item.fuel}>
+            <i style={{ backgroundColor: colors[item.fuel] }} />
+            {item.fuel} {formatWatts(item.watts)}
+          </span>
+        ))}
+        {props.fleet.length === 0 && <span>No operational generation</span>}
+      </div>
+    </div>
+  );
+}
+
+function RunDebrief({
+  debrief,
+}: {
+  debrief: VictoryDebriefType;
+}): React.JSX.Element {
+  const units = useUnits();
+  const reliability = `${(debrief.reliability * 100).toFixed(
+    debrief.reliability >= 0.999 ? 2 : 1,
+  )}%`;
+  return (
+    <section className="victoryDebrief" aria-labelledby="debrief-title">
+      <Typography id="debrief-title" variant="h6" component="h3">
+        The story of your grid
+      </Typography>
+      <div className="victoryFleetComparison">
+        <FleetMix
+          title="Then · starting capacity"
+          fleet={debrief.startingFleet}
+        />
+        <FleetMix
+          title="Now · operational capacity"
+          fleet={debrief.finalFleet}
+        />
+      </div>
+      <div className="victoryDebriefStats">
+        <div>
+          <ConceptIcon concept="supply" fontSize="small" />
+          <Typography variant="caption">Demand served</Typography>
+          <strong>{reliability}</strong>
+        </div>
+        <div>
+          <ConceptIcon concept="money" fontSize="small" />
+          <Typography variant="caption">Cash</Typography>
+          <strong>
+            {formatMoneyConcise(debrief.startingCash)} →{" "}
+            {formatMoneyConcise(debrief.finalCash)}
+          </strong>
+        </div>
+        <div>
+          <ConceptIcon concept="customers" fontSize="small" />
+          <Typography variant="caption">Customers</Typography>
+          <strong>
+            {numbro(debrief.finalCustomers).format({ average: true })}
+          </strong>
+        </div>
+        <div>
+          <ConceptIcon concept="danger" fontSize="small" />
+          <Typography variant="caption">Emissions</Typography>
+          <strong>{formatLargeMass(debrief.kgco2e, units)}</strong>
+        </div>
+        {debrief.unservedWh > 0 && (
+          <div>
+            <ConceptIcon concept="blackout" fontSize="small" />
+            <Typography variant="caption">Energy unserved</Typography>
+            <strong>{formatWattHours(debrief.unservedWh)}</strong>
+          </div>
+        )}
+      </div>
+      {debrief.highlights.length > 0 && (
+        <>
+          <Divider />
+          <Typography variant="overline" component="h4">
+            Turning points
+          </Typography>
+          <ol className="victoryHighlights">
+            {debrief.highlights.map((event, index) => (
+              <li key={`${event.label}-${index}`}>
+                <ConceptIcon
+                  concept={EVENT_CONCEPTS[event.kind]}
+                  fontSize="small"
+                />
+                <span>
+                  <Typography variant="body2" component="span">
+                    {event.message}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    component="span"
+                  >
+                    {event.label}
+                  </Typography>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
 }
 
 /**
@@ -202,6 +361,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             {endMessage}
           </Typography>
         )}
+        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
+        {victory.debrief && <Divider sx={{ my: 1.5 }} />}
         <Typography variant="body1" sx={{ fontWeight: 600 }}>
           Final score: <strong>{formatScore(victory.score)}</strong>
         </Typography>

@@ -82,3 +82,22 @@ describe("tutorial mission metadata", () => {
     ).toHaveTextContent("variable O&M whenever it generates");
   });
 });
+
+describe("authored scenario briefings", () => {
+  it("gives every scored scenario a reusable story, stakes, and target", () => {
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => {
+        expect(scenario.briefing).toEqual(
+          expect.objectContaining({
+            tone: expect.any(String),
+            fantasy: expect.any(String),
+            objective: expect.any(String),
+            constraint: expect.any(String),
+            threat: expect.any(String),
+            target: expect.any(String),
+          }),
+        );
+      },
+    );
+  });
+});

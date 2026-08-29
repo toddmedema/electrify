@@ -476,6 +476,23 @@ export interface TutorialStepChangeType {
   currentCard: CardNameType;
 }
 
+export type ScenarioBriefingToneType =
+  "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
+
+/**
+ * The authored promise of a scenario, kept beside its simulation setup so the mission list and
+ * briefing screen tell the same story. The artwork is assembled from the existing fuel icons and
+ * a limited-palette tone rather than requiring a bespoke bitmap for every new scenario.
+ */
+export interface ScenarioBriefingType {
+  tone: ScenarioBriefingToneType;
+  fantasy: string;
+  objective: string;
+  constraint: string;
+  threat: string;
+  target: string;
+}
+
 export interface ScenarioType {
   id: number;
   name: string;
@@ -486,6 +503,7 @@ export interface ScenarioType {
   // wins over locationId; getScenarioLocation is the one place that resolves the two.
   location?: LocationType;
   summary?: string;
+  briefing?: ScenarioBriefingType;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
@@ -683,6 +701,27 @@ export interface VictoryType {
   // A failed run still earns and submits a score, but the score screen must not celebrate it as a
   // completed mission or let the terminal game resume and submit the same run again
   outcome?: "completed" | "bankrupt" | "fired";
+  debrief?: VictoryDebriefType;
+}
+
+export interface VictoryFleetCapacityType {
+  fuel: FuelNameType;
+  watts: number;
+}
+
+/** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
+export interface VictoryDebriefType {
+  startingFleet: VictoryFleetCapacityType[];
+  finalFleet: VictoryFleetCapacityType[];
+  startingCash: number;
+  finalCash: number;
+  finalCustomers: number;
+  reliability: number;
+  unservedWh: number;
+  kgco2e: number;
+  highlights: Array<
+    Pick<GameEventType, "kind" | "label" | "message" | "importance">
+  >;
 }
 
 export interface UIType {

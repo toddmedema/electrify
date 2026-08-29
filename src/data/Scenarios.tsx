@@ -508,6 +508,14 @@ export const SCENARIOS = [
     icon: "solar",
     locationId: "SF",
     summary: `New limits have been placed on pollution - can you modernize the company?`,
+    briefing: {
+      tone: "transition",
+      fantasy: "Lead a legacy utility through a clean-energy transition.",
+      objective: "Modernize the fleet without sacrificing reliability.",
+      constraint: "A $50/t CO2 fee makes every dirty MWh more expensive.",
+      threat: "Aging coal assets and thin margins leave little room for delay.",
+      target: "A reliable, lower-carbon grid that still creates value.",
+    },
     ownership: "Investor",
     startingYear: 2020,
     cash: 330000000,
@@ -525,6 +533,16 @@ export const SCENARIOS = [
     icon: "natural gas",
     locationId: "PIT",
     summary: `Cheap natural gas has been discovered nearby - are you ready for the boom?`,
+    briefing: {
+      tone: "boom",
+      fantasy: "Turn an energy boom into durable advantage.",
+      objective:
+        "Use cheap gas to grow without betting the company on one fuel.",
+      constraint:
+        "Coal dominates the starting fleet and new plants last decades.",
+      threat: "Fuel prices can turn before a rushed buildout pays for itself.",
+      target: "A flexible fleet that can survive the boom's next turn.",
+    },
     ownership: "Investor",
     startingYear: 2006,
     cash: 220000000,
@@ -539,6 +557,15 @@ export const SCENARIOS = [
     icon: "wind",
     locationId: "HNL",
     summary: "A beautiful island - with a complex grid.",
+    briefing: {
+      tone: "island",
+      fantasy: "Keep an island paradise bright without mainland backup.",
+      objective: "Replace expensive oil while matching a volatile island load.",
+      constraint:
+        "Every fuel shipment and every build dollar matters more offshore.",
+      threat: "One weak link can leave the whole island in the dark.",
+      target: "A diverse island grid powered by local resources.",
+    },
     ownership: "Investor",
     startingYear: 2004,
     cash: 275000000,
@@ -557,6 +584,16 @@ export const SCENARIOS = [
     icon: "geothermal",
     locationId: "SF",
     summary: "Technology is advancing rapidly - can you keep up?",
+    briefing: {
+      tone: "innovation",
+      fantasy: "Ride the first great wave of modern renewable power.",
+      objective: "Retire aging oil and build the technologies of the future.",
+      constraint:
+        "Promising options arrive at different times and price points.",
+      threat:
+        "Move too early and overpay; move too late and fall behind demand.",
+      target: "A modern fleet ready for the next energy era.",
+    },
     ownership: "Investor",
     startingYear: 2002,
     cash: 220000000,
@@ -574,6 +611,14 @@ export const SCENARIOS = [
     icon: "wind",
     locationId: "SJU",
     summary: "A remote island, with expensive fuel and destructive weather.",
+    briefing: {
+      tone: "storm",
+      fantasy: "Run a fragile island grid through relentless storm seasons.",
+      objective: "Build enough resilience to keep essential power flowing.",
+      constraint: "Remote fuel is costly and replacement capacity takes time.",
+      threat: "Extreme weather can turn a narrow reserve into a crisis.",
+      target: "A resilient, diversified grid that can weather the next storm.",
+    },
     ownership: "Public",
     startingYear: 2000,
     cash: 220000000,
@@ -592,6 +637,16 @@ export const SCENARIOS = [
     icon: "coal",
     locationId: "PIT",
     summary: "Your coal business faces new challenges - and opportunities.",
+    briefing: {
+      tone: "legacy",
+      fantasy: "Decide what comes after a century built on coal.",
+      objective:
+        "Evolve the business before its aging fleet becomes a liability.",
+      constraint: "Most of your capital and operating knowledge sits in coal.",
+      threat:
+        "Old plants, new competitors and long build times punish hesitation.",
+      target: "A profitable successor to the coal empire you inherited.",
+    },
     ownership: "Investor",
     startingYear: 1980,
     cash: 198000000,

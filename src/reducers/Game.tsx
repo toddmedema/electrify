@@ -36,6 +36,8 @@ import {
 import { arrayMove, newSeed } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
+import { buildConsequenceMessage } from "../helpers/BuildConsequences";
+import { buildVictoryDebrief } from "../helpers/Debrief";
 import {
   getAirborneWindOutputFactor,
   getAirborneWindReferenceKph,
@@ -851,7 +853,8 @@ function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   logGameEvent(
     state,
     "BUILD",
-    `Building ${built.name}, ${built.peakWh ? formatWattHours(built.peakWh) : formatWatts(built.peakW)}${payload.financed ? " (financed)" : ""}`,
+    buildConsequenceMessage(built, payload.financed),
+    { importance: "NOTABLE", actionTarget: "FACILITIES" },
   );
   state = buildFacilityHelper(state, built, payload.financed);
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
@@ -1166,6 +1169,12 @@ export function tickState(state: GameType) {
         const { id: scoredScenarioId, name: scenarioName } = scenario;
         const submitsScore = ranked;
         const replay = submitsScore ? serializeReplay(state) : undefined;
+        const debrief = buildVictoryDebrief(
+          scenario,
+          summary,
+          state.facilities,
+          state.eventLog,
+        );
 
         if (!isReplay) {
           logEvent("scenario_end", {
@@ -1203,6 +1212,7 @@ export function tickState(state: GameType) {
               ranked,
               previousBest,
               outcome,
+              debrief,
             }),
           );
           if (submitsScore) {

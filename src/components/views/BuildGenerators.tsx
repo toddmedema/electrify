@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardHeader,
+  Chip,
   Collapse,
   Dialog,
   DialogActions,
@@ -15,6 +16,7 @@ import {
   Menu,
   MenuItem,
   Slider,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -61,6 +63,7 @@ import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
+import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import {
   getBuildAvailability,
   ViableLocationsRow,
@@ -74,7 +77,44 @@ interface GeneratorBuildItemProps {
   location: LocationType;
   seed: number;
   secondaryMetric?: string;
+  forecastGapW?: number;
+  advantages?: string[];
+  compared?: boolean;
+  compareDisabled?: boolean;
+  onCompare?: () => void;
   onBuild: (financed: boolean) => void;
+}
+
+export interface GeneratorRoleType {
+  label: string;
+  detail: string;
+}
+
+export function generatorRole(
+  generator: GeneratorShoppingType,
+): GeneratorRoleType {
+  if (generator.fuel === "Hydro") {
+    return {
+      label: "Clean & dispatchable",
+      detail: "Weather-fed power that can respond when the grid needs it.",
+    };
+  }
+  if (generator.btuPerWh === 0) {
+    return {
+      label: "Clean, weather-led",
+      detail: "No direct emissions; output follows local conditions.",
+    };
+  }
+  if (generator.spinMinutes <= 30) {
+    return {
+      label: "Flexible power",
+      detail: "Can respond quickly, with fuel and emissions tradeoffs.",
+    };
+  }
+  return {
+    label: "Steady output",
+    detail: "Firm supply with a slower response and long-lived commitment.",
+  };
 }
 
 export function GeneratorBuildItem(
@@ -112,6 +152,12 @@ export function GeneratorBuildItem(
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
+  const typicalOutputW = generator.peakW * generator.capacityFactor;
+  const gapCoverage =
+    props.forecastGapW && props.forecastGapW > 0
+      ? Math.round((typicalOutputW / props.forecastGapW) * 100)
+      : undefined;
+  const role = generatorRole(generator);
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -137,22 +183,68 @@ export function GeneratorBuildItem(
           />
         }
         action={
-          <Button
-            className="buy-button"
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={toggleOpen}
-            disabled={financingGap > 0 || !buildable}
-            startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-            aria-label={`Review purchase of ${generator.name}`}
-          >
-            Review
-          </Button>
+          <Stack direction="row" spacing={0.5}>
+            {props.onCompare && (
+              <Button
+                size="small"
+                variant={props.compared ? "contained" : "outlined"}
+                aria-pressed={props.compared}
+                disabled={props.compareDisabled && !props.compared}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onCompare?.();
+                }}
+              >
+                Compare
+              </Button>
+            )}
+            <Button
+              className="buy-button"
+              size="small"
+              variant="contained"
+              color="primary"
+              onClick={toggleOpen}
+              disabled={financingGap > 0 || !buildable}
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+              aria-label={`Review purchase of ${generator.name}`}
+            >
+              Review
+            </Button>
+          </Stack>
         }
         title={generator.name}
         subheader={secondaryText}
       />
+      <Box className="generatorDecisionLead">
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {role.label}
+        </Typography>
+        <Typography variant="caption" color="textSecondary">
+          {role.detail}
+        </Typography>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          useFlexGap
+          sx={{ flexWrap: "wrap" }}
+        >
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${formatWatts(typicalOutputW)} typical output`}
+          />
+          {gapCoverage !== undefined && (
+            <Chip
+              size="small"
+              color={gapCoverage >= 100 ? "success" : "default"}
+              label={`~${gapCoverage}% of peak forecast gap`}
+            />
+          )}
+          {(props.advantages || []).map((advantage) => (
+            <Chip key={advantage} size="small" label={advantage} />
+          ))}
+        </Stack>
+      </Box>
       <Box
         sx={{
           display: "grid",
@@ -414,6 +506,39 @@ export function GeneratorBuildItem(
           </IconButton>
         </DialogTitle>
         <DialogContent className="noPadding">
+          <DecisionImpactPreview
+            facts={[
+              {
+                concept: "money",
+                label: "Cash purchase",
+                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - generator.buildCost)}`,
+                detail: `Loan: ${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - downpayment)}, then ${formatMoneyConcise(monthlyPayment)}/mo`,
+              },
+              {
+                concept: "time",
+                label: "Online in",
+                value: `${Math.round(generator.yearsToBuild * 12)} months`,
+                detail: "Reserve does not change until construction finishes.",
+              },
+              {
+                concept: "supply",
+                label: "Typical supply",
+                value: `+${formatWatts(typicalOutputW)}`,
+                detail:
+                  gapCoverage === undefined
+                    ? `${formatWatts(generator.peakW)} nameplate capacity`
+                    : `About ${gapCoverage}% of the peak forecast gap`,
+              },
+              {
+                concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
+                label: "Direct emissions",
+                value:
+                  kgCO2ePerMWh > 0
+                    ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+                    : "None",
+              },
+            ]}
+          />
           <TableContainer>
             <Table size="small">
               <TableBody>
@@ -521,6 +646,49 @@ function GeneratorMetric(props: {
   );
 }
 
+function GeneratorComparison(props: {
+  generators: GeneratorShoppingType[];
+  onClear: () => void;
+}): React.JSX.Element | null {
+  if (props.generators.length === 0) {
+    return null;
+  }
+  return (
+    <section className="generatorComparison" aria-label="Generator comparison">
+      <div className="generatorComparisonHeader">
+        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+          Comparing {props.generators.length}/3
+        </Typography>
+        <Button size="small" onClick={props.onClear}>
+          Clear
+        </Button>
+      </div>
+      <div className="generatorComparisonChoices">
+        {props.generators.map((generator) => (
+          <div className="generatorComparisonChoice" key={generator.name}>
+            <img
+              src={`/images/${generator.name.toLowerCase()}.svg`}
+              alt=""
+              aria-hidden
+            />
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {generator.name}
+            </Typography>
+            <Typography variant="caption">
+              {formatMoneyConcise(generator.buildCost)} ·{" "}
+              {Math.round(generator.yearsToBuild * 12)} mo
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              {formatWatts(generator.peakW * generator.capacityFactor)} typical
+              · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+            </Typography>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 const sortOptions = [
   ["buildCost", "Build Cost"],
   ["yearsToBuild", "Build Time"],
@@ -571,6 +739,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   );
   const [sort, setSort] = React.useState<string>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [comparedNames, setComparedNames] = React.useState<string[]>([]);
 
   if (!now) {
     return <span />;
@@ -597,6 +766,35 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     offshoreWindSpeeds,
     airborneWindSpeeds,
   ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
+  const forecastGapW = Math.max(
+    0,
+    ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
+  );
+  const buildableGenerators = generators.filter(
+    (generator) => generator.available && generator.peakW <= generator.maxPeakW,
+  );
+  const lowestBuildCost = Math.min(
+    ...buildableGenerators.map((generator) => generator.buildCost),
+  );
+  const fastestBuild = Math.min(
+    ...buildableGenerators.map((generator) => generator.yearsToBuild),
+  );
+  const lowestEnergyCost = Math.min(
+    ...buildableGenerators.map((generator) => generator.lcWh),
+  );
+  const comparedGenerators = generators.filter((generator) =>
+    comparedNames.includes(generator.name),
+  );
+
+  const toggleCompare = (name: string) => {
+    setComparedNames((current) =>
+      current.includes(name)
+        ? current.filter((candidate) => candidate !== name)
+        : current.length < 3
+          ? [...current, name]
+          : current,
+    );
+  };
 
   const onSlider = (_event: Event, newValue: number | number[]) => {
     if (Array.isArray(newValue)) {
@@ -704,23 +902,41 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           })}
         </Menu>
       </Toolbar>
+      <GeneratorComparison
+        generators={comparedGenerators}
+        onClear={() => setComparedNames([])}
+      />
       <List dense className="scrollable cardList">
-        {generators.map((g: GeneratorShoppingType, i: number) => (
-          <GeneratorBuildItem
-            date={game.date}
-            seed={game.seed}
-            location={game.location}
-            interestRate={game.interestRate}
-            generator={g}
-            key={i}
-            cash={cash}
-            secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
-            onBuild={(financed: boolean) => {
-              props.onBuildGenerator(g, financed);
-              onBack();
-            }}
-          />
-        ))}
+        {generators.map((g: GeneratorShoppingType, i: number) => {
+          const advantages = [
+            g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,
+            g.yearsToBuild === fastestBuild ? "Fastest online" : undefined,
+            g.lcWh === lowestEnergyCost ? "Lowest lifetime cost" : undefined,
+            g.btuPerWh === 0 ? "No direct emissions" : undefined,
+          ].filter((value): value is string => Boolean(value));
+          const compared = comparedNames.includes(g.name);
+          return (
+            <GeneratorBuildItem
+              date={game.date}
+              seed={game.seed}
+              location={game.location}
+              interestRate={game.interestRate}
+              generator={g}
+              key={i}
+              cash={cash}
+              secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
+              forecastGapW={forecastGapW}
+              advantages={advantages.slice(0, 2)}
+              compared={compared}
+              compareDisabled={comparedNames.length >= 3}
+              onCompare={() => toggleCompare(g.name)}
+              onBuild={(financed: boolean) => {
+                props.onBuildGenerator(g, financed);
+                onBack();
+              }}
+            />
+          );
+        })}
       </List>
     </div>
   );
