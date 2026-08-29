@@ -99,6 +99,9 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+// MUI interaction tests share the coverage runner with the simulation suite in CI, where opening
+// and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
+jest.setTimeout(15_000);
 
 function renderInsights(scenarioId = 100, suppliedGame?: GameType) {
   return render(
