@@ -36,6 +36,8 @@ import { arrayMove, newSeed } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import {
+  getAirborneWindOutputFactor,
+  getAirborneWindReferenceKph,
   getOffshoreWindOutputFactor,
   getSolarOutputFactor,
   getWindOutputFactor,
@@ -1431,6 +1433,7 @@ function reforecastWeatherAndPrices(
           weather.CLOUD_PCT,
         ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
+        windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
         storedWh: 0,
         precipitationMm: hydrology.precipitationMm,
@@ -1502,6 +1505,9 @@ function updateSupplyFacilitiesFinances(
   const windOutputFactor = getWindOutputFactor(now.windKph);
   const offshoreWindOutputFactor = getOffshoreWindOutputFactor(
     now.windOffshoreKph || 0,
+  );
+  const airborneWindOutputFactor = getAirborneWindOutputFactor(
+    now.windAirborneKph || 0,
   );
   const solarOutputFactor = getSolarOutputFactor(
     now.solarIrradianceWM2,
@@ -1618,6 +1624,9 @@ function updateSupplyFacilitiesFinances(
             break;
           case "Offshore Wind":
             g.currentW = g.peakW * offshoreWindOutputFactor;
+            break;
+          case "Airborne Wind":
+            g.currentW = g.peakW * airborneWindOutputFactor;
             break;
           default: // on-demand produces up to demand + reserve margin
             if (
@@ -1935,6 +1944,7 @@ export function generateNewTimeline(
       },
       solarIrradianceWM2: 0,
       windKph: 0,
+      windAirborneKph: 0,
       temperatureC: 0,
       cash,
       customers,

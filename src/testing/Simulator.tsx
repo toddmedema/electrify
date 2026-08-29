@@ -184,6 +184,7 @@ function setUpGame(
       state.timeline
         .map((tick) => tick.windOffshoreKph)
         .filter((wind): wind is number => wind !== undefined),
+      state.timeline.map((tick) => tick.windAirborneKph),
     ).find(
       (facility) =>
         facility.available && facility.name === options.initialBuild?.name,
@@ -267,6 +268,7 @@ function pickFacilityToBuild(
     [now.windKph],
     [now.solarIrradianceWM2],
     now.windOffshoreKph === undefined ? [] : [now.windOffshoreKph],
+    [now.windAirborneKph],
   )
     .filter(
       (g: GeneratorShoppingType) =>

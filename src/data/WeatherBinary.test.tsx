@@ -2,7 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { decodeWeather, readWeatherHeader } from "./WeatherBinary";
 import { RawWeatherType } from "../Types";
-import { getOffshoreWindCapacityFactor } from "../helpers/Energy";
+import {
+  getAirborneWindCapacityFactor,
+  getAirborneWindReferenceKph,
+  getOffshoreWindCapacityFactor,
+} from "../helpers/Energy";
 
 const DATA_DIR = path.resolve(
   __dirname,
@@ -286,5 +290,12 @@ describe("the shipped weather files", () => {
     const capacityFactor = getOffshoreWindCapacityFactor(speeds);
     expect(capacityFactor).toBeGreaterThan(0.2);
     expect(capacityFactor).toBeLessThan(0.7);
+  });
+
+  it("calibrates Airborne Wind to Lista's 3,500 full-load-hour target", () => {
+    const speeds100m = decodeWeather(readShipped("Lista")).map((row) =>
+      getAirborneWindReferenceKph(row.WIND_KPH),
+    );
+    expect(getAirborneWindCapacityFactor(speeds100m)).toBeCloseTo(0.4, 3);
   });
 });

@@ -506,6 +506,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   const offshoreWindSpeeds = forecastedTimeline.flatMap((w) =>
     w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
   );
+  const airborneWindSpeeds = forecastedTimeline.map((w) => w.windAirborneKph);
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
   const generators = GENERATORS(
     game,
@@ -513,6 +514,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     windSpeeds,
     solarIrradiances,
     offshoreWindSpeeds,
+    airborneWindSpeeds,
   ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
 
   const onSlider = (_event: Event, newValue: number | number[]) => {

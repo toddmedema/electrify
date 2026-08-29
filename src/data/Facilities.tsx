@@ -4,6 +4,7 @@ import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
 import { GameType, GeneratorShoppingType, StorageShoppingType } from "../Types";
 import {
+  getAirborneWindCapacityFactor,
   getOffshoreWindCapacityFactor,
   getWindCapacityFactor,
   getSolarCapacityFactor,
@@ -131,12 +132,25 @@ function batteryCostPerWh(year: number): number {
   return costBetween(year, 2020, 0.345 * CPI_2020_TO_2024, 2024, 0.192);
 }
 
+/**
+ * Early-commercial Airborne Wind estimate, held flat outside the evidence window.
+ * The $7/W pilot anchor and inferred $4.1/W early-series floor are documented in issue #124.
+ */
+export function airborneWindCostPerW(year: number): number {
+  return costBetween(year, 2028, 7, 2035, 4.1);
+}
+
+export function airborneWindMaxPeakW(year: number): number {
+  return Math.min(500000000, 1200000 * Math.pow(2, (year - 2028) / 2));
+}
+
 export function GENERATORS(
   state: GameType,
   peakW: number,
   windSpeedsKph: number[],
   irradiancesWM2: number[],
   offshoreWindSpeedsKph: number[] = [],
+  airborneWindSpeedsKph: number[] = [],
 ) {
   const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
@@ -166,6 +180,9 @@ export function GENERATORS(
   const windCapacityFactor = getWindCapacityFactor(windSpeedsKph);
   const offshoreWindCapacityFactor = getOffshoreWindCapacityFactor(
     offshoreWindSpeedsKph,
+  );
+  const airborneWindCapacityFactor = getAirborneWindCapacityFactor(
+    airborneWindSpeedsKph,
   );
   const solarCapacityFactor = getSolarCapacityFactor(irradiancesWM2);
 
@@ -377,6 +394,26 @@ export function GENERATORS(
       yearsToBuild: 3 + magnitude / 3,
       spinMinutes: 1,
       capacityFactor: offshoreWindCapacityFactor,
+      lifespanYears: 25,
+    },
+    {
+      name: "Airborne Wind",
+      fuel: "Airborne Wind",
+      description:
+        "Higher, steadier winds with light infrastructure, but immature and maintenance-heavy",
+      // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
+      available: year >= 2030,
+      buildCost: scaledBuildCost(airborneWindCostPerW(year), 1200000, peakW),
+      // The 1.2MW NAWEP array is the source anchor. Doubling every two years and the 500MW
+      // ceiling are deliberately conservative gameplay assumptions until fleet data exists.
+      peakW,
+      maxPeakW: airborneWindMaxPeakW(year),
+      btuPerWh: 0,
+      // NAWEP's series-production model uses EUR45.5/kW-year, converted at $1.13/EUR.
+      annualOperatingCost: 0.0514 * peakW,
+      yearsToBuild: 2 + magnitude / 3,
+      spinMinutes: 1,
+      capacityFactor: airborneWindCapacityFactor,
       lifespanYears: 25,
     },
     {

@@ -43,6 +43,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     Sun: "#a87817", // 3.9:1
     Wind: "#193f79", // 10.4:1
     "Offshore Wind": "#0097a7", // 3.5:1 on white, 3.0:1 against Wind
+    "Airborne Wind": "#6a1b9a",
     Geothermal: "#531834", // 13.6:1
     Hydro: "#006b54",
   },
@@ -55,6 +56,7 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     Sun: "#ffd54f", // 13.6:1
     Wind: "#64b5f6", // 8.0:1
     "Offshore Wind": "#006e75", // 3.0:1 on #0f161f, 2.7:1 against Wind
+    "Airborne Wind": "#b39ddb",
     Geothermal: "#f48fb1", // 8.7:1
     Hydro: "#66d9b7",
   },

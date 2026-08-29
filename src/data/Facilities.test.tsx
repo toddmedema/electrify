@@ -1,4 +1,9 @@
-import { GENERATORS, STORAGE } from "./Facilities";
+import {
+  airborneWindCostPerW,
+  airborneWindMaxPeakW,
+  GENERATORS,
+  STORAGE,
+} from "./Facilities";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
 
@@ -299,6 +304,44 @@ describe("offshore wind", () => {
     const cost2023 = generatorAt(newYork, 2023)?.buildCost as number;
     expect(cost2010).toBeGreaterThan(cost2000);
     expect(cost2010).toBeGreaterThan(cost2023);
+  });
+});
+
+describe("airborne wind", () => {
+  const generatorAt = (year: number, peakW = 1200000) =>
+    GENERATORS(stateAt(france, year), peakW, [], [], [], [11 * 3.6]).find(
+      (generator) => generator.name === "Airborne Wind",
+    );
+
+  it("stays locked through 2029 and unlocks in 2030", () => {
+    expect(generatorAt(2029)).toBeUndefined();
+    expect(generatorAt(2030)).toBeDefined();
+  });
+
+  it("anchors source-sized construction cost in 2028 and 2035", () => {
+    expect(airborneWindCostPerW(2028) * 1200000).toBeCloseTo(8400000, -2);
+    expect(generatorAt(2035)?.buildCost).toBeCloseTo(4920000, -2);
+    expect(airborneWindCostPerW(2050)).toBe(airborneWindCostPerW(2035));
+  });
+
+  it("uses early-commercial operating and build assumptions", () => {
+    const generator = generatorAt(2030);
+    expect(generator).toMatchObject({
+      fuel: "Airborne Wind",
+      annualOperatingCost: 61680,
+      btuPerWh: 0,
+      lifespanYears: 25,
+      spinMinutes: 1,
+    });
+    expect(generator?.capacityFactor).toBeCloseTo(0.888, 3);
+    expect(generator?.yearsToBuild).toBeCloseTo(2.026, 3);
+  });
+
+  it("grows modular arrays from the 1.2MW anchor to a 500MW cap", () => {
+    expect(airborneWindMaxPeakW(2028)).toBe(1200000);
+    expect(airborneWindMaxPeakW(2030)).toBe(2400000);
+    expect(airborneWindMaxPeakW(2032)).toBe(4800000);
+    expect(airborneWindMaxPeakW(2050)).toBe(500000000);
   });
 });
 
