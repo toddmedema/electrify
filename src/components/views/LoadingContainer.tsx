@@ -116,7 +116,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
 
         // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
         if (scenario.tutorialSteps && !resumed && !replaying) {
-          setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
+          // A capstone retry comes through the same clean scenario-start path with its authored
+          // step already selected. Preserve it; a normal tutorial still arrives with -1 and
+          // starts at the first objective after the card transition has mounted its controls.
+          const tutorialStep = game.tutorialStep >= 0 ? game.tutorialStep : 0;
+          setTimeout(() => dispatch(delta({ tutorialStep })), 300);
         }
       } catch (error) {
         reportError(

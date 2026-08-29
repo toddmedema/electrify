@@ -81,6 +81,22 @@ describe("tutorial mission metadata", () => {
       screen.getByText(/Oil pays fixed O&M even when idle/),
     ).toHaveTextContent("variable O&M whenever it generates");
   });
+
+  it("stages deterministic unguided capstones in the first two missions", () => {
+    const pilot = TUTORIALS.slice(0, 2);
+    pilot.forEach((tutorial) => {
+      expect(tutorial.seed).toEqual(expect.any(Number));
+      const capstones = tutorial.tutorialSteps!.filter((step) => step.capstone);
+      expect(capstones).toHaveLength(1);
+      expect(capstones[0].target).toBeUndefined();
+      expect(capstones[0].hint).toBeTruthy();
+    });
+    expect(
+      TUTORIALS.slice(2).flatMap((tutorial) =>
+        tutorial.tutorialSteps!.filter((step) => step.capstone),
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("authored scenario briefings", () => {

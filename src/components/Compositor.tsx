@@ -5,19 +5,9 @@ import {
   DialogContent,
   DialogTitle,
   Snackbar,
-  Typography,
 } from "@mui/material";
-import TouchAppIcon from "@mui/icons-material/TouchApp";
 import * as React from "react";
 import { GlobalHotKeys, configure } from "react-hotkeys";
-import {
-  ACTIONS,
-  EVENTS,
-  Joyride,
-  type EventData,
-  type Step,
-  type TooltipRenderProps,
-} from "react-joyride";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -34,6 +24,7 @@ import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import InstallAppButton from "./base/InstallAppButton";
+import TutorialHud from "./base/TutorialHud";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -266,66 +257,6 @@ const shortcutHandlers = {
   ),
 };
 
-function Tooltip(props: TooltipRenderProps): React.JSX.Element {
-  const {
-    index,
-    size,
-    step,
-    backProps,
-    closeProps,
-    primaryProps,
-    tooltipProps,
-    isLastStep,
-  } = props;
-  const isString = typeof step.content === "string";
-  // Presentation flags baked in by stepsForViewport: a gated step has no Next button -
-  // doing the highlighted deed is what advances it - and Back is hidden next to a gate,
-  // since backing into a satisfied one would instantly re-advance
-  const flags = (step.data || {}) as { gated?: boolean; hideBack?: boolean };
-  // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
-  // without one screen readers announce an anonymous dialog
-  return (
-    <div id="tutorial-tooltip" aria-label="Tutorial" {...tooltipProps}>
-      {step.title && (
-        <Typography variant="h6" gutterBottom>
-          {step.title}
-        </Typography>
-      )}
-      {isString ? (
-        <Typography variant="body1">{step.content}</Typography>
-      ) : (
-        step.content
-      )}
-      <div className="tutorialFooter">
-        {/* Joyride's own showProgress only applies to its built-in tooltip */}
-        <span className="tutorialProgress">
-          Step {index + 1} of {size}
-        </span>
-        <Button {...closeProps} color="primary" size="small">
-          Exit tutorial
-        </Button>
-        {index > 0 && !flags.hideBack && (
-          <Button {...backProps} color="primary">
-            Back
-          </Button>
-        )}
-        {flags.gated ? (
-          <span
-            className="tutorialDoIt"
-            aria-label="Do the highlighted action to continue"
-          >
-            <TouchAppIcon color="primary" />
-          </span>
-        ) : (
-          <Button {...primaryProps} variant="contained" color="primary">
-            {isLastStep ? "Play" : "Next"}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export interface StateProps {
   card: CardType;
   settings: SettingsType;
@@ -355,10 +286,6 @@ export function isNavCard(name: CardNameType) {
 
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
-  private tutorialScrollTimeout: ReturnType<typeof setTimeout> | undefined;
-  private stepsCache:
-    | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
-    | undefined;
 
   // react-transition-group falls back to ReactDOM.findDOMNode when no nodeRef is given, and
   // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
@@ -375,39 +302,6 @@ export default class Compositor extends React.Component<Props, {}> {
     return ref;
   }
 
-  // Applies each step's desktop override when the panes are side by side, and drops the key
-  // either way so Joyride only ever sees a plain step. The result is cached because Joyride
-  // reloads its steps whenever the array isn't identical, which loses the current step -- but
-  // it still recomputes when handleResize carries the layout across the breakpoint
-  private stepsForViewport(steps: TutorialStepType[]): Step[] {
-    const desktop = isDesktopScreen();
-    const cache = this.stepsCache;
-    if (cache && cache.source === steps && cache.desktop === desktop) {
-      return cache.resolved;
-    }
-    const resolved = steps.map((step, i) => {
-      // The gate fields and onNext are engine concerns; Joyride only needs the
-      // presentation, plus flags telling the tooltip which buttons make sense here
-      const {
-        desktop: override,
-        advanceOn: _advanceOn,
-        advanceOnAction: _advanceOnAction,
-        onNext: _onNext,
-        ...rest
-      } = step;
-      const merged = desktop && override ? { ...rest, ...override } : rest;
-      return {
-        ...merged,
-        data: {
-          gated: isGatedStep(step),
-          hideBack: isGatedStep(step) || (i > 0 && isGatedStep(steps[i - 1])),
-        },
-      } as Step;
-    });
-    this.stepsCache = { source: steps, desktop, resolved };
-    return resolved;
-  }
-
   // isDesktopScreen() is read straight from the DOM rather than from state, so a resize needs
   // its own trigger -- forceUpdate skips shouldComponentUpdate, which otherwise blocks re-renders
   // when nothing about the current card has changed
@@ -418,80 +312,21 @@ export default class Compositor extends React.Component<Props, {}> {
 
   public componentDidMount() {
     window.addEventListener("resize", this.handleResize);
-    this.scrollTutorialTargetIntoView();
-  }
-
-  public componentDidUpdate(prevProps: Props) {
-    if (
-      prevProps.tutorialStep !== this.props.tutorialStep ||
-      prevProps.card.name !== this.props.card.name
-    ) {
-      this.scrollTutorialTargetIntoView();
-    }
   }
 
   public componentWillUnmount() {
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
-    clearTimeout(this.tutorialScrollTimeout);
   }
 
-  /** Joyride scrolling hangs inside card panes, so move their real scroll container ourselves. */
-  private scrollTutorialTargetIntoView() {
-    clearTimeout(this.tutorialScrollTimeout);
-    this.tutorialScrollTimeout = setTimeout(() => {
-      const steps = this.props.tutorialSteps;
-      const index = this.props.tutorialStep;
-      if (!steps || index < 0 || index >= steps.length) {
-        return;
-      }
-      const target = this.stepsForViewport(steps)[index]?.target;
-      if (typeof target !== "string") {
-        return;
-      }
-      const element = document.querySelector(target);
-      if (element && typeof element.scrollIntoView === "function") {
-        element.scrollIntoView({ block: "center", inline: "nearest" });
-      }
-    }, 50);
-  }
-
-  public handleJoyrideCallback = (data: EventData) => {
-    const { action, index, type } = data;
-    // Esc: leave the walkthrough without crediting it as done, so it's still offered on the
-    // scenario list. Has to come first, since closing also reports STEP_AFTER
-    if (action === ACTIONS.CLOSE) {
-      this.props.onTutorialEnd(this.props.tutorialSteps);
-      return;
-    }
-    // A gated step advances only by its deed. Skipping it on a missing target would wave
-    // the player past the very thing the step exists to make them do - and the deed itself
-    // often removes the target for a frame (buying closes the build screen), which Joyride
-    // reports as TARGET_NOT_FOUND while the gate middleware is already landing the next step
-    const current =
-      this.props.tutorialStep >= 0 && this.props.tutorialSteps
-        ? this.props.tutorialSteps[this.props.tutorialStep]
-        : undefined;
-    if (type === EVENTS.TARGET_NOT_FOUND && current && isGatedStep(current)) {
-      return;
-    }
-    const advancingEvents: string[] = [
-      EVENTS.STEP_AFTER,
-      EVENTS.TARGET_NOT_FOUND,
-    ];
-    // Quitting tears the walkthrough's targets out of the DOM, and Joyride reports that as
-    // TARGET_NOT_FOUND on the way out. Advancing on it navigated the just-reset game back onto
-    // the step's card, which then rendered nothing because the game was over - a blank screen
-    // where the main menu should be. tutorialStep is only >= 0 while a walkthrough is live
-    if (advancingEvents.includes(type) && this.props.tutorialStep >= 0) {
-      this.props.onTutorialStep({
-        fromStep: index,
-        toStep: index + (action === ACTIONS.PREV ? -1 : 1),
-        tutorialSteps: this.props.tutorialSteps,
-        scenarioId: this.props.scenarioId,
-        currentCard: this.props.card.name,
-      });
-    }
+  public moveTutorial = (toStep: number) => {
+    this.props.onTutorialStep({
+      fromStep: this.props.tutorialStep,
+      toStep,
+      tutorialSteps: this.props.tutorialSteps,
+      scenarioId: this.props.scenarioId,
+      currentCard: this.props.card.name,
+    });
   };
 
   public snackbarActionClicked(e: React.MouseEvent<HTMLElement>) {
@@ -596,6 +431,16 @@ export default class Compositor extends React.Component<Props, {}> {
   public render() {
     const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
       this.props;
+    const currentTutorialStep =
+      tutorialSteps && tutorialStep >= 0 && tutorialStep < tutorialSteps.length
+        ? tutorialSteps[tutorialStep]
+        : undefined;
+    const canGoBack = !!(
+      currentTutorialStep &&
+      tutorialStep > 0 &&
+      !isGatedStep(currentTutorialStep) &&
+      !isGatedStep(tutorialSteps![tutorialStep - 1])
+    );
 
     // The pane layouts don't slide between their own cards: on desktop nothing about the screen
     // changes, and on two columns only the second one does -- sliding the pinned fleet off the
@@ -638,37 +483,20 @@ export default class Compositor extends React.Component<Props, {}> {
             </main>
           </CSSTransition>
         </TransitionGroup>
-        {tutorialSteps && (
-          <Joyride
-            // Swapping in the desktop targets hands Joyride a different steps array, which it
-            // reloads mid-tour and ends up showing no tooltip behind a blocking overlay.
-            // Remounting instead resumes cleanly, since it starts from the stepIndex prop
-            key={isDesktopScreen() ? "desktop" : "compact"}
-            onEvent={this.handleJoyrideCallback}
-            continuous={true}
-            run={tutorialStep >= 0 && tutorialStep < tutorialSteps.length}
-            tooltipComponent={Tooltip}
-            stepIndex={tutorialStep}
-            steps={this.stepsForViewport(tutorialSteps)}
-            // v3 folded the old top-level styles.options, and the standalone
-            // disableOverlayClose prop, into this single options prop
-            options={{
-              beaconSize: 48,
-              // Enough separation to make the highlighted control unmistakable while keeping
-              // the surrounding dashboard legible as context for what the prompt is teaching.
-              overlayColor: "rgba(0, 0, 0, 0.38)",
-              // Joyride traps Tab inside the tooltip, so Esc is the way back out for
-              // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
-              // those are far too easy to trigger by accident mid-walkthrough
-              overlayClickAction: false,
-              // v3 scrolls each target into view and waits for a scroll:end that never
-              // arrives for targets inside the non-scrolling card panes, which hangs the
-              // tour on step 4 of the generators walkthrough. Every target is already in
-              // view, so there is nothing to scroll to
-              skipScroll: true,
-            }}
-          />
-        )}
+        {tutorialSteps &&
+          currentTutorialStep &&
+          this.props.card.name !== "LOADING" && (
+            <TutorialHud
+              desktop={isDesktopScreen()}
+              step={currentTutorialStep}
+              stepIndex={tutorialStep}
+              totalSteps={tutorialSteps.length}
+              canGoBack={canGoBack}
+              onBack={() => this.moveTutorial(tutorialStep - 1)}
+              onNext={() => this.moveTutorial(tutorialStep + 1)}
+              onExit={() => this.props.onTutorialEnd(tutorialSteps)}
+            />
+          )}
         <Dialog
           open={ui.dialog.open}
           // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A

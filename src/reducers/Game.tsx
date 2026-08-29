@@ -1144,6 +1144,9 @@ export function tickState(state: GameType) {
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
       const isTutorial = Boolean(scenario.tutorialSteps);
+      const activeTutorialCapstone = Boolean(
+        scenario.tutorialSteps?.[state.tutorialStep]?.capstone,
+      );
       // The leaderboard is keyed on scenario id alone, so custom runs - whatever cash, duration
       // and rules the player gave themselves - would be scored against each other as if they
       // were the same scenario. Replays likewise belong to the original player, not the viewer.
@@ -1285,14 +1288,14 @@ export function tickState(state: GameType) {
           );
         }
       } else if (
-        state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20)
+        state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20) &&
+        !activeTutorialCapstone
       ) {
         // Success: Survived duration
         // Every custom game shares one id, so recording it would light up a completion marker for
-        // a scenario nobody authored, and its score belongs to nothing comparable
-        if (ranked) {
-          // Tutorials are already marked played once their walkthrough ends, so this is a
-          // no-op for the ones the player sat all the way through
+        // a scenario nobody authored. Tutorials are recorded only when their final objective is
+        // satisfied, so merely letting their scenario clock expire cannot bypass a capstone.
+        if (ranked && !isTutorial) {
           recordScenarioPlayed(scenarioId);
         }
 
@@ -1303,6 +1306,9 @@ export function tickState(state: GameType) {
           const { id: scoredScenarioId, endTitle, endMessage } = scenario;
           const difficulty = state.difficulty;
           const nextTutorial = getNextTutorial(scoredScenarioId);
+          const capstoneIndex =
+            scenario.tutorialSteps?.findIndex((step) => step.capstone) ?? -1;
+          const endingMinute = state.date.minute;
           if (!isReplay) {
             logEvent("scenario_end", {
               id: scoredScenarioId,
@@ -1312,6 +1318,18 @@ export function tickState(state: GameType) {
             });
           }
           setTimeout(() => {
+            const live = getStore().getState().game;
+            // Entering a capstone rebuilds the same scenario from minute zero. A completion
+            // callback queued by the final tick of the guided run must not celebrate over that
+            // freshly authored checkpoint merely because both runs share a scenario id.
+            if (
+              capstoneIndex >= 0 &&
+              live.scenarioId === scenarioId &&
+              live.tutorialStep === capstoneIndex &&
+              live.date.minute < endingMinute
+            ) {
+              return;
+            }
             if (!isReplay) {
               clearSaveFor(scenarioId);
             }
