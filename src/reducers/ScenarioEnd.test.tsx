@@ -71,7 +71,7 @@ function playOutOnTheStore(state: GameType, untilMonth: number) {
     // hanging the suite
     for (
       let i = 0;
-      i < 10000 && getStore().getState().game.date.monthsEllapsed < untilMonth;
+      i < 10000 && getStore().getState().game.date.monthsElapsed < untilMonth;
       i++
     ) {
       wallClockMs += TICK_MS.FAST * 2;
@@ -80,7 +80,7 @@ function playOutOnTheStore(state: GameType, untilMonth: number) {
   } finally {
     now.mockRestore();
   }
-  expect(getStore().getState().game.date.monthsEllapsed).toBe(untilMonth);
+  expect(getStore().getState().game.date.monthsElapsed).toBe(untilMonth);
 }
 
 describe("ending a scenario from inside the reducer", () => {
@@ -95,7 +95,7 @@ describe("ending a scenario from inside the reducer", () => {
   it("survives to the end of the term without reading the revoked draft", () => {
     const scenario = customScenario({ durationMonths: 2 });
     let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
-    while (state.date.monthsEllapsed < (scenario.durationMonths as number)) {
+    while (state.date.monthsElapsed < (scenario.durationMonths as number)) {
       state = tick(state);
     }
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
@@ -110,7 +110,7 @@ describe("ending a scenario from inside the reducer", () => {
     getStore().dispatch(quit());
     const scenario = customScenario({ durationMonths: 2, name: "A Test Run" });
     let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
-    while (state.date.monthsEllapsed < (scenario.durationMonths as number)) {
+    while (state.date.monthsElapsed < (scenario.durationMonths as number)) {
       state = tick(state);
     }
     jest.runOnlyPendingTimers();
@@ -147,7 +147,7 @@ describe("ending a scenario from inside the reducer", () => {
     const duration = scenario.durationMonths as number;
     let state = createGame({ scenarioId: scenario.id });
     // Cheap up to the second to last month, then the store drives the one that ends the run
-    while (state.date.monthsEllapsed < duration - 1) {
+    while (state.date.monthsElapsed < duration - 1) {
       state = tick(state);
     }
     playOutOnTheStore(state, duration);
@@ -168,7 +168,7 @@ describe("ending a scenario from inside the reducer", () => {
       scenario,
       dollarsPerkWh: 0,
     });
-    while (state.date.monthsEllapsed < 2) {
+    while (state.date.monthsElapsed < 2) {
       state = tick(state);
     }
     expect(state.monthlyHistory[0].cash).toBeLessThan(0);
@@ -282,7 +282,7 @@ describe("finishing a tutorial", () => {
   // Runs the tutorial out to its end and hands back the dialog the reducer opened for it
   function finishTutorial() {
     let state = createGame({ scenarioId: tutorial.id });
-    while (state.date.monthsEllapsed < tutorial.durationMonths) {
+    while (state.date.monthsElapsed < tutorial.durationMonths) {
       state = tick(state);
     }
     jest.runOnlyPendingTimers();

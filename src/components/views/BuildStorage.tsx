@@ -82,12 +82,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, props.interestRate);
-  // <TableRow>
-  // <TableCell>Payments during construction (interest only)</TableCell>
-  // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
-  // </TableRow>
-
   return (
     <Card className="build-list-item">
       <CardHeader
@@ -300,7 +294,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   );
 }
 
-const sortOptions = [
+type StorageSortKey = "buildCost" | "yearsToBuild";
+
+const sortOptions: ReadonlyArray<readonly [StorageSortKey, string]> = [
   ["buildCost", "Build Cost"],
   ["yearsToBuild", "Build Time"],
 ];
@@ -344,7 +340,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
-  const [sort, setSort] = React.useState<string>("buildCost");
+  const [sort, setSort] = React.useState<StorageSortKey>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
 
   if (!now) {
@@ -352,8 +348,8 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   }
 
   const cash = now.cash;
-  const storage = STORAGE(game, getW(sliderTick)).sort((a, b) =>
-    a[sort] > b[sort] ? 1 : -1,
+  const storage = STORAGE(game, getW(sliderTick)).sort(
+    (a, b) => a[sort] - b[sort],
   );
 
   const handleSliderChange = (_event: Event, newValue: number | number[]) => {
@@ -363,7 +359,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     setSliderTick(newValue);
   };
 
-  const onSort = (newValue: string) => {
+  const onSort = (newValue: StorageSortKey) => {
     setSort(newValue);
     onSortClose();
   };

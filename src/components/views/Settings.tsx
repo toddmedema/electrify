@@ -94,25 +94,6 @@ function SettingsSection({
 
 export default function Settings(props: Props): React.JSX.Element {
   const installedApp = useIsInstalledApp();
-  // TODO: font size, auto-pause while looking at build options, keyboard shortcuts, ...?
-  // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
-
-  // <Checkbox id="help" label="Show Help" value={props.settings.showHelp} onChange={props.onShowHelpChange}>
-  //   {(props.settings.showHelp) ? 'Setup and combat hints are shown.' : 'Setup and combat hints are hidden.'}
-  // </Checkbox>
-
-  // <Checkbox id="vibration" label="Vibration" value={props.settings.vibration} onChange={props.onVibrationChange}>
-  //   {(props.settings.vibration) ? 'Vibrate on touch.' : 'Do not vibrate.'}
-  // </Checkbox>
-
-  // <Picker label="Font Size" value={fontSizeValues[fontSizeIdx]} onDelta={(i: number) => props.onFontSizeDelta(fontSizeIdx, i)}>
-  //   Takes effect once you leave settings.
-  // </Picker>
-
-  // <Checkbox id="experimental" label="Experimental" value={props.settings.experimental} onChange={props.onExperimentalChange}>
-  //   {(props.settings.experimental) ? 'Experimental features are currently enabled.' : 'Experimental features are currently disabled.'}
-  // </Checkbox>
-
   // The file picker is driven by the Import button rather than wrapping it, so that both buttons
   // are plainly buttons and the disabled Export one behaves like one
   const fileInput = React.useRef<HTMLInputElement>(null);

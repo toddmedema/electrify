@@ -203,10 +203,6 @@ export const FUELS = {
   Hydro: {
     kgCO2ePerBtu: 0,
   },
-  // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
-  // 'Trash': {
-  //   kgCO2ePerBtu: 999,
-  // },
 } as { [fuel: string]: FuelType };
 
 export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];

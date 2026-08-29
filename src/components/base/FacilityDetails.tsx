@@ -82,7 +82,7 @@ export function fuelPriceTrend(
   seed: number,
   location?: LocationType,
 ): number[] {
-  const months = Math.min(TREND_MONTHS, date.monthsEllapsed + 1);
+  const months = Math.min(TREND_MONTHS, date.monthsElapsed + 1);
   if (months < 2) {
     return [];
   }
@@ -119,6 +119,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const variableOperatingCostPerMWh = (
     facility as Partial<GeneratorOperatingType>
   ).variableOperatingCostPerMWh;
+  const minimumStableOutput = (facility as Partial<GeneratorOperatingType>)
+    .minimumStableOutput;
   const isStorage = facility.peakWh > 0;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
@@ -201,6 +203,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <Stat
             label="Equivalent operating hours"
             value={Math.round(equivalentOperatingHours).toLocaleString()}
+          />
+        )}
+        {minimumStableOutput !== undefined && (
+          <Stat
+            label="Minimum stable output"
+            value={`${percent(minimumStableOutput)} · ${formatWatts(facility.peakW * minimumStableOutput)}`}
           />
         )}
         {variableOperatingCostPerMWh !== undefined && (

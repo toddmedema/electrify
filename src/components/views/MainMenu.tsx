@@ -71,7 +71,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
               variant="contained"
               color="primary"
               onClick={props.onContinue}
-              autoFocus={true}
             >
               Continue your game
             </Button>
@@ -81,7 +80,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             variant={props.hasSavedGame ? "outlined" : "contained"}
             color="primary"
             onClick={props.onStart}
-            autoFocus={!props.hasSavedGame}
           >
             {startLabel}
           </Button>

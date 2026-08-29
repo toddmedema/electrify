@@ -19,8 +19,8 @@ const OPTIONS = { scenarioId: 101, seed: 20260824 };
 const PLAYED_MONTHS = 12;
 
 function runMonths(state: GameType, months: number) {
-  const until = state.date.monthsEllapsed + months;
-  while (state.date.monthsEllapsed < until) {
+  const until = state.date.monthsElapsed + months;
+  while (state.date.monthsElapsed < until) {
     tickState(state);
   }
 }

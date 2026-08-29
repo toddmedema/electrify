@@ -24,9 +24,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
-// Version 6 is the launch schema; earlier values identify unsupported pre-release saves.
-export const SAVE_VERSION = 6;
+// This is the initial release schema. Increment it for breaking post-release changes.
+export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
   version: number;
@@ -112,6 +111,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       const optionalNumbersInvalid = [
         current.costPerStart,
         current.lifetimeStarts,
+        current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
       ].some(
         (value) =>
@@ -119,12 +119,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
           (typeof value !== "number" || !Number.isFinite(value) || value < 0),
       );
       const optionalBooleansInvalid = [
+        current.committed,
         current.tracksStarts,
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
+        (typeof current.minimumStableOutput === "number" &&
+          current.minimumStableOutput > 1) ||
         optionalBooleansInvalid
       );
     }) ||

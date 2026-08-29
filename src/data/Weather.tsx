@@ -445,7 +445,8 @@ export function getWeather(
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
 // https://earthobservatory.nasa.gov/features/EnergyBalance/page2.php
 // indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight
-// TODO fix the pointiness, esp in shorter winter months - Maybe by factoring in day lenght to determine the shape of the curve?
+// Monthly interpolation remains visibly sharp in short winter months; daylight length should be
+// part of the eventual smoothing model.
 // Day length / minutes from dark used as proxy for season / max sun height
 // Rough approximation of solar output: https://www.wolframalpha.com/input?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+200%29%29%29+from+0+to+420
 // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm

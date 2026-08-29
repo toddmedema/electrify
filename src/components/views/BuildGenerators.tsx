@@ -167,12 +167,6 @@ export function GeneratorBuildItem(
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, props.interestRate);
-  // <TableRow>
-  // <TableCell>Payments during construction (interest only)</TableCell>
-  // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
-  // </TableRow>
-
   return (
     <Card className="build-list-item">
       <CardHeader
@@ -345,6 +339,23 @@ export function GeneratorBuildItem(
                   {formatWatts(generator.peakW * generator.capacityFactor)}
                 </TableCell>
               </TableRow>
+              {generator.minimumStableOutput !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Minimum stable output
+                    <ManualLink entry={MANUAL_ENTRY.RAMP_RATE} />
+                    <Typography variant="body2" color="textSecondary">
+                      While the plant remains online
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {Math.round(generator.minimumStableOutput * 100)}% ·{" "}
+                    {formatWatts(
+                      generator.peakW * generator.minimumStableOutput,
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>
                   {hasVariableOM ? "Fixed O&M" : "Base O&M"}
@@ -689,7 +700,9 @@ function GeneratorComparison(props: {
   );
 }
 
-const sortOptions = [
+type GeneratorSortKey = "buildCost" | "yearsToBuild" | "lcWh";
+
+const sortOptions: ReadonlyArray<readonly [GeneratorSortKey, string]> = [
   ["buildCost", "Build Cost"],
   ["yearsToBuild", "Build Time"],
   ["lcWh", "Cost per MWh"],
@@ -737,7 +750,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
-  const [sort, setSort] = React.useState<string>("buildCost");
+  const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const [comparedNames, setComparedNames] = React.useState<string[]>([]);
 
@@ -765,7 +778,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
-  ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
+  ).sort((a, b) => a[sort] - b[sort]);
   const forecastGapW = Math.max(
     0,
     ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
@@ -803,7 +816,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     setSliderTick(newValue);
   };
 
-  const onSort = (newValue: string) => {
+  const onSort = (newValue: GeneratorSortKey) => {
     setSort(newValue);
     onSortClose();
   };

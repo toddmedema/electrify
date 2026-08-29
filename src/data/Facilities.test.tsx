@@ -162,6 +162,24 @@ describe("current facility economics", () => {
     expect(byName("Enhanced Geothermal")?.costPerStart).toBeUndefined();
   });
 
+  it("assigns technology-specific minimum stable outputs only to thermal plants", () => {
+    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
+    const minimum = (name: string) =>
+      generators.find((generator) => generator.name === name)
+        ?.minimumStableOutput;
+
+    expect(minimum("Coal")).toBe(0.4);
+    expect(minimum("Nuclear")).toBe(0.5);
+    expect(minimum("Natural Gas")).toBe(0.5);
+    expect(minimum("Oil")).toBe(0.5);
+    expect(minimum("Biomass")).toBe(0.4);
+    expect(minimum("Geothermal")).toBe(0.15);
+    expect(minimum("Enhanced Geothermal")).toBe(0.15);
+    expect(minimum("Hydro")).toBeUndefined();
+    expect(minimum("Wind")).toBeUndefined();
+    expect(minimum("Solar")).toBeUndefined();
+  });
+
   it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {
     const pumpedHydro = STORAGE(stateAt(iceland, 2024), 1000000000).find(
       (facility) => facility.name === "Pumped Hydro",

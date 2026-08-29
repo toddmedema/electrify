@@ -88,12 +88,10 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
-  OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
-  OIL_VARIABLE_OPERATING_COST_PER_MWH,
-  START_TRACKING_FACILITY_NAMES,
   STORAGE,
   windAnnualOutputDegradation,
 } from "../data/Facilities";
+import { shouldKeepGeneratorCommitted } from "../helpers/Commitment";
 import { getViableLocationsRemaining } from "../data/FacilitySites";
 import { logEvent } from "../Globals";
 import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
@@ -689,42 +687,6 @@ export const gameSlice = createSlice({
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
-      restored.facilities.forEach((facility) => {
-        // The former Oil model stored one annual expense equal to $0.05/W-year. Recover the
-        // facility's already-applied difficulty and build-date inflation multiplier, then use it
-        // for both halves of the sourced fixed/variable split. Historical books are untouched.
-        if (
-          facility.name === "Oil" &&
-          facility.variableOperatingCostPerMWh === undefined
-        ) {
-          const legacyBaseAnnualCost = 0.05 * facility.peakW;
-          const recoveredMultiplier =
-            legacyBaseAnnualCost > 0
-              ? facility.annualOperatingCost / legacyBaseAnnualCost
-              : 1;
-          const multiplier =
-            Number.isFinite(recoveredMultiplier) && recoveredMultiplier >= 0
-              ? recoveredMultiplier
-              : 1;
-          facility.annualOperatingCost =
-            (facility.peakW / 1000) *
-            OIL_FIXED_OPERATING_COST_PER_KW_YEAR *
-            multiplier;
-          facility.variableOperatingCostPerMWh =
-            OIL_VARIABLE_OPERATING_COST_PER_MWH * multiplier;
-        }
-        // Save v6 predates the explicit capability for these technologies. Upgrade the facility
-        // snapshot once on resume, starting from its actual generating state so loading an online
-        // plant does not invent an opening start. Historical starts and charges remain unknown.
-        if (
-          facility.tracksStarts === undefined &&
-          START_TRACKING_FACILITY_NAMES.has(facility.name)
-        ) {
-          facility.tracksStarts = true;
-          facility.lifetimeStarts = facility.lifetimeStarts || 0;
-          facility.generatingLastRealTick = facility.currentW > 0;
-        }
-      });
       // The tick loop's module-level locals have to line up with the state being restored.
       // Unlike initGame, this one keeps the month: clearing it would make the first tick record a
       // second history entry for a month that's already in the log.
@@ -1298,7 +1260,7 @@ export function tickState(state: GameType) {
           );
         }
       } else if (
-        state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20) &&
+        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20) &&
         !activeTutorialCapstone
       ) {
         // Success: Survived duration
@@ -1453,10 +1415,10 @@ const KG_PER_MEGATON = 1000000000;
  * Everything the player has emitted so far, in megatons of CO2e, which is what the weather warms
  * and destabilises in proportion to.
  *
- * Summed from the monthly history rather than carried as its own field so that it needs no
- * migration, no place in a save, and no chance of disagreeing with the emissions the player is
- * actually scored on. The history is one entry per month -- a few hundred at the very most -- and
- * this runs once per reforecast, not once per tick.
+ * Summed from the monthly history rather than carried as its own field, keeping it out of the
+ * persisted shape and preventing it from disagreeing with the emissions the player is actually
+ * scored on. The history is one entry per month -- a few hundred at the very most -- and this
+ * runs once per reforecast, not once per tick.
  */
 function getCumulativeMegatons(monthlyHistory: MonthlyHistoryType[]): number {
   let kgco2e = 0;
@@ -1552,6 +1514,38 @@ function reforecastDemand(state: GameType): TickPresentFutureType[] {
   });
 }
 
+/** Variable cost of holding one generator at its minimum stable output for one game tick. */
+function minimumStableOperatingCost(
+  state: GameType,
+  generator: GeneratorOperatingType,
+  tick: TickPresentFutureType,
+): number {
+  const minimumW = generator.peakW * (generator.minimumStableOutput || 0);
+  const generatedWh = (minimumW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  const variableOM =
+    (generatedWh / 1000000) * (generator.variableOperatingCostPerMWh || 0);
+  const fuel = FUELS[generator.fuel];
+  if (!fuel) {
+    return variableOM;
+  }
+  const fuelBtu =
+    ((minimumW * (generator.btuPerWh || 0)) / TICKS_PER_HOUR) *
+    GAME_TO_REAL_YEARS;
+  const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
+  const carbonCost = fuelBtu * fuel.kgCO2ePerBtu * state.feePerKgCO2e;
+  return variableOM + fuelCost + carbonCost;
+}
+
+function forecastIndexAt(state: GameType, minute: number): number {
+  if (state.timeline.length === 0) {
+    return 0;
+  }
+  return Math.max(
+    0,
+    Math.round((minute - state.timeline[0].minute) / TICK_MINUTES),
+  );
+}
+
 // Updates game state and now in place
 function updateSupplyFacilitiesFinances(
   state: GameType,
@@ -1559,6 +1553,7 @@ function updateSupplyFacilitiesFinances(
   now: TickPresentFutureType,
   simulated?: boolean,
   preRoll?: boolean,
+  optimizeCommitment = true,
 ) {
   const { facilities, date } = state;
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
@@ -1621,11 +1616,17 @@ function updateSupplyFacilitiesFinances(
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
   const startedFacilityIds = new Set<number>();
+  now.dispatchTargetWByFacility = {};
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
-    const previouslyGenerating = simulated
-      ? previousW > 0
-      : (g.generatingLastRealTick ?? previousW > 0);
+    const generator = g as GeneratorOperatingType;
+    const hasMinimumStableOutput =
+      !g.peakWh && (generator.minimumStableOutput || 0) > 0;
+    const previouslyCommitted = simulated
+      ? (generator.committed ?? previousW > 0)
+      : (generator.generatingLastRealTick ??
+        generator.committed ??
+        previousW > 0);
     let dispatchPeakW = g.peakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
@@ -1682,6 +1683,10 @@ function updateSupplyFacilitiesFinances(
       storageLossWh += lossWh;
     }
     if (g.paused) {
+      now.dispatchTargetWByFacility[g.id] = 0;
+      if (hasMinimumStableOutput) {
+        generator.committed = false;
+      }
       g.currentW = Math.max(
         0,
         g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
@@ -1694,7 +1699,9 @@ function updateSupplyFacilitiesFinances(
         hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
       }
       if (!simulated && g.tracksStarts) {
-        g.generatingLastRealTick = g.currentW > 0;
+        g.generatingLastRealTick = hasMinimumStableOutput
+          ? !!generator.committed
+          : g.currentW > 0;
       }
       return;
     }
@@ -1720,39 +1727,53 @@ function updateSupplyFacilitiesFinances(
             g.currentW = g.peakW * airborneWindOutputFactor;
             break;
           default: // on-demand produces up to demand + reserve margin
-            if (
-              requiredTargetW > g.currentW ||
-              i < indexOfLastUnchargedBattery
-            ) {
-              // spinning up
-              // If there's a battery to charge after me, output as much as possible to charge it beyond demand
-              if (
-                indexOfLastUnchargedBattery >= 0 &&
+            // If there's a battery after this plant, the dispatch request includes the extra
+            // output the existing storage policy would use to charge it beyond current demand.
+            const dispatchTargetW = Math.min(
+              dispatchPeakW,
+              indexOfLastUnchargedBattery >= 0 &&
                 i < indexOfLastUnchargedBattery
-              ) {
-                g.currentW = Math.min(
-                  now.demandW + totalChargeNeeded - charge,
-                  dispatchPeakW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
-                );
-              } else {
-                // Otherwise just try to fulfill demand + reserve margin
-                g.currentW = Math.min(
-                  dispatchPeakW,
-                  requiredTargetW,
-                  g.currentW + (g.peakW * TICK_MINUTES) / g.spinMinutes,
-                );
+                ? now.demandW + totalChargeNeeded - charge
+                : requiredTargetW,
+            );
+            now.dispatchTargetWByFacility[g.id] = dispatchTargetW;
+
+            let committedTargetW = dispatchTargetW;
+            if (hasMinimumStableOutput) {
+              if (dispatchTargetW > 0) {
+                generator.committed = true;
+              } else if (generator.committed) {
+                const keepOnline =
+                  !optimizeCommitment ||
+                  shouldKeepGeneratorCommitted({
+                    facilityId: g.id,
+                    forecast: state.timeline,
+                    fromIndex: forecastIndexAt(state, now.minute),
+                    startCost:
+                      (generator.costPerStart || 0) * GAME_TO_REAL_YEARS,
+                    minimumOperatingCost: (futureTick) =>
+                      minimumStableOperatingCost(state, generator, futureTick),
+                  });
+                generator.committed = keepOnline;
               }
-            } else {
-              g.currentW = Math.min(
-                dispatchPeakW,
-                Math.max(
-                  0,
-                  requiredTargetW,
-                  g.currentW - (g.peakW * TICK_MINUTES) / g.spinMinutes,
-                ),
-              );
+              committedTargetW = generator.committed
+                ? Math.max(
+                    dispatchTargetW,
+                    Math.min(
+                      dispatchPeakW,
+                      g.peakW * (generator.minimumStableOutput || 0),
+                    ),
+                  )
+                : 0;
             }
+
+            const rampW = (g.peakW * TICK_MINUTES) / g.spinMinutes;
+            g.currentW = Math.min(
+              dispatchPeakW,
+              committedTargetW > g.currentW
+                ? Math.min(committedTargetW, g.currentW + rampW)
+                : Math.max(committedTargetW, g.currentW - rampW),
+            );
             break;
         }
         supply += g.currentW;
@@ -1766,13 +1787,15 @@ function updateSupplyFacilitiesFinances(
         if (
           g.tracksStarts &&
           !preRoll &&
-          !previouslyGenerating &&
-          g.currentW > 0
+          !previouslyCommitted &&
+          (hasMinimumStableOutput ? generator.committed : g.currentW > 0)
         ) {
           startedFacilityIds.add(g.id);
         }
         if (!simulated && g.tracksStarts) {
-          g.generatingLastRealTick = g.currentW > 0;
+          g.generatingLastRealTick = hasMinimumStableOutput
+            ? !!generator.committed
+            : g.currentW > 0;
         }
       }
       if (g.peakWh) {
@@ -1817,10 +1840,10 @@ function updateSupplyFacilitiesFinances(
   now.hydroMandatedReleaseW = hydroMandatedReleaseW;
 
   // Update finances
-  // TODO have starting dollarsPerkWh rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const supplyWh =
-    (Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-  const demandWh = (now.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+    (Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  // Scale the representative simulated day to the real month it stands for.
+  const demandWh = (now.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
   const revenue = (supplyWh / 1000) * state.dollarsPerkWh;
 
   // Facilities expenses
@@ -1987,9 +2010,10 @@ function updateSupplyFacilitiesFinances(
   return now;
 }
 
-function reforecastSupply(
+function supplyForecastPass(
   state: GameType,
   simulated?: boolean,
+  withoutMinimumStableOutput = false,
 ): TickPresentFutureType[] {
   // updateSupplyFacilitiesFinances ramps generators, charges batteries and pays down loans by
   // mutating the facilities in place, so forecasting has to run against a copy of them. A shallow
@@ -1997,13 +2021,27 @@ function reforecastSupply(
   // its end-of-horizon state -- resuming a paused nuclear plant snapped straight to full output
   // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
   const newState = { ...state, facilities: cloneDeep(state.facilities) };
+  if (withoutMinimumStableOutput) {
+    newState.facilities.forEach((facility) => {
+      if (!facility.peakWh) {
+        (facility as GeneratorOperatingType).minimumStableOutput = undefined;
+      }
+    });
+  }
   const current = getTimeFromTimeline(state.date.minute, state.timeline);
   const currentCash = current?.cash;
   const currentCustomers = current?.customers;
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
-      t = updateSupplyFacilitiesFinances(newState, prev, { ...t }, simulated);
+      t = updateSupplyFacilitiesFinances(
+        newState,
+        prev,
+        { ...t },
+        simulated,
+        undefined,
+        !withoutMinimumStableOutput,
+      );
       // The current tick already happened. Reforecast its supply against the player's action,
       // but keep the transaction and customer balance that caused this reforecast. Otherwise
       // rebuilding from the previous tick erases a purchase refund (and, symmetrically, a cost).
@@ -2020,6 +2058,18 @@ function reforecastSupply(
     prev = t;
     return t;
   });
+}
+
+function reforecastSupply(
+  state: GameType,
+  simulated?: boolean,
+): TickPresentFutureType[] {
+  // First record the merit-order request each generator would receive without minimum-load
+  // constraints. The optimized pass then scans those per-facility requests to compare the cost
+  // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
+  // recursively re-simulating the fleet for every plant on every tick.
+  const baseline = supplyForecastPass(state, true, true);
+  return supplyForecastPass({ ...state, timeline: baseline }, simulated);
 }
 
 export function generateNewTimeline(
@@ -2092,6 +2142,7 @@ export function generateNewTimeline(
       hydroMandatedReleaseW: 0,
       storageLossWh: 0,
       supplyByFuel: {} as FuelProductionType,
+      dispatchTargetWByFacility: {},
       // Asserted because FuelPricesType carries a `[index: string]: number` index signature,
       // which a fresh object literal with a non-number field cannot satisfy. Same reason
       // reforecastWeatherAndPrices asserts its own tick literal.
@@ -2181,6 +2232,10 @@ function buildFacilityHelper(
           0,
         ) + 1,
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
+      committed:
+        g.minimumStableOutput !== undefined && g.peakWh === undefined
+          ? newGame
+          : undefined,
       generatingLastRealTick:
         g.tracksStarts && newGame && g.peakWh === undefined,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,

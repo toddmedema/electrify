@@ -29,9 +29,10 @@ describe("MainMenu", () => {
 
   it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
+    const user = userEvent.setup();
     render(<MainMenu {...props({ onStart })} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Play" }));
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
   });
