@@ -35,6 +35,12 @@ jest.mock("../base/ChartForecastFuelPrices", () => ({
     <div role="img" data-chart="fuel-prices" data-sync-key={syncKey} />
   ),
 }));
+jest.mock("../base/ChartForecastDemandByType", () => ({
+  __esModule: true,
+  default: ({ syncKey }: ChartMockProps) => (
+    <div role="img" data-chart="demand-by-type" data-sync-key={syncKey} />
+  ),
+}));
 jest.mock("../base/ChartForecastSupplyByFuel", () => ({
   __esModule: true,
   forecastFuels: () => [],
@@ -92,6 +98,7 @@ describe("Insights layers", () => {
       INSIGHT_LAYERS.length,
     );
     expect(INSIGHT_PRESETS.reliability.layers).toContain("supplyDemand");
+    expect(INSIGHT_PRESETS.reliability.layers).toContain("demandByType");
     expect(INSIGHT_PRESETS.profitability.layers).toContain("profit");
     expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
   });

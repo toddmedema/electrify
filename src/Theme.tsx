@@ -5,7 +5,12 @@
 
 import { blue, green, grey, red, amber } from "@mui/material/colors";
 import { createTheme, Theme } from "@mui/material/styles";
-import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
+import {
+  DemandTypeNameType,
+  FuelNameType,
+  ThemeChoiceType,
+  ThemeModeType,
+} from "./Types";
 
 /**
  * The game's two palettes.
@@ -58,6 +63,31 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
 /** The fuel colours for the palette in use. */
 export function fuelColors(): { [fuel: string]: string } {
   return FUEL_COLORS[currentMode];
+}
+
+const DEMAND_TYPE_COLORS: Record<
+  ThemeModeType,
+  Record<DemandTypeNameType, string>
+> = {
+  light: {
+    Residential: "#1565c0",
+    Commercial: "#6a1b9a",
+    Industrial: "#8d4b20",
+    Transportation: "#2e7d32",
+    "Data centers": "#c62828",
+  },
+  dark: {
+    Residential: "#64b5f6",
+    Commercial: "#ce93d8",
+    Industrial: "#d7a86e",
+    Transportation: "#81c784",
+    "Data centers": "#ef9a9a",
+  },
+};
+
+/** Colors shared by the demand-by-type chart and its DOM legend. */
+export function demandTypeColors(): Record<DemandTypeNameType, string> {
+  return DEMAND_TYPE_COLORS[currentMode];
 }
 
 /** One fuel's colour, or the storage colour for a facility that burns nothing. */
