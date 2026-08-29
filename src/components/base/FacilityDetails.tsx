@@ -82,7 +82,7 @@ export function fuelPriceTrend(
   seed: number,
   location?: LocationType,
 ): number[] {
-  const months = Math.min(TREND_MONTHS, date.monthsEllapsed + 1);
+  const months = Math.min(TREND_MONTHS, date.monthsElapsed + 1);
   if (months < 2) {
     return [];
   }

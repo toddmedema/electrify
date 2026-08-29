@@ -346,8 +346,8 @@ export function runSimulation(options: SimOptionsType): SimResultType {
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
-  // monthsEllapsed reaching the scenario duration, negative cash, or chronic blackouts.
-  while (state.date.monthsEllapsed < resolved.months) {
+  // monthsElapsed reaching the scenario duration, negative cash, or chronic blackouts.
+  while (state.date.monthsElapsed < resolved.months) {
     tickState(state);
     ticks++;
 
@@ -386,19 +386,19 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     checkMonth(collector, state.monthlyHistory[0], formatWhen(state));
 
     if (now.cash < 0) {
-      bankruptAtMonth = state.date.monthsEllapsed;
+      bankruptAtMonth = state.date.monthsElapsed;
       break; // The real game forces a restart here, so anything past it isn't a reachable state
     }
 
     if (hasChronicBlackouts(state.monthlyHistory)) {
-      firedAtMonth = state.date.monthsEllapsed;
+      firedAtMonth = state.date.monthsElapsed;
       break;
     }
 
     if (
       resolved.sellFacilityId !== null &&
       resolved.sellAtMonth > 0 &&
-      state.date.monthsEllapsed === resolved.sellAtMonth
+      state.date.monthsElapsed === resolved.sellAtMonth
     ) {
       state = cloneDeep(
         gameReducer(state, sellFacility(resolved.sellFacilityId)),
@@ -409,7 +409,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       const toBuild = pickFacilityToBuild(state, state.monthlyHistory[0]);
       if (toBuild) {
         builds.push({
-          month: state.date.monthsEllapsed,
+          month: state.date.monthsElapsed,
           name: toBuild.name,
           buildCost: toBuild.buildCost,
         });

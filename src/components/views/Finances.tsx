@@ -603,7 +603,7 @@ export default class Finances extends React.Component<Props, State> {
 
     const key = [
       this.state.range,
-      date.monthsEllapsed,
+      date.monthsElapsed,
       game.monthlyHistory.length,
       game.dollarsPerkWh,
       game.facilities.map((f) => `${f.id}${f.paused ? "p" : ""}`).join(","),

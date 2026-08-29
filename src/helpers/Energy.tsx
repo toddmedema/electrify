@@ -78,10 +78,9 @@ export function getAirborneWindOutputFactor(wind100mKph: number): number {
   return curve * AIRBORNE_SYSTEM_AVAILABILITY;
 }
 
-// Since solar panel nameplate wattages are usually rated at peak output at equator noon, we use that as baseline
-// Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-// TODO what about rain and snow, esp panels covered in snow? We should update irradianceWM2 based on weather when it's originally calculated...
-// but that still means we'd need to track some additional historic value of "even though it's not currently snowing, they're still covered in snow"
+// Solar nameplate wattages use peak irradiance as their baseline. Panel efficiency declines by
+// about 1% per degree above 10 C. Snow cover is not modeled because it would require persistent
+// accumulation state rather than only the current hour's weather.
 export function getSolarOutputFactor(
   irradianceWM2: number,
   temepratureC: number,

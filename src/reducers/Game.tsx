@@ -88,10 +88,6 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
-  MINIMUM_STABLE_OUTPUT_BY_FACILITY,
-  OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
-  OIL_VARIABLE_OPERATING_COST_PER_MWH,
-  START_TRACKING_FACILITY_NAMES,
   STORAGE,
   windAnnualOutputDegradation,
 } from "../data/Facilities";
@@ -691,59 +687,6 @@ export const gameSlice = createSlice({
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
-      restored.facilities.forEach((facility) => {
-        // The former Oil model stored one annual expense equal to $0.05/W-year. Recover the
-        // facility's already-applied difficulty and build-date inflation multiplier, then use it
-        // for both halves of the sourced fixed/variable split. Historical books are untouched.
-        if (
-          facility.name === "Oil" &&
-          facility.variableOperatingCostPerMWh === undefined
-        ) {
-          const legacyBaseAnnualCost = 0.05 * facility.peakW;
-          const recoveredMultiplier =
-            legacyBaseAnnualCost > 0
-              ? facility.annualOperatingCost / legacyBaseAnnualCost
-              : 1;
-          const multiplier =
-            Number.isFinite(recoveredMultiplier) && recoveredMultiplier >= 0
-              ? recoveredMultiplier
-              : 1;
-          facility.annualOperatingCost =
-            (facility.peakW / 1000) *
-            OIL_FIXED_OPERATING_COST_PER_KW_YEAR *
-            multiplier;
-          facility.variableOperatingCostPerMWh =
-            OIL_VARIABLE_OPERATING_COST_PER_MWH * multiplier;
-        }
-        // Save v6 predates the explicit capability for these technologies. Upgrade the facility
-        // snapshot once on resume, starting from its actual generating state so loading an online
-        // plant does not invent an opening start. Historical starts and charges remain unknown.
-        if (
-          facility.tracksStarts === undefined &&
-          START_TRACKING_FACILITY_NAMES.has(facility.name)
-        ) {
-          facility.tracksStarts = true;
-          facility.lifetimeStarts = facility.lifetimeStarts || 0;
-          facility.generatingLastRealTick = facility.currentW > 0;
-        }
-        const minimumStableOutput =
-          MINIMUM_STABLE_OUTPUT_BY_FACILITY[facility.name];
-        if (
-          facility.minimumStableOutput === undefined &&
-          minimumStableOutput !== undefined
-        ) {
-          facility.minimumStableOutput = minimumStableOutput;
-        }
-        if (
-          facility.minimumStableOutput !== undefined &&
-          facility.committed === undefined
-        ) {
-          facility.committed = !facility.paused && facility.currentW > 0;
-          if (facility.tracksStarts) {
-            facility.generatingLastRealTick = facility.committed;
-          }
-        }
-      });
       // The tick loop's module-level locals have to line up with the state being restored.
       // Unlike initGame, this one keeps the month: clearing it would make the first tick record a
       // second history entry for a month that's already in the log.
@@ -1317,7 +1260,7 @@ export function tickState(state: GameType) {
           );
         }
       } else if (
-        state.date.monthsEllapsed === (scenario.durationMonths || 12 * 20) &&
+        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20) &&
         !activeTutorialCapstone
       ) {
         // Success: Survived duration
@@ -1472,10 +1415,10 @@ const KG_PER_MEGATON = 1000000000;
  * Everything the player has emitted so far, in megatons of CO2e, which is what the weather warms
  * and destabilises in proportion to.
  *
- * Summed from the monthly history rather than carried as its own field so that it needs no
- * migration, no place in a save, and no chance of disagreeing with the emissions the player is
- * actually scored on. The history is one entry per month -- a few hundred at the very most -- and
- * this runs once per reforecast, not once per tick.
+ * Summed from the monthly history rather than carried as its own field, keeping it out of the
+ * persisted shape and preventing it from disagreeing with the emissions the player is actually
+ * scored on. The history is one entry per month -- a few hundred at the very most -- and this
+ * runs once per reforecast, not once per tick.
  */
 function getCumulativeMegatons(monthlyHistory: MonthlyHistoryType[]): number {
   let kgco2e = 0;
@@ -1897,10 +1840,10 @@ function updateSupplyFacilitiesFinances(
   now.hydroMandatedReleaseW = hydroMandatedReleaseW;
 
   // Update finances
-  // TODO have starting dollarsPerkWh rate by location, based on historic prices (not as fulfilling) - or at least use to double check
   const supplyWh =
-    (Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
-  const demandWh = (now.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS; // Output-dependent #'s converted to real months, since we don't simulate every day
+    (Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  // Scale the representative simulated day to the real month it stands for.
+  const demandWh = (now.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
   const revenue = (supplyWh / 1000) * state.dollarsPerkWh;
 
   // Facilities expenses

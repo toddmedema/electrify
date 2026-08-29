@@ -218,7 +218,7 @@ export function formatMinuteAsMonthAxis(
   multiyear: boolean,
 ): string {
   return formatMonthChartAxis(
-    getDateFromMinute(minute, startingYear).monthsEllapsed + 12 * startingYear,
+    getDateFromMinute(minute, startingYear).monthsElapsed + 12 * startingYear,
     multiyear,
   );
 }
@@ -356,7 +356,7 @@ export function getDateFromMinute(
   const hourOfDay = Math.floor(minuteOfDay / 60);
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
-  const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
+  const monthsElapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
   const year = yearsEllapsed + startingYear;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
@@ -375,7 +375,7 @@ export function getDateFromMinute(
     percentOfYear: percentOfYear || 0.00001,
     month,
     monthNumber,
-    monthsEllapsed,
+    monthsElapsed,
     year,
   };
 }

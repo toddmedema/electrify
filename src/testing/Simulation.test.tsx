@@ -13,8 +13,8 @@ jest.setTimeout(120000);
 // Ticks a state forwards without the simulator around it, for tests that care about where the
 // game ends up rather than about how it played
 function runMonths(state: GameType, months: number) {
-  const until = state.date.monthsEllapsed + months;
-  while (state.date.monthsEllapsed < until) {
+  const until = state.date.monthsElapsed + months;
+  while (state.date.monthsElapsed < until) {
     tickState(state);
   }
 }

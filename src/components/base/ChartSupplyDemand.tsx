@@ -141,8 +141,6 @@ function tooltip(idx: number, state: State): string {
   return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
-// TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
-// and don't actually differentiate between reality +  forecast in data?
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const { startingYear, height, legend, timeline, location } = props;
   // Figure out the boundaries of the chart data

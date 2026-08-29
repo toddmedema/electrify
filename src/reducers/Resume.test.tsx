@@ -3,10 +3,6 @@ import gameReducer, { loaded, resume, start, tickState } from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame } from "../testing/Simulator";
 import { GameType } from "../Types";
-import {
-  OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
-  OIL_VARIABLE_OPERATING_COST_PER_MWH,
-} from "../data/Facilities";
 
 jest.setTimeout(60000);
 
@@ -15,8 +11,8 @@ const OPTIONS = { scenarioId: 101, seed: 8675309 };
 const PLAYED_MONTHS = 6;
 
 function runMonths(state: GameType, months: number) {
-  const until = state.date.monthsEllapsed + months;
-  while (state.date.monthsEllapsed < until) {
+  const until = state.date.monthsElapsed + months;
+  while (state.date.monthsElapsed < until) {
     tickState(state);
   }
 }
@@ -53,56 +49,6 @@ describe("resume", () => {
     expect(restored.speed).toBe("PAUSED");
     expect(restored.inGame).toBe(false);
     expect(gameReducer(restored, loaded()).inGame).toBe(true);
-  });
-
-  it("upgrades old thermal facilities without inventing an opening start", () => {
-    const oldSave = serialized(createGame({ scenarioId: 103, seed: 8675309 }));
-    const coal = oldSave.facilities.find(
-      (facility) => facility.name === "Coal",
-    )!;
-    coal.tracksStarts = undefined;
-    coal.costPerStart = undefined;
-    coal.lifetimeStarts = undefined;
-    coal.minimumStableOutput = undefined;
-    coal.committed = undefined;
-    coal.generatingLastRealTick = undefined;
-
-    const restored = restore(oldSave);
-    const restoredCoal = restored.facilities.find(
-      (facility) => facility.name === "Coal",
-    )!;
-    expect(restoredCoal.tracksStarts).toBe(true);
-    expect(restoredCoal.costPerStart).toBeUndefined();
-    expect(restoredCoal.lifetimeStarts).toBe(0);
-    expect(restoredCoal.minimumStableOutput).toBe(0.4);
-    expect(restoredCoal.committed).toBe(restoredCoal.currentW > 0);
-    expect(restoredCoal.generatingLastRealTick).toBe(restoredCoal.currentW > 0);
-  });
-
-  it("migrates legacy Oil O&M with its saved difficulty and vintage multiplier", () => {
-    const oldSave = serialized(createGame({ scenarioId: 101, seed: 8675309 }));
-    const oil = oldSave.facilities.find((facility) => facility.name === "Oil")!;
-    const multiplier = 1.37;
-    const historicalExpenses = oil.lifetimeExpenses;
-    oil.annualOperatingCost = 0.05 * oil.peakW * multiplier;
-    oil.variableOperatingCostPerMWh = undefined;
-
-    const restoredOil = restore(oldSave).facilities.find(
-      (facility) => facility.name === "Oil",
-    )!;
-    expect(restoredOil.annualOperatingCost).toBeCloseTo(
-      (restoredOil.peakW / 1000) *
-        OIL_FIXED_OPERATING_COST_PER_KW_YEAR *
-        multiplier,
-      6,
-    );
-    expect(restoredOil.variableOperatingCostPerMWh).toBeCloseTo(
-      OIL_VARIABLE_OPERATING_COST_PER_MWH * multiplier,
-      10,
-    );
-    expect(restoredOil.lifetimeExpenses).toBe(historicalExpenses);
-    expect(Number.isFinite(restoredOil.annualOperatingCost)).toBe(true);
-    expect(Number.isFinite(restoredOil.variableOperatingCostPerMWh)).toBe(true);
   });
 
   /**

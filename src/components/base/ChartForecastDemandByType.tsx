@@ -169,8 +169,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
         return;
       }
       minutes.push(tick.minute);
-      // Old saves can briefly render one pre-migration tick before the first reforecast.
-      byType.push(tick.demandByType || EMPTY_BREAKDOWN);
+      byType.push(tick.demandByType);
     });
 
     const stacked: number[][] = [];

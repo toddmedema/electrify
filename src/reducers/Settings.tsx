@@ -17,8 +17,6 @@ function storedVolume(key: string): number {
 
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBooleanOrUndefined("audioEnabled"),
-  // Saves from before separate buses have neither key, which preserves their old full-volume
-  // behaviour. audioEnabled still decides whether either bus is allowed to play.
   musicVolume: storedVolume("musicVolume"),
   soundEffectsVolume: storedVolume("soundEffectsVolume"),
   // getStorageChoice rather than getStorageString so a hand-edited or outdated value falls back

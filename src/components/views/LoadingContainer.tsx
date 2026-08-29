@@ -111,8 +111,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         ]);
         reportProgress("Starting your mission…");
         if (!resumed) {
-          // Otherwise, generate from scratch
-          // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
+          // A new game uses the scenario's authored opening fleet.
           dispatch(
             initGame({
               facilities: scenario.facilities,

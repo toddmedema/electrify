@@ -226,7 +226,7 @@ export interface DateType {
   percentOfYear: number; // 0 - 1
   month: MonthType;
   monthNumber: number; // 1 - 12
-  monthsEllapsed: number;
+  monthsElapsed: number;
   year: number;
 }
 
@@ -367,7 +367,7 @@ export interface LifetimeTotals {
   lifetimeRevenue: number; // Its pro-rata share of what the company sold
   lifetimeExpenses: number; // Its own fuel, O&M, carbon fees and loan interest
   // Representative starts: one on/off edge in the sampled day stands for every day in its month.
-  // Optional so launch saves made before start-based maintenance remain readable.
+  // Present only for generators whose maintenance model tracks starts.
   lifetimeStarts?: number;
 }
 
@@ -398,7 +398,7 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Fraction of nameplate output permanently lost each operating year. Optional because most
   // generator types do not have a well-supported secular output decline.
   annualOutputDegradation?: number;
-  spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
+  spinMinutes: number; // 1 for renewables, avoiding repeated fallback coercion in the tick loop
   btuPerWh: number; // Heat Rate, but per W for less math per frame
   // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
   // it transiently; an online unit otherwise produces at least this much.
@@ -409,8 +409,8 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Non-fuel expense charged for one physical start. Only present when the technology's source
   // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
-  // Non-fuel O&M charged against actual generation. Optional because most legacy technology
-  // records already annualize every non-fuel operating expense into annualOperatingCost.
+  // Non-fuel O&M charged against actual generation. Technologies without a separately sourced
+  // variable component annualize all non-fuel operating expense into annualOperatingCost.
   variableOperatingCostPerMWh?: number;
   // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
   // long-run inflow lands on capacityFactor without flattening wet and dry years.
@@ -420,9 +420,9 @@ export interface GeneratorShoppingType extends SharedShoppingType {
 }
 
 interface SharedShoppingType {
-  // TODO remove: this defeats type checking on every shopping type, but the build and
-  // facilities views index these by string and treat the Storage/Generator union as
-  // interchangeable, so it cannot go until those are narrowed properly.
+  // Facility reducers and presentation components read technology-specific fields through the
+  // generator/storage union. Keep that established structural API localized here; code that
+  // dynamically selects known fields should use a keyed union instead.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [index: string]: any;
   name: string;
@@ -682,8 +682,8 @@ export type ThemeChoiceType = ThemeModeType | "system";
 
 export interface SettingsType {
   audioEnabled?: boolean;
-  // Independent buses: zero mutes one without silencing the other. audioEnabled remains the
-  // master switch (and the first-run permission), so old preferences migrate without surprise.
+  // Independent buses: zero mutes one without silencing the other. audioEnabled is the master
+  // switch and remains undefined until the player grants first-run audio permission.
   musicVolume: number;
   soundEffectsVolume: number;
   units: UnitSystemType;

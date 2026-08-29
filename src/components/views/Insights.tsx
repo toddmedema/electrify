@@ -433,8 +433,8 @@ export default class Insights extends React.Component<Props, State> {
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
     return (
       nextState !== this.state ||
-      nextProps.game.date.monthsEllapsed !==
-        this.props.game.date.monthsEllapsed ||
+      nextProps.game.date.monthsElapsed !==
+        this.props.game.date.monthsElapsed ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -552,7 +552,7 @@ export default class Insights extends React.Component<Props, State> {
       years > 0 ? years * 12 : Math.max(0, 12 - game.date.monthNumber);
     const key = [
       this.state.range,
-      game.date.monthsEllapsed,
+      game.date.monthsElapsed,
       game.monthlyHistory.length,
       game.dollarsPerkWh,
       game.feePerKgCO2e,
