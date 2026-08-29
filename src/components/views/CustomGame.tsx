@@ -36,6 +36,7 @@ import { getViableLocationCount } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
+import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { formatWattHours, formatWatts } from "../../helpers/Format";
@@ -228,6 +229,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // one of its options renders blank and drops the choice on the next edit. Listed last, under
   // its own heading, so it doesn't shuffle the rest of the list around.
   const current = getScenarioLocation(scenario);
+  React.useEffect(() => {
+    if (current) {
+      void prefetchScenarioData(current);
+    }
+  }, [current]);
   const selectableLocations = React.useMemo(
     () =>
       current && !cities.some((c: CityType) => c.id === current.id)
