@@ -64,14 +64,15 @@ import {
 } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
-import { DEMAND_TYPES } from "../../data/DemandProfiles";
 import {
   chartPalette,
   demandTypeColors,
   fuelColors,
   fuelDashArrays,
 } from "../../Theme";
-import ChartForecastDemandByType from "../base/ChartForecastDemandByType";
+import ChartForecastDemandByType, {
+  demandTypesBySizeAtStart,
+} from "../base/ChartForecastDemandByType";
 import ChartFinances from "../base/ChartFinances";
 import ChartForecastFuelPrices, {
   PRICED_FUELS,
@@ -145,9 +146,9 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
 ] as const;
 
 export type InsightPresetId =
+  | "overview"
   | "reliability"
   | "profitability"
-  | "hydro"
   | "growth"
   | "decarbonization"
   | "custom";
@@ -156,31 +157,34 @@ export const INSIGHT_PRESETS: Record<
   Exclude<InsightPresetId, "custom">,
   { label: string; layers: InsightLayerId[] }
 > = {
+  // Each preset reads from the outcome a player is trying to protect into the causes they can
+  // act on. Overview is deliberately the five universal health signals: optional technologies
+  // belong in the diagnostic presets, not in the first view a new player sees.
+  overview: {
+    label: "Overview",
+    layers: ["supplyDemand", "cash", "profit", "customers", "emissions"],
+  },
   reliability: {
     label: "Reliability",
-    layers: [
-      "supplyDemand",
-      "demandByType",
-      "supplyByFuel",
-      "storage",
-      "weather",
-    ],
+    layers: ["supplyDemand", "supplyByFuel", "storage", "weather", "water"],
   },
   profitability: {
     label: "Profitability",
-    layers: ["profit", "revenue", "expenses", "fuelPrices", "financeDetails"],
-  },
-  hydro: {
-    label: "Hydro operations",
-    layers: ["supplyDemand", "water", "weather", "profit"],
+    layers: ["profit", "cash", "revenue", "expenses", "fuelPrices"],
   },
   growth: {
-    label: "Growth",
+    label: "Growth & pricing",
     layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
   },
   decarbonization: {
     label: "Decarbonization",
-    layers: ["supplyByFuel", "emissions", "fuelPrices", "profit"],
+    layers: [
+      "emissions",
+      "supplyByFuel",
+      "supplyDemand",
+      "fuelPrices",
+      "profit",
+    ],
   },
 };
 
@@ -245,7 +249,7 @@ function storedLayers(): InsightLayerId[] {
     (id, index): id is InsightLayerId =>
       ALL_LAYER_IDS.has(id as InsightLayerId) && value.indexOf(id) === index,
   );
-  return valid.length ? valid : [...INSIGHT_PRESETS.reliability.layers];
+  return valid.length ? valid : [...INSIGHT_PRESETS.overview.layers];
 }
 
 export function presetForLayers(layers: InsightLayerId[]): InsightPresetId {
@@ -784,11 +788,15 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
-        case "demandByType":
+        case "demandByType": {
+          const demandTypes = demandTypesBySizeAtStart(
+            projection.sampled,
+            projection.domain.x[0],
+          );
           body = (
             <>
               <ChartLegend
-                items={DEMAND_TYPES.map((type) => ({
+                items={demandTypes.map((type) => ({
                   name: type,
                   color: demandTypeColors()[type],
                 }))}
@@ -797,6 +805,7 @@ export default class Insights extends React.Component<Props, State> {
                 height={140}
                 timeline={projection.sampled}
                 domain={{ x: projection.domain.x }}
+                displayTypes={demandTypes}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
@@ -804,6 +813,7 @@ export default class Insights extends React.Component<Props, State> {
             </>
           );
           break;
+        }
         case "supplyByFuel":
           body = (
             <>

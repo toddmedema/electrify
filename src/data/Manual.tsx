@@ -163,10 +163,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           together. This is also where you set the electricity rate.
         </p>
         <p>
-          A good first move is to open Insights, choose the Reliability preset,
-          find the first blackout, and work out whether it needs something cheap
-          that runs constantly or something expensive that starts quickly. The
-          rest of this manual explains the terms you'll meet along the way.
+          A good first move is to open Insights and scan the Overview: first for
+          blackouts or falling cash, then for the profit, customer and emissions
+          trends behind them. If supply falls short, choose Reliability to work
+          out whether the gap needs something cheap that runs constantly or
+          something expensive that starts quickly. The rest of this manual
+          explains the terms you'll meet along the way.
         </p>
       </div>
     ),
