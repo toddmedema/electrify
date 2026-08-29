@@ -64,6 +64,30 @@ describe("MainMenu", () => {
     );
   });
 
+  it("puts every non-footer action on its own line with cohesive spacing", () => {
+    render(
+      <MainMenu
+        {...props({
+          audioEnabled: undefined,
+          hasSavedGame: true,
+          uid: undefined,
+        })}
+      />,
+    );
+
+    const primary = screen.getByRole("region", { name: "Primary actions" });
+    const resources = screen.getByRole("navigation", {
+      name: "Game resources",
+    });
+    const discovery = screen.getByRole("region", {
+      name: "Discovery actions",
+    });
+
+    expect(primary).toHaveStyle({ flexDirection: "column" });
+    expect(resources).toHaveStyle({ flexDirection: "column", gap: "6px" });
+    expect(discovery).toHaveStyle({ flexDirection: "column", gap: "6px" });
+  });
+
   it("keeps sharing as a compact footer icon", () => {
     render(<MainMenu {...props()} />);
 
