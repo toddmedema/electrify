@@ -540,6 +540,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           moving.
         </p>
         <p>
+          Thermal plants also have a <strong>minimum stable output</strong>.
+          While online they cannot sit at a trace output: depending on the
+          technology, Electrify holds them at 15% to 50% of nameplate. When
+          demand falls below that level, dispatch compares the forecasted cost
+          of running at minimum with the next start cost, then either keeps the
+          plant online or begins shutting it down.
+        </p>
+        <p>
           Demand can swing by a third between 4am and 6pm, so a fleet has to be
           able to follow it. A slow plant is only useful for the demand that's
           there all day, which is why ramp rate, not price, is usually what

@@ -74,6 +74,25 @@ export const START_TRACKING_FACILITY_NAMES = new Set([
   "Enhanced Geothermal",
 ]);
 
+// Representative steady-state turndown limits. These are deliberately technology-level inputs,
+// not claims that every individual unit has the same operating envelope. The GE Energy/HNEI
+// ancillary-services study reports 35-40% for coal and biomass, 12-15% for geothermal, 15-70%
+// for heavy-duty simple-cycle gas turbines and 50% for reciprocating engines. NREL production-
+// cost studies commonly model coal/nuclear and gas units in the 30-60% range. Midpoints keep the
+// gameplay legible while preventing a nominally online thermal plant from idling at trace output.
+// Existing saves use this map during resume migration.
+export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
+  Record<string, number>
+> = {
+  Coal: 0.4,
+  Nuclear: 0.5,
+  "Natural Gas": 0.5,
+  Oil: 0.5,
+  Biomass: 0.4,
+  Geothermal: 0.15,
+  "Enhanced Geothermal": 0.15,
+};
+
 /** Exponential interpolation between two real-cost observations, held flat outside them. */
 function costBetween(
   year: number,
@@ -231,6 +250,7 @@ export function GENERATORS(
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
       annualOperatingCost: annualOperatingCost(peakW, 0.68, 61.6, 6.4),
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Coal,
       tracksStarts: true,
       // NREL's conservative hot-start case, normalized from 2011$ to 2023$ with annual-average
       // CPI-U and scaled by nameplate MW. Fuel input and EFOR effects are deliberately excluded.
@@ -260,6 +280,7 @@ export function GENERATORS(
       btuPerWh: 10.608,
       spinMinutes: 600,
       annualOperatingCost: annualOperatingCost(peakW, 0.93, 156.2, 2.52),
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Nuclear,
       tracksStarts: true,
       yearsToBuild: 6 + magnitude / 3,
       // AEO2025 reference lead time is 84 months and operating life is 40 years.
@@ -286,6 +307,7 @@ export function GENERATORS(
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY["Natural Gas"],
       tracksStarts: true,
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
       // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
@@ -322,6 +344,7 @@ export function GENERATORS(
       // https://www.eia.gov/analysis/studies/buildings/distrigen/pdf/dg_chp.pdf
       annualOperatingCost:
         (peakW / 1000) * OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Oil,
       variableOperatingCostPerMWh: OIL_VARIABLE_OPERATING_COST_PER_MWH,
       yearsToBuild: 1 + magnitude / 3,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
@@ -353,6 +376,7 @@ export function GENERATORS(
       // has one annual O&M field, so both are converted to 2018 dollars and variable O&M is
       // annualized at the observed 60.2% capacity factor.
       annualOperatingCost: 0.14471 * peakW,
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Biomass,
       tracksStarts: true,
       yearsToBuild: 5,
       // 2022 U.S. "other biomass" fleet average; wood was 57.9% in the same table.
@@ -544,6 +568,7 @@ export function GENERATORS(
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
       annualOperatingCost: annualOperatingCost(peakW, 0.88, 150.6, 0),
+      minimumStableOutput: MINIMUM_STABLE_OUTPUT_BY_FACILITY.Geothermal,
       tracksStarts: true,
       yearsToBuild: 3,
       // EIA AEO2025 reference lead time is 36 months and operating life is 40 years.
@@ -564,6 +589,8 @@ export function GENERATORS(
       maxPeakW: 500000000,
       btuPerWh: 0,
       annualOperatingCost: 0.16 * peakW,
+      minimumStableOutput:
+        MINIMUM_STABLE_OUTPUT_BY_FACILITY["Enhanced Geothermal"],
       tracksStarts: true,
       yearsToBuild: 3 + magnitude / 4,
       spinMinutes: 1,
