@@ -1,9 +1,23 @@
-import { loadAudioFiles, state as audioState } from "../../data/Audio";
+import {
+  loadAudioFiles,
+  pause,
+  playSoundEffect,
+  resume,
+  setMusicVolume,
+  setSoundEffectsVolume,
+  state as audioState,
+} from "../../data/Audio";
+import {
+  soundEffectsForUpdate,
+  SoundEventSnapshot,
+} from "../../audio/SoundEvents";
 import { INIT_DELAY } from "../../Constants";
 import * as React from "react";
 
-export interface StateProps {
+export interface StateProps extends SoundEventSnapshot {
   enabled?: boolean;
+  musicVolume: number;
+  soundEffectsVolume: number;
 }
 
 export interface DispatchProps {
@@ -20,24 +34,22 @@ export default class Audio extends React.Component<Props, {}> {
       if (!this.props.enabled) {
         return;
       }
-      this.handleEnableState();
+      this.handleEnableState(this.props.enabled);
     }, INIT_DELAY.LOAD_AUDIO_MILLIS);
   }
 
   private handleEnableState(enabled?: boolean) {
     if (audioState.loaded === "UNLOADED") {
-      loadAudioFiles();
+      loadAudioFiles(this.props.musicVolume, this.props.soundEffectsVolume);
     } else if (audioState.loaded === "ERROR" && enabled) {
       this.props.disableAudio();
     } else {
-      const tm = audioState.themeManager;
-      if (!tm) {
-        return;
-      }
+      setMusicVolume(this.props.musicVolume);
+      setSoundEffectsVolume(this.props.soundEffectsVolume);
       if (!enabled) {
-        tm.pause();
+        pause();
       } else {
-        tm.resume();
+        resume();
       }
     }
   }
@@ -48,6 +60,17 @@ export default class Audio extends React.Component<Props, {}> {
   componentDidUpdate(prevProps: StateProps) {
     if (this.props.enabled !== prevProps.enabled) {
       this.handleEnableState(this.props.enabled);
+    } else {
+      if (this.props.musicVolume !== prevProps.musicVolume) {
+        setMusicVolume(this.props.musicVolume);
+      }
+      if (this.props.soundEffectsVolume !== prevProps.soundEffectsVolume) {
+        setSoundEffectsVolume(this.props.soundEffectsVolume);
+      }
+    }
+
+    if (this.props.enabled) {
+      soundEffectsForUpdate(prevProps, this.props).forEach(playSoundEffect);
     }
   }
 

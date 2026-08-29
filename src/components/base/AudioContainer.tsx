@@ -5,9 +5,18 @@ import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Audio, { DispatchProps, StateProps } from "./Audio";
 
+const NO_EVENTS: NonNullable<AppStateType["game"]["eventLog"]> = [];
+
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     enabled: state.settings.audioEnabled,
+    musicVolume: state.settings.musicVolume,
+    soundEffectsVolume: state.settings.soundEffectsVolume,
+    inGame: state.game.inGame,
+    events: state.game.eventLog || NO_EVENTS,
+    victoryOpen: Boolean(state.ui.victory),
+    dialogOpen: state.ui.dialog.open,
+    dialogTitle: state.ui.dialog.title,
   };
 };
 

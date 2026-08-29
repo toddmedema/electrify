@@ -10,6 +10,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
+  Slider,
   Stack,
   Toolbar,
   Typography,
@@ -37,6 +38,8 @@ export interface DispatchProps {
   onLogout: () => void;
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
+  onMusicVolumeChange: (change: number) => void;
+  onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onExportSave: () => void;
@@ -91,7 +94,7 @@ function SettingsSection({
 
 export default function Settings(props: Props): React.JSX.Element {
   const installedApp = useIsInstalledApp();
-  // TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
+  // TODO: font size, auto-pause while looking at build options, keyboard shortcuts, ...?
   // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
 
   // <Checkbox id="help" label="Show Help" value={props.settings.showHelp} onChange={props.onShowHelpChange}>
@@ -172,6 +175,31 @@ export default function Settings(props: Props): React.JSX.Element {
                   : "Music and sound effects disabled"
               }
             />
+            <Box sx={{ width: "100%", maxWidth: 360, px: 1 }}>
+              <Typography id="music-volume-label" variant="body2">
+                Music volume: {Math.round(props.settings.musicVolume * 100)}%
+              </Typography>
+              <Slider
+                aria-labelledby="music-volume-label"
+                value={Math.round(props.settings.musicVolume * 100)}
+                disabled={!props.settings.audioEnabled}
+                onChange={(_e: Event, value: number | number[]) =>
+                  props.onMusicVolumeChange((value as number) / 100)
+                }
+              />
+              <Typography id="effects-volume-label" variant="body2">
+                Sound effects volume:{" "}
+                {Math.round(props.settings.soundEffectsVolume * 100)}%
+              </Typography>
+              <Slider
+                aria-labelledby="effects-volume-label"
+                value={Math.round(props.settings.soundEffectsVolume * 100)}
+                disabled={!props.settings.audioEnabled}
+                onChange={(_e: Event, value: number | number[]) =>
+                  props.onSoundEffectsVolumeChange((value as number) / 100)
+                }
+              />
+            </Box>
           </SettingsSection>
 
           <SettingsSection id="account-settings" title="Account">

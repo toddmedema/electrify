@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   getStorageBooleanOrUndefined,
   getStorageChoice,
+  getStorageNumber,
   setStorageKeyValue,
 } from "../LocalStorage";
 import { SettingsType } from "../Types";
@@ -9,8 +10,17 @@ import { pause, resume } from "../data/Audio";
 import { DEFAULT_UNIT_SYSTEM, UNIT_SYSTEMS } from "../helpers/Units";
 import { THEME_CHOICES } from "../Theme";
 
+function storedVolume(key: string): number {
+  const value = getStorageNumber(key, 1);
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+}
+
 export const initialSettings: SettingsType = {
   audioEnabled: getStorageBooleanOrUndefined("audioEnabled"),
+  // Saves from before separate buses have neither key, which preserves their old full-volume
+  // behaviour. audioEnabled still decides whether either bus is allowed to play.
+  musicVolume: storedVolume("musicVolume"),
+  soundEffectsVolume: storedVolume("soundEffectsVolume"),
   // getStorageChoice rather than getStorageString so a hand-edited or outdated value falls back
   // to metric instead of reaching the formatters as a system that does not exist
   units: getStorageChoice("units", UNIT_SYSTEMS, DEFAULT_UNIT_SYSTEM),
