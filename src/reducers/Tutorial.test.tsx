@@ -1,12 +1,17 @@
 import { configureStore, UnknownAction } from "@reduxjs/toolkit";
 import * as React from "react";
 import { getPlayedScenarioIds } from "../LocalStorage";
-import { AppStateType, CardNameType, TutorialStepType } from "../Types";
+import {
+  AppStateType,
+  CardNameType,
+  GameType,
+  TutorialStepType,
+} from "../Types";
 import { DEFAULT_CUSTOM_SCENARIO, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
-import { tutorialGateMiddleware } from "./Tutorial";
+import { restartTutorialAtStep, tutorialGateMiddleware } from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
 
@@ -20,7 +25,11 @@ function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
 
 function initialState(
   steps: TutorialStepType[],
-  options: { rate?: number; tutorialStep?: number } = {},
+  options: {
+    rate?: number;
+    speed?: GameType["speed"];
+    tutorialStep?: number;
+  } = {},
 ): AppStateType {
   const init = { type: "test/init" };
   return {
@@ -36,6 +45,7 @@ function initialState(
         tutorialSteps: steps,
       },
       dollarsPerkWh: options.rate ?? 0.07,
+      speed: options.speed ?? "PAUSED",
       tutorialStep: options.tutorialStep || 0,
     },
     settings: settingsReducer(undefined, init),
@@ -63,6 +73,15 @@ function reducer(
       },
     };
   }
+  if (action.type === "game/setSpeed") {
+    return {
+      ...state,
+      game: {
+        ...state.game,
+        speed: action.payload as GameType["speed"],
+      },
+    };
+  }
   if (action.type === "card/navigate") {
     const payload = action.payload as
       string | { name: AppStateType["card"]["name"] };
@@ -86,12 +105,22 @@ function reducer(
       },
     };
   }
+  if (action.type === "ui/dialogOpen") {
+    return {
+      ...state,
+      ui: uiReducer(state.ui, action),
+    };
+  }
   return state;
 }
 
 function tutorialStore(
   steps: TutorialStepType[],
-  options?: { rate?: number; tutorialStep?: number },
+  options?: {
+    rate?: number;
+    speed?: GameType["speed"];
+    tutorialStep?: number;
+  },
 ) {
   return configureStore({
     reducer,
@@ -190,5 +219,77 @@ describe("tutorialGateMiddleware", () => {
     expect(store.getState().ui.snackbar).toEqual(
       expect.objectContaining({ open: true, actionLabel: "Missions" }),
     );
+  });
+
+  it("completes a capstone from its deterministic state predicate", () => {
+    const steps: TutorialStepType[] = [
+      {
+        ...informational(),
+        capstone: {
+          success: (state) => state.game.dollarsPerkWh < 0.07,
+          successMessage: "Capacity arrived before the peak.",
+          failureMessage: "Capacity arrived after the peak.",
+        },
+      },
+    ];
+    const store = tutorialStore(steps, { rate: 0.06 });
+
+    store.dispatch({ type: "test/check-capstone" });
+
+    expect(store.getState().game.tutorialStep).toBe(1);
+    expect(store.getState().ui.snackbar.message).toBe(
+      "Capacity arrived before the peak.",
+    );
+  });
+
+  it("pauses a failed capstone with consequence feedback and retry controls", () => {
+    const steps: TutorialStepType[] = [
+      {
+        ...informational(),
+        capstone: {
+          success: () => false,
+          failure: (state) => state.game.dollarsPerkWh < 0.07,
+          successMessage: "Capacity arrived before the peak.",
+          failureMessage: "Construction finished after the forecast peak.",
+        },
+      },
+    ];
+    const store = tutorialStore(steps, { rate: 0.06, speed: "FAST" });
+
+    store.dispatch({ type: "test/check-capstone" });
+
+    expect(store.getState().game.tutorialStep).toBe(0);
+    expect(store.getState().game.speed).toBe("PAUSED");
+    expect(store.getState().ui.dialog).toEqual(
+      expect.objectContaining({
+        open: true,
+        title: "Capstone needs another try",
+        message: "Construction finished after the forecast peak.",
+        actionLabel: "Retry capstone",
+        secondaryLabel: "Exit tutorial",
+      }),
+    );
+  });
+});
+
+describe("restartTutorialAtStep", () => {
+  it("rebuilds the authored scenario and preserves the capstone objective", () => {
+    const dispatched: UnknownAction[] = [];
+    restartTutorialAtStep(
+      ((action: UnknownAction) => {
+        dispatched.push(action);
+        return action;
+      }) as never,
+      1,
+      5,
+    );
+
+    expect(dispatched.map((action) => action.type)).toEqual([
+      "game/quit",
+      "game/start",
+      "game/delta",
+    ]);
+    expect(dispatched[1].payload).toBe(1);
+    expect(dispatched[2].payload).toEqual({ tutorialStep: 5 });
   });
 });

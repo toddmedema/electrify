@@ -204,7 +204,7 @@ export function isResumedGame(game: GameType): boolean {
  *
  * isSaveableScenario is injected rather than looked up here (see the note at the top of the file);
  * pass a predicate that rejects tutorials, which are short enough not to be worth saving and would
- * need their mid-Joyride step restored too.
+ * otherwise need their short-lived objective state restored too.
  */
 export function startAutosave(
   store: AppStore,

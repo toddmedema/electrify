@@ -2,12 +2,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as React from "react";
 import { UnknownAction } from "redux";
-import { ACTIONS, EVENTS, EventData } from "react-joyride";
 import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
-import Compositor, { Props as CompositorProps } from "./Compositor";
 import { mapDispatchToProps } from "./CompositorContainer";
 
 // Where `loaded` drops the player, and so where every walkthrough starts
@@ -98,8 +96,8 @@ describe("onTutorialStep", () => {
   /**
    * Regression test. Back used to dispatch the previous step's onNext, which only ever modelled
    * moving forwards, so nothing undid the navigation the forward step performed: the player was
-   * left on the build screen while the step's target lived on Facilities, Joyride found no
-   * target, and the walkthrough appeared to die with no tooltip anywhere.
+   * left on the build screen while the step's target lived on Facilities, so the objective had
+   * no relevant control to identify.
    */
   it("navigates back onto the card holding the previous step's target", () => {
     const dispatched = step({
@@ -169,6 +167,26 @@ describe("onTutorialStep", () => {
         step({ steps, fromStep: 1, toStep: 0, currentCard: "INSIGHTS" }),
       ).not.toContainEqual(sideEffect);
     });
+  });
+
+  it("starts an unguided capstone from its authored scenario state", () => {
+    const capstone = generators.findIndex((candidate) => candidate.capstone);
+    expect(capstone).toBeGreaterThan(0);
+
+    const dispatched = step({
+      steps: generators,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
+    expect(dispatched.map((action) => action.type)).toEqual([
+      "game/quit",
+      "game/start",
+      "game/delta",
+    ]);
+    expect(dispatched[1].payload).toBe(1);
+    expect(dispatched[2].payload).toEqual({ tutorialStep: capstone });
   });
 });
 
@@ -263,7 +281,7 @@ describe("walkthrough steps", () => {
     });
 
     // Walk the whole thing forwards and then all the way back, tracking the card the store
-    // would be showing. Any step whose target isn't on the current card would show no tooltip
+    // would be showing. Any step whose target isn't on the current card would point at nothing
     it(`${scenario.name} shows each step's card in both directions`, () => {
       let card: CardNameType = STARTING_CARD;
       expect(cardOf(steps[0])).toBe(card);
@@ -292,12 +310,9 @@ describe("walkthrough steps", () => {
     });
 
     /**
-     * Joyride reports a selector matching nothing as TARGET_NOT_FOUND, which the walkthrough
-     * handles by moving straight on - so a step pointing at markup that has since been renamed
-     * quietly vanishes rather than failing. The move off Victory took `.VictoryContainer` with
-     * it exactly that way, and the tutorial lost its tour of the supply/demand graph without a
-     * single red test. Rendering every card would be the airtight check; scanning the source
-     * for the id or class each selector names catches the same kind of rename far cheaper.
+     * A selector matching nothing silently loses the restrained target treatment. Rendering every
+     * card would be the airtight check; scanning the source for the id or class each selector names
+     * catches that kind of rename far cheaper.
      */
     it(`${scenario.name} points every step at markup that still exists`, () => {
       targetsOf(steps).forEach((target) => {
@@ -306,63 +321,5 @@ describe("walkthrough steps", () => {
         });
       });
     });
-  });
-});
-
-describe("handleJoyrideCallback", () => {
-  const steps = walkthrough("Mission 2: Generators");
-
-  function fire(tutorialStep: number, event: Partial<EventData>) {
-    const onTutorialStep = jest.fn();
-    const onTutorialEnd = jest.fn();
-    const compositor = new Compositor({
-      tutorialStep,
-      tutorialSteps: steps,
-      scenarioId: 1,
-      card: { name: STARTING_CARD, ts: 0 },
-      onTutorialStep,
-      onTutorialEnd,
-    } as unknown as CompositorProps);
-    compositor.handleJoyrideCallback(event as EventData);
-    return { onTutorialStep, onTutorialEnd };
-  }
-
-  it("advances past a target that never turns up mid-walkthrough", () => {
-    const { onTutorialStep } = fire(1, {
-      action: ACTIONS.NEXT,
-      index: 1,
-      type: EVENTS.TARGET_NOT_FOUND,
-    });
-    expect(onTutorialStep).toHaveBeenCalled();
-  });
-
-  it("does not skip a gated deed when its target is temporarily missing", () => {
-    const { onTutorialStep } = fire(2, {
-      action: ACTIONS.NEXT,
-      index: 2,
-      type: EVENTS.TARGET_NOT_FOUND,
-    });
-    expect(onTutorialStep).not.toHaveBeenCalled();
-  });
-
-  // Quitting takes the targets out of the DOM, which Joyride reports the same way. Acting on it
-  // navigated the freshly reset game back onto the walkthrough's card, which had nothing left to
-  // render - a blank screen where the main menu should be
-  it("ignores targets disappearing once the walkthrough is over", () => {
-    const { onTutorialStep } = fire(-1, {
-      action: ACTIONS.NEXT,
-      index: 2,
-      type: EVENTS.TARGET_NOT_FOUND,
-    });
-    expect(onTutorialStep).not.toHaveBeenCalled();
-  });
-
-  it("still ends the walkthrough when the player closes it", () => {
-    const { onTutorialEnd } = fire(2, {
-      action: ACTIONS.CLOSE,
-      index: 2,
-      type: EVENTS.STEP_AFTER,
-    });
-    expect(onTutorialEnd).toHaveBeenCalledWith(steps);
   });
 });

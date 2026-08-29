@@ -7,6 +7,7 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
+import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame } from "../testing/Simulator";
 import {
   loaded,
@@ -321,5 +322,28 @@ describe("finishing a tutorial", () => {
     const state = getStore().getState();
     expect(state.card.name).toBe("MAIN_MENU");
     expect(state.ui.dialog.open).toBe(false);
+  });
+
+  it("lets an active capstone own completion at the scenario boundary", () => {
+    window.localStorage.clear();
+    const capstoneIndex = tutorial.tutorialSteps!.findIndex(
+      (step) => step.capstone,
+    );
+    const state = createGame({ scenarioId: tutorial.id });
+    state.tutorialStep = capstoneIndex;
+
+    // Mission 1's one-day capstone and one-month scenario boundary are the same game instant.
+    // The capstone success must pause and explain the result instead of racing a second, stale
+    // scenario-complete dialog onto the screen.
+    playOutOnTheStore(state, tutorial.durationMonths);
+    jest.runOnlyPendingTimers();
+
+    const completed = getStore().getState();
+    expect(completed.ui.dialog.open).toBe(false);
+    expect(completed.ui.snackbar.message).toBe(
+      tutorial.tutorialSteps![capstoneIndex].capstone!.successMessage,
+    );
+    expect(completed.game.speed).toBe("PAUSED");
+    expect(getPlayedScenarioIds()).toContain(tutorial.id);
   });
 });

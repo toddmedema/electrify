@@ -2,6 +2,23 @@ import * as React from "react";
 
 import TutorialPrompt from "../components/base/TutorialPrompt";
 import { AppStateType, ScenarioType } from "../Types";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+
+const hasBlackout = (state: AppStateType) =>
+  state.game.eventLog.some((event) => event.kind === "BLACKOUT");
+
+const generatorCapstoneSucceeded = (state: AppStateType) => {
+  const now = getTimeFromTimeline(state.game.date.minute, state.game.timeline);
+  return !!(
+    now &&
+    state.game.facilities.length >= 2 &&
+    state.game.facilities
+      .slice(1)
+      .some((facility) => facility.yearsToBuildLeft <= 0) &&
+    now.supplyW >= now.demandW &&
+    now.cash >= 0
+  );
+};
 
 export const SCENARIOS = [
   {
@@ -11,6 +28,8 @@ export const SCENARIOS = [
     summary: "Meet your grid",
     locationId: "SF",
     ownership: "Investor",
+    // Capstone retries rebuild the exact same weather, demand and market conditions.
+    seed: 249001,
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -77,6 +96,25 @@ export const SCENARIOS = [
           />
         ),
       },
+      {
+        card: "FACILITIES",
+        content: (
+          <TutorialPrompt
+            concepts={["goal", "supply", "time"]}
+            text="Your turn: keep the lights on for a full day with no blackout."
+          />
+        ),
+        hint: "Check the reserve readout, then choose a speed. Positive reserve means available capacity exceeds demand right now.",
+        capstone: {
+          success: (s: AppStateType) =>
+            s.game.date.minute >= 1440 && !hasBlackout(s),
+          failure: hasBlackout,
+          successMessage:
+            "Capstone complete - positive reserve kept demand covered for the full day.",
+          failureMessage:
+            "Demand outran available supply, so some electricity went unserved. Watch reserve before running the clock and retry from the same forecast.",
+        },
+      },
     ],
   },
   {
@@ -86,6 +124,7 @@ export const SCENARIOS = [
     summary: "Build a generator",
     locationId: "SF",
     ownership: "Investor",
+    seed: 249002,
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -151,6 +190,25 @@ export const SCENARIOS = [
             action={["play"]}
           />
         ),
+      },
+      {
+        card: "FACILITIES",
+        content: (
+          <TutorialPrompt
+            concepts={["forecast", "build", "supply"]}
+            text="Your turn: commission enough capacity to cover demand within nine months and stay solvent."
+          />
+        ),
+        hint: "Compare the forecast peak with your current capacity, then choose any generator whose cost and construction time fit the deadline.",
+        capstone: {
+          success: generatorCapstoneSucceeded,
+          failure: (s: AppStateType) =>
+            s.game.date.monthsEllapsed >= 9 && !generatorCapstoneSucceeded(s),
+          successMessage:
+            "Capstone complete - new capacity came online before the deadline and covered demand without exhausting cash.",
+          failureMessage:
+            "The added capacity was not online and covering demand by the nine-month deadline. Compare construction time, capacity and financing before trying again.",
+        },
       },
     ],
   },

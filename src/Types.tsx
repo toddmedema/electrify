@@ -434,16 +434,21 @@ export interface TutorialStepType {
   skipBeacon?: boolean;
   // The card this step's target lives on. Every step change navigates here, in both
   // directions, so stepping backwards over a step that navigated forwards still lands on
-  // the card holding the target instead of leaving Joyride with nothing to point at
+  // the card holding the target instead of leaving the objective pointing at absent UI
   card?: CardNameType | NavigateActionType;
   // A one-way side effect of leaving this step forwards, such as starting the clock. It
   // isn't replayed when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
   onNext?: () => Redux.Action;
-  target: string;
+  // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
+  // outline, while a capstone deliberately leaves the player to find the answer themselves.
+  target?: string;
   content: React.JSX.Element;
-  // Present = the step is action-gated ("play, don't tell"): the tooltip shows a "do it"
-  // affordance instead of a Next button, and the walkthrough advances the moment this
+  // Player-requested help. Kept outside content so the objective HUD never reveals it before the
+  // player asks, and so hiding/showing it does not affect the underlying objective gate.
+  hint?: React.ReactNode;
+  // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
+  // objective" status instead of a Next button, and the walkthrough advances the moment this
   // returns true. Evaluated after every dispatch - including every tick - so keep it to
   // cheap field reads. Tutorial scenarios have fixed authored starting states, so
   // predicates are absolute (e.g. facilities.length >= 2), never relative to step entry
@@ -452,6 +457,15 @@ export interface TutorialStepType {
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)
   advanceOnAction?: string | string[];
+  // An independent application check. Entering one restarts the authored scenario at this step,
+  // giving it a deterministic, retryable state instead of inheriting whatever the guided portion
+  // changed. Success advances normally; failure pauses for consequence-specific feedback.
+  capstone?: {
+    success: (state: AppStateType) => boolean;
+    failure?: (state: AppStateType) => boolean;
+    successMessage: string;
+    failureMessage: string;
+  };
   // Above the desktop breakpoint the bottom nav is hidden and Facilities / Insights render
   // side by side, so a step whose target lives in that nav - or whose
   // selector matches more than one pane - needs a different target there, and usually
@@ -463,7 +477,7 @@ export interface TutorialStepType {
 }
 
 export function isGatedStep(step: TutorialStepType): boolean {
-  return !!(step.advanceOn || step.advanceOnAction);
+  return !!(step.advanceOn || step.advanceOnAction || step.capstone);
 }
 
 // A walkthrough moving between two steps. Both ends are named because Back and Next need

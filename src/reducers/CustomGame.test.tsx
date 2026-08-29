@@ -173,10 +173,10 @@ describe("a custom game", () => {
     });
     expect(getPlayedScenarioIds()).not.toContain(CUSTOM_SCENARIO_ID);
 
-    // The same run of an authored scenario does get recorded, so the assertion above isn't
-    // passing because nothing reaches the end
-    runSimulation({ scenarioId: 4 }); // 104: Finances, also one month long
-    expect(getPlayedScenarioIds()).toContain(4);
+    // A tutorial is also withheld until its final objective succeeds. Letting the one-month
+    // Finances clock expire must not award completion or bypass a future capstone.
+    runSimulation({ scenarioId: 4 });
+    expect(getPlayedScenarioIds()).not.toContain(4);
   });
 
   // The point of a scenario carrying a whole location rather than an id: a place the game has

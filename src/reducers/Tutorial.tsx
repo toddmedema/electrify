@@ -9,10 +9,28 @@ import {
   isGatedStep,
 } from "../Types";
 import { navigate } from "./Card";
-import { delta, quit } from "./Game";
-import { snackbarOpen } from "./UI";
+import { delta, quit, setSpeed, start } from "./Game";
+import { dialogOpen, snackbarOpen } from "./UI";
 
-// Moves a live walkthrough between two steps, whether a tooltip button or a satisfied gate
+/**
+ * Restores a capstone's authored state while keeping the player on the capstone objective.
+ *
+ * Tutorial scenarios are not autosaved. Reusing their normal start path is consequently both
+ * faster and safer than maintaining a second partial snapshot format: cash, clock, fleet, event
+ * log and all derived forecasts are rebuilt together, and a scenario seed makes the rebuild
+ * deterministic. LoadingContainer preserves the requested step instead of reopening step zero.
+ */
+export function restartTutorialAtStep(
+  dispatch: AppDispatch,
+  scenarioId: number,
+  tutorialStep: number,
+): void {
+  dispatch(quit());
+  dispatch(start(scenarioId));
+  dispatch(delta({ tutorialStep }));
+}
+
+// Moves a live walkthrough between two steps, whether a HUD button or a satisfied gate
 // asked for it - both paths need the same side effects, in the same order
 export function changeTutorialStep(
   dispatch: AppDispatch,
@@ -33,9 +51,21 @@ export function changeTutorialStep(
     dispatch(leaving.onNext());
   }
 
+  const entering = steps[toStep];
+  if (toStep > fromStep && entering?.capstone) {
+    restartTutorialAtStep(dispatch, scenarioId, toStep);
+    return;
+  }
+
+  // A capstone is the mission's proof point. Freeze the authored consequence at success so the
+  // player can read it instead of letting the scenario clock race on to its separate end dialog.
+  if (toStep > fromStep && leaving?.capstone) {
+    dispatch(setSpeed("PAUSED"));
+  }
+
   // Steps declare the card their target lives on, and every step change navigates there
   // regardless of direction. Otherwise Back leaves the player on whatever card the
-  // forward step navigated to, where Joyride can't find the target and shows no tooltip
+  // forward step navigated to, where the objective's target treatment cannot find its control
   const destination = steps[toStep] && steps[toStep].card;
   if (destination) {
     const name =
@@ -57,7 +87,9 @@ export function changeTutorialStep(
   recordScenarioPlayed(scenarioId);
   dispatch(
     snackbarOpen({
-      message: "Walkthrough complete - keep practicing, or move on",
+      message:
+        leaving?.capstone?.successMessage ||
+        "Walkthrough complete - keep practicing, or move on",
       actionLabel: "Missions",
       action: () => dispatch(quit({ toScenarioList: true })),
       open: true,
@@ -119,10 +151,42 @@ export const tutorialGateMiddleware: Middleware =
         }
         const byAction = freshAction && matchesActionGate(step, actionType);
         let byState = false;
+        let capstoneFailed = false;
         try {
-          byState = !!(step.advanceOn && step.advanceOn(state));
+          byState = !!(
+            (step.advanceOn && step.advanceOn(state)) ||
+            (step.capstone && step.capstone.success(state))
+          );
+          capstoneFailed = !!(
+            step.capstone?.failure && step.capstone.failure(state)
+          );
         } catch {
           // A broken gate must not kill the dispatch it rides on
+        }
+        if (!byState && capstoneFailed && step.capstone) {
+          const { failureMessage } = step.capstone;
+          // Freeze the failed state before presenting it. Otherwise a fast clock can keep
+          // mutating the consequence behind the modal while the player is deciding what to do.
+          (api.dispatch as AppDispatch)(setSpeed("PAUSED"));
+          api.dispatch(
+            dialogOpen({
+              title: "Capstone needs another try",
+              message: failureMessage,
+              open: true,
+              notCancellable: true,
+              secondaryLabel: "Exit tutorial",
+              secondaryAction: () =>
+                (api.dispatch as AppDispatch)(quit({ toScenarioList: true })),
+              actionLabel: "Retry capstone",
+              action: () =>
+                restartTutorialAtStep(
+                  api.dispatch as AppDispatch,
+                  state.game.scenarioId,
+                  stepIndex,
+                ),
+            }),
+          );
+          break;
         }
         if (!byAction && !byState) {
           break;

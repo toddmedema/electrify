@@ -356,19 +356,6 @@ button,
   padding: 16px;
 }
 
-.react-joyride__overlay {
-  cursor: auto !important;
-}
-
-// react-floater sizes the tutorial wrapper to the full viewport, then offsets it 10px from the
-// left edge. On phones that makes the document 10px wider even though the tooltip itself fits.
-@media screen and (max-width: ($abswidthmax - 1px)) {
-  .react-joyride__floater {
-    width: calc(100vw - 20px) !important;
-    max-width: calc(100vw - 20px) !important;
-  }
-}
-
 .MuiSelect-select {
   padding-top: 2px !important;
   padding-left: 6px !important;
@@ -728,10 +715,6 @@ $pane_header_height: 40px;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.react-joyride__spotlight {
-  background: none !important;
 }
 
 .base_main {
@@ -1604,38 +1587,6 @@ html[data-theme="dark"] .uplot {
     border-radius: 0;
   }
 
-  #tutorial-tooltip {
-    background: $bg_primary;
-    padding: size(medium);
-    margin: auto;
-    width: 90%;
-    max-width: 500px;
-    box-sizing: border-box;
-
-    .tutorialFooter {
-      display: flex;
-      align-items: center;
-      margin-top: size(medium);
-      gap: size(small);
-    }
-
-    // Pushes the buttons to the trailing edge, so the row reads progress-then-actions
-    .tutorialProgress {
-      margin-right: auto;
-      opacity: 0.6;
-      font-size: 0.85em;
-    }
-
-    // Stands in for the Next button on action-gated steps: doing the highlighted thing is
-    // what advances, so the affordance pulses instead of being clickable
-    .tutorialDoIt {
-      display: inline-flex;
-      align-items: center;
-      padding: size(tiny);
-      animation: tutorialDoItPulse 1.5s ease-in-out infinite;
-    }
-  }
-
   // Icon-led step content: symbols on top, one confirming line of text, and for gated
   // steps a "do this" chip naming the deed in the same symbols
   .tutorialPrompt {
@@ -1661,18 +1612,6 @@ html[data-theme="dark"] .uplot {
       padding: size(tiny) size(small);
       border: 1px solid var(--border-strong);
       border-radius: 100px;
-    }
-  }
-
-  @keyframes tutorialDoItPulse {
-    0%,
-    100% {
-      transform: scale(1);
-      opacity: 0.7;
-    }
-    50% {
-      transform: scale(1.25);
-      opacity: 1;
     }
   }
 
@@ -2190,6 +2129,184 @@ html[data-theme="dark"] .uplot {
 
 @include styling();
 
+// A mission objective is game chrome, not a modal: it stays out of the bottom navigation,
+// leaves the whole grid interactive and collapses to one progress-marked concept.
+.tutorialHud {
+  position: fixed;
+  z-index: 1250;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(56px + env(safe-area-inset-bottom) + 8px);
+  left: max(8px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  max-height: calc(100vh - 80px - env(safe-area-inset-bottom));
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: 12px;
+  background: var(--tooltip-bg);
+  box-shadow: 0 8px 24px var(--tooltip-shadow);
+  color: $font_color_primary;
+  backdrop-filter: blur(10px);
+}
+
+.tutorialHud-collapsed {
+  left: auto;
+  width: min(230px, calc(100vw - 16px));
+  overflow: hidden;
+}
+
+.tutorialHudHeader {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorialHudHeading {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+
+  h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    flex: 0 0 auto;
+    color: $font_color_faded;
+  }
+}
+
+.tutorialHudToggle {
+  flex: 0 0 auto;
+}
+
+.tutorialHudProgressRing {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+}
+
+.tutorialHudProgressRing > * {
+  grid-area: 1 / 1;
+}
+
+.tutorialHudProgressIcon {
+  display: grid;
+  place-items: center;
+
+  .conceptIcon {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.tutorialHudContent {
+  margin-top: 6px;
+
+  .tutorialPrompt {
+    gap: 4px !important;
+  }
+
+  .tutorialPromptConcepts {
+    min-height: 32px;
+    margin-bottom: 0;
+    padding: 4px 8px;
+  }
+
+  .tutorialPromptAction {
+    margin-top: 2px;
+  }
+}
+
+.tutorialHudHint {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid $interactive_blue;
+  border-radius: 4px;
+  background: var(--bg-selected);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.tutorialHudFooter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.tutorialHudFooterSpacer {
+  flex: 1 1 auto;
+}
+
+.tutorialHudGate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: $interactive_blue;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tutorialHudScreenReader {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
+// A restrained cue rather than a spotlight: it names the relevant control without dimming the
+// surrounding choices. Capstones never receive this class.
+.tutorialTarget {
+  outline: 3px solid var(--interactive-blue) !important;
+  outline-offset: 3px;
+  animation: tutorialTargetPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tutorialTargetPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--interactive-tint);
+  }
+  50% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorialTarget {
+    animation: none;
+  }
+}
+
+@media screen and (min-width: $desktop_breakpoint) {
+  .tutorialHud {
+    top: calc(82px + env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: min(360px, calc(100vw - 32px));
+    max-height: calc(100vh - 98px - env(safe-area-inset-top));
+  }
+
+  .tutorialHud-collapsed {
+    width: 230px;
+  }
+}
+
 // ===============================================
 // Apply scaling or fixed styling if we're on
 // a desktop. Center and border the fixed result.
@@ -2226,10 +2343,6 @@ $sizemap: (
     height: 100%;
     max-width: 100%;
     max-height: 100%;
-  }
-
-  #tutorial-tooltip {
-    width: auto;
   }
 }
 

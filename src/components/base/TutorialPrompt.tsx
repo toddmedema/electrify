@@ -10,7 +10,7 @@ export interface TutorialPromptProps {
   // At most one short sentence - the symbols carry the teaching, the words only confirm it
   text?: string;
   // For gated steps: the deed being asked for, as a "do this" chip matching the pulsing
-  // affordance in the tooltip footer
+  // affordance in the objective HUD
   action?: ConceptNameType[];
 }
 
