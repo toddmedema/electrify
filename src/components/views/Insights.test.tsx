@@ -60,6 +60,16 @@ jest.mock("../base/ChartForecastStorage", () => ({
     <div role="img" data-chart="storage" data-sync-key={syncKey} />
   ),
 }));
+jest.mock("../base/ChartForecastSolarCapacityFactor", () => ({
+  __esModule: true,
+  default: ({ syncKey }: ChartMockProps) => (
+    <div
+      role="img"
+      data-testid="solar-capacity-factor-chart"
+      data-sync-key={syncKey}
+    />
+  ),
+}));
 jest.mock("../base/ChartForecastWater", () => ({
   __esModule: true,
   default: ({ syncKey }: ChartMockProps) => (
@@ -142,5 +152,21 @@ describe("Insights layers", () => {
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Custom");
+  });
+
+  it("offers a solar capacity factor chart as an insight layer", async () => {
+    renderInsights();
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Solar Capacity Factor" }),
+    );
+
+    expect(
+      screen.getByText("Solar Capacity Factor", { selector: "h6" }),
+    ).toBeVisible();
+    expect(screen.getByTestId("solar-capacity-factor-chart")).toHaveAttribute(
+      "data-sync-key",
+      "insights",
+    );
   });
 });
