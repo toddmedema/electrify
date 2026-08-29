@@ -36,12 +36,9 @@ describe("buildShareText", () => {
 });
 
 describe("canShare", () => {
-  it("keeps a share affordance for the legacy copy fallback", () => {
+  it("keeps a share affordance with or without a clipboard", () => {
     setNavigator({});
     expect(canShare()).toBe(true);
-  });
-
-  it("is true with only a clipboard", () => {
     setNavigator({ clipboard: { writeText: async () => undefined } });
     expect(canShare()).toBe(true);
   });
@@ -77,7 +74,7 @@ describe("shareText", () => {
     expect(writeText).toHaveBeenCalledWith("hello");
   });
 
-  it("gives up when the clipboard is refused", async () => {
+  it("gives up when the fallback is refused or unavailable", async () => {
     const warn = jest
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
@@ -85,11 +82,8 @@ describe("shareText", () => {
       clipboard: { writeText: jest.fn().mockRejectedValue(new Error("nope")) },
     });
     expect(await shareText("hello")).toBe("unavailable");
-    warn.mockRestore();
-  });
-
-  it("gives up when the browser offers nothing", async () => {
     setNavigator({});
     expect(await shareText("hello")).toBe("unavailable");
+    warn.mockRestore();
   });
 });

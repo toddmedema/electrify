@@ -69,26 +69,26 @@ function generatorAt(
 }
 
 describe("current facility economics", () => {
-  it.each([
-    ["Coal", 2023, 650000000, 4.103],
-    ["Nuclear", 2023, 2156000000, 7.861],
-    ["Natural Gas", 2023, 419000000, 0.836],
-    ["Oil", 2023, 3000000, 1.248],
-    ["Wind", 2024, 200000000, 1.041],
-    ["Solar", 2024, 150000000, 0.691],
-    ["Hydro", 2024, 100000000, 2.267],
-    ["Geothermal", 2024, 50000000, 4.015],
-  ])(
-    "prices a reference-sized %s plant at its published benchmark",
-    (name, year, peakW, dollarsPerW) => {
+  it("prices reference plants at their published benchmarks", () => {
+    const benchmarks: Array<[string, number, number, number]> = [
+      ["Coal", 2023, 650000000, 4.103],
+      ["Nuclear", 2023, 2156000000, 7.861],
+      ["Natural Gas", 2023, 419000000, 0.836],
+      ["Oil", 2023, 3000000, 1.248],
+      ["Wind", 2024, 200000000, 1.041],
+      ["Solar", 2024, 150000000, 0.691],
+      ["Hydro", 2024, 100000000, 2.267],
+      ["Geothermal", 2024, 50000000, 4.015],
+    ];
+    benchmarks.forEach(([name, year, peakW, dollarsPerW]) => {
       const location =
         name === "Hydro" || name === "Geothermal" ? iceland : france;
-      expect(
-        generatorAt(year as number, name as string, peakW as number, location)
-          ?.buildCost,
-      ).toBeCloseTo((peakW as number) * (dollarsPerW as number), -2);
-    },
-  );
+      expect(generatorAt(year, name, peakW, location)?.buildCost).toBeCloseTo(
+        peakW * dollarsPerW,
+        -2,
+      );
+    });
+  });
 
   it("uses the latest battery cost, duration, life, and augmentation O&M", () => {
     const battery = STORAGE(stateAt(france, 2024), 600000000).find(
@@ -196,15 +196,14 @@ describe("current facility economics", () => {
 });
 
 describe("real technology cost trends", () => {
-  it.each(["Wind", "Solar"])(
-    "models the observed 2020-2024 decline for %s",
-    (name) => {
+  it("models the observed 2020-2024 wind and solar decline", () => {
+    ["Wind", "Solar"].forEach((name) => {
       const peakW = name === "Wind" ? 200000000 : 150000000;
       expect(generatorAt(2024, name, peakW)?.buildCost).toBeLessThan(
         generatorAt(2020, name, peakW)?.buildCost as number,
       );
-    },
-  );
+    });
+  });
 
   it("models falling battery costs and rising nuclear costs", () => {
     const battery2020 = STORAGE(stateAt(france, 2020), 600000000).find(

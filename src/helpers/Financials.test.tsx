@@ -65,19 +65,13 @@ describe("getMonthlyPayment", () => {
     expect(balance).toBeCloseTo(0, 6);
   });
 
-  it("charges more per month over a shorter term", () => {
+  it("charges more for a shorter term or a higher rate", () => {
     expect(getMonthlyPayment(1000000, 0.06, 60)).toBeGreaterThan(
       getMonthlyPayment(1000000, 0.06, 120),
     );
-  });
-
-  it("charges more per month at a higher rate", () => {
     expect(getMonthlyPayment(1000000, 0.1, LOAN_MONTHS)).toBeGreaterThan(
       getMonthlyPayment(1000000, 0.05, LOAN_MONTHS),
     );
-  });
-
-  it("always repays at least the principal", () => {
     const principal = 1000000;
     const total = getMonthlyPayment(principal, 0.06, LOAN_MONTHS) * LOAN_MONTHS;
     expect(total).toBeGreaterThan(principal);
@@ -85,15 +79,9 @@ describe("getMonthlyPayment", () => {
 });
 
 describe("getPaymentInterest", () => {
-  it("charges the monthly share of the annual rate on the balance", () => {
+  it("charges the monthly share of the rate and falls with the balance", () => {
     expect(getPaymentInterest(120000, 0.06)).toBeCloseTo(600, 6);
-  });
-
-  it("charges nothing once the loan is paid off", () => {
     expect(getPaymentInterest(0, 0.06)).toBe(0);
-  });
-
-  it("falls as the balance falls", () => {
     expect(getPaymentInterest(50000, 0.06)).toBeLessThan(
       getPaymentInterest(100000, 0.06),
     );
@@ -101,28 +89,22 @@ describe("getPaymentInterest", () => {
 });
 
 describe("facilityCashBack", () => {
-  it("returns the full build cost for a facility that was never started", () => {
+  it("returns the committed equity throughout construction", () => {
     // Nothing has been spent on materials yet, so there is nothing to lose on resale
     expect(
       facilityCashBack(aFacility({ yearsToBuildLeft: 4, yearsToBuild: 4 })),
     ).toBe(1000000);
-  });
-
-  it("starts a finished facility at its full unfinanced value", () => {
-    expect(facilityCashBack(aFacility())).toBe(1000000);
+    [0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
+      expect(facilityCashBack(aFacility({ yearsToBuildLeft }))).toBe(1000000);
+    });
   });
 
   it("depreciates linearly over the facility's own lifespan", () => {
     const minute = (years: number) => years * DAYS_PER_YEAR * 24 * 60;
+    expect(facilityCashBack(aFacility())).toBe(1000000);
     expect(facilityCashBack(aFacility(), minute(20))).toBeCloseTo(500000, 6);
     expect(facilityCashBack(aFacility(), minute(40))).toBe(0);
     expect(facilityCashBack(aFacility(), minute(60))).toBe(0);
-  });
-
-  it("refunds the same committed equity throughout construction", () => {
-    [0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
-      expect(facilityCashBack(aFacility({ yearsToBuildLeft }))).toBe(1000000);
-    });
   });
 
   it("nets out what is still owed on the loan", () => {
@@ -131,14 +113,6 @@ describe("facilityCashBack", () => {
       1000000 - owed,
       6,
     );
-  });
-
-  it("never returns more than was spent", () => {
-    [0, 0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
-      expect(
-        facilityCashBack(aFacility({ yearsToBuildLeft })),
-      ).toBeLessThanOrEqual(1000000);
-    });
   });
 });
 
@@ -267,11 +241,8 @@ function aCleanCompany(
 }
 
 describe("getCreditPremium", () => {
-  it("lends at prime to a company with nothing wrong with it", () => {
+  it("uses prime as the floor for clean companies", () => {
     expect(getCreditPremium(aCleanCompany())).toEqual(1);
-  });
-
-  it("charges nothing extra for being better than the bar", () => {
     // Sitting on twice the cash asked for doesn't earn a discount - prime is the floor
     expect(
       getCreditPremium(

@@ -21,19 +21,10 @@ import { generateNewTimeline } from "../reducers/Game";
 import { createGame } from "../testing/Simulator";
 
 describe("formatMinuteOfDayChartAxis", () => {
-  it("should render midnight as 12am", () => {
+  it("formats a day in twelve-hour time", () => {
     expect(formatMinuteOfDayChartAxis(0)).toEqual("12am");
-  });
-
-  it("should render noon as 12pm", () => {
     expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12pm");
-  });
-
-  it("should render the evening peak in 12 hour time", () => {
     expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7pm");
-  });
-
-  it("should ignore whole days, since the axis only shows a clock", () => {
     expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6am");
   });
 });
@@ -170,20 +161,12 @@ describe("summarizeTimeline", () => {
     );
   }
 
-  it("reports the balances the period ended on, not the ones it opened with", () => {
+  it("reports ending balances and rates while totalling flows", () => {
     const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.cash).toEqual(300);
     expect(summary.netWorth).toEqual(600);
     expect(summary.customers).toEqual(1002);
-  });
-
-  it("reports the rate in force at the end of the period", () => {
-    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.interestRate).toBeCloseTo(0.042, 10);
-  });
-
-  it("still totals the flows across every tick", () => {
-    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.revenue).toEqual(30);
     expect(summary.expensesFuel).toEqual(3);
   });
@@ -213,15 +196,12 @@ describe("summarizeHistory", () => {
     );
   }
 
-  it("reports the balances of the most recent month", () => {
+  it("reports the latest balances while totalling monthly flows", () => {
     // Newest first, so 300 is the newest month and 100 the oldest
     const summary = summarizeHistory(months([300, 200, 100]));
     expect(summary.cash).toEqual(300);
     expect(summary.netWorth).toEqual(600);
-  });
-
-  it("still totals the flows across every month", () => {
-    expect(summarizeHistory(months([300, 200, 100])).revenue).toEqual(30);
+    expect(summary.revenue).toEqual(30);
   });
 });
 
