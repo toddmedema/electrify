@@ -39,6 +39,10 @@ import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
 import ConceptIcon from "../base/ConceptIcon";
+import {
+  getBuildAvailability,
+  ViableLocationsRow,
+} from "../base/BuildAvailability";
 import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
@@ -60,18 +64,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     LOAN_MONTHS,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const siteBuildable = props.storage.viableLocationsRemaining !== 0;
-  const buildable = sizeBuildable && siteBuildable;
-  const secondaryText = !siteBuildable ? (
-    "No viable locations remaining."
-  ) : sizeBuildable ? (
-    storage.description
-  ) : (
-    <div>
-      Too large for current tech.
-      <br />
-      Max size: <strong>{formatWatts(props.storage.maxPeakWh)}h</strong>
-    </div>
+  const { buildable, secondaryText } = getBuildAvailability(
+    storage.description,
+    sizeBuildable,
+    `${formatWatts(storage.maxPeakWh)}h`,
+    storage.viableLocationsRemaining,
   );
 
   const toggleExpand = () => {
@@ -170,19 +167,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
-              {storage.viableLocationsRemaining !== undefined && (
-                <TableRow>
-                  <TableCell>
-                    Number of viable locations remaining
-                    <Typography variant="body2" color="textSecondary">
-                      Each project uses one suitable site
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {storage.viableLocationsRemaining}
-                  </TableCell>
-                </TableRow>
-              )}
+              <ViableLocationsRow
+                remaining={storage.viableLocationsRemaining}
+              />
             </TableBody>
           </Table>
         </TableContainer>

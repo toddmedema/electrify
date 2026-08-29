@@ -573,17 +573,9 @@ export const gameSlice = createSlice({
           facilitySearch.peakW || 1000000,
           [],
           [],
-        ).find((g: FacilityShoppingType) => {
-          if (g.viableLocationsRemaining === 0) {
-            return false;
-          }
-          for (const property in facilitySearch) {
-            if (g[property] !== facilitySearch[property]) {
-              return false;
-            }
-          }
-          return true;
-        });
+        ).find((g: FacilityShoppingType) =>
+          matchesFacilitySearch(g, facilitySearch),
+        );
         if (generator) {
           state = buildFacilityHelper(
             state,
@@ -594,17 +586,8 @@ export const gameSlice = createSlice({
           );
         } else {
           const storage = STORAGE(state, facilitySearch.peakWh || 1000000).find(
-            (g: FacilityShoppingType) => {
-              if (g.viableLocationsRemaining === 0) {
-                return false;
-              }
-              for (const property in facilitySearch) {
-                if (g[property] !== facilitySearch[property]) {
-                  return false;
-                }
-              }
-              return true;
-            },
+            (g: FacilityShoppingType) =>
+              matchesFacilitySearch(g, facilitySearch),
           );
           if (storage) {
             state = buildFacilityHelper(
@@ -796,6 +779,18 @@ export default gameSlice.reducer;
  * reproduce the original run rather than an approximation of it: there is one implementation of
  * "the player built a plant", not two that have to be kept in step.
  */
+function matchesFacilitySearch(
+  candidate: FacilityShoppingType,
+  search: Partial<FacilityShoppingType>,
+): boolean {
+  if (candidate.viableLocationsRemaining === 0) {
+    return false;
+  }
+  return Object.keys(search).every(
+    (property: string) => candidate[property] === search[property],
+  );
+}
+
 function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   const built = payload.facility;
   const viableLocationsRemaining = getViableLocationsRemaining(
@@ -2028,8 +2023,14 @@ function buildFacilityHelper(
       // purchased in cash
       now.cash -= g.buildCost;
     }
+    // Site availability belongs to the current fleet quote, not the facility bought from it. A
+    // saved operating asset must not retain a permanently stale "remaining" count.
+    const {
+      viableLocationsRemaining: _viableLocationsRemaining,
+      ...facilitySnapshot
+    } = g;
     const facility = {
-      ...g,
+      ...facilitySnapshot,
       // A scenario's catalog is priced in its starting year, but an inherited wind farm belongs
       // to its commissioning vintage and should use that cohort's observed degradation rate.
       ...(newGame && g.fuel === "Wind"
