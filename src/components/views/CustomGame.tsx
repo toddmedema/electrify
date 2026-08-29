@@ -39,7 +39,11 @@ import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
-import { formatWattHours, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatWattHours,
+  formatWatts,
+} from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import { newSeed } from "../../helpers/Math";
@@ -78,26 +82,26 @@ const STARTING_YEARS = Array.from(
   (_v: unknown, i: number) => WEATHER_STARTING_YEAR + i * STARTING_YEAR_STEP,
 );
 const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
-// The era the rates and fees above are written in: cents per kilowatt hour a player recognises,
-// against the fuel prices the data ends on.
-const RATE_BASE_YEAR = 2020;
+// The era the cash, rates and fees below are written in: amounts a player recognises, against the
+// fuel prices the data ends on.
+const MONEY_BASE_YEAR = 2020;
 
 /**
- * A rate or a fee re-quoted into the money of the year the game starts in.
+ * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
  *
  * Fuel is the one price the game reads at face value for the year it is in - build costs and O&M
  * are anchored on whatever year a game starts, so they always open at what the tables say. A 2080
  * game therefore opens against sixty years of escalated fuel, and offering it a literal seven
  * cents a kilowatt hour is offering a game that is bankrupt inside a quarter.
  *
- * Only forwards. A game starting before RATE_BASE_YEAR is played against real recorded prices
+ * Only forwards. A game starting before MONEY_BASE_YEAR is played against real recorded prices
  * rather than a projection, so there is no escalation to undo, and deflating those rates would
  * change every historical scenario's balance for no reason.
  */
 function inEraMoney(base: number, startingYear: number): number {
   const factor =
-    getFuelEscalation(Math.max(startingYear, RATE_BASE_YEAR)) /
-    getFuelEscalation(RATE_BASE_YEAR);
+    getFuelEscalation(Math.max(startingYear, MONEY_BASE_YEAR)) /
+    getFuelEscalation(MONEY_BASE_YEAR);
   // Two significant figures, so the offered numbers stay round enough to choose between
   return Number((base * factor).toPrecision(2));
 }
@@ -196,10 +200,15 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const sizes = (adding?.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W).filter(
     (size) => !adding || size <= adding.maxSize,
   );
-  // What a kilowatt hour may be charged at, and what a ton of CO2e may be feed, in the money of
-  // the year the game starts in. Both move with the starting year, which is why changing that
-  // year has to re-quote whatever was already chosen rather than leaving a 2020 rate on a 2080
-  // game -- see changeStartingYear below.
+  // What the utility starts with, what a kilowatt hour may be charged at, and what a ton of CO2e
+  // may be feed, in the money of the year the game starts in. All move with the starting year,
+  // which is why changing that year has to re-quote whatever was already chosen rather than
+  // leaving a 2020 amount on a 2080 game -- see changeStartingYear below.
+  const cashOptions = React.useMemo(
+    () =>
+      STARTING_CASH.map((c: number) => inEraMoney(c, scenario.startingYear)),
+    [scenario.startingYear],
+  );
   const rateOptions = React.useMemo(
     () =>
       RATES_PER_KWH.map((r: number) => inEraMoney(r, scenario.startingYear)),
@@ -277,10 +286,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
    * 2080 and leaving seven cents behind would silently hand back a game that cannot be won.
    */
   const changeStartingYear = (startingYear: number) => {
+    const cash = nearestIndex(cashOptions, scenario.cash);
     const rate = nearestIndex(rateOptions, scenario.dollarsPerkWh);
     const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
     change({
       startingYear,
+      cash: inEraMoney(STARTING_CASH[cash], startingYear),
       dollarsPerkWh: inEraMoney(RATES_PER_KWH[rate], startingYear),
       feePerKgCO2e: inEraMoney(FEES_PER_TON[fee], startingYear) / 1000,
     });
@@ -482,10 +493,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     change({ cash: Number(e.target.value) })
                   }
                 >
-                  {STARTING_CASH.map((c: number) => {
+                  {cashOptions.map((c: number) => {
                     return (
                       <MenuItem value={c} key={c}>
-                        ${c / 1000000}M
+                        {formatMoneyConcise(c)}
                       </MenuItem>
                     );
                   })}
