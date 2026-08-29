@@ -7,10 +7,26 @@ import { initWeather } from "../../data/Weather";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { getScenario } from "../../data/Scenarios";
+import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
-import { AppStateType, GameType } from "../../Types";
+import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
+
+export function restoreTutorialAfterLoading(
+  dispatch: AppDispatch,
+  tutorialSteps: TutorialStepType[],
+  tutorialStep: number,
+): void {
+  const destination = tutorialSteps[tutorialStep]?.card;
+  // loaded() always mounts Facilities first. Reapply the selected objective's authored pane after
+  // a capstone reset so Finances/Pricing retries do not strand their HUD on the fleet, and so
+  // future capstones can safely start anywhere.
+  if (destination) {
+    dispatch(navigate(destination));
+  }
+  dispatch(delta({ tutorialStep }));
+}
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -120,7 +136,15 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           // step already selected. Preserve it; a normal tutorial still arrives with -1 and
           // starts at the first objective after the card transition has mounted its controls.
           const tutorialStep = game.tutorialStep >= 0 ? game.tutorialStep : 0;
-          setTimeout(() => dispatch(delta({ tutorialStep })), 300);
+          setTimeout(
+            () =>
+              restoreTutorialAfterLoading(
+                dispatch,
+                scenario.tutorialSteps!,
+                tutorialStep,
+              ),
+            300,
+          );
         }
       } catch (error) {
         reportError(

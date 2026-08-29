@@ -461,6 +461,15 @@ export interface TutorialStepType {
   // giving it a deterministic, retryable state instead of inheriting whatever the guided portion
   // changed. Success advances normally; failure pauses for consequence-specific feedback.
   capstone?: {
+    // Optional authored checkpoint overrides. The normal tutorial and its capstone can therefore
+    // teach with different starting economics while still rebuilding the whole Game slice through
+    // initGame on entry/retry. Anything omitted inherits the mission's scenario-level value.
+    checkpoint?: {
+      cash?: number;
+      dollarsPerkWh?: number;
+      facilities?: ScenarioFacilityType[];
+      startingCustomers?: number;
+    };
     success: (state: AppStateType) => boolean;
     failure?: (state: AppStateType) => boolean;
     successMessage: string;

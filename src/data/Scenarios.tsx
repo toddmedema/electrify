@@ -20,6 +20,61 @@ const generatorCapstoneSucceeded = (state: AppStateType) => {
   );
 };
 
+const latestMonthProfit = (state: AppStateType) => {
+  const month = state.game.monthlyHistory[0];
+  return month
+    ? month.revenue -
+        month.expensesFuel -
+        month.expensesOM -
+        month.expensesCarbonFee -
+        month.expensesInterest
+    : undefined;
+};
+
+const storageCapstoneSucceeded = (state: AppStateType) => {
+  const storage = state.game.facilities.find(
+    (facility) => "currentWh" in facility,
+  );
+  // Authored storage starts empty, so delivered lifetime energy proves that it first charged from
+  // surplus and later discharged. Merely buying a battery cannot satisfy the objective.
+  return !!(
+    storage &&
+    state.game.date.minute >= 1440 &&
+    storage.lifetimeWh > 0 &&
+    !hasBlackout(state)
+  );
+};
+
+const financesCapstoneSucceeded = (state: AppStateType) =>
+  state.game.date.monthsEllapsed >= 1 &&
+  (latestMonthProfit(state) || 0) > 0 &&
+  !hasBlackout(state);
+
+const pricingCapstoneSucceeded = (state: AppStateType) => {
+  const now = getTimeFromTimeline(state.game.date.minute, state.game.timeline);
+  const startingCustomers = state.game.customerMarketSize / 2;
+  return !!(
+    now &&
+    state.game.date.monthsEllapsed >= 6 &&
+    state.game.dollarsPerkWh < 0.07 &&
+    now.customers >= startingCustomers * 1.05 &&
+    (latestMonthProfit(state) || 0) > 0 &&
+    !hasBlackout(state)
+  );
+};
+
+const forecastingCapstoneSucceeded = (state: AppStateType) => {
+  const addedGenerator = state.game.facilities.some(
+    (facility) =>
+      facility.id > 1 &&
+      !("currentWh" in facility) &&
+      facility.yearsToBuildLeft <= 0,
+  );
+  return (
+    state.game.date.monthsEllapsed >= 7 && addedGenerator && !hasBlackout(state)
+  );
+};
+
 export const SCENARIOS = [
   {
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -219,6 +274,7 @@ export const SCENARIOS = [
     summary: "Store energy for later",
     locationId: "SF",
     ownership: "Investor",
+    seed: 249003,
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -291,6 +347,32 @@ export const SCENARIOS = [
           />
         ),
       },
+      {
+        card: "FACILITIES",
+        content: (
+          <TutorialPrompt
+            concepts={["storage", "supply", "time"]}
+            text="Your turn: charge from spare supply, then discharge through an evening peak within two days without a blackout."
+          />
+        ),
+        hint: "Run the clock and watch the storage bar and power readout. Stored energy should rise off-peak, then fall while storage supplies the grid at peak.",
+        capstone: {
+          checkpoint: {
+            facilities: [
+              { name: "Pumped Hydro", peakWh: 500000000 },
+              { fuel: "Coal", peakW: 375000000 },
+            ],
+          },
+          success: storageCapstoneSucceeded,
+          failure: (s: AppStateType) =>
+            hasBlackout(s) ||
+            (s.game.date.minute >= 2880 && !storageCapstoneSucceeded(s)),
+          successMessage:
+            "Capstone complete - surplus charged storage, and its later discharge carried demand through the peak without unserved energy.",
+          failureMessage:
+            "Storage did not complete a charge-and-discharge cycle before the deadline, or demand went unserved. Watch its state of charge and dispatch order before retrying.",
+        },
+      },
     ],
   },
   {
@@ -300,6 +382,7 @@ export const SCENARIOS = [
     summary: "Read the books",
     locationId: "SF",
     ownership: "Investor",
+    seed: 249004,
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -364,6 +447,26 @@ export const SCENARIOS = [
           />
         ),
       },
+      {
+        card: "INSIGHTS",
+        content: (
+          <TutorialPrompt
+            concepts={["finances", "rate", "money"]}
+            text="Your turn: turn the projected loss into a profitable month without causing a blackout."
+          />
+        ),
+        hint: "Compare revenue with fuel and O&M expenses. The rate control changes revenue per unit sold; choose a rate that makes the next month profitable.",
+        capstone: {
+          checkpoint: { dollarsPerkWh: 0.03 },
+          success: financesCapstoneSucceeded,
+          failure: (s: AppStateType) =>
+            s.game.date.monthsEllapsed >= 1 && !financesCapstoneSucceeded(s),
+          successMessage:
+            "Capstone complete - revenue covered fuel and operating costs, leaving a positive monthly profit while the grid stayed reliable.",
+          failureMessage:
+            "Revenue did not cover fuel, O&M and financing costs for the month, or demand went unserved. Use the financial layers to set a sustainable rate before retrying.",
+        },
+      },
     ],
   },
   {
@@ -373,6 +476,7 @@ export const SCENARIOS = [
     summary: "Grow your customers",
     locationId: "SF",
     ownership: "Investor",
+    seed: 249005,
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -439,6 +543,26 @@ export const SCENARIOS = [
           />
         ),
       },
+      {
+        card: "INSIGHTS",
+        content: (
+          <TutorialPrompt
+            concepts={["rate", "customers", "money"]}
+            text="Your turn: grow customers by at least 5% in six months while staying profitable and reliable."
+          />
+        ),
+        hint: "A modest discount below the market rate attracts customers. Check the financial forecast too: a rate that is too low can grow sales while losing money.",
+        capstone: {
+          success: pricingCapstoneSucceeded,
+          failure: (s: AppStateType) =>
+            hasBlackout(s) ||
+            (s.game.date.monthsEllapsed >= 6 && !pricingCapstoneSucceeded(s)),
+          successMessage:
+            "Capstone complete - the lower rate grew the customer base by 5% while monthly revenue still covered costs and every unit of demand was served.",
+          failureMessage:
+            "The customer target, positive monthly profit and reliable supply did not all hold for six months. Balance the rate against both demand growth and cost before retrying.",
+        },
+      },
     ],
   },
   {
@@ -448,6 +572,7 @@ export const SCENARIOS = [
     summary: "See what's coming",
     locationId: "SF",
     ownership: "Investor",
+    seed: 249006,
     startingYear: 2020,
     cash: 220000000,
     feePerKgCO2e: 0,
@@ -557,6 +682,27 @@ export const SCENARIOS = [
             action={["play"]}
           />
         ),
+      },
+      {
+        card: "FACILITIES",
+        content: (
+          <TutorialPrompt
+            concepts={["forecast", "build", "blackout"]}
+            text="Your turn: commission enough generation before the forecast summer shortage, then reach month seven without a blackout."
+          />
+        ),
+        hint: "Inspect the supply-and-demand forecast, then choose any generator with enough capacity and a construction time shorter than the shortage deadline.",
+        capstone: {
+          success: forecastingCapstoneSucceeded,
+          failure: (s: AppStateType) =>
+            hasBlackout(s) ||
+            (s.game.date.monthsEllapsed >= 7 &&
+              !forecastingCapstoneSucceeded(s)),
+          successMessage:
+            "Capstone complete - construction finished before the forecast peak, and the added generator prevented the projected summer shortage.",
+          failureMessage:
+            "Demand reached available capacity before enough new generation was online. Recheck the forecast gap and construction time, then commission earlier.",
+        },
       },
     ],
   },

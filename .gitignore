@@ -12,6 +12,8 @@ pids
 lib-cov
 coverage
 .nyc_output
+playwright-report/
+test-results/
 
 # Compiled outputs & binary addons (http://nodejs.org/api/addons.html)
 build/Release
