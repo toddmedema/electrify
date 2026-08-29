@@ -1,7 +1,12 @@
-import type { FacilityOperatingType, LocationType } from "../Types";
+import type { LocationType } from "../Types";
 import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
 
 export type SiteLimitedFacilityName = "Hydro" | "Geothermal" | "Pumped Hydro";
+
+/** The only facility state needed to determine whether a project has claimed a site. */
+export interface FacilitySiteClaim {
+  name: string;
+}
 
 // Conventional hydro and geothermal used to express scarcity only through a linear price
 // multiplier. Until those resources get the same site-level GIS treatment as pumped hydro, keep
@@ -83,7 +88,7 @@ export function getViableLocationCount(
 /** Counts projects already owned or under construction because either one has claimed its site. */
 export function getViableLocationsRemaining(
   location: LocationType | undefined,
-  facilities: readonly FacilityOperatingType[],
+  facilities: readonly FacilitySiteClaim[],
   facilityName: string,
 ): number | undefined {
   const total = getViableLocationCount(location, facilityName);

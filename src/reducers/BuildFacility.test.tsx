@@ -100,6 +100,9 @@ describe("buildFacility", () => {
     expect(
       state.facilities.filter((facility) => facility.name === "Hydro"),
     ).toHaveLength(3);
+    state.facilities.forEach((facility) => {
+      expect(facility).not.toHaveProperty("viableLocationsRemaining");
+    });
   });
 
   it("keeps a long cash forecast finite when hydro finishes construction", () => {

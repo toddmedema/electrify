@@ -32,7 +32,7 @@ import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
-import { getViableLocationCount } from "../../data/FacilitySites";
+import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
@@ -241,17 +241,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
-  const usedSites = new Map<string, number>();
+  const claimedSites: Array<{ name: string }> = [];
   const unavailable = scenario.facilities.filter(
     (f: Partial<FacilityShoppingType>) => {
       const name = facilityName(f);
       if (!technologies.some((t) => t.name === name)) {
         return true;
       }
-      const used = (usedSites.get(name) || 0) + 1;
-      usedSites.set(name, used);
-      const sites = getViableLocationCount(location, name);
-      return sites !== undefined && used > sites;
+      const sitesRemaining = getViableLocationsRemaining(
+        location,
+        claimedSites,
+        name,
+      );
+      claimedSites.push({ name });
+      return sitesRemaining === 0;
     },
   );
 
