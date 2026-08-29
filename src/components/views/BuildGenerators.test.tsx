@@ -147,6 +147,35 @@ it("describes clean variable generation as a strategic role", () => {
   );
 });
 
+it("submits a generator purchase only once on a double-click", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 419000000, [], []).find(
+    (candidate) => candidate.name === "Natural Gas",
+  )!;
+  const onBuild = jest.fn();
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator}
+      location={game.location}
+      seed={game.seed}
+      onBuild={onBuild}
+    />,
+  );
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+  );
+  const takeLoan = screen.getByRole("button", { name: "Take loan" });
+  fireEvent.click(takeLoan);
+  fireEvent.click(takeLoan);
+
+  expect(onBuild).toHaveBeenCalledTimes(1);
+});
+
 it("pins up to three current-grid choices into a comparison tray", () => {
   const game = createGame({ scenarioId: 100, difficulty: "Employee" });
   render(
@@ -158,7 +187,7 @@ it("pins up to three current-grid choices into a comparison tray", () => {
     />,
   );
 
-  const compare = screen.getAllByRole("button", { name: "Compare" });
+  const compare = screen.getAllByRole("button", { name: /^Compare / });
   fireEvent.click(compare[0]);
   fireEvent.click(compare[1]);
   expect(

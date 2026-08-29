@@ -58,6 +58,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(
@@ -78,8 +79,25 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   };
 
   const toggleOpen = (e: React.SyntheticEvent) => {
-    setOpen(!open);
+    setOpen((wasOpen: boolean) => {
+      if (!wasOpen) {
+        purchaseSubmitted.current = false;
+      }
+      return !wasOpen;
+    });
     e.stopPropagation();
+  };
+
+  const submitPurchase = (
+    financed: boolean,
+    e: React.MouseEvent<HTMLElement>,
+  ) => {
+    if (purchaseSubmitted.current) {
+      return;
+    }
+    purchaseSubmitted.current = true;
+    props.onBuild(financed);
+    toggleOpen(e);
   };
 
   return (
@@ -269,10 +287,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             color="primary"
             disabled={cash < storage.buildCost}
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(false);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(false, e)
+            }
             startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
@@ -280,10 +297,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           <Button
             color="primary"
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(true);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(true, e)
+            }
             startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan

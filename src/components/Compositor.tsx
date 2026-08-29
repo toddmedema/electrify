@@ -47,7 +47,7 @@ import {
   togglePauseFacility,
 } from "../reducers/Game";
 import { snackbarOpen } from "../reducers/UI";
-import { isDesktopScreen, isPaneLayout, isUltrawideScreen } from "../Globals";
+import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
 
 // The in-game cards share one stable transition key above the desktop breakpoint. Facilities
@@ -345,14 +345,8 @@ export default class Compositor extends React.Component<Props, {}> {
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            {this.props.card.name === "EVENTS" && !isUltrawideScreen() ? (
-              <EventLogContainer />
-            ) : (
-              <InsightsContainer />
-            )}
-            {/* An ultrawide window is otherwise three panes and a lot of nothing. Only here,
-                because below this a fourth column comes out of the three that carry the game */}
-            {isUltrawideScreen() ? <EventLogContainer /> : null}
+            <InsightsContainer />
+            <EventLogContainer />
           </DesktopPanes>
         </div>
       );

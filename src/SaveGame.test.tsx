@@ -273,6 +273,19 @@ describe("SaveGame", () => {
       stop();
     });
 
+    it("flushes player actions made while the clock stays paused", () => {
+      const store = fakeStore(quit);
+      const stop = startAutosave(store as never, () => true);
+      const running = playing(game, 2020, 0);
+
+      store.set(running);
+      store.set({ ...running, speed: "PAUSED" });
+      store.set(quit);
+
+      expect(readSave()!.game.speed).toBe("PAUSED");
+      stop();
+    });
+
     // Bankrupt and fired clear the save and then quit, and the flush must not undo that
     it("doesn't resurrect a save the scenario ending cleared", () => {
       const store = fakeStore(quit);

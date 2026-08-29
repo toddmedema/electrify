@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Settings, { Props } from "./Settings";
 import { clearAppCache } from "../../helpers/Cache";
@@ -207,5 +207,22 @@ describe("Settings", () => {
     await userEvent.click(button);
 
     expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns focus to the control that opened Settings", () => {
+    jest.useFakeTimers();
+    const trigger = document.createElement("button");
+    trigger.dataset.settingsTrigger = "";
+    document.body.appendChild(trigger);
+    const onBack = jest.fn();
+    renderSettings({ onBack });
+
+    fireEvent.click(screen.getByRole("button", { name: "back" }));
+    act(() => jest.advanceTimersByTime(350));
+
+    expect(onBack).toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+    jest.useRealTimers();
   });
 });

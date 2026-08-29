@@ -59,3 +59,23 @@ it("keeps toolbar actions inside compact viewport gutters", () => {
     "MuiIconButton-edgeEnd",
   );
 });
+
+it("submits a storage purchase only once on a double-click", () => {
+  const onBuildStorage = jest.fn();
+  render(
+    <BuildStorage
+      game={game()}
+      onBuildStorage={onBuildStorage}
+      onBack={jest.fn()}
+      onSpeedChange={jest.fn()}
+    />,
+  );
+
+  // Pumped Hydro is the first shopping card, so its price is the first purchase button.
+  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  const takeLoan = screen.getByRole("button", { name: "Take loan" });
+  fireEvent.click(takeLoan);
+  fireEvent.click(takeLoan);
+
+  expect(onBuildStorage).toHaveBeenCalledTimes(1);
+});

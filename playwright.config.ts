@@ -27,6 +27,15 @@ export default defineConfig({
         viewport: { width: 390, height: 844 },
       },
     },
+    {
+      name: "mobile-320px",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        isMobile: true,
+        viewport: { width: 320, height: 568 },
+      },
+    },
   ],
   webServer: {
     command: "npm start",

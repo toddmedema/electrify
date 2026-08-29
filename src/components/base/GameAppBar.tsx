@@ -176,6 +176,12 @@ export function GameAppBar(props: Props) {
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
+  const handleQuit = React.useCallback(() => {
+    onQuit();
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>("[data-main-action]")?.focus();
+    }, 350);
+  }, [onQuit]);
 
   /**
    * The bar has to re-render every tick to keep the cash and the clock honest, which at FAST is
@@ -198,6 +204,7 @@ export function GameAppBar(props: Props) {
     () => (
       <>
         <IconButton
+          data-settings-trigger
           className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label="menu"
@@ -234,7 +241,7 @@ export function GameAppBar(props: Props) {
               Next tutorial
             </MenuItem>
           )}
-          <MenuItem onClick={onQuit}>
+          <MenuItem onClick={handleQuit}>
             {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
           </MenuItem>
         </Menu>
@@ -246,7 +253,7 @@ export function GameAppBar(props: Props) {
       onManual,
       onSettings,
       onNextTutorial,
-      onQuit,
+      handleQuit,
       nextTutorial,
       isReplay,
       isTutorial,

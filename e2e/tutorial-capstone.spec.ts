@@ -21,6 +21,15 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
 
+  if (testInfo.project.name.startsWith("mobile-")) {
+    const speedButtons = page.locator("#speedChangeButtons button");
+    for (let i = 0; i < (await speedButtons.count()); i++) {
+      const box = await speedButtons.nth(i).boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+  }
+
   if (testInfo.project.name === "mobile-390px") {
     await expect(page.getByRole("button", { name: "Insights" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Events" })).toBeVisible();
@@ -33,7 +42,15 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   ).toBeVisible();
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry.
-  await page.locator(".facilityRow", { hasText: "Natural Gas" }).click();
+  if (testInfo.project.name === "mobile-320px") {
+    await page.getByRole("button", { name: "Collapse objective" }).click();
+  }
+  const naturalGas = page.locator(".facilityRow", { hasText: "Natural Gas" });
+  if (testInfo.project.name === "mobile-320px") {
+    await naturalGas.click({ position: { x: 12, y: 12 } });
+  } else {
+    await naturalGas.click();
+  }
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
