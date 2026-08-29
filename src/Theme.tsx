@@ -22,8 +22,8 @@ import {
  *
  * Dark is not light inverted. A series tuned to clear 3:1 against a white plot area is often
  * invisible against a near-black one - Coal at #1a1a1a most of all - so each one moves up its own
- * ramp far enough to clear the same bar against #121212, keeping the luminance spread that lets
- * four lines on one chart be told apart.
+ * ramp far enough to clear the same bar against the dark plot surface, keeping the luminance
+ * spread that lets four lines on one chart be told apart.
  */
 
 // Nine series can never all clear WCAG's 3:1 non-text contrast against each other - the
@@ -47,14 +47,14 @@ const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
     Hydro: "#006b54",
   },
   dark: {
-    Coal: "#d0d0d0", // 11.9:1 on #121212 - the darkest fuel has to become the lightest
+    Coal: "#d0d0d0", // 11.8:1 on #0f161f - the darkest fuel has to become the lightest
     Biomass: "#9ccc65",
     Uranium: "#4dd0e1", // 9.9:1
     Oil: "#ffa726", // 10.6:1
     "Natural Gas": "#ce93d8", // 7.7:1
     Sun: "#ffd54f", // 13.6:1
     Wind: "#64b5f6", // 8.0:1
-    "Offshore Wind": "#006e75", // 3.1:1 on #121212, 2.7:1 against Wind
+    "Offshore Wind": "#006e75", // 3.0:1 on #0f161f, 2.7:1 against Wind
     Geothermal: "#f48fb1", // 8.7:1
     Hydro: "#66d9b7",
   },
@@ -126,7 +126,7 @@ interface ChartPaletteType {
   cursor: string;
   /** A trend line on offer rather than being read: the unselected metric tiles */
   muted: string;
-  /** Baselines, and the captions the finance charts carry instead of a legend */
+  /** Baselines around the plot. Kept quieter than titles and data. */
   axis: string;
   tickLabel: string;
   grid: string;
@@ -134,7 +134,7 @@ interface ChartPaletteType {
   legendText: string;
   /** What the interactive blue is on this palette, for the bits of chrome that aren't MUI's */
   interactive: string;
-  /** The page behind the plot, for decorations that have to read as a gap rather than a line */
+  /** The plot surface, for decorations that have to read as a gap rather than a line */
   background: string;
 }
 
@@ -166,28 +166,31 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     storage: blue[300],
-    demand: grey[100],
-    supply: blue[300],
+    // Near-white demand used to glare against the plot and visually overpower supply. This
+    // cooler off-white still clears 13:1 while behaving like a peer rather than a highlight.
+    demand: "#dce6f0",
+    supply: "#6ab8f7",
     // Blue50 solid, as light uses, reads as a near-white glare on a near-black plot; a faint
     // tint of the supply line itself keeps the wash subtle enough for both lines to read over it
-    historicFill: withAlpha(blue[300], 0.16),
-    blackout: red[400],
-    temperature: red[300],
-    temperatureAxis: red[300],
+    historicFill: withAlpha("#6ab8f7", 0.12),
+    blackout: "#ff6b6b",
+    temperature: "#ff8a80",
+    temperatureAxis: "#ff8a80",
     wind: FUEL_COLORS.dark.Wind,
     offshoreWind: FUEL_COLORS.dark["Offshore Wind"],
     precipitation: blue[300],
     snowpack: "#ce93d8",
     reservoir: FUEL_COLORS.dark.Hydro,
-    cursor: grey[500],
-    muted: grey[500],
-    axis: grey[300],
-    tickLabel: "rgba(255, 255, 255, 0.7)",
-    grid: "#2f2f2f",
-    tick: "#6d7c85",
-    legendText: "#e0e0e0",
-    interactive: blue[300],
-    background: "#121212",
+    cursor: "#7f91a6",
+    muted: "#718094",
+    axis: "#526173",
+    tickLabel: "#9aa9ba",
+    // Solid, low-contrast rules give the eye a scale without putting graph paper behind the data.
+    grid: "rgba(148, 163, 184, 0.13)",
+    tick: "rgba(148, 163, 184, 0.34)",
+    legendText: "#dce6f0",
+    interactive: "#6ab8f7",
+    background: "#0f161f",
   },
 };
 
@@ -276,7 +279,7 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       // Kept in step with --bg-primary in app.scss, which paints everything MUI doesn't
       background:
         mode === "dark"
-          ? { default: "#121212", paper: "#1a1a1a" }
+          ? { default: "#0b1016", paper: "#111820" }
           : { default: "#ffffff", paper: "#ffffff" },
     },
     typography: {
@@ -302,6 +305,15 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiButtonBase: {
         defaultProps: {
           disableRipple: false,
+        },
+      },
+      // MUI's dark-mode elevation overlay muddies the deliberately layered charcoal surfaces.
+      // Shadows and borders already communicate elevation, so keep paper on its authored colour.
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundImage: "none",
+          },
         },
       },
     },
