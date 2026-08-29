@@ -92,14 +92,12 @@ const MainMenu = (props: Props): React.JSX.Element => {
         <Stack
           component="nav"
           aria-label="Game resources"
-          direction="row"
+          className="resourceActions"
+          direction="column"
+          spacing={0.75}
           useFlexGap
           sx={{
-            mx: "auto",
-            maxWidth: 440,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            "& > button": { m: "0 4px 8px !important" },
+            alignItems: "center",
           }}
         >
           <Button variant="text" color="primary" onClick={props.onManual}>
@@ -120,10 +118,13 @@ const MainMenu = (props: Props): React.JSX.Element => {
           )}
         </Stack>
         <Stack
+          component="section"
+          aria-label="Discovery actions"
           className="discoveryActions"
-          direction="row"
+          direction="column"
+          spacing={0.75}
           useFlexGap
-          sx={{ flexWrap: "wrap", justifyContent: "center" }}
+          sx={{ alignItems: "center" }}
         >
           <InstallAppButton />
           {props.audioEnabled === undefined && (
