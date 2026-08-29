@@ -230,6 +230,20 @@ describe("Insights layers", () => {
     );
   });
 
+  it("offers one rolling 12-month range instead of separate calendar years", async () => {
+    localStorage.setItem("insightsRange", "current");
+    renderInsights();
+
+    const range = screen.getByRole("combobox", { name: "Insight range" });
+    expect(range).toHaveTextContent("Next 12 months");
+    await user.click(range);
+
+    const options = within(await screen.findByRole("listbox"));
+    expect(options.getByText("Next 12 months")).toBeVisible();
+    expect(options.queryByText("Current year")).toBeNull();
+    expect(options.queryByText("Next year")).toBeNull();
+  });
+
   it("keeps tutorial targets visible without duplicating stored layers", () => {
     expect(withRequiredLayers(["profit"], 4)).toEqual([
       "profit",

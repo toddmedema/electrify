@@ -34,7 +34,7 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onBack: () => undefined,
     ...overrides,
   };
-  render(<Settings {...props} />);
+  return render(<Settings {...props} />);
 }
 
 function exportButton(): HTMLButtonElement {
@@ -89,6 +89,31 @@ describe("Settings", () => {
     );
     expect(onMusicVolumeChange).toHaveBeenCalledWith(0.35);
     expect(onSoundEffectsVolumeChange).toHaveBeenCalledWith(0.8);
+  });
+
+  it("only shows volume controls while audio is enabled", () => {
+    const view = renderSettings();
+
+    expect(screen.queryByRole("slider", { name: /music volume/i })).toBeNull();
+    expect(
+      screen.queryByRole("slider", { name: /sound effects volume/i }),
+    ).toBeNull();
+
+    view.unmount();
+    renderSettings({
+      settings: {
+        audioEnabled: true,
+        musicVolume: 1,
+        soundEffectsVolume: 1,
+        units: "metric",
+        theme: "system",
+      },
+    });
+
+    expect(screen.getByRole("slider", { name: /music volume/i })).toBeVisible();
+    expect(
+      screen.getByRole("slider", { name: /sound effects volume/i }),
+    ).toBeVisible();
   });
 
   it("names the saved game that Export would download", async () => {
