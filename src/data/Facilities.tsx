@@ -243,6 +243,9 @@ export function GENERATORS(
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
+      // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
+      costPerStart: 23100 * (peakW / 419000000),
       yearsToBuild: 2.46 + magnitude / 3,
       capacityFactor: 0.45,
       // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
@@ -504,6 +507,9 @@ export function GENERATORS(
   generators = generators.filter((g: GeneratorShoppingType) => {
     g.buildCost *= difficulty.buildCost * inflation;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
+    if (g.costPerStart !== undefined) {
+      g.costPerStart *= difficulty.expensesOM * inflation;
+    }
     g.yearsToBuild *= difficulty.buildTime;
     // The custom game screen asks what can be built in a year before any game has loaded the
     // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no

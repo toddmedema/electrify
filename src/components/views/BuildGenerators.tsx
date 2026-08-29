@@ -29,7 +29,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import PauseIcon from "@mui/icons-material/Pause";
 import SortIcon from "@mui/icons-material/Sort";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { getMonthlyPayment } from "../../helpers/Financials";
+import {
+  estimatedAnnualOperatingCost,
+  getMonthlyPayment,
+} from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatMoneyStable,
@@ -72,7 +75,9 @@ interface GeneratorBuildItemProps {
   onBuild: (financed: boolean) => void;
 }
 
-function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
+export function GeneratorBuildItem(
+  props: GeneratorBuildItemProps,
+): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
   const fuel = FUELS[generator.fuel] || {};
@@ -162,8 +167,12 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
         <GeneratorMetric
-          label="Operating cost"
-          value={`${formatMoneyConcise(generator.annualOperatingCost)}/yr`}
+          label={
+            generator.costPerStart !== undefined
+              ? "Est. O&M (1 start/day)"
+              : "Operating cost"
+          }
+          value={`${formatMoneyConcise(estimatedAnnualOperatingCost(generator))}/yr`}
         />
         <GeneratorMetric
           label="Energy cost"
@@ -213,6 +222,9 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                     <Typography variant="body2" color="textSecondary">
                       Across life, based on{" "}
                       {Math.round(generator.capacityFactor * 100)}% uptime
+                      {generator.costPerStart !== undefined
+                        ? " and one start/day"
+                        : ""}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -237,15 +249,45 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               </TableRow>
               <TableRow>
                 <TableCell>
-                  Operating costs
+                  Base O&M
                   <Typography variant="body2" color="textSecondary">
-                    Regardless of output
+                    At {Math.round(generator.capacityFactor * 100)}% expected
+                    output
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {formatMoneyConcise(generator.annualOperatingCost)}/yr
                 </TableCell>
               </TableRow>
+              {generator.costPerStart !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Startup maintenance
+                    <Typography variant="body2" color="textSecondary">
+                      Per equivalent start
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(generator.costPerStart)}/start
+                  </TableCell>
+                </TableRow>
+              )}
+              {generator.costPerStart !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Estimated O&M
+                    <Typography variant="body2" color="textSecondary">
+                      Base O&M plus one start/day
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(
+                      estimatedAnnualOperatingCost(generator),
+                    )}
+                    /yr
+                  </TableCell>
+                </TableRow>
+              )}
               {fuelPrices[generator.fuel] && (
                 <TableRow>
                   <TableCell>

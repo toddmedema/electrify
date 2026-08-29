@@ -159,10 +159,30 @@ export function LCWH(
     g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh =
     (g.buildCost +
-      g.annualOperatingCost * g.lifespanYears +
+      estimatedAnnualOperatingCost(g) * g.lifespanYears +
       (fuelCostPerWh + carbonCostPerWh) * totalWh) /
     totalWh;
   return costPerWh;
+}
+
+// The build quote needs one legible operating pattern. A daily start matches a peaking turbine
+// that shuts down overnight, and turns EIA's per-start maintenance value into an annual estimate;
+// live play still charges only when the facility actually crosses from off to generating.
+export const ASSUMED_STARTS_PER_YEAR = 365;
+
+export function estimatedAnnualStartCost(
+  generator: Pick<GeneratorShoppingType, "costPerStart">,
+): number {
+  return (generator.costPerStart || 0) * ASSUMED_STARTS_PER_YEAR;
+}
+
+export function estimatedAnnualOperatingCost(
+  generator: Pick<
+    GeneratorShoppingType,
+    "annualOperatingCost" | "costPerStart"
+  >,
+): number {
+  return generator.annualOperatingCost + estimatedAnnualStartCost(generator);
 }
 
 /**
@@ -261,6 +281,13 @@ export function facilityEquivalentCycles(
   g: FacilityOperatingType,
 ): number | undefined {
   return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
+}
+
+/** Nameplate-equivalent hours generated, using the already calendar-scaled lifetime energy. */
+export function facilityEquivalentOperatingHours(
+  g: FacilityOperatingType,
+): number | undefined {
+  return !g.peakWh && g.peakW > 0 ? g.lifetimeWh / g.peakW : undefined;
 }
 
 // Returns how much cash the user receives if they sell / cancel the facility. Construction

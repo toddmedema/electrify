@@ -4,6 +4,7 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   facilityAgeYears,
   facilityEquivalentCycles,
+  facilityEquivalentOperatingHours,
   facilityLifetime,
   facilityOutputFactor,
 } from "../../helpers/Financials";
@@ -122,6 +123,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
   const equivalentCycles = facilityEquivalentCycles(facility);
+  const equivalentOperatingHours = facilityEquivalentOperatingHours(facility);
 
   const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
   const trendChange =
@@ -190,6 +192,36 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <Stat
             label="Equivalent cycles"
             value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+          />
+        )}
+        {!isStorage && equivalentOperatingHours !== undefined && (
+          <Stat
+            label="Equivalent operating hours"
+            value={Math.round(equivalentOperatingHours).toLocaleString()}
+          />
+        )}
+        {facility.costPerStart !== undefined && (
+          <Stat
+            label="Equivalent starts"
+            value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
+          />
+        )}
+        {facility.costPerStart !== undefined && (
+          <Stat
+            label="Service intervals"
+            value="HGP 900 · major 1,800 starts"
+          />
+        )}
+        {facility.costPerStart !== undefined && (
+          <Stat
+            label="Start maintenance"
+            value={`${formatMoneyConcise(facility.costPerStart)}/start`}
+          />
+        )}
+        {facility.costPerStart !== undefined && (
+          <Stat
+            label="Start accounting"
+            value="Each simulated day represents its month"
           />
         )}
         {isHydro && (

@@ -100,13 +100,22 @@ export function parseSave(raw: unknown): SaveGameType | null {
         return true;
       }
       const current = facility as Record<string, unknown>;
-      return [
+      const requiredNumbersInvalid = [
         current.lifespanYears,
         current.lifetimeWh,
         current.lifetimePotentialWh,
         current.lifetimeRevenue,
         current.lifetimeExpenses,
       ].some((value) => typeof value !== "number" || !Number.isFinite(value));
+      const optionalNumbersInvalid = [
+        current.costPerStart,
+        current.lifetimeStarts,
+      ].some(
+        (value) =>
+          value !== undefined &&
+          (typeof value !== "number" || !Number.isFinite(value) || value < 0),
+      );
+      return requiredNumbersInvalid || optionalNumbersInvalid;
     }) ||
     !Array.isArray(game.timeline) ||
     !Array.isArray(game.monthlyHistory) ||

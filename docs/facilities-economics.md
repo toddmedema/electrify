@@ -55,7 +55,12 @@ The EIA AEO2025 reference designs also update:
 - Coal: 8,638 Btu/kWh, 60-month reference lead time, and 40-year operating life.
 - Nuclear: 10,608 Btu/kWh, 84-month reference lead time, and 40-year economic life.
 - Natural gas: the H-class simple-cycle design matches the facility's fast-start role: 9,142
-  Btu/kWh, a 40-month lead time, and a 40-year life.
+  Btu/kWh, a 40-month lead time, and a 40-year life. Its $6.87/kW-year fixed O&M and $1.24/MWh
+  consumables remain the base O&M; EIA reports start maintenance separately at $23,100 per
+  equivalent start for the 419 MW reference plant, scaled linearly for the player's chosen size.
+  The build quote adds one start per day ($8.432 million/year for the reference plant) to make the
+  tradeoff legible, while live play charges only on actual off-to-on edges. Because one simulated
+  day represents a month, each visible edge represents 365/12 equivalent starts.
 - Onshore wind: $33.06/kW-year fixed O&M, 21-month reference lead time, and 25-year life.
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
@@ -172,10 +177,11 @@ so their introductory economics and controls remain predictable. Existing saves 
 commissioning timestamp still begin their age clock on the first real tick, and saves without a
 degradation field use the modern solar or wind default from the day they resume.
 
-The next fidelity step is intentionally separate: starts and equivalent operating hours for thermal
-plants, start costs for natural gas, maintenance/refurbishment decisions, and wear-driven outage
-risk. Adding an arbitrary fossil output penalty now would duplicate mechanisms that should instead
-depend on duty cycle, starts, and maintenance history.
+The facility panel now reports equivalent operating hours for generators and equivalent starts for
+natural gas. The 900-start hot-gas-path and 1,800-start major-inspection intervals are shown as
+maintenance context, but do not trigger a second refurbishment bill: EIA's $23,100/start figure is
+already the levelized major-maintenance cost. Maintenance decisions and wear-driven outage risk
+remain separate future work.
 
 ## Commercial technology review
 

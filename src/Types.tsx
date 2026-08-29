@@ -320,6 +320,9 @@ export interface GeneratorOperatingType
   // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
   paused: boolean;
+  // Last real-tick state for start edge detection. Forecast/pre-roll dispatch mutates currentW,
+  // so currentW alone cannot distinguish a player-visible start from a synthetic one.
+  generatingLastRealTick?: boolean;
   reservoirWh?: number;
   hydroLastInflowWh?: number;
   hydroLastSpillWh?: number;
@@ -350,6 +353,9 @@ export interface LifetimeTotals {
   lifetimePotentialWh: number;
   lifetimeRevenue: number; // Its pro-rata share of what the company sold
   lifetimeExpenses: number; // Its own fuel, O&M, carbon fees and loan interest
+  // Representative starts: one on/off edge in the sampled day stands for every day in its month.
+  // Optional so launch saves made before start-based maintenance remain readable.
+  lifetimeStarts?: number;
 }
 
 interface LoanInfo {
@@ -381,6 +387,9 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   annualOutputDegradation?: number;
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
+  // Non-fuel maintenance charged for one physical start. Only present when the technology's
+  // source case reports it separately from fixed and output-dependent O&M.
+  costPerStart?: number;
   // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
   // long-run inflow lands on capacityFactor without flattening wet and dry years.
   reservoirCapacityWh?: number;
