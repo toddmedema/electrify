@@ -114,7 +114,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare cost, build time and fuel."
+            text="Compare build cost, time, fuel and O&M. Oil pays fixed O&M even when idle, plus variable O&M whenever it generates."
           />
         ),
       },
