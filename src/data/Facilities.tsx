@@ -52,9 +52,16 @@ function offshoreEraMultiple(year: number): number {
 // annual-average CPI-U from BLS, not the game's inflation: that is applied separately below.
 const CPI_2019_TO_2023 = 304.702 / 255.657;
 const CPI_2020_TO_2024 = 313.689 / 258.811;
+const CPI_2015_TO_2023 = 304.702 / 237.017;
 // NREL's 500-1,300 MW supercritical-coal class reports $54/MW-start of capitalized
 // cycling/maintenance plus $5.81/MW-start of other startup operations, in 2011 dollars.
 const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
+
+// EIA's directly matched 340 kW commercial Oil reciprocating-engine case, normalized from
+// 2015$ to 2023$ with annual-average CPI-U. These stay separate because fixed service is paid for
+// standing capacity while use-driven service and consumables follow the MWh actually generated.
+export const OIL_FIXED_OPERATING_COST_PER_KW_YEAR = 24 * CPI_2015_TO_2023;
+export const OIL_VARIABLE_OPERATING_COST_PER_MWH = 20 * CPI_2015_TO_2023;
 
 // Used only to upgrade current-version saves written before start tracking was added to these
 // technologies. New shopping and operating records carry the explicit tracksStarts field below.
@@ -309,9 +316,13 @@ export function GENERATORS(
       btuPerWh: 11,
       // https://www.eia.gov/electricity/annual/html/epa_08_01.html
       spinMinutes: 10,
-      annualOperatingCost: 0.05 * peakW,
-      // ~$0.006 -> .005/kwh 2008->18, -2%/yr - https://www.eia.gov/electricity/annual/html/epa_08_04.html
-      // ~$0.01/wy in 2016 - https://www.eia.gov/analysis/studies/powerplants/capitalcost/xls/table1.xls
+      // EIA, Distributed Generation and Combined Heat & Power System Characteristics and Costs
+      // in the Buildings Sector, Tables 4-38 through 4-41. The 2015-dollar source values are
+      // $24/kW-year fixed and $20/MWh variable before the CPI normalization above.
+      // https://www.eia.gov/analysis/studies/buildings/distrigen/pdf/dg_chp.pdf
+      annualOperatingCost:
+        (peakW / 1000) * OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
+      variableOperatingCostPerMWh: OIL_VARIABLE_OPERATING_COST_PER_MWH,
       yearsToBuild: 1 + magnitude / 3,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
       capacityFactor: 0.2,
@@ -567,6 +578,9 @@ export function GENERATORS(
   generators = generators.filter((g: GeneratorShoppingType) => {
     g.buildCost *= difficulty.buildCost * inflation;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
+    if (g.variableOperatingCostPerMWh !== undefined) {
+      g.variableOperatingCostPerMWh *= difficulty.expensesOM * inflation;
+    }
     if (g.costPerStart !== undefined) {
       g.costPerStart *= difficulty.expensesOM * inflation;
     }

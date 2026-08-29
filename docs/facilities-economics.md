@@ -45,10 +45,10 @@ detailed design is used for duration, life, construction time, and augmentation 
 
 ## Operating and performance logic
 
-The simulation has one annual non-fuel O&M field, while EIA reports fixed O&M in $/kW-year and
-variable O&M in $/MWh. For generators, variable O&M is converted to an annual amount at the
-facility's modeled capacity factor and added to fixed O&M. Actual fuel and carbon expenses remain
-separate.
+Most generator records retain one annual non-fuel O&M field: where a source separates fixed O&M
+in $/kW-year and variable O&M in $/MWh, the variable amount remains annualized at the modeled
+capacity factor for those technologies. Oil is the explicit exception described below. Actual fuel
+and carbon expenses remain separate for every generator.
 
 The EIA AEO2025 reference designs also update:
 
@@ -61,6 +61,14 @@ The EIA AEO2025 reference designs also update:
   The build quote adds one start per day ($8.432 million/year for the reference plant) to make the
   tradeoff legible, while live play charges only on actual off-to-on edges. Because one simulated
   day represents a month, each visible edge represents 365/12 equivalent starts.
+- Oil: the matched EIA commercial Oil reciprocating-engine case reports $24/kW-year fixed O&M and
+  $20/MWh variable O&M in 2015 dollars. Annual-average CPI-U (`304.702 / 237.017`) converts these
+  to $30.8536856/kW-year and $25.7114047/MWh in 2023 dollars. Fixed O&M scales with nameplate and
+  variable O&M is charged against actual representative-month generation. A 100 MW build at the
+  modeled 20% capacity factor therefore quotes $3.085 million/year fixed plus $4.505 million/year
+  variable, or $7.590 million/year before difficulty and later game inflation. Those multipliers
+  are persisted at construction. Legacy facilities recover the same multiplier from their former
+  `$0.05 × peakW` annual cost before adopting the split; prior expense history is unchanged.
 - Onshore wind: $33.06/kW-year fixed O&M, 21-month reference lead time, and 25-year life.
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
@@ -168,8 +176,9 @@ The simulation now distinguishes three aging effects that were previously easy t
 
 At 0.5% annual degradation, solar retains `0.995^20 = 90.5%` of its original output after 20
 years—about a 9.5% loss, not 20%. Weather and curtailment still vary actual production around that
-aged maximum. The build screen's lifetime cost integrates the same compounding output curve, while
-annual O&M remains flat; fuel and carbon costs continue to scale only with energy actually produced.
+aged maximum. The build screen's lifetime cost integrates the same compounding output curve. Fixed
+annual O&M remains flat; Oil variable O&M, fuel, and carbon costs scale only with energy actually
+produced.
 
 Scenario starting ages are deliberately authored rather than inferred from technology or scenario
 year. The narrative scenarios now begin with mixed-age inherited fleets; tutorials keep new assets
@@ -181,18 +190,20 @@ The facility panel now reports equivalent operating hours for generators. It als
 equivalent starts for Natural Gas, Coal, Nuclear, Biomass, Geothermal, and Enhanced Geothermal.
 A real zero-to-generating edge represents `365 / 12` starts because the visible day stands for the
 average day in its month; ramping while already above zero does not add another start. Oil remains
-an internal-combustion-generator benchmark, and Hydro is not thermal, so neither is included.
+an internal-combustion-generator benchmark whose use-driven maintenance follows generated MWh, and
+Hydro is not thermal, so neither is included.
 
 Start tracking and start charges are deliberately separate capabilities:
 
-| Facility | Tracks starts | Non-fuel start charge | Basis |
-| --- | --- | --- | --- |
-| Natural Gas | Yes | EIA's $23,100 per start at 419 MW, size-normalized | H-class simple-cycle reference |
-| Coal | Yes | $81.0185278/MW-start in 2023$, size-normalized | NREL supercritical hot-start cycling plus startup operations |
-| Nuclear | Yes | None | IAEA finds shutdown/startup cycling consequential but unit-specific |
-| Biomass | Yes | None | EIA documents diesel startup burners but no transferable quantity or wear cost |
-| Geothermal | Yes | None | Published lifetime FOM already annualizes overhaul and maintenance |
-| Enhanced Geothermal | Yes | None | Same FOM treatment, without commercial start-cost observations |
+| Facility            | Tracks starts | Non-fuel start charge                              | Basis                                                                                   |
+| ------------------- | ------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Natural Gas         | Yes           | EIA's $23,100 per start at 419 MW, size-normalized | H-class simple-cycle reference                                                          |
+| Coal                | Yes           | $81.0185278/MW-start in 2023$, size-normalized     | NREL supercritical hot-start cycling plus startup operations                            |
+| Nuclear             | Yes           | None                                               | IAEA finds shutdown/startup cycling consequential but unit-specific                     |
+| Biomass             | Yes           | None                                               | EIA documents diesel startup burners but no transferable quantity or wear cost          |
+| Geothermal          | Yes           | None                                               | Published lifetime FOM already annualizes overhaul and maintenance                      |
+| Enhanced Geothermal | Yes           | None                                               | Same FOM treatment, without commercial start-cost observations                          |
+| Oil                 | No            | None                                               | Reciprocating-engine service follows use; starts do not change its maintenance schedule |
 
 Coal uses NREL's conservative hot-start values for 500-1,300 MW supercritical units: $54/MW-start
 of capitalized cycling and maintenance plus $5.81/MW-start of auxiliary operations, chemicals,
@@ -226,6 +237,8 @@ No additional facility type is added in this pass:
 - [EIA, Capital Cost and Performance Characteristics for Utility-Scale Electric Power Generating Technologies, AEO2025](https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf)
 - [EIA, 2020 edition of the same standardized study](https://www.eia.gov/analysis/studies/powerplants/capitalcost/archive/2020/pdf/capital_cost_AEO2020.pdf)
 - [EIA, construction costs for generators installed in 2023](https://www.eia.gov/electricity/generatorcosts/)
+- [EIA, Distributed Generation and Combined Heat & Power System Characteristics and Costs in the Buildings Sector](https://www.eia.gov/analysis/studies/buildings/distrigen/pdf/dg_chp.pdf)
+- [Wärtsilä, Combustion Engine Power Plants](https://www.wartsila.com/docs/default-source/power-plants-documents/downloads/white-papers/general/wartsila-bwp-combustion-engine-power-plants.pdf)
 - [IRENA, Renewable Power Generation Costs in 2024](https://www.irena.org/Publications/2025/Jun/Renewable-Power-Generation-Costs-in-2024)
 - [IRENA, Renewable Power Generation Costs in 2020](https://www.irena.org/Publications/2021/Jun/Renewable-Power-Costs-in-2020)
 - [NREL, Cost Projections for Utility-Scale Battery Storage: 2021 Update](https://docs.nrel.gov/docs/fy21osti/79236.pdf)

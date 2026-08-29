@@ -31,6 +31,7 @@ import SortIcon from "@mui/icons-material/Sort";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
+  estimatedAnnualVariableOperatingCost,
   getMonthlyPayment,
 } from "../../helpers/Financials";
 import {
@@ -104,6 +105,8 @@ export function GeneratorBuildItem(
     generator.viableLocationsRemaining,
   );
   const financingGap = Math.max(0, downpayment - cash);
+  const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
+  const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(
@@ -169,9 +172,11 @@ export function GeneratorBuildItem(
         />
         <GeneratorMetric
           label={
-            generator.costPerStart !== undefined
-              ? "Est. O&M (1 start/day)"
-              : "Operating cost"
+            hasVariableOM
+              ? `Estimated O&M (${Math.round(generator.capacityFactor * 100)}% expected output)`
+              : generator.costPerStart !== undefined
+                ? "Est. O&M (1 start/day)"
+                : "Operating cost"
           }
           value={`${formatMoneyConcise(estimatedAnnualOperatingCost(generator))}/yr`}
         />
@@ -250,16 +255,31 @@ export function GeneratorBuildItem(
               </TableRow>
               <TableRow>
                 <TableCell>
-                  Base O&M
+                  {hasVariableOM ? "Fixed O&M" : "Base O&M"}
                   <Typography variant="body2" color="textSecondary">
-                    At {Math.round(generator.capacityFactor * 100)}% expected
-                    output
+                    {hasVariableOM
+                      ? "Standing annual expense"
+                      : `At ${Math.round(generator.capacityFactor * 100)}% expected output`}
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {formatMoneyConcise(generator.annualOperatingCost)}/yr
                 </TableCell>
               </TableRow>
+              {hasVariableOM && (
+                <TableRow>
+                  <TableCell>
+                    Variable O&M
+                    <Typography variant="body2" color="textSecondary">
+                      Per generated MWh
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    ${(generator.variableOperatingCostPerMWh || 0).toFixed(2)}
+                    /MWh generated
+                  </TableCell>
+                </TableRow>
+              )}
               {generator.costPerStart !== undefined && (
                 <TableRow>
                   <TableCell>
@@ -289,12 +309,14 @@ export function GeneratorBuildItem(
                   </TableCell>
                 </TableRow>
               )}
-              {generator.costPerStart !== undefined && (
+              {(hasVariableOM || generator.costPerStart !== undefined) && (
                 <TableRow>
                   <TableCell>
                     Estimated O&M
                     <Typography variant="body2" color="textSecondary">
-                      Base O&M plus one start/day
+                      {hasVariableOM
+                        ? `Fixed plus ${formatMoneyConcise(estimatedVariableOM)}/yr variable at ${Math.round(generator.capacityFactor * 100)}% expected output`
+                        : "Base O&M plus one start/day"}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">

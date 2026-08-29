@@ -29,6 +29,8 @@ import {
  */
 
 // Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
+// 8 splits Oil's non-fuel O&M into fixed and output-dependent expenses; older replays would have
+// different Oil dispatch finances.
 // 7 extends equivalent-start tracking to thermal steam/geothermal plants and charges Coal; older
 // replays would have different Coal finances.
 // 6 adds start-based gas-turbine maintenance; older replays would have different finances.
@@ -39,7 +41,7 @@ import {
 // 3 adds offshore wind weather and generation; an older replay would simulate a different grid.
 // 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
 // where it is played, so there is no safe way to migrate one.
-export const REPLAY_VERSION = 7;
+export const REPLAY_VERSION = 8;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

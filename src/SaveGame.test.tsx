@@ -45,6 +45,13 @@ describe("SaveGame", () => {
     expect(save!.game.facilities).toEqual(game.facilities);
     expect(save!.game.monthlyHistory).toEqual(game.monthlyHistory);
     expect(cash(save!.game)).toBe(cash(game));
+    expect(
+      save!.game.facilities.find((facility) => facility.name === "Oil")
+        ?.variableOperatingCostPerMWh,
+    ).toBe(
+      game.facilities.find((facility) => facility.name === "Oil")
+        ?.variableOperatingCostPerMWh,
+    );
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game
@@ -101,6 +108,20 @@ describe("SaveGame", () => {
       GameType["facilities"][number]
     >;
     delete facility.lifetimeRevenue;
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, facilities: [facility] },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a non-finite variable operating cost", () => {
+    const save = serializeSave(game);
+    const facility = {
+      ...save.game.facilities[0],
+      variableOperatingCostPerMWh: Number.POSITIVE_INFINITY,
+    };
     expect(
       parseSave({
         ...save,

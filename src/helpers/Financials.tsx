@@ -176,13 +176,35 @@ export function estimatedAnnualStartCost(
   return (generator.costPerStart || 0) * ASSUMED_STARTS_PER_YEAR;
 }
 
+export function estimatedAnnualVariableOperatingCost(
+  generator: Pick<
+    GeneratorShoppingType,
+    "capacityFactor" | "peakW" | "variableOperatingCostPerMWh"
+  >,
+): number {
+  return (
+    (generator.variableOperatingCostPerMWh || 0) *
+    (generator.peakW / 1000000) *
+    HOURS_PER_YEAR_REAL *
+    generator.capacityFactor
+  );
+}
+
 export function estimatedAnnualOperatingCost(
   generator: Pick<
     GeneratorShoppingType,
-    "annualOperatingCost" | "costPerStart"
+    | "annualOperatingCost"
+    | "capacityFactor"
+    | "costPerStart"
+    | "peakW"
+    | "variableOperatingCostPerMWh"
   >,
 ): number {
-  return generator.annualOperatingCost + estimatedAnnualStartCost(generator);
+  return (
+    generator.annualOperatingCost +
+    estimatedAnnualVariableOperatingCost(generator) +
+    estimatedAnnualStartCost(generator)
+  );
 }
 
 /**

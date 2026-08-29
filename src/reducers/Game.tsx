@@ -86,6 +86,8 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
+  OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
+  OIL_VARIABLE_OPERATING_COST_PER_MWH,
   START_TRACKING_FACILITY_NAMES,
   STORAGE,
   windAnnualOutputDegradation,
@@ -676,6 +678,29 @@ export const gameSlice = createSlice({
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
       restored.facilities.forEach((facility) => {
+        // The former Oil model stored one annual expense equal to $0.05/W-year. Recover the
+        // facility's already-applied difficulty and build-date inflation multiplier, then use it
+        // for both halves of the sourced fixed/variable split. Historical books are untouched.
+        if (
+          facility.name === "Oil" &&
+          facility.variableOperatingCostPerMWh === undefined
+        ) {
+          const legacyBaseAnnualCost = 0.05 * facility.peakW;
+          const recoveredMultiplier =
+            legacyBaseAnnualCost > 0
+              ? facility.annualOperatingCost / legacyBaseAnnualCost
+              : 1;
+          const multiplier =
+            Number.isFinite(recoveredMultiplier) && recoveredMultiplier >= 0
+              ? recoveredMultiplier
+              : 1;
+          facility.annualOperatingCost =
+            (facility.peakW / 1000) *
+            OIL_FIXED_OPERATING_COST_PER_KW_YEAR *
+            multiplier;
+          facility.variableOperatingCostPerMWh =
+            OIL_VARIABLE_OPERATING_COST_PER_MWH * multiplier;
+        }
         // Save v6 predates the explicit capability for these technologies. Upgrade the facility
         // snapshot once on resume, starting from its actual generating state so loading an online
         // plant does not invent an opening start. Historical starts and charges remain unknown.
@@ -1778,19 +1803,28 @@ function updateSupplyFacilitiesFinances(
     // facility as well as into the company's own totals below
     let facilityExpenses = 0;
     if (g.yearsToBuildLeft === 0) {
+      // Output-dependent costs use the same representative-month scaling as fuel and lifetime
+      // generation. A paused plant may still be ramping down internally, but it produces and
+      // incurs no variable O&M while it is disconnected from dispatch.
+      const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
+      const generatedWh = (deliveredW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+      let facilityOM = 0;
       if (g.paused) {
         // paused facilities only pay half of their operating costs
-        facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR / 2;
+        facilityOM += g.annualOperatingCost / TICKS_PER_YEAR / 2;
       } else {
-        facilityExpenses += g.annualOperatingCost / TICKS_PER_YEAR;
+        facilityOM += g.annualOperatingCost / TICKS_PER_YEAR;
       }
+      facilityOM +=
+        (generatedWh / 1000000) * (g.variableOperatingCostPerMWh || 0);
       const started = startedFacilityIds.has(g.id);
       if (started) {
         // One simulated day stands for the average month. The visible off-to-on edge therefore
         // represents the same daily start repeated throughout that month.
-        facilityExpenses += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
+        facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
-      expensesOM += facilityExpenses;
+      facilityExpenses += facilityOM;
+      expensesOM += facilityOM;
       if (g.fuel && FUELS[g.fuel]) {
         const fuelBtu =
           ((g.currentW * (g.btuPerWh || 0)) / TICKS_PER_HOUR) *
@@ -1837,8 +1871,7 @@ function updateSupplyFacilitiesFinances(
         // down, and those watts are deliberately left out of the company's supply, so
         // crediting them here would book revenue nobody was paid for. Its potential keeps
         // accruing though -- being switched off is exactly what a capacity factor is for
-        const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
-        g.lifetimeWh += (deliveredW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+        g.lifetimeWh += generatedWh;
         g.lifetimePotentialWh +=
           (g.peakW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
         g.lifetimeRevenue += deliveredW * revenuePerSuppliedW;

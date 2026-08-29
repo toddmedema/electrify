@@ -7,7 +7,9 @@ import gameReducer, {
 import {
   GAME_TO_REAL_YEARS,
   TICKS_PER_DAY,
+  TICKS_PER_HOUR,
   TICKS_PER_MONTH,
+  TICKS_PER_YEAR,
 } from "../Constants";
 import { facilityLifetime } from "../helpers/Financials";
 import { getTimeFromTimeline } from "../helpers/DateTime";
@@ -175,6 +177,149 @@ describe("per-facility lifetime totals", () => {
       expenses: afterStart.expenses,
       starts: afterStart.starts,
     });
+  });
+
+  it("charges Oil fixed and actual-output O&M once to both sets of books", () => {
+    const state = createGame({ scenarioId: 101, difficulty: "CEO" });
+    tickState(state);
+    const oil = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.name === "Oil",
+    )!;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
+      facility.btuPerWh = 0;
+      facility.currentW = 0;
+      facility.paused = facility.id !== oil.id;
+    });
+    oil.annualOperatingCost = 3085368.560061;
+    oil.variableOperatingCostPerMWh = 25.711404667176;
+    const openingWh = oil.lifetimeWh;
+    const openingExpenses = oil.lifetimeExpenses;
+
+    tickState(state);
+
+    const generatedWh = oil.lifetimeWh - openingWh;
+    const expectedOM =
+      oil.annualOperatingCost / TICKS_PER_YEAR +
+      (generatedWh / 1000000) * oil.variableOperatingCostPerMWh;
+    expect(generatedWh).toBeGreaterThan(0);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(expectedOM, 6);
+    expect(oil.lifetimeExpenses - openingExpenses).toBeCloseTo(expectedOM, 6);
+    expect(oil.lifetimeStarts).toBe(0);
+  });
+
+  it("charges an idle Oil plant fixed O&M but no variable O&M", () => {
+    const state = createGame({ scenarioId: 101, difficulty: "CEO" });
+    tickState(state);
+    const oil = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.name === "Oil",
+    )!;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
+      facility.btuPerWh = 0;
+      facility.currentW = 0;
+      facility.paused = facility.id !== oil.id;
+    });
+    oil.annualOperatingCost = 3085368.560061;
+    oil.variableOperatingCostPerMWh = 25.711404667176;
+    oil.spinMinutes = Number.POSITIVE_INFINITY;
+    const openingWh = oil.lifetimeWh;
+    const openingExpenses = oil.lifetimeExpenses;
+
+    tickState(state);
+
+    const expectedFixedOM = oil.annualOperatingCost / TICKS_PER_YEAR;
+    expect(oil.lifetimeWh).toBe(openingWh);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(expectedFixedOM, 6);
+    expect(oil.lifetimeExpenses - openingExpenses).toBeCloseTo(
+      expectedFixedOM,
+      6,
+    );
+  });
+
+  it("keeps paused Oil at half fixed O&M with no variable charge", () => {
+    const state = createGame({ scenarioId: 101, difficulty: "CEO" });
+    tickState(state);
+    const oil = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.name === "Oil",
+    )!;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
+      facility.btuPerWh = 0;
+      facility.paused = true;
+    });
+    oil.annualOperatingCost = 3085368.560061;
+    oil.variableOperatingCostPerMWh = 25.711404667176;
+    oil.currentW = oil.peakW;
+    const openingWh = oil.lifetimeWh;
+    const openingExpenses = oil.lifetimeExpenses;
+
+    tickState(state);
+
+    const expectedFixedOM = oil.annualOperatingCost / TICKS_PER_YEAR / 2;
+    expect(oil.lifetimeWh).toBe(openingWh);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(expectedFixedOM, 6);
+    expect(oil.lifetimeExpenses - openingExpenses).toBeCloseTo(
+      expectedFixedOM,
+      6,
+    );
+  });
+
+  it("forecasts Oil variable O&M without mutating the live facility", () => {
+    const state = play(createGame({ scenarioId: 101, difficulty: "CEO" }), 8);
+    const oil = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.name === "Oil",
+    )!;
+    state.facilities.forEach((facility: FacilityOperatingType) => {
+      facility.annualOperatingCost = 0;
+      facility.variableOperatingCostPerMWh = undefined;
+      facility.btuPerWh = 0;
+    });
+    oil.variableOperatingCostPerMWh = 25.711404667176;
+    const before = cloneDeep(state.facilities);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const forecast = generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      TICKS_PER_DAY,
+    );
+    const withoutVariable = cloneDeep(state);
+    withoutVariable.facilities.find(
+      (facility) => facility.id === oil.id,
+    )!.variableOperatingCostPerMWh = undefined;
+    const baseline = generateNewTimeline(
+      withoutVariable,
+      now.cash,
+      now.customers,
+      TICKS_PER_DAY,
+    );
+    const projectedVariableOM = forecast.reduce(
+      (sum, tick, index) => sum + tick.expensesOM - baseline[index].expensesOM,
+      0,
+    );
+    const expectedVariableOM = forecast.reduce(
+      (sum, tick) =>
+        sum +
+        (((tick.supplyByFuel.Oil || 0) / TICKS_PER_HOUR) *
+          GAME_TO_REAL_YEARS *
+          oil.variableOperatingCostPerMWh!) /
+          1000000,
+      0,
+    );
+
+    expect(projectedVariableOM).toBeGreaterThan(0);
+    expect(projectedVariableOM).toBeCloseTo(expectedVariableOM, 5);
+    expect(state.facilities).toEqual(before);
   });
 
   it.each(["Nuclear", "Biomass", "Geothermal", "Enhanced Geothermal"])(

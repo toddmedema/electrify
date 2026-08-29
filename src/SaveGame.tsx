@@ -101,15 +101,18 @@ export function parseSave(raw: unknown): SaveGameType | null {
       }
       const current = facility as Record<string, unknown>;
       const requiredNumbersInvalid = [
+        current.annualOperatingCost,
         current.lifespanYears,
         current.lifetimeWh,
         current.lifetimePotentialWh,
         current.lifetimeRevenue,
         current.lifetimeExpenses,
+        current.peakW,
       ].some((value) => typeof value !== "number" || !Number.isFinite(value));
       const optionalNumbersInvalid = [
         current.costPerStart,
         current.lifetimeStarts,
+        current.variableOperatingCostPerMWh,
       ].some(
         (value) =>
           value !== undefined &&

@@ -79,3 +79,46 @@ it("shows Coal's physical and representative-day start charges", () => {
     }),
   ).toBeInTheDocument();
 });
+
+it("shows Oil's fixed, variable, and expected-output O&M", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 100000000, [], []).find(
+    (candidate) => candidate.name === "Oil",
+  );
+  expect(generator).toBeDefined();
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator!}
+      location={game.location}
+      seed={game.seed}
+      onBuild={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText("Estimated O&M (20% expected output)"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("$7.59M/yr")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show Oil details" }));
+
+  expect(
+    screen.getByRole("row", {
+      name: /Fixed O&M.*Standing annual expense.*\$3\.09M\/yr/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Variable O&M.*Per generated MWh.*\$25\.71\/MWh generated/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Estimated O&M.*20% expected output.*\$7\.59M\/yr/,
+    }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Non-fuel start cost")).toBeNull();
+});

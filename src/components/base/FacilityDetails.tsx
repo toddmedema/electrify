@@ -116,6 +116,9 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  const variableOperatingCostPerMWh = (
+    facility as Partial<GeneratorOperatingType>
+  ).variableOperatingCostPerMWh;
   const isStorage = facility.peakWh > 0;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
@@ -198,6 +201,18 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           <Stat
             label="Equivalent operating hours"
             value={Math.round(equivalentOperatingHours).toLocaleString()}
+          />
+        )}
+        {variableOperatingCostPerMWh !== undefined && (
+          <Stat
+            label="Fixed O&M"
+            value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
+          />
+        )}
+        {variableOperatingCostPerMWh !== undefined && (
+          <Stat
+            label="Variable O&M"
+            value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh generated`}
           />
         )}
         {facility.tracksStarts && (

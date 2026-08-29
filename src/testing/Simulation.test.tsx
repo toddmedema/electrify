@@ -323,7 +323,8 @@ describe("simulation economics", () => {
     },
     104: { dollarsPerkWh: 0.08 },
     105: {
-      dollarsPerkWh: 0.08,
+      // Oil's output-dependent O&M makes the old $0.08/kWh play run out of cash in 2007.
+      dollarsPerkWh: 0.085,
       initialBuild: {
         name: "Natural Gas",
         peakW: 300000000,
