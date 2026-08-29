@@ -470,6 +470,10 @@ export type ThemeChoiceType = ThemeModeType | "system";
 
 export interface SettingsType {
   audioEnabled?: boolean;
+  // Independent buses: zero mutes one without silencing the other. audioEnabled remains the
+  // master switch (and the first-run permission), so old preferences migrate without surprise.
+  musicVolume: number;
+  soundEffectsVolume: number;
   units: UnitSystemType;
   theme: ThemeChoiceType;
 }

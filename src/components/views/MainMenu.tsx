@@ -65,7 +65,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
             onClick={() => props.onAudioChange(true)}
             style={{ display: "inline", marginRight: "12px", marginTop: "4px" }}
           >
-            Enable music
+            Enable audio
           </Button>
         )}
       </div>

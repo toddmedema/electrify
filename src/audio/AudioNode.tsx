@@ -15,14 +15,25 @@ interface LegacyBufferSource extends AudioBufferSourceNode {
 export class AudioNode {
   private context: AudioContext;
   private buffer: AudioBuffer;
+  private output: AudioDestinationNode | GainNode;
   private gain: GainNode | null;
   private source: LegacyBufferSource | null;
 
-  constructor(audioContext: AudioContext, buffer: AudioBuffer) {
+  constructor(
+    audioContext: AudioContext,
+    buffer: AudioBuffer,
+    output: AudioDestinationNode | GainNode = audioContext.destination,
+  ) {
     this.buffer = buffer;
     this.context = audioContext;
+    this.output = output;
     this.gain = null;
     this.source = null;
+  }
+
+  /** Routes future playbacks through a shared bus, used for independent music volume. */
+  public setOutput(output: AudioDestinationNode | GainNode) {
+    this.output = output;
   }
 
   /**
@@ -45,7 +56,7 @@ export class AudioNode {
         ? offsetSeconds
         : 0;
     this.gain = this.context.createGain();
-    this.gain.connect(this.context.destination);
+    this.gain.connect(this.output);
     this.gain.gain.setValueAtTime(initialVolume, when);
     if (fadeInVolume) {
       this.fadeIn(fadeInVolume);

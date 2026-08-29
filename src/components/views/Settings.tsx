@@ -6,6 +6,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
+  Slider,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -30,6 +31,8 @@ export interface DispatchProps {
   onLogout: () => void;
   onChangeName: () => void;
   onAudioChange: (change: boolean) => void;
+  onMusicVolumeChange: (change: number) => void;
+  onSoundEffectsVolumeChange: (change: number) => void;
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onExportSave: () => void;
@@ -40,7 +43,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function Settings(props: Props): React.JSX.Element {
-  // TODO: enable / disable music, font size, auto-pause while looking at build options, keyboard shortcuts, ...?
+  // TODO: font size, auto-pause while looking at build options, keyboard shortcuts, ...?
   // const fontSizeIdx = fontSizeValues.indexOf(props.settings.fontSize);
 
   // <Checkbox id="help" label="Show Help" value={props.settings.showHelp} onChange={props.onShowHelpChange}>
@@ -89,19 +92,48 @@ export default function Settings(props: Props): React.JSX.Element {
         </Toolbar>
       </div>
       <div
+        className="scrollable"
         style={{ textAlign: "center", margin: "20px 0", lineHeight: "30px" }}
       >
-        <Checkbox
-          color="primary"
-          id="sound"
-          checked={props.settings.audioEnabled}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            props.onAudioChange(e.target.checked)
-          }
-        />
-        {props.settings.audioEnabled
-          ? "Music and sound effects enabled."
-          : "Music and sound effects disabled."}
+        <Typography variant="h6">Audio</Typography>
+        <div>
+          <Checkbox
+            color="primary"
+            id="sound"
+            checked={Boolean(props.settings.audioEnabled)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              props.onAudioChange(e.target.checked)
+            }
+          />
+          <label htmlFor="sound">
+            {props.settings.audioEnabled ? "Audio enabled" : "Audio disabled"}
+          </label>
+        </div>
+        <div style={{ maxWidth: 360, margin: "0 auto", padding: "0 28px" }}>
+          <Typography id="music-volume-label" variant="body2">
+            Music volume: {Math.round(props.settings.musicVolume * 100)}%
+          </Typography>
+          <Slider
+            aria-labelledby="music-volume-label"
+            value={Math.round(props.settings.musicVolume * 100)}
+            disabled={!props.settings.audioEnabled}
+            onChange={(_e: Event, value: number | number[]) =>
+              props.onMusicVolumeChange((value as number) / 100)
+            }
+          />
+          <Typography id="effects-volume-label" variant="body2">
+            Sound effects volume:{" "}
+            {Math.round(props.settings.soundEffectsVolume * 100)}%
+          </Typography>
+          <Slider
+            aria-labelledby="effects-volume-label"
+            value={Math.round(props.settings.soundEffectsVolume * 100)}
+            disabled={!props.settings.audioEnabled}
+            onChange={(_e: Event, value: number | number[]) =>
+              props.onSoundEffectsVolumeChange((value as number) / 100)
+            }
+          />
+        </div>
         <Typography variant="h6" style={{ marginTop: 24 }}>
           Account
         </Typography>

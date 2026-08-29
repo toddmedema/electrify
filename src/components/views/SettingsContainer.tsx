@@ -42,6 +42,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onAudioChange: (v: boolean) => {
       dispatch(changeSettings({ audioEnabled: v }));
     },
+    onMusicVolumeChange: (v: number) => {
+      dispatch(changeSettings({ musicVolume: v }));
+    },
+    onSoundEffectsVolumeChange: (v: number) => {
+      dispatch(changeSettings({ soundEffectsVolume: v }));
+    },
     onUnitsChange: (v: UnitSystemType) => {
       dispatch(changeSettings({ units: v }));
     },

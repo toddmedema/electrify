@@ -1,6 +1,7 @@
 import { eachLimit } from "async";
 import { AudioNode } from "../audio/AudioNode";
 import { ThemeManager } from "../audio/ThemeManager";
+import { SoundEffects, SoundEffectType } from "../audio/SoundEffects";
 import { MUSIC_DEFINITIONS } from "../Constants";
 import { getAudioContext } from "../Globals";
 import { AudioLoadingType } from "../Types";
@@ -8,18 +9,44 @@ import { AudioLoadingType } from "../Types";
 export const state = {
   loaded: "UNLOADED" as AudioLoadingType,
   themeManager: null as ThemeManager | null,
+  soundEffects: null as SoundEffects | null,
+  musicOutput: null as GainNode | null,
+  paused: false,
 };
 
 export function pause() {
+  state.paused = true;
   if (state.themeManager) {
     state.themeManager.pause();
   }
+  state.soundEffects?.pause();
 }
 
 export function resume() {
+  state.paused = false;
   if (state.themeManager) {
     state.themeManager.resume();
   }
+  state.soundEffects?.resume();
+}
+
+function volume(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function setMusicVolume(value: number) {
+  const output = state.musicOutput;
+  if (output) {
+    output.gain.setValueAtTime(volume(value), output.context.currentTime);
+  }
+}
+
+export function setSoundEffectsVolume(value: number) {
+  state.soundEffects?.setVolume(value);
+}
+
+export function playSoundEffect(effect: SoundEffectType) {
+  state.soundEffects?.play(effect);
 }
 
 export function getAllMusicFiles(): string[] {
@@ -62,13 +89,22 @@ export function loadAudioLocalFile(
   request.send();
 }
 
-export function loadAudioFiles() {
+export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
   const ac = getAudioContext();
   if (!ac) {
     return;
   }
 
   state.loaded = "LOADING";
+  const musicOutput = ac.createGain();
+  musicOutput.connect(ac.destination);
+  state.musicOutput = musicOutput;
+  state.soundEffects = new SoundEffects(ac);
+  setMusicVolume(musicVolume);
+  setSoundEffectsVolume(soundEffectsVolume);
+  if (state.paused) {
+    state.soundEffects.pause();
+  }
   const musicFiles = getAllMusicFiles();
   const audioNodes: { [key: string]: AudioNode } = {};
   eachLimit(
@@ -86,6 +122,9 @@ export function loadAudioFiles() {
             );
             return callback(err);
           }
+          // Every track routes through one gain node, so changing music volume does not disturb
+          // ThemeManager's per-track fades or restart the six-minute loop.
+          buffer.setOutput(musicOutput);
           audioNodes[file] = buffer;
           return callback();
         },
@@ -98,6 +137,9 @@ export function loadAudioFiles() {
       }
       state.themeManager = new ThemeManager(ac, audioNodes);
       state.loaded = "LOADED";
+      if (state.paused) {
+        state.themeManager.pause();
+      }
       state.themeManager.setIntensity(1);
     },
   );

@@ -1,16 +1,23 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Settings, { Props } from "./Settings";
 
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
-    settings: { units: "metric", theme: "system" },
+    settings: {
+      musicVolume: 1,
+      soundEffectsVolume: 1,
+      units: "metric",
+      theme: "system",
+    },
     loggedIn: false,
     onLogin: () => undefined,
     onLogout: () => undefined,
     onChangeName: () => undefined,
     onAudioChange: () => undefined,
+    onMusicVolumeChange: () => undefined,
+    onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onExportSave: () => undefined,
@@ -30,6 +37,32 @@ function fileInput(): HTMLInputElement {
 }
 
 describe("Settings", () => {
+  it("controls music and sound-effects volume independently", () => {
+    const onMusicVolumeChange = jest.fn();
+    const onSoundEffectsVolumeChange = jest.fn();
+    renderSettings({
+      settings: {
+        audioEnabled: true,
+        musicVolume: 0.7,
+        soundEffectsVolume: 0.4,
+        units: "metric",
+        theme: "system",
+      },
+      onMusicVolumeChange,
+      onSoundEffectsVolumeChange,
+    });
+
+    fireEvent.change(screen.getByRole("slider", { name: /music volume/i }), {
+      target: { value: 35 },
+    });
+    fireEvent.change(
+      screen.getByRole("slider", { name: /sound effects volume/i }),
+      { target: { value: 80 } },
+    );
+    expect(onMusicVolumeChange).toHaveBeenCalledWith(0.35);
+    expect(onSoundEffectsVolumeChange).toHaveBeenCalledWith(0.8);
+  });
+
   it("names the saved game that Export would download", async () => {
     const onExportSave = jest.fn();
     renderSettings({ savedGame: "Rise of Renewables, 2035", onExportSave });
