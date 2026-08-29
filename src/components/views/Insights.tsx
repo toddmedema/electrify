@@ -76,6 +76,7 @@ import ChartFinances from "../base/ChartFinances";
 import ChartForecastFuelPrices, {
   PRICED_FUELS,
 } from "../base/ChartForecastFuelPrices";
+import ChartForecastSolarCapacityFactor from "../base/ChartForecastSolarCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -96,6 +97,7 @@ export type InsightLayerId =
   | "supplyByFuel"
   | "storage"
   | "fuelPrices"
+  | "solarCapacityFactor"
   | "water"
   | "weather"
   | "profit"
@@ -133,6 +135,11 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "financeDetails", label: "Financial Details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
   { id: "emissions", label: "CO2e Emitted", group: "Environment" },
+  {
+    id: "solarCapacityFactor",
+    label: "Solar Capacity Factor",
+    group: "Environment",
+  },
   { id: "weather", label: "Weather", group: "Environment" },
   { id: "water", label: "Water", group: "Environment", availability: "hydro" },
 ] as const;
@@ -854,6 +861,18 @@ export default class Insights extends React.Component<Props, State> {
                 syncKey={SYNC_KEY}
               />
             </>
+          );
+          break;
+        case "solarCapacityFactor":
+          body = (
+            <ChartForecastSolarCapacityFactor
+              height={140}
+              timeline={projection.timeline}
+              domain={{ x: projection.domain.x }}
+              startingYear={game.startingYear}
+              multiyear={multiyear}
+              syncKey={SYNC_KEY}
+            />
           );
           break;
         case "water":
