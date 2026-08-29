@@ -211,6 +211,23 @@ describe("LCWH", () => {
     );
   });
 
+  it("quotes variable O&M at expected annual output", () => {
+    const oil = {
+      ...generator,
+      annualOperatingCost: 3085368.560061,
+      capacityFactor: 0.2,
+      variableOperatingCostPerMWh: 25.711404667176,
+    };
+    expect(estimatedAnnualOperatingCost(oil)).toBeCloseTo(7590006.65775, 5);
+
+    const totalWh =
+      oil.peakW * oil.lifespanYears * HOURS_PER_YEAR_REAL * oil.capacityFactor;
+    expect(LCWH(oil, date, 0, SEED)).toBeCloseTo(
+      (oil.buildCost + 7590006.65775 * oil.lifespanYears) / totalWh,
+      12,
+    );
+  });
+
   it("charges a carbon fee against a fuel's emissions", () => {
     const gas = {
       ...generator,

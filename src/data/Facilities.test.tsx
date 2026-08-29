@@ -6,6 +6,7 @@ import {
 } from "./Facilities";
 import { GAME_TO_REAL_YEARS } from "../Constants";
 import { getDateFromMinute } from "../helpers/DateTime";
+import { estimatedAnnualOperatingCost } from "../helpers/Financials";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
 
 function stateAt(
@@ -111,6 +112,16 @@ describe("current facility economics", () => {
     expect(
       generatorAt(2023, "Natural Gas", 100000000)?.costPerStart,
     ).toBeCloseTo((23100 * 100) / 419, 8);
+  });
+
+  it("splits Oil O&M into fixed capacity and variable generation costs", () => {
+    const oil = generatorAt(2023, "Oil", 100000000);
+
+    expect(oil?.annualOperatingCost).toBeCloseTo(3085368.560061, 6);
+    expect(oil?.variableOperatingCostPerMWh).toBeCloseTo(25.711404667176, 10);
+    expect(estimatedAnnualOperatingCost(oil!)).toBeCloseTo(7590006.65775, 5);
+    expect(oil?.tracksStarts).toBeUndefined();
+    expect(oil?.costPerStart).toBeUndefined();
   });
 
   it("scales Coal's CPI-normalized hot-start expense by nameplate MW", () => {

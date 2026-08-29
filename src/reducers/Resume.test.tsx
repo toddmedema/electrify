@@ -3,6 +3,10 @@ import gameReducer, { loaded, resume, start, tickState } from "./Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { createGame } from "../testing/Simulator";
 import { GameType } from "../Types";
+import {
+  OIL_FIXED_OPERATING_COST_PER_KW_YEAR,
+  OIL_VARIABLE_OPERATING_COST_PER_MWH,
+} from "../data/Facilities";
 
 jest.setTimeout(60000);
 
@@ -69,6 +73,32 @@ describe("resume", () => {
     expect(restoredCoal.costPerStart).toBeUndefined();
     expect(restoredCoal.lifetimeStarts).toBe(0);
     expect(restoredCoal.generatingLastRealTick).toBe(restoredCoal.currentW > 0);
+  });
+
+  it("migrates legacy Oil O&M with its saved difficulty and vintage multiplier", () => {
+    const oldSave = serialized(createGame({ scenarioId: 101, seed: 8675309 }));
+    const oil = oldSave.facilities.find((facility) => facility.name === "Oil")!;
+    const multiplier = 1.37;
+    const historicalExpenses = oil.lifetimeExpenses;
+    oil.annualOperatingCost = 0.05 * oil.peakW * multiplier;
+    oil.variableOperatingCostPerMWh = undefined;
+
+    const restoredOil = restore(oldSave).facilities.find(
+      (facility) => facility.name === "Oil",
+    )!;
+    expect(restoredOil.annualOperatingCost).toBeCloseTo(
+      (restoredOil.peakW / 1000) *
+        OIL_FIXED_OPERATING_COST_PER_KW_YEAR *
+        multiplier,
+      6,
+    );
+    expect(restoredOil.variableOperatingCostPerMWh).toBeCloseTo(
+      OIL_VARIABLE_OPERATING_COST_PER_MWH * multiplier,
+      10,
+    );
+    expect(restoredOil.lifetimeExpenses).toBe(historicalExpenses);
+    expect(Number.isFinite(restoredOil.annualOperatingCost)).toBe(true);
+    expect(Number.isFinite(restoredOil.variableOperatingCostPerMWh)).toBe(true);
   });
 
   /**

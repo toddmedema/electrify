@@ -7,6 +7,7 @@ import {
   TUTORIALS,
 } from "./Scenarios";
 import { ScenarioType } from "../Types";
+import { render, screen } from "@testing-library/react";
 
 describe("getScenario", () => {
   it("finds an authored scenario by id", () => {
@@ -68,5 +69,16 @@ describe("tutorial mission metadata", () => {
       expect(tutorial.icon).toBeTruthy();
       expect(tutorial.summary).toBeTruthy();
     });
+  });
+
+  it("introduces Oil's fixed and output-dependent O&M", () => {
+    const generatorsMission = TUTORIALS.find(
+      (tutorial) => tutorial.name === "Mission 2: Generators",
+    )!;
+    render(generatorsMission.tutorialSteps![1].content);
+
+    expect(
+      screen.getByText(/Oil pays fixed O&M even when idle/),
+    ).toHaveTextContent("variable O&M whenever it generates");
   });
 });

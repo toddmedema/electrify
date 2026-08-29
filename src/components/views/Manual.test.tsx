@@ -49,6 +49,7 @@ describe("Manual", () => {
     ["dispatch order", MANUAL_ENTRY.FORECASTS],
     ["peak shortage", MANUAL_ENTRY.FORECASTS],
     ["board of directors", MANUAL_ENTRY.BLACKOUTS],
+    ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
   ])("finds %s inside mixed markup", async (term: string, title: string) => {
     renderManual();
     await search(term);

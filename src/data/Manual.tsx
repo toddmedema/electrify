@@ -729,13 +729,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: MANUAL_ENTRY.TOTAL_COST_OF_ENERGY,
     group: "Money",
-    keywords: "lcoe levelized cost of energy cost per mwh total energy cost",
+    keywords:
+      "lcoe levelized cost of energy cost per mwh total energy cost oil fixed variable operating maintenance om",
     entry: (
-      <p>
-        Also known as "Levelized Cost of Energy", it's the expected cost of all
-        energy produced by the plant during its lifetime, including
-        construction, maintenance and fuel.
-      </p>
+      <div>
+        <p>
+          Also known as "Levelized Cost of Energy", it's the expected cost of
+          all energy produced by the plant during its lifetime, including
+          construction, maintenance and fuel.
+        </p>
+        <p>
+          Operating and maintenance (O&amp;M) costs can be fixed or depend on
+          output. Oil plants pay fixed O&amp;M while available, plus variable
+          O&amp;M for each MWh they actually generate; pausing halves the fixed
+          charge and stops the variable charge.
+        </p>
+      </div>
     ),
   },
 ];

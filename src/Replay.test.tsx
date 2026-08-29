@@ -104,6 +104,30 @@ describe("recordReplayAction", () => {
     ).toEqual(replay);
   });
 
+  it("round-trips an Oil build's variable O&M", () => {
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: {
+            facility: {
+              name: "Oil",
+              fuel: "Oil",
+              peakW: 100000000,
+              annualOperatingCost: 3085368.560061,
+              variableOperatingCostPerMWh: 25.711404667176,
+            },
+            financed: false,
+          },
+        },
+      ],
+    });
+    expect(
+      decodeReplay(JSON.parse(JSON.stringify(encodeReplay(replay)))),
+    ).toEqual(replay);
+  });
+
   it("merges deltas fired within one minute", () => {
     const game = aGame(60, []);
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.1 });

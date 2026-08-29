@@ -115,6 +115,21 @@ describe("the fleet list", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows Oil fixed and variable O&M without turbine start details", () => {
+    const oilGame = createGame({ scenarioId: 101, difficulty: "CEO" });
+    const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
+    renderFacilities(oilGame, oil.id);
+
+    expect(screen.getByText("Equivalent operating hours")).toBeInTheDocument();
+    expect(screen.getByText("Fixed O&M")).toBeInTheDocument();
+    expect(screen.getByText("$3.09M/yr")).toBeInTheDocument();
+    expect(screen.getByText("Variable O&M")).toBeInTheDocument();
+    expect(screen.getByText("$25.71/MWh generated")).toBeInTheDocument();
+    expect(screen.queryByText("Equivalent starts")).toBeNull();
+    expect(screen.queryByText("Non-fuel start cost")).toBeNull();
+    expect(screen.queryByText("Service intervals")).toBeNull();
+  });
+
   it("leaves every row closed when nothing is selected", () => {
     renderFacilities(game, null);
     expect(screen.queryByText("Lifetime profit")).toBeNull();

@@ -398,6 +398,9 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   // Non-fuel expense charged for one physical start. Only present when the technology's source
   // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
+  // Non-fuel O&M charged against actual generation. Optional because most legacy technology
+  // records already annualize every non-fuel operating expense into annualOperatingCost.
+  variableOperatingCostPerMWh?: number;
   // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
   // long-run inflow lands on capacityFactor without flattening wet and dry years.
   reservoirCapacityWh?: number;
