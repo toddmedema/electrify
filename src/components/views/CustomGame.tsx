@@ -51,6 +51,7 @@ import {
   DifficultyType,
   FacilityShoppingType,
   GameType,
+  ScenarioFacilityType,
   ScenarioType,
 } from "../../Types";
 
@@ -183,6 +184,31 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
     : formatWatts(facility.peakW || 0);
 }
 
+/**
+ * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
+ * The default 500 MW plant for one million customers covers the opening demand plus the game's
+ * 5% reserve margin; scaling every starting generator together preserves that coverage and the
+ * player's chosen generation mix. Storage is energy capacity rather than firm generation, so it
+ * stays at the size the player selected.
+ */
+function facilitiesForStartingCustomers(
+  scenario: ScenarioType,
+  startingCustomers: number,
+): ScenarioFacilityType[] {
+  const previousCustomers =
+    scenario.startingCustomers ||
+    getStartingCustomers(getScenarioLocation(scenario));
+  if (previousCustomers <= 0 || previousCustomers === startingCustomers) {
+    return scenario.facilities;
+  }
+  const scale = startingCustomers / previousCustomers;
+  return scenario.facilities.map((facility: ScenarioFacilityType) =>
+    facility.peakW && !facility.peakWh
+      ? { ...facility, peakW: Math.round(facility.peakW * scale) }
+      : facility,
+  );
+}
+
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
@@ -278,6 +304,21 @@ export default function CustomGame(props: Props): React.JSX.Element {
     setScenario({ ...scenario, ...delta });
   };
 
+  const changeStartingCustomers = (
+    startingCustomers: number,
+    delta: Partial<ScenarioType> = {},
+  ) => {
+    setScenario((currentScenario: ScenarioType) => ({
+      ...currentScenario,
+      ...delta,
+      startingCustomers,
+      facilities: facilitiesForStartingCustomers(
+        currentScenario,
+        startingCustomers,
+      ),
+    }));
+  };
+
   /**
    * Moving the game's era, and carrying the prices that are quoted in it along.
    *
@@ -354,10 +395,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   value={location}
                   onChange={(_e: unknown, picked: CityType | null) => {
                     if (picked) {
-                      change({
+                      changeStartingCustomers(getStartingCustomers(picked), {
                         locationId: picked.id,
                         location: picked,
-                        startingCustomers: getStartingCustomers(picked),
                       });
                     }
                   }}
@@ -397,11 +437,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   valueLabelDisplay="auto"
                   valueLabelFormat={(value: number) => value.toLocaleString()}
                   onChange={(_event: Event, value: number | number[]) =>
-                    change({
-                      startingCustomers: Array.isArray(value)
-                        ? value[0]
-                        : value,
-                    })
+                    changeStartingCustomers(
+                      Array.isArray(value) ? value[0] : value,
+                    )
                   }
                 />
                 <Typography variant="caption" color="textSecondary">

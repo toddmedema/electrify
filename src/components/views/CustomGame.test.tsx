@@ -1,6 +1,10 @@
 import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
+import { RESERVE_MARGIN } from "../../Constants";
+import {
+  CUSTOM_SCENARIO_ID,
+  DEFAULT_CUSTOM_SCENARIO,
+} from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { createGame } from "../../testing/Simulator";
 import CustomGame from "./CustomGame";
@@ -63,5 +67,47 @@ it("re-quotes starting cash when the starting year changes", () => {
   const expectedCash = Number((500000000 * inflation).toPrecision(2));
   expect(onStart).toHaveBeenCalledWith(
     expect.objectContaining({ startingYear: 2080, cash: expectedCash }),
+  );
+});
+
+it("scales starting nameplate capacity with starting customers", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: [
+          ...DEFAULT_CUSTOM_SCENARIO.facilities,
+          { name: "Pumped Hydro", peakWh: 500000000 },
+        ],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
+    target: { value: 2000000 },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+  const scenario = onStart.mock.calls[0][0];
+  expect(scenario.facilities).toEqual([
+    expect.objectContaining({ name: "Natural Gas", peakW: 1000000000 }),
+    expect.objectContaining({ name: "Pumped Hydro", peakWh: 500000000 }),
+  ]);
+
+  const state = createGame({
+    scenarioId: CUSTOM_SCENARIO_ID,
+    scenario,
+  });
+  const totalNameplateW = state.facilities.reduce(
+    (total, facility) => total + (facility.peakWh ? 0 : facility.peakW),
+    0,
+  );
+  expect(totalNameplateW).toBeGreaterThanOrEqual(
+    state.timeline[0].demandW * (1 + RESERVE_MARGIN),
   );
 });
