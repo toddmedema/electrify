@@ -4,6 +4,7 @@ import {
   GENERATORS,
   STORAGE,
 } from "./Facilities";
+import { GAME_TO_REAL_YEARS } from "../Constants";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
 
@@ -110,6 +111,44 @@ describe("current facility economics", () => {
     expect(
       generatorAt(2023, "Natural Gas", 100000000)?.costPerStart,
     ).toBeCloseTo((23100 * 100) / 419, 8);
+  });
+
+  it("scales Coal's CPI-normalized hot-start expense by nameplate MW", () => {
+    const referenceCost = generatorAt(2023, "Coal", 650000000)?.costPerStart;
+    expect(referenceCost).toBeCloseTo(52662.043056, 6);
+    expect((referenceCost || 0) * GAME_TO_REAL_YEARS).toBeCloseTo(
+      1601803.809623,
+      5,
+    );
+    const hundredMwCost = generatorAt(2023, "Coal", 100000000)?.costPerStart;
+    expect(hundredMwCost).toBeCloseTo(8101.852778, 6);
+    expect((hundredMwCost || 0) * GAME_TO_REAL_YEARS).toBeCloseTo(
+      246431.355328,
+      5,
+    );
+  });
+
+  it("tracks starts only for the audited thermal facilities", () => {
+    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
+    const byName = (name: string) =>
+      generators.find((generator) => generator.name === name);
+
+    for (const name of [
+      "Natural Gas",
+      "Coal",
+      "Nuclear",
+      "Biomass",
+      "Geothermal",
+      "Enhanced Geothermal",
+    ]) {
+      expect(byName(name)?.tracksStarts).toBe(true);
+    }
+    expect(byName("Oil")?.tracksStarts).toBeUndefined();
+    expect(byName("Hydro")?.tracksStarts).toBeUndefined();
+    expect(byName("Nuclear")?.costPerStart).toBeUndefined();
+    expect(byName("Biomass")?.costPerStart).toBeUndefined();
+    expect(byName("Geothermal")?.costPerStart).toBeUndefined();
+    expect(byName("Enhanced Geothermal")?.costPerStart).toBeUndefined();
   });
 
   it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {

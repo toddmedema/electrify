@@ -52,6 +52,20 @@ function offshoreEraMultiple(year: number): number {
 // annual-average CPI-U from BLS, not the game's inflation: that is applied separately below.
 const CPI_2019_TO_2023 = 304.702 / 255.657;
 const CPI_2020_TO_2024 = 313.689 / 258.811;
+// NREL's 500-1,300 MW supercritical-coal class reports $54/MW-start of capitalized
+// cycling/maintenance plus $5.81/MW-start of other startup operations, in 2011 dollars.
+const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
+
+// Used only to upgrade current-version saves written before start tracking was added to these
+// technologies. New shopping and operating records carry the explicit tracksStarts field below.
+export const START_TRACKING_FACILITY_NAMES = new Set([
+  "Natural Gas",
+  "Coal",
+  "Nuclear",
+  "Biomass",
+  "Geothermal",
+  "Enhanced Geothermal",
+]);
 
 /** Exponential interpolation between two real-cost observations, held flat outside them. */
 function costBetween(
@@ -210,6 +224,10 @@ export function GENERATORS(
       // 6 hours - https://spectrum.ieee.org/green-tech/wind/taming-wind-power-with-better-forecasts
       // 4-8 hours - https://www.reuters.com/article/coal-power-generation/column-to-...wer-plants-must-become-more-flexible-kemp-idUSL5N0J42YG20131119
       annualOperatingCost: annualOperatingCost(peakW, 0.68, 61.6, 6.4),
+      tracksStarts: true,
+      // NREL's conservative hot-start case, normalized from 2011$ to 2023$ with annual-average
+      // CPI-U and scaled by nameplate MW. Fuel input and EFOR effects are deliberately excluded.
+      costPerStart: COAL_START_COST_PER_MW_2023 * (peakW / 1000000),
       yearsToBuild: 4 + magnitude / 3,
       // AEO2025 reference lead time is 60 months and operating life is 40 years.
       capacityFactor: 0.68,
@@ -235,6 +253,7 @@ export function GENERATORS(
       btuPerWh: 10.608,
       spinMinutes: 600,
       annualOperatingCost: annualOperatingCost(peakW, 0.93, 156.2, 2.52),
+      tracksStarts: true,
       yearsToBuild: 6 + magnitude / 3,
       // AEO2025 reference lead time is 84 months and operating life is 40 years.
       capacityFactor: 0.93,
@@ -260,6 +279,7 @@ export function GENERATORS(
       btuPerWh: 9.142,
       spinMinutes: 10,
       annualOperatingCost: annualOperatingCost(peakW, 0.45, 6.87, 1.24),
+      tracksStarts: true,
       // EIA AEO2025 Case 4 reports this separately from both fixed and variable O&M:
       // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
       costPerStart: 23100 * (peakW / 419000000),
@@ -322,6 +342,7 @@ export function GENERATORS(
       // has one annual O&M field, so both are converted to 2018 dollars and variable O&M is
       // annualized at the observed 60.2% capacity factor.
       annualOperatingCost: 0.14471 * peakW,
+      tracksStarts: true,
       yearsToBuild: 5,
       // 2022 U.S. "other biomass" fleet average; wood was 57.9% in the same table.
       // https://www.eia.gov/electricity/annual/table.php?t=epa_04_08_b.html
@@ -512,6 +533,7 @@ export function GENERATORS(
       // ~800MW, except for one outlier - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Geothermal
       btuPerWh: 0,
       annualOperatingCost: annualOperatingCost(peakW, 0.88, 150.6, 0),
+      tracksStarts: true,
       yearsToBuild: 3,
       // EIA AEO2025 reference lead time is 36 months and operating life is 40 years.
       spinMinutes: 1,
@@ -531,6 +553,7 @@ export function GENERATORS(
       maxPeakW: 500000000,
       btuPerWh: 0,
       annualOperatingCost: 0.16 * peakW,
+      tracksStarts: true,
       yearsToBuild: 3 + magnitude / 4,
       spinMinutes: 1,
       capacityFactor: 0.83,

@@ -42,6 +42,7 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
+  GAME_TO_REAL_YEARS,
   LOAN_MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -262,13 +263,29 @@ export function GeneratorBuildItem(
               {generator.costPerStart !== undefined && (
                 <TableRow>
                   <TableCell>
-                    Startup maintenance
+                    Non-fuel start cost
                     <Typography variant="body2" color="textSecondary">
                       Per equivalent start
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {formatMoneyConcise(generator.costPerStart)}/start
+                  </TableCell>
+                </TableRow>
+              )}
+              {generator.costPerStart !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Representative-day charge
+                    <Typography variant="body2" color="textSecondary">
+                      365 / 12 equivalent starts
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {formatMoneyConcise(
+                      generator.costPerStart * GAME_TO_REAL_YEARS,
+                    )}
+                    /displayed start
                   </TableCell>
                 </TableRow>
               )}

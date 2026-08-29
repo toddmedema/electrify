@@ -94,6 +94,27 @@ describe("the fleet list", () => {
     expect(screen.getByText("Earned")).toBeInTheDocument();
   });
 
+  it("shows Coal starts and cost without gas-turbine service intervals", () => {
+    const coal = game.facilities.find((facility) => facility.name === "Coal")!;
+    renderFacilities(game, coal.id);
+
+    expect(screen.getByText("Equivalent starts")).toBeInTheDocument();
+    expect(screen.getByText("Non-fuel start cost")).toBeInTheDocument();
+    expect(screen.queryByText("Service intervals")).toBeNull();
+  });
+
+  it("keeps gas-turbine service context on Natural Gas", () => {
+    const gas = game.facilities.find(
+      (facility) => facility.name === "Natural Gas",
+    )!;
+    renderFacilities(game, gas.id);
+
+    expect(screen.getByText("Service intervals")).toBeInTheDocument();
+    expect(
+      screen.getByText("HGP 900 · major 1,800 starts"),
+    ).toBeInTheDocument();
+  });
+
   it("leaves every row closed when nothing is selected", () => {
     renderFacilities(game, null);
     expect(screen.queryByText("Lifetime profit")).toBeNull();
