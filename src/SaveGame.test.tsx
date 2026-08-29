@@ -81,6 +81,34 @@ describe("SaveGame", () => {
     expect(parseSave({ ...save, game: withoutMarket })).toBeNull();
   });
 
+  it("rejects a current-version save without current runtime state", () => {
+    const save = serializeSave(game);
+    for (const field of [
+      "eventLog",
+      "reportedEventKeys",
+      "eventLogReadThroughId",
+      "worldEvents",
+    ] as const) {
+      const incomplete = { ...save.game } as Partial<GameType>;
+      delete incomplete[field];
+      expect(parseSave({ ...save, game: incomplete })).toBeNull();
+    }
+  });
+
+  it("rejects a current-version save with incomplete facility totals", () => {
+    const save = serializeSave(game);
+    const facility = { ...save.game.facilities[0] } as Partial<
+      GameType["facilities"][number]
+    >;
+    delete facility.lifetimeRevenue;
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, facilities: [facility] },
+      }),
+    ).toBeNull();
+  });
+
   it("ignores corrupt JSON", () => {
     window.localStorage.setItem(SAVE_KEY, "{not json");
     expect(readSave()).toBeNull();

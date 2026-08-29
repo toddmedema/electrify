@@ -205,12 +205,9 @@ function logGameEvent(
 ): boolean {
   if (
     options.reportedKey &&
-    (state.reportedEventKeys || []).includes(options.reportedKey)
+    state.reportedEventKeys.includes(options.reportedKey)
   ) {
     return false;
-  }
-  if (!state.eventLog) {
-    state.eventLog = [];
   }
   const log = state.eventLog;
   log.unshift({
@@ -222,7 +219,6 @@ function logGameEvent(
     actionTarget: options.actionTarget,
   });
   if (options.reportedKey) {
-    state.reportedEventKeys = state.reportedEventKeys || [];
     state.reportedEventKeys.push(options.reportedKey);
   }
   if (log.length > MAX_EVENTS) {
@@ -385,7 +381,6 @@ const MAX_WORLD_EVENT_CHECKS = 2400;
 
 /** Starts/ends authored events before this month's forecast is built. */
 function updateWorldEvents(state: GameType) {
-  state.worldEvents = state.worldEvents || { active: [], checkedKeys: [] };
   state.worldEvents.active = state.worldEvents.active.filter(
     (event) => event.endsMinute > state.date.minute,
   );
@@ -395,12 +390,12 @@ function updateWorldEvents(state: GameType) {
       date: state.date,
       location: state.location,
     });
-    if (state.worldEvents!.checkedKeys.includes(resolved.checkedKey)) {
+    if (state.worldEvents.checkedKeys.includes(resolved.checkedKey)) {
       return;
     }
-    state.worldEvents!.checkedKeys.push(resolved.checkedKey);
+    state.worldEvents.checkedKeys.push(resolved.checkedKey);
     if (resolved.occurrence) {
-      state.worldEvents!.active.push(resolved.occurrence);
+      state.worldEvents.active.push(resolved.occurrence);
       logGameEvent(
         state,
         resolved.occurrence.kind,
@@ -428,7 +423,7 @@ function getEffectiveFuelPrices(
 ): FuelPricesType {
   const prices = getFuelPricesPerMBTU(date, state.seed, state.location);
   const multipliers = activeWorldEventEffects(
-    state.worldEvents?.active,
+    state.worldEvents.active,
     date.minute,
   ).fuelPriceMultipliers;
   if (!multipliers) {
@@ -465,6 +460,9 @@ const initialGame: GameType = {
   timeline: [] as TickPresentFutureType[],
   monthlyHistory: [] as MonthlyHistoryType[],
   eventLog: [] as GameEventType[],
+  reportedEventKeys: [],
+  eventLogReadThroughId: 0,
+  worldEvents: { active: [], checkedKeys: [] },
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -672,7 +670,7 @@ export const gameSlice = createSlice({
       ensureTicking(state);
     },
     markEventsRead: (state) => {
-      state.eventLogReadThroughId = state.eventLog?.[0]?.id || 0;
+      state.eventLogReadThroughId = state.eventLog[0]?.id || 0;
     },
   },
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
@@ -699,12 +697,6 @@ export const gameSlice = createSlice({
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
-      // Saves written before replays existed have no log, and a run recorded from halfway
-      // through would play back as a different game. Undefined is how the recorder is told to
-      // stay off for the rest of this run, so the score it eventually sets carries no replay
-      if (!Array.isArray(restored.replayLog)) {
-        restored.replayLog = undefined;
-      }
       // Nothing ever autosaves a replay, so anything here came out of a hand-edited save
       restored.replayPlayback = undefined;
       // tickLoopRunning is deliberately left alone: any loop still alive clears the flag and stops
@@ -1360,10 +1352,7 @@ function getDemandW(
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
-  const effects = activeWorldEventEffects(
-    game.worldEvents?.active,
-    date.minute,
-  );
+  const effects = activeWorldEventEffects(game.worldEvents.active, date.minute);
   return demandMultiple * now.customers * (effects.demandMultiplier || 1);
 }
 
@@ -1404,7 +1393,7 @@ function reforecastWeatherAndPrices(
       const weather = getWeather(date, state.seed, cumulativeMegatons);
       const fuelPrices = getEffectiveFuelPrices(date, state);
       const effects = activeWorldEventEffects(
-        state.worldEvents?.active,
+        state.worldEvents.active,
         date.minute,
       );
       const hydroKey = `${date.year}-${date.monthNumber}`;
@@ -1788,15 +1777,11 @@ function updateSupplyFacilitiesFinances(
         // crediting them here would book revenue nobody was paid for. Its potential keeps
         // accruing though -- being switched off is exactly what a capacity factor is for
         const deliveredW = g.paused ? 0 : Math.max(0, g.currentW);
-        g.lifetimeWh =
-          (g.lifetimeWh || 0) +
-          (deliveredW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-        g.lifetimePotentialWh =
-          (g.lifetimePotentialWh || 0) +
+        g.lifetimeWh += (deliveredW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+        g.lifetimePotentialWh +=
           (g.peakW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-        g.lifetimeRevenue =
-          (g.lifetimeRevenue || 0) + deliveredW * revenuePerSuppliedW;
-        g.lifetimeExpenses = (g.lifetimeExpenses || 0) + facilityExpenses;
+        g.lifetimeRevenue += deliveredW * revenuePerSuppliedW;
+        g.lifetimeExpenses += facilityExpenses;
       }
     } else {
       facilityExpenses =
@@ -1805,7 +1790,7 @@ function updateSupplyFacilitiesFinances(
       // A half-built plant is already costing interest, and a row that only started counting on
       // the day it switched on would hide the cheapest place to notice that
       if (!simulated) {
-        g.lifetimeExpenses = (g.lifetimeExpenses || 0) + facilityExpenses;
+        g.lifetimeExpenses += facilityExpenses;
       }
     }
   });
@@ -2036,6 +2021,10 @@ function buildFacilityHelper(
           }
         : {}),
       ...financing,
+      lifetimeWh: 0,
+      lifetimePotentialWh: 0,
+      lifetimeRevenue: 0,
+      lifetimeExpenses: 0,
       id:
         state.facilities.reduce(
           (max: number, f: FacilityOperatingType) => (max > f.id ? max : f.id),

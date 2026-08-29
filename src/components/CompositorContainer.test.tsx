@@ -155,7 +155,7 @@ describe("onTutorialStep", () => {
         content: <span />,
         onNext: () => sideEffect,
       },
-      { card: "FINANCES", target: "#second", content: <span /> },
+      { card: "INSIGHTS", target: "#second", content: <span /> },
     ];
 
     it("fires onNext when leaving a step forwards", () => {
@@ -166,7 +166,7 @@ describe("onTutorialStep", () => {
 
     it("doesn't replay onNext when stepping backwards", () => {
       expect(
-        step({ steps, fromStep: 1, toStep: 0, currentCard: "FINANCES" }),
+        step({ steps, fromStep: 1, toStep: 0, currentCard: "INSIGHTS" }),
       ).not.toContainEqual(sideEffect);
     });
   });

@@ -33,11 +33,11 @@ function ticked(state: GameType, ticks: number): GameType {
 }
 
 function messages(state: GameType): string[] {
-  return (state.eventLog || []).map((e: GameEventType) => e.message);
+  return state.eventLog.map((e: GameEventType) => e.message);
 }
 
 function kinds(state: GameType): string[] {
-  return (state.eventLog || []).map((e: GameEventType) => e.kind);
+  return state.eventLog.map((e: GameEventType) => e.kind);
 }
 
 // A fleet that has been switched off entirely, which is the shortest road to a blackout
@@ -67,7 +67,7 @@ describe("the event log", () => {
       f.paused = false;
     });
     const lit = ticked(recovered, 60);
-    const over = (lit.eventLog || []).find(
+    const over = lit.eventLog.find(
       (e: GameEventType) => e.kind === "BLACKOUT_OVER",
     );
     expect(over).toBeDefined();
@@ -78,7 +78,7 @@ describe("the event log", () => {
 
   it("stamps each entry with the month it happened in, newest first", () => {
     const dark = ticked(pauseEverything(createGame({ scenarioId: 100 })), 200);
-    const log = dark.eventLog || [];
+    const log = dark.eventLog;
     expect(log.length).toBeGreaterThan(0);
     expect(log[0].label).toMatch(/^[A-Z][a-z]{2} \d{4}$/);
     // Ids are handed out in order, so newest first means descending
@@ -127,7 +127,7 @@ describe("the event log", () => {
    */
   it("keeps only the most recent hundred entries", () => {
     const dark = ticked(pauseEverything(createGame({ scenarioId: 100 })), 400);
-    const log = dark.eventLog || [];
+    const log = dark.eventLog;
     expect(log.length).toBeLessThanOrEqual(100);
   });
 
@@ -162,8 +162,8 @@ describe("the event log", () => {
     logFuelCrossovers(game);
     expect(kinds(game)).toContain("FUEL_CROSSOVER");
     expect(messages(game)[0]).toContain(`${dearer} is now more expensive`);
-    expect(game.eventLog?.[0].importance).toEqual("NOTABLE");
-    expect(game.eventLog?.[0].actionTarget).toEqual("FACILITIES");
+    expect(game.eventLog[0].importance).toEqual("NOTABLE");
+    expect(game.eventLog[0].actionTarget).toEqual("FACILITIES");
     expect(game.speed).toEqual("PAUSED");
 
     // Even after recreating the same edge, the persistent per-fuel key suppresses it.

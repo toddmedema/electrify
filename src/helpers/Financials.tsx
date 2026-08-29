@@ -206,10 +206,10 @@ export interface FacilityLifetimeType {
 export function facilityLifetime(
   f: FacilityOperatingType,
 ): FacilityLifetimeType {
-  const wh = f.lifetimeWh || 0;
-  const revenue = f.lifetimeRevenue || 0;
-  const expenses = f.lifetimeExpenses || 0;
-  const potentialWh = f.lifetimePotentialWh || 0;
+  const wh = f.lifetimeWh;
+  const revenue = f.lifetimeRevenue;
+  const expenses = f.lifetimeExpenses;
+  const potentialWh = f.lifetimePotentialWh;
   const mwh = wh / 1000000;
   return {
     wh,
@@ -242,11 +242,7 @@ export function facilityOutputFactor(
   g: FacilityOperatingType,
   currentMinute: number,
 ): number {
-  // Current facilities carry their researched rate. Legacy saves do not, so apply the modern
-  // defaults rather than making old solar and wind immune to aging from the day they resume.
-  const annualDegradation =
-    g.annualOutputDegradation ??
-    (g.fuel === "Sun" ? 0.005 : g.fuel === "Wind" ? 0.002 : 0);
+  const annualDegradation = g.annualOutputDegradation || 0;
   if (annualDegradation <= 0) {
     return 1;
   }
@@ -258,13 +254,13 @@ export function facilityOutputFactor(
 
 /**
  * Storage lifetimeWh already counts discharge only, which is the industry convention for an
- * equivalent full cycle. Deriving the counter keeps old saves compatible and avoids a second
- * running total that could drift out of sync.
+ * equivalent full cycle. Deriving the counter avoids a second running total that could drift out
+ * of sync.
  */
 export function facilityEquivalentCycles(
   g: FacilityOperatingType,
 ): number | undefined {
-  return g.peakWh > 0 ? (g.lifetimeWh || 0) / g.peakWh : undefined;
+  return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
 }
 
 // Returns how much cash the user receives if they sell / cancel the facility. Construction
@@ -275,16 +271,9 @@ export function facilityCashBack(
   currentMinute = g.minuteOperational ?? g.minuteCreated,
 ): number {
   if (g.yearsToBuildLeft === 0) {
-    // Saves from before technology-specific lives were added do not have this field. Thirty years
-    // is the conservative common economic-life assumption; the facility's researched value wins
-    // for every new game and save written by current code.
-    const lifespanYears =
-      Number.isFinite(g.lifespanYears) && g.lifespanYears > 0
-        ? g.lifespanYears
-        : 30;
     const remainingLife = Math.max(
       0,
-      1 - facilityAgeYears(g, currentMinute) / lifespanYears,
+      1 - facilityAgeYears(g, currentMinute) / g.lifespanYears,
     );
     return g.buildCost * remainingLife - g.loanAmountLeft;
   }

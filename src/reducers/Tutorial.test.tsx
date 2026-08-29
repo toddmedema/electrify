@@ -10,7 +10,7 @@ import { tutorialGateMiddleware } from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
 
-function informational(card: "FACILITIES" | "FINANCES" = "FACILITIES") {
+function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
   return {
     card,
     target: "#information",
@@ -114,14 +114,14 @@ describe("tutorialGateMiddleware", () => {
         ...informational(),
         advanceOn: (state) => state.game.dollarsPerkWh < 0.07,
       },
-      informational("FINANCES"),
+      informational("INSIGHTS"),
     ];
     const store = tutorialStore(steps);
 
     store.dispatch({ type: "test/satisfy-predicate" });
 
     expect(store.getState().game.tutorialStep).toBe(1);
-    expect(store.getState().card.name).toBe("FINANCES");
+    expect(store.getState().card.name).toBe("INSIGHTS");
   });
 
   it("advances an action gate only for a declared action type", () => {

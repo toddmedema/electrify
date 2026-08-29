@@ -209,24 +209,3 @@ describe("watching a replay", () => {
     );
   });
 });
-
-describe("resuming a recorded run", () => {
-  /**
-   * A save from before replays existed carries no log, and a run recorded from halfway through
-   * would play back as a different game. Recording stays off rather than starting mid-run.
-   */
-  it("gives up on the replay rather than recording half of one", () => {
-    const played = createGame(OPTIONS);
-    runMonths(played, 2);
-
-    const { replayLog: _dropped, ...withoutLog } = played;
-    let resumed = cloneDeep(withoutLog) as GameType;
-    resumed = dispatch(
-      resumed,
-      buildFacility({ facility: aGeneratorToBuild(resumed), financed: true }),
-    );
-
-    expect(resumed.replayLog).toBeUndefined();
-    expect(serializeReplay(resumed)).toBeUndefined();
-  });
-});

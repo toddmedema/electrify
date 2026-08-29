@@ -427,7 +427,7 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) =>
-          (s.game.eventLog || []).some((event) => event.kind === "BLACKOUT"),
+          s.game.eventLog.some((event) => event.kind === "BLACKOUT"),
         content: (
           <TutorialPrompt
             concepts={["play", "blackout"]}

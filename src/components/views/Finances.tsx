@@ -848,7 +848,7 @@ export default class Finances extends React.Component<Props, State> {
     const selectedLifetime =
       selectedFacility && facilityLifetime(selectedFacility);
     const fleetWh = game.facilities.reduce(
-      (sum: number, f: FacilityOperatingType) => sum + (f.lifetimeWh || 0),
+      (sum: number, f: FacilityOperatingType) => sum + f.lifetimeWh,
       0,
     );
 

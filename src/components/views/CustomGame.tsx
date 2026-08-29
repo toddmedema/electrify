@@ -102,7 +102,7 @@ function inEraMoney(base: number, startingYear: number): number {
 }
 
 // The option nearest a value, used to keep the player's position in a list when the era under it
-// moves, and to migrate a custom game stored before these became era-aware.
+// moves.
 function nearestIndex(options: number[], value: number): number {
   let best = 0;
   options.forEach((option: number, i: number) => {
@@ -113,35 +113,6 @@ function nearestIndex(options: number[], value: number): number {
   return best;
 }
 
-/**
- * A stored custom game with its cash, rate and fee snapped onto the options this screen
- * offers - the rate and fee against its own starting year.
- *
- * Only ever changes a game saved before those became era-aware. Doing it on the way in rather
- * than on the way out is what keeps the screen honest: showing the nearest option while the
- * scenario still held the old number would start a game at a rate the player was never shown.
- * There is no recovering what they originally meant -- fifty dollars a ton is a rounding error in
- * 2090 money -- so the nearest option is the best that can be done, once.
- */
-function inEraScenario(scenario: ScenarioType): ScenarioType {
-  const rates = RATES_PER_KWH.map((r: number) =>
-    inEraMoney(r, scenario.startingYear),
-  );
-  const fees = FEES_PER_TON.map((f: number) =>
-    inEraMoney(f, scenario.startingYear),
-  );
-  return {
-    ...scenario,
-    // Cash is quoted the same in every era, so this only catches a game stored against an
-    // amount the picker no longer offers - which would otherwise render the field blank
-    cash: STARTING_CASH[nearestIndex(STARTING_CASH, scenario.cash)],
-    startingCustomers:
-      scenario.startingCustomers ||
-      getStartingCustomers(getScenarioLocation(scenario)),
-    dollarsPerkWh: rates[nearestIndex(rates, scenario.dollarsPerkWh)],
-    feePerKgCO2e: fees[nearestIndex(fees, scenario.feePerKgCO2e * 1000)] / 1000,
-  };
-}
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
 const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
@@ -209,9 +180,7 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
-  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
-    inEraScenario(props.scenario),
-  );
+  const [scenario, setScenario] = React.useState<ScenarioType>(props.scenario);
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
