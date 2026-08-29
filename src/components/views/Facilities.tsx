@@ -157,12 +157,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   let secondaryText = "";
   if (underConstruction) {
+    const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
     const percentBuilt = Math.round(
       ((facility.yearsToBuild - facility.yearsToBuildLeft) /
         facility.yearsToBuild) *
         100,
     );
-    secondaryText = `Building: ${percentBuilt}%, ${Math.ceil(props.facility.yearsToBuildLeft * 12)} months left`;
+    secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
     secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
   } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {

@@ -348,6 +348,15 @@ button,
   cursor: auto !important;
 }
 
+// react-floater sizes the tutorial wrapper to the full viewport, then offsets it 10px from the
+// left edge. On phones that makes the document 10px wider even though the tooltip itself fits.
+@media screen and (max-width: ($abswidthmax - 1px)) {
+  .react-joyride__floater {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}
+
 .MuiSelect-select {
   padding-top: 2px !important;
   padding-left: 6px !important;
@@ -837,6 +846,7 @@ $pane_header_height: 40px;
 .chartDataSummary {
   margin: 4px 8px 10px;
   font-size: 0.75rem;
+  overflow-x: auto;
 
   summary {
     width: fit-content;
@@ -847,6 +857,7 @@ $pane_header_height: 40px;
 
   table {
     width: 100%;
+    min-width: max-content;
     margin-top: 6px;
   }
 }

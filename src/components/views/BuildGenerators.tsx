@@ -563,7 +563,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           <IconButton
             onClick={() => props.onSpeedChange("PAUSED")}
             aria-label="pause"
-            edge="end"
             color="primary"
             size="large"
           >
@@ -572,7 +571,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         )}
         <IconButton
           id="close-button"
-          edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
@@ -610,7 +608,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         />
         <IconButton
           id="sort"
-          edge="end"
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"
