@@ -1,6 +1,7 @@
 import {
   decodeReplay,
   encodeReplay,
+  replayVersionError,
   MAX_REPLAY_ACTIONS,
   recordReplayAction,
   recordedDelta,
@@ -199,6 +200,13 @@ describe("decodeReplay", () => {
     expect(
       decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
     ).toBeNull();
+  });
+
+  it("explains that older simulation replays cannot be migrated", () => {
+    const old = encodeReplay(aReplay({ version: REPLAY_VERSION - 1 }));
+    expect(replayVersionError(old)).toMatch(
+      /created by an older simulation version/,
+    );
   });
 
   it("ignores a replay missing the fields the run is rebuilt from", () => {

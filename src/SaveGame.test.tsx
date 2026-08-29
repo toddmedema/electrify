@@ -102,6 +102,20 @@ describe("SaveGame", () => {
     }
   });
 
+  it("rejects current-version monthly history without story simulation facts", () => {
+    const save = serializeSave(game);
+    const month = { ...save.game.monthlyHistory[0] } as Partial<
+      GameType["monthlyHistory"][number]
+    >;
+    delete month.deliveredWhByFuel;
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, monthlyHistory: [month] },
+      }),
+    ).toBeNull();
+  });
+
   it("rejects a current-version save with incomplete facility totals", () => {
     const save = serializeSave(game);
     const facility = { ...save.game.facilities[0] } as Partial<

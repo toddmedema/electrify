@@ -214,6 +214,8 @@ describe("ending a scenario from inside the reducer", () => {
       month: 0,
       supplyWh: 1,
       demandWh: 100,
+      deliveredWhByFuel: {},
+      peakDemandW: 100,
       cash: scenario.cash,
       customers: 100,
       netWorth: scenario.cash,

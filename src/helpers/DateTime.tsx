@@ -23,6 +23,8 @@ export const EMPTY_HISTORY = {
   year: 0,
   supplyWh: 0,
   demandWh: 0,
+  deliveredWhByFuel: {},
+  peakDemandW: 0,
   customers: 0,
   cash: 0,
   kgco2e: 0,
@@ -36,13 +38,28 @@ export const EMPTY_HISTORY = {
   inflationRate: 0,
 } as MonthlyHistoryType;
 
+function emptyHistory(): MonthlyHistoryType {
+  return { ...EMPTY_HISTORY, deliveredWhByFuel: {} };
+}
+
 // edits acc in place to avoid making tons of extra objects
 export function reduceHistories(
   acc: MonthlyHistoryType,
   t: MonthlyHistoryType,
 ): MonthlyHistoryType {
+  // Several chart reducers seed with `{ ...EMPTY_HISTORY }`. Clone the nested map on first use so
+  // one summary cannot write fuel totals into the exported constant or another summary.
+  if (acc.deliveredWhByFuel === EMPTY_HISTORY.deliveredWhByFuel) {
+    acc.deliveredWhByFuel = {};
+  }
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
+  Object.entries(t.deliveredWhByFuel || {}).forEach(([fuel, wh]) => {
+    if (wh !== undefined) {
+      acc.deliveredWhByFuel[fuel] = (acc.deliveredWhByFuel[fuel] || 0) + wh;
+    }
+  });
+  acc.peakDemandW = Math.max(acc.peakDemandW, t.peakDemandW || 0);
   acc.kgco2e += t.kgco2e;
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
@@ -93,6 +110,18 @@ function accumulateTick(
   summary.supplyWh +=
     (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
   summary.demandWh += (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
+  // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
+  // excess. Storage is deliberately absent because it is not a fuel.
+  const deliveredShare = t.supplyW > 0 ? Math.min(1, t.demandW / t.supplyW) : 0;
+  Object.entries(t.supplyByFuel).forEach(([fuel, watts]) => {
+    if (watts !== undefined) {
+      summary.deliveredWhByFuel[fuel] =
+        (summary.deliveredWhByFuel[fuel] || 0) +
+        ((watts * deliveredShare) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    }
+  });
+  summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
   summary.kgco2e += t.kgco2e;
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
@@ -115,7 +144,7 @@ export function summarizeTimeline(
   startingYear: number,
   filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
-  const summary = { ...EMPTY_HISTORY };
+  const summary = emptyHistory();
   // Ticks are ordered oldest first, so walk forwards: reduceHistories keeps the last value it
   // sees for the point-in-time fields, and the period should report the balances it ended on.
   // Note that summarizeHistory below walks the other way, because monthlyHistory is newest first.
@@ -152,7 +181,7 @@ export function summarizeTimelineByMonth(
     const month = Math.floor(t.minute / MINUTES_PER_MONTH);
     let summary = byMonth.get(month);
     if (!summary) {
-      summary = { ...EMPTY_HISTORY };
+      summary = emptyHistory();
       byMonth.set(month, summary);
     }
     accumulateTick(summary, t, startingYear);
@@ -166,7 +195,7 @@ export function summarizeHistory(
   timeline: MonthlyHistoryType[],
   filter?: (t: MonthlyHistoryType) => boolean,
 ): MonthlyHistoryType {
-  const summary = { ...EMPTY_HISTORY };
+  const summary = emptyHistory();
   // Months are ordered newest first (state.monthlyHistory is built by unshifting), so walking
   // backwards is what ends on the most recent one - the opposite direction to summarizeTimeline
   // above, for the opposite array order.

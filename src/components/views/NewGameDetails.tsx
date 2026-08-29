@@ -43,7 +43,7 @@ import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
-import { decodeReplay } from "../../Replay";
+import { decodeReplay, replayVersionError } from "../../Replay";
 import {
   DifficultyType,
   GameType,
@@ -208,11 +208,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
     this.setState({ loadingReplayId: replayId });
     try {
       const snapshot = await getDoc(doc(getDb(), "replays", replayId));
-      const replay = snapshot.exists() ? decodeReplay(snapshot.data()) : null;
+      const data = snapshot.exists() ? snapshot.data() : undefined;
+      const replay = data ? decodeReplay(data) : null;
       if (replay) {
         this.props.onWatchReplay(replay);
       } else {
-        this.props.onReplayError("Sorry, that replay couldn't be loaded.");
+        this.props.onReplayError(
+          replayVersionError(data) || "Sorry, that replay couldn't be loaded.",
+        );
       }
     } catch (err) {
       console.warn("Couldn't load the replay: ", err);

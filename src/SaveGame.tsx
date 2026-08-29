@@ -24,8 +24,21 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// This is the initial release schema. Increment it for breaking post-release changes.
-export const SAVE_VERSION = 1;
+// v2 persists fuel-specific delivery and peak demand for deterministic story checkpoints.
+export const SAVE_VERSION = 2;
+
+export function saveVersionError(raw: unknown): string | undefined {
+  if (typeof raw !== "object" || raw === null) {
+    return undefined;
+  }
+  const version = (raw as { version?: unknown }).version;
+  if (typeof version !== "number" || version === SAVE_VERSION) {
+    return undefined;
+  }
+  return version < SAVE_VERSION
+    ? "That save was created by an older simulation version and can't be resumed."
+    : "That save was created by a newer simulation version and can't be resumed.";
+}
 
 export interface SaveGameType {
   version: number;
@@ -133,6 +146,23 @@ export function parseSave(raw: unknown): SaveGameType | null {
     }) ||
     !Array.isArray(game.timeline) ||
     !Array.isArray(game.monthlyHistory) ||
+    game.monthlyHistory.some((month) => {
+      if (typeof month !== "object" || month === null) {
+        return true;
+      }
+      const record = month as Partial<GameType["monthlyHistory"][number]>;
+      return (
+        typeof record.deliveredWhByFuel !== "object" ||
+        record.deliveredWhByFuel === null ||
+        Object.values(record.deliveredWhByFuel).some(
+          (value) =>
+            typeof value !== "number" || !Number.isFinite(value) || value < 0,
+        ) ||
+        typeof record.peakDemandW !== "number" ||
+        !Number.isFinite(record.peakDemandW) ||
+        record.peakDemandW < 0
+      );
+    }) ||
     !Array.isArray(game.eventLog) ||
     !Array.isArray(game.reportedEventKeys) ||
     typeof game.eventLogReadThroughId !== "number"

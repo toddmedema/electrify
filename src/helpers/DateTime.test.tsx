@@ -9,7 +9,13 @@ import {
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "./DateTime";
-import { LOCATIONS, TICK_MINUTES, TICKS_PER_MONTH } from "../Constants";
+import {
+  GAME_TO_REAL_YEARS,
+  LOCATIONS,
+  TICK_MINUTES,
+  TICKS_PER_HOUR,
+  TICKS_PER_MONTH,
+} from "../Constants";
 import {
   DateType,
   LocationType,
@@ -144,8 +150,9 @@ describe("summarizeTimeline", () => {
       (cash: number, i: number) =>
         ({
           minute: i * TICK_MINUTES,
-          supplyW: 0,
-          demandW: 0,
+          supplyW: 100 + i * 50,
+          demandW: 200 + i * 100,
+          supplyByFuel: { Coal: 60 + i * 10, Wind: 40 + i * 40 },
           cash,
           customers: 1000 + i,
           netWorth: cash * 2,
@@ -169,6 +176,13 @@ describe("summarizeTimeline", () => {
     expect(summary.interestRate).toBeCloseTo(0.042, 10);
     expect(summary.revenue).toEqual(30);
     expect(summary.expensesFuel).toEqual(3);
+    expect(summary.peakDemandW).toEqual(400);
+    expect(summary.deliveredWhByFuel.Coal).toBeCloseTo(
+      ((60 + 70 + 80) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS,
+    );
+    expect(summary.deliveredWhByFuel.Wind).toBeCloseTo(
+      ((40 + 80 + 120) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS,
+    );
   });
 
   it("ends on the last tick the filter kept, not the last one in the array", () => {
@@ -180,6 +194,20 @@ describe("summarizeTimeline", () => {
     expect(summary.cash).toEqual(300);
     expect(summary.revenue).toEqual(30);
   });
+
+  it("does not attribute curtailed oversupply as delivered fuel energy", () => {
+    const oversupplied = ticks([100]);
+    oversupplied[0].supplyW = 200;
+    oversupplied[0].demandW = 100;
+    oversupplied[0].supplyByFuel = { Coal: 120, Wind: 80 };
+    const summary = summarizeTimeline(oversupplied, 2020);
+    expect(
+      Object.values(summary.deliveredWhByFuel).reduce<number>(
+        (total, delivered) => total + (delivered || 0),
+        0,
+      ),
+    ).toBeCloseTo(summary.supplyWh);
+  });
 });
 
 describe("summarizeHistory", () => {
@@ -189,6 +217,8 @@ describe("summarizeHistory", () => {
       (cash: number) =>
         ({
           ...EMPTY_HISTORY,
+          deliveredWhByFuel: { Coal: cash },
+          peakDemandW: cash * 10,
           cash,
           netWorth: cash * 2,
           revenue: 10,
@@ -202,6 +232,8 @@ describe("summarizeHistory", () => {
     expect(summary.cash).toEqual(300);
     expect(summary.netWorth).toEqual(600);
     expect(summary.revenue).toEqual(30);
+    expect(summary.deliveredWhByFuel.Coal).toEqual(600);
+    expect(summary.peakDemandW).toEqual(3000);
   });
 });
 
