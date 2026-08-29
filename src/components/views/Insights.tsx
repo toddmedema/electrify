@@ -95,13 +95,7 @@ import { UnitsContext } from "../base/UnitsContext";
 import { formatCustomerChange } from "./Finances";
 
 export type InsightRange =
-  | "all"
-  | "current"
-  | "next1"
-  | "next5"
-  | "next10"
-  | "next20"
-  | `year:${number}`;
+  "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -202,7 +196,6 @@ export const INSIGHT_PRESETS: Record<
 const RANGE_KEY = "insightsRange";
 const LAYERS_KEY = "insightsLayers";
 const FORECAST_RANGE_OPTIONS: readonly InsightRange[] = [
-  "current",
   "next1",
   "next5",
   "next10",
@@ -635,10 +628,6 @@ export default class Insights extends React.Component<Props, State> {
       timeline,
       game.startingYear,
     ).slice(1, 1 + monthsAhead);
-    const financePast =
-      this.state.range === "current"
-        ? game.monthlyHistory.filter((month) => month.year === game.date.year)
-        : [];
     const projection: ProjectionView = {
       historical: false,
       timeline,
@@ -649,7 +638,7 @@ export default class Insights extends React.Component<Props, State> {
       largestBlackout,
       hasStorage: timeline.some((tick) => tick.storedWh > 0),
       hasHydro: game.facilities.some((facility) => facility.fuel === "Hydro"),
-      financePast,
+      financePast: [],
       financeProjected: [currentMonth, ...projectedMonths],
     };
     this.projectionCache = { key, projection };
@@ -1135,8 +1124,7 @@ export default class Insights extends React.Component<Props, State> {
               className="headerControl"
               aria-label="Insight range"
             >
-              <MenuItem value="current">Current year</MenuItem>
-              <MenuItem value="next1">Next year</MenuItem>
+              <MenuItem value="next1">Next 12 months</MenuItem>
               <MenuItem value="next5">Next 5 years</MenuItem>
               <MenuItem value="next10">Next 10 years</MenuItem>
               <MenuItem value="next20">Next 20 years</MenuItem>

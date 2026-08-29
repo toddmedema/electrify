@@ -175,31 +175,31 @@ export default function Settings(props: Props): React.JSX.Element {
                   : "Music and sound effects disabled"
               }
             />
-            <Box sx={{ width: "100%", maxWidth: 360, px: 1 }}>
-              <Typography id="music-volume-label" variant="body2">
-                Music volume: {Math.round(props.settings.musicVolume * 100)}%
-              </Typography>
-              <Slider
-                aria-labelledby="music-volume-label"
-                value={Math.round(props.settings.musicVolume * 100)}
-                disabled={!props.settings.audioEnabled}
-                onChange={(_e: Event, value: number | number[]) =>
-                  props.onMusicVolumeChange((value as number) / 100)
-                }
-              />
-              <Typography id="effects-volume-label" variant="body2">
-                Sound effects volume:{" "}
-                {Math.round(props.settings.soundEffectsVolume * 100)}%
-              </Typography>
-              <Slider
-                aria-labelledby="effects-volume-label"
-                value={Math.round(props.settings.soundEffectsVolume * 100)}
-                disabled={!props.settings.audioEnabled}
-                onChange={(_e: Event, value: number | number[]) =>
-                  props.onSoundEffectsVolumeChange((value as number) / 100)
-                }
-              />
-            </Box>
+            {!!props.settings.audioEnabled && (
+              <Box sx={{ width: "100%", maxWidth: 360, px: 1 }}>
+                <Typography id="music-volume-label" variant="body2">
+                  Music volume: {Math.round(props.settings.musicVolume * 100)}%
+                </Typography>
+                <Slider
+                  aria-labelledby="music-volume-label"
+                  value={Math.round(props.settings.musicVolume * 100)}
+                  onChange={(_e: Event, value: number | number[]) =>
+                    props.onMusicVolumeChange((value as number) / 100)
+                  }
+                />
+                <Typography id="effects-volume-label" variant="body2">
+                  Sound effects volume:{" "}
+                  {Math.round(props.settings.soundEffectsVolume * 100)}%
+                </Typography>
+                <Slider
+                  aria-labelledby="effects-volume-label"
+                  value={Math.round(props.settings.soundEffectsVolume * 100)}
+                  onChange={(_e: Event, value: number | number[]) =>
+                    props.onSoundEffectsVolumeChange((value as number) / 100)
+                  }
+                />
+              </Box>
+            )}
           </SettingsSection>
 
           <SettingsSection id="account-settings" title="Account">
