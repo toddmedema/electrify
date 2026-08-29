@@ -320,8 +320,7 @@ export default function Manual(props: Props): React.JSX.Element {
               No entries match "{searchTerm}".
             </Typography>
             <Typography variant="body2">
-              Think it belongs in here? <a href={FEEDBACK_URL}>Let us know</a>
-              .
+              Think it belongs in here? <a href={FEEDBACK_URL}>Let us know</a>.
             </Typography>
           </div>
         )}
