@@ -106,6 +106,7 @@ describe("per-facility lifetime totals", () => {
     const state = play(createGame({ scenarioId: 103 }), 8);
     const coal = state.facilities[0];
     coal.currentW = 0;
+    coal.committed = false;
     coal.generatingLastRealTick = false;
     coal.annualOperatingCost = 0;
     coal.btuPerWh = 0;
@@ -152,6 +153,7 @@ describe("per-facility lifetime totals", () => {
       facility.annualOperatingCost = 0;
       facility.btuPerWh = 0;
       facility.currentW = 0;
+      facility.committed = false;
       facility.paused = facility.id !== coal.id;
     });
     coal.generatingLastRealTick = false;
@@ -332,6 +334,7 @@ describe("per-facility lifetime totals", () => {
         facility.annualOperatingCost = 0;
         facility.btuPerWh = 0;
         facility.currentW = 0;
+        facility.committed = false;
         facility.paused = facility.id !== coal.id;
       });
       coal.name = name;

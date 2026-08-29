@@ -63,6 +63,8 @@ describe("resume", () => {
     coal.tracksStarts = undefined;
     coal.costPerStart = undefined;
     coal.lifetimeStarts = undefined;
+    coal.minimumStableOutput = undefined;
+    coal.committed = undefined;
     coal.generatingLastRealTick = undefined;
 
     const restored = restore(oldSave);
@@ -72,6 +74,8 @@ describe("resume", () => {
     expect(restoredCoal.tracksStarts).toBe(true);
     expect(restoredCoal.costPerStart).toBeUndefined();
     expect(restoredCoal.lifetimeStarts).toBe(0);
+    expect(restoredCoal.minimumStableOutput).toBe(0.4);
+    expect(restoredCoal.committed).toBe(restoredCoal.currentW > 0);
     expect(restoredCoal.generatingLastRealTick).toBe(restoredCoal.currentW > 0);
   });
 

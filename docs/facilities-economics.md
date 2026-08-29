@@ -205,6 +205,27 @@ Start tracking and start charges are deliberately separate capabilities:
 | Enhanced Geothermal | Yes           | None                                               | Same FOM treatment, without commercial start-cost observations                          |
 | Oil                 | No            | None                                               | Reciprocating-engine service follows use; starts do not change its maintenance schedule |
 
+Thermal generators also carry a minimum stable output. These technology-level values are
+representative production-cost inputs rather than limits for every individual unit:
+
+| Facility            | Minimum stable output | Basis                                                                                   |
+| ------------------- | --------------------: | --------------------------------------------------------------------------------------- |
+| Coal                |                   40% | GE Energy/HNEI ancillary-services study: 35-40% typical turndown level                  |
+| Nuclear             |                   50% | NREL production-cost modeling; individual IAEA load-following examples can reach 20-30% |
+| Natural Gas         |                   50% | Representative heavy-duty simple-cycle value within the published 15-70% range          |
+| Oil                 |                   50% | GE Energy/HNEI reciprocating-engine value                                               |
+| Biomass             |                   40% | GE Energy/HNEI ancillary-services study: 35-40%                                         |
+| Geothermal          |                   15% | GE Energy/HNEI ancillary-services study: 12-15%                                         |
+| Enhanced Geothermal |                   15% | Same thermally stable turndown assumption pending commercial fleet data                 |
+
+The dispatcher first forecasts the unconstrained merit-order request for each facility. When an
+online plant is no longer requested, it scans that facility's upcoming requests and accumulates
+the fuel, carbon, and variable O&M cost of remaining at minimum output. It stays online only when
+it is needed again before those costs reach the next-start charge. The scan aborts immediately
+once shutdown is cheaper; if the plant is not needed again inside the forecast, it shuts down.
+Fixed O&M is omitted because the company pays it in either state. Startup fuel, hot/warm/cold
+state, minimum up/down times, and part-load heat-rate penalties remain outside this model.
+
 Coal uses NREL's conservative hot-start values for 500-1,300 MW supercritical units: $54/MW-start
 of capitalized cycling and maintenance plus $5.81/MW-start of auxiliary operations, chemicals,
 water, and additives. Converting 2011 dollars with CPI-U (`304.702 / 224.939`) gives
@@ -254,6 +275,8 @@ No additional facility type is added in this pass:
 - [Lawrence Berkeley National Laboratory, U.S. wind-plant performance with age](https://emp.lbl.gov/publications/how-does-wind-project-performance)
 - [BLS, annual CPI-U indexes](https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm)
 - [NREL, Power Plant Cycling Costs](https://docs.nrel.gov/docs/fy12osti/55433.pdf)
+- [GE Energy/HNEI, Ancillary Services Definitions and Capability Study](https://www.hnei.hawaii.edu/wp-content/uploads/Ancillary-Services-Definitions-and-Capability-Study.pdf)
+- [NREL, Operational Analysis of the Eastern Interconnection at Very High Renewable Penetrations](https://docs.nrel.gov/docs/fy18osti/71465.pdf)
 - [IAEA, Non-baseload Operation in Nuclear Power Plants](https://www-pub.iaea.org/MTCD/Publications/PDF/P1756_web.pdf)
 - [NREL 2024 ATB, Geothermal](https://atb.nrel.gov/electricity/2024/geothermal)
 - [DOE, Geothermal Basics](https://www.energy.gov/hgeo/geothermal/geothermal-basics)

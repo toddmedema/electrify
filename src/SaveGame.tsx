@@ -112,6 +112,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       const optionalNumbersInvalid = [
         current.costPerStart,
         current.lifetimeStarts,
+        current.minimumStableOutput,
         current.variableOperatingCostPerMWh,
       ].some(
         (value) =>
@@ -119,12 +120,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
           (typeof value !== "number" || !Number.isFinite(value) || value < 0),
       );
       const optionalBooleansInvalid = [
+        current.committed,
         current.tracksStarts,
         current.generatingLastRealTick,
       ].some((value) => value !== undefined && typeof value !== "boolean");
       return (
         requiredNumbersInvalid ||
         optionalNumbersInvalid ||
+        (typeof current.minimumStableOutput === "number" &&
+          current.minimumStableOutput > 1) ||
         optionalBooleansInvalid
       );
     }) ||

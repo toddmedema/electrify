@@ -271,6 +271,10 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;
+    // The unconstrained dispatch request for each facility in the most recent forecast pass.
+    // Kept on forecast ticks so minimum-load generators can decide whether avoiding a future
+    // start is worth remaining online; it is intentionally not copied into monthly history.
+    dispatchTargetWByFacility: Record<number, number>;
   };
 
 export type DerivedHistoryKeysType = keyof DerivedHistoryType;
@@ -325,8 +329,12 @@ export interface GeneratorOperatingType
   // Set when construction completes; absent while the facility is still being built.
   minuteOperational?: number;
   paused: boolean;
+  // Unit commitment is distinct from instantaneous output: a plant ramps through outputs below
+  // its stable minimum while starting and stopping, but cannot remain there indefinitely.
+  committed?: boolean;
   // Last real-tick state for start edge detection. Forecast/pre-roll dispatch mutates currentW,
-  // so currentW alone cannot distinguish a player-visible start from a synthetic one.
+  // so currentW alone cannot distinguish a player-visible start from a synthetic one. For
+  // minimum-load plants this records commitment rather than a literal positive currentW.
   generatingLastRealTick?: boolean;
   reservoirWh?: number;
   hydroLastInflowWh?: number;
@@ -392,6 +400,9 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   annualOutputDegradation?: number;
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
+  // Lowest steady output as a fraction of nameplate. Starting and shutdown ramps may pass below
+  // it transiently; an online unit otherwise produces at least this much.
+  minimumStableOutput?: number;
   // Explicit because neither purchased fuel nor a start charge identifies every thermal plant:
   // geothermal buys no fuel, while the Oil facility is an internal-combustion generator.
   tracksStarts?: boolean;

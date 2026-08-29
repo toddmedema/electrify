@@ -345,6 +345,23 @@ export function GeneratorBuildItem(
                   {formatWatts(generator.peakW * generator.capacityFactor)}
                 </TableCell>
               </TableRow>
+              {generator.minimumStableOutput !== undefined && (
+                <TableRow>
+                  <TableCell>
+                    Minimum stable output
+                    <ManualLink entry={MANUAL_ENTRY.RAMP_RATE} />
+                    <Typography variant="body2" color="textSecondary">
+                      While the plant remains online
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {Math.round(generator.minimumStableOutput * 100)}% ·{" "}
+                    {formatWatts(
+                      generator.peakW * generator.minimumStableOutput,
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>
                   {hasVariableOM ? "Fixed O&M" : "Base O&M"}
