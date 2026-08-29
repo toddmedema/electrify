@@ -11,6 +11,10 @@ import BuildGenerators, { DispatchProps, StateProps } from "./BuildGenerators";
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     game: state.game,
+    focusFuel:
+      state.card.storyTarget?.card === "FACILITIES"
+        ? state.card.storyTarget.fuel
+        : undefined,
   };
 };
 

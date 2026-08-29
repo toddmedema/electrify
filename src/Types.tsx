@@ -121,12 +121,48 @@ export type CardNameType =
   | "SETTINGS"
   | "CUSTOM_GAME";
 
+export type ConceptNameType =
+  | "money"
+  | "supply"
+  | "demand"
+  | "blackout"
+  | "customers"
+  | "generator"
+  | "storage"
+  | "build"
+  | "buy"
+  | "reorder"
+  | "pause"
+  | "play"
+  | "time"
+  | "construction"
+  | "finances"
+  | "forecast"
+  | "rate"
+  | "fuel"
+  | "weather"
+  | "danger"
+  | "goal";
+
+export type StoryActionTargetType =
+  | {
+      card: "FACILITIES";
+      view?: "FLEET" | "BUILD_GENERATORS";
+      fuel?: FuelNameType;
+    }
+  | {
+      card: "INSIGHTS";
+      layer?: "FINANCES" | "SUPPLY_DEMAND" | "FUEL_PRICES";
+    }
+  | { card: "EVENTS" };
+
 // What the card reducer's navigate action accepts, beyond a bare card name
 export interface NavigateActionType {
   name: CardNameType;
   dontRemember?: boolean;
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
+  storyTarget?: StoryActionTargetType;
 }
 
 export interface CardType {
@@ -135,6 +171,7 @@ export interface CardType {
   history?: CardNameType[];
   toPrevious?: boolean;
   entry?: string;
+  storyTarget?: StoryActionTargetType;
 }
 
 // The per-category points that sum to `score`. Investor and public-ownership scenarios are
@@ -581,7 +618,8 @@ export type GameEventKindType =
   | "SELL"
   | "LOAN"
   | "FUEL_PRICE"
-  | "FUEL_CROSSOVER";
+  | "FUEL_CROSSOVER"
+  | "WORLD_EVENT";
 
 export type GameEventImportanceType = "ROUTINE" | "NOTABLE" | "CRITICAL";
 
@@ -602,7 +640,12 @@ export interface GameEventType {
   // Most entries are passive history. Important entries can interrupt the clock, stand out in
   // the log and take the player to the screen where the consequence can be investigated.
   importance?: GameEventImportanceType;
-  actionTarget?: CardNameType;
+  actionTarget?: StoryActionTargetType;
+  title?: string;
+  details?: string;
+  concept?: ConceptNameType;
+  storyPhaseKey?: string;
+  turningPointPriority?: number;
 }
 
 export interface WorldEventEffectsType {

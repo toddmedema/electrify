@@ -1,8 +1,14 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import GameCard from "../base/GameCard";
-import { GameEventKindType, GameEventType } from "../../Types";
-import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
+import {
+  ConceptNameType,
+  GameEventImportanceType,
+  GameEventKindType,
+  GameEventType,
+  StoryActionTargetType,
+} from "../../Types";
+import ConceptIcon from "../base/ConceptIcon";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -22,21 +28,34 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
   LOAN: "finances",
   FUEL_PRICE: "fuel",
   FUEL_CROSSOVER: "fuel",
+  WORLD_EVENT: "forecast",
 };
+
+export interface UpcomingStoryEventType {
+  key: string;
+  label: string;
+  title?: string;
+  message: string;
+  details?: string;
+  concept?: ConceptNameType;
+  importance?: GameEventImportanceType;
+  actionTarget?: StoryActionTargetType;
+}
 
 export interface StateProps {
   events: GameEventType[];
+  upcoming?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
   onOpen: () => void;
-  onSelect: (event: GameEventType) => void;
+  onSelect: (target?: StoryActionTargetType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
-  const { events, onOpen, onSelect } = props;
+  const { events, onOpen, onSelect, upcoming = [] } = props;
   // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
   // so the expression-bodied form returned an object here; React later tried to call that object
   // while unmounting this phone-only pane and crashed the app to a blank screen.
@@ -46,6 +65,83 @@ export default function EventLog(props: Props): React.JSX.Element {
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
+        {upcoming.length > 0 && (
+          <section
+            className="upcomingEvents"
+            aria-labelledby="upcomingEventsTitle"
+          >
+            <Typography id="upcomingEventsTitle" variant="subtitle2">
+              Upcoming
+            </Typography>
+            <ul className="eventLogList">
+              {upcoming.map((event) => (
+                <li
+                  className={`eventLogItem upcoming importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                  key={event.key}
+                  onClick={() => onSelect(event.actionTarget)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                    if (
+                      event.actionTarget &&
+                      (e.key === "Enter" || e.key === " ")
+                    ) {
+                      e.preventDefault();
+                      onSelect(event.actionTarget);
+                    }
+                  }}
+                  role={event.actionTarget ? "button" : undefined}
+                  tabIndex={event.actionTarget ? 0 : undefined}
+                >
+                  <span className="eventLogIcon">
+                    <ConceptIcon
+                      concept={event.concept || "forecast"}
+                      fontSize="small"
+                    />
+                  </span>
+                  <span>
+                    {event.title && <strong>{event.title}</strong>}
+                    {event.importance && event.importance !== "ROUTINE" && (
+                      <span className="eventLogImportance">
+                        {event.importance === "CRITICAL"
+                          ? "Critical"
+                          : "Notable"}
+                      </span>
+                    )}
+                    <Typography
+                      variant="body2"
+                      component="span"
+                      sx={{ display: "block" }}
+                    >
+                      {event.message}
+                    </Typography>
+                    {event.details && (
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        component="span"
+                        sx={{ display: "block" }}
+                      >
+                        {event.details}
+                      </Typography>
+                    )}
+                  </span>
+                  <Typography
+                    className="eventLogWhen"
+                    variant="body2"
+                    color="textSecondary"
+                    component="span"
+                  >
+                    {event.label}
+                  </Typography>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {upcoming.length > 0 && (
+          <Typography className="eventLogHistoryTitle" variant="subtitle2">
+            History
+          </Typography>
+        )}
         {events.length === 0 && (
           <Typography
             className="eventLogEmpty"
@@ -61,14 +157,14 @@ export default function EventLog(props: Props): React.JSX.Element {
             <li
               className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
               key={event.id}
-              onClick={() => onSelect(event)}
+              onClick={() => onSelect(event.actionTarget)}
               onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
                 if (
                   event.actionTarget &&
                   (e.key === "Enter" || e.key === " ")
                 ) {
                   e.preventDefault();
-                  onSelect(event);
+                  onSelect(event.actionTarget);
                 }
               }}
               role={event.actionTarget ? "button" : undefined}
@@ -76,13 +172,35 @@ export default function EventLog(props: Props): React.JSX.Element {
             >
               <span className="eventLogIcon">
                 <ConceptIcon
-                  concept={KIND_CONCEPTS[event.kind]}
+                  concept={event.concept || KIND_CONCEPTS[event.kind]}
                   fontSize="small"
                 />
               </span>
-              <Typography variant="body2" component="span">
-                {event.message}
-              </Typography>
+              <span>
+                {event.title && <strong>{event.title}</strong>}
+                {event.importance && event.importance !== "ROUTINE" && (
+                  <span className="eventLogImportance">
+                    {event.importance === "CRITICAL" ? "Critical" : "Notable"}
+                  </span>
+                )}
+                <Typography
+                  variant="body2"
+                  component="span"
+                  sx={{ display: "block" }}
+                >
+                  {event.message}
+                </Typography>
+                {event.details && (
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    component="span"
+                    sx={{ display: "block" }}
+                  >
+                    {event.details}
+                  </Typography>
+                )}
+              </span>
               <Typography
                 className="eventLogWhen"
                 variant="body2"

@@ -243,6 +243,7 @@ interface ProjectionView {
 export interface StateProps {
   game: GameType;
   selectedFacilityId: number | null;
+  focusLayer?: InsightLayerId;
 }
 
 export interface DispatchProps {
@@ -421,6 +422,9 @@ export default class Insights extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const layers = withRequiredLayers(storedLayers(), props.game.scenarioId);
+    if (props.focusLayer && !layers.includes(props.focusLayer)) {
+      layers.push(props.focusLayer);
+    }
     this.state = {
       range: getStorageChoice(RANGE_KEY, rangeOptions(props.game), "next1"),
       layers,
@@ -438,8 +442,19 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
+      nextProps.focusLayer !== this.props.focusLayer ||
       facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
     );
+  }
+
+  public componentDidUpdate(previousProps: Props) {
+    if (
+      this.props.focusLayer &&
+      this.props.focusLayer !== previousProps.focusLayer &&
+      !this.state.layers.includes(this.props.focusLayer)
+    ) {
+      this.setLayers([...this.state.layers, this.props.focusLayer]);
+    }
   }
 
   private setRange(range: InsightRange) {

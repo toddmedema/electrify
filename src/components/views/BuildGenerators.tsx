@@ -54,6 +54,7 @@ import {
   DateType,
   GameType,
   GeneratorShoppingType,
+  FuelNameType,
   LocationType,
   SpeedType,
 } from "../../Types";
@@ -746,6 +747,7 @@ function valueLabelFormat(x: number) {
 
 export interface StateProps {
   game: GameType;
+  focusFuel?: FuelNameType;
 }
 
 export interface DispatchProps {
@@ -797,7 +799,17 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     solarIrradiances,
     offshoreWindSpeeds,
     airborneWindSpeeds,
-  ).sort((a, b) => a[sort] - b[sort]);
+  ).sort((a, b) => {
+    if (props.focusFuel && a.fuel !== b.fuel) {
+      if (a.fuel === props.focusFuel) {
+        return -1;
+      }
+      if (b.fuel === props.focusFuel) {
+        return 1;
+      }
+    }
+    return a[sort] - b[sort];
+  });
   const forecastGapW = Math.max(
     0,
     ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),

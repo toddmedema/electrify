@@ -5,9 +5,13 @@ import {
   combineStoryEffects,
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
+  SHALE_BOOM_BALANCE,
+  STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
+  upcomingStoryPhases,
 } from "./WorldEvents";
+import { DifficultyType } from "../Types";
 
 const EMPTY_SNAPSHOT: StorySnapshotType = {
   deliveredWhByFuel12m: {},
@@ -183,5 +187,87 @@ describe("story effect composition", () => {
         { effects: { carbonFeePerKgCO2e: 0.1 } },
       ]),
     ).toThrow(/overlapping story carbon-fee/i);
+  });
+});
+
+describe("The Shale Boom pilot arc", () => {
+  const shaleContext = (
+    month: number,
+    difficulty: DifficultyType = "Manager",
+  ) => ({
+    ...context(month),
+    difficulty,
+  });
+
+  it("uses the authored fixed schedule and stacks the freeze price once", () => {
+    expect(
+      resolveStoryAtDate(shaleContext(12)).occurrences.map(
+        (event) => event.key,
+      ),
+    ).toEqual(["story:103:shale-boom:regional-glut-warning"]);
+    expect(resolveStoryAtDate(shaleContext(48)).effects).toMatchObject({
+      fuelPriceMultipliers: { "Natural Gas": 0.75 },
+    });
+
+    const freeze = resolveStoryAtDate(shaleContext(96));
+    expect(freeze.occurrences[0]).toMatchObject({
+      key: "story:103:shale-boom:freeze",
+      importance: "CRITICAL",
+      attributes: {
+        effectiveGasPriceMultiplier: 1.35,
+        freezeGasOutput: 0.7,
+      },
+    });
+    expect(freeze.effects).toMatchObject({
+      fuelPriceMultipliers: { "Natural Gas": 1.35 },
+      facilityOutputMultipliersByFuel: { "Natural Gas": 0.7 },
+    });
+    expect(resolveStoryAtDate(shaleContext(99)).effects).toEqual({
+      demandMultiplier: 1,
+      temperatureOffsetC: 0,
+      fuelPriceMultipliers: { "Natural Gas": 0.75 },
+    });
+    expect(resolveStoryAtDate(shaleContext(122)).effects).toEqual({});
+  });
+
+  it("checks in exact Manager values and monotonic difficulty scaling", () => {
+    expect(SHALE_BOOM_BALANCE.Manager).toEqual({
+      boomGasMultiplier: 0.75,
+      freezeSurcharge: 1.8,
+      freezeGasOutput: 0.7,
+    });
+    const ordered: DifficultyType[] = [
+      "Intern",
+      "Employee",
+      "Manager",
+      "VP",
+      "CEO",
+    ];
+    const values = ordered.map((difficulty) => SHALE_BOOM_BALANCE[difficulty]);
+    expect(values.map((value) => value.boomGasMultiplier)).toEqual([
+      0.7, 0.725, 0.75, 0.775, 0.8,
+    ]);
+    expect(values.map((value) => value.freezeSurcharge)).toEqual([
+      1.5, 1.65, 1.8, 1.95, 2.1,
+    ]);
+    expect(values.map((value) => value.freezeGasOutput)).toEqual([
+      0.8, 0.75, 0.7, 0.65, 0.6,
+    ]);
+  });
+
+  it("shows future phases without treating upcoming rows as active effects", () => {
+    const upcoming = upcomingStoryPhases(shaleContext(47));
+    expect(upcoming.map((phase) => phase.key)).toEqual([
+      "story:103:shale-boom:regional-glut",
+      "story:103:shale-boom:freeze-warning",
+      "story:103:shale-boom:freeze",
+      "story:103:shale-boom:normalization",
+    ]);
+    expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
+  });
+
+  it("authors only the scored Shale scenario in this pilot", () => {
+    expect(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId)).toEqual([103]);
+    expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
 });

@@ -19,33 +19,13 @@ import SwapVertIcon from "@mui/icons-material/SwapVert";
 import WarningIcon from "@mui/icons-material/Warning";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import * as React from "react";
+import { ConceptNameType } from "../../Types";
+
+export type { ConceptNameType } from "../../Types";
 
 // The game's symbol vocabulary: one glyph per concept, everywhere a concept appears.
 // Consistency is what lets the symbols teach themselves - a player who met "blackout"
 // in Mission 1 recognizes it in an event row or a dialog without reading anything.
-export type ConceptNameType =
-  | "money"
-  | "supply"
-  | "demand"
-  | "blackout"
-  | "customers"
-  | "generator"
-  | "storage"
-  | "build"
-  | "buy"
-  | "reorder"
-  | "pause"
-  | "play"
-  | "time"
-  | "construction"
-  | "finances"
-  | "forecast"
-  | "rate"
-  | "fuel"
-  | "weather"
-  | "danger"
-  | "goal";
-
 export const CONCEPT_NAMES: ConceptNameType[] = [
   "money",
   "supply",

@@ -163,7 +163,10 @@ describe("the event log", () => {
     expect(kinds(game)).toContain("FUEL_CROSSOVER");
     expect(messages(game)[0]).toContain(`${dearer} is now more expensive`);
     expect(game.eventLog[0].importance).toEqual("NOTABLE");
-    expect(game.eventLog[0].actionTarget).toEqual("FACILITIES");
+    expect(game.eventLog[0].actionTarget).toEqual({
+      card: "FACILITIES",
+      view: "FLEET",
+    });
     expect(game.speed).toEqual("PAUSED");
 
     // Even after recreating the same edge, the persistent per-fuel key suppresses it.
