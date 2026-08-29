@@ -128,7 +128,6 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
-  CardNameType,
   VictoryType,
 } from "../Types";
 
@@ -206,7 +205,12 @@ function logGameEvent(
   message: string,
   options: {
     importance?: GameEventImportanceType;
-    actionTarget?: CardNameType;
+    actionTarget?: GameEventType["actionTarget"];
+    title?: string;
+    details?: string;
+    concept?: GameEventType["concept"];
+    storyPhaseKey?: string;
+    turningPointPriority?: number;
     reportedKey?: string;
     pause?: boolean;
   } = {},
@@ -225,6 +229,11 @@ function logGameEvent(
     message,
     importance: options.importance,
     actionTarget: options.actionTarget,
+    title: options.title,
+    details: options.details,
+    concept: options.concept,
+    storyPhaseKey: options.storyPhaseKey,
+    turningPointPriority: options.turningPointPriority,
   });
   if (options.reportedKey) {
     state.reportedEventKeys.push(options.reportedKey);
@@ -250,7 +259,10 @@ const FUEL_PRICE_SPIKE = 0.15;
  * A coal spike is not news to a company running on wind, and the fuel price chart in Forecasts
  * already draws every fuel for the player who wants them all.
  */
-function logFuelPriceMoves(state: GameType) {
+function logFuelPriceMoves(
+  state: GameType,
+  storyPriceFuels: ReadonlySet<FuelNameType> = new Set(),
+) {
   const prices = getEffectiveFuelPrices(state.date, state);
   const previous = previousFuelPrices;
   previousFuelPrices = prices;
@@ -266,6 +278,9 @@ function logFuelPriceMoves(state: GameType) {
     }
   });
   burned.forEach((fuel: string) => {
+    if (storyPriceFuels.has(fuel as FuelNameType)) {
+      return;
+    }
     const change = (prices[fuel] - previous[fuel]) / previous[fuel];
     if (Math.abs(change) < FUEL_PRICE_SPIKE) {
       return;
@@ -378,7 +393,7 @@ export function logFuelCrossovers(state: GameType) {
         `${fuel} is now more expensive than ${otherFuel}: ${formatMoneyConcise(cost)}/MWh vs ${formatMoneyConcise(crossed[1])}/MWh`,
         {
           importance: "NOTABLE",
-          actionTarget: "FACILITIES",
+          actionTarget: { card: "FACILITIES", view: "FLEET" },
           reportedKey: `fuel-crossover:${fuel}`,
           pause: true,
         },
@@ -390,14 +405,22 @@ export function logFuelCrossovers(state: GameType) {
 const MAX_WORLD_EVENT_CHECKS = 2400;
 
 /** Starts/ends authored events before this month's forecast is built. */
-function updateWorldEvents(state: GameType) {
+function updateWorldEvents(state: GameType): Set<FuelNameType> {
+  const storyPriceFuels = new Set<FuelNameType>();
+  state.worldEvents.active.forEach((event) => {
+    if (event.endsMinute <= state.date.minute) {
+      Object.keys(event.effects.fuelPriceMultipliers || {}).forEach((fuel) =>
+        storyPriceFuels.add(fuel as FuelNameType),
+      );
+    }
+  });
   state.worldEvents.active = state.worldEvents.active.filter(
     (event) => event.endsMinute > state.date.minute,
   );
   if (
     !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
   ) {
-    return;
+    return storyPriceFuels;
   }
   const resolved = resolveStoryAtDate({
     seed: state.seed,
@@ -417,9 +440,16 @@ function updateWorldEvents(state: GameType) {
     }
     state.worldEvents.checkedKeys.push(occurrence.key);
     state.worldEvents.active.push(occurrence);
+    Object.keys(occurrence.effects.fuelPriceMultipliers || {}).forEach((fuel) =>
+      storyPriceFuels.add(fuel as FuelNameType),
+    );
     logGameEvent(state, occurrence.kind, occurrence.message, {
       importance: occurrence.importance,
       actionTarget: occurrence.actionTarget,
+      title: occurrence.title,
+      details: occurrence.details,
+      concept: occurrence.concept,
+      storyPhaseKey: occurrence.key,
       reportedKey: occurrence.key,
       pause: occurrence.importance === "CRITICAL",
     });
@@ -430,6 +460,7 @@ function updateWorldEvents(state: GameType) {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
+  return storyPriceFuels;
 }
 
 /**
@@ -872,7 +903,10 @@ function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
     state,
     "BUILD",
     buildConsequenceMessage(built, payload.financed),
-    { importance: "NOTABLE", actionTarget: "FACILITIES" },
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
   );
   state = buildFacilityHelper(state, built, payload.financed);
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
@@ -1134,9 +1168,9 @@ export function tickState(state: GameType) {
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
-      updateWorldEvents(state);
+      const storyPriceFuels = updateWorldEvents(state);
       state.timeline = generateNewTimeline(state, cash, customers);
-      logFuelPriceMoves(state);
+      logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
 
       // Pre-roll a few frames to compensate for temperature / demand jumps across months
@@ -1659,6 +1693,7 @@ function updateSupplyFacilitiesFinances(
   let hydroSpillWh = 0;
   let hydroMandatedReleaseW = 0;
   const startedFacilityIds = new Set<number>();
+  const tickStoryEffects = storyEffectsAt(tickDate, state);
   now.dispatchTargetWByFacility = {};
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
@@ -1670,7 +1705,14 @@ function updateSupplyFacilitiesFinances(
       : (generator.generatingLastRealTick ??
         generator.committed ??
         previousW > 0);
-    let dispatchPeakW = g.peakW;
+    const generatorFuel = generator.fuel as FuelNameType | undefined;
+    const fuelOutputMultiplier = generatorFuel
+      ? tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] || 1
+      : 1;
+    const facilityOutputMultiplier =
+      tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] || 1;
+    let dispatchPeakW =
+      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;

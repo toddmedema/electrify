@@ -20,4 +20,38 @@ describe("EventLog", () => {
     expect(screen.getByText(/Blackouts, finished construction/)).toBeVisible();
     expect(() => view.unmount()).not.toThrow();
   });
+
+  it("renders authored upcoming phases with timing and a keyboard action", () => {
+    const onSelect = jest.fn();
+    render(
+      <EventLog
+        events={[]}
+        upcoming={[
+          {
+            key: "story:103:shale-boom:freeze",
+            label: "Jan 2014",
+            title: "Winter gas squeeze",
+            message: "Gas prices and available output will change.",
+            concept: "danger",
+            importance: "CRITICAL",
+            actionTarget: { card: "INSIGHTS", layer: "FUEL_PRICES" },
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={onSelect}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /winter gas squeeze/i });
+    expect(screen.getByText("Upcoming")).toBeVisible();
+    expect(screen.getByText("Jan 2014")).toBeVisible();
+    row.focus();
+    row.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    expect(onSelect).toHaveBeenCalledWith({
+      card: "INSIGHTS",
+      layer: "FUEL_PRICES",
+    });
+  });
 });

@@ -2010,6 +2010,32 @@ html[data-theme="dark"] .uplot {
     list-style: none;
   }
 
+  .upcomingEvents,
+  .eventLogHistoryTitle {
+    padding-top: size(small);
+
+    > .MuiTypography-root {
+      padding: 0 size(base) size(tiny);
+    }
+  }
+
+  .eventLogHistoryTitle {
+    padding-right: size(base);
+    padding-left: size(base);
+  }
+
+  .eventLogImportance {
+    display: inline-block;
+    margin-left: size(tiny);
+    padding: 0 size(tiny);
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
   .eventLogItem {
     display: grid;
     grid-template-columns: 20px 1fr;

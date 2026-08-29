@@ -1,12 +1,13 @@
 import {
   ActiveWorldEventType,
-  CardNameType,
+  ConceptNameType,
   DateType,
   DifficultyType,
   GameEventImportanceType,
   GameEventKindType,
   LocationType,
   StorySnapshotType,
+  StoryActionTargetType,
   WorldEventEffectsType,
 } from "../Types";
 import { MINUTES_PER_MONTH } from "../helpers/DateTime";
@@ -31,10 +32,13 @@ export type StoryScheduleType =
 export type StoryRandomType = (attribute: string) => number;
 
 export interface StoryPhaseDescriptionType {
+  title?: string;
   message: string;
+  details?: string;
+  concept?: ConceptNameType;
   kind: GameEventKindType;
   importance?: GameEventImportanceType;
-  actionTarget?: CardNameType;
+  actionTarget?: StoryActionTargetType;
   attributes?: Record<string, string | number>;
   effects?: WorldEventEffectsType;
 }
@@ -64,9 +68,154 @@ export interface ResolvedStoryType {
   effects: WorldEventEffectsType;
 }
 
-// Foundation only. Scenario content is deliberately delivered in the later, separately balanced
-// PRs listed by issue #250.
-export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [];
+export interface ShaleBoomBalanceType {
+  boomGasMultiplier: number;
+  freezeSurcharge: number;
+  freezeGasOutput: number;
+}
+
+export const SHALE_BOOM_BALANCE: Record<DifficultyType, ShaleBoomBalanceType> =
+  {
+    Intern: {
+      boomGasMultiplier: 0.7,
+      freezeSurcharge: 1.5,
+      freezeGasOutput: 0.8,
+    },
+    Employee: {
+      boomGasMultiplier: 0.725,
+      freezeSurcharge: 1.65,
+      freezeGasOutput: 0.75,
+    },
+    Manager: {
+      boomGasMultiplier: 0.75,
+      freezeSurcharge: 1.8,
+      freezeGasOutput: 0.7,
+    },
+    VP: {
+      boomGasMultiplier: 0.775,
+      freezeSurcharge: 1.95,
+      freezeGasOutput: 0.65,
+    },
+    CEO: {
+      boomGasMultiplier: 0.8,
+      freezeSurcharge: 2.1,
+      freezeGasOutput: 0.6,
+    },
+  };
+
+const FUEL_PRICE_TARGET: StoryActionTargetType = {
+  card: "INSIGHTS",
+  layer: "FUEL_PRICES",
+};
+
+const SHALE_BOOM_ARC: StoryArcDefinitionType = {
+  id: "shale-boom",
+  scenarioId: 103,
+  phases: [
+    {
+      id: "regional-glut-warning",
+      schedule: { atMonth: 12 },
+      describe: () => ({
+        title: "Regional gas boom forecast",
+        message:
+          "New shale production is expected to push natural gas prices down in Jan 2010.",
+        details:
+          "The discount is temporary. Compare flexible gas capacity with alternatives that are less exposed to fuel prices.",
+        concept: "fuel",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: FUEL_PRICE_TARGET,
+      }),
+    },
+    {
+      id: "regional-glut",
+      schedule: { atMonth: 48 },
+      durationMonths: 74,
+      describe: ({ difficulty }) => {
+        const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
+        return {
+          title: "Regional gas glut",
+          message: `Natural gas prices fall ${Math.round((1 - boomGasMultiplier) * 100)}% through Feb 2016.`,
+          details: `Difficulty-adjusted gas-price multiplier: ${boomGasMultiplier.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}×.`,
+          concept: "fuel",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: FUEL_PRICE_TARGET,
+          attributes: { boomGasMultiplier },
+          effects: {
+            fuelPriceMultipliers: { "Natural Gas": boomGasMultiplier },
+          },
+        };
+      },
+    },
+    {
+      id: "freeze-warning",
+      schedule: { atMonth: 95 },
+      describe: ({ difficulty }) => {
+        const { freezeGasOutput, freezeSurcharge } =
+          SHALE_BOOM_BALANCE[difficulty];
+        return {
+          title: "Winter gas squeeze warning",
+          message: `A Jan–Mar 2014 freeze could raise gas prices and cap gas generation at ${Math.round(freezeGasOutput * 100)}% output.`,
+          details: `The freeze surcharge will be ${freezeSurcharge.toFixed(2).replace(/0$/, "")}×, stacked with the continuing shale discount.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: FUEL_PRICE_TARGET,
+        };
+      },
+    },
+    {
+      id: "freeze",
+      schedule: { atMonth: 96 },
+      durationMonths: 3,
+      describe: ({ difficulty }) => {
+        const balance = SHALE_BOOM_BALANCE[difficulty];
+        const effectiveMultiplier =
+          balance.boomGasMultiplier * balance.freezeSurcharge;
+        return {
+          title: "Winter gas squeeze",
+          message: `Gas is ${Math.round(Math.abs(effectiveMultiplier - 1) * 100)}% ${effectiveMultiplier >= 1 ? "above" : "below"} normal and all gas plants are capped at ${Math.round(balance.freezeGasOutput * 100)}% output through Mar 2014.`,
+          details: `${balance.boomGasMultiplier.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}× shale price × ${balance.freezeSurcharge.toFixed(2).replace(/0$/, "")}× freeze surcharge = ${effectiveMultiplier.toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}× effective gas price.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: FUEL_PRICE_TARGET,
+          attributes: {
+            freezeSurcharge: balance.freezeSurcharge,
+            freezeGasOutput: balance.freezeGasOutput,
+            effectiveGasPriceMultiplier: effectiveMultiplier,
+          },
+          effects: {
+            fuelPriceMultipliers: {
+              "Natural Gas": balance.freezeSurcharge,
+            },
+            facilityOutputMultipliersByFuel: {
+              "Natural Gas": balance.freezeGasOutput,
+            },
+          },
+        };
+      },
+    },
+    {
+      id: "normalization",
+      schedule: { atMonth: 122 },
+      describe: () => ({
+        title: "Gas market normalization",
+        message:
+          "Regional natural gas prices return to normal after the shale glut.",
+        details:
+          "Review how much of the grid now depends on gas before the next market cycle.",
+        concept: "fuel",
+        kind: "WORLD_EVENT",
+        importance: "ROUTINE",
+        actionTarget: FUEL_PRICE_TARGET,
+      }),
+    },
+  ],
+};
+
+export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [SHALE_BOOM_ARC];
 
 /** Stable 32-bit address for a string, independent of definition and facility array order. */
 export function storyHash(value: string): number {
@@ -170,7 +319,7 @@ export function combineStoryEffects(
   return combined;
 }
 
-function resolvePhase(
+export function resolveStoryPhase(
   arc: StoryArcDefinitionType,
   phase: StoryPhaseDefinitionType,
   context: StoryContextType,
@@ -226,7 +375,7 @@ export function resolveStoryAtDate(
       ),
     )
     .forEach(({ arc, phase }) => {
-      const resolved = resolvePhase(arc, phase, context);
+      const resolved = resolveStoryPhase(arc, phase, context);
       const scheduledMonth = resolved.attributes.scheduledMonth as number;
       if (context.date.monthsElapsed === scheduledMonth) {
         occurrences.push(resolved);
@@ -239,6 +388,26 @@ export function resolveStoryAtDate(
       }
     });
   return { occurrences, active, effects: combineStoryEffects(active) };
+}
+
+/** Future authored phases for presentation only; these never participate in effect aggregation. */
+export function upcomingStoryPhases(
+  context: StoryContextType,
+  definitions: StoryArcDefinitionType[] = STORY_ARC_DEFINITIONS,
+): Array<ActiveWorldEventType & StoryPhaseDescriptionType> {
+  return definitions
+    .filter((arc) => arc.scenarioId === context.scenarioId)
+    .flatMap((arc) =>
+      arc.phases.map((phase) => resolveStoryPhase(arc, phase, context)),
+    )
+    .filter(
+      (phase) =>
+        (phase.attributes.scheduledMonth as number) >
+        context.date.monthsElapsed,
+    )
+    .sort(
+      (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
+    );
 }
 
 export function activeWorldEventEffects(

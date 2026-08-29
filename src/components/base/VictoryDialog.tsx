@@ -88,6 +88,7 @@ const EVENT_CONCEPTS: Record<GameEventKindType, ConceptNameType> = {
   LOAN: "finances",
   FUEL_PRICE: "fuel",
   FUEL_CROSSOVER: "fuel",
+  WORLD_EVENT: "forecast",
 };
 
 function FleetMix(props: {
