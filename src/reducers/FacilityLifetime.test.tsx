@@ -102,18 +102,29 @@ describe("per-facility lifetime totals", () => {
 
   it("does not count a forecast as time the fleet lived through", () => {
     const state = play(createGame({ scenarioId: 103 }), 8);
+    const coal = state.facilities[0];
+    coal.currentW = 0;
+    coal.generatingLastRealTick = false;
+    coal.annualOperatingCost = 0;
+    coal.btuPerWh = 0;
     const before = state.facilities.map(totals);
 
     const now = getTimeFromTimeline(state.date.minute, state.timeline);
     // A year of simulation, which the Forecasts pane asks for on every month rollover
-    generateNewTimeline(
+    const forecast = generateNewTimeline(
       state,
       now?.cash || 0,
       now?.customers || 0,
       TICKS_PER_DAY * 12,
     );
 
+    expect(forecast[0].expensesOM).toBeCloseTo(
+      (coal.costPerStart || 0) * GAME_TO_REAL_YEARS,
+      6,
+    );
     expect(state.facilities.map(totals)).toEqual(before);
+    expect(coal.currentW).toBe(0);
+    expect(coal.generatingLastRealTick).toBe(false);
   });
 
   it("does not count the reforecast a player action triggers", () => {
@@ -128,36 +139,71 @@ describe("per-facility lifetime totals", () => {
     expect(after.facilities.map(totals)).toEqual(before);
   });
 
-  it("charges gas maintenance once on a real off-to-on edge", () => {
-    const state = createGame({ scenarioId: 104, difficulty: "CEO" });
-    const gas = state.facilities.find(
-      (facility: FacilityOperatingType) => facility.fuel === "Natural Gas",
+  it("charges a start once to both Coal lifetime and company O&M", () => {
+    const state = createGame({ scenarioId: 103, difficulty: "CEO" });
+    // Let the opening tick build the month's forecast before forcing the real start under test.
+    tickState(state);
+    const coal = state.facilities.find(
+      (facility: FacilityOperatingType) => facility.fuel === "Coal",
     ) as FacilityOperatingType;
     state.facilities.forEach((facility: FacilityOperatingType) => {
       facility.annualOperatingCost = 0;
       facility.btuPerWh = 0;
       facility.currentW = 0;
-      facility.paused = facility.id !== gas.id;
+      facility.paused = facility.id !== coal.id;
     });
-    gas.generatingLastRealTick = false;
-    gas.lifetimeStarts = 0;
-    const openingExpenses = gas.lifetimeExpenses;
-    const expectedStartCost = (gas.costPerStart || 0) * GAME_TO_REAL_YEARS;
+    coal.generatingLastRealTick = false;
+    coal.lifetimeStarts = 0;
+    const openingExpenses = coal.lifetimeExpenses;
+    const expectedStartCost = (coal.costPerStart || 0) * GAME_TO_REAL_YEARS;
 
     tickState(state);
 
-    expect(gas.currentW).toBeGreaterThan(0);
-    expect(gas.lifetimeStarts).toBeCloseTo(GAME_TO_REAL_YEARS, 10);
-    expect(gas.lifetimeExpenses - openingExpenses).toBeCloseTo(
+    expect(coal.currentW).toBeGreaterThan(0);
+    expect(coal.lifetimeStarts).toBeCloseTo(GAME_TO_REAL_YEARS, 10);
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+    ).toBeCloseTo(expectedStartCost, 6);
+    expect(coal.lifetimeExpenses - openingExpenses).toBeCloseTo(
       expectedStartCost,
       6,
     );
 
-    const afterStart = totals(gas);
+    const afterStart = totals(coal);
     tickState(state);
-    expect(totals(gas)).toMatchObject({
+    expect(totals(coal)).toMatchObject({
       expenses: afterStart.expenses,
       starts: afterStart.starts,
     });
   });
+
+  it.each(["Nuclear", "Biomass", "Geothermal", "Enhanced Geothermal"])(
+    "tracks a zero-cost %s start without adding an expense",
+    (name) => {
+      const state = createGame({ scenarioId: 103 });
+      tickState(state);
+      const coal = state.facilities[0];
+      state.facilities.forEach((facility: FacilityOperatingType) => {
+        facility.annualOperatingCost = 0;
+        facility.btuPerWh = 0;
+        facility.currentW = 0;
+        facility.paused = facility.id !== coal.id;
+      });
+      coal.name = name;
+      coal.tracksStarts = true;
+      coal.costPerStart = undefined;
+      coal.generatingLastRealTick = false;
+      coal.lifetimeStarts = 0;
+      const openingExpenses = coal.lifetimeExpenses;
+
+      tickState(state);
+
+      expect(coal.currentW).toBeGreaterThan(0);
+      expect(coal.lifetimeStarts).toBeCloseTo(GAME_TO_REAL_YEARS, 10);
+      expect(coal.lifetimeExpenses).toBe(openingExpenses);
+      expect(
+        getTimeFromTimeline(state.date.minute, state.timeline)?.expensesOM,
+      ).toBe(0);
+    },
+  );
 });

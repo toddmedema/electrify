@@ -86,6 +86,7 @@ import {
 } from "../Constants";
 import {
   GENERATORS,
+  START_TRACKING_FACILITY_NAMES,
   STORAGE,
   windAnnualOutputDegradation,
 } from "../data/Facilities";
@@ -674,6 +675,19 @@ export const gameSlice = createSlice({
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
+      restored.facilities.forEach((facility) => {
+        // Save v6 predates the explicit capability for these technologies. Upgrade the facility
+        // snapshot once on resume, starting from its actual generating state so loading an online
+        // plant does not invent an opening start. Historical starts and charges remain unknown.
+        if (
+          facility.tracksStarts === undefined &&
+          START_TRACKING_FACILITY_NAMES.has(facility.name)
+        ) {
+          facility.tracksStarts = true;
+          facility.lifetimeStarts = facility.lifetimeStarts || 0;
+          facility.generatingLastRealTick = facility.currentW > 0;
+        }
+      });
       // The tick loop's module-level locals have to line up with the state being restored.
       // Unlike initGame, this one keeps the month: clearing it would make the first tick record a
       // second history entry for a month that's already in the log.
@@ -1616,7 +1630,7 @@ function updateSupplyFacilitiesFinances(
         hydroReservoirWh += g.reservoirWh || 0;
         hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
       }
-      if (!simulated && g.costPerStart !== undefined) {
+      if (!simulated && g.tracksStarts) {
         g.generatingLastRealTick = g.currentW > 0;
       }
       return;
@@ -1687,14 +1701,14 @@ function updateSupplyFacilitiesFinances(
           hydroMandatedReleaseW += Math.min(g.currentW, mandatedW);
         }
         if (
-          g.costPerStart !== undefined &&
+          g.tracksStarts &&
           !preRoll &&
           !previouslyGenerating &&
           g.currentW > 0
         ) {
           startedFacilityIds.add(g.id);
         }
-        if (!simulated && g.costPerStart !== undefined) {
+        if (!simulated && g.tracksStarts) {
           g.generatingLastRealTick = g.currentW > 0;
         }
       }
@@ -2097,7 +2111,7 @@ function buildFacilityHelper(
         ) + 1,
       currentW: newGame && g.peakWh === undefined ? g.peakW : 0,
       generatingLastRealTick:
-        g.costPerStart !== undefined && newGame && g.peakWh === undefined,
+        g.tracksStarts && newGame && g.peakWh === undefined,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
       minuteCreated: state.date.minute,
       minuteOperational: newGame

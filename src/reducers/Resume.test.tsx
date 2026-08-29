@@ -51,6 +51,26 @@ describe("resume", () => {
     expect(gameReducer(restored, loaded()).inGame).toBe(true);
   });
 
+  it("upgrades old thermal facilities without inventing an opening start", () => {
+    const oldSave = serialized(createGame({ scenarioId: 103, seed: 8675309 }));
+    const coal = oldSave.facilities.find(
+      (facility) => facility.name === "Coal",
+    )!;
+    coal.tracksStarts = undefined;
+    coal.costPerStart = undefined;
+    coal.lifetimeStarts = undefined;
+    coal.generatingLastRealTick = undefined;
+
+    const restored = restore(oldSave);
+    const restoredCoal = restored.facilities.find(
+      (facility) => facility.name === "Coal",
+    )!;
+    expect(restoredCoal.tracksStarts).toBe(true);
+    expect(restoredCoal.costPerStart).toBeUndefined();
+    expect(restoredCoal.lifetimeStarts).toBe(0);
+    expect(restoredCoal.generatingLastRealTick).toBe(restoredCoal.currentW > 0);
+  });
+
   /**
    * The regression the restored previousMonth guards: the tick loop's month tracker lives outside
    * Redux, so a resume that cleared it (the way initGame does) would roll the month over on the

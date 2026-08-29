@@ -392,8 +392,11 @@ export interface GeneratorShoppingType extends SharedShoppingType {
   annualOutputDegradation?: number;
   spinMinutes: number; // 1 for renewables, to avoid eating up CPU on coersing to 1 in case it doesn't exist
   btuPerWh: number; // Heat Rate, but per W for less math per frame
-  // Non-fuel maintenance charged for one physical start. Only present when the technology's
-  // source case reports it separately from fixed and output-dependent O&M.
+  // Explicit because neither purchased fuel nor a start charge identifies every thermal plant:
+  // geothermal buys no fuel, while the Oil facility is an internal-combustion generator.
+  tracksStarts?: boolean;
+  // Non-fuel expense charged for one physical start. Only present when the technology's source
+  // case reports a transferable amount separately from fixed and output-dependent O&M.
   costPerStart?: number;
   // Conventional hydro only. whPerMm is calibrated against the loaded watershed record so that
   // long-run inflow lands on capacityFactor without flattening wet and dry years.

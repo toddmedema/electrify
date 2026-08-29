@@ -200,13 +200,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={Math.round(equivalentOperatingHours).toLocaleString()}
           />
         )}
-        {facility.costPerStart !== undefined && (
+        {facility.tracksStarts && (
           <Stat
             label="Equivalent starts"
             value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
           />
         )}
-        {facility.costPerStart !== undefined && (
+        {facility.tracksStarts && fuel === "Natural Gas" && (
           <Stat
             label="Service intervals"
             value="HGP 900 · major 1,800 starts"
@@ -214,11 +214,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {facility.costPerStart !== undefined && (
           <Stat
-            label="Start maintenance"
+            label="Non-fuel start cost"
             value={`${formatMoneyConcise(facility.costPerStart)}/start`}
           />
         )}
-        {facility.costPerStart !== undefined && (
+        {facility.tracksStarts && (
           <Stat
             label="Start accounting"
             value="Each simulated day represents its month"

@@ -38,12 +38,44 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Startup maintenance.*Per equivalent start.*\$23\.1k\/start/,
+      name: /Non-fuel start cost.*Per equivalent start.*\$23\.1k\/start/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
       name: /Estimated O&M.*Base O&M plus one start\/day.*\$13\.4M\/yr/,
+    }),
+  ).toBeInTheDocument();
+});
+
+it("shows Coal's physical and representative-day start charges", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 650000000, [], []).find(
+    (candidate) => candidate.name === "Coal",
+  );
+  expect(generator).toBeDefined();
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator!}
+      location={game.location}
+      seed={game.seed}
+      onBuild={jest.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Show Coal details" }));
+
+  expect(
+    screen.getByRole("row", {
+      name: /Non-fuel start cost.*Per equivalent start.*\$52\.7k\/start/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Representative-day charge.*365 \/ 12 equivalent starts.*\$1\.6M\/displayed start/,
     }),
   ).toBeInTheDocument();
 });

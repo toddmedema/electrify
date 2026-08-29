@@ -1,6 +1,6 @@
 # Facility economics refresh
 
-Last reviewed: 2026-08-28. The implemented latest observations are 2023 for EIA's engineering
+Last reviewed: 2026-08-29. The implemented latest observations are 2023 for EIA's engineering
 estimates and 2024 for IRENA's global deployment data.
 
 ## Method
@@ -177,11 +177,34 @@ so their introductory economics and controls remain predictable. Existing saves 
 commissioning timestamp still begin their age clock on the first real tick, and saves without a
 degradation field use the modern solar or wind default from the day they resume.
 
-The facility panel now reports equivalent operating hours for generators and equivalent starts for
-natural gas. The 900-start hot-gas-path and 1,800-start major-inspection intervals are shown as
-maintenance context, but do not trigger a second refurbishment bill: EIA's $23,100/start figure is
-already the levelized major-maintenance cost. Maintenance decisions and wear-driven outage risk
-remain separate future work.
+The facility panel now reports equivalent operating hours for generators. It also reports
+equivalent starts for Natural Gas, Coal, Nuclear, Biomass, Geothermal, and Enhanced Geothermal.
+A real zero-to-generating edge represents `365 / 12` starts because the visible day stands for the
+average day in its month; ramping while already above zero does not add another start. Oil remains
+an internal-combustion-generator benchmark, and Hydro is not thermal, so neither is included.
+
+Start tracking and start charges are deliberately separate capabilities:
+
+| Facility | Tracks starts | Non-fuel start charge | Basis |
+| --- | --- | --- | --- |
+| Natural Gas | Yes | EIA's $23,100 per start at 419 MW, size-normalized | H-class simple-cycle reference |
+| Coal | Yes | $81.0185278/MW-start in 2023$, size-normalized | NREL supercritical hot-start cycling plus startup operations |
+| Nuclear | Yes | None | IAEA finds shutdown/startup cycling consequential but unit-specific |
+| Biomass | Yes | None | EIA documents diesel startup burners but no transferable quantity or wear cost |
+| Geothermal | Yes | None | Published lifetime FOM already annualizes overhaul and maintenance |
+| Enhanced Geothermal | Yes | None | Same FOM treatment, without commercial start-cost observations |
+
+Coal uses NREL's conservative hot-start values for 500-1,300 MW supercritical units: $54/MW-start
+of capitalized cycling and maintenance plus $5.81/MW-start of auxiliary operations, chemicals,
+water, and additives. Converting 2011 dollars with CPI-U (`304.702 / 224.939`) gives
+$81.0185278/MW-start in 2023 dollars, or $52,662.04 for the game's 650 MW reference plant before
+difficulty and game inflation. The resulting cost is fixed when the facility is created and is not
+repriced each month. Startup fuel, emissions, EFOR effects, and hot/warm/cold state are not modeled.
+
+Natural Gas alone shows the 900-start hot-gas-path and 1,800-start major-inspection context. Those
+intervals do not trigger a second refurbishment bill: EIA's per-start value is already the
+levelized major-maintenance cost. Maintenance decisions and wear-driven outage risk remain separate
+future work.
 
 ## Commercial technology review
 
@@ -217,4 +240,8 @@ No additional facility type is added in this pass:
 - [NREL 2024 ATB, utility-scale PV degradation assumptions](https://atb.nrel.gov/electricity/2024/utility-scale_pv)
 - [Lawrence Berkeley National Laboratory, U.S. wind-plant performance with age](https://emp.lbl.gov/publications/how-does-wind-project-performance)
 - [BLS, annual CPI-U indexes](https://www.bls.gov/regions/mid-atlantic/data/ConsumerPriceIndexAnnualandSemiAnnual_Table.htm)
+- [NREL, Power Plant Cycling Costs](https://docs.nrel.gov/docs/fy12osti/55433.pdf)
+- [IAEA, Non-baseload Operation in Nuclear Power Plants](https://www-pub.iaea.org/MTCD/Publications/PDF/P1756_web.pdf)
+- [NREL 2024 ATB, Geothermal](https://atb.nrel.gov/electricity/2024/geothermal)
+- [DOE, Geothermal Basics](https://www.energy.gov/hgeo/geothermal/geothermal-basics)
 - [DOE, Long-Duration Energy Storage portfolio](https://www.energy.gov/cmei/oced/long-duration-energy-storage)

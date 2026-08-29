@@ -115,7 +115,15 @@ export function parseSave(raw: unknown): SaveGameType | null {
           value !== undefined &&
           (typeof value !== "number" || !Number.isFinite(value) || value < 0),
       );
-      return requiredNumbersInvalid || optionalNumbersInvalid;
+      const optionalBooleansInvalid = [
+        current.tracksStarts,
+        current.generatingLastRealTick,
+      ].some((value) => value !== undefined && typeof value !== "boolean");
+      return (
+        requiredNumbersInvalid ||
+        optionalNumbersInvalid ||
+        optionalBooleansInvalid
+      );
     }) ||
     !Array.isArray(game.timeline) ||
     !Array.isArray(game.monthlyHistory) ||

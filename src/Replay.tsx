@@ -29,6 +29,8 @@ import {
  */
 
 // Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
+// 7 extends equivalent-start tracking to thermal steam/geothermal plants and charges Coal; older
+// replays would have different Coal finances.
 // 6 adds start-based gas-turbine maintenance; older replays would have different finances.
 // 5 adds age-dependent renewable output and authored starting ages; older replays would dispatch
 // a different amount of solar and wind even if they contain exactly the same actions.
@@ -37,7 +39,7 @@ import {
 // 3 adds offshore wind weather and generation; an older replay would simulate a different grid.
 // 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
 // where it is played, so there is no safe way to migrate one.
-export const REPLAY_VERSION = 6;
+export const REPLAY_VERSION = 7;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
