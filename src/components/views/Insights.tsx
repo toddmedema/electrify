@@ -20,7 +20,11 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CloseIcon from "@mui/icons-material/Close";
 import LayersIcon from "@mui/icons-material/Layers";
 import TuneIcon from "@mui/icons-material/Tune";
-import { TICK_MINUTES, TICKS_PER_YEAR } from "../../Constants";
+import {
+  GAME_TO_REAL_YEARS,
+  TICK_MINUTES,
+  TICKS_PER_YEAR,
+} from "../../Constants";
 import {
   DerivedHistoryKeysType,
   FacilityOperatingType,
@@ -89,7 +93,14 @@ import GameCard from "../base/GameCard";
 import { UnitsContext } from "../base/UnitsContext";
 import { formatCustomerChange } from "./Finances";
 
-export type InsightRange = "current" | "next1" | "next5" | "next10" | "next20";
+export type InsightRange =
+  | "all"
+  | "current"
+  | "next1"
+  | "next5"
+  | "next10"
+  | "next20"
+  | `year:${number}`;
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -186,7 +197,7 @@ export const INSIGHT_PRESETS: Record<
 
 const RANGE_KEY = "insightsRange";
 const LAYERS_KEY = "insightsLayers";
-const RANGE_OPTIONS: readonly InsightRange[] = [
+const FORECAST_RANGE_OPTIONS: readonly InsightRange[] = [
   "current",
   "next1",
   "next5",
@@ -196,6 +207,17 @@ const RANGE_OPTIONS: readonly InsightRange[] = [
 const SYNC_KEY = "insights";
 const GROUPS: LayerGroup[] = ["Grid", "Customers", "Economics", "Environment"];
 const ALL_LAYER_IDS = new Set(INSIGHT_LAYERS.map((layer) => layer.id));
+const HISTORICAL_LAYER_IDS = new Set<InsightLayerId>([
+  "supplyDemand",
+  "profit",
+  "revenue",
+  "expenses",
+  "cash",
+  "customers",
+  "emissions",
+  "financeDetails",
+]);
+const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
 
 const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate) => ({
   value: rate,
@@ -208,6 +230,7 @@ interface BlackoutEdges {
 }
 
 interface ProjectionView {
+  historical: boolean;
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
   domain: { x: [number, number]; y: [number, number] };
@@ -284,7 +307,42 @@ export function withRequiredLayers(
 }
 
 function rangeYears(range: InsightRange): number {
-  return range === "current" ? 0 : Number(range.slice(4));
+  return range.startsWith("next") ? Number(range.slice(4)) : 0;
+}
+
+function historicalYear(range: InsightRange): number | null {
+  return range.startsWith("year:") ? Number(range.slice(5)) : null;
+}
+
+function isHistoricalRange(range: InsightRange): boolean {
+  return range === "all" || historicalYear(range) !== null;
+}
+
+function historyRange(year: number): InsightRange {
+  return `year:${year}`;
+}
+
+function playedHistoryYears(game: GameType): number[] {
+  return [...new Set(game.monthlyHistory.map((month) => month.year))].sort(
+    (a, b) => b - a,
+  );
+}
+
+function rangeOptions(game: GameType): InsightRange[] {
+  if (!game.monthlyHistory.length) {
+    return [...FORECAST_RANGE_OPTIONS];
+  }
+  return [
+    ...FORECAST_RANGE_OPTIONS,
+    "all",
+    ...playedHistoryYears(game).map(historyRange),
+  ];
+}
+
+function monthMinute(month: MonthlyHistoryType, startingYear: number): number {
+  return (
+    ((month.year - startingYear) * 12 + month.month - 1) * MINUTES_PER_MONTH
+  );
 }
 
 function financeMetadata(
@@ -367,7 +425,7 @@ export default class Insights extends React.Component<Props, State> {
     super(props);
     const layers = withRequiredLayers(storedLayers(), props.game.scenarioId);
     this.state = {
-      range: getStorageChoice(RANGE_KEY, RANGE_OPTIONS, "next1"),
+      range: getStorageChoice(RANGE_KEY, rangeOptions(props.game), "next1"),
       layers,
       preset: presetForLayers(layers),
       layersOpen: false,
@@ -427,6 +485,60 @@ export default class Insights extends React.Component<Props, State> {
     this.setLayers(layers);
   }
 
+  private getHistoricalProjection(now: TickPresentFutureType): ProjectionView {
+    const { game } = this.props;
+    const year = historicalYear(this.state.range);
+    const financePast = game.monthlyHistory.filter(
+      (month) => year === null || month.year === year,
+    );
+    const months = [...financePast].reverse();
+    const timeline = months.map((month) => {
+      // The historical supply chart reads these three fields only. Cloning a real tick keeps the
+      // shared chart contract intact without pretending monthlyHistory retained the other layers.
+      const tick = { ...now } as TickPresentFutureType;
+      tick.minute = monthMinute(month, game.startingYear);
+      tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
+      tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
+      return tick;
+    });
+    const rangeMin = timeline[0].minute;
+    const rangeMax = timeline[timeline.length - 1].minute + MINUTES_PER_MONTH;
+    let domainMin = Number.POSITIVE_INFINITY;
+    let domainMax = 0;
+    let blackoutTotalWh = 0;
+    for (let i = 0; i < timeline.length; i++) {
+      const tick = timeline[i];
+      const month = months[i];
+      domainMin = Math.min(domainMin, tick.supplyW, tick.demandW);
+      domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
+      blackoutTotalWh += Math.max(0, month.demandWh - month.supplyWh);
+    }
+
+    return {
+      historical: true,
+      timeline,
+      sampled: timeline,
+      domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
+      // The monthly record knows how much energy went unserved, but not when. Drawing a blackout
+      // band across the whole month would imply precision the saved data does not have.
+      blackouts: [
+        { minute: rangeMin, value: 0 },
+        { minute: rangeMax, value: 0 },
+      ],
+      blackoutTotalWh,
+      largestBlackout: {
+        wh: 0,
+        peakW: 0,
+        start: rangeMin,
+        end: rangeMin,
+      },
+      hasStorage: false,
+      hasHydro: false,
+      financePast,
+      financeProjected: [],
+    };
+  }
+
   private getProjection(now: TickPresentFutureType): ProjectionView {
     const { game } = this.props;
     const years = rangeYears(this.state.range);
@@ -451,6 +563,11 @@ export default class Insights extends React.Component<Props, State> {
     ].join("|");
     if (this.projectionCache?.key === key) {
       return this.projectionCache.projection;
+    }
+    if (isHistoricalRange(this.state.range)) {
+      const projection = this.getHistoricalProjection(now);
+      this.projectionCache = { key, projection };
+      return projection;
     }
 
     const timeline = generateNewTimeline(game, now.cash, now.customers, ticks);
@@ -519,6 +636,7 @@ export default class Insights extends React.Component<Props, State> {
         ? game.monthlyHistory.filter((month) => month.year === game.date.year)
         : [];
     const projection: ProjectionView = {
+      historical: false,
       timeline,
       sampled,
       domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
@@ -535,6 +653,9 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   private available(layer: InsightLayerDefinition, projection: ProjectionView) {
+    if (projection.historical) {
+      return HISTORICAL_LAYER_IDS.has(layer.id);
+    }
     return (
       !layer.availability ||
       (layer.availability === "storage" && projection.hasStorage) ||
@@ -645,7 +766,8 @@ export default class Insights extends React.Component<Props, State> {
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
             (layer) =>
-              layer.group === group && this.available(layer, projection),
+              layer.group === group &&
+              (projection.historical || this.available(layer, projection)),
           );
           return (
             <div className="insightsLayerGroup" key={group}>
@@ -657,7 +779,11 @@ export default class Insights extends React.Component<Props, State> {
                     <Checkbox
                       id={`insightsLayer${layer.id[0].toUpperCase()}${layer.id.slice(1)}`}
                       checked={this.state.layers.includes(layer.id)}
-                      disabled={required.includes(layer.id)}
+                      disabled={
+                        required.includes(layer.id) ||
+                        (projection.historical &&
+                          !HISTORICAL_LAYER_IDS.has(layer.id))
+                      }
                       onChange={() => this.toggleLayer(layer.id)}
                     />
                   }
@@ -688,7 +814,7 @@ export default class Insights extends React.Component<Props, State> {
       selected && facilityLifetime(selected as FacilityOperatingType);
     return (
       <>
-        {selected && lifetime && (
+        {!projection.historical && selected && lifetime && (
           <div className="selectedFacilitySummary">
             <strong>{selected.name}</strong>: {formatWattHours(lifetime.wh)}{" "}
             delivered · {formatMoneyConcise(lifetime.profit)} profit
@@ -726,8 +852,8 @@ export default class Insights extends React.Component<Props, State> {
   ) {
     const { game, selectedFacilityId } = this.props;
     const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
-    const years = rangeYears(this.state.range);
-    const multiyear = years > 1;
+    const multiyear =
+      projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
       getDispatchOrderedFuels(game.facilities) as FuelNameType[],
       projection.sampled,
@@ -776,9 +902,18 @@ export default class Insights extends React.Component<Props, State> {
               />
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
-                  Blackouts forecasted: ~
-                  {formatWattHours(projection.blackoutTotalWh)} · peak shortage{" "}
-                  {formatWatts(projection.largestBlackout.peakW)}
+                  {projection.historical ? (
+                    <>
+                      Energy not served:{" "}
+                      {formatWattHours(projection.blackoutTotalWh)}
+                    </>
+                  ) : (
+                    <>
+                      Blackouts forecasted: ~
+                      {formatWattHours(projection.blackoutTotalWh)} · peak
+                      shortage {formatWatts(projection.largestBlackout.peakW)}
+                    </>
+                  )}
                 </Typography>
               )}
             </>
@@ -970,6 +1105,7 @@ export default class Insights extends React.Component<Props, State> {
       return <span />;
     }
     const projection = this.getProjection(now);
+    const years = playedHistoryYears(game);
     const visible = this.state.layers.filter((id) => {
       const definition = INSIGHT_LAYERS.find((layer) => layer.id === id);
       return !!definition && this.available(definition, projection);
@@ -987,12 +1123,21 @@ export default class Insights extends React.Component<Props, State> {
                 this.setRange(event.target.value as InsightRange)
               }
               className="headerControl"
+              aria-label="Insight range"
             >
               <MenuItem value="current">Current year</MenuItem>
               <MenuItem value="next1">Next year</MenuItem>
               <MenuItem value="next5">Next 5 years</MenuItem>
               <MenuItem value="next10">Next 10 years</MenuItem>
               <MenuItem value="next20">Next 20 years</MenuItem>
+              {!!game.monthlyHistory.length && (
+                <MenuItem value="all">All recorded</MenuItem>
+              )}
+              {years.map((year) => (
+                <MenuItem value={historyRange(year)} key={year}>
+                  {year}
+                </MenuItem>
+              ))}
             </Select>
             <Select
               id="insightsPreset"
@@ -1028,7 +1173,13 @@ export default class Insights extends React.Component<Props, State> {
             </Button>
           </Toolbar>
           {this.renderLayerPanel(projection)}
-          {this.renderLevers(now)}
+          {projection.historical ? (
+            <Typography className="insightsHistoryNotice" color="textSecondary">
+              Monthly records · forecast-only layers are unavailable
+            </Typography>
+          ) : (
+            this.renderLevers(now)
+          )}
           <div className="insightsTracks">
             {visible.map((id, index) =>
               this.renderTrack(id, index, visible, projection),
