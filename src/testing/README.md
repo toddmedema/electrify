@@ -11,8 +11,8 @@ npm run sim -- --all
 ```
   SCENARIO                  MONTHS   OUTCOME              CASH      UNSERVED  INVARIANTS
   ------------------------- -------- -------------------- --------- --------- ----------
-  Carbon Fee                144      survived             $56M      0.3%      ok
-  The Shale Boom            240      survived             $3,099M   0.7%      ok
+  Carbon Fee                144      bankrupt @ month 54  $-1M      0.3%      ok
+  The Shale Boom            240      bankrupt @ month 104 $-1M      0.7%      ok
   Paradise                  144      bankrupt @ month 43  $-3M      0.1%      ok
   ...
   All scenarios hold every invariant.
@@ -25,7 +25,9 @@ npm run sim -- --scenario 103 --strategy keepUp
 ```
 
 which prints a month by month table (customers, demand, supplied, unserved, cash, net worth,
-profit, emissions), totals for the run, the fleet it finished with, and any invariant violations.
+profit, emissions), the number of recorded player actions, totals for the run, the fleet it
+finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
+or fired after three consecutive months below 90% supplied.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
 
 `--year` and `--location` play an authored scenario somewhere or somewhen else, which is the
@@ -57,7 +59,7 @@ code rather than a vibe.
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends
-of the difficulty range, marketing spend, and a run that builds on credit. It also pins down
+of the difficulty range, customer price competition, and a run that builds on credit. It also pins down
 determinism and a few economic identities (revenue really is rate times kilowatt hours, the carbon
 fee really is proportional to emissions).
 

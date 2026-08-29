@@ -6,24 +6,42 @@ import {
   DialogContent,
   DialogTitle,
   Skeleton,
+  Stack,
   Typography,
 } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import numbro from "numbro";
 import { VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
-import { buildShareText, canShare, shareText } from "../../helpers/Share";
+import {
+  buildScoreShareContent,
+  canShare,
+  shareText,
+} from "../../helpers/Share";
+import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
+import InstallAppButton from "./InstallAppButton";
 
 // What each scored category is called on the score screen. The breakdown's keys differ by
 // ownership (see reducers/Game), so this is a lookup rather than a fixed list -- a scenario type
 // with new categories shows up here as soon as it scores them, in the order they were scored.
-const SCORE_LABELS: { [key: string]: string } = {
+export const SCORE_LABELS: { [key: string]: string } = {
   supply: "electricity supplied",
   netWorth: "final net worth",
   customers: "final customers",
   rate: "electric rates",
   emissions: "emissions",
   blackouts: "blackouts",
+};
+
+const SCORE_CONCEPTS: { [key: string]: ConceptNameType | undefined } = {
+  supply: "supply",
+  netWorth: "money",
+  customers: "customers",
+  rate: "money",
+  emissions: "danger",
+  blackouts: "blackout",
 };
 
 export interface StateProps {
@@ -34,6 +52,7 @@ export interface StateProps {
 export interface DispatchProps {
   onClose: () => void;
   onQuit: () => void;
+  onRetry: (victory: VictoryType) => void;
   onLogin: () => void;
   // Reported once the player has actually shared, with how it went out
   onShared: (victory: VictoryType, method: string) => void;
@@ -42,7 +61,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-function formatScore(score: number): string {
+export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }
 
@@ -96,16 +115,28 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   }
 
   const { previousBest, breakdown, endTitle, endMessage } = victory;
+  const failed = victory.outcome === "bankrupt" || victory.outcome === "fired";
   const isPersonalBest =
     previousBest === undefined || victory.score > previousBest;
+  let displayTitle =
+    endTitle ||
+    (victory.outcome === "bankrupt"
+      ? "Bankrupt!"
+      : victory.outcome === "fired"
+        ? "Fired!"
+        : `You've retired!`);
+  if (!failed && endTitle && /^mission complete!?$/i.test(endTitle.trim())) {
+    displayTitle = victory.scenarioName;
+  }
 
   const onShare = () => {
-    const text = buildShareText({
+    const content = buildScoreShareContent({
+      scenarioId: victory.scenarioId,
       score: victory.score,
       scenarioName: victory.scenarioName,
       difficulty: victory.difficulty,
     });
-    shareText(text).then((method) => {
+    shareText(content).then((method) => {
       if (method === "cancelled") {
         return; // The player changed their mind, which is not a failure to report
       }
@@ -121,28 +152,70 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
     <Dialog
       open={true}
       // The run is over either way; dismissing by backdrop or Esc is the same as "Keep playing"
-      onClose={onClose}
+      // only after a completed term. A failed run is terminal and would fail and submit again on
+      // the next month if it could resume.
+      onClose={failed ? undefined : onClose}
       aria-labelledby="victory-title"
+      fullWidth
+      maxWidth="sm"
+      slotProps={{
+        paper: {
+          sx: {
+            overflow: "hidden",
+            backgroundImage: failed
+              ? "radial-gradient(circle at 50% -20%, rgba(211, 47, 47, 0.2), transparent 45%)"
+              : "radial-gradient(circle at 50% -20%, rgba(255, 193, 7, 0.28), transparent 45%)",
+          },
+        },
+      }}
     >
-      <DialogTitle id="victory-title">
-        {endTitle || `You've retired!`}
+      <DialogTitle id="victory-title" sx={{ pb: 1.5 }}>
+        <Stack spacing={0.5} sx={{ alignItems: "center", textAlign: "center" }}>
+          {failed ? (
+            <ReportProblemOutlinedIcon
+              color="error"
+              sx={{ fontSize: 52 }}
+              aria-hidden
+            />
+          ) : (
+            <EmojiEventsIcon
+              color="warning"
+              sx={{ fontSize: 52 }}
+              aria-hidden
+            />
+          )}
+          <Typography
+            variant="overline"
+            color={failed ? "error.main" : "warning.main"}
+            sx={{ fontWeight: 800, letterSpacing: "0.14em" }}
+          >
+            {failed ? "Run ended" : "Mission complete"}
+          </Typography>
+          <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>
+            {displayTitle}
+          </Typography>
+        </Stack>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ px: { xs: 2, sm: 3 } }}>
         {endMessage && (
-          <Typography variant="body1" gutterBottom>
+          <Typography variant="body1" gutterBottom sx={{ textAlign: "center" }}>
             {endMessage}
           </Typography>
         )}
-        <Typography variant="body1">
-          Your final score is <strong>{formatScore(victory.score)}</strong>:
+        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+          Final score: <strong>{formatScore(victory.score)}</strong>
         </Typography>
         <div style={{ margin: "8px 0" }}>
-          {Object.keys(breakdown).map((category: string) => (
-            <div key={category}>
-              {breakdown[category]} pts from{" "}
-              {SCORE_LABELS[category] || category}
-            </div>
-          ))}
+          {Object.keys(breakdown).map((category: string) => {
+            const concept = SCORE_CONCEPTS[category];
+            return (
+              <div key={category} className="scoreBreakdownRow">
+                {concept && <ConceptIcon concept={concept} fontSize="small" />}
+                {breakdown[category]} pts from{" "}
+                {SCORE_LABELS[category] || category}
+              </div>
+            );
+          })}
         </div>
         {ranked && loggedIn && (
           <Typography variant="body1" style={{ marginTop: 12 }}>
@@ -182,17 +255,35 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Typography>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions
+        sx={{
+          px: { xs: 2, sm: 3 },
+          pb: 2,
+          flexWrap: "wrap",
+          gap: 0.5,
+          "& > :not(:first-of-type)": { ml: 0 },
+        }}
+      >
         {canShare() && (
           <Button color="primary" onClick={onShare} startIcon={<ShareIcon />}>
-            Share
+            Share score
           </Button>
         )}
-        <Button color="primary" onClick={onClose}>
-          Keep playing
+        <InstallAppButton label="Install for later" afterMilestone />
+        {!failed && (
+          <Button color="primary" onClick={onClose}>
+            Review final grid
+          </Button>
+        )}
+        <Button color="primary" onClick={onQuit}>
+          Choose scenario
         </Button>
-        <Button color="primary" variant="contained" onClick={onQuit}>
-          Return to scenarios
+        <Button
+          color="primary"
+          variant="contained"
+          onClick={() => props.onRetry(victory)}
+        >
+          Try again
         </Button>
       </DialogActions>
     </Dialog>

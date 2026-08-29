@@ -15,6 +15,7 @@ import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
@@ -44,6 +45,7 @@ interface State {
   startingYear: number;
   multiyear: boolean;
   units: UnitSystemType;
+  offshore: boolean;
 }
 
 // A scale each, labelled on its own side and coloured to match its line: degrees and km/h only
@@ -52,6 +54,32 @@ interface State {
 const WIND_SCALE = "wind";
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  const series: uPlot.Series[] = [
+    {},
+    {
+      stroke: chartPalette().temperature,
+      width: 1,
+      points: { show: false },
+      paths: SPLINE,
+    },
+    {
+      scale: WIND_SCALE,
+      stroke: chartPalette().wind,
+      width: 1,
+      points: { show: false },
+      paths: SPLINE,
+    },
+  ];
+  if (getState().offshore) {
+    series.push({
+      scale: WIND_SCALE,
+      stroke: chartPalette().offshoreWind,
+      dash: [6 * scale, 4 * scale],
+      width: 1,
+      points: { show: false },
+      paths: SPLINE,
+    });
+  }
   return {
     width: 0, // set by UPlotChart
     height: 0,
@@ -101,28 +129,18 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
     ],
-    series: [
-      {},
-      {
-        stroke: chartPalette().temperature,
-        width: 1,
-        points: { show: false },
-        paths: SPLINE,
-      },
-      {
-        scale: WIND_SCALE,
-        stroke: chartPalette().wind,
-        width: 1,
-        points: { show: false },
-        paths: SPLINE,
-      },
-    ],
+    series,
   };
 }
 
 function tooltip(idx: number, state: State): string {
   const d = state.data[idx];
-  return `Temperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}`;
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  const offshore =
+    state.offshore && d.windOffshoreKph !== undefined
+      ? `\nWind, offshore: ${formatSpeed(d.windOffshoreKph, state.units)}`
+      : "";
+  return `${header}\nTemperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}${offshore}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders.
@@ -150,22 +168,36 @@ export default class ChartForecastWeather extends React.PureComponent<
     const minutes = new Array<number>(data.length);
     const temperature = new Array<number>(data.length);
     const wind = new Array<number>(data.length);
+    const offshore = data.some((t) => t.windOffshoreKph !== undefined);
+    const offshoreWind = offshore ? new Array<number>(data.length) : undefined;
     data.forEach((t: TickPresentFutureType, i: number) => {
       minutes[i] = t.minute;
       temperature[i] = toDisplayTemperature(t.temperatureC, units);
       wind[i] = toDisplaySpeed(t.windKph, units);
+      if (offshoreWind) {
+        offshoreWind[i] = toDisplaySpeed(t.windOffshoreKph || 0, units);
+      }
     });
+
+    const plotData: uPlot.AlignedData = offshoreWind
+      ? [minutes, temperature, wind, offshoreWind]
+      : [minutes, temperature, wind];
 
     return (
       <UPlotChart<State>
         id="chartForecastWeather"
         ariaLabel="Chart of forecasted temperature and wind"
         height={height}
-        state={{ data, domain, startingYear, multiyear, units }}
-        data={[minutes, temperature, wind]}
+        state={{ data, domain, startingYear, multiyear, units, offshore }}
+        data={plotData}
+        seriesLabels={
+          offshore
+            ? ["Temperature", "Wind speed", "Offshore wind speed"]
+            : ["Temperature", "Wind speed"]
+        }
         buildOptions={buildOptions}
         // The axis labels are baked into the options, so a change of system rebuilds the plot
-        structureKey={units}
+        structureKey={`${units}-${offshore}`}
         syncKey={syncKey}
         tooltip={tooltip}
       />

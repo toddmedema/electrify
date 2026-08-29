@@ -2,6 +2,7 @@ import * as React from "react";
 import KeyboardShortcuts, {
   SHORTCUTS_SEARCH_TEXT,
 } from "../components/base/KeyboardShortcuts";
+import ConceptLegend from "../components/base/ConceptLegend";
 import { useUnits } from "../components/base/UnitsContext";
 import {
   formatLargeMassApprox,
@@ -50,9 +51,10 @@ export const MANUAL_ENTRY = {
   BTU: "BTU and MMBTU",
   CAPACITY_FACTOR: "Capacity Factor",
   CARBON_FEE: "Carbon Fee",
-  CUSTOMERS: "Customers, Demand & Marketing",
+  CUSTOMERS: "Customers, Demand & Pricing",
   EMISSIONS: "Emissions and CO2e",
-  FORECASTS: "Forecasts",
+  FORECASTS: "Insights & data layers",
+  HYDROPOWER: "Hydropower & Reservoirs",
   INTEREST_RATES: "Interest Rates & Inflation",
   KEYBOARD_SHORTCUTS: "Keyboard Shortcuts",
   PRIORITIZING_GENERATORS: "Prioritizing Generators",
@@ -60,6 +62,7 @@ export const MANUAL_ENTRY = {
   RATES: "Rates",
   ROUND_TRIP_EFFICIENCY: "Round-trip Efficiency",
   SCORE: "Score",
+  SYMBOLS: "Symbol Guide",
   TOTAL_COST_OF_ENERGY: "Total Cost of Energy",
 } as const;
 
@@ -154,21 +157,34 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           pause or sell anything that's costing more than it earns.
         </p>
         <p>
-          <strong>Finances</strong> shows where the money went, and is where you
-          set marketing spend (which buys customers) and, in public-ownership
-          scenarios, the rate you charge.
+          <strong>Insights</strong> combines the company's finances and its
+          operational forecast. Choose data layers such as profit, supply,
+          weather or fuel prices, then use the shared time range to read them
+          together. This is also where you set the electricity rate.
         </p>
         <p>
-          <strong>Forecasts</strong> projects all of that forward so you can see
-          a shortfall coming while there's still time to build for it - plants
-          take months or years to finish.
-        </p>
-        <p>
-          A good first move is to open Forecasts, find the first blackout, and
-          work out whether it needs something cheap that runs constantly or
+          A good first move is to open Insights and scan the Overview: first for
+          blackouts or falling cash, then for the profit, customer and emissions
+          trends behind them. If supply falls short, choose Reliability to work
+          out whether the gap needs something cheap that runs constantly or
           something expensive that starts quickly. The rest of this manual
           explains the terms you'll meet along the way.
         </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.SYMBOLS,
+    group: "Gameplay",
+    keywords:
+      "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather danger goal",
+    entry: (
+      <div>
+        <p>
+          These symbols mean the same thing in missions, controls, events and
+          results. Learn one once, then follow it everywhere.
+        </p>
+        <ConceptLegend />
       </div>
     ),
   },
@@ -291,6 +307,44 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     ),
   },
   {
+    title: MANUAL_ENTRY.HYDROPOWER,
+    group: "Physics & Units",
+    keywords:
+      "hydro rain precipitation watershed snow snowpack melt runoff dam reservoir spill drought deadpool minimum power pool water rights irrigation municipal must run",
+    entry: (
+      <div>
+        <p>
+          Conventional hydro is dispatchable, but it is not an unlimited
+          generator. Rain and melting snow create runoff in the upstream
+          watershed, runoff fills the plant's reservoir, and every MWh the
+          turbines generate draws that reservoir down. Water above the dam's
+          capacity spills and cannot be recovered; a drought can empty it.
+        </p>
+        <p>
+          The <strong>Water</strong> forecast appears once you own conventional
+          hydro. It plots monthly precipitation, snow-water equivalent and the
+          fleet's reservoir level together. Cold months can store precipitation
+          as snow instead of immediate runoff, then release it during a warm
+          melt. Warming from your fleet's cumulative emissions shifts that
+          timing and reduces the standing snowpack.
+        </p>
+        <p>
+          Reservoirs also serve farms, cities, ecosystems and cultural uses.
+          Those <strong>water rights</strong> create a seasonal minimum release.
+          When the pool is high enough, that water becomes must-run generation
+          even if demand is low. Below the dead-pool floor the plant cannot
+          produce power, but required water can still bypass its turbines.
+        </p>
+        <p>
+          Pumped Hydro is different: Electrify models it as closed-loop storage,
+          so it only returns electricity previously used to pump water uphill.
+          It does not receive rain or river inflow, and evaporation slowly
+          reduces its stored energy.
+        </p>
+      </div>
+    ),
+  },
+  {
     // Credit to https://www.e-education.psu.edu/ebf200/node/151
     title: MANUAL_ENTRY.CUSTOMERS,
     group: "Gameplay",
@@ -313,11 +367,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           sourceUrl="https://www.eia.gov/todayinenergy/detail.php?id=10211"
         />
         <p>
-          Like in real life, you as a company can spend money on marketing to
-          acquire more customers (you exist as one of many electricity
-          generation companies customers can select from). Your customer base
-          also naturally grows or shrinks depending on if you provide them good
-          service (i.e. few blackouts).
+          In investor-owned scenarios, you compete with other electricity
+          companies for a finite market. Charge less than the market rate and
+          customers gradually switch to you; charge more and they gradually
+          leave. They react to several months of bills rather than a single rate
+          change. Your customer base also naturally grows or shrinks depending
+          on whether you provide good service, including avoiding blackouts.
         </p>
         <p>
           Load changes continuously as people turn stuff on and off, as
@@ -374,10 +429,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          The Forecasts tab projects your company forward, so you can spot
-          problems before they cost you customers. Use the dropdown at the top
-          right to look ahead 1, 5, 10 or 20 years - the further out you look,
-          the coarser (and less certain) the projection.
+          Insights projects your company forward, so you can spot problems
+          before they cost you customers. Pick a preset for a common question,
+          or use Layers to build and reorder your own view. Every chart uses the
+          same range and cursor, so a weather change, shortage and profit dip
+          can be read at the same moment.
         </p>
         <p>
           <strong>Supply &amp; Demand</strong> plots your projected output
@@ -407,15 +463,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           watch this chart before committing to a decades-long build.
         </p>
         <p>
-          <strong>Weather</strong> projects temperature and sunlight for your
+          <strong>Weather</strong> projects temperature and wind for your
           region. It drives demand (heating and air conditioning) as well as the
-          output of your solar and wind generators.
+          output of your solar and wind generators. Once you own hydro, a
+          separate <strong>Water</strong> chart shows watershed precipitation,
+          snowpack and reservoir level.
         </p>
         <p>
-          Forecasts assume you make no further changes, so treat them as "what
-          happens if I do nothing" rather than a promise. Pausing a generator or
-          reordering your stack updates them immediately, which makes them a
-          cheap way to test a decision before you pay for it.
+          Insight projections assume you make no further changes, so treat them
+          as "what happens if I do nothing" rather than a promise. Pausing a
+          generator or reordering your stack updates them immediately, which
+          makes them a cheap way to test a decision before you pay for it.
         </p>
       </div>
     ),
@@ -553,17 +611,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           per kWh depending on the state.
         </p>
         <p>
-          In <strong>investor-owned</strong> scenarios the rate is fixed by the
-          regulator and you can't change it, so the only lever you have on
-          revenue is supplying more energy to more customers.
+          In <strong>investor-owned</strong> scenarios you compete for
+          customers. The market rate begins at the scenario's advertised rate
+          and rises with inflation. Charge below it to gain market share or
+          above it to earn more from each customer while accepting that some
+          will leave. Switching takes several months, and the available market
+          is finite.
         </p>
         <p>
           In <strong>public-owned</strong> scenarios you set the rate yourself
-          on the Finances tab, and it's part of how you're scored: your lifetime
-          average rate is compared against the scenario's target, and every cent
-          per kWh above or below moves your score. Charging more makes the books
-          easy and the score bad, so the game is to keep the rate down while
-          still funding the plants you need.
+          in Insights, and it's part of how you're scored: your lifetime average
+          rate is compared against the scenario's target, and every cent per kWh
+          above or below moves your score. Charging more makes the books easy
+          and the score bad, so the game is to keep the rate down while still
+          funding the plants you need.
         </p>
       </div>
     ),

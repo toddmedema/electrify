@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Avatar,
+  Box,
   Button,
   Card,
   CardHeader,
@@ -46,6 +47,7 @@ import {
   DateType,
   GameType,
   GeneratorShoppingType,
+  LocationType,
   SpeedType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
@@ -53,12 +55,18 @@ import { MANUAL_ENTRY } from "../../data/Manual";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
+import ConceptIcon from "../base/ConceptIcon";
+import {
+  getBuildAvailability,
+  ViableLocationsRow,
+} from "../base/BuildAvailability";
 
 interface GeneratorBuildItemProps {
   cash: number;
   date: DateType;
   interestRate: number;
   generator: GeneratorShoppingType;
+  location: LocationType;
   seed: number;
   secondaryMetric?: string;
   onBuild: (financed: boolean) => void;
@@ -68,7 +76,11 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
   const fuel = FUELS[generator.fuel] || {};
-  const fuelPrices = getFuelPricesPerMBTU(props.date, props.seed);
+  const fuelPrices = getFuelPricesPerMBTU(
+    props.date,
+    props.seed,
+    props.location,
+  );
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
@@ -78,22 +90,19 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
     props.interestRate,
     LOAN_MONTHS,
   );
-  const buildable = props.generator.peakW <= props.generator.maxPeakW;
+  const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
+  const { buildable, secondaryText } = getBuildAvailability(
+    generator.description,
+    sizeBuildable,
+    formatWatts(generator.maxPeakW),
+    generator.viableLocationsRemaining,
+  );
+  const financingGap = Math.max(0, downpayment - cash);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
-  const secondaryText = buildable ? (
-    generator.description
-  ) : (
-    <div>
-      Too large for current tech.
-      <br />
-      Max size: <strong>{formatWatts(props.generator.maxPeakW)}</strong>
-    </div>
-  );
-
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -110,7 +119,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
   // </TableRow>
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar
@@ -119,40 +128,78 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
           />
         }
         action={
-          <span>
-            <Button
-              className="buy-button"
-              size="small"
-              variant="contained"
-              color="primary"
-              onClick={toggleOpen}
-              disabled={downpayment > cash || !buildable}
-            >
-              {formatMoneyConcise(generator.buildCost)}
-            </Button>
-            <Typography
-              className="action-seconday-text"
-              variant="body2"
-              color="textSecondary"
-            >
-              {Math.round(generator.yearsToBuild * 12)}mo to build
-              <br />
-              {fuelPrices[generator.fuel] ? "~" : ""}
-              {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
-              <br />
-              {kgCO2ePerMWh > 0
-                ? `${formatMass(kgCO2ePerMWh, units)} CO2e/MWh`
-                : "No CO2e"}
-            </Typography>
-          </span>
+          <Button
+            className="buy-button"
+            size="small"
+            variant="contained"
+            color="primary"
+            onClick={toggleOpen}
+            disabled={financingGap > 0 || !buildable}
+            startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+            aria-label={`Review purchase of ${generator.name}`}
+          >
+            Review
+          </Button>
         }
         title={generator.name}
         subheader={secondaryText}
       />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
+          gap: 1,
+          px: 2,
+          pb: 1.5,
+        }}
+      >
+        <GeneratorMetric
+          label="Build cost"
+          value={formatMoneyConcise(generator.buildCost)}
+        />
+        <GeneratorMetric
+          label="Build time"
+          value={`${Math.round(generator.yearsToBuild * 12)} mo`}
+        />
+        <GeneratorMetric
+          label="Operating cost"
+          value={`${formatMoneyConcise(generator.annualOperatingCost)}/yr`}
+        />
+        <GeneratorMetric
+          label="Energy cost"
+          value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+        />
+        <GeneratorMetric
+          label="Emissions"
+          value={
+            kgCO2ePerMWh > 0 ? `${formatMass(kgCO2ePerMWh, units)}/MWh` : "None"
+          }
+        />
+      </Box>
+      {buildable && financingGap > 0 && (
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          sx={{ px: 2, pb: 1.5 }}
+        >
+          Need {formatMoneyConcise(financingGap)} more cash for the{" "}
+          {formatMoneyConcise(downpayment)} loan down payment.
+        </Typography>
       )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+      <Button
+        color="primary"
+        className="expand-details"
+        size="small"
+        aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
+        aria-expanded={expanded}
+        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleExpand();
+        }}
+      >
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
@@ -240,6 +287,9 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   {generator.lifespanYears} years
                 </TableCell>
               </TableRow>
+              <ViableLocationsRow
+                remaining={generator.viableLocationsRemaining}
+              />
               {props.secondaryMetric !== "yearsToBuild" && (
                 <TableRow>
                   <TableCell>Time to build</TableCell>
@@ -260,7 +310,9 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
-                  {formatMass(kgCO2ePerMWh, units)} CO2e/MWh
+                  {kgCO2ePerMWh > 0
+                    ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+                    : "None"}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -342,6 +394,7 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               props.onBuild(false);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
@@ -352,12 +405,38 @@ function GeneratorBuildItem(props: GeneratorBuildItemProps): React.JSX.Element {
               props.onBuild(true);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan
           </Button>
         </DialogActions>
       </Dialog>
     </Card>
+  );
+}
+
+function GeneratorMetric(props: {
+  label: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <Box
+      sx={{
+        minWidth: 0,
+        p: 1,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1,
+        bgcolor: "action.hover",
+      }}
+    >
+      <Typography variant="caption" color="textSecondary" component="div">
+        {props.label}
+      </Typography>
+      <Typography variant="body2" component="div" sx={{ fontWeight: 600 }}>
+        {props.value}
+      </Typography>
+    </Box>
   );
 }
 
@@ -424,12 +503,16 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     TICKS_PER_YEAR * 3, // 3 years - TODO turn this into a memoized selector of month/year -> long term forecasted wind speeds and irradiances
   );
   const windSpeeds = forecastedTimeline.map((w) => w.windKph);
+  const offshoreWindSpeeds = forecastedTimeline.flatMap((w) =>
+    w.windOffshoreKph === undefined ? [] : [w.windOffshoreKph],
+  );
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
   const generators = GENERATORS(
     game,
     getW(sliderTick),
     windSpeeds,
     solarIrradiances,
+    offshoreWindSpeeds,
   ).sort((a, b) => (a[sort] > b[sort] ? 1 : -1));
 
   const onSlider = (_event: Event, newValue: number | number[]) => {
@@ -457,13 +540,15 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       <Toolbar className="bottomBorder">
         <Typography variant="h6">
           {formatMoneyStable(cash)}{" "}
-          <span className="weak">Build Generator</span>
+          <span className="weak gameStatusValue">
+            <ConceptIcon concept="generator" fontSize="small" />
+            Build Generator
+          </span>
         </Typography>
         {game.speed !== "PAUSED" && (
           <IconButton
             onClick={() => props.onSpeedChange("PAUSED")}
             aria-label="pause"
-            edge="end"
             color="primary"
             size="large"
           >
@@ -472,7 +557,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         )}
         <IconButton
           id="close-button"
-          edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
@@ -510,7 +594,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         />
         <IconButton
           id="sort"
-          edge="end"
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"
@@ -543,6 +626,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           <GeneratorBuildItem
             date={game.date}
             seed={game.seed}
+            location={game.location}
             interestRate={game.interestRate}
             generator={g}
             key={i}

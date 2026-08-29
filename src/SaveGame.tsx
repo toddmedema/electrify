@@ -25,9 +25,8 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
-// 2: facilities carry the rate their loan was signed at, and the game carries the rate a new one
-// would cost. A version 1 save has neither, and a loan with no rate cannot be repaid.
-export const SAVE_VERSION = 2;
+// Version 6 is the launch schema; earlier values identify unsupported pre-release saves.
+export const SAVE_VERSION = 6;
 
 export interface SaveGameType {
   version: number;
@@ -72,6 +71,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
+    typeof game.customerMarketSize !== "number" ||
+    !Number.isFinite(game.customerMarketSize) ||
+    game.customerMarketSize <= 0 ||
+    typeof game.customerRate !== "number" ||
+    !Number.isFinite(game.customerRate) ||
+    game.customerRate < 0 ||
     // Checked in full rather than trusted, the same way decodeReplay checks a replay's: the
     // location's id becomes the path of the weather file the loading screen fetches, and its
     // lat/long and time zone drive the sun model. A save is hand-editable too
@@ -86,10 +91,38 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  if (!Array.isArray(game.facilities)) {
+    return null;
+  }
   if (
-    !Array.isArray(game.facilities) ||
+    game.facilities.some((facility) => {
+      if (typeof facility !== "object" || facility === null) {
+        return true;
+      }
+      const current = facility as Record<string, unknown>;
+      return [
+        current.lifespanYears,
+        current.lifetimeWh,
+        current.lifetimePotentialWh,
+        current.lifetimeRevenue,
+        current.lifetimeExpenses,
+      ].some((value) => typeof value !== "number" || !Number.isFinite(value));
+    }) ||
     !Array.isArray(game.timeline) ||
-    !Array.isArray(game.monthlyHistory)
+    !Array.isArray(game.monthlyHistory) ||
+    !Array.isArray(game.eventLog) ||
+    !Array.isArray(game.reportedEventKeys) ||
+    typeof game.eventLogReadThroughId !== "number"
+  ) {
+    return null;
+  }
+  const worldEvents = game.worldEvents as
+    Partial<GameType["worldEvents"]> | undefined;
+  if (
+    typeof worldEvents !== "object" ||
+    worldEvents === null ||
+    !Array.isArray(worldEvents.active) ||
+    !Array.isArray(worldEvents.checkedKeys)
   ) {
     return null;
   }

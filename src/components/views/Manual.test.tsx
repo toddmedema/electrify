@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Manual, { clearManualMemory } from "./Manual";
 import { MANUAL_ENTRY } from "../../data/Manual";
+import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
 
 function renderManual(focusEntry?: string) {
   return render(<Manual onBack={() => undefined} focusEntry={focusEntry} />);
@@ -73,6 +74,17 @@ describe("Manual", () => {
       await search(term);
       expect(listedTitles().length).toBeGreaterThan(0);
     }
+  });
+
+  it("includes every shared game symbol in the symbol guide", async () => {
+    renderManual();
+    await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
+    const legend = screen.getByTestId("concept-legend");
+    CONCEPT_NAMES.forEach((concept) => {
+      expect(
+        within(legend).getByLabelText(CONCEPT_LABELS[concept]),
+      ).toHaveAttribute("data-concept", concept);
+    });
   });
 
   it("expands matched entries and highlights the match", async () => {

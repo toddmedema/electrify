@@ -18,12 +18,16 @@ const FLAGS = {
   "--months": "SIM_MONTHS",
   "--seed": "SIM_SEED",
   "--strategy": "SIM_STRATEGY",
-  "--marketing": "SIM_MARKETING",
   "--rate": "SIM_RATE",
+  "--build": "SIM_BUILD",
+  "--build-mw": "SIM_BUILD_MW",
+  "--sell-id": "SIM_SELL_ID",
+  "--sell-month": "SIM_SELL_MONTH",
 };
 const BOOLEAN_FLAGS = {
   "--all": "SIM_ALL",
   "--full": "SIM_FULL",
+  "--finance": "SIM_FINANCE",
 };
 
 const USAGE = `
@@ -42,8 +46,12 @@ Runs the game's simulation headlessly and reports what happened.
   --months <n>           Override the scenario's own duration
   --seed <n>             Pin the run's randomness (default 12345)
   --strategy <name>      none (default) or keepUp, which buys generators when short on supply
-  --marketing <dollars>  Monthly marketing spend (default 0)
   --rate <dollars>       $/kWh charged to customers (default: whatever a real game starts at)
+  --build <name>         Build one generator immediately (a real recorded player action)
+  --build-mw <n>         Size for --build in MW (default 300)
+  --finance              Finance --build instead of paying cash
+  --sell-id <n>          Sell one starting facility by facility id
+  --sell-month <n>       Wait until this month to apply --sell-id (default 0)
   --all                  Sweep every scenario instead of reporting on one
   --full                 Print every month rather than a sample
   --list                 List the scenarios and exit
@@ -106,14 +114,11 @@ function requireScenarios() {
 const result = spawnSync(
   process.execPath,
   [
-    path.resolve(
-      __dirname,
-      "..",
-      "node_modules",
-      "react-scripts",
-      "bin",
-      "react-scripts.js",
-    ),
+    // Let Node walk parent module directories. A git worktree may have only CRA's local cache in
+    // its own node_modules while sharing the repository's installed dependencies one level up.
+    require.resolve("react-scripts/bin/react-scripts.js", {
+      paths: [path.resolve(__dirname, "..")],
+    }),
     "test",
     "--watchAll=false",
     "--testMatch",

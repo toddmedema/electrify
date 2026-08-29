@@ -1,14 +1,8 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import AddCircleIcon from "@mui/icons-material/AddCircle";
-import BuildIcon from "@mui/icons-material/Build";
-import FlashOffIcon from "@mui/icons-material/FlashOff";
-import FlashOnIcon from "@mui/icons-material/FlashOn";
-import LocalGasStationIcon from "@mui/icons-material/LocalGasStation";
-import RemoveCircleIcon from "@mui/icons-material/RemoveCircle";
 import GameCard from "../base/GameCard";
 import { GameEventKindType, GameEventType } from "../../Types";
+import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -19,24 +13,36 @@ import { GameEventKindType, GameEventType } from "../../Types";
  * which makes a simulation feel arbitrary rather than causal. This is the run's own record of it.
  */
 
-const KIND_ICONS: { [k in GameEventKindType]: React.JSX.Element } = {
-  BLACKOUT: <FlashOffIcon fontSize="small" />,
-  BLACKOUT_OVER: <FlashOnIcon fontSize="small" />,
-  CONSTRUCTION: <BuildIcon fontSize="small" />,
-  BUILD: <AddCircleIcon fontSize="small" />,
-  SELL: <RemoveCircleIcon fontSize="small" />,
-  LOAN: <AccountBalanceIcon fontSize="small" />,
-  FUEL_PRICE: <LocalGasStationIcon fontSize="small" />,
+const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
+  BLACKOUT: "blackout",
+  BLACKOUT_OVER: "supply",
+  CONSTRUCTION: "construction",
+  BUILD: "build",
+  SELL: "money",
+  LOAN: "finances",
+  FUEL_PRICE: "fuel",
+  FUEL_CROSSOVER: "fuel",
 };
 
 export interface StateProps {
   events: GameEventType[];
 }
 
-export interface Props extends StateProps {}
+export interface DispatchProps {
+  onOpen: () => void;
+  onSelect: (event: GameEventType) => void;
+}
+
+export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
-  const { events } = props;
+  const { events, onOpen, onSelect } = props;
+  // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
+  // so the expression-bodied form returned an object here; React later tried to call that object
+  // while unmounting this phone-only pane and crashed the app to a blank screen.
+  React.useEffect(() => {
+    onOpen();
+  }, [onOpen]);
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
@@ -52,9 +58,27 @@ export default function EventLog(props: Props): React.JSX.Element {
         )}
         <ul className="eventLogList">
           {events.map((event: GameEventType) => (
-            <li className={`eventLogItem kind-${event.kind}`} key={event.id}>
-              <span className="eventLogIcon" aria-hidden="true">
-                {KIND_ICONS[event.kind]}
+            <li
+              className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+              key={event.id}
+              onClick={() => onSelect(event)}
+              onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                if (
+                  event.actionTarget &&
+                  (e.key === "Enter" || e.key === " ")
+                ) {
+                  e.preventDefault();
+                  onSelect(event);
+                }
+              }}
+              role={event.actionTarget ? "button" : undefined}
+              tabIndex={event.actionTarget ? 0 : undefined}
+            >
+              <span className="eventLogIcon">
+                <ConceptIcon
+                  concept={KIND_CONCEPTS[event.kind]}
+                  fontSize="small"
+                />
               </span>
               <Typography variant="body2" component="span">
                 {event.message}

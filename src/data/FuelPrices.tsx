@@ -1,6 +1,7 @@
-import { DateType, FuelPricesType } from "../Types";
+import { DateType, FuelPricesType, LocationType } from "../Types";
 import { fetchCsv, parseCsv } from "../helpers/Csv";
 import { normalAt, RANDOM_STREAM } from "../helpers/Math";
+import { regionalizeFuelPrices } from "./LocationProfiles";
 
 // GOOGLE SHEET: https://docs.google.com/spreadsheets/d/1IFc_5NOuU-y0pJGml1IBd2HlKV8unhgIpnhZQmsMCs4/edit#gid=0
 // Sources: (all prices real / in that year's $'s, per million BTU)
@@ -27,8 +28,62 @@ const EARLIEST_DATA_YEAR = 1975;
 export const LATEST_DATA_YEAR = 2019;
 
 // Fixed so that each fuel always draws from the same slot of the fuel stream, whatever order
-// the CSV's columns happen to arrive in
-const FUEL_KEYS = ["Natural Gas", "Coal", "Uranium", "Oil"];
+// the CSV's columns happen to arrive in. New fuels belong at the end so adding one cannot shift
+// the established simulations for every fuel before it.
+const FUEL_KEYS = ["Natural Gas", "Coal", "Uranium", "Oil", "Biomass"];
+
+// Annual U.S. wood-and-waste prices for electric power, repeated across the twelve months because
+// EIA publishes this series annually. Kept beside the older four-fuel CSV until that sheet grows a
+// biomass column; collectFuelPriceRow prefers such a column if one is present.
+// Series WWEID, state US, dollars per million Btu:
+// https://www.eia.gov/opendata/browser/seds
+const BIOMASS_PRICES_PER_MBTU: Record<number, number> = {
+  1975: 0.92,
+  1976: 0.98,
+  1977: 1.04,
+  1978: 1.12,
+  1979: 1.56,
+  1980: 1.74,
+  1981: 1.24,
+  1982: 1.28,
+  1983: 1.12,
+  1984: 1.28,
+  1985: 0.79,
+  1986: 0.32,
+  1987: 0.95,
+  1988: 0.87,
+  1989: 0.53,
+  1990: 0.34,
+  1991: 0.41,
+  1992: 0.42,
+  1993: 0.52,
+  1994: 1.09,
+  1995: 1.13,
+  1996: 0.75,
+  1997: 0.53,
+  1998: 0.66,
+  1999: 0.54,
+  2000: 0.68,
+  2001: 1.3,
+  2002: 1.66,
+  2003: 1.69,
+  2004: 1.61,
+  2005: 2.31,
+  2006: 2.56,
+  2007: 3.22,
+  2008: 2.53,
+  2009: 2.4,
+  2010: 2.63,
+  2011: 2.66,
+  2012: 2.31,
+  2013: 2.26,
+  2014: 2.72,
+  2015: 2.59,
+  2016: 2.52,
+  2017: 2.37,
+  2018: 2.15,
+  2019: 2.28,
+};
 
 // How fast the trend a projected price is tied to climbs, in that year's dollars. The recorded
 // series run between 1.8%/yr (natural gas) and 3.6%/yr (oil) across 1975-2019, so this sits just
@@ -72,6 +127,7 @@ interface FuelTrendType extends DepartureType {
 type RawFuelPricesType = {
   month: string;
   year: string;
+  biomass?: string;
   naturalgas: string;
   coal: string;
   uranium: string;
@@ -263,6 +319,11 @@ function collectFuelPriceRow(data: RawFuelPricesType) {
   // Frozen because getFuelPricesPerMBTU hands the cached object straight to its callers rather
   // than copying it per tick, and a caller that wrote to one would be rewriting the record
   fuelPrices[+data.year][+data.month] = Object.freeze({
+    Biomass:
+      data.biomass !== undefined && data.biomass !== ""
+        ? +data.biomass
+        : BIOMASS_PRICES_PER_MBTU[+data.year] ||
+          BIOMASS_PRICES_PER_MBTU[LATEST_DATA_YEAR],
     "Natural Gas": +data.naturalgas,
     Coal: +data.coal,
     Uranium: +data.uranium,
@@ -361,6 +422,7 @@ function projectYear(
 export function getFuelPricesPerMBTU(
   date: DateType,
   seed: number,
+  location?: LocationType,
 ): FuelPricesType {
   if (fuelPrices[date.year] === undefined) {
     // Prices only run from EARLIEST_DATA_YEAR, so anything before that means nothing was
@@ -382,5 +444,8 @@ export function getFuelPricesPerMBTU(
       projectYear(seed, year, fuelPrices[year - 1][12]);
     }
   }
-  return fuelPrices[date.year][date.monthNumber];
+  return regionalizeFuelPrices(
+    fuelPrices[date.year][date.monthNumber],
+    location,
+  );
 }

@@ -1,12 +1,9 @@
-import {
-  FUELS,
-  GENERATOR_SELL_MULTIPLIER,
-  HOURS_PER_YEAR_REAL,
-} from "../Constants";
+import { DAYS_PER_YEAR, FUELS, HOURS_PER_YEAR_REAL } from "../Constants";
 import {
   DateType,
   FacilityOperatingType,
   GeneratorShoppingType,
+  LocationType,
   MonthlyHistoryType,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
@@ -143,23 +140,48 @@ export function LCWH(
   date: DateType,
   feePerKgCO2e: number,
   seed: number,
+  location?: LocationType,
 ) {
   const fuel = FUELS[g.fuel] || {};
   const fuelCostPerWh =
-    ((getFuelPricesPerMBTU(date, seed)[g.fuel] || 0) * g.btuPerWh) / 1000000;
+    ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
+    1000000;
   const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
   // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money
   // formatters render that as a dash.
+  const productiveYears = degradedLifetimeYears(
+    g.lifespanYears,
+    g.annualOutputDegradation || 0,
+  );
   const totalWh =
-    g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
+    g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh =
     (g.buildCost +
       g.annualOperatingCost * g.lifespanYears +
       (fuelCostPerWh + carbonCostPerWh) * totalWh) /
     totalWh;
   return costPerWh;
+}
+
+/**
+ * Nameplate-equivalent years delivered across a design life with compounding annual decline.
+ * Runtime degradation is continuous in operating age, so the lifetime quote integrates the same
+ * curve instead of approximating it with beginning- or end-of-year steps.
+ */
+export function degradedLifetimeYears(
+  lifespanYears: number,
+  annualOutputDegradation: number,
+): number {
+  if (annualOutputDegradation <= 0) {
+    return lifespanYears;
+  }
+  if (annualOutputDegradation >= 1) {
+    return 0;
+  }
+  const retention = 1 - annualOutputDegradation;
+  return (Math.pow(retention, lifespanYears) - 1) / Math.log(retention);
 }
 
 /**
@@ -184,10 +206,10 @@ export interface FacilityLifetimeType {
 export function facilityLifetime(
   f: FacilityOperatingType,
 ): FacilityLifetimeType {
-  const wh = f.lifetimeWh || 0;
-  const revenue = f.lifetimeRevenue || 0;
-  const expenses = f.lifetimeExpenses || 0;
-  const potentialWh = f.lifetimePotentialWh || 0;
+  const wh = f.lifetimeWh;
+  const revenue = f.lifetimeRevenue;
+  const expenses = f.lifetimeExpenses;
+  const potentialWh = f.lifetimePotentialWh;
   const mwh = wh / 1000000;
   return {
     wh,
@@ -200,19 +222,62 @@ export function facilityLifetime(
   };
 }
 
-// Returns how much cash the user recieves if they sell / cancel the facility
-export function facilityCashBack(g: FacilityOperatingType): number {
-  // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
-  // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
-  const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
-  const lostFromSelling =
-    (g.buildCost - g.loanAmountLeft) *
-    GENERATOR_SELL_MULTIPLIER *
-    Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
-  return g.buildCost - lostFromSelling - g.loanAmountLeft;
+const MINUTES_PER_GAME_YEAR = DAYS_PER_YEAR * 24 * 60;
+
+/** The time a completed facility has spent operating, excluding its construction period. */
+export function facilityAgeYears(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  return g.minuteOperational === undefined
+    ? 0
+    : Math.max(
+        0,
+        (currentMinute - g.minuteOperational) / MINUTES_PER_GAME_YEAR,
+      );
 }
 
-// CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
-export function customersFromMarketingSpend(spend: number) {
-  return Math.floor(spend / (100 + spend / 1000000));
+/** Current output capability after permanent age-related degradation. */
+export function facilityOutputFactor(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  const annualDegradation = g.annualOutputDegradation || 0;
+  if (annualDegradation <= 0) {
+    return 1;
+  }
+  return Math.pow(
+    Math.max(0, 1 - annualDegradation),
+    facilityAgeYears(g, currentMinute),
+  );
+}
+
+/**
+ * Storage lifetimeWh already counts discharge only, which is the industry convention for an
+ * equivalent full cycle. Deriving the counter avoids a second running total that could drift out
+ * of sync.
+ */
+export function facilityEquivalentCycles(
+  g: FacilityOperatingType,
+): number | undefined {
+  return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
+}
+
+// Returns how much cash the user receives if they sell / cancel the facility. Construction
+// refunds committed equity; an operating asset depreciates linearly to zero over the
+// technology-specific life in Facilities.tsx. Any outstanding loan is settled on sale.
+export function facilityCashBack(
+  g: FacilityOperatingType,
+  currentMinute = g.minuteOperational ?? g.minuteCreated,
+): number {
+  if (g.yearsToBuildLeft === 0) {
+    const remainingLife = Math.max(
+      0,
+      1 - facilityAgeYears(g, currentMinute) / g.lifespanYears,
+    );
+    return g.buildCost * remainingLife - g.loanAmountLeft;
+  }
+  // Cancellation unwinds the committed purchase. For a financed build this returns only the
+  // down payment/equity because the outstanding loan is settled at the same time.
+  return g.buildCost - g.loanAmountLeft;
 }

@@ -14,6 +14,7 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 import {
+  formatHour,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
@@ -55,6 +56,7 @@ interface State {
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
   legendItems: LegendItem[];
+  startingYear: number;
 }
 
 const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
@@ -135,7 +137,8 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const time = formatHour(getDateFromMinute(d.minute, state.startingYear));
+  return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
 // TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
@@ -156,28 +159,31 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
 
-  let sunrise = midnight + getSunriseSunset(date, location).sunrise;
-  let sunset = midnight + getSunriseSunset(date, location).sunset;
-  if (sunrise < rangeMin) {
-    sunrise =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunrise;
+  const sun = getSunriseSunset(date, location);
+  let sunTicks: number[] = [];
+  if (sun.daylight === "normal") {
+    let sunrise = midnight + sun.sunrise;
+    let sunset = midnight + sun.sunset;
+    if (sunrise < rangeMin) {
+      sunrise =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunrise;
+    }
+    if (sunset < rangeMin) {
+      sunset =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunset;
+    }
+    sunTicks = [sunrise, sunrise + (sunset - sunrise) / 2, sunset];
   }
-  if (sunset < rangeMin) {
-    sunset =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunset;
-  }
-
-  const noon = sunrise + (sunset - sunrise) / 2;
 
   // "Demand peaks in the early evening" only lands if you can read the clock off the axis
   const hourTicks = getHourTicks(rangeMin, rangeMax);
@@ -271,19 +277,22 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     domain: padRange(domainMin, domainMax),
     range: [rangeMin, rangeMax],
     hourTicks,
-    sunTicks: [sunrise, noon, sunset],
+    sunTicks,
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute: currentMinute === rangeMax ? null : currentMinute,
     legendItems,
+    startingYear,
   };
 
   return (
     <UPlotChart<State>
       ariaLabel="Chart of electricity supply and demand over the day"
+      formatSummaryValue={formatWatts}
       id="chartSupplyDemand"
       height={height}
       state={state}
       data={[minutes, supplyHistoric, supplyForecast, demand]}
+      seriesLabels={["Past supply", "Forecast supply", "Demand"]}
       buildOptions={buildOptions}
       tooltip={tooltip}
     />

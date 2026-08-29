@@ -18,6 +18,7 @@ import { isValidLocation } from "../helpers/Locations";
 export interface CityType extends LocationType {
   region: string;
   country?: string;
+  admin?: string;
   elevation?: number;
 }
 
@@ -98,12 +99,19 @@ export function initCities(): Promise<CityType[]> {
         if (listed.length === 0) {
           throw new Error("the city index lists no usable cities");
         }
-        // The index wins over the built-in copy of the same city, so a location's timezone or
-        // coordinates only have to be corrected in one place
+        // The index wins for fetched metadata, while a built-in resource override survives. The
+        // weather catalogue cannot infer whether a city is connected to a usable river or field.
         const byId = new Map<string, CityType>(
           BUILT_IN.map((city: CityType) => [city.id, city]),
         );
-        listed.forEach((city: CityType) => byId.set(city.id, city));
+        listed.forEach((city: CityType) => {
+          const builtIn = byId.get(city.id);
+          byId.set(city.id, {
+            ...builtIn,
+            ...city,
+            resources: city.resources || builtIn?.resources,
+          });
+        });
         cities = sortCities(Array.from(byId.values()));
         return cities;
       })

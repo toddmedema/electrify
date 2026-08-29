@@ -54,10 +54,10 @@ function playAScriptedGame(): GameType {
   );
 
   runMonths(state, 2);
-  state = dispatch(state, delta({ monthlyMarketingSpend: 40000 }));
+  state = dispatch(state, delta({ dollarsPerkWh: 0.06 }));
   // Two deltas in the same minute: the sliders fire one of these per pixel dragged, and only the
   // last matters, so the recorder merges them
-  state = dispatch(state, delta({ monthlyMarketingSpend: 60000 }));
+  state = dispatch(state, delta({ dollarsPerkWh: 0.065 }));
 
   runMonths(state, 2);
   state = dispatch(state, togglePauseFacility(state.facilities[0].id));
@@ -105,7 +105,7 @@ describe("recording a run", () => {
   it("merges the deltas fired within one minute into the value that stuck", () => {
     const deltas = played.replayLog!.filter((a) => a.type === "delta");
     expect(deltas.length).toBe(1);
-    expect(deltas[0].payload).toEqual({ monthlyMarketingSpend: 60000 });
+    expect(deltas[0].payload).toEqual({ dollarsPerkWh: 0.065 });
   });
 
   it("stamps each action with a tick boundary inside the run", () => {
@@ -207,26 +207,5 @@ describe("watching a replay", () => {
     expect(watched.monthlyHistory.length).toBeGreaterThan(
       played.monthlyHistory.length,
     );
-  });
-});
-
-describe("resuming a recorded run", () => {
-  /**
-   * A save from before replays existed carries no log, and a run recorded from halfway through
-   * would play back as a different game. Recording stays off rather than starting mid-run.
-   */
-  it("gives up on the replay rather than recording half of one", () => {
-    const played = createGame(OPTIONS);
-    runMonths(played, 2);
-
-    const { replayLog: _dropped, ...withoutLog } = played;
-    let resumed = cloneDeep(withoutLog) as GameType;
-    resumed = dispatch(
-      resumed,
-      buildFacility({ facility: aGeneratorToBuild(resumed), financed: true }),
-    );
-
-    expect(resumed.replayLog).toBeUndefined();
-    expect(serializeReplay(resumed)).toBeUndefined();
   });
 });

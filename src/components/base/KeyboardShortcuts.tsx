@@ -13,8 +13,8 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["Q"], description: "Facilities tab" },
-  { keys: ["W"], description: "Finances tab" },
-  { keys: ["E"], description: "Forecasts tab" },
+  { keys: ["W", "E"], description: "Insights tab" },
+  { keys: ["R"], description: "Events tab" },
   { keys: ["G"], description: "Build a generator" },
   { keys: ["S"], description: "Build storage" },
   {
@@ -26,6 +26,7 @@ export const SHORTCUTS: ShortcutType[] = [
     description: "Move the selected facility up / down the dispatch order",
   },
   { keys: ["?"], description: "Open the manual" },
+  { keys: ["Esc"], description: "Close the current screen" },
 ];
 
 // The shortcuts render as a component rather than as plain markup, so the manual's search has

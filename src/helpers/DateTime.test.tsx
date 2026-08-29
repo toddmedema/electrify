@@ -10,7 +10,12 @@ import {
   summarizeTimelineByMonth,
 } from "./DateTime";
 import { LOCATIONS, TICK_MINUTES, TICKS_PER_MONTH } from "../Constants";
-import { DateType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
+import {
+  DateType,
+  LocationType,
+  MonthlyHistoryType,
+  TickPresentFutureType,
+} from "../Types";
 import { SCENARIOS } from "../data/Scenarios";
 import { generateNewTimeline } from "../reducers/Game";
 import { createGame } from "../testing/Simulator";
@@ -102,6 +107,40 @@ describe("getSunriseSunset", () => {
     // location's own zone
     expect(typeof machineOffsetMinutes).toEqual("number");
   });
+
+  it("derives local time from longitude when an arbitrary point has no timezone", () => {
+    const arbitrary = {
+      id: "arbitrary",
+      name: "30 degrees east",
+      lat: 0,
+      long: 30,
+    } as LocationType;
+    const { sunrise, sunset } = getSunriseSunset(january, arbitrary);
+    expect(sunrise).toBeGreaterThan(5 * 60);
+    expect(sunrise).toBeLessThan(7 * 60);
+    expect(sunset).toBeGreaterThan(17 * 60);
+    expect(sunset).toBeLessThan(19 * 60);
+  });
+
+  it("models polar day and night instead of inventing a 6am to 6pm day", () => {
+    const tromso = {
+      id: "tromso",
+      name: "Tromsø, Norway",
+      lat: 69.6492,
+      long: 18.9553,
+      timeZone: "Europe/Oslo",
+    } as LocationType;
+    expect(getSunriseSunset(january, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 0,
+      daylight: "polar-night",
+    });
+    expect(getSunriseSunset(july, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 1440,
+      daylight: "polar-day",
+    });
+  });
 });
 
 // The two summarize helpers walk arrays that are ordered opposite ways, and reduceHistories keeps
@@ -124,7 +163,6 @@ describe("summarizeTimeline", () => {
           expensesOM: 0,
           expensesCarbonFee: 0,
           expensesInterest: 0,
-          expensesMarketing: 0,
           kgco2e: 0,
           interestRate: 0.04 + i / 1000,
           inflationRate: 0.02,

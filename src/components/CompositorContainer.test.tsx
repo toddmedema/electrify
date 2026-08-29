@@ -1,12 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as React from "react";
-import type { UnknownAction } from "redux";
-import { ACTIONS, EVENTS, type EventData } from "react-joyride";
+import { UnknownAction } from "redux";
+import { ACTIONS, EVENTS, EventData } from "react-joyride";
 import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
+import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
-import Compositor, { type Props as CompositorProps } from "./Compositor";
+import Compositor, { Props as CompositorProps } from "./Compositor";
 import { mapDispatchToProps } from "./CompositorContainer";
 
 // Where `loaded` drops the player, and so where every walkthrough starts
@@ -70,7 +71,7 @@ function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
 }
 
 describe("onTutorialStep", () => {
-  const generators = walkthrough("102: Generators");
+  const generators = walkthrough("Mission 2: Generators");
 
   it("moves the walkthrough to the new step", () => {
     const dispatched = step({
@@ -113,15 +114,20 @@ describe("onTutorialStep", () => {
     );
   });
 
-  // The mirror of the case above: the last step closes the build screen, so stepping back into
-  // it has to reopen it
+  // The mirror of the case above: a later step closes the build screen, so stepping back into
+  // the preceding shop step has to reopen it
   it("navigates back into a screen a later step closed", () => {
-    const last = generators.length - 1;
-    expect(cardOf(generators[last])).toBe(STARTING_CARD);
+    const facilitiesStep = generators.findIndex(
+      (candidate, index) =>
+        index > 0 &&
+        cardOf(candidate) === STARTING_CARD &&
+        cardOf(generators[index - 1]) === "BUILD_GENERATORS",
+    );
+    expect(facilitiesStep).toBeGreaterThan(0);
     const dispatched = step({
       steps: generators,
-      fromStep: last,
-      toStep: last - 1,
+      fromStep: facilitiesStep,
+      toStep: facilitiesStep - 1,
       currentCard: STARTING_CARD,
     });
     expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
@@ -149,7 +155,7 @@ describe("onTutorialStep", () => {
         content: <span />,
         onNext: () => sideEffect,
       },
-      { card: "FINANCES", target: "#second", content: <span /> },
+      { card: "INSIGHTS", target: "#second", content: <span /> },
     ];
 
     it("fires onNext when leaving a step forwards", () => {
@@ -160,7 +166,7 @@ describe("onTutorialStep", () => {
 
     it("doesn't replay onNext when stepping backwards", () => {
       expect(
-        step({ steps, fromStep: 1, toStep: 0, currentCard: "FINANCES" }),
+        step({ steps, fromStep: 1, toStep: 0, currentCard: "INSIGHTS" }),
       ).not.toContainEqual(sideEffect);
     });
   });
@@ -210,9 +216,41 @@ function declares(simple: string): boolean {
 
 describe("walkthrough steps", () => {
   const tutorials = SCENARIOS.filter((s) => s.tutorialSteps);
+  const actionGateTypes = new Set<string>([
+    reprioritizeFacility.type,
+    togglePauseFacility.type,
+  ]);
 
   it("covers every walkthrough", () => {
     expect(tutorials.length).toBeGreaterThan(0);
+  });
+
+  it("uses real game actions for every action gate", () => {
+    const declared = tutorials.flatMap(
+      (scenario) =>
+        scenario.tutorialSteps?.flatMap((tutorialStep) =>
+          tutorialStep.advanceOnAction
+            ? ([] as string[]).concat(tutorialStep.advanceOnAction)
+            : [],
+        ) || [],
+    );
+    expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
+  });
+
+  it("uses the same symbols as the generator and storage buttons it highlights", () => {
+    const actionOf = (step: TutorialStepType) =>
+      React.isValidElement<{ action?: string[] }>(step.content)
+        ? step.content.props.action
+        : undefined;
+    const generatorStep = walkthrough("Mission 2: Generators").find(
+      (step) => step.target === ".button-buildGenerator",
+    )!;
+    const storageStep = walkthrough("Mission 3: Storage").find(
+      (step) => step.target === ".button-buildStorage",
+    )!;
+
+    expect(actionOf(generatorStep)).toEqual(["generator"]);
+    expect(actionOf(storageStep)).toEqual(["storage"]);
   });
 
   tutorials.forEach((scenario) => {
@@ -272,7 +310,7 @@ describe("walkthrough steps", () => {
 });
 
 describe("handleJoyrideCallback", () => {
-  const steps = walkthrough("102: Generators");
+  const steps = walkthrough("Mission 2: Generators");
 
   function fire(tutorialStep: number, event: Partial<EventData>) {
     const onTutorialStep = jest.fn();
@@ -290,12 +328,21 @@ describe("handleJoyrideCallback", () => {
   }
 
   it("advances past a target that never turns up mid-walkthrough", () => {
+    const { onTutorialStep } = fire(1, {
+      action: ACTIONS.NEXT,
+      index: 1,
+      type: EVENTS.TARGET_NOT_FOUND,
+    });
+    expect(onTutorialStep).toHaveBeenCalled();
+  });
+
+  it("does not skip a gated deed when its target is temporarily missing", () => {
     const { onTutorialStep } = fire(2, {
       action: ACTIONS.NEXT,
       index: 2,
       type: EVENTS.TARGET_NOT_FOUND,
     });
-    expect(onTutorialStep).toHaveBeenCalled();
+    expect(onTutorialStep).not.toHaveBeenCalled();
   });
 
   // Quitting takes the targets out of the DOM, which Joyride reports the same way. Acting on it

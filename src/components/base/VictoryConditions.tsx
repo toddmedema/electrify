@@ -12,7 +12,7 @@ export interface Props {
  * How a scenario is scored, in the player's terms. Shared by the scenario details screen and the
  * custom game screen, which both offer it behind an info button.
  *
- * Scoring algorithm should also be updated in Game.tsx and in the Manual.
+ * Scoring algorithm should also be updated in helpers/Scoring.tsx and in the Manual.
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
   const { ownership, dollarsPerkWh } = props;

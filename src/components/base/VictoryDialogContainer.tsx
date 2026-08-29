@@ -1,6 +1,6 @@
 import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
-import { quit } from "../../reducers/Game";
+import { quit, start } from "../../reducers/Game";
 import { snackbarOpen, victoryClose } from "../../reducers/UI";
 import { login, logEvent } from "../../Globals";
 import { AppStateType, VictoryType } from "../../Types";
@@ -21,6 +21,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onQuit: () => {
       dispatch(victoryClose());
       dispatch(quit({ toScenarioList: true }));
+    },
+    onRetry: (victory: VictoryType) => {
+      dispatch(victoryClose());
+      dispatch(quit());
+      dispatch(start(victory.scenarioId));
     },
     onLogin: () => {
       login();

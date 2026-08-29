@@ -1,4 +1,4 @@
-import { getTimes } from "suncalc";
+import { getPosition, getTimes } from "suncalc";
 import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
@@ -31,7 +31,6 @@ export const EMPTY_HISTORY = {
   expensesOM: 0,
   expensesCarbonFee: 0,
   expensesInterest: 0,
-  expensesMarketing: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
@@ -48,7 +47,6 @@ export function reduceHistories(
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
-  acc.expensesMarketing += t.expensesMarketing;
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
   acc.cash = t.cash;
@@ -67,11 +65,7 @@ export function deriveExpandedSummary(
   s: MonthlyHistoryType,
 ): DerivedHistoryType {
   const expenses =
-    s.expensesFuel +
-    s.expensesOM +
-    s.expensesMarketing +
-    s.expensesCarbonFee +
-    s.expensesInterest;
+    s.expensesFuel + s.expensesOM + s.expensesCarbonFee + s.expensesInterest;
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
     ...s,
@@ -103,7 +97,6 @@ function accumulateTick(
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;
-  summary.expensesMarketing += t.expensesMarketing;
   summary.expensesCarbonFee += t.expensesCarbonFee;
   summary.expensesInterest += t.expensesInterest;
   summary.cash = t.cash;
@@ -237,6 +230,18 @@ export function formatHour(date: DateType): string {
   return time.toLocaleString("en-US", { hour: "numeric", hour12: true });
 }
 
+/**
+ * "Jan 2030, 4 PM" -- the header line every tooltip on a minute-based chart leads with, matching
+ * the month/year/time the app bar shows for the current instant.
+ */
+export function formatMinuteAsTooltipHeader(
+  minute: number,
+  startingYear: number,
+): string {
+  const date = getDateFromMinute(minute, startingYear);
+  return `${date.month} ${date.year}, ${formatHour(date)}`;
+}
+
 // Faster subset of getDateFromMinute
 export function getMonthYearFromMinute(minute: number, startingYear: number) {
   const dayOfGame = Math.floor(minute / 1440);
@@ -251,9 +256,10 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
   };
 }
 
-interface SunriseSunsetType {
+export interface SunriseSunsetType {
   sunrise: number;
   sunset: number;
+  daylight: "normal" | "polar-day" | "polar-night";
 }
 
 /**
@@ -273,16 +279,28 @@ const sunriseSunsetCache = new Map<string, SunriseSunsetType>();
  * runner's zone, which for a player outside the scenario's own timezone put sunrise after sunset
  * and left the sun switched off for the whole game.
  */
-function minuteOfDayIn(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const value = (type: string) =>
-    Number(parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value);
-  return value("hour") * 60 + value("minute");
+function minuteOfDayIn(date: Date, location: LocationType): number {
+  if (location.timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: location.timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(date);
+      const value = (type: string) =>
+        Number(
+          parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value,
+        );
+      return value("hour") * 60 + value("minute");
+    } catch (_error) {
+      // Hand-authored coordinates can carry a stale or misspelled zone. They are still playable:
+      // fall through to the same solar-time approximation used when no zone was supplied.
+    }
+  }
+  const offsetMinutes = Math.round(location.long / 15) * 60;
+  const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+  return (utcMinutes + offsetMinutes + 1440) % 1440;
 }
 
 // returns minutes since midnight, in the location's own timezone
@@ -290,7 +308,7 @@ export function getSunriseSunset(
   date: DateType,
   location: LocationType,
 ): SunriseSunsetType {
-  const key = `${date.monthNumber}|${date.year}|${location.id}`;
+  const key = `${date.monthNumber}|${date.year}|${location.id}|${location.lat}|${location.long}|${location.timeZone || "solar"}`;
   const cached = sunriseSunsetCache.get(key);
   if (cached) {
     return cached;
@@ -305,17 +323,27 @@ export function getSunriseSunset(
     location.long,
   );
 
-  // suncalc returns null above the polar circles, where the sun may never rise or never set
-  // on a given day. None of the locations the game ships get anywhere near that, so
-  // these fallbacks are only here to keep a hypothetical high-latitude location from
-  // crashing the simulation
-  const minuteOfDay = (d: Date | null, fallback: number) =>
-    d && !isNaN(d.getTime()) ? minuteOfDayIn(d, location.timeZone) : fallback;
-
-  const times = {
-    sunrise: minuteOfDay(calc.sunrise, 6 * 60),
-    sunset: minuteOfDay(calc.sunset, 18 * 60),
-  };
+  const valid = (d: Date | null): d is Date => !!d && !isNaN(d.getTime());
+  let times: SunriseSunsetType;
+  if (!valid(calc.sunrise) || !valid(calc.sunset)) {
+    // There is no sunrise or sunset during a polar day/night. SunCalc's altitude tells which one
+    // it is; sentinels keep every existing daylight calculation simple and truthful.
+    const sunUp =
+      getPosition(
+        new Date(Date.UTC(date.year, date.monthNumber - 1, 1, 12)),
+        location.lat,
+        location.long,
+      ).altitude > 0;
+    times = sunUp
+      ? { sunrise: 0, sunset: 1440, daylight: "polar-day" }
+      : { sunrise: 0, sunset: 0, daylight: "polar-night" };
+  } else {
+    times = {
+      sunrise: minuteOfDayIn(calc.sunrise, location),
+      sunset: minuteOfDayIn(calc.sunset, location),
+      daylight: "normal",
+    };
+  }
   sunriseSunsetCache.set(key, times);
   return times;
 }

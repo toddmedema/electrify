@@ -7,13 +7,16 @@ import gameReducer, {
   buildFacility,
   delta,
   initGame,
+  hasChronicBlackouts,
   start,
   startReplay,
+  sellFacility,
   tickState,
 } from "../reducers/Game";
 import { DIFFICULTIES } from "../Constants";
 import { GENERATORS } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
+import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import {
@@ -36,6 +39,12 @@ import {
 import { loadSimData } from "./SimData";
 
 export type StrategyType = "none" | "keepUp";
+
+export interface InitialBuildType {
+  name: string;
+  peakW: number;
+  financed: boolean;
+}
 
 /**
  * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
@@ -62,8 +71,10 @@ export interface SimOptionsType {
   months?: number; // Defaults to the scenario's own duration
   seed?: number;
   dollarsPerkWh?: number;
-  monthlyMarketingSpend?: number;
   strategy?: StrategyType;
+  initialBuild?: InitialBuildType;
+  sellFacilityId?: number;
+  sellAtMonth?: number;
 }
 
 export interface ResolvedSimOptionsType {
@@ -72,8 +83,10 @@ export interface ResolvedSimOptionsType {
   months: number;
   seed: number;
   dollarsPerkWh: number | null; // null = left at the scenario's own rate
-  monthlyMarketingSpend: number;
   strategy: StrategyType;
+  initialBuild: InitialBuildType | null;
+  sellFacilityId: number | null;
+  sellAtMonth: number;
 }
 
 export interface BuildRecordType {
@@ -92,6 +105,10 @@ export interface SimResultType {
   finalNetWorth: number;
   wentBankrupt: boolean;
   bankruptAtMonth: number | null;
+  wasFired: boolean;
+  firedAtMonth: number | null;
+  outcome: "completed" | "bankrupt" | "fired";
+  actionCount: number;
   builds: BuildRecordType[];
   // Mean fill level of the storage fleet across the run, 0 - 1, or null with no storage built
   averageStateOfCharge: number | null;
@@ -100,7 +117,6 @@ export interface SimResultType {
   violationCount: number;
 }
 
-const DEFAULT_CUSTOMERS = 1030000; // Matches LoadingContainer, the real game's entry point
 const DEFAULT_SEED = 12345;
 
 function formatWhen(state: GameType): string {
@@ -122,7 +138,7 @@ export function createGame(options: SimOptionsType): GameType {
     options.scenario ||
     SCENARIOS.find((s: ScenarioType) => s.id === options.scenarioId) ||
     SCENARIOS[0];
-  loadSimData(scenarioLocation(scenario).id);
+  loadSimData(scenarioLocation(scenario));
   return setUpGame(scenario, resolveOptions(scenario, options));
 }
 
@@ -130,13 +146,13 @@ function setUpGame(
   scenario: ScenarioType,
   options: ResolvedSimOptionsType,
 ): GameType {
+  const location = scenarioLocation(scenario);
   let state = gameReducer(undefined, start(scenario.id));
   // Chosen on the new game screen, before the game is built
   state = gameReducer(
     state,
     delta({
       difficulty: options.difficulty,
-      monthlyMarketingSpend: options.monthlyMarketingSpend,
       // A scenario that isn't in SCENARIOS can only be found again through the slice, which is
       // exactly what the custom game screen does before it starts a game
       customScenario: SCENARIOS.some((s: ScenarioType) => s.id === scenario.id)
@@ -149,8 +165,8 @@ function setUpGame(
     initGame({
       facilities: scenario.facilities,
       cash: scenario.cash,
-      customers: DEFAULT_CUSTOMERS,
-      location: scenarioLocation(scenario),
+      customers: scenario.startingCustomers || getStartingCustomers(location),
+      location,
       seed: options.seed,
     }),
   );
@@ -158,6 +174,35 @@ function setUpGame(
   // the rate on the Finances screen would
   if (options.dollarsPerkWh !== null) {
     state = gameReducer(state, delta({ dollarsPerkWh: options.dollarsPerkWh }));
+  }
+  if (options.initialBuild) {
+    const build = GENERATORS(
+      state,
+      options.initialBuild.peakW,
+      state.timeline.map((tick) => tick.windKph),
+      state.timeline.map((tick) => tick.solarIrradianceWM2),
+      state.timeline
+        .map((tick) => tick.windOffshoreKph)
+        .filter((wind): wind is number => wind !== undefined),
+    ).find(
+      (facility) =>
+        facility.available && facility.name === options.initialBuild?.name,
+    );
+    if (!build) {
+      throw new Error(
+        `Cannot build ${options.initialBuild.name} in ${scenario.name}`,
+      );
+    }
+    state = gameReducer(
+      state,
+      buildFacility({
+        facility: build,
+        financed: options.initialBuild.financed,
+      }),
+    );
+  }
+  if (options.sellFacilityId !== null && options.sellAtMonth === 0) {
+    state = gameReducer(state, sellFacility(options.sellFacilityId));
   }
   // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
   return cloneDeep(state);
@@ -177,14 +222,15 @@ export function createGameFromReplay(replay: ReplayType): GameType {
     SCENARIOS[0];
   // The replay's own location, not the scenario's: that is the whole point of recording it, and
   // it is also what the loading screen uses in the browser
-  loadSimData(replay.location.id);
+  loadSimData(replay.location);
   let state = gameReducer(undefined, startReplay(replay));
   state = gameReducer(
     state,
     initGame({
       facilities: scenario.facilities,
       cash: scenario.cash,
-      customers: DEFAULT_CUSTOMERS,
+      customers:
+        scenario.startingCustomers || getStartingCustomers(replay.location),
       location: replay.location,
       seed: replay.seed,
     }),
@@ -220,6 +266,7 @@ function pickFacilityToBuild(
     peakW,
     [now.windKph],
     [now.solarIrradianceWM2],
+    now.windOffshoreKph === undefined ? [] : [now.windOffshoreKph],
   )
     .filter(
       (g: GeneratorShoppingType) =>
@@ -251,8 +298,10 @@ function resolveOptions(
           : DEFAULT_SEED,
     dollarsPerkWh:
       options.dollarsPerkWh === undefined ? null : options.dollarsPerkWh,
-    monthlyMarketingSpend: options.monthlyMarketingSpend || 0,
     strategy: options.strategy || "none",
+    initialBuild: options.initialBuild || null,
+    sellFacilityId: options.sellFacilityId ?? null,
+    sellAtMonth: options.sellAtMonth || 0,
   };
 }
 
@@ -263,15 +312,31 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     SCENARIOS[0];
   const resolved = resolveOptions(scenario, options);
 
-  loadSimData(scenarioLocation(scenario).id);
+  loadSimData(scenarioLocation(scenario));
   let state = setUpGame(scenario, resolved);
 
   const collector = new InvariantCollector();
-  const builds: BuildRecordType[] = [];
+  const initialBuild = resolved.initialBuild
+    ? state.facilities.find(
+        (facility) =>
+          facility.name === resolved.initialBuild?.name &&
+          facility.yearsToBuildLeft > 0,
+      )
+    : undefined;
+  const builds: BuildRecordType[] = initialBuild
+    ? [
+        {
+          month: 0,
+          name: initialBuild.name,
+          buildCost: initialBuild.buildCost,
+        },
+      ]
+    : [];
   let stateOfChargeSum = 0;
   let stateOfChargeTicks = 0;
   let ticks = 0;
   let bankruptAtMonth: number | null = null;
+  let firedAtMonth: number | null = null;
   let previousMonthCount = state.monthlyHistory.length;
   let prevTick: TickPresentFutureType | null = null;
   let justBuilt = false;
@@ -279,7 +344,7 @@ export function runSimulation(options: SimOptionsType): SimResultType {
 
   // tickState fires the game's end-of-run dialogs through setTimeout, which never run here, so the
   // loop watches state directly instead and stops on the same conditions the player would hit:
-  // monthsEllapsed reaching the scenario duration, or negative cash at a month rollover.
+  // monthsEllapsed reaching the scenario duration, negative cash, or chronic blackouts.
   while (state.date.monthsEllapsed < resolved.months) {
     tickState(state);
     ticks++;
@@ -323,6 +388,21 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       break; // The real game forces a restart here, so anything past it isn't a reachable state
     }
 
+    if (hasChronicBlackouts(state.monthlyHistory)) {
+      firedAtMonth = state.date.monthsEllapsed;
+      break;
+    }
+
+    if (
+      resolved.sellFacilityId !== null &&
+      resolved.sellAtMonth > 0 &&
+      state.date.monthsEllapsed === resolved.sellAtMonth
+    ) {
+      state = cloneDeep(
+        gameReducer(state, sellFacility(resolved.sellFacilityId)),
+      );
+    }
+
     if (resolved.strategy === "keepUp") {
       const toBuild = pickFacilityToBuild(state, state.monthlyHistory[0]);
       if (toBuild) {
@@ -355,6 +435,15 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     finalNetWorth: lastTick ? lastTick.netWorth : 0,
     wentBankrupt: bankruptAtMonth !== null,
     bankruptAtMonth,
+    wasFired: firedAtMonth !== null,
+    firedAtMonth,
+    outcome:
+      bankruptAtMonth !== null
+        ? "bankrupt"
+        : firedAtMonth !== null
+          ? "fired"
+          : "completed",
+    actionCount: state.replayLog?.length || 0,
     builds,
     averageStateOfCharge: stateOfChargeTicks
       ? stateOfChargeSum / stateOfChargeTicks

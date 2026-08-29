@@ -1,7 +1,16 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Settings, { Props } from "./Settings";
+import { clearAppCache } from "../../helpers/Cache";
+
+jest.mock("../../helpers/Cache", () => ({
+  clearAppCache: jest.fn(async () => undefined),
+}));
+
+const mockedClearAppCache = clearAppCache as jest.MockedFunction<
+  typeof clearAppCache
+>;
 
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
@@ -37,6 +46,25 @@ function fileInput(): HTMLInputElement {
 }
 
 describe("Settings", () => {
+  it("groups controls into labeled, scannable sections", () => {
+    renderSettings();
+
+    ["Sound", "Account", "Units", "Appearance", "Saved Game"].forEach((name) =>
+      expect(screen.getByRole("region", { name })).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Music and sound effects disabled",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Measurement system" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Color theme" }),
+    ).toBeInTheDocument();
+  });
+
   it("controls music and sound-effects volume independently", () => {
     const onMusicVolumeChange = jest.fn();
     const onSoundEffectsVolumeChange = jest.fn();
@@ -86,7 +114,7 @@ describe("Settings", () => {
 
   it("offers a way in when nobody is logged in", () => {
     renderSettings();
-    expect(screen.getByText("Log in")).toBeInTheDocument();
+    expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     expect(screen.queryByText("Log out")).not.toBeInTheDocument();
   });
 
@@ -119,5 +147,40 @@ describe("Settings", () => {
 
     // Picking the same file again still counts, for the player who went and fixed a bad one
     expect(fileInput().value).toBe("");
+  });
+
+  it("hides installation controls when already running as an installed app", () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = jest.fn().mockReturnValue({
+      matches: true,
+      media: "(display-mode: standalone)",
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    });
+
+    renderSettings();
+
+    expect(
+      screen.queryByRole("region", { name: "App" }),
+    ).not.toBeInTheDocument();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it("offers a subtle cache reset at the bottom", async () => {
+    renderSettings();
+
+    const button = screen.getByRole("button", { name: "Clear cache" });
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("button", {
+        name: "Clear cache",
+      }),
+    ).toBe(button);
+    await userEvent.click(button);
+
+    expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
   });
 });

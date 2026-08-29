@@ -1,7 +1,12 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
-import { facilityLifetime } from "../../helpers/Financials";
+import {
+  facilityAgeYears,
+  facilityEquivalentCycles,
+  facilityLifetime,
+  facilityOutputFactor,
+} from "../../helpers/Financials";
 import {
   formatMoneyConcise,
   formatWattHours,
@@ -14,6 +19,7 @@ import {
   FacilityOperatingType,
   FuelNameType,
   GeneratorOperatingType,
+  LocationType,
   StorageOperatingType,
 } from "../../Types";
 import Sparkline from "./Sparkline";
@@ -35,6 +41,7 @@ export interface Props {
   facility: FacilityOperatingType;
   date: DateType;
   seed: number;
+  location: LocationType;
 }
 
 interface StatProps {
@@ -72,6 +79,7 @@ export function fuelPriceTrend(
   fuel: FuelNameType,
   date: DateType,
   seed: number,
+  location?: LocationType,
 ): number[] {
   const months = Math.min(TREND_MONTHS, date.monthsEllapsed + 1);
   if (months < 2) {
@@ -88,6 +96,7 @@ export function fuelPriceTrend(
           monthNumber: (absolute % 12) + 1,
         } as DateType,
         seed,
+        location,
       )[fuel];
       if (price === undefined) {
         return [];
@@ -103,14 +112,18 @@ export function fuelPriceTrend(
 }
 
 export default function FacilityDetails(props: Props): React.JSX.Element {
-  const { facility, date, seed } = props;
+  const { facility, date, seed, location } = props;
   const lifetime = facilityLifetime(facility);
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const isStorage = facility.peakWh > 0;
   const accentColor = facilityColor(fuel);
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const isHydro = fuel === "Hydro" && !!facility.reservoirCapacityWh;
+  const ageYears = facilityAgeYears(facility, date.minute);
+  const outputFactor = facilityOutputFactor(facility, date.minute);
+  const equivalentCycles = facilityEquivalentCycles(facility);
 
-  const trend = fuel ? fuelPriceTrend(fuel, date, seed) : [];
+  const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
   const trendChange =
     trend.length > 1 && trend[0] > 0
       ? trend[trend.length - 1] / trend[0] - 1
@@ -125,16 +138,22 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             value={`${Math.ceil(facility.yearsToBuildLeft * 12)} months`}
           />
         ) : (
-          <Stat
-            // Capacity factor is the generator's word for it; a battery isn't producing
-            // anything, it's being used or it isn't
-            label={isStorage ? "Utilization" : "Capacity factor"}
-            value={
-              lifetime.capacityFactor === undefined
-                ? "—"
-                : percent(lifetime.capacityFactor)
-            }
-          />
+          <>
+            <Stat
+              label="Age / design life"
+              value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
+            />
+            <Stat
+              // Capacity factor is the generator's word for it; a battery isn't producing
+              // anything, it's being used or it isn't
+              label={isStorage ? "Utilization" : "Capacity factor"}
+              value={
+                lifetime.capacityFactor === undefined
+                  ? "—"
+                  : percent(lifetime.capacityFactor)
+              }
+            />
+          </>
         )}
         <Stat
           label="Cost"
@@ -167,6 +186,33 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
           />
         )}
+        {facility.name === "Battery" && equivalentCycles !== undefined && (
+          <Stat
+            label="Equivalent cycles"
+            value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Reservoir"
+            value={formatWattHoursOfPeak(
+              facility.reservoirWh || 0,
+              facility.reservoirCapacityWh || 0,
+            )}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Last inflow"
+            value={formatWattHours(facility.hydroLastInflowWh || 0)}
+          />
+        )}
+        {isHydro && (
+          <Stat
+            label="Last spill"
+            value={formatWattHours(facility.hydroLastSpillWh || 0)}
+          />
+        )}
         {isStorage && (
           <Stat
             label="Round trip"
@@ -177,6 +223,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {!isStorage && (
           <Stat label="Nameplate" value={formatWatts(facility.peakW)} />
+        )}
+        {!isStorage && outputFactor < 1 && (
+          <Stat
+            label="Effective max"
+            value={`${formatWatts(facility.peakW * outputFactor)} · ${percent(outputFactor)} health`}
+          />
         )}
         {facility.loanAmountLeft > 0 && (
           <Stat

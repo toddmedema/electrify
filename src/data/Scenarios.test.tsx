@@ -60,3 +60,13 @@ describe("getNextTutorial", () => {
     expect(getNextTutorial(CUSTOM_SCENARIO_ID)).toBeUndefined();
   });
 });
+
+describe("tutorial mission metadata", () => {
+  it("gives every tutorial a mission name, icon, and summary", () => {
+    TUTORIALS.forEach((tutorial, index) => {
+      expect(tutorial.name).toMatch(new RegExp(`^Mission ${index + 1}: `));
+      expect(tutorial.icon).toBeTruthy();
+      expect(tutorial.summary).toBeTruthy();
+    });
+  });
+});

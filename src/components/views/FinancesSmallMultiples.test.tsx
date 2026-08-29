@@ -27,6 +27,10 @@ jest.mock("../base/GameCard", () => ({
     <div>{children}</div>
   ),
 }));
+jest.mock("../base/ManualLink", () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
 const user = userEvent.setup({ delay: null });
 

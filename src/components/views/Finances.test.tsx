@@ -2,7 +2,12 @@ import * as React from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
-import Finances, { getComparison, parseRange, projectMonths } from "./Finances";
+import Finances, {
+  formatCustomerChange,
+  getComparison,
+  parseRange,
+  projectMonths,
+} from "./Finances";
 import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
@@ -22,6 +27,10 @@ jest.mock("../base/GameCard", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+}));
+jest.mock("../base/ManualLink", () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 /**
@@ -95,6 +104,28 @@ function renderFinances(
   );
 }
 
+describe("the customer forecast", () => {
+  it("shows customer growth as a delta and percent when compact totals would look equal", () => {
+    expect(formatCustomerChange(9900, 1000000)).toEqual("+9.9k (+1.0%)");
+  });
+
+  it("formats losses and omits an undefined percent with no existing customers", () => {
+    expect(formatCustomerChange(-9900, 1000000)).toEqual("-9.9k (-1.0%)");
+    expect(formatCustomerChange(9900, 0)).toEqual("+9.9k");
+  });
+
+  it("shows investor players the market benchmark and a rate control", () => {
+    renderFinances(createGame({ scenarioId: 101 }), "PAUSED");
+    expect(
+      screen.getByRole("slider", {
+        name: "The rate you charge for electricity generation",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/market \$/)).toBeInTheDocument();
+    cleanup();
+  });
+});
+
 describe("the Finances chart selectors", () => {
   // Two years in, so that the period select has past years to offer and each one covers a
   // different stretch of the history
@@ -102,10 +133,9 @@ describe("the Finances chart selectors", () => {
 
   beforeEach(() => localStorage.clear());
 
-  // Every speed, because the pane skips frames at FAST and used to skip the player's own clicks
-  // along with them: the dropdown redrew itself with the new label while the chart kept plotting
-  // the old metric, which looks exactly like a selector that does nothing
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  // PAUSED covers the unthrottled path and FAST covers the frame-skipping path that used to
+  // swallow the player's own clicks. SLOW and NORMAL exercise the same branches as FAST.
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "replots when the metric changes at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);
@@ -124,7 +154,7 @@ describe("the Finances chart selectors", () => {
     },
   );
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "keeps the metric dropdown showing what is plotted at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);
@@ -137,7 +167,7 @@ describe("the Finances chart selectors", () => {
     },
   );
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
+  it.each(["PAUSED", "FAST"] as SpeedType[])(
     "replots when the period changes at %s speed",
     async (speed: SpeedType) => {
       renderFinances(game, speed);

@@ -442,8 +442,8 @@ export function padRange(
 
 /**
  * Evenly spaced ticks across a domain, snapped to whole steps of `unit`, spaced so at most
- * `maxTicks` land in the span. The month axes use it with a month's worth of minutes; the
- * finance charts use it with 1, because their x is already a month index.
+ * `maxTicks` land in the span. Minute-based month axes use it with a month's worth of minutes;
+ * charts whose x is already a month index use it with 1.
  */
 export function stepTicks(
   min: number,

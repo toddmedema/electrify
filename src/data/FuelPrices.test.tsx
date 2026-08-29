@@ -27,6 +27,13 @@ interface FixtureFuelType {
   swing: number;
 }
 const FIXTURE_FUELS: FixtureFuelType[] = [
+  {
+    column: "biomass",
+    name: "Biomass",
+    base: 1.5,
+    trendYearly: 0.025,
+    swing: 0.15,
+  },
   { column: "coal", name: "Coal", base: 2, trendYearly: 0.03, swing: 0.2 },
   {
     column: "naturalgas",
@@ -44,8 +51,8 @@ const FIXTURE_FUELS: FixtureFuelType[] = [
   },
   { column: "oil", name: "Oil", base: 10, trendYearly: 0.035, swing: 0.45 },
 ];
-const COAL = FIXTURE_FUELS[0];
-const NATURAL_GAS = FIXTURE_FUELS[1];
+const COAL = FIXTURE_FUELS.find((fuel) => fuel.name === "Coal")!;
+const NATURAL_GAS = FIXTURE_FUELS.find((fuel) => fuel.name === "Natural Gas")!;
 
 // A trend with a slow cycle riding on it, which is the shape a fuel price actually has -- and,
 // unlike the flat series this fixture used to be, something the projection can measure a spread
@@ -60,7 +67,7 @@ function fixturePrice(fuel: FixtureFuelType, monthsIn: number): number {
 }
 
 function fixtureCsv(): string {
-  const rows = ["year,month,naturalgas,coal,uranium,oil"];
+  const rows = ["year,month,biomass,naturalgas,coal,uranium,oil"];
   for (let year = FIXTURE_STARTING_YEAR; year <= FIXTURE_ENDING_YEAR; year++) {
     for (let month = 1; month <= 12; month++) {
       const monthsIn = (year - FIXTURE_STARTING_YEAR) * 12 + (month - 1);
@@ -73,6 +80,7 @@ function fixtureCsv(): string {
         [
           year,
           month,
+          by("biomass"),
           by("naturalgas"),
           by("coal"),
           by("uranium"),
@@ -86,10 +94,10 @@ function fixtureCsv(): string {
 
 // A flat record, for the degenerate case: a fuel that never moved has no spread to reproduce
 function flatCsv(): string {
-  const rows = ["year,month,naturalgas,coal,uranium,oil"];
+  const rows = ["year,month,biomass,naturalgas,coal,uranium,oil"];
   for (let year = FIXTURE_STARTING_YEAR; year <= FIXTURE_ENDING_YEAR; year++) {
     for (let month = 1; month <= 12; month++) {
-      rows.push([year, month, 3, 2, 0.7, 10].join(","));
+      rows.push([year, month, 1.5, 3, 2, 0.7, 10].join(","));
     }
   }
   return rows.join("\n");
@@ -133,6 +141,43 @@ describe("getFuelPricesPerMBTU", () => {
     });
   });
 
+  it("fills biomass from EIA's annual history when the legacy CSV has no column", () => {
+    initFuelPricesFromCsv(
+      "year,month,naturalgas,coal,uranium,oil\n2018,1,3,2,0.7,10",
+    );
+    expect(getFuelPricesPerMBTU(dateIn(2018, 1), SEED).Biomass).toBe(2.15);
+  });
+
+  it("keeps the US history but applies regional fuel-price levels", () => {
+    const date = dateIn(FIXTURE_STARTING_YEAR, 6);
+    const us = getFuelPricesPerMBTU(date, SEED);
+    const europe = getFuelPricesPerMBTU(date, SEED, {
+      id: "Paris",
+      name: "Paris",
+      lat: 48.8566,
+      long: 2.3522,
+      region: "Europe",
+      country: "France",
+    });
+    expect(europe["Natural Gas"]).toBeCloseTo(us["Natural Gas"] * 3);
+    expect(europe.Coal).toBeCloseTo(us.Coal * 1.5);
+    expect(Object.isFrozen(europe)).toBe(true);
+  });
+
+  it("makes coal cheaper in Australia and Indonesia", () => {
+    const date = dateIn(FIXTURE_STARTING_YEAR, 6);
+    const us = getFuelPricesPerMBTU(date, SEED);
+    const australia = getFuelPricesPerMBTU(date, SEED, {
+      id: "Sydney",
+      name: "Sydney",
+      lat: -33.8688,
+      long: 151.2093,
+      region: "Oceania",
+      country: "Australia",
+    });
+    expect(australia.Coal).toBeCloseTo(us.Coal * 0.6);
+  });
+
   it("projects prices past the end of the data", () => {
     const projected = pricesIn(FIXTURE_ENDING_YEAR + 3, 6);
     Object.values(projected).forEach((price: number) => {
@@ -171,7 +216,7 @@ describe("getFuelPricesPerMBTU", () => {
   });
 
   it("explains itself rather than hanging when nothing has been loaded", () => {
-    initFuelPricesFromCsv("year,month,naturalgas,coal,uranium,oil");
+    initFuelPricesFromCsv("year,month,biomass,naturalgas,coal,uranium,oil");
     expect(() => pricesIn(FIXTURE_STARTING_YEAR, 1)).toThrow(
       /No fuel prices loaded/,
     );
@@ -335,7 +380,7 @@ describe("initFuelPrices", () => {
       ok: true,
       text: () =>
         Promise.resolve(
-          "month,year,coal,naturalgas,uranium,oil\n12,2019,2.9,1.09,0.0011,9.76",
+          "month,year,biomass,coal,naturalgas,uranium,oil\n12,2019,2.28,2.9,1.09,0.0011,9.76",
         ),
     }) as unknown as typeof fetch;
     const failure = await new Promise((resolve) => initFuelPrices(resolve));

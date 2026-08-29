@@ -34,6 +34,8 @@ export interface UPlotChartProps<S> {
   /** Everything the option callbacks and plugins need, recomputed every render */
   state: S;
   data: uPlot.AlignedData;
+  /** Optional unstacked values for the accessible summary when the canvas needs cumulative data. */
+  summaryData?: uPlot.AlignedData;
   /** Called once per plot. Width and height are filled in by this component. */
   buildOptions: (ctx: BuildContext<S>) => uPlot.Options;
   /** Change to force a rebuild, eg when the number of series changes */
@@ -46,6 +48,10 @@ export interface UPlotChartProps<S> {
    * with the pointer -- five tooltips at once would cover the data they are about.
    */
   syncKey?: string;
+  /** Human names for each y-series, used by the keyboard/screen-reader summary below. */
+  seriesLabels?: string[];
+  /** Formats summary values with the same compact units the visible chart uses. */
+  formatSummaryValue?: (value: number, seriesIndex: number) => string;
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -110,6 +116,41 @@ export default function UPlotChart<S>(
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
+  const number = React.useMemo(
+    () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
+    [],
+  );
+  const formatSummaryValue =
+    props.formatSummaryValue || ((value: number) => number.format(value));
+  const seriesSummary = (props.summaryData || data)
+    .slice(1)
+    .map((series, index) => {
+      const values = Array.from(series).filter(
+        (value): value is number =>
+          typeof value === "number" && isFinite(value),
+      );
+      const first = values[0] || 0;
+      const latest = values[values.length - 1] || 0;
+      return {
+        label: props.seriesLabels?.[index] || `Series ${index + 1}`,
+        latest: formatSummaryValue(latest, index),
+        minimum: formatSummaryValue(
+          values.length ? Math.min(...values) : 0,
+          index,
+        ),
+        maximum: formatSummaryValue(
+          values.length ? Math.max(...values) : 0,
+          index,
+        ),
+        trend: latest > first ? "up" : latest < first ? "down" : "flat",
+      };
+    });
+  const accessibleLabel = `${ariaLabel}. ${seriesSummary
+    .map(
+      (series) =>
+        `${series.label}: latest ${series.latest}, range ${series.minimum} to ${series.maximum}, trend ${series.trend}`,
+    )
+    .join(". ")}`;
 
   // Refs rather than deps: the plot is built once, and everything it calls back into wants the
   // newest render's values, not the ones that happened to be current when it was built.
@@ -133,7 +174,14 @@ export default function UPlotChart<S>(
 
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
-    const measure = () => setWidth(root.clientWidth);
+    const measure = () => {
+      // Floor fractional flex widths so uPlot's explicit canvas width can never
+      // round a pixel wider than the pane that owns it.
+      const nextWidth = Math.floor(root.getBoundingClientRect().width);
+      setWidth((currentWidth) =>
+        currentWidth === nextWidth ? currentWidth : nextWidth,
+      );
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
@@ -190,5 +238,45 @@ export default function UPlotChart<S>(
     }
   });
 
-  return <div id={id} ref={rootRef} role="img" aria-label={ariaLabel} />;
+  return (
+    <div className="accessibleChart">
+      <div
+        id={id}
+        ref={rootRef}
+        role="img"
+        aria-label={accessibleLabel}
+        style={{
+          width: "100%",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+        }}
+      />
+      <details className="chartDataSummary">
+        <summary>View chart summary</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Series</th>
+              <th>Latest</th>
+              <th>Minimum</th>
+              <th>Maximum</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {seriesSummary.map((series) => (
+              <tr key={series.label}>
+                <th>{series.label}</th>
+                <td>{series.latest}</td>
+                <td>{series.minimum}</td>
+                <td>{series.maximum}</td>
+                <td>{series.trend}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  );
 }

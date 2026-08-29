@@ -10,6 +10,7 @@ import { getStore } from "../StoreRegistry";
 import { createGame } from "../testing/Simulator";
 import {
   loaded,
+  hasChronicBlackouts,
   quit,
   resume,
   setSpeed,
@@ -17,7 +18,8 @@ import {
   tickState,
 } from "./Game";
 import { TICK_MS } from "../Constants";
-import { GameType, ScenarioType } from "../Types";
+import { GameType, MonthlyHistoryType, ScenarioType } from "../Types";
+import * as User from "./User";
 
 /**
  * The end of scenario triggers hand their dialogs off to setTimeout so that the autosave
@@ -81,8 +83,13 @@ function playOutOnTheStore(state: GameType, untilMonth: number) {
 }
 
 describe("ending a scenario from inside the reducer", () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
 
   it("survives to the end of the term without reading the revoked draft", () => {
     const scenario = customScenario({ durationMonths: 2 });
@@ -145,18 +152,110 @@ describe("ending a scenario from inside the reducer", () => {
   });
 
   it("goes bankrupt without reading the revoked draft", () => {
-    // No cash and a marketing budget far past what the fleet earns: it is under within a month
+    // No cash and free electricity: operating the fleet puts it under within a month
     const scenario = customScenario({ cash: 0, durationMonths: 12 * 20 });
     let state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
       scenario,
-      monthlyMarketingSpend: 1000000000,
+      dollarsPerkWh: 0,
     });
     while (state.date.monthsEllapsed < 2) {
       state = tick(state);
     }
     expect(state.monthlyHistory[0].cash).toBeLessThan(0);
     expect(() => jest.runOnlyPendingTimers()).not.toThrow();
+  });
+
+  it("shows and submits a score after bankruptcy", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const scenario = SCENARIOS.find(
+      (s: ScenarioType) => s.id === 100,
+    ) as ScenarioType;
+    const state = createGame({ scenarioId: scenario.id });
+    // Start the month already overdrawn so this test reaches the bankruptcy path without relying
+    // on the removed marketing expense as an artificial cash drain.
+    state.timeline.forEach((tick) => {
+      tick.cash = -1;
+    });
+
+    playOutOnTheStore(state, 1);
+    expect(getStore().getState().game.monthlyHistory[0].cash).toBeLessThan(0);
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toEqual(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        outcome: "bankrupt",
+        ranked: true,
+      }),
+    );
+    expect(submitHighscore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        score: victory?.score,
+      }),
+    );
+  });
+
+  it("shows and submits a score after the player is fired", () => {
+    const submitHighscore = jest.spyOn(User, "submitHighscore");
+    getStore().dispatch(quit());
+    const scenario = SCENARIOS.find(
+      (s: ScenarioType) => s.id === 100,
+    ) as ScenarioType;
+    const state = createGame({ scenarioId: scenario.id });
+    const blackoutMonth: MonthlyHistoryType = {
+      year: scenario.startingYear,
+      month: 0,
+      supplyWh: 1,
+      demandWh: 100,
+      cash: scenario.cash,
+      customers: 100,
+      netWorth: scenario.cash,
+      revenue: 1,
+      expensesFuel: 0,
+      expensesOM: 0,
+      expensesCarbonFee: 0,
+      expensesInterest: 0,
+      kgco2e: 0,
+      interestRate: 0.05,
+      inflationRate: 0.02,
+    };
+    state.monthlyHistory = [
+      { ...blackoutMonth, month: 3 },
+      { ...blackoutMonth, month: 2 },
+      { ...blackoutMonth, month: 1 },
+    ];
+    expect(
+      hasChronicBlackouts([
+        { ...blackoutMonth, month: 4, supplyWh: 100 },
+        ...state.monthlyHistory,
+      ]),
+    ).toBe(false);
+    state.facilities.forEach((facility) => {
+      facility.paused = true;
+      facility.currentW = 0;
+    });
+
+    playOutOnTheStore(state, 1);
+    jest.runOnlyPendingTimers();
+
+    const victory = getStore().getState().ui.victory;
+    expect(victory).toEqual(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        outcome: "fired",
+        ranked: true,
+      }),
+    );
+    expect(submitHighscore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: scenario.id,
+        score: victory?.score,
+      }),
+    );
   });
 });
 
@@ -189,9 +288,9 @@ describe("finishing a tutorial", () => {
     expect(dialog.notCancellable).toBe(true);
   });
 
-  it("leads with the next tutorial and keeps the main menu as the way out", () => {
+  it("leads with the next mission and keeps the main menu as the way out", () => {
     const dialog = finishTutorial();
-    expect(dialog.actionLabel).toBe("Next tutorial");
+    expect(dialog.actionLabel).toBe("Next mission");
     expect(dialog.secondaryLabel).toBe("Main menu");
   });
 

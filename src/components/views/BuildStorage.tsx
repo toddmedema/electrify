@@ -38,6 +38,11 @@ import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
+import ConceptIcon from "../base/ConceptIcon";
+import {
+  getBuildAvailability,
+  ViableLocationsRow,
+} from "../base/BuildAvailability";
 import { GameType, SpeedType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
@@ -58,15 +63,12 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.interestRate,
     LOAN_MONTHS,
   );
-  const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const secondaryText = buildable ? (
-    storage.description
-  ) : (
-    <div>
-      Too large for current tech.
-      <br />
-      Max size: <strong>{formatWatts(props.storage.maxPeakWh)}h</strong>
-    </div>
+  const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
+  const { buildable, secondaryText } = getBuildAvailability(
+    storage.description,
+    sizeBuildable,
+    `${formatWatts(storage.maxPeakWh)}h`,
+    storage.viableLocationsRemaining,
   );
 
   const toggleExpand = () => {
@@ -85,7 +87,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   // </TableRow>
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar
@@ -101,6 +103,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               color="primary"
               onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
               {formatMoneyConcise(storage.buildCost)}
             </Button>
@@ -114,10 +117,17 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         title={storage.name}
         subheader={secondaryText}
       />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
-      )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+      <Button
+        color="primary"
+        className="expand-details"
+        size="small"
+        aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
+        aria-expanded={expanded}
+        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+        onClick={toggleExpand}
+      >
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
@@ -157,6 +167,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
+              <ViableLocationsRow
+                remaining={storage.viableLocationsRemaining}
+              />
             </TableBody>
           </Table>
         </TableContainer>
@@ -236,6 +249,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               props.onBuild(false);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
@@ -246,6 +260,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               props.onBuild(true);
               toggleOpen(e);
             }}
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan
           </Button>
@@ -335,13 +350,16 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     <div id="topbar" className="flexContainer">
       <Toolbar className="bottomBorder">
         <Typography variant="h6">
-          {formatMoneyStable(cash)} <span className="weak">Build Storage</span>
+          {formatMoneyStable(cash)}{" "}
+          <span className="weak gameStatusValue">
+            <ConceptIcon concept="storage" fontSize="small" />
+            Build Storage
+          </span>
         </Typography>
         {game.speed !== "PAUSED" && (
           <IconButton
             onClick={() => props.onSpeedChange("PAUSED")}
             aria-label="pause"
-            edge="end"
             color="primary"
             size="large"
           >
@@ -350,7 +368,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         )}
         <IconButton
           id="close-button"
-          edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
@@ -387,7 +404,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
           onChange={handleSliderChange}
         />
         <IconButton
-          edge="end"
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"

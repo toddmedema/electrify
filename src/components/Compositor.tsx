@@ -7,8 +7,9 @@ import {
   Snackbar,
   Typography,
 } from "@mui/material";
+import TouchAppIcon from "@mui/icons-material/TouchApp";
 import * as React from "react";
-import { GlobalHotKeys } from "react-hotkeys";
+import { GlobalHotKeys, configure } from "react-hotkeys";
 import {
   ACTIONS,
   EVENTS,
@@ -24,12 +25,15 @@ import {
   CardType,
   SettingsType,
   TransitionClassType,
+  TutorialStepChangeType,
   TutorialStepType,
   UIType,
+  isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import InstallAppButton from "./base/InstallAppButton";
 import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
@@ -38,15 +42,14 @@ import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
 import CustomGameContainer from "./views/CustomGameContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
-import FinancesContainer from "./views/FinancesContainer";
-import ForecastsContainer from "./views/ForecastsContainer";
+import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
-import { navigate } from "../reducers/Card";
+import { navigate, navigateBack } from "../reducers/Card";
 import {
   reprioritizeFacility,
   setSpeed,
@@ -56,9 +59,8 @@ import { snackbarOpen } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout, isUltrawideScreen } from "../Globals";
 import { store } from "../Store";
 
-// All three of these cards are shown at once side by side above the desktop breakpoint (see
-// isDesktopScreen / $desktop_breakpoint), so they share one stable transition key there --
-// switching among them shouldn't slide/remount the pane group, since nothing visibly changes
+// The in-game cards share one stable transition key above the desktop breakpoint. Facilities
+// and Insights stay mounted while Events replaces Insights, or joins it on an ultrawide screen.
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
 // And the same again for the two-column layout below it, where Facilities is pinned and the nav
@@ -73,6 +75,50 @@ const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 // the fleet has had shortcuts of its own
 const facilitySlotKey = (slot: number) => `shift+${slot}`;
 
+// react-hotkeys' default ignoreEventsCondition treats every <input> as a text field and drops
+// the keydown entirely -- but the capacity sliders on the build screens and the rate slider in
+// Finances are MUI Sliders, which render as a bare <input type="range">. Just
+// clicking one leaves it focused, and from then on every shortcut silently did nothing until
+// the player happened to click something else -- the "some element is pulling focus" bug.
+// These types don't take character input, so there's nothing for a shortcut key to clobber.
+// Escape is exempted outright too, so it can always back out of a screen even if focus never
+// left an actual text field.
+const NON_TEXT_INPUT_TYPES = new Set([
+  "range",
+  "checkbox",
+  "radio",
+  "button",
+  "color",
+  "submit",
+  "reset",
+  "image",
+  "file",
+]);
+configure({
+  ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      return false;
+    }
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName?.toLowerCase();
+    if (!tagName) {
+      return false;
+    }
+    if (
+      tagName === "input" &&
+      NON_TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)
+    ) {
+      return false;
+    }
+    return (
+      tagName === "input" ||
+      tagName === "select" ||
+      tagName === "textarea" ||
+      !!target?.isContentEditable
+    );
+  },
+});
+
 // Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
 // both list -- exported so a test can hold the two against each other rather than a comment
 // asking politely. react-hotkeys ignores key events from inputs, so `?` still types into a
@@ -83,13 +129,14 @@ export const keyMap = {
   NORMAL: "2",
   FAST: "3",
   FACILITIES: "q",
-  FINANCES: "w",
-  FORECASTS: "e",
+  INSIGHTS: ["w", "e"],
+  EVENTS: "r",
   BUILD_GENERATOR: "g",
   BUILD_STORAGE: "s",
   PRIORITIZE_EARLIER: "[",
   PRIORITIZE_LATER: "]",
   MANUAL: ["?", "shift+/"],
+  ESCAPE: "esc",
   ...Object.fromEntries(
     FACILITY_SLOTS.map((slot: number) => [
       `TOGGLE_FACILITY_${slot}`,
@@ -179,11 +226,11 @@ const shortcutHandlers = {
   FACILITIES: () => {
     store.dispatch(navigate("FACILITIES"));
   },
-  FINANCES: () => {
-    store.dispatch(navigate("FINANCES"));
+  INSIGHTS: () => {
+    store.dispatch(navigate("INSIGHTS"));
   },
-  FORECASTS: () => {
-    store.dispatch(navigate("FORECASTS"));
+  EVENTS: () => {
+    store.dispatch(navigate("EVENTS"));
   },
   BUILD_GENERATOR: () => {
     if (canPlay()) {
@@ -202,6 +249,15 @@ const shortcutHandlers = {
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
+  // Every screen that isn't one of the three panes (Build Generator/Storage, Manual, Settings)
+  // is reached by a "back"/"close" control rather than tab navigation, and none of them
+  // responded to Escape -- this gives all of them one, without hardcoding which cards count
+  ESCAPE: () => {
+    const { card, game } = store.getState();
+    if (game.inGame && !isNavCard(card.name)) {
+      store.dispatch(navigateBack());
+    }
+  },
   ...Object.fromEntries(
     FACILITY_SLOTS.map((slot: number) => [
       `TOGGLE_FACILITY_${slot}`,
@@ -216,11 +272,16 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
     size,
     step,
     backProps,
+    closeProps,
     primaryProps,
     tooltipProps,
     isLastStep,
   } = props;
   const isString = typeof step.content === "string";
+  // Presentation flags baked in by stepsForViewport: a gated step has no Next button -
+  // doing the highlighted deed is what advances it - and Back is hidden next to a gate,
+  // since backing into a satisfied one would instantly re-advance
+  const flags = (step.data || {}) as { gated?: boolean; hideBack?: boolean };
   // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
   // without one screen readers announce an anonymous dialog
   return (
@@ -240,14 +301,26 @@ function Tooltip(props: TooltipRenderProps): React.JSX.Element {
         <span className="tutorialProgress">
           Step {index + 1} of {size}
         </span>
-        {index > 0 && (
+        <Button {...closeProps} color="primary" size="small">
+          Exit tutorial
+        </Button>
+        {index > 0 && !flags.hideBack && (
           <Button {...backProps} color="primary">
             Back
           </Button>
         )}
-        <Button {...primaryProps} variant="contained" color="primary">
-          {isLastStep ? "Play" : "Next"}
-        </Button>
+        {flags.gated ? (
+          <span
+            className="tutorialDoIt"
+            aria-label="Do the highlighted action to continue"
+          >
+            <TouchAppIcon color="primary" />
+          </span>
+        ) : (
+          <Button {...primaryProps} variant="contained" color="primary">
+            {isLastStep ? "Play" : "Next"}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -263,15 +336,9 @@ export interface StateProps {
   tutorialSteps?: TutorialStepType[];
 }
 
-// A walkthrough moving between two steps. Both ends are named because Back and Next need
-// telling apart: a step's onNext only applies to leaving it forwards
-export interface TutorialStepChangeType {
-  fromStep: number;
-  toStep: number;
-  tutorialSteps: TutorialStepType[] | undefined;
-  scenarioId: number;
-  currentCard: CardNameType;
-}
+// Moved to Types so the tutorial gate middleware can share it without a component import;
+// re-exported here for existing consumers
+export type { TutorialStepChangeType } from "../Types";
 
 export interface DispatchProps {
   closeDialog: () => void;
@@ -288,6 +355,7 @@ export function isNavCard(name: CardNameType) {
 
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+  private tutorialScrollTimeout: ReturnType<typeof setTimeout> | undefined;
   private stepsCache:
     | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
     | undefined;
@@ -317,9 +385,24 @@ export default class Compositor extends React.Component<Props, {}> {
     if (cache && cache.source === steps && cache.desktop === desktop) {
       return cache.resolved;
     }
-    const resolved = steps.map((step) => {
-      const { desktop: override, ...rest } = step;
-      return (desktop && override ? { ...rest, ...override } : rest) as Step;
+    const resolved = steps.map((step, i) => {
+      // The gate fields and onNext are engine concerns; Joyride only needs the
+      // presentation, plus flags telling the tooltip which buttons make sense here
+      const {
+        desktop: override,
+        advanceOn: _advanceOn,
+        advanceOnAction: _advanceOnAction,
+        onNext: _onNext,
+        ...rest
+      } = step;
+      const merged = desktop && override ? { ...rest, ...override } : rest;
+      return {
+        ...merged,
+        data: {
+          gated: isGatedStep(step),
+          hideBack: isGatedStep(step) || (i > 0 && isGatedStep(steps[i - 1])),
+        },
+      } as Step;
     });
     this.stepsCache = { source: steps, desktop, resolved };
     return resolved;
@@ -335,11 +418,42 @@ export default class Compositor extends React.Component<Props, {}> {
 
   public componentDidMount() {
     window.addEventListener("resize", this.handleResize);
+    this.scrollTutorialTargetIntoView();
+  }
+
+  public componentDidUpdate(prevProps: Props) {
+    if (
+      prevProps.tutorialStep !== this.props.tutorialStep ||
+      prevProps.card.name !== this.props.card.name
+    ) {
+      this.scrollTutorialTargetIntoView();
+    }
   }
 
   public componentWillUnmount() {
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
+    clearTimeout(this.tutorialScrollTimeout);
+  }
+
+  /** Joyride scrolling hangs inside card panes, so move their real scroll container ourselves. */
+  private scrollTutorialTargetIntoView() {
+    clearTimeout(this.tutorialScrollTimeout);
+    this.tutorialScrollTimeout = setTimeout(() => {
+      const steps = this.props.tutorialSteps;
+      const index = this.props.tutorialStep;
+      if (!steps || index < 0 || index >= steps.length) {
+        return;
+      }
+      const target = this.stepsForViewport(steps)[index]?.target;
+      if (typeof target !== "string") {
+        return;
+      }
+      const element = document.querySelector(target);
+      if (element && typeof element.scrollIntoView === "function") {
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    }, 50);
   }
 
   public handleJoyrideCallback = (data: EventData) => {
@@ -348,6 +462,17 @@ export default class Compositor extends React.Component<Props, {}> {
     // scenario list. Has to come first, since closing also reports STEP_AFTER
     if (action === ACTIONS.CLOSE) {
       this.props.onTutorialEnd(this.props.tutorialSteps);
+      return;
+    }
+    // A gated step advances only by its deed. Skipping it on a missing target would wave
+    // the player past the very thing the step exists to make them do - and the deed itself
+    // often removes the target for a frame (buying closes the build screen), which Joyride
+    // reports as TARGET_NOT_FOUND while the gate middleware is already landing the next step
+    const current =
+      this.props.tutorialStep >= 0 && this.props.tutorialSteps
+        ? this.props.tutorialSteps[this.props.tutorialStep]
+        : undefined;
+    if (type === EVENTS.TARGET_NOT_FOUND && current && isGatedStep(current)) {
       return;
     }
     const advancingEvents: string[] = [
@@ -377,17 +502,19 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): React.JSX.Element {
     const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
-    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them.
-    // Cash, the date, the speed controls and the year's progress are the game's state rather
-    // than any one pane's, so they span all three columns instead of living in the first
+    // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
+    // instead of splitting the width between separate Finance and Forecast chart columns.
     if (isPanes && isDesktopScreen()) {
       return (
         <div className="desktop-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            <FinancesContainer />
-            <ForecastsContainer />
+            {this.props.card.name === "EVENTS" && !isUltrawideScreen() ? (
+              <EventLogContainer />
+            ) : (
+              <InsightsContainer />
+            )}
             {/* An ultrawide window is otherwise three panes and a lot of nothing. Only here,
                 because below this a fourth column comes out of the three that carry the game */}
             {isUltrawideScreen() ? <EventLogContainer /> : null}
@@ -395,20 +522,17 @@ export default class Compositor extends React.Component<Props, {}> {
         </div>
       );
     }
-    // Laptops and landscape tablets, which used to get a phone-width card floating in a sea of
-    // margin. There isn't room for three columns here, but there is for two: the fleet, which
-    // is the pane a player wants on screen while they read either of the others, pinned beside
-    // whichever of them the nav is on
+    // Laptops and landscape tablets keep the fleet pinned beside Insights or Events.
     if (isPanes) {
       return (
         <div className="pane-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            {this.props.card.name === "FORECASTS" ? (
-              <ForecastsContainer />
+            {this.props.card.name === "EVENTS" ? (
+              <EventLogContainer />
             ) : (
-              <FinancesContainer />
+              <InsightsContainer />
             )}
           </DesktopPanes>
           {/* The panes supply no nav of their own in this layout, and it is still what
@@ -422,10 +546,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <BuildGeneratorsContainer />;
       case "BUILD_STORAGE":
         return <BuildStorageContainer />;
-      case "FINANCES":
-        return <FinancesContainer />;
-      case "FORECASTS":
-        return <ForecastsContainer />;
+      case "INSIGHTS":
+        return <InsightsContainer />;
+      case "EVENTS":
+        return <EventLogContainer />;
       case "FACILITIES":
         return <FacilitiesContainer />;
       case "SETTINGS":
@@ -509,9 +633,9 @@ export default class Compositor extends React.Component<Props, {}> {
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <div className="base_main" ref={transitionNodeRef}>
+            <main className="base_main" ref={transitionNodeRef}>
               {this.renderCard()}
-            </div>
+            </main>
           </CSSTransition>
         </TransitionGroup>
         {tutorialSteps && (
@@ -530,7 +654,9 @@ export default class Compositor extends React.Component<Props, {}> {
             // disableOverlayClose prop, into this single options prop
             options={{
               beaconSize: 48,
-              overlayColor: "rgba(0, 0, 0, 0.1)",
+              // Enough separation to make the highlighted control unmistakable while keeping
+              // the surrounding dashboard legible as context for what the prompt is teaching.
+              overlayColor: "rgba(0, 0, 0, 0.38)",
               // Joyride traps Tab inside the tooltip, so Esc is the way back out for
               // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
               // those are far too easy to trigger by accident mid-walkthrough
@@ -559,6 +685,9 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
+            {ui.dialog.title.startsWith("🎉") && (
+              <InstallAppButton label="Install for later" afterMilestone />
+            )}
             {ui.dialog.secondaryAction && (
               <Button color="primary" onClick={ui.dialog.secondaryAction}>
                 {ui.dialog.secondaryLabel || "Close"}
@@ -581,7 +710,7 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <Snackbar
-          className="snackbar"
+          className={`snackbar ${isNavCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}

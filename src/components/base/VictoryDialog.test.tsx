@@ -11,7 +11,11 @@ jest.mock("../../reducers/User", () => ({
 
 const mockShareText = jest.fn();
 jest.mock("../../helpers/Share", () => ({
-  buildShareText: () => "I scored 812 ...",
+  buildScoreShareContent: () => ({
+    title: "score",
+    text: "I scored 812 ...",
+    url: "https://electrifygame.com",
+  }),
   canShare: () => true,
   shareText: (...args: unknown[]) => mockShareText(...args),
 }));
@@ -34,6 +38,7 @@ function renderDialog(overrides: Partial<Props> = {}) {
     loggedIn: true,
     onClose: () => undefined,
     onQuit: () => undefined,
+    onRetry: () => undefined,
     onLogin: () => undefined,
     onShared: () => undefined,
     onShareFailed: () => undefined,
@@ -67,6 +72,14 @@ describe("VictoryDialog", () => {
       screen.getByText(/800 pts from electricity supplied/),
     ).toBeInTheDocument();
     expect(screen.getByText(/-18 pts from blackouts/)).toBeInTheDocument();
+    expect(screen.queryByText("What you accomplished")).not.toBeInTheDocument();
+  });
+
+  it("uses the scenario name instead of repeating a generic completion title", () => {
+    renderDialog({ victory: aVictory({ endTitle: "Mission complete!" }) });
+
+    expect(screen.getByText("Deregulation")).toBeInTheDocument();
+    expect(screen.getAllByText(/Mission complete/i)).toHaveLength(1);
   });
 
   it("fills in the global rank once it resolves", async () => {
@@ -134,7 +147,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("clipboard");
     renderDialog({ onShared });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByText("Share score"));
     await waitFor(() => expect(onShared).toHaveBeenCalled());
     expect(onShared.mock.calls[0][1]).toBe("clipboard");
   });
@@ -146,7 +159,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("cancelled");
     renderDialog({ onShared, onShareFailed });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByText("Share score"));
     await waitFor(() => expect(mockShareText).toHaveBeenCalled());
     expect(onShared).not.toHaveBeenCalled();
     expect(onShareFailed).not.toHaveBeenCalled();
@@ -157,11 +170,30 @@ describe("VictoryDialog", () => {
     const onQuit = jest.fn();
     renderDialog({ onClose, onQuit });
 
-    await userEvent.click(screen.getByText("Keep playing"));
+    await userEvent.click(screen.getByText("Review final grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Return to scenarios"));
+    await userEvent.click(screen.getByText("Choose scenario"));
     expect(onQuit).toHaveBeenCalled();
   });
+
+  it.each([
+    ["bankrupt", "Bankrupt!"],
+    ["fired", "Fired!"],
+  ] as const)(
+    "shows a %s score without letting the terminal run resume",
+    async (outcome, title) => {
+      const onClose = jest.fn();
+      renderDialog({ victory: aVictory({ outcome }), onClose });
+
+      expect(screen.getByText("Run ended")).toBeInTheDocument();
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
+      expect(screen.getByText(/Final score/)).toBeInTheDocument();
+      expect(screen.queryByText("Review final grid")).not.toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      expect(onClose).not.toHaveBeenCalled();
+    },
+  );
 
   it("uses the scenario's own ending when it has one", () => {
     renderDialog({

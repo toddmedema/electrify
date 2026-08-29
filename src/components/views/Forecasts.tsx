@@ -35,10 +35,11 @@ import ChartForecastSupplyByFuel, {
 } from "../base/ChartForecastSupplyByFuel";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartForecastStorage from "../base/ChartForecastStorage";
+import ChartForecastWater from "../base/ChartForecastWater";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
-import { fuelColors, fuelDashArrays } from "../../Theme";
+import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
 
 const FORECAST_YEARS_KEY = "forecastYears";
 const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
@@ -87,14 +88,12 @@ export default class Forecasts extends React.Component<Props, State> {
     // Because forecasts are computationally intense and long term, only update when the
     // month or state changes -- plus when the player selects a facility, which is a direct
     // request to re-highlight the stack and would otherwise wait for a month rollover, or moves
-    // a slider that feeds the forecast (marketing spend drives customer growth, the rate drives
-    // revenue), which would otherwise sit frozen until the next month rolled over
+    // the rate slider, which drives both customer growth and revenue and would otherwise sit
+    // frozen until the next month rolled over
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
       this.props.selectedFacilityId !== nextProps.selectedFacilityId ||
       this.state.years !== nextState.years ||
-      this.props.game.monthlyMarketingSpend !==
-        nextProps.game.monthlyMarketingSpend ||
       this.props.game.dollarsPerkWh !== nextProps.game.dollarsPerkWh
     );
   }
@@ -116,6 +115,9 @@ export default class Forecasts extends React.Component<Props, State> {
     );
 
     let hasStorage = false;
+    const hasHydro = game.facilities.some(
+      (facility) => facility.fuel === "Hydro",
+    );
     for (let i = 0; i < forecastedTimeline.length; i++) {
       if (forecastedTimeline[i].storedWh > 0) {
         hasStorage = true;
@@ -370,6 +372,35 @@ export default class Forecasts extends React.Component<Props, State> {
             showXLabels={false}
             syncKey={FORECAST_SYNC_KEY}
           />
+          {hasHydro && (
+            <div>
+              <Toolbar className="forecastSection">
+                <Typography variant="h6">
+                  Water in {game.location.watershedName || game.location.name}
+                </Typography>
+                <ChartLegend
+                  inline
+                  items={[
+                    {
+                      name: "Precipitation",
+                      color: chartPalette().precipitation,
+                    },
+                    { name: "Snowpack", color: chartPalette().snowpack },
+                    { name: "Reservoir", color: chartPalette().reservoir },
+                  ]}
+                />
+              </Toolbar>
+              <ChartForecastWater
+                height={140}
+                timeline={sampledForecastedTimeline}
+                domain={{ x: [rangeMin, rangeMax] }}
+                startingYear={game.startingYear}
+                multiyear={years > 1}
+                showXLabels={false}
+                syncKey={FORECAST_SYNC_KEY}
+              />
+            </div>
+          )}
           <Toolbar className="forecastSection">
             <Typography variant="h6">
               Weather in {game.location.name}

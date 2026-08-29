@@ -56,6 +56,12 @@ export const LOCATIONS = {
     lat: 40.4406,
     long: -79.9959,
     timeZone: "America/New_York",
+    region: "North America",
+    country: "United States",
+    admin: "PA",
+    watershedId: "AlleghenyUpper",
+    watershedName: "Upper Allegheny watershed",
+    resources: { hydro: true },
   },
   SF: {
     id: "SF",
@@ -63,6 +69,13 @@ export const LOCATIONS = {
     lat: 37.7749,
     long: -122.4194,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    offshore: true,
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
+    resources: { geothermal: true, hydro: true },
   },
   LA: {
     id: "LA",
@@ -70,16 +83,25 @@ export const LOCATIONS = {
     lat: 34.0522,
     long: -118.2437,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    offshore: true,
+    resources: { geothermal: true },
   },
-  // Named for where its data was read as coming from, back when it was a CSV of unknown
-  // provenance. It now genuinely is the Santa Cruz Mountains: every location is fetched from
-  // these coordinates, so the name and the weather can no longer disagree
+  // Echo Summit stands in for the snow-fed Sierra headwaters supplying California hydro.
   CAMountains: {
     id: "CAMountains",
-    name: "Santa Cruz Mountains, CA",
-    lat: 37.1041,
-    long: -122.0308,
+    name: "Echo Summit, CA",
+    lat: 38.93,
+    long: -120.03,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
+    resources: { geothermal: true, hydro: true },
   },
   HNL: {
     id: "HNL",
@@ -87,6 +109,11 @@ export const LOCATIONS = {
     lat: 21.3099,
     long: -157.8581,
     timeZone: "Pacific/Honolulu",
+    region: "North America",
+    country: "United States",
+    admin: "HI",
+    offshore: true,
+    resources: { geothermal: true },
   },
   SJU: {
     id: "SJU",
@@ -94,8 +121,13 @@ export const LOCATIONS = {
     lat: 18.4671,
     long: -66.1185,
     timeZone: "America/Puerto_Rico",
+    region: "North America",
+    country: "United States",
+    admin: "Puerto Rico",
+    offshore: true,
+    resources: { hydro: true },
   },
-} as { [id: string]: LocationType };
+} as { [id: string]: LocationType & { admin?: string } };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 
@@ -110,9 +142,8 @@ export const TICK_MS = {
 // Fallbacks for the screens that run before any economic data has been loaded, and the anchor
 // the projected cycles rest near. The played game reads its rates from data/Economy instead.
 export const INFLATION = 0.03;
-export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% 2018 -> 2019, and that's with some marketing spending
+export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const RESERVE_MARGIN = 0.05;
-export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;
@@ -151,6 +182,12 @@ export const FUELS = {
   Coal: {
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
+  Biomass: {
+    // 195 lb CO2/MMBtu for biomass, converted to kg/Btu. This is direct combustion CO2:
+    // net biogenic emissions depend on the feedstock and regrowth and cannot be assumed zero.
+    // https://www.eia.gov/outlooks/capitalcost/pdf/updated_capcost.pdf
+    kgCO2ePerBtu: 0.000088451,
+  },
   "Natural Gas": {
     kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
@@ -160,17 +197,19 @@ export const FUELS = {
   Oil: {
     kgCO2ePerBtu: 0.00002031, // https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references
   },
+  Geothermal: {
+    kgCO2ePerBtu: 0,
+  },
+  Hydro: {
+    kgCO2ePerBtu: 0,
+  },
   // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
   // 'Trash': {
   //   kgCO2ePerBtu: 999,
   // },
 } as { [fuel: string]: FuelType };
 
-export const NAV_CARDS = [
-  "FACILITIES",
-  "FINANCES",
-  "FORECASTS",
-] as CardNameType[];
+export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click

@@ -5,7 +5,12 @@
 
 import { blue, green, grey, red, amber } from "@mui/material/colors";
 import { createTheme, Theme } from "@mui/material/styles";
-import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
+import {
+  DemandTypeNameType,
+  FuelNameType,
+  ThemeChoiceType,
+  ThemeModeType,
+} from "./Types";
 
 /**
  * The game's two palettes.
@@ -21,7 +26,7 @@ import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
  * four lines on one chart be told apart.
  */
 
-// Seven series can never all clear WCAG's 3:1 non-text contrast against each other - the
+// Nine series can never all clear WCAG's 3:1 non-text contrast against each other - the
 // luminance ladder runs out at about four - so these are tuned for two things that are achievable:
 // every fuel clears 3:1 against the plot area, and the pairs that share a line chart
 // (the four priced fuels) are spread as far apart in luminance as that constraint allows.
@@ -31,27 +36,58 @@ import { FuelNameType, ThemeChoiceType, ThemeModeType } from "./Types";
 const FUEL_COLORS: { [mode in ThemeModeType]: { [fuel: string]: string } } = {
   light: {
     Coal: "#1a1a1a", // 17.4:1 on white
+    Biomass: "#356b20",
     Uranium: "#0f5b63", // 7.8:1
     Oil: "#ac4e13", // 5.5:1
     "Natural Gas": "#bb79e6", // 3.0:1
     Sun: "#a87817", // 3.9:1
     Wind: "#193f79", // 10.4:1
+    "Offshore Wind": "#0097a7", // 3.5:1 on white, 3.0:1 against Wind
     Geothermal: "#531834", // 13.6:1
+    Hydro: "#006b54",
   },
   dark: {
     Coal: "#d0d0d0", // 11.9:1 on #121212 - the darkest fuel has to become the lightest
+    Biomass: "#9ccc65",
     Uranium: "#4dd0e1", // 9.9:1
     Oil: "#ffa726", // 10.6:1
     "Natural Gas": "#ce93d8", // 7.7:1
     Sun: "#ffd54f", // 13.6:1
     Wind: "#64b5f6", // 8.0:1
+    "Offshore Wind": "#006e75", // 3.1:1 on #121212, 2.7:1 against Wind
     Geothermal: "#f48fb1", // 8.7:1
+    Hydro: "#66d9b7",
   },
 };
 
 /** The fuel colours for the palette in use. */
 export function fuelColors(): { [fuel: string]: string } {
   return FUEL_COLORS[currentMode];
+}
+
+const DEMAND_TYPE_COLORS: Record<
+  ThemeModeType,
+  Record<DemandTypeNameType, string>
+> = {
+  light: {
+    Residential: "#1565c0",
+    Commercial: "#6a1b9a",
+    Industrial: "#8d4b20",
+    Transportation: "#2e7d32",
+    "Data centers": "#c62828",
+  },
+  dark: {
+    Residential: "#64b5f6",
+    Commercial: "#ce93d8",
+    Industrial: "#d7a86e",
+    Transportation: "#81c784",
+    "Data centers": "#ef9a9a",
+  },
+};
+
+/** Colors shared by the demand-by-type chart and its DOM legend. */
+export function demandTypeColors(): Record<DemandTypeNameType, string> {
+  return DEMAND_TYPE_COLORS[currentMode];
 }
 
 /** One fuel's colour, or the storage colour for a facility that burns nothing. */
@@ -64,6 +100,7 @@ export function facilityColor(fuel?: FuelNameType): string {
 // a dash pattern reads the same on either palette.
 export const fuelDashArrays = {
   Coal: undefined, // solid
+  Biomass: "12,3",
   "Natural Gas": "6,3",
   Oil: "2,3",
   Uranium: "9,3,2,3",
@@ -81,6 +118,10 @@ interface ChartPaletteType {
   /** The temperature line's punch is too thin for the axis labels naming it */
   temperatureAxis: string;
   wind: string;
+  offshoreWind: string;
+  precipitation: string;
+  snowpack: string;
+  reservoir: string;
   /** Hover crosshair, lighter than the data it crosses */
   cursor: string;
   /** A trend line on offer rather than being read: the unselected metric tiles */
@@ -108,6 +149,10 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     temperatureAxis: red[800],
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
+    offshoreWind: FUEL_COLORS.light["Offshore Wind"],
+    precipitation: blue[400],
+    snowpack: "#6d4c9a",
+    reservoir: FUEL_COLORS.light.Hydro,
     cursor: grey[600],
     muted: grey[600],
     axis: "black",
@@ -115,7 +160,8 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     grid: "#ECEFF1", // VictoryTheme.material's, which these charts inherited
     tick: "#90A4AE",
     legendText: "#252525",
-    interactive: blue[600],
+    // blue600 misses 4.5:1 for the small link/button text used throughout the app.
+    interactive: blue[800],
     background: "#ffffff",
   },
   dark: {
@@ -129,6 +175,10 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     temperature: red[300],
     temperatureAxis: red[300],
     wind: FUEL_COLORS.dark.Wind,
+    offshoreWind: FUEL_COLORS.dark["Offshore Wind"],
+    precipitation: blue[300],
+    snowpack: "#ce93d8",
+    reservoir: FUEL_COLORS.dark.Hydro,
     cursor: grey[500],
     muted: grey[500],
     axis: grey[300],
@@ -230,9 +280,29 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           : { default: "#ffffff", paper: "#ffffff" },
     },
     typography: {
-      fontSize: 14,
+      fontSize: 15,
       body1: {
-        lineHeight: 1.2,
+        lineHeight: 1.35,
+      },
+    },
+    shape: {
+      borderRadius: 6,
+    },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            minHeight: 40,
+            fontWeight: 600,
+            textTransform: "none",
+            touchAction: "manipulation",
+          },
+        },
+      },
+      MuiButtonBase: {
+        defaultProps: {
+          disableRipple: false,
+        },
       },
     },
   });

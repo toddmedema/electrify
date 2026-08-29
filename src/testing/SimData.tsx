@@ -46,29 +46,44 @@ export function simLocationIds(): string[] {
  * run left behind. Both modules loop or throw when asked for data they don't have, so this
  * has to run before any simulation is started.
  */
-export function loadSimData(locationId: LocationIdType) {
+export function loadSimData(locationOrId: LocationIdType | LocationType) {
+  const locationId =
+    typeof locationOrId === "string" ? locationOrId : locationOrId.id;
   // Now that a location id is any string rather than a checked union, it can't go into a path
   // unexamined -- and "no such file" thrown from deep inside readFileSync is a worse error than
   // this one anyway
   if (!isValidLocationId(locationId)) {
     throw new Error(`Invalid location id "${locationId}"`);
   }
-  const file = path.join(DATA_DIR, "weather", `${locationId}.bin`);
-  if (!fs.existsSync(file)) {
-    throw new Error(
-      `No weather data for "${locationId}" - run: node scripts/fetch-weather.js ${locationId}`,
-    );
-  }
-  // Node hands back a Buffer that may be a window onto a larger pool, so the exact byte range
-  // has to be sliced out rather than the whole underlying ArrayBuffer handed over
-  const bytes = fs.readFileSync(file);
-  initWeatherFromBinary(
+  const location =
+    typeof locationOrId === "string"
+      ? getSimLocation(locationId)
+      : locationOrId;
+  const weatherIds = [
     locationId,
-    bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer,
-  );
+    ...(location?.watershedId && location.watershedId !== locationId
+      ? [location.watershedId]
+      : []),
+  ];
+  weatherIds.forEach((id, index) => {
+    const file = path.join(DATA_DIR, "weather", `${id}.bin`);
+    if (!fs.existsSync(file)) {
+      throw new Error(
+        `No weather data for "${id}" - run: node scripts/fetch-weather.js ${id}`,
+      );
+    }
+    // Node hands back a Buffer that may be a window onto a larger pool, so the exact byte range
+    // has to be sliced out rather than the whole underlying ArrayBuffer handed over
+    const bytes = fs.readFileSync(file);
+    initWeatherFromBinary(
+      id,
+      bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer,
+      index > 0,
+    );
+  });
   initFuelPricesFromCsv(
     fs.readFileSync(path.join(DATA_DIR, "FuelPricesRaw.csv"), "utf8"),
   );

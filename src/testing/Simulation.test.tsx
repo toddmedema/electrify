@@ -2,7 +2,7 @@ import { SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { createGame, runSimulation, SimResultType } from "./Simulator";
 import { loadSimData } from "./SimData";
-import { TICKS_PER_MONTH } from "../Constants";
+import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
@@ -81,13 +81,11 @@ describe("simulation invariants", () => {
     });
   });
 
-  it("holds while spending on marketing", () => {
-    expectNoViolations(
-      runSimulation({
-        scenarioId: 101,
-        months: MONTHS,
-        monthlyMarketingSpend: 5000000,
-      }),
+  it("holds while gaining and losing customers through price competition", () => {
+    [0.01, 0.2].forEach((dollarsPerkWh) =>
+      expectNoViolations(
+        runSimulation({ scenarioId: 101, months: MONTHS, dollarsPerkWh }),
+      ),
     );
   });
 
@@ -172,7 +170,149 @@ describe("simulation determinism", () => {
   });
 });
 
+describe("hydro dispatch", () => {
+  const scenario: ScenarioType = {
+    id: 9999,
+    name: "Hydro test basin",
+    icon: "hydro",
+    locationId: "SF",
+    location: LOCATIONS.SF,
+    ownership: "Public",
+    startingYear: 2002,
+    cash: 500_000_000,
+    startingCustomers: 250_000,
+    feePerKgCO2e: 0,
+    dollarsPerkWh: 0.1,
+    durationMonths: 24,
+    facilities: [{ fuel: "Hydro", peakW: 150_000_000 }],
+  };
+
+  function hydroGame() {
+    return createGame({ scenarioId: scenario.id, scenario });
+  }
+
+  it("holds the water-balance invariants across wet and dry seasons", () => {
+    expectNoViolations(
+      runSimulation({ scenarioId: scenario.id, scenario, months: 24 }),
+    );
+  });
+
+  it("turns water-rights flow into must-run power above the dead pool", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.hydroMandatedReleaseW).toBeGreaterThan(0);
+    expect(now.supplyByFuel.Hydro).toBeGreaterThanOrEqual(
+      now.hydroMandatedReleaseW,
+    );
+    expect(hydro.reservoirWh).toBeLessThan(hydro.reservoirCapacityWh!);
+  });
+
+  it("stops producing below minimum power pool while required releases continue", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh! * 0.05;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
+  });
+
+  it("keeps paused reservoirs visible while required releases bypass the turbine", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.paused = true;
+    const before = hydro.reservoirWh!;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(now.hydroReservoirWh).toBe(hydro.reservoirWh);
+    expect(now.hydroReservoirCapacityWh).toBe(hydro.reservoirCapacityWh);
+    expect(hydro.reservoirWh).not.toBe(before);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
+  });
+});
+
 describe("simulation economics", () => {
+  // Reproducible, UI-legal playthroughs found by the CEO playtest agents. Investor scenarios use
+  // facility actions only; the one rate change belongs to the Public scenario and is checked below.
+  const CEO_WINNING_PLAYS = {
+    100: {
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 150000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 37,
+    },
+    101: { sellFacilityId: 1 },
+    102: {
+      dollarsPerkWh: 0.034,
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 200000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    },
+    103: {
+      dollarsPerkWh: 0.039,
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 400000000,
+        financed: true,
+      },
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    },
+    104: { dollarsPerkWh: 0.08 },
+    105: {
+      dollarsPerkWh: 0.08,
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 300000000,
+        financed: true,
+      },
+    },
+  } as const;
+  const CEO_ACTION_COUNTS = {
+    100: 2,
+    101: 1,
+    102: 3,
+    103: 3,
+    104: 1,
+    105: 2,
+  } as Record<number, number>;
+
+  SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+    (scenario) => {
+      it(`requires player input to win "${scenario.name}" on CEO`, () => {
+        const passive = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+        });
+        expectNoViolations(passive);
+        expect(passive.actionCount).toBe(0);
+        expect(passive.outcome).not.toBe("completed");
+
+        const play =
+          CEO_WINNING_PLAYS[scenario.id as keyof typeof CEO_WINNING_PLAYS];
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+        });
+        expectNoViolations(active);
+        expect(active.actionCount).toBe(CEO_ACTION_COUNTS[scenario.id]);
+        expect(active.outcome).toBe("completed");
+      });
+    },
+  );
+
   it("bills every customer it supplies at the going rate", () => {
     const result = runSimulation({
       scenarioId: 101,
@@ -209,6 +349,23 @@ describe("simulation economics", () => {
     const revenue = (r: SimResultType) =>
       r.months.reduce((a, m) => a + m.revenue, 0);
     expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
+  });
+
+  it("moves investor customers toward a cheaper utility and away from a dearer one", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 101, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.05)).toBeGreaterThan(customersAt(0.07));
+    expect(customersAt(0.07)).toBeGreaterThan(customersAt(0.1));
+  });
+
+  it("keeps public customer growth independent of the rate", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 104, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.02)).toBe(customersAt(0.2));
   });
 
   /**
