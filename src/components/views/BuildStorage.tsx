@@ -373,7 +373,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
           <IconButton
             onClick={() => props.onSpeedChange("PAUSED")}
             aria-label="pause"
-            edge="end"
             color="primary"
             size="large"
           >
@@ -382,7 +381,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         )}
         <IconButton
           id="close-button"
-          edge="end"
           color="primary"
           onClick={onBack}
           aria-label="close"
@@ -419,7 +417,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
           onChange={handleSliderChange}
         />
         <IconButton
-          edge="end"
           color="primary"
           onClick={onSortOpen}
           aria-label="sort"

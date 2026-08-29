@@ -146,6 +146,9 @@ export default class ChartForecastWater extends React.PureComponent<Props, {}> {
       <UPlotChart<State>
         id="chartForecastWater"
         ariaLabel="Chart of watershed precipitation, snowpack, and hydro reservoir level"
+        formatSummaryValue={(value, seriesIndex) =>
+          seriesIndex < 2 ? `${Math.round(value)} mm` : formatWattHours(value)
+        }
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}
         data={[minutes, precipitation, snowpack, reservoir]}

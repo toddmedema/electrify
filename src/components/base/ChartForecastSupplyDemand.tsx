@@ -143,6 +143,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
       <UPlotChart<State>
         id="chartForecastSupplyDemand"
         ariaLabel="Chart of forecasted electricity supply and demand"
+        formatSummaryValue={formatWatts}
         height={height}
         state={state}
         data={[minutes, supply, demand]}

@@ -41,3 +41,21 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   expect(row).toHaveTextContent("648");
   expect(row).toHaveTextContent("Each project uses one suitable site");
 });
+
+it("keeps toolbar actions inside compact viewport gutters", () => {
+  render(
+    <BuildStorage
+      game={game()}
+      onBuildStorage={jest.fn()}
+      onBack={jest.fn()}
+      onSpeedChange={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "close" })).not.toHaveClass(
+    "MuiIconButton-edgeEnd",
+  );
+  expect(screen.getByRole("button", { name: "sort" })).not.toHaveClass(
+    "MuiIconButton-edgeEnd",
+  );
+});

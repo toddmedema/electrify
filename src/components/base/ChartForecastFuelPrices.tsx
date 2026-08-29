@@ -148,6 +148,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
       <div id="chartForecastFuelPrices">
         <UPlotChart<State>
           ariaLabel="Chart of forecasted fuel prices"
+          formatSummaryValue={formatMoneyStable}
           height={height}
           state={{ prices, minutes, domain, startingYear, multiyear }}
           data={[minutes, ...prices]}

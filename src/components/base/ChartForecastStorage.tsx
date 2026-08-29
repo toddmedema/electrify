@@ -115,6 +115,7 @@ export default class chartForecastStorage extends React.PureComponent<
       <UPlotChart<State>
         id="chartForecastStorage"
         ariaLabel="Chart of forecasted stored power"
+        formatSummaryValue={formatWattHours}
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}
         data={[minutes, stored]}

@@ -50,6 +50,8 @@ export interface UPlotChartProps<S> {
   syncKey?: string;
   /** Human names for each y-series, used by the keyboard/screen-reader summary below. */
   seriesLabels?: string[];
+  /** Formats summary values with the same compact units the visible chart uses. */
+  formatSummaryValue?: (value: number, seriesIndex: number) => string;
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -118,6 +120,8 @@ export default function UPlotChart<S>(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
   );
+  const formatSummaryValue =
+    props.formatSummaryValue || ((value: number) => number.format(value));
   const seriesSummary = (props.summaryData || data)
     .slice(1)
     .map((series, index) => {
@@ -129,16 +133,22 @@ export default function UPlotChart<S>(
       const latest = values[values.length - 1] || 0;
       return {
         label: props.seriesLabels?.[index] || `Series ${index + 1}`,
-        latest,
-        minimum: values.length ? Math.min(...values) : 0,
-        maximum: values.length ? Math.max(...values) : 0,
+        latest: formatSummaryValue(latest, index),
+        minimum: formatSummaryValue(
+          values.length ? Math.min(...values) : 0,
+          index,
+        ),
+        maximum: formatSummaryValue(
+          values.length ? Math.max(...values) : 0,
+          index,
+        ),
         trend: latest > first ? "up" : latest < first ? "down" : "flat",
       };
     });
   const accessibleLabel = `${ariaLabel}. ${seriesSummary
     .map(
       (series) =>
-        `${series.label}: latest ${number.format(series.latest)}, range ${number.format(series.minimum)} to ${number.format(series.maximum)}, trend ${series.trend}`,
+        `${series.label}: latest ${series.latest}, range ${series.minimum} to ${series.maximum}, trend ${series.trend}`,
     )
     .join(". ")}`;
 
@@ -258,9 +268,9 @@ export default function UPlotChart<S>(
             {seriesSummary.map((series) => (
               <tr key={series.label}>
                 <th>{series.label}</th>
-                <td>{number.format(series.latest)}</td>
-                <td>{number.format(series.minimum)}</td>
-                <td>{number.format(series.maximum)}</td>
+                <td>{series.latest}</td>
+                <td>{series.minimum}</td>
+                <td>{series.maximum}</td>
                 <td>{series.trend}</td>
               </tr>
             ))}

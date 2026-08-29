@@ -287,6 +287,7 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   return (
     <UPlotChart<State>
       ariaLabel="Chart of electricity supply and demand over the day"
+      formatSummaryValue={formatWatts}
       id="chartSupplyDemand"
       height={height}
       state={state}

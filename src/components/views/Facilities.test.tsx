@@ -99,6 +99,25 @@ describe("the fleet list", () => {
     expect(screen.queryByText("Lifetime profit")).toBeNull();
   });
 
+  it("uses singular construction copy for one month remaining", () => {
+    const underConstruction = createGame({ scenarioId: 100 });
+    underConstruction.facilities[0].yearsToBuildLeft = 1 / 12;
+    renderFacilities(underConstruction, null);
+
+    expect(screen.getByText(/1 month left/)).toBeInTheDocument();
+    expect(screen.queryByText(/1 months left/)).toBeNull();
+  });
+
+  it("uses compact watt units in the accessible chart summary", () => {
+    renderFacilities(game, null);
+
+    expect(
+      screen.getByRole("img", {
+        name: /electricity supply and demand over the day/i,
+      }),
+    ).toHaveAccessibleName(/MW/);
+  });
+
   /**
    * onReprioritize was declared and passed for years without the row ever calling it: dispatch
    * order could only be changed by dragging, which is undiscoverable with a mouse and unusable
