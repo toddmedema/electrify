@@ -82,7 +82,7 @@ async function choose(select: HTMLElement, option: string) {
 // end of game machinery (dialogs, high scores) fires while the pane is under test
 function playMonths(months: number): GameType {
   let state = createGame({ scenarioId: 100 });
-  while (state.date.monthsEllapsed < months) {
+  while (state.date.monthsElapsed < months) {
     state = produce(state, (draft: GameType) => {
       tickState(draft);
     });

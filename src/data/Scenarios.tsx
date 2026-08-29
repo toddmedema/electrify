@@ -46,7 +46,7 @@ const storageCapstoneSucceeded = (state: AppStateType) => {
 };
 
 const financesCapstoneSucceeded = (state: AppStateType) =>
-  state.game.date.monthsEllapsed >= 1 &&
+  state.game.date.monthsElapsed >= 1 &&
   (latestMonthProfit(state) || 0) > 0 &&
   !hasBlackout(state);
 
@@ -55,7 +55,7 @@ const pricingCapstoneSucceeded = (state: AppStateType) => {
   const startingCustomers = state.game.customerMarketSize / 2;
   return !!(
     now &&
-    state.game.date.monthsEllapsed >= 6 &&
+    state.game.date.monthsElapsed >= 6 &&
     state.game.dollarsPerkWh < 0.07 &&
     now.customers >= startingCustomers * 1.05 &&
     (latestMonthProfit(state) || 0) > 0 &&
@@ -71,7 +71,7 @@ const forecastingCapstoneSucceeded = (state: AppStateType) => {
       facility.yearsToBuildLeft <= 0,
   );
   return (
-    state.game.date.monthsEllapsed >= 7 && addedGenerator && !hasBlackout(state)
+    state.game.date.monthsElapsed >= 7 && addedGenerator && !hasBlackout(state)
   );
 };
 
@@ -258,7 +258,7 @@ export const SCENARIOS = [
         capstone: {
           success: generatorCapstoneSucceeded,
           failure: (s: AppStateType) =>
-            s.game.date.monthsEllapsed >= 9 && !generatorCapstoneSucceeded(s),
+            s.game.date.monthsElapsed >= 9 && !generatorCapstoneSucceeded(s),
           successMessage:
             "Capstone complete - new capacity came online before the deadline and covered demand without exhausting cash.",
           failureMessage:
@@ -460,7 +460,7 @@ export const SCENARIOS = [
           checkpoint: { dollarsPerkWh: 0.03 },
           success: financesCapstoneSucceeded,
           failure: (s: AppStateType) =>
-            s.game.date.monthsEllapsed >= 1 && !financesCapstoneSucceeded(s),
+            s.game.date.monthsElapsed >= 1 && !financesCapstoneSucceeded(s),
           successMessage:
             "Capstone complete - revenue covered fuel and operating costs, leaving a positive monthly profit while the grid stayed reliable.",
           failureMessage:
@@ -556,7 +556,7 @@ export const SCENARIOS = [
           success: pricingCapstoneSucceeded,
           failure: (s: AppStateType) =>
             hasBlackout(s) ||
-            (s.game.date.monthsEllapsed >= 6 && !pricingCapstoneSucceeded(s)),
+            (s.game.date.monthsElapsed >= 6 && !pricingCapstoneSucceeded(s)),
           successMessage:
             "Capstone complete - the lower rate grew the customer base by 5% while monthly revenue still covered costs and every unit of demand was served.",
           failureMessage:
@@ -696,7 +696,7 @@ export const SCENARIOS = [
           success: forecastingCapstoneSucceeded,
           failure: (s: AppStateType) =>
             hasBlackout(s) ||
-            (s.game.date.monthsEllapsed >= 7 &&
+            (s.game.date.monthsElapsed >= 7 &&
               !forecastingCapstoneSucceeded(s)),
           successMessage:
             "Capstone complete - construction finished before the forecast peak, and the added generator prevented the projected summer shortage.",
@@ -862,7 +862,6 @@ export const SCENARIOS = [
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 10 },
     ],
   },
-  // TODO more public-ownership scenarios, such as in LA or Nebraska
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them

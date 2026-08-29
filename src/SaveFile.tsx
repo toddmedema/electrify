@@ -104,8 +104,7 @@ export async function readSaveFile(file: File): Promise<ImportedSaveType> {
   const save = parseSave(parsed);
   if (!save) {
     return {
-      error:
-        "That save was made by an incompatible version of Electrify, or isn't a save at all.",
+      error: "That file isn't a compatible Electrify save game.",
     };
   }
   if (!getScenario(save.game.scenarioId, save.game.customScenario)) {
@@ -117,7 +116,7 @@ export async function readSaveFile(file: File): Promise<ImportedSaveType> {
   return { save };
 }
 
-// FileReader rather than file.text(), which older mobile Safari and jsdom both lack
+// FileReader keeps this path testable in jsdom and works across the supported browsers.
 function readText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

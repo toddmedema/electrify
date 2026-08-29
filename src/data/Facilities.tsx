@@ -63,24 +63,12 @@ const COAL_START_COST_PER_MW_2023 = (54 + 5.81) * (304.702 / 224.939);
 export const OIL_FIXED_OPERATING_COST_PER_KW_YEAR = 24 * CPI_2015_TO_2023;
 export const OIL_VARIABLE_OPERATING_COST_PER_MWH = 20 * CPI_2015_TO_2023;
 
-// Used only to upgrade current-version saves written before start tracking was added to these
-// technologies. New shopping and operating records carry the explicit tracksStarts field below.
-export const START_TRACKING_FACILITY_NAMES = new Set([
-  "Natural Gas",
-  "Coal",
-  "Nuclear",
-  "Biomass",
-  "Geothermal",
-  "Enhanced Geothermal",
-]);
-
 // Representative steady-state turndown limits. These are deliberately technology-level inputs,
 // not claims that every individual unit has the same operating envelope. The GE Energy/HNEI
 // ancillary-services study reports 35-40% for coal and biomass, 12-15% for geothermal, 15-70%
 // for heavy-duty simple-cycle gas turbines and 50% for reciprocating engines. NREL production-
 // cost studies commonly model coal/nuclear and gas units in the 30-60% range. Midpoints keep the
 // gameplay legible while preventing a nominally online thermal plant from idling at trace output.
-// Existing saves use this map during resume migration.
 export const MINIMUM_STABLE_OUTPUT_BY_FACILITY: Readonly<
   Record<string, number>
 > = {
@@ -351,7 +339,6 @@ export function GENERATORS(
       capacityFactor: 0.2,
       // https://www.eia.gov/todayinenergy/detail.php?id=31232
       lifespanYears: 30,
-      // TODO
     },
     {
       name: "Biomass",
@@ -506,30 +493,6 @@ export function GENERATORS(
       // ~10-25% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       lifespanYears: 35,
     },
-    // {
-    //   // as of 2018 very limited location options for these, and only two in the world are >20MW
-    //   // TODO revisit, a lot's changed
-    //   name: 'Tidal',
-    //   fuel: 'Tides',
-    //   description: 'Stable output except 4 times per day',
-    // available: true,
-    //   buildCost: 200000000,
-    //     // TODO
-    //   peakW,
-    //   maxPeakW: 250000000,
-    //     // ~250MW - https://en.wikipedia.org/wiki/List_of_largest_power_stations#Tide
-    //   btuPerWh: 0,
-    //   annualOperatingCost: 1000000,
-    //     // TODO
-    //   yearsToBuild: 1,
-    //     // TODO
-    //   spinMinutes: 1,
-    //   capacityFactor: 0.26,
-    //     // 24% - https://en.wikipedia.org/wiki/Sihwa_Lake_Tidal_Power_Station
-    //     // 28% - https://en.wikipedia.org/wiki/Rance_Tidal_Power_Station
-    //   lifespanYears: 30,
-    //     // TODO
-    // },
     {
       name: "Hydro",
       fuel: "Hydro",
@@ -575,7 +538,6 @@ export function GENERATORS(
       spinMinutes: 1,
       capacityFactor: 0.88,
       lifespanYears: 40,
-      // TODO
     },
     {
       name: "Enhanced Geothermal",
@@ -667,8 +629,6 @@ export function STORAGE(state: GameType, peakWh: number) {
       roundTripEfficiency: 0.85,
       // https://www.nrel.gov/docs/fy19osti/73222.pdf
       hourlyLoss: 0.0001,
-      // TODO #'s
-      // TODO implement mechanic
       annualOperatingCost: 0.01 * peakWh,
       // EIA's $10/kWh-year includes augmentation for about 1.5% annual degradation.
       yearsToBuild: 0.57 + magnitude / 3,
@@ -694,15 +654,12 @@ export function STORAGE(state: GameType, peakWh: number) {
       roundTripEfficiency: 0.8,
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       hourlyLoss: 0.001,
-      // TODO #'s
-      // TODO implement mechanic
       annualOperatingCost: 0.0019 * peakWh,
       // NREL 2024 ATB fixed O&M is $19/kW-year, or $1.90/kWh-year at ten hours.
       yearsToBuild: 6 + magnitude,
       // 6-10 years to build - https://cleantechnica.com/2020/01/03/120-gigawatts-of-energy-storage-by-2050-we-got-this/
       spinMinutes: 10,
     },
-    // TODO thermal storage, hydrogen, ...
   ] as StorageShoppingType[];
 
   // update with calculations that occur across all entries, like difficulty multipliers

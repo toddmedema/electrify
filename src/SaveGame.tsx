@@ -24,9 +24,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
-// Version 6 is the launch schema; earlier values identify unsupported pre-release saves.
-export const SAVE_VERSION = 6;
+// This is the initial release schema. Increment it for breaking post-release changes.
+export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
   version: number;

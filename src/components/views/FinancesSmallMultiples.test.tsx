@@ -54,7 +54,7 @@ function tile(label: string): HTMLElement {
 
 function playMonths(months: number): GameType {
   let state = createGame({ scenarioId: 100 });
-  while (state.date.monthsEllapsed < months) {
+  while (state.date.monthsElapsed < months) {
     state = produce(state, (draft: GameType) => {
       tickState(draft);
     });

@@ -134,7 +134,7 @@ export function getCreditInputs(
   };
 }
 
-// TODO extrapolate future fuel prices over plant lifetime
+// Fuel prices stay at the current forecast value across the quoted lifetime.
 export function LCWH(
   g: GeneratorShoppingType,
   date: DateType,
