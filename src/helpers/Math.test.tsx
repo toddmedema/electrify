@@ -11,12 +11,9 @@ import {
 const STREAM = 1;
 
 describe("getIntersectionX", () => {
-  it("finds where two crossing segments meet", () => {
+  it("finds where crossing segments meet", () => {
     // A rising line and a falling line through (5, 5)
     expect(getIntersectionX(0, 0, 10, 10, 0, 10, 10, 0)).toBeCloseTo(5);
-  });
-
-  it("finds the crossing of a sloped line and a flat one", () => {
     // Supply ramping past a flat demand line, which is what the chart actually uses this for
     expect(getIntersectionX(0, 0, 10, 20, 0, 5, 10, 5)).toBeCloseTo(2.5);
   });
@@ -36,23 +33,17 @@ describe("randomAt", () => {
     }
   });
 
-  it("returns the same value for the same coordinates, whatever came before", () => {
+  it("addresses draws deterministically by seed, stream, and index", () => {
     const expected = randomAt(12345, STREAM, 7);
     for (let index = 0; index < 100; index++) {
       randomAt(999, STREAM, index); // Draws that would have advanced a sequential generator
     }
     expect(randomAt(12345, STREAM, 7)).toEqual(expected);
-  });
-
-  it("gives neighbouring indexes unrelated values", () => {
     const values = [];
     for (let index = 0; index < 8; index++) {
       values.push(randomAt(12345, STREAM, index));
     }
     expect(new Set(values).size).toEqual(values.length);
-  });
-
-  it("separates seeds and streams", () => {
     expect(randomAt(1, STREAM, 0)).not.toEqual(randomAt(2, STREAM, 0));
     expect(randomAt(1, STREAM, 0)).not.toEqual(randomAt(1, STREAM + 1, 0));
   });
@@ -94,12 +85,8 @@ describe("normalAt", () => {
     );
     expect(mean).toBeCloseTo(0, 1);
     expect(sd).toBeCloseTo(1, 1);
-  });
-
-  it("puts about two thirds of its draws within one standard deviation", () => {
     // The property that makes this the right shape for a weather anomaly, and the one a uniform
     // does not have: most departures are small, big ones are rare, and none are impossible
-    const values = sample(999, 20000);
     const within = (limit: number) =>
       values.filter((v) => Math.abs(v) < limit).length / values.length;
     expect(within(1)).toBeCloseTo(0.68, 1);
@@ -174,21 +161,17 @@ describe("newSeed", () => {
 });
 
 describe("arrayMove", () => {
-  it("should correctly move an element to a new index", () => {
+  it("moves elements for ordinary, sparse, and negative indexes", () => {
     const arr = [1, 2, 3, 4, 5];
     arrayMove(arr, 0, 2);
     expect(arr).toEqual([2, 3, 1, 4, 5]);
-  });
 
-  it("should add undefined elements if the new index is greater than array length", () => {
-    const arr = [1, 2, 3];
-    arrayMove(arr, 0, 5);
-    expect(arr).toEqual([2, 3, undefined, undefined, undefined, 1]);
-  });
+    const sparse = [1, 2, 3];
+    arrayMove(sparse, 0, 5);
+    expect(sparse).toEqual([2, 3, undefined, undefined, undefined, 1]);
 
-  it("should handle negative indices", () => {
-    const arr = [1, 2, 3, 4, 5];
-    arrayMove(arr, -1, 0);
-    expect(arr).toEqual([5, 1, 2, 3, 4]);
+    const negative = [1, 2, 3, 4, 5];
+    arrayMove(negative, -1, 0);
+    expect(negative).toEqual([5, 1, 2, 3, 4]);
   });
 });

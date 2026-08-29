@@ -44,16 +44,18 @@ describe("Manual", () => {
 
   // The old filter only looked at children that were plain strings, so any paragraph
   // containing an element (<strong>, a nested list, ...) was invisible to search
-  it.each([
-    ["merit order", MANUAL_ENTRY.FORECASTS],
-    ["dispatch order", MANUAL_ENTRY.FORECASTS],
-    ["peak shortage", MANUAL_ENTRY.FORECASTS],
-    ["board of directors", MANUAL_ENTRY.BLACKOUTS],
-    ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
-  ])("finds %s inside mixed markup", async (term: string, title: string) => {
+  it("finds representative terms inside mixed markup", async () => {
     renderManual();
-    await search(term);
-    expect(entryHeader(title)).toBeInTheDocument();
+    for (const [term, title] of [
+      ["merit order", MANUAL_ENTRY.FORECASTS],
+      ["dispatch order", MANUAL_ENTRY.FORECASTS],
+      ["peak shortage", MANUAL_ENTRY.FORECASTS],
+      ["board of directors", MANUAL_ENTRY.BLACKOUTS],
+      ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    ]) {
+      await search(term);
+      expect(entryHeader(title)).toBeInTheDocument();
+    }
   });
 
   it("finds terms by keyword as well as by title", async () => {

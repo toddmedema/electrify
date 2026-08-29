@@ -5,14 +5,13 @@ describe("facility fuel colors", () => {
 
   afterAll(() => setThemeMode(originalMode));
 
-  it.each(["light", "dark"] as const)(
-    "gives Airborne Wind a distinct %s palette color",
-    (mode) => {
+  it("gives Airborne Wind a distinct color in both palettes", () => {
+    (["light", "dark"] as const).forEach((mode) => {
       setThemeMode(mode);
       const airborne = facilityColor("Airborne Wind");
       expect(airborne).toMatch(/^#[0-9a-f]{6}$/i);
       expect(airborne).not.toBe(facilityColor("Wind"));
       expect(airborne).not.toBe(facilityColor("Offshore Wind"));
-    },
-  );
+    });
+  });
 });

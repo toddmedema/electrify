@@ -42,19 +42,8 @@ describe("Airborne Wind", () => {
 // The argument is the wind at the site in kph, and the turbine sees a fraction of it - so the
 // speeds that matter to the power curve are several times the ones quoted in m/s below
 describe("getWindOutputFactor", () => {
-  it("should return 0 below the turbine's cut-in speed", () => {
-    const windKph = 2;
-    const result = getWindOutputFactor(windKph);
-    expect(result).toEqual(0);
-  });
-
-  it("should return 0 above the turbine's cut-out speed", () => {
-    const windKph = 150;
-    const result = getWindOutputFactor(windKph);
-    expect(result).toEqual(0);
-  });
-
-  it("should slope between cut-in and rated speed", () => {
+  it("follows the turbine curve from cut-in through cut-out", () => {
+    expect(getWindOutputFactor(2)).toEqual(0);
     // 20kph at the site is 5.6m/s, which the gradient and derate together turn into 4.9m/s at the
     // hub: not quite two metres a second above cut-in, of the eleven that reach rated output
     const result = getWindOutputFactor(20);
@@ -62,6 +51,7 @@ describe("getWindOutputFactor", () => {
     // Doubling the wind more than doubles what comes out, until it flattens off at rated
     expect(getWindOutputFactor(40)).toBeGreaterThan(2 * result);
     expect(getWindOutputFactor(80)).toEqual(1);
+    expect(getWindOutputFactor(150)).toEqual(0);
   });
 });
 
@@ -80,40 +70,20 @@ describe("getOffshoreWindOutputFactor", () => {
 });
 
 describe("getSolarOutputFactor", () => {
-  it("should correctly calculate the solar output factor", () => {
-    const irradianceWM2 = 500;
-    const temperatureC = 20;
-    const result = getSolarOutputFactor(irradianceWM2, temperatureC);
-    expect(result).toEqual(0.45);
-  });
-
-  it("should not go below 1 for the temperature factor", () => {
-    const irradianceWM2 = 500;
-    const temperatureC = 5;
-    const result = getSolarOutputFactor(irradianceWM2, temperatureC);
-    expect(result).toEqual(0.5);
-  });
-
-  it("should correctly handle negative temperatures", () => {
-    const irradianceWM2 = 500;
-    const temperatureC = -10;
-    const result = getSolarOutputFactor(irradianceWM2, temperatureC);
-    expect(result).toEqual(0.5);
+  it("derates hot panels without boosting cool ones", () => {
+    expect(getSolarOutputFactor(500, 20)).toEqual(0.45);
+    expect(getSolarOutputFactor(500, 5)).toEqual(0.5);
+    expect(getSolarOutputFactor(500, -10)).toEqual(0.5);
   });
 });
 
 describe("getWindCapacityFactor", () => {
-  it("should correctly handle empty case", () => {
-    const windSpeedsKph: number[] = [];
-    const result = getWindCapacityFactor(windSpeedsKph);
-    expect(result).toBeGreaterThanOrEqual(0);
-    expect(result).toBeLessThanOrEqual(1);
-  });
-  it("should correctly calculate the average wind capacity factor", () => {
-    const windSpeedsKph = [5, 10, 15, 20, 25];
-    const result = getWindCapacityFactor(windSpeedsKph);
-    expect(result).toBeGreaterThanOrEqual(0);
-    expect(result).toBeLessThanOrEqual(1);
+  it("returns a bounded average, including for an empty sample", () => {
+    [[], [5, 10, 15, 20, 25]].forEach((windSpeedsKph) => {
+      const result = getWindCapacityFactor(windSpeedsKph);
+      expect(result).toBeGreaterThanOrEqual(0);
+      expect(result).toBeLessThanOrEqual(1);
+    });
   });
 });
 
@@ -127,17 +97,12 @@ describe("getOffshoreWindCapacityFactor", () => {
 });
 
 describe("getSolarCapacityFactor", () => {
-  it("should correctly handle empty case", () => {
-    const irradiancesWM2: number[] = [];
-    const result = getSolarCapacityFactor(irradiancesWM2);
-    expect(result).toBeGreaterThanOrEqual(0);
-    expect(result).toBeLessThanOrEqual(1);
-  });
-  it("should correctly calculate the average solar capacity factor", () => {
-    const irradiancesWM2 = [500, 1000, 1000, 500, 0];
-    const result = getSolarCapacityFactor(irradiancesWM2);
-    expect(result).toBeGreaterThanOrEqual(0);
-    expect(result).toBeLessThanOrEqual(1);
+  it("returns a bounded average, including for an empty sample", () => {
+    [[], [500, 1000, 1000, 500, 0]].forEach((irradiancesWM2) => {
+      const result = getSolarCapacityFactor(irradiancesWM2);
+      expect(result).toBeGreaterThanOrEqual(0);
+      expect(result).toBeLessThanOrEqual(1);
+    });
   });
 });
 
@@ -170,12 +135,10 @@ describe("getDispatchOrderedFuels", () => {
     ]);
   });
 
-  it("should skip storage, which has no fuel", () => {
-    const result = getDispatchOrderedFuels([{}, { fuel: "Coal" }, {}]);
-    expect(result).toEqual(["Coal"]);
-  });
-
-  it("should handle an empty fleet", () => {
+  it("should skip facilities that have no fuel", () => {
+    expect(getDispatchOrderedFuels([{}, { fuel: "Coal" }, {}])).toEqual([
+      "Coal",
+    ]);
     expect(getDispatchOrderedFuels([])).toEqual([]);
   });
 });

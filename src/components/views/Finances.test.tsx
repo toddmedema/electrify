@@ -135,9 +135,9 @@ describe("the Finances chart selectors", () => {
 
   // PAUSED covers the unthrottled path and FAST covers the frame-skipping path that used to
   // swallow the player's own clicks. SLOW and NORMAL exercise the same branches as FAST.
-  it.each(["PAUSED", "FAST"] as SpeedType[])(
-    "replots when the metric changes at %s speed",
-    async (speed: SpeedType) => {
+  it("replots metric changes on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
       expect(plottedMetric()).toContain("Profit");
 
@@ -151,12 +151,13 @@ describe("the Finances chart selectors", () => {
 
       await choose(metricSelect(), "Demand");
       expect(plottedMetric()).toContain("Demand");
-    },
-  );
+      cleanup();
+    }
+  });
 
-  it.each(["PAUSED", "FAST"] as SpeedType[])(
-    "keeps the metric dropdown showing what is plotted at %s speed",
-    async (speed: SpeedType) => {
+  it("keeps the dropdown in sync on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
 
       await choose(metricSelect(), "Revenue");
@@ -164,12 +165,13 @@ describe("the Finances chart selectors", () => {
 
       expect(metricSelect()).toHaveTextContent("Expenses");
       expect(plottedMetric()).toContain("Expenses");
-    },
-  );
+      cleanup();
+    }
+  });
 
-  it.each(["PAUSED", "FAST"] as SpeedType[])(
-    "replots when the period changes at %s speed",
-    async (speed: SpeedType) => {
+  it("replots period changes on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
       const thisYear = summarised("Revenue");
 
@@ -183,8 +185,9 @@ describe("the Finances chart selectors", () => {
       await choose(periodSelect(), "Current year");
       expect(periodSelect()).toHaveTextContent("Current year");
       expect(summarised("Revenue")).toEqual(thisYear);
-    },
-  );
+      cleanup();
+    }
+  });
 
   it("remembers the metric across a remount, dropdown and chart together", async () => {
     const view = renderFinances(game, "PAUSED");
@@ -220,15 +223,15 @@ describe("the Finances chart selectors", () => {
 
   // The sentinels the dropdown used to store its two non-year options as. They aren't options
   // any more, and a returning player has one of them sitting in storage
-  it.each(["-1", "0"])(
-    "falls back to the current year when storage holds the old %s sentinel",
-    (stored: string) => {
+  it("falls back when storage holds either old range sentinel", () => {
+    ["-1", "0"].forEach((stored) => {
       localStorage.setItem("financesChartYear", stored);
 
       renderFinances(game, "PAUSED");
       expect(periodSelect()).toHaveTextContent("Current year");
-    },
-  );
+      cleanup();
+    });
+  });
 
   it("plots further than the game has reached when a forward range is chosen", async () => {
     renderFinances(game, "PAUSED");

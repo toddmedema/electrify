@@ -283,13 +283,15 @@ describe("the shipped weather files", () => {
     expect(monthMean(7)).toBeGreaterThan(20);
   });
 
-  it.each(offshoreIds)("%s has a usable offshore wind resource", (id) => {
-    const speeds = decodeWeather(readShipped(id)).map(
-      (row) => row.WIND_OFFSHORE_KPH as number,
-    );
-    const capacityFactor = getOffshoreWindCapacityFactor(speeds);
-    expect(capacityFactor).toBeGreaterThan(0.2);
-    expect(capacityFactor).toBeLessThan(0.7);
+  it("gives every offshore location a usable wind resource", () => {
+    offshoreIds.forEach((id) => {
+      const speeds = decodeWeather(readShipped(id)).map(
+        (row) => row.WIND_OFFSHORE_KPH as number,
+      );
+      const capacityFactor = getOffshoreWindCapacityFactor(speeds);
+      expect(capacityFactor).toBeGreaterThan(0.2);
+      expect(capacityFactor).toBeLessThan(0.7);
+    });
   });
 
   it("calibrates Airborne Wind to Lista's 3,500 full-load-hour target", () => {

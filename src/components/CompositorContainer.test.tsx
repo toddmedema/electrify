@@ -271,18 +271,22 @@ describe("walkthrough steps", () => {
     expect(actionOf(storageStep)).toEqual(["storage"]);
   });
 
-  tutorials.forEach((scenario) => {
-    const steps = scenario.tutorialSteps as TutorialStepType[];
-
-    it(`${scenario.name} declares the card every step's target lives on`, () => {
+  it("declares the card every tutorial target lives on", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       steps.forEach((s, i) => {
-        expect([`step ${i}`, cardOf(s)]).not.toContainEqual(undefined);
+        expect([scenario.name, `step ${i}`, cardOf(s)]).not.toContainEqual(
+          undefined,
+        );
       });
     });
+  });
 
-    // Walk the whole thing forwards and then all the way back, tracking the card the store
-    // would be showing. Any step whose target isn't on the current card would point at nothing
-    it(`${scenario.name} shows each step's card in both directions`, () => {
+  // Walk each walkthrough forwards and then all the way back, tracking the card the store
+  // would be showing. Any step whose target isn't on the current card would point at nothing
+  it("shows each guided step's card in both directions", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       let card: CardNameType = STARTING_CARD;
       expect(cardOf(steps[0])).toBe(card);
 
@@ -295,11 +299,14 @@ describe("walkthrough steps", () => {
       }
 
       moves.forEach(([fromStep, toStep]) => {
-        const destination = navigatedTo(
-          step({ steps, fromStep, toStep, currentCard: card }),
-        );
+        const dispatched = step({ steps, fromStep, toStep, currentCard: card });
+        const destination = navigatedTo(dispatched);
         if (destination) {
           card = destination;
+        } else if (dispatched.some((action) => action.type === "game/start")) {
+          // Capstones restart through Loading; its eventual card is outside this dispatch unit.
+          card = STARTING_CARD;
+          return;
         }
         expect([scenario.name, toStep, card]).toEqual([
           scenario.name,
@@ -308,16 +315,23 @@ describe("walkthrough steps", () => {
         ]);
       });
     });
+  });
 
-    /**
-     * A selector matching nothing silently loses the restrained target treatment. Rendering every
-     * card would be the airtight check; scanning the source for the id or class each selector names
-     * catches that kind of rename far cheaper.
-     */
-    it(`${scenario.name} points every step at markup that still exists`, () => {
+  /**
+   * A selector matching nothing silently loses the restrained target treatment. Rendering every
+   * card would be the airtight check; scanning the source for the id or class each selector names
+   * catches that kind of rename far cheaper.
+   */
+  it("points every tutorial step at markup that still exists", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       targetsOf(steps).forEach((target) => {
         target.split(/\s+/).forEach((simple) => {
-          expect([target, declares(simple)]).toEqual([target, true]);
+          expect([scenario.name, target, declares(simple)]).toEqual([
+            scenario.name,
+            target,
+            true,
+          ]);
         });
       });
     });

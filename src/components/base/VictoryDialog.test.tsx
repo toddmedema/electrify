@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
@@ -218,12 +218,11 @@ describe("VictoryDialog", () => {
     expect(onQuit).toHaveBeenCalled();
   });
 
-  it.each([
-    ["bankrupt", "Bankrupt!"],
-    ["fired", "Fired!"],
-  ] as const)(
-    "shows a %s score without letting the terminal run resume",
-    async (outcome, title) => {
+  it("shows terminal scores without letting either run resume", async () => {
+    for (const [outcome, title] of [
+      ["bankrupt", "Bankrupt!"],
+      ["fired", "Fired!"],
+    ] as const) {
       const onClose = jest.fn();
       renderDialog({ victory: aVictory({ outcome }), onClose });
 
@@ -234,8 +233,9 @@ describe("VictoryDialog", () => {
       expect(screen.queryByText("Review final grid")).not.toBeInTheDocument();
       await userEvent.keyboard("{Escape}");
       expect(onClose).not.toHaveBeenCalled();
-    },
-  );
+      cleanup();
+    }
+  });
 
   it("uses the scenario's own ending when it has one", () => {
     renderDialog({

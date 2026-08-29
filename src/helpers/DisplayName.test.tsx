@@ -14,8 +14,8 @@ describe("validateDisplayName", () => {
     "a".repeat(DISPLAY_NAME_MAX_LENGTH),
     "  Padded  ", // trimmed rather than rejected
   ];
-  accepted.forEach((name) => {
-    it(`accepts ${JSON.stringify(name)}`, () => {
+  it("accepts the supported name forms", () => {
+    accepted.forEach((name) => {
       expect(validateDisplayName(name)).toBeUndefined();
     });
   });
@@ -30,8 +30,8 @@ describe("validateDisplayName", () => {
     ["Admin", /reserved/],
     ["anonymous", /reserved/],
   ];
-  rejected.forEach(([name, message]) => {
-    it(`rejects ${JSON.stringify(name)}`, () => {
+  it("rejects each invalid name class with a useful reason", () => {
+    rejected.forEach(([name, message]) => {
       expect(validateDisplayName(name)).toMatch(message);
     });
   });

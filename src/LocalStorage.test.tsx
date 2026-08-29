@@ -12,12 +12,9 @@ describe("getStorageChoice", () => {
     expect(getStorageChoice(KEY, [1, 5, 10, 20], 1)).toBe(1);
   });
 
-  it("round trips a number through storage", () => {
+  it("round trips supported primitive choices through storage", () => {
     setStorageKeyValue(KEY, 20);
     expect(getStorageChoice(KEY, [1, 5, 10, 20], 1)).toBe(20);
-  });
-
-  it("round trips a string through storage", () => {
     setStorageKeyValue(KEY, "revenue");
     expect(getStorageChoice(KEY, ["profit", "revenue"], "profit")).toBe(
       "revenue",
