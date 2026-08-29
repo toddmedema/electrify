@@ -555,26 +555,36 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      const checkpoint =
+        scenario.tutorialSteps?.[state.tutorialStep]?.capstone?.checkpoint;
+      const startingCash = checkpoint?.cash ?? a.cash;
+      const startingCustomers = checkpoint?.startingCustomers ?? a.customers;
+      const startingFacilities = checkpoint?.facilities ?? a.facilities;
+      const startingRate = checkpoint?.dollarsPerkWh ?? scenario.dollarsPerkWh;
       state.date = getDateFromMinute(0, scenario.startingYear);
       state.startingYear = scenario.startingYear;
       // A company on day one has no track record, no debt and nothing but cash, so it borrows at
       // whatever prime was in the year the scenario opens -- 4.75% in 2019, 21.5% in 1980. It is
       // repriced against its own results at the first month rollover, and every one after.
       state.creditPremium = getCreditPremium(
-        getCreditInputs([], a.cash, a.cash, []),
+        getCreditInputs([], startingCash, startingCash, []),
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
       state.feePerKgCO2e = scenario.feePerKgCO2e;
       // The rate the scenario advertises on the new game screen, and the rate Public scenarios are
       // scored against, so the game has to actually start there rather than at the slice default
-      state.dollarsPerkWh = scenario.dollarsPerkWh;
-      state.customerRate = scenario.dollarsPerkWh;
-      state.customerMarketSize = a.customers * CUSTOMER_MARKET_MULTIPLIER;
+      state.dollarsPerkWh = startingRate;
+      state.customerRate = startingRate;
+      state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
       state.location = a.location;
-      state.timeline = generateNewTimeline(state, a.cash, a.customers);
+      state.timeline = generateNewTimeline(
+        state,
+        startingCash,
+        startingCustomers,
+      );
 
-      a.facilities.forEach((search: ScenarioFacilityType) => {
+      startingFacilities.forEach((search: ScenarioFacilityType) => {
         // Age is scenario metadata rather than a catalog property, so exclude it from the exact
         // technology match and pass it to the completed operating asset separately.
         const { initialAgeYears = 0, ...facilitySearch } = search;
