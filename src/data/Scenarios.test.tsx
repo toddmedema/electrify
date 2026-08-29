@@ -111,3 +111,29 @@ describe("authored scenario briefings", () => {
     );
   });
 });
+
+describe("authored starting fleets", () => {
+  it("starts every facility with time in service", () => {
+    SCENARIOS.forEach((scenario) => {
+      scenario.facilities.forEach((facility) => {
+        expect(facility.initialAgeYears).toBeGreaterThan(0);
+      });
+
+      scenario.tutorialSteps?.forEach((step) => {
+        step.capstone?.checkpoint?.facilities?.forEach((facility) => {
+          expect(facility.initialAgeYears).toBeGreaterThan(0);
+        });
+      });
+    });
+  });
+
+  it("makes every plant in the aging coal fleet at least 20 years old", () => {
+    const endOfEra = SCENARIOS.find(
+      (scenario) => scenario.name === "The End of an Era",
+    )!;
+
+    endOfEra.facilities.forEach((facility) => {
+      expect(facility.initialAgeYears).toBeGreaterThanOrEqual(20);
+    });
+  });
+});

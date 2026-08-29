@@ -93,8 +93,8 @@ export const SCENARIOS = [
     endTitle: "Mission complete!",
     endMessage: "You kept the grid running for a full day.",
     facilities: [
-      { fuel: "Natural Gas", peakW: 410000000 },
-      { fuel: "Sun", peakW: 300000000 },
+      { fuel: "Natural Gas", peakW: 410000000, initialAgeYears: 12 },
+      { fuel: "Sun", peakW: 300000000, initialAgeYears: 5 },
     ],
     tutorialSteps: [
       {
@@ -187,7 +187,9 @@ export const SCENARIOS = [
     durationMonths: 12,
     endTitle: "Mission complete!",
     endMessage: "You built your first generator and put it to work.",
-    facilities: [{ fuel: "Natural Gas", peakW: 500000000 }],
+    facilities: [
+      { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 15 },
+    ],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
@@ -284,8 +286,8 @@ export const SCENARIOS = [
     endMessage:
       "You stored spare power and used dispatch order to control the grid.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 500000000 },
-      { fuel: "Coal", peakW: 480000000 },
+      { name: "Pumped Hydro", peakWh: 500000000, initialAgeYears: 35 },
+      { fuel: "Coal", peakW: 480000000, initialAgeYears: 25 },
     ],
     tutorialSteps: [
       {
@@ -359,8 +361,12 @@ export const SCENARIOS = [
         capstone: {
           checkpoint: {
             facilities: [
-              { name: "Pumped Hydro", peakWh: 500000000 },
-              { fuel: "Coal", peakW: 375000000 },
+              {
+                name: "Pumped Hydro",
+                peakWh: 500000000,
+                initialAgeYears: 35,
+              },
+              { fuel: "Coal", peakW: 375000000, initialAgeYears: 25 },
             ],
           },
           success: storageCapstoneSucceeded,
@@ -391,8 +397,8 @@ export const SCENARIOS = [
     endTitle: "Mission complete!",
     endMessage: "You read the books and tracked how the company makes money.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 1000000000 },
-      { fuel: "Coal", peakW: 600000000 },
+      { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
+      { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
     ],
     tutorialSteps: [
       {
@@ -485,8 +491,8 @@ export const SCENARIOS = [
     endTitle: "Mission complete!",
     endMessage: "You grew your customer base while keeping demand in view.",
     facilities: [
-      { name: "Pumped Hydro", peakWh: 1000000000 },
-      { fuel: "Coal", peakW: 600000000 },
+      { name: "Pumped Hydro", peakWh: 1000000000, initialAgeYears: 30 },
+      { fuel: "Coal", peakW: 600000000, initialAgeYears: 25 },
     ],
     tutorialSteps: [
       {
@@ -581,7 +587,7 @@ export const SCENARIOS = [
     endTitle: "Mission complete!",
     endMessage:
       "You used forecasts to plan ahead. You're ready for a full scenario.",
-    facilities: [{ fuel: "Coal", peakW: 450000000 }],
+    facilities: [{ fuel: "Coal", peakW: 450000000, initialAgeYears: 20 }],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
@@ -858,8 +864,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.025,
     durationMonths: 12 * 20,
     facilities: [
-      { fuel: "Coal", peakW: 200000000, initialAgeYears: 25 },
-      { fuel: "Coal", peakW: 300000000, initialAgeYears: 10 },
+      { fuel: "Coal", peakW: 200000000, initialAgeYears: 35 },
+      { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
     ],
   },
 ] as ScenarioType[];
