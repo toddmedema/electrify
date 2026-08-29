@@ -123,7 +123,7 @@ describe("Manual", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Let us know" })).toHaveAttribute(
       "href",
-      expect.stringContaining("mailto:"),
+      "/about.html#feedback",
     );
   });
 

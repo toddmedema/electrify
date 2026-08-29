@@ -224,7 +224,7 @@ export function GameAppBar(props: Props) {
           >
             Scenario details
           </MenuItem>
-          <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
+          <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
           {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,

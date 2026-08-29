@@ -73,4 +73,13 @@ describe("MainMenu", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share game" })).toBeNull();
   });
+
+  it("opens the embedded feedback form without exposing an email address", () => {
+    render(<MainMenu {...props()} />);
+
+    expect(screen.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
+      "href",
+      "/about.html#feedback",
+    );
+  });
 });

@@ -340,9 +340,42 @@ a:hover {
 .panel--contact {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(14rem, 0.72fr) minmax(20rem, 1.28fr);
+  align-items: start;
   gap: 2rem;
+}
+
+.panel--contact:target {
+  scroll-margin-top: 5.5rem;
+}
+
+.panel__intro {
+  position: sticky;
+  top: 5.5rem;
+}
+
+.feedback-privacy {
+  font-size: 0.85rem;
+}
+
+.feedback-form {
+  min-width: 0;
+}
+
+.feedback-form iframe {
+  display: block;
+  width: 100%;
+  height: min(48rem, 80vh);
+  min-height: 38rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: #ffffff;
+}
+
+.feedback-form__fallback {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .panel__number {
@@ -533,6 +566,15 @@ a:hover {
 
   .panel--contact .panel__actions {
     margin-top: 0;
+  }
+
+  .panel__intro {
+    position: static;
+  }
+
+  .feedback-form iframe {
+    height: 46rem;
+    min-height: 0;
   }
 
   .summary-card {
