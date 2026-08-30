@@ -37,7 +37,6 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditions from "../base/VictoryConditions";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import ScenarioArtwork from "../base/ScenarioArtwork";
 import { DIFFICULTIES } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
@@ -350,7 +349,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
             className="scenarioDossier"
             aria-labelledby="scenario-fantasy"
           >
-            <ScenarioArtwork scenario={scenario} />
+            <img
+              className="scenarioDossierIcon"
+              src={`/images/${scenario.icon.toLowerCase()}.svg`}
+              alt={`${scenario.name} icon`}
+            />
             <div className="scenarioDossierCopy">
               <Typography variant="overline" component="div">
                 {location.name} · {scenario.startingYear}-{endYear} ·{" "}
