@@ -20,6 +20,7 @@ import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
 import {
+  ActiveWorldEventType,
   DifficultyType,
   FacilityOperatingType,
   GameType,
@@ -75,6 +76,7 @@ export interface SimOptionsType {
   initialBuild?: InitialBuildType;
   sellFacilityId?: number;
   sellAtMonth?: number;
+  storyEffectsEnabled?: boolean;
 }
 
 export interface ResolvedSimOptionsType {
@@ -87,6 +89,7 @@ export interface ResolvedSimOptionsType {
   initialBuild: InitialBuildType | null;
   sellFacilityId: number | null;
   sellAtMonth: number;
+  storyEffectsEnabled: boolean;
 }
 
 export interface BuildRecordType {
@@ -115,6 +118,7 @@ export interface SimResultType {
   violations: ViolationType[];
   violationCountByRule: { [rule: string]: number };
   violationCount: number;
+  storyOccurrences: ActiveWorldEventType[];
 }
 
 const DEFAULT_SEED = 12345;
@@ -174,6 +178,9 @@ function setUpGame(
   // the rate on the Finances screen would
   if (options.dollarsPerkWh !== null) {
     state = gameReducer(state, delta({ dollarsPerkWh: options.dollarsPerkWh }));
+  }
+  if (!options.storyEffectsEnabled) {
+    state = gameReducer(state, delta({ storyEffectsDisabled: true }));
   }
   if (options.initialBuild) {
     const build = GENERATORS(
@@ -304,6 +311,7 @@ function resolveOptions(
     initialBuild: options.initialBuild || null,
     sellFacilityId: options.sellFacilityId ?? null,
     sellAtMonth: options.sellAtMonth || 0,
+    storyEffectsEnabled: options.storyEffectsEnabled !== false,
   };
 }
 
@@ -453,5 +461,6 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     violations: collector.getViolations(),
     violationCountByRule: collector.getCountByRule(),
     violationCount: collector.getTotalCount(),
+    storyOccurrences: state.worldEvents.occurrences,
   };
 }

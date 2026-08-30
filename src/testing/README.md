@@ -29,6 +29,30 @@ profit, emissions), the number of recorded player actions, totals for the run, t
 finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
 or fired after three consecutive months below 90% supplied.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
+Pass `--without-stories` to run the same playthrough as an authored-effects control.
+
+Story balance uses the checked-in seeds 1–20 across all six scored scenarios and five
+difficulties, running the same UI-legal playbooks as the CEO economics tests with authored effects
+disabled and enabled:
+
+```sh
+npm run sim -- --matrix
+```
+
+Each cell records outcome month, unserved share, ending cash, generation mix, phase keys,
+onset-selected facility IDs, and resolved effects (`--full` prints the records). A failure-rate
+gate is only calculated when at least 12 baseline seeds complete; otherwise the cell reports
+`INSUFFICIENT COVERAGE` instead of a misleading percentage. The story run may fail no more than
+25% of those otherwise-successful seeds.
+
+The forecast performance gate is independently reproducible:
+
+```sh
+npm run sim -- --benchmark-stories
+```
+
+It compares median warmed 20-year Shale forecasts with scheduled story resolution disabled and
+enabled, and fails above a 15% regression.
 
 `--year` and `--location` play an authored scenario somewhere or somewhen else, which is the
 only way to exercise a start past the recorded weather from the command line:

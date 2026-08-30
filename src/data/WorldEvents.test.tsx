@@ -3,6 +3,11 @@ import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { StorySnapshotType } from "../Types";
 import {
   combineStoryEffects,
+  CARBON_FEE_BALANCE,
+  END_OF_ERA_BALANCE,
+  HURRICANE_BALANCE,
+  PARADISE_BALANCE,
+  RENEWABLES_BALANCE,
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
   SHALE_BOOM_BALANCE,
@@ -10,6 +15,7 @@ import {
   StoryArcDefinitionType,
   storyPhaseKey,
   upcomingStoryPhases,
+  validateStoryDifficultyMonotonicity,
 } from "./WorldEvents";
 import { DifficultyType } from "../Types";
 
@@ -261,13 +267,169 @@ describe("The Shale Boom pilot arc", () => {
       "story:103:shale-boom:regional-glut",
       "story:103:shale-boom:freeze-warning",
       "story:103:shale-boom:freeze",
+      "story:103:shale-boom:freeze-recovery",
       "story:103:shale-boom:normalization",
     ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
   });
 
-  it("authors only the scored Shale scenario in this pilot", () => {
-    expect(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId)).toEqual([103]);
+  it("authors every scored scenario and no custom game", () => {
+    expect(
+      [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
+    ).toEqual([100, 101, 102, 103, 104, 105]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
+  });
+});
+
+describe("remaining scored story arcs", () => {
+  it("checks in exact Manager reference values and monotonic scaling", () => {
+    expect(CARBON_FEE_BALANCE.Manager).toBe(100);
+    expect(PARADISE_BALANCE.Manager).toEqual({
+      visitorDemand: 1.06,
+      oilShock: 1.45,
+    });
+    expect(RENEWABLES_BALANCE.Manager).toEqual({
+      solarBuildCost: 0.75,
+      windBuildCost: 0.9,
+      demandLoad: 1.08,
+    });
+    expect(HURRICANE_BALANCE.Manager).toEqual({
+      severity: "Major",
+      targetCapacityShare: 0.3,
+      outputMultiplier: 0.6,
+      durationMonths: 4,
+      oilMultiplier: 1.4,
+    });
+    expect(END_OF_ERA_BALANCE.Manager).toEqual({
+      oldCoalOutput: 0.85,
+      coalOM: 1.2,
+    });
+    expect(validateStoryDifficultyMonotonicity()).toEqual([]);
+  });
+
+  it("applies each fixed Manager effect at its exact boundary", () => {
+    expect(resolveStoryAtDate(context(48, 100)).effects).toMatchObject({
+      carbonFeePerKgCO2e: 0.1,
+    });
+    expect(resolveStoryAtDate(context(28, 105)).effects).toMatchObject({
+      demandMultiplier: 1.06,
+    });
+    expect(resolveStoryAtDate(context(84, 101)).effects).toMatchObject({
+      buildCostMultipliersByFuel: { Sun: 0.75, Wind: 0.9 },
+    });
+    expect(resolveStoryAtDate(context(180, 102)).effects).toMatchObject({
+      operatingCostMultipliersByFuel: { Coal: 1.2 },
+    });
+  });
+
+  it("selects hurricane capacity stably rather than depending on fleet order", () => {
+    const snapshot: StorySnapshotType = {
+      ...EMPTY_SNAPSHOT,
+      facilities: [
+        {
+          id: 10,
+          name: "Oil A",
+          fuel: "Oil",
+          ageYears: 10,
+          peakW: 100,
+          operational: true,
+        },
+        {
+          id: 11,
+          name: "Gas B",
+          fuel: "Natural Gas",
+          ageYears: 10,
+          peakW: 300,
+          operational: true,
+        },
+        {
+          id: 12,
+          name: "Storage",
+          ageYears: 1,
+          peakW: 1000,
+          operational: true,
+        },
+      ],
+    };
+    const landfallMonth = resolveStoryScheduleMonth(
+      STORY_ARC_DEFINITIONS.find((arc) => arc.scenarioId === 104)!.phases[1]
+        .schedule,
+      77,
+      storyPhaseKey(104, "hurricane-2008", "landfall"),
+    );
+    const resolve = (facilities: StorySnapshotType["facilities"]) =>
+      resolveStoryAtDate({
+        ...context(landfallMonth, 104, 77),
+        snapshot: { ...snapshot, facilities },
+      }).occurrences.find((event) => event.definitionId.endsWith("landfall"));
+    const first = resolve(snapshot.facilities)!;
+    const reordered = resolve([...snapshot.facilities].reverse())!;
+    expect(first.attributes.selectedFacilityIds).toEqual(
+      reordered.attributes.selectedFacilityIds,
+    );
+    expect(first.attributes.selectedCapacityShare).toBeGreaterThanOrEqual(0.3);
+    expect(first.effects.facilityOutputMultipliersById).toBeDefined();
+    expect(first.effects.facilityOutputMultipliersById?.["12"]).toBeUndefined();
+  });
+
+  it("reports exact hurricane restoration-window totals", () => {
+    const hurricane = STORY_ARC_DEFINITIONS.find(
+      (arc) => arc.scenarioId === 104,
+    )!;
+    const landfallMonth = resolveStoryScheduleMonth(
+      hurricane.phases[1].schedule,
+      77,
+      storyPhaseKey(104, "hurricane-2008", "landfall"),
+    );
+    const restoration = resolveStoryAtDate({
+      ...context(landfallMonth + 4, 104, 77),
+      periodSnapshots: {
+        4: {
+          deliveredWhByFuel: { Oil: 50 },
+          demandWh: 100,
+          unservedWh: 2,
+          netIncome: -1,
+          peakDemandW: 10,
+        },
+      },
+      occurrences: [
+        {
+          key: "story:104:hurricane-2008:landfall",
+          definitionId: "hurricane-2008:landfall",
+          startsMinute: landfallMonth * MINUTES_PER_MONTH,
+          endsMinute: (landfallMonth + 4) * MINUTES_PER_MONTH,
+          attributes: { selectedFacilityNames: ["Oil A"] },
+          effects: {},
+        },
+      ],
+    }).occurrences.find((event) => event.definitionId.endsWith("restoration"))!;
+    expect(restoration.attributes).toMatchObject({
+      demandWh: 100,
+      unservedWh: 2,
+      reliability: 0.98,
+    });
+    expect(restoration.message).toMatch(/98% of demand was served/);
+  });
+
+  it("branches checkpoints from persisted simulation facts", () => {
+    const strongSnapshot: StorySnapshotType = {
+      ...EMPTY_SNAPSHOT,
+      deliveredWhByFuel12m: { "Natural Gas": 30 },
+      demandWh12m: 100,
+      unservedWh12m: 0,
+      netIncome12m: 1,
+      peakDemandW12m: 100,
+      firmPeakW: 80,
+      storagePeakW: 20,
+    };
+    const normalization = resolveStoryAtDate({
+      ...context(122, 103),
+      snapshot: strongSnapshot,
+    }).occurrences[0];
+    expect(normalization.message).toMatch(/reliable/i);
+    expect(normalization.attributes).toMatchObject({
+      gasShare: 0.3,
+      reliability: 1,
+    });
   });
 });

@@ -213,6 +213,22 @@ describe("LCWH", () => {
     );
   });
 
+  it("integrates a known future carbon fee over the applicable operating years", () => {
+    const gas = {
+      ...generator,
+      fuel: "Natural Gas",
+      btuPerWh: 0.0035,
+      yearsToBuild: 2,
+    } as GeneratorShoppingType;
+    const noFee = LCWH(gas, date, 0, SEED);
+    const futureFee = LCWH(gas, date, 0, SEED, undefined, (yearsFromQuote) =>
+      yearsFromQuote >= 4 ? 0.1 : 0,
+    );
+    const fullFee = LCWH(gas, date, 0.1, SEED);
+    expect(futureFee).toBeGreaterThan(noFee);
+    expect(futureFee).toBeLessThan(fullFee);
+  });
+
   /**
    * An intermittent generator sampled across a window with no sun in it comes back with a zero
    * capacity factor, and dividing by that used to reach the build screen as "$INFINITY/MWh".

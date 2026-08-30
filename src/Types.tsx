@@ -648,6 +648,9 @@ export interface GameEventType {
   turningPointPriority?: number;
 }
 
+export type StoryAttributeValueType =
+  string | number | boolean | string[] | number[];
+
 export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
@@ -680,6 +683,15 @@ export interface StorySnapshotType {
   }>;
 }
 
+/** A pure summary of an event's completed monthly window. */
+export interface StoryPeriodSnapshotType {
+  deliveredWhByFuel: Partial<Record<FuelNameType, number>>;
+  demandWh: number;
+  unservedWh: number;
+  netIncome: number;
+  peakDemandW: number;
+}
+
 /** One deterministic, time-bounded occurrence created by the world-event engine. */
 export interface ActiveWorldEventType {
   // Definition id plus location/date, stable across a replay of the same run
@@ -687,12 +699,15 @@ export interface ActiveWorldEventType {
   definitionId: string;
   startsMinute: number;
   endsMinute: number;
-  attributes: Record<string, string | number>;
+  attributes: Record<string, StoryAttributeValueType>;
   effects: WorldEventEffectsType;
 }
 
 export interface WorldEventStateType {
   active: ActiveWorldEventType[];
+  // Resolved live occurrences survive expiry so recovery copy, saves, replays, matrix reports,
+  // and debrief selection can refer to the exact onset-time attributes and facility IDs.
+  occurrences: ActiveWorldEventType[];
   // A bounded record of month/definition checks prevents a save resumed in the same month from
   // drawing (and announcing) the same occurrence twice.
   checkedKeys: string[];
@@ -734,6 +749,9 @@ export interface GameType {
   // All-in $/MWh by fuel at the last monthly rollover, used to edge-detect cost-order changes.
   fuelCostSnapshot?: Partial<Record<FuelNameType, number>>;
   worldEvents: WorldEventStateType;
+  // Headless balance harness only: baseline matrix cells run the identical strategy with authored
+  // effects disabled. Undefined means enabled and is what every browser save/replay uses.
+  storyEffectsDisabled?: boolean;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is

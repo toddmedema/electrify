@@ -1,4 +1,6 @@
 import { LCWH } from "../helpers/Financials";
+import { buildStorySnapshot } from "../helpers/Story";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { hasFuelPrices } from "./FuelPrices";
 import { getInflationIndex, hasEconomy } from "./Economy";
 import { DIFFICULTIES } from "../Constants";
@@ -15,6 +17,7 @@ import {
   getViableLocationCount,
   getViableLocationsRemaining,
 } from "./FacilitySites";
+import { resolveStoryAtDate } from "./WorldEvents";
 
 /**
  * What a dollar in the tables below is worth by the time the game reaches this month. Every cost
@@ -182,6 +185,40 @@ export function GENERATORS(
 ) {
   const magnitude = Math.log10(peakW) - 6; // 0 = 1MW, 4 = 10GW (+1 for each 10x)
   const year = state.date.year;
+  const storySnapshot = buildStorySnapshot(
+    state.monthlyHistory || [],
+    state.facilities || [],
+    state.date.minute,
+  );
+  const storyContext = {
+    seed: state.seed,
+    scenarioId: state.scenarioId,
+    difficulty: state.difficulty,
+    location: state.location,
+    snapshot: storySnapshot,
+    occurrences: state.worldEvents?.occurrences || [],
+  };
+  const currentStoryEffects = state.storyEffectsDisabled
+    ? {}
+    : resolveStoryAtDate({ ...storyContext, date: state.date }).effects;
+  const carbonFeeCache = new Map<number, number>();
+  const carbonFeeAtYear = (yearsFromQuote: number) => {
+    const monthOffset = Math.round(yearsFromQuote * 12);
+    const cached = carbonFeeCache.get(monthOffset);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const date = getDateFromMinute(
+      state.date.minute + monthOffset * MINUTES_PER_MONTH,
+      state.startingYear,
+    );
+    const fee = state.storyEffectsDisabled
+      ? state.feePerKgCO2e
+      : (resolveStoryAtDate({ ...storyContext, date }).effects
+          .carbonFeePerKgCO2e ?? state.feePerKgCO2e);
+    carbonFeeCache.set(monthOffset, fee);
+    return fee;
+  };
 
   const hydroLocations = getViableLocationCount(state.location, "Hydro");
   const hydroLocationsRemaining = getViableLocationsRemaining(
@@ -566,6 +603,8 @@ export function GENERATORS(
   const inflation = getCostInflation(state);
   generators = generators.filter((g: GeneratorShoppingType) => {
     g.buildCost *= difficulty.buildCost * inflation;
+    g.buildCost *=
+      currentStoryEffects.buildCostMultipliersByFuel?.[g.fuel] || 1;
     g.annualOperatingCost *= difficulty.expensesOM * inflation;
     if (g.variableOperatingCostPerMWh !== undefined) {
       g.variableOperatingCostPerMWh *= difficulty.expensesOM * inflation;
@@ -578,7 +617,14 @@ export function GENERATORS(
     // price data a levelized cost needs. Nothing there reads lcWh, and a cost per Wh with no
     // fuel prices behind it is genuinely unknown rather than zero
     g.lcWh = hasFuelPrices()
-      ? LCWH(g, state.date, state.feePerKgCO2e, state.seed, state.location)
+      ? LCWH(
+          g,
+          state.date,
+          currentStoryEffects.carbonFeePerKgCO2e ?? state.feePerKgCO2e,
+          state.seed,
+          state.location,
+          carbonFeeAtYear,
+        )
       : Infinity;
     return g.available;
   });

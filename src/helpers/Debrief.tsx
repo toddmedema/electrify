@@ -35,7 +35,7 @@ export function fleetCapacity(
 
 function debriefHighlights(events: GameEventType[]) {
   const seen = new Set<string>();
-  return events
+  const candidates = events
     .filter(
       (event) =>
         event.importance ||
@@ -50,14 +50,27 @@ function debriefHighlights(events: GameEventType[]) {
       seen.add(event.message);
       return true;
     })
+    .sort((a, b) => {
+      const priority =
+        (b.turningPointPriority || 0) - (a.turningPointPriority || 0);
+      if (priority !== 0) {
+        return priority;
+      }
+      const importance = { ROUTINE: 0, NOTABLE: 1, CRITICAL: 2 };
+      const importanceDelta =
+        importance[b.importance || "ROUTINE"] -
+        importance[a.importance || "ROUTINE"];
+      return importanceDelta !== 0 ? importanceDelta : b.id - a.id;
+    })
     .slice(0, 3)
-    .reverse()
-    .map(({ kind, label, message, importance }) => ({
-      kind,
-      label,
-      message,
-      importance,
-    }));
+    // The chosen events are intentionally ranked, but the debrief reads as a timeline.
+    .sort((a, b) => a.id - b.id);
+  return candidates.map(({ kind, label, message, importance }) => ({
+    kind,
+    label,
+    message,
+    importance,
+  }));
 }
 
 export function buildVictoryDebrief(

@@ -52,3 +52,37 @@ it("captures a plain then-versus-now story and the latest meaningful beats", () 
     "Jan 2028",
   ]);
 });
+
+it("selects authored turning points intentionally before recent routine events", () => {
+  const scenario = SCENARIOS.find((candidate) => candidate.id === 103)!;
+  const events = [
+    {
+      id: 5,
+      kind: "CONSTRUCTION",
+      label: "Jan 2025",
+      message: "A recent build",
+    },
+    {
+      id: 4,
+      kind: "WORLD_EVENT",
+      label: "Mar 2016",
+      message: "Normalization review",
+      importance: "ROUTINE",
+      turningPointPriority: 80,
+    },
+    {
+      id: 3,
+      kind: "WORLD_EVENT",
+      label: "Jan 2014",
+      message: "Winter gas squeeze",
+      importance: "CRITICAL",
+      turningPointPriority: 100,
+    },
+  ] as GameEventType[];
+  const debrief = buildVictoryDebrief(scenario, summary, [], events);
+  expect(debrief.highlights.map((event) => event.message)).toEqual([
+    "Winter gas squeeze",
+    "Normalization review",
+    "A recent build",
+  ]);
+});
