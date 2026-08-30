@@ -40,6 +40,10 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
+function scenarioEndYear(scenario: ScenarioType): number {
+  return scenario.startingYear + scenario.durationMonths / 12;
+}
+
 interface MissionListItemProps {
   s: ScenarioType;
   completed: boolean;
@@ -63,8 +67,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         {s.summary}
         <br />
         <i>
-          {location.name}, {s.startingYear}-
-          {s.startingYear + s.durationMonths / 12}
+          {location.name}, {s.startingYear}-{scenarioEndYear(s)}
         </i>
       </span>
     );
@@ -128,7 +131,9 @@ export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
   const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
-    (a, b) => b.startingYear - a.startingYear,
+    (a, b) =>
+      b.startingYear - a.startingYear ||
+      scenarioEndYear(b) - scenarioEndYear(a),
   );
 
   return (

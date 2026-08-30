@@ -31,14 +31,20 @@ function recordPlayed(...scenarioIds: number[]) {
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
 
-  it("shows training in its authored order and scenarios newest first", () => {
+  it("shows training in its authored order and scenarios by latest timeframe", () => {
     render(<NewGame {...props()} />);
 
     const rows = screen.getAllByTestId(/^mission-row-/);
     expect(rows).toHaveLength(SCENARIOS.length + 1);
     const scenariosNewestFirst = SCENARIOS.filter(
       (scenario) => !scenario.tutorialSteps,
-    ).sort((a, b) => b.startingYear - a.startingYear);
+    ).sort(
+      (a, b) =>
+        b.startingYear - a.startingYear ||
+        b.startingYear +
+          b.durationMonths / 12 -
+          (a.startingYear + a.durationMonths / 12),
+    );
     [...TUTORIALS, ...scenariosNewestFirst].forEach((scenario, index) =>
       expect(rows[index]).toHaveTextContent(scenario.name),
     );
@@ -46,6 +52,11 @@ describe("NewGame", () => {
       (scenario) => scenario.startingYear,
     );
     expect(scenarioYears).toEqual([...scenarioYears].sort((a, b) => b - a));
+    expect(
+      scenariosNewestFirst
+        .filter((scenario) => scenario.startingYear === 2020)
+        .map((scenario) => scenario.name),
+    ).toEqual(["Data Center Boom", "Carbon Fee"]);
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
     expect(screen.getByText("Training")).toBeInTheDocument();
     expect(screen.getByText("Scenarios")).toBeInTheDocument();
