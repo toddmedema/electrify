@@ -315,17 +315,15 @@ describe("Texas Deep Freeze", () => {
     const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
     expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
     expect(uri.effects.demandMultiplier).toBeUndefined();
-    expect(uri.details).toMatch(
-      /Solar follows weather without an extra derate/,
-    );
+    expect(uri.details).toMatch(/plants can produce less/i);
   });
 
   it("keeps the future thaw neutral, then reports the recorded outcome", () => {
     const thawUpcoming = upcomingStoryPhases(context(0, 107)).find((phase) =>
       phase.key.endsWith(":thaw"),
     )!;
-    expect(thawUpcoming.message).toMatch(/outcome will depend/i);
-    expect(thawUpcoming.message).not.toMatch(/carried|recovery/i);
+    expect(thawUpcoming.message).toMatch(/normal plant output/i);
+    expect(thawUpcoming.message).not.toMatch(/supplied|recovery|blackout/i);
 
     const period = {
       deliveredWhByFuel: {},
@@ -341,14 +339,14 @@ describe("Texas Deep Freeze", () => {
       ...context(50, 107),
       periodSnapshots: { 1: { ...period, unservedWh: 1 } },
     }).occurrences[0];
-    expect(success.message).toMatch(/without unserved energy/i);
+    expect(success.message).toMatch(/every customer supplied/i);
     expect(deficit.message).toMatch(/recovery/i);
   });
 
   it("does not claim local load shed before the simulation records a deficit", () => {
     const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
-    expect(uri.message).toMatch(/emergency operations across Texas/i);
-    expect(uri.message).not.toMatch(/forced local load shed/i);
+    expect(uri.message).toMatch(/power supplies across Texas/i);
+    expect(uri.message).not.toMatch(/load shed|ERCOT/i);
   });
 });
 
@@ -482,7 +480,7 @@ describe("remaining scored story arcs", () => {
       unservedWh: 2,
       reliability: 0.98,
     });
-    expect(restoration.message).toMatch(/98% of demand was served/);
+    expect(restoration.message).toMatch(/met 98% of demand/);
   });
 
   it("branches checkpoints from persisted simulation facts", () => {

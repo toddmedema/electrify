@@ -99,30 +99,25 @@ export default function EventLog(props: Props): React.JSX.Element {
                   </span>
                   <span>
                     {event.title && <strong>{event.title}</strong>}
-                    {event.importance && event.importance !== "ROUTINE" && (
-                      <span className="eventLogImportance">
-                        {event.importance === "CRITICAL"
-                          ? "Critical"
-                          : "Notable"}
-                      </span>
-                    )}
-                    <Typography
-                      variant="body2"
-                      component="span"
-                      sx={{ display: "block" }}
-                    >
-                      {event.message}
-                    </Typography>
-                    {event.details && (
+                    <span className="eventLogCopy">
                       <Typography
-                        variant="caption"
-                        color="textSecondary"
+                        variant="body2"
                         component="span"
                         sx={{ display: "block" }}
                       >
-                        {event.details}
+                        {event.message}
                       </Typography>
-                    )}
+                      {event.details && (
+                        <Typography
+                          variant="caption"
+                          color="textSecondary"
+                          component="span"
+                          sx={{ display: "block" }}
+                        >
+                          {event.details}
+                        </Typography>
+                      )}
+                    </span>
                   </span>
                   <Typography
                     className="eventLogWhen"
@@ -137,7 +132,7 @@ export default function EventLog(props: Props): React.JSX.Element {
             </ul>
           </section>
         )}
-        {upcoming.length > 0 && (
+        {upcoming.length > 0 && events.length < 2 && (
           <Typography className="eventLogHistoryTitle" variant="subtitle2">
             History
           </Typography>
@@ -178,28 +173,25 @@ export default function EventLog(props: Props): React.JSX.Element {
               </span>
               <span>
                 {event.title && <strong>{event.title}</strong>}
-                {event.importance && event.importance !== "ROUTINE" && (
-                  <span className="eventLogImportance">
-                    {event.importance === "CRITICAL" ? "Critical" : "Notable"}
-                  </span>
-                )}
-                <Typography
-                  variant="body2"
-                  component="span"
-                  sx={{ display: "block" }}
-                >
-                  {event.message}
-                </Typography>
-                {event.details && (
+                <span className="eventLogCopy">
                   <Typography
-                    variant="caption"
-                    color="textSecondary"
+                    variant="body2"
                     component="span"
                     sx={{ display: "block" }}
                   >
-                    {event.details}
+                    {event.message}
                   </Typography>
-                )}
+                  {event.details && (
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      component="span"
+                      sx={{ display: "block" }}
+                    >
+                      {event.details}
+                    </Typography>
+                  )}
+                </span>
               </span>
               <Typography
                 className="eventLogWhen"

@@ -127,7 +127,9 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
 export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
-  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps);
+  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
+    (a, b) => b.startingYear - a.startingYear,
+  );
 
   return (
     <div id="listCard" className="flexContainer">
