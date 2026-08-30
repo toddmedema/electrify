@@ -898,6 +898,9 @@ export const SCENARIOS = [
     // Calibrates the customer-driven model to a 45-52 MW municipal average without inventing
     // hundreds of thousands of accounts. The authored data-center schedule is separate below.
     startingDemandScale: 7.5,
+    // Surviving by shedding a third of the municipal customer base is not a successful response
+    // to the boom. This is shown with the victory conditions before play and checked at the end.
+    minimumCustomerRetention: 0.9,
     dollarsPerkWh: 0.1,
     cash: 25000000,
     feePerKgCO2e: 0,
@@ -944,9 +947,10 @@ export const SCENARIOS = [
       "Four years before Winter Storm Uri, harden an Austin-scale public grid for record cold and cascading ERCOT shortages.",
     briefing: {
       tone: "storm",
-      fantasy: "Prepare an Austin-scale public grid for a known winter crisis.",
+      fantasy:
+        "Steward an Austin-scale public grid through a known winter crisis.",
       objective:
-        "Build portfolio resilience before Winter Storm Uri arrives in February 2021.",
+        "Preserve the existing portfolio's resilience through Winter Storm Uri in February 2021.",
       constraint:
         "The opening fleet represents aggregate Austin resources and PPAs, not plant ownership.",
       threat:
@@ -958,7 +962,7 @@ export const SCENARIOS = [
     durationMonths: 7 * 12,
     startingCustomers: 472701,
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
-    startingDemandScale: 7.6,
+    startingDemandScale: 7.61,
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,

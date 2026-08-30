@@ -8,6 +8,7 @@ import gameReducer, {
   delta,
   initGame,
   hasChronicBlackouts,
+  scenarioObjectiveFailure,
   start,
   startReplay,
   sellFacility,
@@ -433,6 +434,15 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     }
     // The timeline was just regenerated and pre-rolled, so tick continuity restarts next tick
     prevTick = null;
+  }
+
+  if (
+    firedAtMonth === null &&
+    bankruptAtMonth === null &&
+    state.date.monthsElapsed >= scenario.durationMonths &&
+    scenarioObjectiveFailure(scenario, state.monthlyHistory)
+  ) {
+    firedAtMonth = state.date.monthsElapsed;
   }
 
   return {

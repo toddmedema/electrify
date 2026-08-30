@@ -209,6 +209,9 @@ describe("ending a scenario from inside the reducer", () => {
       (s: ScenarioType) => s.id === 100,
     ) as ScenarioType;
     const state = createGame({ scenarioId: scenario.id });
+    while (state.date.monthsElapsed < 3) {
+      tickState(state);
+    }
     const blackoutMonth: MonthlyHistoryType = {
       year: scenario.startingYear,
       month: 0,
@@ -244,7 +247,7 @@ describe("ending a scenario from inside the reducer", () => {
       facility.currentW = 0;
     });
 
-    playOutOnTheStore(state, 1);
+    playOutOnTheStore(state, 4);
     jest.runOnlyPendingTimers();
 
     const victory = getStore().getState().ui.victory;

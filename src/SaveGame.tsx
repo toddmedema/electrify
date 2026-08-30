@@ -1,4 +1,5 @@
 import packageJson from "../package.json";
+import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import {
   getStorageJson,
@@ -208,6 +209,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !Array.isArray(worldEvents.checkedKeys)
   ) {
     return null;
+  }
+  // Older v4 sessions could record the opening forecast as an extra completed month. History is
+  // newest-first, so any impossible excess is the oldest tail and can be repaired losslessly.
+  const completedMonths = Math.floor(game.date.minute / MINUTES_PER_MONTH);
+  if (game.monthlyHistory.length > completedMonths) {
+    game.monthlyHistory = game.monthlyHistory.slice(0, completedMonths);
   }
   return save as SaveGameType;
 }

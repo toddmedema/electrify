@@ -84,3 +84,33 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
       .map((line) => line.split(":")[0]),
   ).toEqual(ordered);
 });
+
+it("shows an authored load label without changing its demand category", () => {
+  const breakdown = {
+    Residential: 200,
+    Commercial: 100,
+    Industrial: 50,
+    Transportation: 25,
+    "Data centers": 100,
+  };
+  expect(
+    formatDemandTypeTooltip(0, breakdown, 2020, ["Data centers"], {
+      "Data centers": "New data centers",
+    }),
+  ).toContain("New data centers: 100W");
+
+  render(
+    <ChartForecastDemandByType
+      timeline={[tick(0, breakdown)]}
+      domain={{ x: [0, 1440] }}
+      startingYear={2020}
+      multiyear={false}
+      typeLabels={{ "Data centers": "New data centers" }}
+    />,
+  );
+  expect(
+    screen.getByRole("img", {
+      name: /new data centers/i,
+    }),
+  ).toBeInTheDocument();
+});

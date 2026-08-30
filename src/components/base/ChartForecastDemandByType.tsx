@@ -28,6 +28,8 @@ export interface Props {
   domain: { x: [number, number] };
   /** Shared with the DOM legend so both surfaces always present the same ranking. */
   displayTypes?: readonly DemandTypeNameType[];
+  /** Player-facing authored labels while the underlying demand category remains stable. */
+  typeLabels?: Partial<Record<DemandTypeNameType, string>>;
   startingYear: number;
   multiyear: boolean;
   showXLabels?: boolean;
@@ -42,6 +44,7 @@ interface State {
   maxY: number;
   startingYear: number;
   multiyear: boolean;
+  typeLabels: Partial<Record<DemandTypeNameType, string>>;
 }
 
 function buildOptions(showXLabels: boolean) {
@@ -131,10 +134,13 @@ export function formatDemandTypeTooltip(
   breakdown: DemandByTypeType,
   startingYear: number,
   displayTypes: readonly DemandTypeNameType[],
+  typeLabels: Partial<Record<DemandTypeNameType, string>> = {},
 ): string {
   return [
     formatMinuteAsTooltipHeader(minute, startingYear),
-    ...displayTypes.map((type) => `${type}: ${formatWatts(breakdown[type])}`),
+    ...displayTypes.map(
+      (type) => `${typeLabels[type] || type}: ${formatWatts(breakdown[type])}`,
+    ),
   ].join("\n");
 }
 
@@ -144,6 +150,7 @@ function tooltip(idx: number, state: State): string {
     state.byType[idx],
     state.startingYear,
     state.displayTypes,
+    state.typeLabels,
   );
 }
 
@@ -161,6 +168,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
       multiyear,
       showXLabels,
       syncKey,
+      typeLabels = {},
     } = this.props;
     const minutes: number[] = [];
     const byType: DemandByTypeType[] = [];
@@ -193,6 +201,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
       maxY,
       startingYear,
       multiyear,
+      typeLabels,
     };
 
     return (
@@ -204,7 +213,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
           state={state}
           data={[minutes, ...stacked]}
           summaryData={[minutes, ...unstacked]}
-          seriesLabels={[...DEMAND_TYPES]}
+          seriesLabels={DEMAND_TYPES.map((type) => typeLabels[type] || type)}
           buildOptions={buildOptions(showXLabels !== false)}
           structureKey={String(showXLabels !== false)}
           syncKey={syncKey}

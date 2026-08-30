@@ -319,6 +319,37 @@ describe("Texas Deep Freeze", () => {
       /Solar follows weather without an extra derate/,
     );
   });
+
+  it("keeps the future thaw neutral, then reports the recorded outcome", () => {
+    const thawUpcoming = upcomingStoryPhases(context(0, 107)).find((phase) =>
+      phase.key.endsWith(":thaw"),
+    )!;
+    expect(thawUpcoming.message).toMatch(/outcome will depend/i);
+    expect(thawUpcoming.message).not.toMatch(/carried|recovery/i);
+
+    const period = {
+      deliveredWhByFuel: {},
+      demandWh: 1,
+      netIncome: 0,
+      peakDemandW: 1,
+    };
+    const success = resolveStoryAtDate({
+      ...context(50, 107),
+      periodSnapshots: { 1: { ...period, unservedWh: 0 } },
+    }).occurrences[0];
+    const deficit = resolveStoryAtDate({
+      ...context(50, 107),
+      periodSnapshots: { 1: { ...period, unservedWh: 1 } },
+    }).occurrences[0];
+    expect(success.message).toMatch(/without unserved energy/i);
+    expect(deficit.message).toMatch(/recovery/i);
+  });
+
+  it("does not claim local load shed before the simulation records a deficit", () => {
+    const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
+    expect(uri.message).toMatch(/emergency operations across Texas/i);
+    expect(uri.message).not.toMatch(/forced local load shed/i);
+  });
 });
 
 describe("remaining scored story arcs", () => {
