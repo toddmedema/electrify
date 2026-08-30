@@ -384,7 +384,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <ArrowBackIosIcon />
             </IconButton>
             <Typography component="div" variant="h6">
-              Scenario
+              Game details
             </Typography>
           </Toolbar>
         </div>
@@ -406,19 +406,19 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 component="h1"
                 sx={{ fontWeight: 800, lineHeight: 1.2 }}
               >
-                {scenario.name} — {briefing.fantasy}
+                {scenario.name}
               </Typography>
               <Typography variant="body1" color="textSecondary">
-                {scenario.summary}
+                {briefing.fantasy}
               </Typography>
               <div className="scenarioBriefingFacts">
                 <BriefingFact
                   concept="goal"
-                  label="Objective"
+                  label="Your goal"
                   action={
                     <IconButton
                       onClick={toggleVictoryDialog}
-                      aria-label="Victory conditions"
+                      aria-label="What counts as a win"
                       color="primary"
                       size="small"
                     >
@@ -428,24 +428,24 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 >
                   {briefing.objective}
                 </BriefingFact>
-                <BriefingFact concept="finances" label="Constraint">
+                <BriefingFact concept="finances" label="The catch">
                   {briefing.constraint}
                 </BriefingFact>
-                <BriefingFact concept="danger" label="Threat">
+                <BriefingFact concept="danger" label="Watch out">
                   {briefing.threat}
                 </BriefingFact>
               </div>
               <div className="scenarioStartControls">
                 <div className="difficultyPicker">
                   <Typography variant="caption" component="div">
-                    Difficulty
+                    Challenge level
                   </Typography>
                   <ToggleButtonGroup
                     exclusive
                     value={game.difficulty}
                     size="small"
                     color="primary"
-                    aria-label="Difficulty"
+                    aria-label="Challenge level"
                     onChange={(_event, difficulty: DifficultyType | null) => {
                       if (difficulty) {
                         onDelta({ difficulty });
@@ -457,7 +457,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                         value={d}
                         key={d}
                         title={DIFFICULTIES[d].description}
-                        aria-label={`${DIFFICULTY_LABELS[d]} (${d})`}
+                        aria-label={DIFFICULTY_LABELS[d]}
                       >
                         {DIFFICULTY_LABELS[d]}
                       </ToggleButton>
@@ -479,7 +479,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
-                  Start mission
+                  Start game
                 </Button>
               </div>
             </div>
@@ -490,7 +490,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             onClose={toggleVictoryDialog}
           >
             <DialogTitle>
-              Victory Conditions: {scenario.ownership}-Owned
+              What counts as a win
               <IconButton
                 aria-label="close"
                 onClick={toggleVictoryDialog}
@@ -527,8 +527,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   <TableCell colSpan={scoreColumnCount}>
                     <Typography variant="h6">
                       {leaderboardExpanded
-                        ? "Global High Scores — All Difficulties"
-                        : `Global High Scores — ${DIFFICULTY_LABELS[game.difficulty]}`}
+                        ? "Leaderboard — All levels"
+                        : `Leaderboard — ${DIFFICULTY_LABELS[game.difficulty]}`}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -536,7 +536,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   <TableCell className="rank">#</TableCell>
                   <TableCell>Name</TableCell>
                   <TableCell>Score</TableCell>
-                  {leaderboardExpanded && <TableCell>Difficulty</TableCell>}
+                  {leaderboardExpanded && <TableCell>Level</TableCell>}
                   <TableCell className="replay">Replay</TableCell>
                 </TableRow>
               </TableHead>
@@ -571,7 +571,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       <Typography variant="body2" color="textSecondary">
                         {visibleBoardFailed
                           ? "Couldn't load the high scores right now."
-                          : "Play the scenario to set a high score"}
+                          : "Finish this game to join the leaderboard"}
                       </Typography>
                     </TableCell>
                   </TableRow>

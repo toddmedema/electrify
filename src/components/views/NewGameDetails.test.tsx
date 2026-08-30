@@ -63,7 +63,7 @@ describe("NewGameDetails leaderboard", () => {
     expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
       expect.objectContaining({ id: "SF" }),
     );
-    await screen.findByText("Play the scenario to set a high score");
+    await screen.findByText("Finish this game to join the leaderboard");
   });
 
   it("leads with the scenario fantasy, objective, and stakes", async () => {
@@ -74,31 +74,34 @@ describe("NewGameDetails leaderboard", () => {
     ).toHaveAttribute("src", "/images/carbon fee.svg");
     expect(
       screen.getByRole("heading", {
-        name: "Carbon Fee — Modernize an aging grid as pollution gets more expensive.",
+        name: "Carbon Fee",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Objective")).toBeInTheDocument();
-    expect(screen.getByText("Constraint")).toBeInTheDocument();
-    expect(screen.getByText("Threat")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Modernize an aging grid as pollution gets more expensive.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Your goal")).toBeInTheDocument();
+    expect(screen.getByText("The catch")).toBeInTheDocument();
+    expect(screen.getByText("Watch out")).toBeInTheDocument();
     expect(screen.queryByText("Winning looks like")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Victory conditions" }),
+      screen.getByRole("button", { name: "What counts as a win" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start mission" })).toBeVisible();
-    expect(screen.getByText(/Easy: 30% cheaper facilities/)).toBeVisible();
-    await screen.findByText("Play the scenario to set a high score");
+    expect(screen.getByRole("button", { name: "Start game" })).toBeVisible();
+    expect(screen.getByText(/Forgiving: lower costs/)).toBeVisible();
+    await screen.findByText("Finish this game to join the leaderboard");
   });
 
   it("is always visible and follows the selected difficulty", async () => {
     const { rerender } = render(<NewGameDetails {...props()} />);
 
     expect(
-      screen.getByRole("heading", { name: "Global High Scores — Easy" }),
+      screen.getByRole("heading", { name: "Leaderboard — Easy" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("See global leaderboard")).toBeNull();
-    expect(
-      screen.queryByRole("columnheader", { name: "Difficulty" }),
-    ).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Level" })).toBeNull();
     await waitFor(() =>
       expect(mockWhere).toHaveBeenCalledWith("difficulty", "==", "Employee"),
     );
@@ -106,7 +109,7 @@ describe("NewGameDetails leaderboard", () => {
     rerender(<NewGameDetails {...props({ game: game("CEO") })} />);
 
     expect(
-      screen.getByRole("heading", { name: "Global High Scores — Expert" }),
+      screen.getByRole("heading", { name: "Leaderboard — Expert" }),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(mockWhere).toHaveBeenCalledWith("difficulty", "==", "CEO"),
@@ -118,11 +121,12 @@ describe("NewGameDetails leaderboard", () => {
     render(<NewGameDetails {...props({ onDelta })} />);
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Easy (Employee)" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Easy" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
-    await userEvent.click(screen.getByRole("button", { name: "Expert (CEO)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expert" }));
 
     expect(onDelta).toHaveBeenCalledWith({ difficulty: "CEO" });
   });
@@ -175,19 +179,17 @@ describe("NewGameDetails leaderboard", () => {
 
     await screen.findByText("Player 3");
     expect(screen.queryByText("Player 4")).toBeNull();
-    expect(
-      screen.queryByRole("columnheader", { name: "Difficulty" }),
-    ).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Level" })).toBeNull();
     await userEvent.click(
       screen.getByRole("button", { name: "View all scores" }),
     );
     expect(
       await screen.findByRole("heading", {
-        name: "Global High Scores — All Difficulties",
+        name: "Leaderboard — All levels",
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("columnheader", { name: "Difficulty" }),
+      screen.getByRole("columnheader", { name: "Level" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("row", { name: /Expert Player 900 Expert/ }),

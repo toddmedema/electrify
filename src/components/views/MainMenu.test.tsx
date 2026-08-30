@@ -18,11 +18,11 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
-  it("shows a single, compact game subtitle", () => {
+  it("explains the game without specialist language", () => {
     render(<MainMenu {...props()} />);
 
     expect(
-      screen.getByText(/Build power plants, keep the lights on/i),
+      screen.getByText(/Keep the lights on. Build a cleaner energy future/i),
     ).toHaveClass("gameSubtitle", "MuiTypography-body1");
     expect(screen.queryByText(/no energy or gaming experience/i)).toBeNull();
   });
@@ -32,18 +32,18 @@ describe("MainMenu", () => {
     const user = userEvent.setup();
     render(<MainMenu {...props({ onStart })} />);
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Start playing" }));
     expect(onStart).toHaveBeenCalled();
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
   });
 
   it("only advertises account-free play before sign-in", () => {
     const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
-    expect(screen.getByText("Free · no account needed")).toBeInTheDocument();
+    expect(screen.getByText("Free · no sign-up needed")).toBeInTheDocument();
 
     rerender(<MainMenu {...props({ uid: "player" })} />);
     expect(
-      screen.queryByText("Free · no account needed"),
+      screen.queryByText("Free · no sign-up needed"),
     ).not.toBeInTheDocument();
   });
 
@@ -51,10 +51,10 @@ describe("MainMenu", () => {
     render(<MainMenu {...props({ hasSavedGame: true })} />);
 
     expect(
-      screen.getByRole("button", { name: "Continue your game" }),
+      screen.getByRole("button", { name: "Continue" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Choose a mission" }),
+      screen.getByRole("button", { name: "Start another game" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),
@@ -64,7 +64,7 @@ describe("MainMenu", () => {
     );
   });
 
-  it("puts every non-footer action on its own line with cohesive spacing", () => {
+  it("groups secondary actions into compact rows", () => {
     render(
       <MainMenu
         {...props({
@@ -84,8 +84,8 @@ describe("MainMenu", () => {
     });
 
     expect(primary).toHaveStyle({ flexDirection: "column" });
-    expect(resources).toHaveStyle({ flexDirection: "column", gap: "6px" });
-    expect(discovery).toHaveStyle({ flexDirection: "column", gap: "6px" });
+    expect(resources).toHaveStyle({ flexDirection: "row", gap: "6px" });
+    expect(discovery).toHaveStyle({ flexDirection: "row", gap: "6px" });
   });
 
   it("keeps sharing as a compact footer icon", () => {
