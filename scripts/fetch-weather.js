@@ -585,7 +585,7 @@ async function main() {
       const batch = wanted.slice(at, at + CITIES_PER_BATCH);
       log(`\n${batch.map((c) => c.id).join(", ")}`);
       const { rows, meta } = await fetchBatch(batch);
-      batch.forEach((city) => {
+      for (const city of batch) {
         const cityRows = rows.get(city.id);
         fs.writeFileSync(binaryPath(city.id), encodeWeather(cityRows));
         fetched[city.id] = meta.get(city.id);
@@ -593,7 +593,7 @@ async function main() {
         log(
           `  ${city.id} (${meta.get(city.id).timeZone}): ${summarise(city.id, cityRows)}`,
         );
-      });
+      }
       writeIndex(fetched);
     }
   } catch (e) {
