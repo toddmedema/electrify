@@ -322,7 +322,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       target: "A reliable grid and a healthy company.",
     };
     const endYear =
-      scenario.startingYear + Math.floor(scenario.durationMonths / 12);
+      scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     const visibleScores =
       scores && !leaderboardExpanded ? scores.slice(0, 3) : scores;
 

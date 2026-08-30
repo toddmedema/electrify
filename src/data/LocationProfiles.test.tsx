@@ -10,7 +10,7 @@ const location = (
   region: string,
   resources?: LocationType["resources"],
   admin?: string,
-): LocationType & { admin?: string } => ({
+): LocationType => ({
   id: country.replace(/\W/g, ""),
   name: country,
   lat: 0,

@@ -1,15 +1,15 @@
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { LocationType } from "../Types";
 import {
+  annualLoadAdditionWh,
   dataCenterLoadShare,
   DEMAND_TYPES,
   demandByTypeAt,
+  scheduledLoadAdditionWAt,
 } from "./DemandProfiles";
+import { ScenarioLoadAdditionType } from "../Types";
 
-const location = (
-  admin: string,
-  id = admin,
-): LocationType & { admin: string } => ({
+const location = (admin: string, id = admin): LocationType => ({
   id,
   name: id,
   lat: 0,
@@ -83,5 +83,79 @@ describe("demand profiles", () => {
     expect(night.Residential).toBeGreaterThan(day.Residential);
     expect(Math.abs(total(day) - 1_000_000) / 1_000_000).toBeLessThan(0.001);
     expect(Math.abs(total(night) - 1_000_000) / 1_000_000).toBeLessThan(0.001);
+  });
+
+  describe("authored absolute loads", () => {
+    const addition: ScenarioLoadAdditionType = {
+      id: "manassas-data-centers",
+      label: "New data centers",
+      startsYear: 2026,
+      peakW: 100_000_000,
+      loadFactor: 0.9,
+      demandType: "Data centers",
+    };
+
+    it("starts in the authored month, remains one absolute block and averages its load factor", () => {
+      const months = Array.from({ length: 12 }, (_, month) =>
+        getDateFromMinute((6 * 12 + month) * MINUTES_PER_MONTH, 2020),
+      );
+      const before = getDateFromMinute((6 * 12 - 1) * MINUTES_PER_MONTH, 2020);
+
+      expect(scheduledLoadAdditionWAt(addition, before)).toBe(0);
+      expect(scheduledLoadAdditionWAt(addition, months[0])).toBe(100_000_000);
+      expect(
+        months.reduce(
+          (sum, date) => sum + scheduledLoadAdditionWAt(addition, date),
+          0,
+        ) / months.length,
+      ).toBeCloseTo(90_000_000);
+      expect(
+        scheduledLoadAdditionWAt(
+          addition,
+          getDateFromMinute(18 * 12 * MINUTES_PER_MONTH, 2020),
+        ),
+      ).toBe(100_000_000);
+      expect(
+        scheduledLoadAdditionWAt(
+          { ...addition, startsMonth: 4 },
+          getDateFromMinute((6 * 12 + 2) * MINUTES_PER_MONTH, 2020),
+        ),
+      ).toBe(0);
+      expect(
+        scheduledLoadAdditionWAt(
+          { ...addition, startsMonth: 4 },
+          getDateFromMinute((6 * 12 + 3) * MINUTES_PER_MONTH, 2020),
+        ),
+      ).toBe(100_000_000);
+    });
+
+    it("replaces Virginia's generic curve and reports only under Data centers", () => {
+      const virginia = location("VA", "Manassas");
+      const before = demandByTypeAt(
+        50_000_000,
+        getDateFromMinute(0, 2020),
+        2020,
+        virginia,
+        [addition],
+      );
+      const after = demandByTypeAt(
+        50_000_000,
+        getDateFromMinute(6 * 12 * MINUTES_PER_MONTH, 2020),
+        2020,
+        virginia,
+        [addition],
+      );
+
+      expect(before["Data centers"]).toBe(0);
+      expect(after["Data centers"]).toBe(100_000_000);
+      expect(total(after)).toBeGreaterThan(100_000_000);
+    });
+
+    it("locks the non-cumulative 100 MW and 260 MW annual arithmetic", () => {
+      expect(annualLoadAdditionWh(addition) / 1_000_000).toBe(788_400);
+      expect(
+        annualLoadAdditionWh({ ...addition, peakW: 260_000_000 }) / 1_000_000,
+      ).toBe(2_049_840);
+    });
   });
 });

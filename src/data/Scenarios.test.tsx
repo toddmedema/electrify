@@ -114,7 +114,7 @@ describe("authored scenario briefings", () => {
 
 describe("authored starting fleets", () => {
   it("starts every facility with time in service", () => {
-    SCENARIOS.forEach((scenario) => {
+    SCENARIOS.filter((scenario) => scenario.id < 106).forEach((scenario) => {
       scenario.facilities.forEach((facility) => {
         expect(facility.initialAgeYears).toBeGreaterThan(0);
       });
@@ -125,6 +125,59 @@ describe("authored starting fleets", () => {
         });
       });
     });
+  });
+
+  it("keeps researched municipal and Austin-scale portfolio anchors exact", () => {
+    const manassas = getScenario(106)!;
+    const austin = getScenario(107)!;
+
+    expect(manassas).toMatchObject({
+      startingYear: 2020,
+      durationMonths: 192,
+      startingCustomers: 16_500,
+      ownership: "Public",
+      dollarsPerkWh: 0.1,
+    });
+    expect(manassas.location).toMatchObject({
+      id: "Manassas",
+      admin: "VA",
+      timeZone: "America/New_York",
+    });
+    expect(manassas.loadAdditions).toEqual([
+      expect.objectContaining({
+        startsYear: 2026,
+        peakW: 100_000_000,
+        loadFactor: 0.9,
+        demandType: "Data centers",
+      }),
+    ]);
+    expect(manassas.facilities).toEqual([
+      expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
+      expect.objectContaining({
+        fuel: "Natural Gas",
+        peakW: 75_000_000,
+        label: "Purchased Power Proxy",
+      }),
+    ]);
+
+    expect(austin).toMatchObject({
+      startingYear: 2017,
+      durationMonths: 84,
+      startingCustomers: 472_701,
+      ownership: "Public",
+      dollarsPerkWh: 0.09,
+    });
+    expect(austin.location).toMatchObject({
+      id: "Austin",
+      admin: "TX",
+      timeZone: "America/Chicago",
+    });
+    expect(
+      austin.facilities.reduce(
+        (total, facility) => total + (facility.peakW || 0),
+        0,
+      ),
+    ).toBe(3_827_000_000);
   });
 
   it("makes every plant in the aging coal fleet at least 20 years old", () => {

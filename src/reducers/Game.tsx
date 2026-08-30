@@ -445,7 +445,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       state.date.minute,
     ),
     periodSnapshots: Object.fromEntries(
-      [2, 3, 4, 5, 6].map((months) => [
+      [1, 2, 3, 4, 5, 6].map((months) => [
         months,
         buildStoryPeriodSnapshot(state.monthlyHistory, months),
       ]),
@@ -655,6 +655,8 @@ const initialGame: GameType = {
   dollarsPerkWh: 0.07,
   customerMarketSize: 0,
   customerRate: 0.07,
+  startingDemandScale: 1,
+  loadAdditions: [],
   // Placeholders until initGame prices the company against the year it actually starts in. The
   // new game screens read these before any economic data has been loaded.
   interestRate: INTEREST_RATE_YEARLY,
@@ -772,6 +774,8 @@ export const gameSlice = createSlice({
       state.dollarsPerkWh = startingRate;
       state.customerRate = startingRate;
       state.customerMarketSize = startingCustomers * CUSTOMER_MARKET_MULTIPLIER;
+      state.startingDemandScale = scenario.startingDemandScale ?? 1;
+      state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
       state.location = a.location;
       state.timeline = generateNewTimeline(
         state,
@@ -782,7 +786,7 @@ export const gameSlice = createSlice({
       startingFacilities.forEach((search: ScenarioFacilityType) => {
         // Age is scenario metadata rather than a catalog property, so exclude it from the exact
         // technology match and pass it to the completed operating asset separately.
-        const { initialAgeYears = 0, ...facilitySearch } = search;
+        const { initialAgeYears = 0, label, ...facilitySearch } = search;
         const generator = GENERATORS(
           state,
           facilitySearch.peakW || 1000000,
@@ -792,6 +796,7 @@ export const gameSlice = createSlice({
           matchesFacilitySearch(g, facilitySearch),
         );
         if (generator) {
+          const existingIds = new Set(state.facilities.map(({ id }) => id));
           state = buildFacilityHelper(
             state,
             generator,
@@ -799,12 +804,21 @@ export const gameSlice = createSlice({
             true,
             initialAgeYears,
           );
+          if (label) {
+            const built = state.facilities.find(
+              ({ id }) => !existingIds.has(id),
+            );
+            if (built) {
+              built.name = label;
+            }
+          }
         } else {
           const storage = STORAGE(state, facilitySearch.peakWh || 1000000).find(
             (g: FacilityShoppingType) =>
               matchesFacilitySearch(g, facilitySearch),
           );
           if (storage) {
+            const existingIds = new Set(state.facilities.map(({ id }) => id));
             state = buildFacilityHelper(
               state,
               storage,
@@ -812,6 +826,14 @@ export const gameSlice = createSlice({
               true,
               initialAgeYears,
             );
+            if (label) {
+              const built = state.facilities.find(
+                ({ id }) => !existingIds.has(id),
+              );
+              if (built) {
+                built.name = label;
+              }
+            }
           } else {
             // A spec that matches nothing used to vanish without a trace, which is a rough way to
             // find out that the technology you picked wasn't invented yet in the year you started
@@ -1358,6 +1380,8 @@ export function tickState(state: GameType) {
           summary,
           state.facilities,
           state.eventLog,
+          state.monthlyHistory,
+          state.dollarsPerkWh,
         );
 
         if (!isReplay) {
@@ -1599,12 +1623,16 @@ function getDemandW(
     65 * minutesFrom5pmLogistics;
   const effects = storyEffectsAt(date, game);
   const baselineDemandW =
-    demandMultiple * now.customers * (effects.demandMultiplier || 1);
+    demandMultiple *
+    now.customers *
+    game.startingDemandScale *
+    (effects.demandMultiplier || 1);
   now.demandByType = demandByTypeAt(
     baselineDemandW,
     date,
     game.startingYear,
     game.location,
+    game.loadAdditions,
   );
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
@@ -1842,8 +1870,9 @@ function updateSupplyFacilitiesFinances(
       : 1;
     const facilityOutputMultiplier =
       tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] || 1;
-    let dispatchPeakW =
+    const availablePeakW =
       g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
+    let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
     const hydro = g.fuel === "Hydro" && !!g.reservoirCapacityWh;
@@ -1872,11 +1901,11 @@ function updateSupplyFacilitiesFinances(
         const bypassWh = requiredReleaseWh - turbineMandatedWh;
         g.reservoirWh = Math.max(0, g.reservoirWh - bypassWh);
         mandatedW = Math.min(
-          g.peakW,
+          availablePeakW,
           (turbineMandatedWh * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS,
         );
         dispatchPeakW = Math.min(
-          g.peakW,
+          availablePeakW,
           (turbineWaterWh * TICKS_PER_HOUR) / GAME_TO_REAL_YEARS,
         );
         g.hydroLastMandatedReleaseWh = requiredReleaseWh;
@@ -1931,16 +1960,16 @@ function updateSupplyFacilitiesFinances(
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
-            g.currentW = g.peakW * outputFactor * solarOutputFactor;
+            g.currentW = availablePeakW * outputFactor * solarOutputFactor;
             break;
           case "Wind":
-            g.currentW = g.peakW * outputFactor * windOutputFactor;
+            g.currentW = availablePeakW * outputFactor * windOutputFactor;
             break;
           case "Offshore Wind":
-            g.currentW = g.peakW * offshoreWindOutputFactor;
+            g.currentW = availablePeakW * offshoreWindOutputFactor;
             break;
           case "Airborne Wind":
-            g.currentW = g.peakW * airborneWindOutputFactor;
+            g.currentW = availablePeakW * airborneWindOutputFactor;
             break;
           default: // on-demand produces up to demand + reserve margin
             // If there's a battery after this plant, the dispatch request includes the extra

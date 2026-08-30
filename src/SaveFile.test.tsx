@@ -20,6 +20,8 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     startingYear: 2020,
     customerMarketSize: 2_000_000,
     customerRate: 0.07,
+    startingDemandScale: 1,
+    loadAdditions: [],
     location: LOCATIONS.PIT,
     date: { minute: 1000, year: 2035, month: 6 },
     facilities: [],

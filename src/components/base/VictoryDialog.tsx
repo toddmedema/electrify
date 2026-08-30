@@ -190,6 +190,13 @@ function RunDebrief({
             <strong>{formatWattHours(debrief.unservedWh)}</strong>
           </div>
         )}
+        {debrief.scenarioMetrics?.map((metric) => (
+          <div key={metric.label}>
+            <ConceptIcon concept={metric.concept} fontSize="small" />
+            <Typography variant="caption">{metric.label}</Typography>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
       </div>
       {debrief.highlights.length > 0 && (
         <>

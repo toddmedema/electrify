@@ -870,6 +870,123 @@ export const SCENARIOS = [
       { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
     ],
   },
+  {
+    id: 106, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: "Data Center Boom",
+    icon: "natural gas",
+    locationId: "Manassas",
+    location: {
+      id: "Manassas",
+      name: "Manassas, VA",
+      admin: "VA",
+      country: "United States",
+      region: "North America",
+      lat: 38.7509,
+      long: -77.4753,
+      timeZone: "America/New_York",
+    },
+    summary:
+      "A wave of 24/7 data centers is about to dwarf your municipal grid. Keep the lights on without pricing residents out.",
+    briefing: {
+      tone: "boom",
+      fantasy: "Guide a small municipal grid through a historic load boom.",
+      objective:
+        "Prepare six years early for 100 MW of near-flat data-center demand arriving in January 2026.",
+      constraint:
+        "You own 55 MW of oil generation; a 75 MW purchased-power proxy supplies today's grid.",
+      threat:
+        "The new load will dwarf today's grid if reliable supply is not ready on time.",
+      target:
+        "Serve the boom reliably while keeping the common rate close to $0.10/kWh.",
+    },
+    ownership: "Public",
+    startingYear: 2020,
+    durationMonths: 16 * 12,
+    startingCustomers: 16500,
+    // Calibrates the customer-driven model to a 45-52 MW municipal average without inventing
+    // hundreds of thousands of accounts. The authored data-center schedule is separate below.
+    startingDemandScale: 7.5,
+    dollarsPerkWh: 0.1,
+    cash: 25000000,
+    feePerKgCO2e: 0,
+    facilities: [
+      { fuel: "Oil", peakW: 55000000, initialAgeYears: 27 },
+      {
+        fuel: "Natural Gas",
+        peakW: 75000000,
+        initialAgeYears: 0,
+        // This is purchased power in gameplay terms, not a fictional city-owned gas plant.
+        label: "Purchased Power Proxy",
+      },
+    ],
+    loadAdditions: [
+      {
+        id: "manassas-data-centers",
+        label: "New data centers",
+        startsYear: 2026,
+        peakW: 100000000,
+        loadFactor: 0.9,
+        demandType: "Data centers",
+      },
+    ],
+    endTitle: "The municipal grid, transformed",
+    endMessage:
+      "Sixteen years tested whether a small public utility could prepare for growth without leaving residents behind.",
+  },
+  {
+    id: 107, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
+    name: "Texas Deep Freeze",
+    icon: "wind",
+    locationId: "Austin",
+    location: {
+      id: "Austin",
+      name: "Austin, TX",
+      admin: "TX",
+      country: "United States",
+      region: "North America",
+      lat: 30.2672,
+      long: -97.7431,
+      timeZone: "America/Chicago",
+    },
+    summary:
+      "Four years before Winter Storm Uri, harden an Austin-scale public grid for record cold and cascading ERCOT shortages.",
+    briefing: {
+      tone: "storm",
+      fantasy: "Prepare an Austin-scale public grid for a known winter crisis.",
+      objective:
+        "Build portfolio resilience before Winter Storm Uri arrives in February 2021.",
+      constraint:
+        "The opening fleet represents aggregate Austin resources and PPAs, not plant ownership.",
+      threat:
+        "Record cold, fuel disruption and ERCOT-wide shortages strike in February 2021.",
+      target:
+        "Limit unserved energy, preserve cash through the thaw and recover by December 2023.",
+    },
+    ownership: "Public",
+    seed: 268107,
+    startingYear: 2017,
+    durationMonths: 7 * 12,
+    startingCustomers: 472701,
+    // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
+    startingDemandScale: 7.6,
+    dollarsPerkWh: 0.09,
+    cash: 335000000,
+    feePerKgCO2e: 0,
+    // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. The solar
+    // residual balances the published 1,287 MW renewable total; it is not a separately audited
+    // solar nameplate.
+    facilities: [
+      { fuel: "Natural Gas", peakW: 1497000000 },
+      { fuel: "Coal", peakW: 600000000 },
+      { fuel: "Uranium", peakW: 430000000 },
+      { fuel: "Wind", peakW: 1145000000 },
+      { fuel: "Biomass", peakW: 100000000 },
+      { fuel: "Sun", peakW: 55000000 },
+    ],
+    endTitle: "After the thaw",
+    endMessage:
+      "The storm tested both your portfolio and the limits of operating inside a larger interconnected system.",
+  },
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them

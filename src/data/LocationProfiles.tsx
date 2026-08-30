@@ -129,7 +129,7 @@ const US_GEOTHERMAL_STATES = new Set([
 ]);
 
 function stateFor(location?: LocationType): string | undefined {
-  return (location as (LocationType & { admin?: string }) | undefined)?.admin;
+  return location?.admin;
 }
 
 function multipliersFor(location?: LocationType): FuelMultipliers {

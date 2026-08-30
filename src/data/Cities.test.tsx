@@ -143,9 +143,7 @@ describe("the bundled locations", () => {
       const shipped = index.cities[id];
       expect(shipped).toBeDefined();
       expect(shipped.name).toEqual(bundled.name);
-      expect(shipped.admin).toEqual(
-        (bundled as LocationType & { admin?: string }).admin,
-      );
+      expect(shipped.admin).toEqual(bundled.admin);
       expect(shipped.timeZone).toEqual(bundled.timeZone);
       expect(shipped.lat).toBeCloseTo(bundled.lat, 3);
       expect(shipped.long).toBeCloseTo(bundled.long, 3);

@@ -273,11 +273,51 @@ describe("The Shale Boom pilot arc", () => {
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
   });
 
-  it("authors every scored scenario and no custom game", () => {
+  it("authors every scenario with deterministic story events and no custom game", () => {
     expect(
       [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105]);
+    ).toEqual([100, 101, 102, 103, 104, 105, 107]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
+  });
+});
+
+describe("Texas Deep Freeze", () => {
+  it("starts only in February 2021 and expires completely in March", () => {
+    const january = resolveStoryAtDate(context(48, 107));
+    const february = resolveStoryAtDate(context(49, 107));
+    const march = resolveStoryAtDate(context(50, 107));
+
+    expect(january.effects).toEqual({});
+    expect(february.occurrences[0]).toMatchObject({
+      key: "story:107:texas-deep-freeze:uri",
+      importance: "CRITICAL",
+    });
+    expect(february.effects).toEqual({
+      temperatureOffsetC: -20,
+      demandMultiplier: 1,
+      fuelPriceMultipliers: { "Natural Gas": 2.8 },
+      facilityOutputMultipliersByFuel: {
+        "Natural Gas": 0.62,
+        Coal: 0.73,
+        Uranium: 0.77,
+        Wind: 0.44,
+      },
+    });
+    expect(march.effects).toEqual({});
+    expect(march.occurrences[0]).toMatchObject({
+      key: "story:107:texas-deep-freeze:thaw",
+    });
+    expect(resolveStoryAtDate(context(49, 0)).effects).toEqual({});
+    expect(resolveStoryAtDate(context(49, 999)).effects).toEqual({});
+  });
+
+  it("uses exactly one explicit wind availability adjustment", () => {
+    const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
+    expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
+    expect(uri.effects.demandMultiplier).toBeUndefined();
+    expect(uri.details).toMatch(
+      /Solar follows weather without an extra derate/,
+    );
   });
 });
 

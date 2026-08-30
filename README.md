@@ -100,6 +100,11 @@ of the catalogue is a matter of running it again tomorrow rather than leaving it
 To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. An `id` ends up
 in save games and replays, so it can never be changed afterwards; everything else can.
 
+The Manassas record is catalogued for the authored Data Center Boom scenario, but its generated
+weather binary and `public/data/weather/index.json` entry intentionally ship through the separate
+weather batch. Until that batch runs `npm run fetch-weather -- Manassas`, the scenario metadata is
+visible but starting it will report that its weather data is unavailable.
+
 ### Release checklist
 
 To release, install and authenticate the AWS CLI.

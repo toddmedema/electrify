@@ -62,7 +62,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
       <DialogContent>
         <p>
           Timeframe: {scenario.startingYear} to{" "}
-          {scenario.startingYear + Math.floor(scenario.durationMonths / 12)}
+          {scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}
         </p>
         {location && <p>Location: {location.name}</p>}
         <p>Difficulty: {game.difficulty}</p>
