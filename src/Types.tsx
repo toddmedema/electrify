@@ -560,8 +560,7 @@ export type ScenarioBriefingToneType =
 
 /**
  * The authored promise of a scenario, kept beside its simulation setup so the mission list and
- * briefing screen tell the same story. The artwork is assembled from the existing fuel icons and
- * a limited-palette tone rather than requiring a bespoke bitmap for every new scenario.
+ * briefing screen tell the same story. Each scenario's dedicated icon supplies the visual tone.
  */
 export interface ScenarioBriefingType {
   tone: ScenarioBriefingToneType;

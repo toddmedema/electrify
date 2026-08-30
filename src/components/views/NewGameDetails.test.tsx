@@ -70,6 +70,9 @@ describe("NewGameDetails leaderboard", () => {
     render(<NewGameDetails {...props()} />);
 
     expect(
+      screen.getByRole("img", { name: "Carbon Fee icon" }),
+    ).toHaveAttribute("src", "/images/carbon fee.svg");
+    expect(
       screen.getByRole("heading", {
         name: "Lead a legacy utility through a clean-energy transition.",
       }),

@@ -48,13 +48,11 @@ describe("NewGame", () => {
     ).toContainElement(rows[0]);
   });
 
-  it("turns scored scenarios into visual postcards of their starting fleets", () => {
+  it("uses each scenario's dedicated icon", () => {
     render(<NewGame {...props()} />);
     expect(
-      screen.getByRole("img", {
-        name: "Carbon Fee starting grid: Coal, Natural Gas",
-      }),
-    ).toBeInTheDocument();
+      screen.getByRole("img", { name: "Carbon Fee icon" }),
+    ).toHaveAttribute("src", "/images/carbon fee.svg");
   });
 
   it("highlights the first incomplete tutorial without replacing its subtitle", () => {

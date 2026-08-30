@@ -25,7 +25,6 @@ import {
   TUTORIALS,
 } from "../../data/Scenarios";
 import { GameType, ScenarioType } from "../../Types";
-import ScenarioArtwork from "../base/ScenarioArtwork";
 
 export interface StateProps {
   game: GameType;
@@ -72,7 +71,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   return (
     <Card
       data-testid={`mission-row-${s.id}`}
-      className={`build-list-item${s.briefing ? " scenarioPostcard" : ""}${next ? " tutorialNext" : ""}`}
+      className={`build-list-item${next ? " tutorialNext" : ""}`}
     >
       <CardActionArea
         onClick={onSelect}
@@ -84,10 +83,9 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         }
       >
         <CardHeader
-          className={s.briefing ? "scenarioPostcardHeader" : undefined}
           avatar={
             <Badge
-              overlap={s.briefing ? "rectangular" : "circular"}
+              overlap="circular"
               anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
               badgeContent={
                 completed ? (
@@ -101,11 +99,10 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
                 ) : undefined
               }
             >
-              {s.briefing ? (
-                <ScenarioArtwork scenario={s} compact />
-              ) : (
-                <Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />
-              )}
+              <Avatar
+                src={`/images/${s.icon.toLowerCase()}.svg`}
+                alt={`${s.name} icon`}
+              />
             </Badge>
           }
           title={<span>{s.name}</span>}
