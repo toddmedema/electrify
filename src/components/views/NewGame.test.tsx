@@ -73,6 +73,9 @@ describe("NewGame", () => {
     expect(
       screen.getByRole("img", { name: "Carbon Fee icon" }),
     ).toHaveAttribute("src", "/images/carbon fee.svg");
+    expect(
+      screen.getByRole("img", { name: "Data Center Boom icon" }),
+    ).toHaveAttribute("src", "/images/ai data center boom.svg");
   });
 
   it("highlights the first incomplete tutorial without replacing its subtitle", () => {
