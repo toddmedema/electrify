@@ -715,7 +715,7 @@ export const SCENARIOS = [
   {
     id: 100, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Carbon Fee",
-    icon: "solar",
+    icon: "carbon fee",
     locationId: "SF",
     summary: `New limits have been placed on pollution - can you modernize the company?`,
     briefing: {
@@ -740,7 +740,7 @@ export const SCENARIOS = [
   {
     id: 103, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "The Shale Boom",
-    icon: "natural gas",
+    icon: "the shale boom",
     locationId: "PIT",
     summary: `Cheap natural gas has been discovered nearby - are you ready for the boom?`,
     briefing: {
@@ -764,7 +764,7 @@ export const SCENARIOS = [
   {
     id: 105, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Paradise",
-    icon: "wind",
+    icon: "paradise",
     locationId: "HNL",
     summary: "A beautiful island - with a complex grid.",
     briefing: {
@@ -791,7 +791,7 @@ export const SCENARIOS = [
   {
     id: 101, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Rise of Renewables",
-    icon: "geothermal",
+    icon: "rise of renewables",
     locationId: "SF",
     summary: "Technology is advancing rapidly - can you keep up?",
     briefing: {
@@ -818,7 +818,7 @@ export const SCENARIOS = [
   {
     id: 104, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Hurricane Season",
-    icon: "wind",
+    icon: "hurricane season",
     locationId: "SJU",
     summary: "A remote island, with expensive fuel and destructive weather.",
     briefing: {
@@ -844,7 +844,7 @@ export const SCENARIOS = [
   {
     id: 102, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "The End of an Era",
-    icon: "coal",
+    icon: "the end of an era",
     locationId: "PIT",
     summary: "Your coal business faces new challenges - and opportunities.",
     briefing: {
