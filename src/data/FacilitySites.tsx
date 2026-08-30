@@ -53,6 +53,7 @@ export const PUMPED_HYDRO_SITES_BY_LOCATION: Readonly<Record<string, number>> =
     LasVegas: 1201,
     Memphis: 1,
     Baltimore: 170,
+    Manassas: 198,
     Milwaukee: 0,
     Albuquerque: 673,
     Tucson: 256,

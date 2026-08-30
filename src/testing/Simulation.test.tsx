@@ -10,7 +10,7 @@ import {
   INTERN_ONE_BUILD_PLAYS,
   STANDARD_BALANCE_PLAYS,
 } from "./BalancePlaybooks";
-import { hasSimWeather, loadSimData } from "./SimData";
+import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
@@ -46,19 +46,16 @@ describe("simulation invariants", () => {
   // amortizing, while keeping the whole suite well under a second per scenario
   const MONTHS = 24;
 
-  // Manassas is intentionally catalogued before its weather binary ships in the next batch.
-  SCENARIOS.filter((scenario) => scenario.id !== 106).forEach(
-    (scenario: ScenarioType) => {
-      it(`holds for "${scenario.name}"`, () => {
-        expectNoViolations(
-          runSimulation({
-            scenarioId: scenario.id,
-            months: Math.min(MONTHS, scenario.durationMonths),
-          }),
-        );
-      });
-    },
-  );
+  SCENARIOS.forEach((scenario: ScenarioType) => {
+    it(`holds for "${scenario.name}"`, () => {
+      expectNoViolations(
+        runSimulation({
+          scenarioId: scenario.id,
+          months: Math.min(MONTHS, scenario.durationMonths),
+        }),
+      );
+    });
+  });
 
   it("holds while building facilities on credit", () => {
     expectNoViolations(
@@ -186,46 +183,40 @@ describe("simulation determinism", () => {
 
 describe("researched public-utility scenarios", () => {
   const manassas = SCENARIOS.find((scenario) => scenario.id === 106)!;
-  const testWithManassasWeather = hasSimWeather(manassas.location!)
-    ? it
-    : it.skip;
 
-  testWithManassasWeather(
-    "calibrates Manassas without committing its separately generated weather asset",
-    () => {
-      const result = runSimulation({ scenarioId: 106, months: 12 });
-      const firstYear = result.months.slice(-12);
-      const annualDemandWh = firstYear.reduce(
-        (total, month) => total + month.demandWh,
-        0,
-      );
-      const peakDemandW = Math.max(
-        ...firstYear.map((month) => month.peakDemandW),
-      );
+  it("calibrates Manassas against its authored weather", () => {
+    const result = runSimulation({ scenarioId: 106, months: 12 });
+    const firstYear = result.months.slice(-12);
+    const annualDemandWh = firstYear.reduce(
+      (total, month) => total + month.demandWh,
+      0,
+    );
+    const peakDemandW = Math.max(
+      ...firstYear.map((month) => month.peakDemandW),
+    );
 
-      expect(annualDemandWh).toBeGreaterThanOrEqual(394_000_000e3);
-      expect(annualDemandWh).toBeLessThanOrEqual(455_000_000e3);
-      expect(peakDemandW).toBeGreaterThanOrEqual(70_000_000);
-      expect(peakDemandW).toBeLessThanOrEqual(80_000_000);
-      const state = createGame({ scenarioId: 106 });
-      expect(
-        state.facilities.find((facility) => facility.fuel === "Natural Gas")
-          ?.name,
-      ).toBe("Purchased Power Proxy");
-      expect(
-        state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
-      ).toBe(true);
-      const restored = parseSave(
-        JSON.parse(JSON.stringify(serializeSave(state))),
-      )!.game;
-      expect(restored.startingDemandScale).toBe(7.5);
-      expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
-      const replayed = createGameFromReplay(serializeReplay(state)!);
-      expect(replayed.startingDemandScale).toBe(7.5);
-      expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
-      expect(replayed.timeline).toEqual(state.timeline);
-    },
-  );
+    expect(annualDemandWh).toBeGreaterThanOrEqual(394_000_000e3);
+    expect(annualDemandWh).toBeLessThanOrEqual(455_000_000e3);
+    expect(peakDemandW).toBeGreaterThanOrEqual(70_000_000);
+    expect(peakDemandW).toBeLessThanOrEqual(80_000_000);
+    const state = createGame({ scenarioId: 106 });
+    expect(
+      state.facilities.find((facility) => facility.fuel === "Natural Gas")
+        ?.name,
+    ).toBe("Purchased Power Proxy");
+    expect(
+      state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
+    ).toBe(true);
+    const restored = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(state))),
+    )!.game;
+    expect(restored.startingDemandScale).toBe(7.5);
+    expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
+    const replayed = createGameFromReplay(serializeReplay(state)!);
+    expect(replayed.startingDemandScale).toBe(7.5);
+    expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
+    expect(replayed.timeline).toEqual(state.timeline);
+  });
 
   it("defaults demand calibration to one and applies it to the whole forecast", () => {
     const base: ScenarioType = {
@@ -361,10 +352,7 @@ describe("researched public-utility scenarios", () => {
     "VP",
     "CEO",
   ];
-  const manassasDifficultyTest = hasSimWeather(manassas.location!)
-    ? it.each(difficulties)
-    : it.skip.each(difficulties);
-  manassasDifficultyTest(
+  it.each(difficulties)(
     "keeps Data Center Boom survivable on %s with a responsive build strategy",
     (difficulty) => {
       const result = runSimulation({
@@ -386,30 +374,27 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  testWithManassasWeather(
-    "supports materially different Manager strategies for Data Center Boom",
-    () => {
-      const responsiveSolar = runSimulation({
-        scenarioId: 106,
-        difficulty: "Manager",
-        strategy: "keepUp",
-      });
-      const plannedGas = runSimulation({
-        scenarioId: 106,
-        difficulty: "Manager",
-        initialBuild: {
-          name: "Natural Gas",
-          peakW: 100_000_000,
-          financed: true,
-        },
-      });
-      expect(responsiveSolar.outcome).toBe("completed");
-      expect(plannedGas.outcome).toBe("completed");
-      expect(responsiveSolar.builds.map((build) => build.name)).not.toEqual(
-        plannedGas.builds.map((build) => build.name),
-      );
-    },
-  );
+  it("supports materially different Manager strategies for Data Center Boom", () => {
+    const responsiveSolar = runSimulation({
+      scenarioId: 106,
+      difficulty: "Manager",
+      strategy: "keepUp",
+    });
+    const plannedGas = runSimulation({
+      scenarioId: 106,
+      difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 100_000_000,
+        financed: true,
+      },
+    });
+    expect(responsiveSolar.outcome).toBe("completed");
+    expect(plannedGas.outcome).toBe("completed");
+    expect(responsiveSolar.builds.map((build) => build.name)).not.toEqual(
+      plannedGas.builds.map((build) => build.name),
+    );
+  });
 
   it("supports materially different Manager strategies for Texas Deep Freeze", () => {
     const existingPortfolio = runSimulation({

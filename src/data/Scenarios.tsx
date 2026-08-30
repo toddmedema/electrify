@@ -724,7 +724,6 @@ export const SCENARIOS = [
       objective: "Modernize the fleet without sacrificing reliability.",
       constraint: "A $50/t CO2 fee makes every dirty MWh more expensive.",
       threat: "Aging coal assets and thin margins leave little room for delay.",
-      target: "A reliable, lower-carbon grid that still creates value.",
     },
     ownership: "Investor",
     startingYear: 2020,
@@ -751,7 +750,6 @@ export const SCENARIOS = [
       constraint:
         "Coal dominates the starting fleet and new plants last decades.",
       threat: "Fuel prices can turn before a rushed buildout pays for itself.",
-      target: "A flexible fleet that can survive the boom's next turn.",
     },
     ownership: "Investor",
     startingYear: 2006,
@@ -774,7 +772,6 @@ export const SCENARIOS = [
       constraint:
         "Every fuel shipment and every build dollar matters more offshore.",
       threat: "One weak link can leave the whole island in the dark.",
-      target: "A diverse island grid powered by local resources.",
     },
     ownership: "Investor",
     startingYear: 2004,
@@ -802,7 +799,6 @@ export const SCENARIOS = [
         "Promising options arrive at different times and price points.",
       threat:
         "Move too early and overpay; move too late and fall behind demand.",
-      target: "A modern fleet ready for the next energy era.",
     },
     ownership: "Investor",
     startingYear: 2002,
@@ -827,7 +823,6 @@ export const SCENARIOS = [
       objective: "Build enough resilience to keep essential power flowing.",
       constraint: "Remote fuel is costly and replacement capacity takes time.",
       threat: "Extreme weather can turn a narrow reserve into a crisis.",
-      target: "A resilient, diversified grid that can weather the next storm.",
     },
     ownership: "Public",
     startingYear: 2000,
@@ -855,7 +850,6 @@ export const SCENARIOS = [
       constraint: "Most of your capital and operating knowledge sits in coal.",
       threat:
         "Old plants, new competitors and long build times punish hesitation.",
-      target: "A profitable successor to the coal empire you inherited.",
     },
     ownership: "Investor",
     startingYear: 1980,
@@ -896,8 +890,6 @@ export const SCENARIOS = [
         "You own 55 MW of oil generation; a 75 MW purchased-power proxy supplies today's grid.",
       threat:
         "The new load will dwarf today's grid if reliable supply is not ready on time.",
-      target:
-        "Serve the boom reliably while keeping the common rate close to $0.10/kWh.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -959,8 +951,6 @@ export const SCENARIOS = [
         "The opening fleet represents aggregate Austin resources and PPAs, not plant ownership.",
       threat:
         "Record cold, fuel disruption and ERCOT-wide shortages strike in February 2021.",
-      target:
-        "Limit unserved energy, preserve cash through the thaw and recover by December 2023.",
     },
     ownership: "Public",
     seed: 268107,

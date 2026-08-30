@@ -1080,8 +1080,7 @@ html[data-theme="dark"] .uplot {
   margin-top: 4px;
 }
 
-.scenarioBriefingFact,
-.scenarioTarget {
+.scenarioBriefingFact {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: start;
@@ -1098,15 +1097,31 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-.scenarioTarget {
-  border-color: var(--border-selected);
-  background: var(--bg-selected);
-}
-
 .scenarioStartControls {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(180px, 0.65fr) auto;
+  align-items: center;
+  gap: 12px;
   margin-top: 4px;
   padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
+}
+
+.difficultyPicker {
+  min-width: 0;
+
+  .MuiToggleButtonGroup-root {
+    display: flex;
+    width: 100%;
+  }
+
+  .MuiToggleButton-root {
+    min-width: 0;
+    flex: 1;
+    padding: 5px 6px;
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
 }
 
 .leaderboard {
@@ -1128,6 +1143,14 @@ html[data-theme="dark"] .uplot {
   .scenarioDossierIcon {
     width: 180px;
     margin: 0 auto 16px;
+  }
+
+  .scenarioStartControls {
+    grid-template-columns: 1fr;
+  }
+
+  .difficultyPicker .MuiToggleButton-root {
+    padding-inline: 2px;
   }
 }
 

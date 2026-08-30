@@ -10,25 +10,21 @@ import {
   limit,
 } from "firebase/firestore";
 import {
-  Box,
   Button,
   IconButton,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
   Toolbar,
-  Tooltip,
   Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CloseIcon from "@mui/icons-material/Close";
@@ -66,6 +62,10 @@ function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }
 
+function formatDifficulty(difficulty: string): string {
+  return DIFFICULTY_LABELS[difficulty] || difficulty;
+}
+
 export interface StateProps {
   game: GameType;
   uid?: string;
@@ -81,9 +81,11 @@ export interface DispatchProps {
 
 interface State {
   scores?: ScoreType[];
+  allScores?: ScoreType[];
   myTopScore?: ScoreType;
   // Tells "nobody has played this yet" apart from "the board couldn't be read"
   boardFailed?: boolean;
+  allScoresFailed?: boolean;
   scenario: ScenarioType | null;
   location: LocationType | null;
   victoryDialogOpen?: boolean;
@@ -98,6 +100,7 @@ function BriefingFact(props: {
   concept: ConceptNameType;
   label: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <div className="scenarioBriefingFact">
@@ -108,6 +111,7 @@ function BriefingFact(props: {
         </Typography>
         <Typography variant="body2">{props.children}</Typography>
       </div>
+      {props.action}
     </div>
   );
 }
@@ -162,6 +166,42 @@ export default class NewGameDetails extends React.Component<Props, State> {
       if (requestId === this.boardRequestId) {
         this.setState({ scores: [], boardFailed: true });
       }
+    }
+  }
+
+  /** Loads the scenario-wide board only when the player asks to compare every difficulty. */
+  private async loadAllScores() {
+    const scenario = this.state.scenario;
+    if (!scenario) {
+      return;
+    }
+    this.setState({ allScores: undefined, allScoresFailed: false });
+    try {
+      const querySnapshot = await getDocs(
+        query(
+          collection(getDb(), "scores"),
+          where("scenarioId", "==", scenario.id),
+          orderBy("score", "desc"),
+          limit(50),
+        ),
+      );
+      this.setState({
+        allScores: querySnapshot.docs.map((doc) => doc.data() as ScoreType),
+      });
+    } catch (err) {
+      console.warn("Couldn't load all high scores: ", err);
+      this.setState({ allScores: [], allScoresFailed: true });
+    }
+  }
+
+  private toggleLeaderboard() {
+    const leaderboardExpanded = !this.state.leaderboardExpanded;
+    this.setState({ leaderboardExpanded });
+    if (
+      leaderboardExpanded &&
+      (!this.state.allScores || this.state.allScoresFailed)
+    ) {
+      void this.loadAllScores();
     }
   }
 
@@ -289,6 +329,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
       location,
       victoryDialogOpen,
       boardFailed,
+      allScores,
+      allScoresFailed,
       leaderboardExpanded,
     } = this.state;
 
@@ -319,12 +361,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
       objective: "Keep the lights on and finish the term.",
       constraint: `${scenario.ownership}-owned scoring rewards a balanced grid.`,
       threat: "Blackouts and insolvency can end the run early.",
-      target: "A reliable grid and a healthy company.",
     };
     const endYear =
       scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
-    const visibleScores =
-      scores && !leaderboardExpanded ? scores.slice(0, 3) : scores;
+    const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
+    const scoreColumnCount = leaderboardExpanded ? 5 : 4;
+    const visibleBoardFailed = leaderboardExpanded
+      ? allScoresFailed
+      : boardFailed;
 
     return (
       <div id="listCard" className="flexContainer">
@@ -371,7 +415,20 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 {scenario.summary}
               </Typography>
               <div className="scenarioBriefingFacts">
-                <BriefingFact concept="goal" label="Objective">
+                <BriefingFact
+                  concept="goal"
+                  label="Objective"
+                  action={
+                    <IconButton
+                      onClick={toggleVictoryDialog}
+                      aria-label="Victory conditions"
+                      color="primary"
+                      size="small"
+                    >
+                      <InfoIcon />
+                    </IconButton>
+                  }
+                >
                   {briefing.objective}
                 </BriefingFact>
                 <BriefingFact concept="finances" label="Constraint">
@@ -381,53 +438,34 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   {briefing.threat}
                 </BriefingFact>
               </div>
-              <Box className="scenarioTarget">
-                <ConceptIcon concept="supply" fontSize="small" />
-                <div>
-                  <Typography variant="overline" component="div">
-                    Winning looks like
-                  </Typography>
-                  <Typography variant="body2">{briefing.target}</Typography>
-                </div>
-                <IconButton
-                  onClick={toggleVictoryDialog}
-                  aria-label="Victory conditions"
-                  color="primary"
-                  size="small"
-                >
-                  <InfoIcon />
-                </IconButton>
-              </Box>
-              <Stack
-                className="scenarioStartControls"
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1.5}
-                sx={{ alignItems: { xs: "stretch", sm: "center" } }}
-              >
-                <div>
+              <div className="scenarioStartControls">
+                <div className="difficultyPicker">
                   <Typography variant="caption" component="div">
                     Difficulty
                   </Typography>
-                  <Select
+                  <ToggleButtonGroup
+                    exclusive
                     value={game.difficulty}
                     size="small"
-                    onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                      onDelta({ difficulty: e.target.value as DifficultyType })
-                    }
+                    color="primary"
+                    aria-label="Difficulty"
+                    onChange={(_event, difficulty: DifficultyType | null) => {
+                      if (difficulty) {
+                        onDelta({ difficulty });
+                      }
+                    }}
                   >
                     {Object.keys(DIFFICULTIES).map((d: string) => (
-                      <MenuItem value={d} key={d}>
-                        <Tooltip
-                          title={DIFFICULTIES[d].description}
-                          placement="right"
-                        >
-                          <span>
-                            {DIFFICULTY_LABELS[d]} ({d})
-                          </span>
-                        </Tooltip>
-                      </MenuItem>
+                      <ToggleButton
+                        value={d}
+                        key={d}
+                        title={DIFFICULTIES[d].description}
+                        aria-label={`${DIFFICULTY_LABELS[d]} (${d})`}
+                      >
+                        {DIFFICULTY_LABELS[d]}
+                      </ToggleButton>
                     ))}
-                  </Select>
+                  </ToggleButtonGroup>
                 </div>
                 <Typography
                   variant="body2"
@@ -446,7 +484,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 >
                   Start mission
                 </Button>
-              </Stack>
+              </div>
             </div>
           </section>
 
@@ -488,9 +526,11 @@ export default class NewGameDetails extends React.Component<Props, State> {
             <Table id="HighScores">
               <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={scoreColumnCount}>
                     <Typography variant="h6">
-                      Global High Scores — {DIFFICULTY_LABELS[game.difficulty]}
+                      {leaderboardExpanded
+                        ? "Global High Scores — All Difficulties"
+                        : `Global High Scores — ${DIFFICULTY_LABELS[game.difficulty]}`}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -498,6 +538,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   <TableCell className="rank">#</TableCell>
                   <TableCell>Name</TableCell>
                   <TableCell>Score</TableCell>
+                  {leaderboardExpanded && <TableCell>Difficulty</TableCell>}
                   <TableCell className="replay">Replay</TableCell>
                 </TableRow>
               </TableHead>
@@ -509,23 +550,28 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     <TableCell className="rank" />
                     <TableCell>Your best</TableCell>
                     <TableCell>{formatScore(myTopScore.score)}</TableCell>
+                    {leaderboardExpanded && (
+                      <TableCell>
+                        {formatDifficulty(myTopScore.difficulty)}
+                      </TableCell>
+                    )}
                     {this.renderReplayCell(myTopScore)}
                   </TableRow>
                 )}
-                {!scores && (
+                {!visibleScores && (
                   <TableRow>
-                    <TableCell colSpan={4}>
+                    <TableCell colSpan={scoreColumnCount}>
                       <Typography variant="body2" color="textSecondary">
                         Loading...
                       </Typography>
                     </TableCell>
                   </TableRow>
                 )}
-                {scores && scores.length === 0 && (
+                {visibleScores && visibleScores.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4}>
+                    <TableCell colSpan={scoreColumnCount}>
                       <Typography variant="body2" color="textSecondary">
-                        {boardFailed
+                        {visibleBoardFailed
                           ? "Couldn't load the high scores right now."
                           : "Play the scenario to set a high score"}
                       </Typography>
@@ -550,23 +596,21 @@ export default class NewGameDetails extends React.Component<Props, State> {
                           {score.displayName || "Anonymous"}
                         </TableCell>
                         <TableCell>{formatScore(score.score)}</TableCell>
+                        {leaderboardExpanded && (
+                          <TableCell>
+                            {formatDifficulty(score.difficulty)}
+                          </TableCell>
+                        )}
                         {this.renderReplayCell(score)}
                       </TableRow>
                     );
                   })}
               </TableBody>
             </Table>
-            {scores && scores.length > 3 && (
+            {scores !== undefined && (
               <div className="leaderboardToggle">
-                <Button
-                  size="small"
-                  onClick={() =>
-                    this.setState({ leaderboardExpanded: !leaderboardExpanded })
-                  }
-                >
-                  {leaderboardExpanded
-                    ? "Show top 3"
-                    : `View all ${scores.length} scores`}
+                <Button size="small" onClick={() => this.toggleLeaderboard()}>
+                  {leaderboardExpanded ? "Show top 3" : "View all scores"}
                 </Button>
               </div>
             )}

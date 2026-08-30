@@ -22,6 +22,9 @@ describe("finite facility sites", () => {
       Object.keys(weatherIndex.cities).sort(),
     );
     expect(getViableLocationCount(location("Memphis"), "Pumped Hydro")).toBe(1);
+    expect(getViableLocationCount(location("Manassas"), "Pumped Hydro")).toBe(
+      198,
+    );
     expect(getViableLocationCount(location("Chicago"), "Pumped Hydro")).toBe(0);
     expect(getViableLocationCount(location("Reykjavik"), "Pumped Hydro")).toBe(
       648,

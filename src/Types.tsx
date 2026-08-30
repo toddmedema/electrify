@@ -579,7 +579,6 @@ export interface ScenarioBriefingType {
   objective: string;
   constraint: string;
   threat: string;
-  target: string;
 }
 
 export interface ScenarioType {

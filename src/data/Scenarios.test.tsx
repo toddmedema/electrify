@@ -94,7 +94,7 @@ describe("tutorial mission metadata", () => {
 });
 
 describe("authored scenario briefings", () => {
-  it("gives every scored scenario a reusable story, stakes, and target", () => {
+  it("gives every scored scenario a reusable story and stakes", () => {
     SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
       (scenario) => {
         expect(scenario.briefing).toEqual(
@@ -104,7 +104,6 @@ describe("authored scenario briefings", () => {
             objective: expect.any(String),
             constraint: expect.any(String),
             threat: expect.any(String),
-            target: expect.any(String),
           }),
         );
       },
