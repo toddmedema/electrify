@@ -13,34 +13,24 @@ import {
   DialogTitle,
   IconButton,
   List,
-  Menu,
-  MenuItem,
-  Slider,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableRow,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import CloseIcon from "@mui/icons-material/Close";
-import PauseIcon from "@mui/icons-material/Pause";
-import SortIcon from "@mui/icons-material/Sort";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
   estimatedAnnualVariableOperatingCost,
   getMonthlyPayment,
 } from "../../helpers/Financials";
-import {
-  formatMoneyConcise,
-  formatMoneyStable,
-  formatWatts,
-} from "../../helpers/Format";
+import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
@@ -56,7 +46,6 @@ import {
   GeneratorShoppingType,
   FuelNameType,
   LocationType,
-  SpeedType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
 import { MANUAL_ENTRY } from "../../data/Manual";
@@ -69,6 +58,7 @@ import {
   getBuildAvailability,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
+import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -756,7 +746,6 @@ export interface DispatchProps {
     financed: boolean,
   ) => void;
   onBack: () => void;
-  onSpeedChange: (speed: SpeedType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -772,7 +761,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     getTickFromW(mostRecentBuiltValue),
   );
   const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
-  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const [comparedNames, setComparedNames] = React.useState<string[]>([]);
 
   if (!now) {
@@ -840,112 +828,22 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     );
   };
 
-  const onSlider = (_event: Event, newValue: number | number[]) => {
-    if (Array.isArray(newValue)) {
-      newValue = newValue[0];
-    }
-    setSliderTick(newValue);
-  };
-
-  const onSort = (newValue: GeneratorSortKey) => {
-    setSort(newValue);
-    onSortClose();
-  };
-
-  const onSortOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const onSortClose = () => {
-    setAnchorEl(null);
-  };
-
   return (
     <div id="topbar" className="flexContainer">
-      <Toolbar className="bottomBorder">
-        <Typography variant="h6">
-          {formatMoneyStable(cash)}{" "}
-          <span className="weak gameStatusValue">
-            <ConceptIcon concept="generator" fontSize="small" />
-            Build Generator
-          </span>
-        </Typography>
-        {game.speed !== "PAUSED" && (
-          <IconButton
-            onClick={() => props.onSpeedChange("PAUSED")}
-            aria-label="pause"
-            color="primary"
-            size="large"
-          >
-            <PauseIcon />
-          </IconButton>
-        )}
-        <IconButton
-          id="close-button"
-          color="primary"
-          onClick={onBack}
-          aria-label="close"
-          size="large"
-        >
-          <CloseIcon />
-        </IconButton>
-        <div className="flex-newline"></div>
-        <div
-          id="yearProgressBar"
-          style={{
-            width: `${game.date.percentOfYear * 100}%`,
-          }}
-        />
-        <Typography
-          id="peak-output"
-          className="flex-newline"
-          variant="body2"
-          color="textSecondary"
-        >
-          Capacity:{" "}
-          <Typography color="primary" component="strong">
-            {valueLabelFormat(sliderTick)}
-          </Typography>{" "}
-          {filtered.length <= 1 && "(slide to change)"}
-        </Typography>
-        <Slider
-          value={sliderTick}
-          aria-labelledby="peak-output"
-          valueLabelDisplay="off"
-          min={0}
-          step={1}
-          max={34}
-          onChange={onSlider}
-        />
-        <IconButton
-          id="sort"
-          color="primary"
-          onClick={onSortOpen}
-          aria-label="sort"
-          size="large"
-        >
-          <SortIcon />
-        </IconButton>
-        <Menu
-          id="sort-menu"
-          anchorEl={anchorEl}
-          keepMounted
-          open={Boolean(anchorEl)}
-          onClose={onSortClose}
-        >
-          {sortOptions.map((option) => {
-            return (
-              <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
-                {sort === option[0] ? (
-                  <strong>{option[1]}</strong>
-                ) : (
-                  <span className="weak">{option[1]}</span>
-                )}
-              </MenuItem>
-            );
-          })}
-        </Menu>
-      </Toolbar>
+      <ConstructionBuildHeader
+        concept="generator"
+        title="Build Generator"
+        cash={cash}
+        capacity={valueLabelFormat(sliderTick)}
+        sliderValue={sliderTick}
+        sliderMin={0}
+        sliderMax={34}
+        sort={sort}
+        sortOptions={sortOptions}
+        onClose={onBack}
+        onSliderChange={setSliderTick}
+        onSortChange={(value) => setSort(value as GeneratorSortKey)}
+      />
       <GeneratorComparison
         generators={comparedGenerators}
         onClear={() => setComparedNames([])}

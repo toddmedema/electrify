@@ -1,12 +1,11 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
-import { setSpeed } from "../../reducers/Game";
 import { buildFacility } from "../../reducers/Game";
 import { selectFacility, snackbarOpen } from "../../reducers/UI";
 import { getStore } from "../../StoreRegistry";
 import { buildConsequenceMessage } from "../../helpers/BuildConsequences";
-import { AppStateType, SpeedType, StorageShoppingType } from "../../Types";
+import { AppStateType, StorageShoppingType } from "../../Types";
 import BuildStorage, { DispatchProps, StateProps } from "./BuildStorage";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -42,9 +41,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           }),
         );
       }
-    },
-    onSpeedChange: (speed: SpeedType) => {
-      dispatch(setSpeed(speed));
     },
   };
 };

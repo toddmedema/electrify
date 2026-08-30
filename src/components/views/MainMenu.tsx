@@ -29,9 +29,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
-  const startLabel = props.hasSavedGame
-    ? "Start another game"
-    : "Start playing";
+  const startLabel = props.hasSavedGame ? "Start a new game" : "Start playing";
   const [shareStatus, setShareStatus] = React.useState("");
 
   const onShare = async () => {

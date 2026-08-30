@@ -36,7 +36,7 @@ import {
 import { arrayMove, newSeed } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
-import { buildConsequenceMessage } from "../helpers/BuildConsequences";
+import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
 import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
 import {
@@ -155,10 +155,11 @@ let previousTickMs = 0;
 // decide whether the tick loop needs restarting, since state.speed can change without going
 // through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
 let speedBeforeDialog = "PAUSED" as SpeedType;
-// Same idea for the manual, which is a full-screen card over a game that would otherwise keep
-// ticking -- looking up "Blackouts" mid-crisis used to cause blackouts. Undefined whenever the
-// manual isn't what paused us, so leaving any other card doesn't resume a deliberate pause.
-let speedBeforeManual: SpeedType | undefined;
+// Same idea for full-screen decision cards over a game that would otherwise keep ticking.
+// Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
+// pause. Construction catalogs belong here too: the quote should not change while it is read.
+let speedBeforeBlockingCard: SpeedType | undefined;
+const BLOCKING_CARDS = new Set(["MANUAL", "BUILD_GENERATORS", "BUILD_STORAGE"]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
@@ -686,13 +687,13 @@ function ensureTicking(state: GameType) {
   }
 }
 
-// Puts the clock back the way the player left it before the manual paused it
-function restoreSpeedAfterManual(state: GameType) {
-  if (speedBeforeManual === undefined) {
+// Puts the clock back the way the player left it before a full-screen card paused it
+function restoreSpeedAfterBlockingCard(state: GameType) {
+  if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  state.speed = speedBeforeManual;
-  speedBeforeManual = undefined;
+  state.speed = speedBeforeBlockingCard;
+  speedBeforeBlockingCard = undefined;
   ensureTicking(state);
 }
 
@@ -884,6 +885,14 @@ export const gameSlice = createSlice({
       recordReplayAction(state, "reprioritizeFacility", action.payload);
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
+      // instructions frozen until the player actually closes the card.
+      if (
+        speedBeforeBlockingCard !== undefined &&
+        action.payload !== "PAUSED"
+      ) {
+        return;
+      }
       state.speed = action.payload;
       ensureTicking(state);
     },
@@ -909,6 +918,7 @@ export const gameSlice = createSlice({
       blackoutUnservedWh = 0;
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
+      speedBeforeBlockingCard = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
@@ -925,7 +935,7 @@ export const gameSlice = createSlice({
      */
     builder.addCase(startReplay, (_state, action) => {
       const replay = action.payload;
-      speedBeforeManual = undefined;
+      speedBeforeBlockingCard = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -946,23 +956,23 @@ export const gameSlice = createSlice({
       state.inGame = true;
     });
     builder.addCase(quit, () => {
-      speedBeforeManual = undefined;
+      speedBeforeBlockingCard = undefined;
       return cloneDeep(initialGame);
     });
-    // Opening the manual pauses the game, and closing it puts the speed back. Without this the
-    // sim runs on while the player reads, which punishes them for looking something up
+    // Opening a reading or construction card pauses the game, and closing it puts the speed back.
+    // The sim should not punish the player for reading, or mutate a quote during a decision.
     builder.addCase(navigate, (state, action) => {
       const payload = action.payload;
       const name = typeof payload === "string" ? payload : payload?.name;
-      if (name !== "MANUAL") {
+      if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
-        restoreSpeedAfterManual(state);
-      } else if (state.inGame && speedBeforeManual === undefined) {
-        speedBeforeManual = state.speed;
+        restoreSpeedAfterBlockingCard(state);
+      } else if (state.inGame && speedBeforeBlockingCard === undefined) {
+        speedBeforeBlockingCard = state.speed;
         state.speed = "PAUSED";
       }
     });
-    builder.addCase(navigateBack, restoreSpeedAfterManual);
+    builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
     builder.addCase(dialogOpen, (state) => {
       speedBeforeDialog = state.speed;
       state.speed = "PAUSED";
@@ -1043,15 +1053,10 @@ function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   if (viableLocationsRemaining !== undefined && viableLocationsRemaining <= 0) {
     return;
   }
-  logGameEvent(
-    state,
-    "BUILD",
-    buildConsequenceMessage(built, payload.financed),
-    {
-      importance: "NOTABLE",
-      actionTarget: { card: "FACILITIES", view: "FLEET" },
-    },
-  );
+  logGameEvent(state, "BUILD", buildStartedMessage(built), {
+    importance: "NOTABLE",
+    actionTarget: { card: "FACILITIES", view: "FLEET" },
+  });
   state = buildFacilityHelper(state, built, payload.financed);
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
   // assigned to the parameter is discarded and the forecast would never reach state

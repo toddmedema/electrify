@@ -11,27 +11,20 @@ import {
   DialogTitle,
   IconButton,
   List,
-  Menu,
-  MenuItem,
-  Slider,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableRow,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import CloseIcon from "@mui/icons-material/Close";
-import PauseIcon from "@mui/icons-material/Pause";
-import SortIcon from "@mui/icons-material/Sort";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { getMonthlyPayment } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
-  formatMoneyStable,
   formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
@@ -45,7 +38,8 @@ import {
   getBuildAvailability,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
-import { GameType, SpeedType, StorageShoppingType } from "../../Types";
+import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import { GameType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
@@ -341,7 +335,6 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
   onBack: () => void;
-  onSpeedChange: (speed: SpeedType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -357,7 +350,6 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     getTickFromW(mostRecentBuiltValue),
   );
   const [sort, setSort] = React.useState<StorageSortKey>("buildCost");
-  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
 
   if (!now) {
     return <span />;
@@ -368,111 +360,22 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
     (a, b) => a[sort] - b[sort],
   );
 
-  const handleSliderChange = (_event: Event, newValue: number | number[]) => {
-    if (Array.isArray(newValue)) {
-      newValue = newValue[0];
-    }
-    setSliderTick(newValue);
-  };
-
-  const onSort = (newValue: StorageSortKey) => {
-    setSort(newValue);
-    onSortClose();
-  };
-
-  const onSortOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const onSortClose = () => {
-    setAnchorEl(null);
-  };
-
   return (
     <div id="topbar" className="flexContainer">
-      <Toolbar className="bottomBorder">
-        <Typography variant="h6">
-          {formatMoneyStable(cash)}{" "}
-          <span className="weak gameStatusValue">
-            <ConceptIcon concept="storage" fontSize="small" />
-            Build Storage
-          </span>
-        </Typography>
-        {game.speed !== "PAUSED" && (
-          <IconButton
-            onClick={() => props.onSpeedChange("PAUSED")}
-            aria-label="pause"
-            color="primary"
-            size="large"
-          >
-            <PauseIcon />
-          </IconButton>
-        )}
-        <IconButton
-          id="close-button"
-          color="primary"
-          onClick={onBack}
-          aria-label="close"
-          size="large"
-        >
-          <CloseIcon />
-        </IconButton>
-        <div className="flex-newline"></div>
-        <div
-          id="yearProgressBar"
-          style={{
-            width: `${game.date.percentOfYear * 100}%`,
-          }}
-        />
-        <Typography
-          id="peak-output"
-          className="flex-newline"
-          variant="body2"
-          color="textSecondary"
-        >
-          Capacity:{" "}
-          <Typography color="primary" component="strong">
-            {valueLabelFormat(sliderTick)}h
-          </Typography>{" "}
-          {filtered.length <= 0 && "(slide to change)"}
-        </Typography>
-        <Slider
-          value={sliderTick}
-          aria-labelledby="peak-output"
-          valueLabelDisplay="off"
-          min={4}
-          step={1}
-          max={37}
-          onChange={handleSliderChange}
-        />
-        <IconButton
-          color="primary"
-          onClick={onSortOpen}
-          aria-label="sort"
-          size="large"
-        >
-          <SortIcon />
-        </IconButton>
-        <Menu
-          id="sort-menu"
-          anchorEl={anchorEl}
-          keepMounted
-          open={Boolean(anchorEl)}
-          onClose={onSortClose}
-        >
-          {sortOptions.map((option) => {
-            return (
-              <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
-                {sort === option[0] ? (
-                  <strong>{option[1]}</strong>
-                ) : (
-                  <span className="weak">{option[1]}</span>
-                )}
-              </MenuItem>
-            );
-          })}
-        </Menu>
-      </Toolbar>
+      <ConstructionBuildHeader
+        concept="storage"
+        title="Build Storage"
+        cash={cash}
+        capacity={`${valueLabelFormat(sliderTick)}h`}
+        sliderValue={sliderTick}
+        sliderMin={4}
+        sliderMax={37}
+        sort={sort}
+        sortOptions={sortOptions}
+        onClose={onBack}
+        onSliderChange={setSliderTick}
+        onSortChange={(value) => setSort(value as StorageSortKey)}
+      />
       <List dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem

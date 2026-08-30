@@ -476,6 +476,95 @@ $topbar_height: 56px;
   padding-right: max(16px, env(safe-area-inset-right)) !important;
 }
 
+.constructionHeader {
+  flex: 0 0 auto;
+  background: var(--bg-primary);
+}
+
+.constructionTitle {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+
+  .iconLabel {
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+.constructionCash {
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.constructionControls {
+  display: grid;
+  grid-template-columns: max-content minmax(80px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 max(8px, env(safe-area-inset-right)) 0
+    max(8px, env(safe-area-inset-left));
+  border-bottom: $border_accent;
+}
+
+.constructionCapacity {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.constructionCapacitySlider.MuiSlider-root {
+  width: 100% !important;
+  min-width: 80px;
+}
+
+.constructionSortButton {
+  margin-right: -8px !important;
+}
+
+.constructionSortSelect {
+  min-width: 156px !important;
+
+  .MuiSelect-select {
+    padding: 8px 32px 8px 12px !important;
+  }
+}
+
+@media screen and (min-width: 600px) {
+  .constructionControls {
+    gap: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+@media screen and (max-width: 359px) {
+  .constructionTitle {
+    gap: 6px;
+    font-size: 1.05rem !important;
+  }
+
+  .constructionCash {
+    font-size: 0.75rem;
+  }
+
+  .constructionControls {
+    gap: 4px;
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+
+  .constructionCapacity {
+    flex-direction: column;
+    gap: 0;
+    line-height: 1.05;
+  }
+}
+
 // Four direct speed choices still fit beside the live status at phone width. The currency and
 // date already name their concepts in text, so their duplicate glyphs are omitted in the
 // component and the remaining chrome tightens just enough for a 320px viewport.
