@@ -2,8 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("custom setup and settings stay usable on a 320px phone", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
+}) => {
   await page.addInitScript(() => {
     window.localStorage.clear();
     window.localStorage.setItem(
@@ -44,8 +43,7 @@ test("custom setup and settings stay usable on a 320px phone", async ({
 
 test("main-menu resources do not sit behind the footer at low height", async ({
   page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
+}) => {
   await page.setViewportSize({ width: 360, height: 320 });
   await page.goto("/");
 

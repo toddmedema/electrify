@@ -16,10 +16,12 @@ export default defineConfig({
   projects: [
     {
       name: "desktop-chromium",
+      testIgnore: /responsive-320\.spec\.ts/,
       use: { browserName: "chromium", viewport: { width: 1280, height: 800 } },
     },
     {
       name: "mobile-390px",
+      testIgnore: /responsive-320\.spec\.ts/,
       use: {
         browserName: "chromium",
         hasTouch: true,
