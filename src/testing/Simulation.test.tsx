@@ -204,7 +204,7 @@ describe("researched public-utility scenarios", () => {
     expect(
       state.facilities.find((facility) => facility.fuel === "Natural Gas")
         ?.name,
-    ).toBe("Purchased Power Proxy");
+    ).toBe("Natural Gas");
     expect(
       state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
     ).toBe(true);
