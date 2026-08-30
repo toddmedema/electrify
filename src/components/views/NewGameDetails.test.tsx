@@ -66,7 +66,7 @@ describe("NewGameDetails leaderboard", () => {
     await screen.findByText("Play the scenario to set a high score");
   });
 
-  it("leads with the scenario fantasy, stakes, and target", async () => {
+  it("leads with the scenario fantasy, objective, and stakes", async () => {
     render(<NewGameDetails {...props()} />);
 
     expect(
@@ -80,7 +80,10 @@ describe("NewGameDetails leaderboard", () => {
     expect(screen.getByText("Objective")).toBeInTheDocument();
     expect(screen.getByText("Constraint")).toBeInTheDocument();
     expect(screen.getByText("Threat")).toBeInTheDocument();
-    expect(screen.getByText("Winning looks like")).toBeInTheDocument();
+    expect(screen.queryByText("Winning looks like")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Victory conditions" }),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Start mission" })).toBeVisible();
     await screen.findByText("Play the scenario to set a high score");
   });
@@ -109,6 +112,20 @@ describe("NewGameDetails leaderboard", () => {
     );
   });
 
+  it("offers every difficulty as a one-tap choice", async () => {
+    const onDelta = jest.fn();
+    render(<NewGameDetails {...props({ onDelta })} />);
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Easy (Employee)" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Expert (CEO)" }));
+
+    expect(onDelta).toHaveBeenCalledWith({ difficulty: "CEO" });
+  });
+
   it("puts the player's best score in the score column", async () => {
     mockGetDocs.mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({
       docs: [{ data: () => ({ score: 432, uid: "player" }) }],
@@ -124,23 +141,61 @@ describe("NewGameDetails leaderboard", () => {
     expect(cells[1]).not.toHaveTextContent("432");
   });
 
-  it("keeps the leaderboard secondary until the player asks for all rows", async () => {
-    mockGetDocs.mockResolvedValue({
-      docs: Array.from({ length: 5 }, (_, index) => ({
-        data: () => ({
-          score: 500 - index,
-          displayName: `Player ${index + 1}`,
-        }),
-      })),
-    });
+  it("shows all difficulties and their labels only on the expanded board", async () => {
+    mockGetDocs
+      .mockResolvedValueOnce({
+        docs: Array.from({ length: 5 }, (_, index) => ({
+          data: () => ({
+            score: 500 - index,
+            displayName: `Player ${index + 1}`,
+            difficulty: "Employee",
+          }),
+        })),
+      })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            data: () => ({
+              score: 900,
+              displayName: "Expert Player",
+              difficulty: "CEO",
+            }),
+          },
+          {
+            data: () => ({
+              score: 800,
+              displayName: "Beginner Player",
+              difficulty: "Intern",
+            }),
+          },
+        ],
+      });
     render(<NewGameDetails {...props()} />);
 
     await screen.findByText("Player 3");
     expect(screen.queryByText("Player 4")).toBeNull();
+    expect(
+      screen.queryByRole("columnheader", { name: "Difficulty" }),
+    ).toBeNull();
     await userEvent.click(
-      screen.getByRole("button", { name: "View all 5 scores" }),
+      screen.getByRole("button", { name: "View all scores" }),
     );
-    expect(screen.getByText("Player 4")).toBeInTheDocument();
-    expect(screen.getByText("Player 5")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Global High Scores — All Difficulties",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Difficulty" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", { name: /Expert Player 900 Expert/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", { name: /Beginner Player 800 Beginner/ }),
+    ).toBeInTheDocument();
+    expect(
+      mockWhere.mock.calls.filter(([field]) => field === "difficulty"),
+    ).toHaveLength(1);
   });
 });
