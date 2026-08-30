@@ -34,6 +34,9 @@ export interface LocationType {
   name: string;
   lat: number;
   long: number;
+  // State / province / first-level subdivision from the city catalogue. Demand profiles use it
+  // for location-specific structural trends such as Virginia data centers and Texas growth.
+  admin?: string;
   // Curated cities carry an IANA zone. An arbitrary coordinate may not, in which case local time
   // is derived from longitude rather than from the player's computer.
   timeZone?: string;
@@ -314,11 +317,16 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     dispatchTargetWByFacility: Record<number, number>;
   };
 
-export type DerivedHistoryKeysType = {
-  [Key in keyof DerivedHistoryType]: DerivedHistoryType[Key] extends number
-    ? Key
-    : never;
-}[keyof DerivedHistoryType];
+export type DerivedHistoryKeysType = Exclude<
+  NonNullable<
+    {
+      [Key in keyof DerivedHistoryType]: DerivedHistoryType[Key] extends number
+        ? Key
+        : never;
+    }[keyof DerivedHistoryType]
+  >,
+  "minimumSupplyMarginW"
+>;
 export interface DerivedHistoryType extends MonthlyHistoryType {
   profit: number;
   profitPerkWh: number;
@@ -337,6 +345,9 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
   // not narrative classifications such as "reliable" or "gas-heavy".
   deliveredWhByFuel: FuelProductionType;
   peakDemandW: number;
+  // The tightest instantaneous reserve in the month. Negative means supply fell short. Kept so
+  // scenario debriefs can explain an event without retaining every tick for the whole run.
+  minimumSupplyMarginW?: number;
 }
 
 interface HistoryForecastShared {
@@ -590,6 +601,13 @@ export interface ScenarioType {
   cash: number;
   // When absent, the location profile supplies the starting grid size.
   startingCustomers?: number;
+  // Customer count and utility-scale load are not interchangeable. Authored scenarios can
+  // calibrate the ordinary customer-driven baseline while the absent default preserves every
+  // legacy scenario and custom game.
+  startingDemandScale?: number;
+  // Absolute loads owned by this scenario. A Data centers schedule replaces the generic regional
+  // data-center curve instead of stacking on top of it.
+  loadAdditions?: ScenarioLoadAdditionType[];
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;
@@ -601,7 +619,21 @@ export interface ScenarioType {
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   initialAgeYears?: number;
+  /** Optional player-facing name for an authored aggregate or gameplay proxy. */
+  label?: string;
 };
+
+export interface ScenarioLoadAdditionType {
+  id: string;
+  label: string;
+  startsYear: number;
+  /** Calendar month, 1-12. Defaults to January. */
+  startsMonth?: number;
+  /** Maximum total load after the start date, never an annual increment. */
+  peakW: number;
+  loadFactor: number;
+  demandType: "Data centers";
+}
 
 /**
  * What kind of thing happened, which is all the event log's icons and colours are keyed off.
@@ -727,6 +759,9 @@ export interface GameType {
   // customerRate is the three-month bill average carried between monthly forecast windows.
   customerMarketSize: number;
   customerRate: number;
+  // Copied from the scenario at init so saves carry the exact demand contract they started with.
+  startingDemandScale: number;
+  loadAdditions: ScenarioLoadAdditionType[];
   // What a loan signed right now would cost, and the multiplier on prime that gets there.
   // Both recomputed once a month. The premium is kept separately so that a forecast can price
   // future months against where prime is heading while holding the company's own creditworthiness
@@ -846,6 +881,11 @@ export interface VictoryDebriefType {
   reliability: number;
   unservedWh: number;
   kgco2e: number;
+  scenarioMetrics?: Array<{
+    label: string;
+    value: string;
+    concept: ConceptNameType;
+  }>;
   highlights: Array<
     Pick<GameEventType, "kind" | "label" | "message" | "importance">
   >;

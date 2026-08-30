@@ -24,8 +24,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// v3 also persists resolved story occurrences and their onset-time facility selections.
-export const SAVE_VERSION = 3;
+// v4 persists calibrated demand and authored absolute-load schedules on the live game slice.
+export const SAVE_VERSION = 4;
 
 export function saveVersionError(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) {
@@ -86,6 +86,32 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.customerMarketSize !== "number" ||
     !Number.isFinite(game.customerMarketSize) ||
     game.customerMarketSize <= 0 ||
+    typeof game.startingDemandScale !== "number" ||
+    !Number.isFinite(game.startingDemandScale) ||
+    game.startingDemandScale <= 0 ||
+    !Array.isArray(game.loadAdditions) ||
+    game.loadAdditions.some(
+      (addition) =>
+        typeof addition !== "object" ||
+        addition === null ||
+        typeof addition.id !== "string" ||
+        typeof addition.label !== "string" ||
+        typeof addition.startsYear !== "number" ||
+        !Number.isInteger(addition.startsYear) ||
+        (addition.startsMonth !== undefined &&
+          (typeof addition.startsMonth !== "number" ||
+            !Number.isInteger(addition.startsMonth) ||
+            addition.startsMonth < 1 ||
+            addition.startsMonth > 12)) ||
+        typeof addition.peakW !== "number" ||
+        !Number.isFinite(addition.peakW) ||
+        addition.peakW < 0 ||
+        typeof addition.loadFactor !== "number" ||
+        !Number.isFinite(addition.loadFactor) ||
+        addition.loadFactor < 0 ||
+        addition.loadFactor > 1 ||
+        addition.demandType !== "Data centers",
+    ) ||
     typeof game.customerRate !== "number" ||
     !Number.isFinite(game.customerRate) ||
     game.customerRate < 0 ||
@@ -160,7 +186,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
         ) ||
         typeof record.peakDemandW !== "number" ||
         !Number.isFinite(record.peakDemandW) ||
-        record.peakDemandW < 0
+        record.peakDemandW < 0 ||
+        (record.minimumSupplyMarginW !== undefined &&
+          (typeof record.minimumSupplyMarginW !== "number" ||
+            !Number.isFinite(record.minimumSupplyMarginW)))
       );
     }) ||
     !Array.isArray(game.eventLog) ||

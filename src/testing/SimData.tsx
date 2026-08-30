@@ -41,6 +41,26 @@ export function simLocationIds(): string[] {
   return Object.keys({ ...LOCATIONS, ...downloadedLocations() });
 }
 
+/** Whether the separately generated weather assets needed for a headless run are present. */
+export function hasSimWeather(
+  locationOrId: LocationIdType | LocationType,
+): boolean {
+  const id = typeof locationOrId === "string" ? locationOrId : locationOrId.id;
+  if (!isValidLocationId(id)) {
+    return false;
+  }
+  const location =
+    typeof locationOrId === "string" ? getSimLocation(id) : locationOrId;
+  return [
+    id,
+    ...(location?.watershedId && location.watershedId !== id
+      ? [location.watershedId]
+      : []),
+  ].every((weatherId) =>
+    fs.existsSync(path.join(WEATHER_DIR, `${weatherId}.bin`)),
+  );
+}
+
 /**
  * Loads the weather, fuel price and economic data the simulation needs, resetting whatever a previous
  * run left behind. Both modules loop or throw when asked for data they don't have, so this

@@ -363,7 +363,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       threat: "Blackouts and insolvency can end the run early.",
     };
     const endYear =
-      scenario.startingYear + Math.floor(scenario.durationMonths / 12);
+      scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
     const visibleScores = leaderboardExpanded ? allScores : scores?.slice(0, 3);
     const scoreColumnCount = leaderboardExpanded ? 5 : 4;
     const visibleBoardFailed = leaderboardExpanded

@@ -86,3 +86,55 @@ it("selects authored turning points intentionally before recent routine events",
     "A recent build",
   ]);
 });
+
+it("surfaces the researched Uri outcome metrics", () => {
+  const scenario = SCENARIOS.find((candidate) => candidate.id === 107)!;
+  const month = (
+    monthNumber: number,
+    overrides: Partial<MonthlyHistoryType> = {},
+  ) =>
+    ({
+      ...summary,
+      year: 2021,
+      month: monthNumber,
+      supplyWh: 1_000_000_000,
+      demandWh: 1_000_000_000,
+      revenue: 90_000,
+      cash: 100_000_000,
+      ...overrides,
+    }) as MonthlyHistoryType;
+  const debrief = buildVictoryDebrief(
+    scenario,
+    summary,
+    [],
+    [],
+    [
+      month(3, { revenue: 100_000 }),
+      month(2, {
+        supplyWh: 900_000_000,
+        demandWh: 1_000_000_000,
+        minimumSupplyMarginW: -100_000_000,
+      }),
+      month(1),
+    ],
+  );
+
+  expect(debrief.scenarioMetrics).toEqual([
+    expect.objectContaining({
+      label: "Uri energy unserved · Feb 2021",
+      value: "100MWh",
+    }),
+    expect.objectContaining({
+      label: "Maximum Uri supply deficit",
+      value: "100MW",
+    }),
+    expect.objectContaining({
+      label: "Common rate · before → after",
+      value: "$0.09/kWh → $0.1/kWh",
+    }),
+    expect.objectContaining({
+      label: "Positive cash through Mar 2021",
+      value: "Yes",
+    }),
+  ]);
+});

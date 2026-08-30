@@ -1070,6 +1070,71 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
+/**
+ * Austin-scale simulation of ERCOT-wide Winter Storm Uri conditions. The availability ratios are
+ * system abstractions from FERC/NERC actual-versus-expected output, not outage claims about named
+ * Austin Energy plants. Wind uses this one explicit availability adjustment; no icing derate is
+ * applied elsewhere, and solar follows only the event weather.
+ */
+const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
+  id: "texas-deep-freeze",
+  scenarioId: 107,
+  phases: [
+    {
+      id: "uri",
+      // January 2017 is month zero, so February 2021 is month 49.
+      schedule: { atMonth: 49 },
+      durationMonths: 1,
+      describe: () => ({
+        title: "Winter Storm Uri",
+        message:
+          "Record cold and ERCOT-wide shortages have forced local load shed. Austin Energy reported that its own diverse generation performed well; these grid-wide availability ratios are an Austin-scale simulation, not failures assigned to specific local plants.",
+        details:
+          "For February, normal modeled output is available at 62% for natural gas, 73% for coal, 77% for uranium and 44% for wind. Texas natural-gas fuel cost is 2.8×. Solar follows weather without an extra derate.",
+        concept: "blackout",
+        kind: "WORLD_EVENT",
+        importance: "CRITICAL",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+        effects: {
+          // Calibrated against the fixed scenario seed so the representative February day reaches
+          // approximately 6°F (-14.4°C) for several game hours.
+          temperatureOffsetC: -20,
+          fuelPriceMultipliers: { "Natural Gas": 2.8 },
+          facilityOutputMultipliersByFuel: {
+            "Natural Gas": 0.62,
+            Coal: 0.73,
+            Uranium: 0.77,
+            Wind: 0.44,
+          },
+        },
+        turningPointPriority: 110,
+      }),
+    },
+    {
+      id: "thaw",
+      schedule: { atMonth: 50 },
+      describe: ({ periodSnapshots }) => {
+        const event = periodSnapshots?.[1];
+        const unservedWh = event?.unservedWh || 0;
+        return {
+          title: "The thaw",
+          message:
+            unservedWh > 0
+              ? "The freeze has ended and normal availability and gas pricing are restored. Your grid now begins a long recovery from ERCOT-wide load shed."
+              : "The freeze has ended and normal availability and gas pricing are restored. Your preparations carried the local grid through ERCOT-wide shortages without unserved energy.",
+          details:
+            "Historically, ERCOT estimated 76,819 MW of unconstrained peak demand, served a 69,871 MW actual peak and shed roughly 20,000 MW at the worst point; about 200,000-220,000 Austin customers lost power.",
+          concept: "weather",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: { card: "INSIGHTS" },
+          turningPointPriority: 105,
+        };
+      },
+    },
+  ],
+};
+
 export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   CARBON_FEE_ARC,
   RENEWABLES_ARC,
@@ -1077,6 +1142,7 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   SHALE_BOOM_ARC,
   HURRICANE_ARC,
   PARADISE_ARC,
+  TEXAS_DEEP_FREEZE_ARC,
 ];
 
 /** Content-level difficulty scaling is centralized and mechanically checkable. */

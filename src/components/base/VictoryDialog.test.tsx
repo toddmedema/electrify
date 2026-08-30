@@ -100,6 +100,13 @@ describe("VictoryDialog", () => {
           reliability: 0.998,
           unservedWh: 1000000000,
           kgco2e: 2000000000,
+          scenarioMetrics: [
+            {
+              label: "Uri energy unserved · Feb 2021",
+              value: "12GWh",
+              concept: "blackout",
+            },
+          ],
           highlights: [
             {
               kind: "CONSTRUCTION",
@@ -119,6 +126,10 @@ describe("VictoryDialog", () => {
       screen.getByRole("img", { name: /Sun 400MW, Natural Gas 200MW/ }),
     ).toBeInTheDocument();
     expect(screen.getByText("99.8%")).toBeInTheDocument();
+    expect(
+      screen.getByText("Uri energy unserved · Feb 2021"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("12GWh")).toBeInTheDocument();
     expect(
       screen.getByText("Construction complete: Solar"),
     ).toBeInTheDocument();

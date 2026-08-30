@@ -28,9 +28,9 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// v3 corresponds to the complete story schema, including persisted resolved occurrences. Older
-// actions cannot reproduce the same monthly facts and are rejected rather than partially migrated.
-export const REPLAY_VERSION = 3;
+// v4 includes calibrated demand and authored absolute-load schedules in scenario reconstruction.
+// Older actions cannot reproduce the same monthly facts and are rejected rather than migrated.
+export const REPLAY_VERSION = 4;
 
 export function replayVersionError(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) {

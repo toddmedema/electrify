@@ -17,6 +17,7 @@
     { "id": "SanDiego", "city": "San Diego", "admin": "CA", "country": "United States", "region": "North America", "lat": 32.7157, "long": -117.1611 },
     { "id": "Dallas", "city": "Dallas", "admin": "TX", "country": "United States", "region": "North America", "lat": 32.7767, "long": -96.797 },
     { "id": "Austin", "city": "Austin", "admin": "TX", "country": "United States", "region": "North America", "lat": 30.2672, "long": -97.7431 },
+    { "id": "Manassas", "city": "Manassas", "admin": "VA", "country": "United States", "region": "North America", "lat": 38.7509, "long": -77.4753 },
     { "id": "Jacksonville", "city": "Jacksonville", "admin": "FL", "country": "United States", "region": "North America", "lat": 30.3322, "long": -81.6557 },
     { "id": "Columbus", "city": "Columbus", "admin": "OH", "country": "United States", "region": "North America", "lat": 39.9612, "long": -82.9988 },
     { "id": "Indianapolis", "city": "Indianapolis", "admin": "IN", "country": "United States", "region": "North America", "lat": 39.7684, "long": -86.1581 },

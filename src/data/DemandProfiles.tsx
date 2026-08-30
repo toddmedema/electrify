@@ -3,6 +3,7 @@ import {
   DemandByTypeType,
   DemandTypeNameType,
   LocationType,
+  ScenarioLoadAdditionType,
 } from "../Types";
 import { DAYS_PER_YEAR } from "../Constants";
 
@@ -184,10 +185,6 @@ const US_DATA_CENTER_FACTOR: Record<string, number> = {
 const RUST_BELT = new Set(["MI", "OH", "PA", "WV"]);
 const HIGH_GROWTH_US = new Set(["AZ", "FL", "GA", "NC", "TX"]);
 
-function adminFor(location?: LocationType): string | undefined {
-  return (location as (LocationType & { admin?: string }) | undefined)?.admin;
-}
-
 function interpolate(
   points: readonly [number, number][],
   year: number,
@@ -218,7 +215,7 @@ export function dataCenterLoadShare(
   if (location?.country === "United States") {
     return Math.min(
       0.25,
-      national * (US_DATA_CENTER_FACTOR[adminFor(location) || ""] || 1),
+      national * (US_DATA_CENTER_FACTOR[location.admin || ""] || 1),
     );
   }
   const regional = REGION_DATA_CENTER_FACTOR[location?.region || ""] || 0.5;
@@ -232,7 +229,7 @@ function growthFor(location?: LocationType): GrowthProfile {
   if (location?.country !== "United States") {
     return profile;
   }
-  const admin = adminFor(location) || "";
+  const admin = location.admin || "";
   if (RUST_BELT.has(admin)) {
     return {
       Residential: -0.005,
@@ -290,15 +287,25 @@ export function demandByTypeAt(
   date: DateType,
   startingYear: number,
   location?: LocationType,
+  loadAdditions: readonly ScenarioLoadAdditionType[] = [],
 ): DemandByTypeType {
   const mix = REGION_MIX[location?.region || ""] || DEFAULT_MIX;
   const growth = growthFor(location);
-  const startDataCenters = dataCenterLoadShare(startingYear, location);
+  // An authored absolute schedule describes the whole scenario-specific data-center load. The
+  // generic regional curve is therefore removed even before the first scheduled block arrives.
+  const hasAuthoredDataCenters = loadAdditions.some(
+    (addition) => addition.demandType === "Data centers",
+  );
+  const startDataCenters = hasAuthoredDataCenters
+    ? 0
+    : dataCenterLoadShare(startingYear, location);
   // date.percentOfYear deliberately substitutes 0.00001 at midnight on New Year's Day for
   // legacy chart math. Elapsed game minutes give this model a true zero at scenario start.
   const currentYear = startingYear + date.minute / (DAYS_PER_YEAR * 24 * 60);
   const years = Math.max(0, currentYear - startingYear);
-  const currentDataCenters = dataCenterLoadShare(currentYear, location);
+  const currentDataCenters = hasAuthoredDataCenters
+    ? 0
+    : dataCenterLoadShare(currentYear, location);
   const nonDataCenterScale = 1 - startDataCenters;
 
   const startingWeights = {
@@ -342,7 +349,39 @@ export function demandByTypeAt(
     // Besides preserving authored balance conceptually, keep it bit-for-bit stable. A few UI
     // calculations compare the change in reserve capacity after adding a plant, and a residual
     // fraction of a watt from summing five floating-point components should not leak into that.
-    result["Data centers"] += baselineDemandW - openingTotal;
+    result[hasAuthoredDataCenters ? "Commercial" : "Data centers"] +=
+      baselineDemandW - openingTotal;
   }
+  loadAdditions.forEach((addition) => {
+    result[addition.demandType] += scheduledLoadAdditionWAt(addition, date);
+  });
   return result;
+}
+
+/** Instantaneous absolute load for one authored schedule. */
+export function scheduledLoadAdditionWAt(
+  addition: ScenarioLoadAdditionType,
+  date: DateType,
+): number {
+  const startsMonth = addition.startsMonth || 1;
+  const scheduledMonth = addition.startsYear * 12 + startsMonth - 1;
+  const currentMonth = date.year * 12 + date.monthNumber - 1;
+  if (currentMonth < scheduledMonth) {
+    return 0;
+  }
+  // The game represents each month with one detailed day. Sampling this twelve-point cosine over
+  // a full game year has an exact mean of loadFactor and a maximum of peakW, which makes a 90%
+  // data-center load both near-flat and arithmetically auditable.
+  const monthOfCycle = (currentMonth - scheduledMonth) % 12;
+  const loadFactor = Math.max(0, Math.min(1, addition.loadFactor));
+  const multiplier =
+    loadFactor + (1 - loadFactor) * Math.cos((2 * Math.PI * monthOfCycle) / 12);
+  return Math.max(0, addition.peakW) * multiplier;
+}
+
+/** Nameplate/load-factor arithmetic, independent of the game's representative-day calendar. */
+export function annualLoadAdditionWh(
+  addition: ScenarioLoadAdditionType,
+): number {
+  return addition.peakW * addition.loadFactor * 8760;
 }

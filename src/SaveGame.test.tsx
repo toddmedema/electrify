@@ -88,6 +88,45 @@ describe("SaveGame", () => {
     expect(parseSave({ ...save, game: withoutMarket })).toBeNull();
   });
 
+  it("persists and validates scenario demand calibration state", () => {
+    const configured: GameType = {
+      ...game,
+      startingDemandScale: 7.5,
+      loadAdditions: [
+        {
+          id: "fixture",
+          label: "Fixture load",
+          startsYear: 2026,
+          startsMonth: 4,
+          peakW: 100_000_000,
+          loadFactor: 0.9,
+          demandType: "Data centers",
+        },
+      ],
+    };
+    expect(parseSave(serializeSave(configured))!.game).toMatchObject({
+      startingDemandScale: 7.5,
+      loadAdditions: configured.loadAdditions,
+    });
+
+    const save = serializeSave(configured);
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, startingDemandScale: undefined },
+      }),
+    ).toBeNull();
+    expect(
+      parseSave({
+        ...save,
+        game: {
+          ...save.game,
+          loadAdditions: [{ ...configured.loadAdditions[0], loadFactor: 1.1 }],
+        },
+      }),
+    ).toBeNull();
+  });
+
   it("rejects a current-version save without current runtime state", () => {
     const save = serializeSave(game);
     for (const field of [

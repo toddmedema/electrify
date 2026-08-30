@@ -12,6 +12,12 @@ comparatively flat. At a scenario's opening instant the five components are norm
 scenario's previous total demand, preserving authored starting balance. From there they follow
 regional and local structural trends and their sum becomes the load the player must serve.
 
+Authored scenarios can apply `startingDemandScale` after customer count is calculated. This keeps
+real account counts independent from utility-scale measured energy and peak demand; omitting it is
+exactly equivalent to `1`. They can also carry absolute `loadAdditions`. Those loads begin in an
+exact calendar month, remain a total block rather than compounding annually, and are included in
+the same forecast breakdown used by dispatch and Insights.
+
 The broad regional sector mixes and growth rates are game-scale assumptions, not city forecasts.
 They let mature markets flatten, high-growth markets expand, and industrial demand decline in
 parts of the U.S. Midwest while growing in faster-growing states. Customer growth remains the
@@ -33,6 +39,11 @@ near-term AI buildout indefinitely would overwhelm century-long sandbox games. B
 identifies Virginia as the largest U.S. data-center electricity load, followed by California and
 Texas; local multipliers reflect that ordering but are scenario parameters rather than measured
 state market shares. Other countries use conservative regional exposure factors.
+
+An authored Data centers schedule replaces this generic curve for that scenario. For example,
+Data Center Boom holds one 100 MW block at a 90% load factor from January 2026 through 2035. Its
+annual energy is therefore `100 MW × 0.9 × 8,760 h = 788,400 MWh`; it is not another 100 MW added
+each year.
 
 Sources:
 

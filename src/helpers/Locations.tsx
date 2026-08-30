@@ -60,6 +60,7 @@ export function isValidLocation(value: unknown): value is LocationType {
     Math.abs(location.long) <= 180 &&
     (location.timeZone === undefined ||
       typeof location.timeZone === "string") &&
+    (location.admin === undefined || typeof location.admin === "string") &&
     (location.region === undefined || typeof location.region === "string") &&
     (location.country === undefined || typeof location.country === "string") &&
     (location.elevation === undefined ||

@@ -60,6 +60,12 @@ export function reduceHistories(
     }
   });
   acc.peakDemandW = Math.max(acc.peakDemandW, t.peakDemandW || 0);
+  if (t.minimumSupplyMarginW !== undefined) {
+    acc.minimumSupplyMarginW =
+      acc.minimumSupplyMarginW === undefined
+        ? t.minimumSupplyMarginW
+        : Math.min(acc.minimumSupplyMarginW, t.minimumSupplyMarginW);
+  }
   acc.kgco2e += t.kgco2e;
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
@@ -122,6 +128,11 @@ function accumulateTick(
     }
   });
   summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
+  const supplyMarginW = t.supplyW - t.demandW;
+  summary.minimumSupplyMarginW =
+    summary.minimumSupplyMarginW === undefined
+      ? supplyMarginW
+      : Math.min(summary.minimumSupplyMarginW, supplyMarginW);
   summary.kgco2e += t.kgco2e;
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
