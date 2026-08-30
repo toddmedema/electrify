@@ -47,14 +47,16 @@ npm run check
 
 Types, lint, formatting and tests, which is what CI runs on every pull request. Individually:
 
-| Command                | Purpose                                        |
-| ---------------------- | ---------------------------------------------- |
-| `npm run typecheck`    | `tsc --noEmit`                                 |
-| `npm run lint`         | ESLint, with warnings treated as errors        |
-| `npm run format`       | Rewrite files with prettier                    |
-| `npm run format:check` | Report unformatted files without changing them |
+| Command                | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `npm run typecheck`    | `tsc --noEmit`                                            |
+| `npm run lint`         | ESLint for app and data scripts; warnings are errors      |
+| `npm run format`       | Rewrite app and script files with Prettier                |
+| `npm run format:check` | Report unformatted app or script files                    |
+| `npm run test:ci`      | Run Jest once with the same coverage checks used by CI    |
+| `npm run sim -- --all` | Run every scenario through the headless invariant checker |
 
-`npm test -- --coverage` reports coverage. `src/helpers` and `src/reducers` have floors set in
+`npm run test:ci` reports coverage. `src/helpers` and `src/reducers` have floors set in
 `package.json` just under where they stand today, so a change that guts them fails rather than
 landing quietly; raise the floors as coverage grows.
 

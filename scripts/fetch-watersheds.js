@@ -51,8 +51,7 @@ function clamp(value, min, max) {
 
 async function fetchWatershed(watershed) {
   const params = new URLSearchParams({
-    parameters:
-      "T2M,PRECTOTCORR,WS2M,ALLSKY_SFC_SW_DWN,CLRSKY_SFC_SW_DWN",
+    parameters: "T2M,PRECTOTCORR,WS2M,ALLSKY_SFC_SW_DWN,CLRSKY_SFC_SW_DWN",
     community: "RE",
     longitude: String(watershed.long),
     latitude: String(watershed.lat),
@@ -70,8 +69,16 @@ async function fetchWatershed(watershed) {
   const wind = body.properties?.parameter?.WS2M;
   const allSkySolar = body.properties?.parameter?.ALLSKY_SFC_SW_DWN;
   const clearSkySolar = body.properties?.parameter?.CLRSKY_SFC_SW_DWN;
-  if (!temperature || !precipitation || !wind || !allSkySolar || !clearSkySolar) {
-    throw new Error(`${watershed.id} response is missing a requested weather series`);
+  if (
+    !temperature ||
+    !precipitation ||
+    !wind ||
+    !allSkySolar ||
+    !clearSkySolar
+  ) {
+    throw new Error(
+      `${watershed.id} response is missing a requested weather series`,
+    );
   }
   return { temperature, precipitation, wind, allSkySolar, clearSkySolar };
 }
