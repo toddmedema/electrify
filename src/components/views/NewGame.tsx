@@ -53,11 +53,16 @@ interface MissionListItemProps {
   onSelect: () => void;
 }
 
+function displayName(s: ScenarioType): string {
+  return s.name.replace(/^Mission \d+:\s*/, "");
+}
+
 // One row for everything: tutorial missions, scenarios, and the custom game all share the
 // list now - the only differences are the action control and what the subheader shows
 function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   const { s, completed, next, onSelect } = props;
   const isTutorial = !!s.tutorialSteps;
+  const name = displayName(s);
   const location = getScenarioLocation(s) || { name: "UNKNOWN" };
   const summary =
     isTutorial || s.id === CUSTOM_SCENARIO_ID ? (
@@ -66,23 +71,23 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
       <span>
         {s.summary}
         <br />
-        <i>
-          {location.name}, {s.startingYear}-{scenarioEndYear(s)}
-        </i>
+        <span className="missionMeta">
+          {location.name} · {s.startingYear}–{scenarioEndYear(s)}
+        </span>
       </span>
     );
   return (
     <Card
       data-testid={`mission-row-${s.id}`}
-      className={`build-list-item${next ? " tutorialNext" : ""}`}
+      className={`build-list-item missionItem${next ? " tutorialNext" : ""}`}
     >
       <CardActionArea
         onClick={onSelect}
         autoFocus={next}
         aria-label={
           isTutorial
-            ? `${completed ? "Replay" : "Play"} ${s.name}`
-            : `View ${s.name} details`
+            ? `${completed ? "Review" : "Start"} ${name}`
+            : `View ${name} details`
         }
       >
         <CardHeader
@@ -104,16 +109,16 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
             >
               <Avatar
                 src={`/images/${s.icon.toLowerCase()}.svg`}
-                alt={`${s.name} icon`}
+                alt={`${name} icon`}
               />
             </Badge>
           }
-          title={<span>{s.name}</span>}
+          title={<span>{name}</span>}
           subheader={<span>{summary}</span>}
           action={
             isTutorial ? (
               <Chip
-                label={completed ? "Replay" : "Play"}
+                label={completed ? "Review" : "Start"}
                 variant={completed ? "outlined" : "filled"}
                 color="primary"
               />
@@ -150,7 +155,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             <ArrowBackIosIcon />
           </IconButton>
           <Typography component="h1" variant="h6">
-            Missions
+            Choose a game
           </Typography>
           {/* Otherwise the Manual is only reachable from the title screen and the in-game
               overflow menu, so players who stop partway through never find out it exists.
@@ -159,7 +164,7 @@ export default function NewGame(props: Props): React.JSX.Element {
           <IconButton
             sx={{ marginLeft: "auto" }}
             onClick={props.onManual}
-            aria-label="manual"
+            aria-label="How to play"
             color="primary"
             size="large"
           >
@@ -169,8 +174,8 @@ export default function NewGame(props: Props): React.JSX.Element {
       </div>
       <List
         dense
-        className="scrollable cardList"
-        aria-label="Available missions"
+        className="scrollable cardList missionList"
+        aria-label="Available games"
       >
         <ListSubheader
           disableSticky
@@ -185,10 +190,10 @@ export default function NewGame(props: Props): React.JSX.Element {
             variant="subtitle2"
             sx={{ fontWeight: 700 }}
           >
-            Training
+            New here?
           </Typography>
           <Typography variant="caption" component="p">
-            Six short missions teach the game step by step.
+            Learn the basics in six short lessons.
           </Typography>
         </ListSubheader>
         {TUTORIALS.map((s) => (
@@ -213,7 +218,10 @@ export default function NewGame(props: Props): React.JSX.Element {
             variant="subtitle2"
             sx={{ fontWeight: 700 }}
           >
-            Scenarios
+            Challenges
+          </Typography>
+          <Typography variant="caption" component="p">
+            Put your skills to work in a real place and time.
           </Typography>
         </ListSubheader>
         {scenarios.map((s) => (
@@ -238,7 +246,10 @@ export default function NewGame(props: Props): React.JSX.Element {
             variant="subtitle2"
             sx={{ fontWeight: 700 }}
           >
-            Sandbox
+            Make it your own
+          </Typography>
+          <Typography variant="caption" component="p">
+            Choose the city, time period and rules.
           </Typography>
         </ListSubheader>
         <MissionListItem

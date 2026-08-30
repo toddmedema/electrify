@@ -1055,16 +1055,16 @@ html[data-theme="dark"] .uplot {
   display: flex;
   flex-direction: column;
   max-width: 900px;
-  margin: 24px auto;
+  margin: 16px auto 12px;
   padding: 0 20px;
 }
 
 .scenarioDossierIcon {
   display: block;
-  width: 132px;
+  width: 96px;
   aspect-ratio: 1;
   align-self: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .scenarioDossierCopy {
@@ -1076,8 +1076,10 @@ html[data-theme="dark"] .uplot {
 
 .scenarioBriefingFacts {
   display: grid;
-  gap: 8px;
+  gap: 0;
   margin-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
   text-align: left;
 }
 
@@ -1086,10 +1088,12 @@ html[data-theme="dark"] .uplot {
   grid-template-columns: auto 1fr auto;
   align-items: start;
   gap: 10px;
-  padding: 9px 11px;
-  border: 1px solid var(--border-tile);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  padding: 10px 2px;
+  border-top: 1px solid var(--border-subtle);
+
+  &:first-child {
+    border-top: 0;
+  }
 
   .MuiTypography-overline {
     font-weight: 800;
@@ -1105,7 +1109,6 @@ html[data-theme="dark"] .uplot {
   gap: 12px;
   margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 .difficultyPicker {
@@ -1146,8 +1149,8 @@ html[data-theme="dark"] .uplot {
   }
 
   .scenarioDossierIcon {
-    width: 120px;
-    margin-bottom: 12px;
+    width: 88px;
+    margin-bottom: 8px;
   }
 
   .scenarioStartControls {
@@ -1540,17 +1543,29 @@ html[data-theme="dark"] .uplot {
       margin: auto;
 
       .gameSubtitle {
-        margin: 0 auto 18px;
+        max-width: 380px;
+        margin: 0 auto 20px;
         color: $font_color_faded;
+        font-size: 1.05rem;
+        line-height: 1.5;
       }
 
       .mainActions {
         align-items: center;
-        margin-bottom: 6px;
+        margin-bottom: 10px;
+
+        .MuiButton-root {
+          width: min(100%, 260px);
+        }
+      }
+
+      .resourceActions {
+        max-width: 440px;
+        margin: 0 auto;
       }
 
       .discoveryActions {
-        margin-top: 6px;
+        margin-top: 2px;
       }
 
       button {
@@ -1733,6 +1748,41 @@ html[data-theme="dark"] .uplot {
     padding-top: size(base) !important;
     padding-bottom: 20px; /* for devices with with bottom bars */
     height: 100%;
+  }
+
+  .missionList {
+    background: $bg_primary;
+    padding-top: 0 !important;
+
+    .MuiListSubheader-root {
+      padding: 18px 16px 8px;
+      line-height: 1.35;
+
+      &:first-child {
+        padding-top: 12px;
+      }
+    }
+  }
+
+  .missionItem {
+    margin: 0 12px 8px;
+    border: 1px solid var(--border-tile);
+    border-radius: 10px;
+    box-shadow: none;
+
+    .MuiCardHeader-root {
+      padding: 10px 12px;
+    }
+
+    .MuiCardHeader-title {
+      font-weight: 700;
+    }
+
+    .missionMeta {
+      display: block;
+      margin-top: 2px;
+      color: $font_color_faded;
+    }
   }
 
   .facility {

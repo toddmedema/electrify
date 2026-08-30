@@ -46,7 +46,9 @@ describe("NewGame", () => {
           (a.startingYear + a.durationMonths / 12),
     );
     [...TUTORIALS, ...scenariosNewestFirst].forEach((scenario, index) =>
-      expect(rows[index]).toHaveTextContent(scenario.name),
+      expect(rows[index]).toHaveTextContent(
+        scenario.name.replace(/^Mission \d+:\s*/, ""),
+      ),
     );
     const scenarioYears = scenariosNewestFirst.map(
       (scenario) => scenario.startingYear,
@@ -58,11 +60,11 @@ describe("NewGame", () => {
         .map((scenario) => scenario.name),
     ).toEqual(["Data Center Boom", "Carbon Fee"]);
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
-    expect(screen.getByText("Training")).toBeInTheDocument();
-    expect(screen.getByText("Scenarios")).toBeInTheDocument();
-    expect(screen.getByText("Sandbox")).toBeInTheDocument();
+    expect(screen.getByText("New here?")).toBeInTheDocument();
+    expect(screen.getByText("Challenges")).toBeInTheDocument();
+    expect(screen.getByText("Make it your own")).toBeInTheDocument();
     expect(
-      screen.getByRole("list", { name: "Available missions" }),
+      screen.getByRole("list", { name: "Available games" }),
     ).toContainElement(rows[0]);
   });
 
@@ -82,10 +84,12 @@ describe("NewGame", () => {
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
     expect(next).not.toHaveTextContent("Start here");
     expect(next).not.toHaveTextContent("Recommended next");
-    expect(next).toHaveTextContent(TUTORIALS[1].name);
+    expect(next).toHaveTextContent(
+      TUTORIALS[1].name.replace(/^Mission \d+:\s*/, ""),
+    );
     expect(next).toHaveClass("tutorialNext");
     expect(within(next).getByRole("button")).toHaveAccessibleName(
-      `Play ${TUTORIALS[1].name}`,
+      `Start ${TUTORIALS[1].name.replace(/^Mission \d+:\s*/, "")}`,
     );
   });
 

@@ -29,7 +29,9 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
-  const startLabel = props.hasSavedGame ? "Choose a mission" : "Play";
+  const startLabel = props.hasSavedGame
+    ? "Start another game"
+    : "Start playing";
   const [shareStatus, setShareStatus] = React.useState("");
 
   const onShare = async () => {
@@ -55,8 +57,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
       </Typography>
       <Box id="centeredMenu" sx={{ px: 3 }}>
         <Typography className="gameSubtitle" variant="body1" component="p">
-          Build power plants, keep the lights on, and clean up the grid — learn
-          as you play.
+          Keep the lights on. Build a cleaner energy future.
         </Typography>
         <Stack
           component="section"
@@ -73,7 +74,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
               color="primary"
               onClick={props.onContinue}
             >
-              Continue your game
+              Continue
             </Button>
           )}
           <Button
@@ -86,22 +87,24 @@ const MainMenu = (props: Props): React.JSX.Element => {
             {startLabel}
           </Button>
           {!props.hasSavedGame && !props.uid && (
-            <Typography variant="caption">Free · no account needed</Typography>
+            <Typography variant="caption">Free · no sign-up needed</Typography>
           )}
         </Stack>
         <Stack
           component="nav"
           aria-label="Game resources"
           className="resourceActions"
-          direction="column"
+          direction="row"
           spacing={0.75}
           useFlexGap
           sx={{
             alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
           }}
         >
           <Button variant="text" color="primary" onClick={props.onManual}>
-            Manual
+            How to play
           </Button>
           <Button
             data-settings-trigger
@@ -109,11 +112,11 @@ const MainMenu = (props: Props): React.JSX.Element => {
             color="primary"
             onClick={props.onSettings}
           >
-            Options
+            Settings
           </Button>
           {!props.uid && (
             <Button variant="text" color="primary" onClick={login}>
-              Sign in with Google
+              Sign in
             </Button>
           )}
         </Stack>
@@ -121,10 +124,14 @@ const MainMenu = (props: Props): React.JSX.Element => {
           component="section"
           aria-label="Discovery actions"
           className="discoveryActions"
-          direction="column"
+          direction="row"
           spacing={0.75}
           useFlexGap
-          sx={{ alignItems: "center" }}
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
         >
           <InstallAppButton />
           {props.audioEnabled === undefined && (
@@ -133,7 +140,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
               startIcon={<VolumeUpIcon />}
               onClick={() => props.onAudioChange(true)}
             >
-              Play with sound
+              Turn on sound
             </Button>
           )}
         </Stack>
