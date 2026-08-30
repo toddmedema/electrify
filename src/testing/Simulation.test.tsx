@@ -1,7 +1,10 @@
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { createGame, runSimulation, SimResultType } from "./Simulator";
-import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
+import {
+  INTERN_ONE_BUILD_PLAYS,
+  STANDARD_BALANCE_PLAYS,
+} from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
@@ -289,18 +292,33 @@ describe("airborne wind dispatch", () => {
 });
 
 describe("simulation economics", () => {
-  const CEO_ACTION_COUNTS = {
-    100: 3,
-    101: 3,
-    102: 3,
-    103: 3,
-    104: 1,
-    105: 2,
-  } as Record<number, number>;
+  SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+    (scenario) => {
+      it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
+        const passive = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+        });
+        expectNoViolations(passive);
+        expect(passive.actionCount).toBe(0);
+        expect(passive.outcome).not.toBe("completed");
+
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect(active.actionCount).toBe(1);
+        expect(active.builds).toHaveLength(1);
+        expect(active.outcome).toBe("completed");
+      });
+    },
+  );
 
   SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
     (scenario) => {
-      it(`requires player input to win "${scenario.name}" on CEO`, () => {
+      it(`rejects passive play and accepts a multi-action plan in "${scenario.name}" on CEO`, () => {
         const passive = runSimulation({
           scenarioId: scenario.id,
           difficulty: "CEO",
@@ -316,11 +334,35 @@ describe("simulation economics", () => {
           ...play,
         });
         expectNoViolations(active);
-        expect(active.actionCount).toBe(CEO_ACTION_COUNTS[scenario.id]);
+        expect(active.actionCount).toBeGreaterThanOrEqual(3);
         expect(active.outcome).toBe("completed");
       });
     },
   );
+
+  it("makes a replacement build necessary at the End of an Era compliance deadline", () => {
+    const shortcut = runSimulation({
+      scenarioId: 102,
+      difficulty: "CEO",
+      dollarsPerkWh: 0.15,
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    });
+    expectNoViolations(shortcut);
+    expect(shortcut.actionCount).toBe(2);
+    expect(shortcut.outcome).not.toBe("completed");
+  });
+
+  it("makes storm hardening necessary on Hurricane Season CEO", () => {
+    const shortcut = runSimulation({
+      scenarioId: 104,
+      difficulty: "CEO",
+      dollarsPerkWh: 0.08,
+    });
+    expectNoViolations(shortcut);
+    expect(shortcut.actionCount).toBe(1);
+    expect(shortcut.outcome).not.toBe("completed");
+  });
 
   it("bills every customer it supplies at the going rate", () => {
     const result = runSimulation({

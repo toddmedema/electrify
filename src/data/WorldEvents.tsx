@@ -287,7 +287,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
 };
 
 export const CARBON_FEE_BALANCE: Record<DifficultyType, number> = {
-  Intern: 80,
+  Intern: 60,
   Employee: 90,
   Manager: 100,
   VP: 110,
@@ -308,6 +308,7 @@ export const PARADISE_BALANCE: Record<DifficultyType, ParadiseBalanceType> = {
 };
 
 export interface RenewablesBalanceType {
+  bridgeGasBuildCost: number;
   solarBuildCost: number;
   windBuildCost: number;
   demandLoad: number;
@@ -315,15 +316,36 @@ export interface RenewablesBalanceType {
 
 export const RENEWABLES_BALANCE: Record<DifficultyType, RenewablesBalanceType> =
   {
-    Intern: { solarBuildCost: 0.7, windBuildCost: 0.86, demandLoad: 1.05 },
+    Intern: {
+      bridgeGasBuildCost: 0.3,
+      solarBuildCost: 0.7,
+      windBuildCost: 0.86,
+      demandLoad: 1.05,
+    },
     Employee: {
+      bridgeGasBuildCost: 0.65,
       solarBuildCost: 0.725,
       windBuildCost: 0.88,
       demandLoad: 1.065,
     },
-    Manager: { solarBuildCost: 0.75, windBuildCost: 0.9, demandLoad: 1.08 },
-    VP: { solarBuildCost: 0.775, windBuildCost: 0.92, demandLoad: 1.095 },
-    CEO: { solarBuildCost: 0.8, windBuildCost: 0.94, demandLoad: 1.11 },
+    Manager: {
+      bridgeGasBuildCost: 1,
+      solarBuildCost: 0.75,
+      windBuildCost: 0.9,
+      demandLoad: 1.08,
+    },
+    VP: {
+      bridgeGasBuildCost: 1,
+      solarBuildCost: 0.775,
+      windBuildCost: 0.92,
+      demandLoad: 1.095,
+    },
+    CEO: {
+      bridgeGasBuildCost: 1,
+      solarBuildCost: 0.8,
+      windBuildCost: 0.94,
+      demandLoad: 1.11,
+    },
   };
 
 export interface HurricaneBalanceType {
@@ -365,8 +387,8 @@ export const HURRICANE_BALANCE: Record<DifficultyType, HurricaneBalanceType> = {
   },
   CEO: {
     severity: "Extreme",
-    targetCapacityShare: 0.5,
-    outputMultiplier: 0.4,
+    targetCapacityShare: 0.6,
+    outputMultiplier: 0.1,
     durationMonths: 6,
     oilMultiplier: 1.6,
   },
@@ -375,14 +397,23 @@ export const HURRICANE_BALANCE: Record<DifficultyType, HurricaneBalanceType> = {
 export interface EndOfEraBalanceType {
   oldCoalOutput: number;
   coalOM: number;
+  complianceCoalOutput: number;
 }
 
 export const END_OF_ERA_BALANCE: Record<DifficultyType, EndOfEraBalanceType> = {
-  Intern: { oldCoalOutput: 0.9, coalOM: 1.1 },
-  Employee: { oldCoalOutput: 0.875, coalOM: 1.15 },
-  Manager: { oldCoalOutput: 0.85, coalOM: 1.2 },
-  VP: { oldCoalOutput: 0.825, coalOM: 1.25 },
-  CEO: { oldCoalOutput: 0.8, coalOM: 1.3 },
+  Intern: { oldCoalOutput: 0.9, coalOM: 1.1, complianceCoalOutput: 1 },
+  Employee: {
+    oldCoalOutput: 0.875,
+    coalOM: 1.15,
+    complianceCoalOutput: 0.9,
+  },
+  Manager: {
+    oldCoalOutput: 0.85,
+    coalOM: 1.2,
+    complianceCoalOutput: 0.75,
+  },
+  VP: { oldCoalOutput: 0.825, coalOM: 1.25, complianceCoalOutput: 0.5 },
+  CEO: { oldCoalOutput: 0.8, coalOM: 1.3, complianceCoalOutput: 0.001 },
 };
 
 const FLEET_TARGET: StoryActionTargetType = {
@@ -613,6 +644,32 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
   id: "renewables-scale",
   scenarioId: 101,
   phases: [
+    {
+      id: "bridge-contracts",
+      schedule: { atMonth: 0 },
+      durationMonths: 144,
+      describe: ({ difficulty }) => {
+        const balance = RENEWABLES_BALANCE[difficulty];
+        return {
+          title: "Transition bridge contracts",
+          message: `New gas quotes cost ${percent(balance.bridgeGasBuildCost)} of normal through mission end.`,
+          details:
+            "The bridge contract applies only to new gas commitments and does not reprice projects already underway.",
+          concept: "build",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: GENERATOR_TARGET,
+          attributes: {
+            bridgeGasBuildCost: balance.bridgeGasBuildCost,
+          },
+          effects: {
+            buildCostMultipliersByFuel: {
+              "Natural Gas": balance.bridgeGasBuildCost,
+            },
+          },
+        };
+      },
+    },
     {
       id: "manufacturing-warning",
       schedule: { atMonth: 72 },
@@ -943,16 +1000,21 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
       schedule: { atMonth: 180 },
       durationMonths: 60,
       describe: ({ difficulty }) => {
-        const coalOM = END_OF_ERA_BALANCE[difficulty].coalOM;
+        const { coalOM, complianceCoalOutput } = END_OF_ERA_BALANCE[difficulty];
         return {
           title: "Coal compliance deadline",
-          message: `Coal fixed, variable, and start O&M are now ${Math.round((coalOM - 1) * 100)}% higher through mission end.`,
+          message: `Coal fixed, variable, and start O&M are now ${Math.round((coalOM - 1) * 100)}% higher and coal output is limited to ${percent(complianceCoalOutput)} through mission end.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
           actionTarget: GENERATOR_TARGET,
-          attributes: { coalOM },
-          effects: { operatingCostMultipliersByFuel: { Coal: coalOM } },
+          attributes: { coalOM, complianceCoalOutput },
+          effects: {
+            operatingCostMultipliersByFuel: { Coal: coalOM },
+            facilityOutputMultipliersByFuel: {
+              Coal: complianceCoalOutput,
+            },
+          },
           turningPointPriority: 100,
         };
       },
@@ -1063,6 +1125,12 @@ export function validateStoryDifficultyMonotonicity(): string[] {
     DIFFICULTY_ORDER.map((difficulty) => PARADISE_BALANCE[difficulty].oilShock),
   );
   ascending(
+    "Renewables bridge gas cost",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => RENEWABLES_BALANCE[difficulty].bridgeGasBuildCost,
+    ),
+  );
+  ascending(
     "Renewables solar cost",
     DIFFICULTY_ORDER.map(
       (difficulty) => RENEWABLES_BALANCE[difficulty].solarBuildCost,
@@ -1113,6 +1181,12 @@ export function validateStoryDifficultyMonotonicity(): string[] {
   ascending(
     "Coal O&M",
     DIFFICULTY_ORDER.map((difficulty) => END_OF_ERA_BALANCE[difficulty].coalOM),
+  );
+  descending(
+    "Compliance coal output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
+    ),
   );
   return problems;
 }

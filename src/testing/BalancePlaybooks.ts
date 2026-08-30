@@ -47,7 +47,16 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellFacilityId: 1,
     sellAtMonth: 39,
   },
-  104: { dollarsPerkWh: 0.08 },
+  104: {
+    dollarsPerkWh: 0.08,
+    initialBuild: {
+      name: "Natural Gas",
+      peakW: 300000000,
+      financed: true,
+    },
+    sellFacilityId: 1,
+    sellAtMonth: 110,
+  },
   105: {
     // Oil's output-dependent O&M makes the old $0.08/kWh play run out of cash in 2007.
     dollarsPerkWh: 0.085,
@@ -56,5 +65,35 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       peakW: 300000000,
       financed: true,
     },
+    sellFacilityId: 1,
+    sellAtMonth: 39,
+  },
+};
+
+/**
+ * The single commitment that teaches each Intern scenario's intended first lesson. These use no
+ * tariff change, sale, or reactive strategy: passive play must fail, while this one build wins.
+ */
+export const INTERN_ONE_BUILD_PLAYS: Record<
+  number,
+  Pick<SimOptionsType, "initialBuild">
+> = {
+  100: {
+    initialBuild: { name: "Geothermal", peakW: 500000000, financed: true },
+  },
+  101: {
+    initialBuild: { name: "Natural Gas", peakW: 390000000, financed: true },
+  },
+  102: {
+    initialBuild: { name: "Natural Gas", peakW: 350000000, financed: true },
+  },
+  103: {
+    initialBuild: { name: "Natural Gas", peakW: 600000000, financed: true },
+  },
+  104: {
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+  },
+  105: {
+    initialBuild: { name: "Natural Gas", peakW: 525000000, financed: true },
   },
 };
