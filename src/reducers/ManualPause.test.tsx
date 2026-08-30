@@ -51,6 +51,23 @@ describe("the manual pausing the game", () => {
   });
 });
 
+describe("construction catalogs pausing the game", () => {
+  it.each(["BUILD_GENERATORS", "BUILD_STORAGE"] as const)(
+    "pauses %s and restores the prior speed when it closes",
+    (card) => {
+      const paused = gameReducer(running("FAST"), navigate(card));
+      expect(paused.speed).toBe("PAUSED");
+      expect(gameReducer(paused, navigateBack()).speed).toBe("FAST");
+    },
+  );
+
+  it("stays paused if a global speed shortcut fires while the catalog is open", () => {
+    const paused = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
+    expect(gameReducer(paused, setSpeed("FAST")).speed).toBe("PAUSED");
+    expect(gameReducer(paused, navigate("FACILITIES")).speed).toBe("NORMAL");
+  });
+});
+
 describe("deep linking into a manual entry", () => {
   it("carries the entry through navigation", () => {
     const state = cardReducer(

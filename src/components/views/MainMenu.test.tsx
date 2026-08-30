@@ -54,7 +54,7 @@ describe("MainMenu", () => {
       screen.getByRole("button", { name: "Continue" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Start another game" }),
+      screen.getByRole("button", { name: "Start a new game" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Game resources" }),

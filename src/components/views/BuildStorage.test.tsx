@@ -27,7 +27,6 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
       game={game()}
       onBuildStorage={jest.fn()}
       onBack={jest.fn()}
-      onSpeedChange={jest.fn()}
     />,
   );
 
@@ -48,16 +47,61 @@ it("keeps toolbar actions inside compact viewport gutters", () => {
       game={game()}
       onBuildStorage={jest.fn()}
       onBack={jest.fn()}
-      onSpeedChange={jest.fn()}
     />,
   );
 
   expect(screen.getByRole("button", { name: "close" })).not.toHaveClass(
     "MuiIconButton-edgeEnd",
   );
-  expect(screen.getByRole("button", { name: "sort" })).not.toHaveClass(
-    "MuiIconButton-edgeEnd",
+  expect(
+    screen.getByRole("button", { name: "Sort facilities: Build Cost" }),
+  ).not.toHaveClass("MuiIconButton-edgeEnd");
+});
+
+it("shows decision context without live-time controls", () => {
+  render(
+    <BuildStorage
+      game={game()}
+      onBuildStorage={jest.fn()}
+      onBack={jest.fn()}
+    />,
   );
+
+  expect(screen.getByText("Build Storage")).toBeInTheDocument();
+  expect(screen.getByLabelText(/Available cash/)).toHaveTextContent("cash");
+  expect(screen.getByText("Capacity")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "pause" })).toBeNull();
+});
+
+it("shows the current sort text when the controls have enough width", () => {
+  const originalMatchMedia = window.matchMedia;
+  window.matchMedia = (query: string) =>
+    ({
+      matches: query === "(min-width:600px)",
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+
+  try {
+    render(
+      <BuildStorage
+        game={game()}
+        onBuildStorage={jest.fn()}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: "Sort facilities" }),
+    ).toHaveTextContent("Sort: Build Cost");
+  } finally {
+    window.matchMedia = originalMatchMedia;
+  }
 });
 
 it("submits a storage purchase only once on a double-click", () => {
@@ -67,7 +111,6 @@ it("submits a storage purchase only once on a double-click", () => {
       game={game()}
       onBuildStorage={onBuildStorage}
       onBack={jest.fn()}
-      onSpeedChange={jest.fn()}
     />,
   );
 

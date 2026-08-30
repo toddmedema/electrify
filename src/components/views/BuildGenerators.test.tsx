@@ -183,7 +183,6 @@ it("pins up to three current-grid choices into a comparison tray", () => {
       game={game}
       onBack={jest.fn()}
       onBuildGenerator={jest.fn()}
-      onSpeedChange={jest.fn()}
     />,
   );
 

@@ -19,3 +19,12 @@ export function buildConsequenceMessage(
     financed ? "down payment" : "committed"
   } → ${facility.name} online in ${months} mo → +${contribution}`;
 }
+
+/** A short event-feed title for the commitment itself; the snackbar carries the full forecast. */
+export function buildStartedMessage(facility: FacilityShoppingType): string {
+  if (facility.peakWh) {
+    const duration = Math.round((facility.peakWh / facility.peakW) * 10) / 10;
+    return `Started construction on ${duration}h ${formatWatts(facility.peakW)} ${facility.name}`;
+  }
+  return `Started construction on ${formatWatts(facility.peakW)} ${facility.name}`;
+}
