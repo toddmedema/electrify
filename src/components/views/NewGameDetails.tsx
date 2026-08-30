@@ -383,16 +383,13 @@ export default class NewGameDetails extends React.Component<Props, State> {
             >
               <ArrowBackIosIcon />
             </IconButton>
-            <Typography component="h1" variant="h6">
-              {scenario.name}
+            <Typography component="div" variant="h6">
+              Scenario
             </Typography>
           </Toolbar>
         </div>
         <div className="scrollable">
-          <section
-            className="scenarioDossier"
-            aria-labelledby="scenario-fantasy"
-          >
+          <section className="scenarioDossier" aria-labelledby="scenario-title">
             <img
               className="scenarioDossierIcon"
               src={`/images/${scenario.icon.toLowerCase()}.svg`}
@@ -404,12 +401,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 {scenario.durationMonths / 12} years
               </Typography>
               <Typography
-                id="scenario-fantasy"
-                variant="h4"
-                component="h2"
-                sx={{ fontWeight: 800, lineHeight: 1.1 }}
+                id="scenario-title"
+                variant="h6"
+                component="h1"
+                sx={{ fontWeight: 800, lineHeight: 1.2 }}
               >
-                {briefing.fantasy}
+                {scenario.name} — {briefing.fantasy}
               </Typography>
               <Typography variant="body1" color="textSecondary">
                 {scenario.summary}
@@ -466,14 +463,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
                       </ToggleButton>
                     ))}
                   </ToggleButtonGroup>
+                  <Typography
+                    className="difficultyDescription"
+                    variant="body2"
+                    color="textSecondary"
+                  >
+                    {DIFFICULTIES[game.difficulty].description}
+                  </Typography>
                 </div>
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  sx={{ flex: 1 }}
-                >
-                  {DIFFICULTIES[game.difficulty].description}
-                </Typography>
                 <Button
                   size="large"
                   variant="contained"

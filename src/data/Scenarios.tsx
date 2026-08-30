@@ -717,13 +717,13 @@ export const SCENARIOS = [
     name: "Carbon Fee",
     icon: "carbon fee",
     locationId: "SF",
-    summary: `New limits have been placed on pollution - can you modernize the company?`,
+    summary: "Pollution now costs money. Can you replace your aging plants?",
     briefing: {
       tone: "transition",
-      fantasy: "Lead a legacy utility through a clean-energy transition.",
-      objective: "Modernize the fleet without sacrificing reliability.",
-      constraint: "A $50/t CO2 fee makes every dirty MWh more expensive.",
-      threat: "Aging coal assets and thin margins leave little room for delay.",
+      fantasy: "Modernize an aging grid as pollution gets more expensive.",
+      objective: "Replace dirty power while keeping the lights on.",
+      constraint: "Burning coal and gas now costs extra.",
+      threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
     startingYear: 2020,
@@ -741,15 +741,14 @@ export const SCENARIOS = [
     name: "The Shale Boom",
     icon: "the shale boom",
     locationId: "PIT",
-    summary: `Cheap natural gas has been discovered nearby - are you ready for the boom?`,
+    summary: "Local gas is suddenly cheap—but the boom may not last.",
     briefing: {
       tone: "boom",
-      fantasy: "Turn an energy boom into durable advantage.",
-      objective:
-        "Use cheap gas to grow without betting the company on one fuel.",
+      fantasy: "Turn a cheap-gas boom into lasting success.",
+      objective: "Grow with cheaper gas without relying on it alone.",
       constraint:
-        "Coal dominates the starting fleet and new plants last decades.",
-      threat: "Fuel prices can turn before a rushed buildout pays for itself.",
+        "Most power comes from coal, and new plants are long-term bets.",
+      threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
     startingYear: 2006,
@@ -764,13 +763,12 @@ export const SCENARIOS = [
     name: "Paradise",
     icon: "paradise",
     locationId: "HNL",
-    summary: "A beautiful island - with a complex grid.",
+    summary: "Power an island where every shipment and outage matters.",
     briefing: {
       tone: "island",
-      fantasy: "Keep an island paradise bright without mainland backup.",
-      objective: "Replace expensive oil while matching a volatile island load.",
-      constraint:
-        "Every fuel shipment and every build dollar matters more offshore.",
+      fantasy: "Keep an island paradise bright without outside backup.",
+      objective: "Use less costly oil while meeting changing demand.",
+      constraint: "Fuel and construction cost more on an island.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
@@ -790,15 +788,13 @@ export const SCENARIOS = [
     name: "Rise of Renewables",
     icon: "rise of renewables",
     locationId: "SF",
-    summary: "Technology is advancing rapidly - can you keep up?",
+    summary: "New clean technologies are arriving fast. Choose when to invest.",
     briefing: {
       tone: "innovation",
-      fantasy: "Ride the first great wave of modern renewable power.",
-      objective: "Retire aging oil and build the technologies of the future.",
-      constraint:
-        "Promising options arrive at different times and price points.",
-      threat:
-        "Move too early and overpay; move too late and fall behind demand.",
+      fantasy: "Build the next generation of clean power.",
+      objective: "Replace aging oil plants with cleaner options.",
+      constraint: "New technologies arrive at different times and prices.",
+      threat: "Invest too early and overpay; wait too long and demand wins.",
     },
     ownership: "Investor",
     startingYear: 2002,
@@ -816,13 +812,13 @@ export const SCENARIOS = [
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
-    summary: "A remote island, with expensive fuel and destructive weather.",
+    summary: "Prepare an isolated grid for expensive fuel and severe storms.",
     briefing: {
       tone: "storm",
-      fantasy: "Run a fragile island grid through relentless storm seasons.",
-      objective: "Build enough resilience to keep essential power flowing.",
-      constraint: "Remote fuel is costly and replacement capacity takes time.",
-      threat: "Extreme weather can turn a narrow reserve into a crisis.",
+      fantasy: "Protect an island grid through years of fierce storms.",
+      objective: "Build a grid that keeps essential power flowing.",
+      constraint: "Fuel is costly, and new plants take time to build.",
+      threat: "A major storm can overwhelm a small backup margin.",
     },
     ownership: "Public",
     startingYear: 2000,
@@ -841,15 +837,13 @@ export const SCENARIOS = [
     name: "The End of an Era",
     icon: "the end of an era",
     locationId: "PIT",
-    summary: "Your coal business faces new challenges - and opportunities.",
+    summary: "Your coal company must adapt to a changing power market.",
     briefing: {
       tone: "legacy",
-      fantasy: "Decide what comes after a century built on coal.",
-      objective:
-        "Evolve the business before its aging fleet becomes a liability.",
-      constraint: "Most of your capital and operating knowledge sits in coal.",
-      threat:
-        "Old plants, new competitors and long build times punish hesitation.",
+      fantasy: "Decide what comes after a century of coal.",
+      objective: "Build a new business before old coal plants hold you back.",
+      constraint: "Most of your money and experience are tied to coal.",
+      threat: "Old plants, new rivals, and slow construction punish delay.",
     },
     ownership: "Investor",
     startingYear: 1980,
@@ -880,16 +874,13 @@ export const SCENARIOS = [
       timeZone: "America/New_York",
     },
     summary:
-      "A wave of 24/7 data centers is about to dwarf your municipal grid. Keep the lights on without pricing residents out.",
+      "Huge new data centers are coming. Grow without pricing out residents.",
     briefing: {
       tone: "boom",
-      fantasy: "Guide a small municipal grid through a historic load boom.",
-      objective:
-        "Prepare six years early for 100 MW of near-flat data-center demand arriving in January 2026.",
-      constraint:
-        "You own 55 MW of oil generation; a 75 MW purchased-power proxy supplies today's grid.",
-      threat:
-        "The new load will dwarf today's grid if reliable supply is not ready on time.",
+      fantasy: "Guide a small city grid through explosive growth.",
+      objective: "Get enough reliable power ready before data centers arrive.",
+      constraint: "Today's grid is small, old, and short on cash.",
+      threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -930,7 +921,7 @@ export const SCENARIOS = [
   },
   {
     id: 107, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "Texas Deep Freeze",
+    name: "Austin Deep Freeze",
     icon: "wind",
     locationId: "Austin",
     location: {
@@ -943,18 +934,14 @@ export const SCENARIOS = [
       long: -97.7431,
       timeZone: "America/Chicago",
     },
-    summary:
-      "Four years before Winter Storm Uri, harden an Austin-scale public grid for record cold and cascading ERCOT shortages.",
+    summary: "Prepare Austin's grid for a historic winter emergency.",
     briefing: {
       tone: "storm",
-      fantasy:
-        "Steward an Austin-scale public grid through a known winter crisis.",
-      objective:
-        "Preserve the existing portfolio's resilience through Winter Storm Uri in February 2021.",
+      fantasy: "Keep Austin powered through a brutal winter storm.",
+      objective: "Strengthen the grid before the February 2021 freeze.",
       constraint:
-        "The opening fleet represents aggregate Austin resources and PPAs, not plant ownership.",
-      threat:
-        "Record cold, fuel disruption and ERCOT-wide shortages strike in February 2021.",
+        "You manage a citywide mix of power sources, not individual plants.",
+      threat: "Extreme cold will cut supplies just as demand surges.",
     },
     ownership: "Public",
     seed: 268107,
@@ -978,8 +965,7 @@ export const SCENARIOS = [
       { fuel: "Sun", peakW: 55000000 },
     ],
     endTitle: "After the thaw",
-    endMessage:
-      "The storm tested both your portfolio and the limits of operating inside a larger interconnected system.",
+    endMessage: "The storm tested every choice you made to prepare Austin.",
   },
 ] as ScenarioType[];
 

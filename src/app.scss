@@ -1052,32 +1052,33 @@ html[data-theme="dark"] .uplot {
 }
 
 .scenarioDossier {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.45fr) minmax(360px, 1.55fr);
-  gap: 24px;
-  max-width: 1040px;
+  display: flex;
+  flex-direction: column;
+  max-width: 900px;
   margin: 24px auto;
   padding: 0 20px;
 }
 
 .scenarioDossierIcon {
   display: block;
-  width: min(100%, 240px);
+  width: 132px;
   aspect-ratio: 1;
-  align-self: start;
-  justify-self: center;
+  align-self: center;
+  margin-bottom: 14px;
 }
 
 .scenarioDossierCopy {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  text-align: center;
 }
 
 .scenarioBriefingFacts {
   display: grid;
   gap: 8px;
   margin-top: 4px;
+  text-align: left;
 }
 
 .scenarioBriefingFact {
@@ -1099,7 +1100,7 @@ html[data-theme="dark"] .uplot {
 
 .scenarioStartControls {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(180px, 0.65fr) auto;
+  grid-template-columns: minmax(360px, 1fr) auto;
   align-items: center;
   gap: 12px;
   margin-top: 4px;
@@ -1122,6 +1123,11 @@ html[data-theme="dark"] .uplot {
     font-size: 0.72rem;
     line-height: 1.25;
   }
+
+  .difficultyDescription {
+    margin-top: 8px;
+    text-align: left;
+  }
 }
 
 .leaderboard {
@@ -1136,13 +1142,12 @@ html[data-theme="dark"] .uplot {
 
 @media (max-width: 760px) {
   .scenarioDossier {
-    display: block;
     padding: 0 12px;
   }
 
   .scenarioDossierIcon {
-    width: 180px;
-    margin: 0 auto 16px;
+    width: 120px;
+    margin-bottom: 12px;
   }
 
   .scenarioStartControls {
@@ -1888,8 +1893,10 @@ html[data-theme="dark"] .uplot {
   // The run's own record of itself. A list rather than a table: the lines are one clause each,
   // and the only column they share is when they happened
   .eventLogList {
+    display: grid;
+    gap: size(small);
     margin: 0;
-    padding: 0;
+    padding: 0 size(small) size(small);
     list-style: none;
   }
 
@@ -1907,25 +1914,15 @@ html[data-theme="dark"] .uplot {
     padding-left: size(base);
   }
 
-  .eventLogImportance {
-    display: inline-block;
-    margin-left: size(tiny);
-    padding: 0 size(tiny);
-    border: 1px solid currentColor;
-    border-radius: 3px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    line-height: 1.4;
-    text-transform: uppercase;
-  }
-
   .eventLogItem {
     display: grid;
     grid-template-columns: 20px 1fr;
-    gap: 0 8px;
+    gap: 0 10px;
     align-items: start;
-    padding: size(small) size(base);
-    border-bottom: 1px solid var(--border-subtle);
+    padding: 12px;
+    border: 1px solid var(--border-tile);
+    border-radius: 8px;
+    background: var(--bg-raised);
 
     &.actionable {
       cursor: pointer;
@@ -1938,12 +1935,21 @@ html[data-theme="dark"] .uplot {
     }
 
     &.importance-NOTABLE {
-      border-left: 3px solid $interactive_blue;
+      border-left: 4px solid $interactive_blue;
     }
 
     &.importance-CRITICAL {
-      border-left: 3px solid $blackout_red;
+      border-left: 4px solid $blackout_red;
       background: var(--blackout-tint);
+    }
+  }
+
+  .eventLogCopy {
+    display: grid;
+    gap: 3px;
+
+    > strong {
+      line-height: 1.3;
     }
   }
 
@@ -1962,6 +1968,7 @@ html[data-theme="dark"] .uplot {
   // column would take a third of it to say something the eye only occasionally asks for
   .eventLogWhen {
     grid-column: 2;
+    margin-top: size(tiny);
     font-size: 0.75rem;
   }
 

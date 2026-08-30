@@ -31,14 +31,21 @@ function recordPlayed(...scenarioIds: number[]) {
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
 
-  it("shows every authored mission in order, followed by the custom game", () => {
+  it("shows training in its authored order and scenarios newest first", () => {
     render(<NewGame {...props()} />);
 
     const rows = screen.getAllByTestId(/^mission-row-/);
     expect(rows).toHaveLength(SCENARIOS.length + 1);
-    SCENARIOS.forEach((scenario, index) =>
+    const scenariosNewestFirst = SCENARIOS.filter(
+      (scenario) => !scenario.tutorialSteps,
+    ).sort((a, b) => b.startingYear - a.startingYear);
+    [...TUTORIALS, ...scenariosNewestFirst].forEach((scenario, index) =>
       expect(rows[index]).toHaveTextContent(scenario.name),
     );
+    const scenarioYears = scenariosNewestFirst.map(
+      (scenario) => scenario.startingYear,
+    );
+    expect(scenarioYears).toEqual([...scenarioYears].sort((a, b) => b - a));
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
     expect(screen.getByText("Training")).toBeInTheDocument();
     expect(screen.getByText("Scenarios")).toBeInTheDocument();

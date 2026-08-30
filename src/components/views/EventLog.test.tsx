@@ -53,5 +53,39 @@ describe("EventLog", () => {
       card: "INSIGHTS",
       layer: "FUEL_PRICES",
     });
+    expect(screen.queryByText("Critical")).not.toBeInTheDocument();
+  });
+
+  it("drops the history label once the log has more than one event", () => {
+    render(
+      <EventLog
+        events={[
+          {
+            id: 1,
+            kind: "BUILD",
+            label: "Jan 2024",
+            message: "Solar project started.",
+          },
+          {
+            id: 2,
+            kind: "CONSTRUCTION",
+            label: "Feb 2024",
+            message: "Solar project finished.",
+          },
+        ]}
+        upcoming={[
+          {
+            key: "next",
+            label: "Mar 2024",
+            message: "Demand will rise.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Upcoming")).toBeVisible();
+    expect(screen.queryByText("History")).not.toBeInTheDocument();
   });
 });

@@ -74,7 +74,7 @@ describe("NewGameDetails leaderboard", () => {
     ).toHaveAttribute("src", "/images/carbon fee.svg");
     expect(
       screen.getByRole("heading", {
-        name: "Lead a legacy utility through a clean-energy transition.",
+        name: "Carbon Fee — Modernize an aging grid as pollution gets more expensive.",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("Objective")).toBeInTheDocument();
@@ -85,6 +85,7 @@ describe("NewGameDetails leaderboard", () => {
       screen.getByRole("button", { name: "Victory conditions" }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Start mission" })).toBeVisible();
+    expect(screen.getByText(/Easy: 30% cheaper facilities/)).toBeVisible();
     await screen.findByText("Play the scenario to set a high score");
   });
 

@@ -172,8 +172,17 @@ describe("authored starting fleets", () => {
       admin: "TX",
       timeZone: "America/Chicago",
     });
-    expect(austin.briefing?.objective).toMatch(/preserve.*resilience/i);
+    expect(austin.briefing?.objective).toMatch(/strengthen.*freeze/i);
     expect(austin.briefing?.objective).not.toMatch(/build/i);
+    expect(
+      [
+        austin.summary,
+        austin.briefing?.fantasy,
+        austin.briefing?.objective,
+        austin.briefing?.constraint,
+        austin.briefing?.threat,
+      ].join(" "),
+    ).not.toMatch(/ERCOT|PPA|portfolio/i);
     expect(
       austin.facilities.reduce(
         (total, facility) => total + (facility.peakW || 0),
