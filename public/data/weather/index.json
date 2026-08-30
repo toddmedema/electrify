@@ -831,6 +831,78 @@
       "startingYear": 1980,
       "endingYear": 2025
     },
+    "Bogota": {
+      "id": "Bogota",
+      "name": "Bogota, Colombia",
+      "region": "South America",
+      "country": "Colombia",
+      "lat": 4.711,
+      "long": -74.0721,
+      "timeZone": "America/Bogota",
+      "elevation": 2557,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Medellin": {
+      "id": "Medellin",
+      "name": "Medellin, Colombia",
+      "region": "South America",
+      "country": "Colombia",
+      "lat": 6.2442,
+      "long": -75.5812,
+      "timeZone": "America/Bogota",
+      "elevation": 1476,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Caracas": {
+      "id": "Caracas",
+      "name": "Caracas, Venezuela",
+      "region": "South America",
+      "country": "Venezuela",
+      "lat": 10.4806,
+      "long": -66.9036,
+      "timeZone": "America/Caracas",
+      "elevation": 882,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Quito": {
+      "id": "Quito",
+      "name": "Quito, Ecuador",
+      "region": "South America",
+      "country": "Ecuador",
+      "lat": -0.1807,
+      "long": -78.4678,
+      "timeZone": "America/Guayaquil",
+      "elevation": 2920,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Guayaquil": {
+      "id": "Guayaquil",
+      "name": "Guayaquil, Ecuador",
+      "region": "South America",
+      "country": "Ecuador",
+      "lat": -2.1894,
+      "long": -79.8891,
+      "timeZone": "America/Guayaquil",
+      "elevation": 10,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Lima": {
+      "id": "Lima",
+      "name": "Lima, Peru",
+      "region": "South America",
+      "country": "Peru",
+      "lat": -12.0464,
+      "long": -77.0428,
+      "timeZone": "America/Lima",
+      "elevation": 139,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
     "London": {
       "id": "London",
       "name": "London, United Kingdom",
