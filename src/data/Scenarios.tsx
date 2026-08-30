@@ -861,7 +861,7 @@ export const SCENARIOS = [
   {
     id: 106, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Data Center Boom",
-    icon: "natural gas",
+    icon: "ai data center boom",
     locationId: "Manassas",
     location: {
       id: "Manassas",
