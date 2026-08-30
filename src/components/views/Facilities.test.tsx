@@ -57,6 +57,8 @@ function renderFacilities(
       onTogglePause={() => undefined}
       onPause={handlers.onPause}
       onReprioritize={handlers.onReprioritize}
+      onFacilityDragStart={() => undefined}
+      onFacilityDragEnd={() => undefined}
       onSelect={handlers.onSelect}
     />,
   );
@@ -219,6 +221,51 @@ describe("the fleet list", () => {
       ),
     );
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("keeps tick renders out of an active facility drag", () => {
+    const fast = { ...game, speed: "FAST" as const };
+    const ref = React.createRef<Facilities>();
+    const onFacilityDragStart = jest.fn();
+    const onFacilityDragEnd = jest.fn();
+    const props: React.ComponentProps<typeof Facilities> = {
+      game: fast,
+      selectedFacilityId: null,
+      onGeneratorBuild: () => undefined,
+      onStorageBuild: () => undefined,
+      onSell: () => undefined,
+      onTogglePause: () => undefined,
+      onPause: () => undefined,
+      onReprioritize: () => undefined,
+      onFacilityDragStart,
+      onFacilityDragEnd,
+      onSelect: () => undefined,
+    };
+    render(<Facilities {...props} ref={ref} />);
+
+    ref.current!.onBeforeDragStart();
+    expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
+    expect(
+      ref.current!.shouldComponentUpdate({
+        ...props,
+        game: {
+          ...fast,
+          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+        },
+      }),
+    ).toBe(false);
+
+    ref.current!.onDragEnd({
+      draggableId: `f${fast.facilities[0].id}`,
+      type: "DEFAULT",
+      source: { droppableId: "droppable", index: 0 },
+      destination: null,
+      reason: "CANCEL",
+      mode: "FLUID",
+      combine: null,
+    });
+    expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
+    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {

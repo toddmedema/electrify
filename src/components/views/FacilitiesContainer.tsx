@@ -3,10 +3,15 @@ import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
 import {
   sellFacility,
+  setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
 } from "../../reducers/Game";
-import { selectFacility, snackbarOpen } from "../../reducers/UI";
+import {
+  selectFacility,
+  setFacilityDragActive,
+  snackbarOpen,
+} from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 
@@ -45,6 +50,26 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onReprioritize: (spotInList: number, delta: number) => {
       dispatch(reprioritizeFacility({ spotInList, delta }));
+    },
+    onFacilityDragStart: (speed) => {
+      dispatch(setFacilityDragActive(true));
+      if (speed !== "PAUSED") {
+        dispatch(setSpeed("PAUSED"));
+      }
+    },
+    onFacilityDragEnd: (sourceIndex, destinationIndex, resumeSpeed) => {
+      dispatch(setFacilityDragActive(false));
+      if (destinationIndex !== null) {
+        dispatch(
+          reprioritizeFacility({
+            spotInList: sourceIndex,
+            delta: destinationIndex - sourceIndex,
+          }),
+        );
+      }
+      if (resumeSpeed !== "PAUSED") {
+        dispatch(setSpeed(resumeSpeed));
+      }
     },
     onSelect: (id) => {
       dispatch(selectFacility(id));

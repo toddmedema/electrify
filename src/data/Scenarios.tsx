@@ -901,8 +901,6 @@ export const SCENARIOS = [
         fuel: "Natural Gas",
         peakW: 75000000,
         initialAgeYears: 0,
-        // This is purchased power in gameplay terms, not a fictional city-owned gas plant.
-        label: "Purchased Power Proxy",
       },
     ],
     loadAdditions: [

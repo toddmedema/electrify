@@ -156,7 +156,6 @@ describe("authored starting fleets", () => {
       expect.objectContaining({
         fuel: "Natural Gas",
         peakW: 75_000_000,
-        label: "Purchased Power Proxy",
       }),
     ]);
 
