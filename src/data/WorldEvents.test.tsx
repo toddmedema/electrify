@@ -289,6 +289,7 @@ describe("remaining scored story arcs", () => {
       oilShock: 1.45,
     });
     expect(RENEWABLES_BALANCE.Manager).toEqual({
+      bridgeGasBuildCost: 1,
       solarBuildCost: 0.75,
       windBuildCost: 0.9,
       demandLoad: 1.08,
@@ -303,6 +304,7 @@ describe("remaining scored story arcs", () => {
     expect(END_OF_ERA_BALANCE.Manager).toEqual({
       oldCoalOutput: 0.85,
       coalOM: 1.2,
+      complianceCoalOutput: 0.75,
     });
     expect(validateStoryDifficultyMonotonicity()).toEqual([]);
   });
@@ -319,6 +321,7 @@ describe("remaining scored story arcs", () => {
     });
     expect(resolveStoryAtDate(context(180, 102)).effects).toMatchObject({
       operatingCostMultipliersByFuel: { Coal: 1.2 },
+      facilityOutputMultipliersByFuel: { Coal: 0.75 },
     });
   });
 
