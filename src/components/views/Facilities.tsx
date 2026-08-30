@@ -461,6 +461,12 @@ export interface DispatchProps {
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
   onPause: (id: FacilityOperatingType["id"], name: string) => void;
   onReprioritize: (spotInList: number, delta: number) => void;
+  onFacilityDragStart: (speed: GameType["speed"]) => void;
+  onFacilityDragEnd: (
+    sourceIndex: number,
+    destinationIndex: number | null,
+    resumeSpeed: GameType["speed"],
+  ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
 }
@@ -470,22 +476,34 @@ export interface Props extends StateProps, DispatchProps {}
 export default class Facilities extends React.Component<Props, {}> {
   constructor(props: Props) {
     super(props);
+    this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
 
   private throttle = new TickThrottle();
+  // The drag library already animates every row while a reorder is active. Letting the 10ms
+  // FAST clock replace the whole list underneath it adds a second stream of layout work and can
+  // make the pointer fall seconds behind. The drag callbacks briefly suspend that clock too;
+  // this guard keeps an already-queued tick from replacing the rows before it stops.
+  private dragging = false;
+  private speedBeforeDrag: GameType["speed"] = "PAUSED";
 
   // In fast mode, skip frames so that CPU can focus on simulation. This used to be 1 frame in
   // 8, when the supply/demand chart was on Victory and one pane render cost 18ms; on uPlot the
   // same render is 3.6ms, so 1 in 2 refreshes the pane four times as often and still costs less
   // per tick than the old setting did.
   public shouldComponentUpdate(nextProps: Props) {
+    if (this.dragging) {
+      return false;
+    }
     // Opening a row is something the player just did, not something the clock did, so it
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.game.speed !== "FAST" ||
-      nextProps.selectedFacilityId !== this.props.selectedFacilityId
+      nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
+      nextProps.game.facilities.map((facility) => facility.id).join("|") !==
+        this.props.game.facilities.map((facility) => facility.id).join("|")
     ) {
       return true;
     }
@@ -496,15 +514,18 @@ export default class Facilities extends React.Component<Props, {}> {
     this.throttle.rendered(this.props.game.date.minute);
   }
 
-  public onDragEnd(result: DropResult) {
-    if (!result.destination) {
-      // dropped outside the list
-      return;
-    }
+  public onBeforeDragStart() {
+    this.dragging = true;
+    this.speedBeforeDrag = this.props.game.speed;
+    this.props.onFacilityDragStart(this.speedBeforeDrag);
+  }
 
-    this.props.onReprioritize(
+  public onDragEnd(result: DropResult) {
+    this.dragging = false;
+    this.props.onFacilityDragEnd(
       result.source.index,
-      result.destination.index - result.source.index,
+      result.destination?.index ?? null,
+      this.speedBeforeDrag,
     );
   }
 
@@ -564,7 +585,10 @@ export default class Facilities extends React.Component<Props, {}> {
           startingYear={game.startingYear}
         />
         <List dense className="scrollable">
-          <DragDropContext onDragEnd={this.onDragEnd}>
+          <DragDropContext
+            onBeforeDragStart={this.onBeforeDragStart}
+            onDragEnd={this.onDragEnd}
+          >
             <Droppable droppableId="droppable">
               {(provided) => (
                 <div {...provided.droppableProps} ref={provided.innerRef}>

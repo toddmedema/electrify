@@ -243,6 +243,7 @@ interface ProjectionView {
 export interface StateProps {
   game: GameType;
   selectedFacilityId: number | null;
+  facilityDragActive: boolean;
   focusLayer?: InsightLayerId;
 }
 
@@ -435,6 +436,16 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
+    // Projection generation simulates as much as twenty years and then redraws every visible
+    // chart. Doing that in the middle of a pointer-driven fleet reorder is the periodic desktop
+    // hitch users feel most. Keep the last projection for the few hundred milliseconds of the
+    // drag, then catch up once on release.
+    if (nextProps.facilityDragActive) {
+      return false;
+    }
+    if (this.props.facilityDragActive) {
+      return true;
+    }
     return (
       nextState !== this.state ||
       nextProps.game.date.monthsElapsed !==

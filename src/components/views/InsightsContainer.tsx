@@ -17,6 +17,7 @@ const STORY_INSIGHT_LAYERS: Record<string, InsightLayerId> = {
 const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
   selectedFacilityId: state.ui.selectedFacilityId,
+  facilityDragActive: state.ui.facilityDragActive,
   focusLayer:
     state.card.storyTarget?.card === "INSIGHTS" && state.card.storyTarget.layer
       ? STORY_INSIGHT_LAYERS[state.card.storyTarget.layer]

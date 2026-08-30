@@ -896,6 +896,9 @@ export interface VictoryDebriefType {
 export interface UIType {
   dialog: DialogType;
   snackbar: SnackbarType;
+  // True only while the player is physically reordering the fleet. Expensive sibling panes can
+  // defer their next projection until the drop, when the temporarily suspended clock resumes.
+  facilityDragActive: boolean;
   // The facility the player has clicked in the fleet list, or null for none. UI rather than game
   // state: it changes nothing about the simulation, and it is read by all three panes -- the
   // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Insights reports what

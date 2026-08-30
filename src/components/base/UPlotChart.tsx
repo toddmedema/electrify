@@ -125,23 +125,36 @@ export default function UPlotChart<S>(
   const seriesSummary = (props.summaryData || data)
     .slice(1)
     .map((series, index) => {
-      const values = Array.from(series).filter(
-        (value): value is number =>
-          typeof value === "number" && isFinite(value),
-      );
-      const first = values[0] || 0;
-      const latest = values[values.length - 1] || 0;
+      // Charts can carry thousands of points and desktop renders several together. Derive the
+      // accessible summary in one pass instead of allocating a filtered copy and spreading it
+      // into Math.min/Math.max for every series.
+      let first = 0;
+      let latest = 0;
+      let minimum = Number.POSITIVE_INFINITY;
+      let maximum = Number.NEGATIVE_INFINITY;
+      let found = false;
+      for (let i = 0; i < series.length; i++) {
+        const value = series[i];
+        if (typeof value !== "number" || !isFinite(value)) {
+          continue;
+        }
+        if (!found) {
+          first = value;
+          found = true;
+        }
+        latest = value;
+        minimum = Math.min(minimum, value);
+        maximum = Math.max(maximum, value);
+      }
+      if (!found) {
+        minimum = 0;
+        maximum = 0;
+      }
       return {
         label: props.seriesLabels?.[index] || `Series ${index + 1}`,
         latest: formatSummaryValue(latest, index),
-        minimum: formatSummaryValue(
-          values.length ? Math.min(...values) : 0,
-          index,
-        ),
-        maximum: formatSummaryValue(
-          values.length ? Math.max(...values) : 0,
-          index,
-        ),
+        minimum: formatSummaryValue(minimum, index),
+        maximum: formatSummaryValue(maximum, index),
         trend: latest > first ? "up" : latest < first ? "down" : "flat",
       };
     });

@@ -24,6 +24,8 @@ interface ChartMockProps {
   timeline?: unknown[];
 }
 
+let mockSupplyDemandPaints = 0;
+
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
   default: ({ id, syncKey, timeline }: ChartMockProps) => (
@@ -66,15 +68,18 @@ jest.mock("../base/ChartForecastSupplyByFuel", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline }: ChartMockProps) => (
-    <div
-      role="img"
-      data-chart="supply-demand"
-      data-testid="supply-demand-chart"
-      data-sync-key={syncKey}
-      data-points={timeline?.length}
-    />
-  ),
+  default: ({ syncKey, timeline }: ChartMockProps) => {
+    mockSupplyDemandPaints++;
+    return (
+      <div
+        role="img"
+        data-chart="supply-demand"
+        data-testid="supply-demand-chart"
+        data-sync-key={syncKey}
+        data-points={timeline?.length}
+      />
+    );
+  },
 }));
 jest.mock("../base/ChartForecastStorage", () => ({
   __esModule: true,
@@ -115,6 +120,7 @@ function renderInsights(scenarioId = 100, suppliedGame?: GameType) {
     <Insights
       game={suppliedGame || createGame({ scenarioId })}
       selectedFacilityId={null}
+      facilityDragActive={false}
       onDelta={() => undefined}
     />,
   );
@@ -353,5 +359,32 @@ describe("Insights layers", () => {
       screen.getByRole("checkbox", { name: "Fuel Prices" }),
     ).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Profit" })).toBeEnabled();
+  });
+
+  it("defers chart projection updates until a facility drag ends", () => {
+    const game = createGame({ scenarioId: 100 });
+    const props: React.ComponentProps<typeof Insights> = {
+      game,
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    mockSupplyDemandPaints = 0;
+    const view = render(<Insights {...props} />);
+    const chartCountBeforeDrag = mockSupplyDemandPaints;
+    const nextGame = {
+      ...game,
+      date: { ...game.date, monthsElapsed: game.date.monthsElapsed + 1 },
+    };
+
+    view.rerender(
+      <Insights {...props} game={nextGame} facilityDragActive={true} />,
+    );
+    expect(mockSupplyDemandPaints).toBe(chartCountBeforeDrag);
+
+    view.rerender(
+      <Insights {...props} game={nextGame} facilityDragActive={false} />,
+    );
+    expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
   });
 });
