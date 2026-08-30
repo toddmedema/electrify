@@ -141,12 +141,27 @@ export function LCWH(
   feePerKgCO2e: number,
   seed: number,
   location?: LocationType,
+  feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
 ) {
   const fuel = FUELS[g.fuel] || {};
   const fuelCostPerWh =
     ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
     1000000;
-  const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
+  let lifetimeFee = feePerKgCO2e;
+  if (feePerKgCO2eAtYear) {
+    let weightedFee = 0;
+    let weight = 0;
+    const retention = Math.max(0, 1 - (g.annualOutputDegradation || 0));
+    for (let year = 0; year < Math.ceil(g.lifespanYears); year++) {
+      const fraction = Math.min(1, g.lifespanYears - year);
+      const yearWeight = Math.pow(retention, year) * fraction;
+      weightedFee +=
+        feePerKgCO2eAtYear(g.yearsToBuild + year + fraction / 2) * yearWeight;
+      weight += yearWeight;
+    }
+    lifetimeFee = weight > 0 ? weightedFee / weight : feePerKgCO2e;
+  }
+  const carbonCostPerWh = (lifetimeFee * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
   // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money

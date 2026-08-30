@@ -5,6 +5,7 @@ import Facilities from "./Facilities";
 import { tickState } from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -142,6 +143,25 @@ describe("the fleet list", () => {
 
     expect(screen.getByText(/1 month left/)).toBeInTheDocument();
     expect(screen.queryByText(/1 months left/)).toBeNull();
+  });
+
+  it("labels a facility whose output is constrained by a world event", () => {
+    const constrained = createGame({ scenarioId: 104 });
+    const facility = constrained.facilities[0];
+    constrained.worldEvents.active = [
+      {
+        key: "story:104:hurricane-2008:landfall",
+        definitionId: "hurricane-2008:landfall",
+        startsMinute: 0,
+        endsMinute: MINUTES_PER_MONTH,
+        attributes: {},
+        effects: {
+          facilityOutputMultipliersById: { [String(facility.id)]: 0.6 },
+        },
+      },
+    ];
+    renderFacilities(constrained, null);
+    expect(screen.getByText("Derated to 60%")).toBeInTheDocument();
   });
 
   it("uses compact watt units in the accessible chart summary", () => {

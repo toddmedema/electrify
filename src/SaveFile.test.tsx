@@ -28,7 +28,7 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     eventLog: [],
     reportedEventKeys: [],
     eventLogReadThroughId: 0,
-    worldEvents: { active: [], checkedKeys: [] },
+    worldEvents: { active: [], occurrences: [], checkedKeys: [] },
     ...overrides,
   } as unknown as GameType;
 }

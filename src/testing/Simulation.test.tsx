@@ -1,6 +1,7 @@
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
 import { createGame, runSimulation, SimResultType } from "./Simulator";
+import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
@@ -288,53 +289,9 @@ describe("airborne wind dispatch", () => {
 });
 
 describe("simulation economics", () => {
-  // Reproducible, UI-legal playthroughs found by the CEO playtest agents. Investor scenarios use
-  // facility actions only; the one rate change belongs to the Public scenario and is checked below.
-  const CEO_WINNING_PLAYS = {
-    100: {
-      initialBuild: {
-        name: "Natural Gas",
-        peakW: 150000000,
-        financed: true,
-      },
-      sellFacilityId: 1,
-      sellAtMonth: 37,
-    },
-    101: { sellFacilityId: 1 },
-    102: {
-      dollarsPerkWh: 0.034,
-      initialBuild: {
-        name: "Natural Gas",
-        peakW: 200000000,
-        financed: true,
-      },
-      sellFacilityId: 1,
-      sellAtMonth: 39,
-    },
-    103: {
-      dollarsPerkWh: 0.039,
-      initialBuild: {
-        name: "Natural Gas",
-        peakW: 400000000,
-        financed: true,
-      },
-      sellFacilityId: 1,
-      sellAtMonth: 39,
-    },
-    104: { dollarsPerkWh: 0.08 },
-    105: {
-      // Oil's output-dependent O&M makes the old $0.08/kWh play run out of cash in 2007.
-      dollarsPerkWh: 0.085,
-      initialBuild: {
-        name: "Natural Gas",
-        peakW: 300000000,
-        financed: true,
-      },
-    },
-  } as const;
   const CEO_ACTION_COUNTS = {
-    100: 2,
-    101: 1,
+    100: 3,
+    101: 3,
     102: 3,
     103: 3,
     104: 1,
@@ -352,8 +309,7 @@ describe("simulation economics", () => {
         expect(passive.actionCount).toBe(0);
         expect(passive.outcome).not.toBe("completed");
 
-        const play =
-          CEO_WINNING_PLAYS[scenario.id as keyof typeof CEO_WINNING_PLAYS];
+        const play = STANDARD_BALANCE_PLAYS[scenario.id];
         const active = runSimulation({
           scenarioId: scenario.id,
           difficulty: "CEO",

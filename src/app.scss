@@ -2155,6 +2155,16 @@ html[data-theme="dark"] .uplot {
       background 50ms linear;
   }
 
+  .storyDerateBadge {
+    height: 20px;
+    margin-left: size(small);
+    vertical-align: text-bottom;
+
+    .MuiChip-label {
+      padding: 0 6px;
+    }
+  }
+
   .MuiListItemAvatar-root {
     position: relative;
 

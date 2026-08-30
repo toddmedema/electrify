@@ -24,8 +24,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// v2 persists fuel-specific delivery and peak demand for deterministic story checkpoints.
-export const SAVE_VERSION = 2;
+// v3 also persists resolved story occurrences and their onset-time facility selections.
+export const SAVE_VERSION = 3;
 
 export function saveVersionError(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) {
@@ -175,6 +175,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof worldEvents !== "object" ||
     worldEvents === null ||
     !Array.isArray(worldEvents.active) ||
+    !Array.isArray(worldEvents.occurrences) ||
     !Array.isArray(worldEvents.checkedKeys)
   ) {
     return null;

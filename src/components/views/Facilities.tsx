@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Avatar,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -152,6 +153,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  const storyOutputMultiplier = game.worldEvents.active
+    .filter(
+      (event) =>
+        game.date.minute >= event.startsMinute &&
+        game.date.minute < event.endsMinute,
+    )
+    .reduce(
+      (multiplier, event) =>
+        multiplier *
+        (event.effects.facilityOutputMultipliersById?.[String(facility.id)] ||
+          (fuel && event.effects.facilityOutputMultipliersByFuel?.[fuel]) ||
+          1),
+      1,
+    );
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
@@ -357,7 +372,22 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 </div>
               </div>
             </ListItemAvatar>
-            <ListItemText primary={facility.name} secondary={secondaryText} />
+            <ListItemText
+              primary={
+                <>
+                  {facility.name}
+                  {storyOutputMultiplier < 1 && (
+                    <Chip
+                      className="storyDerateBadge"
+                      color="warning"
+                      size="small"
+                      label={`Derated to ${Math.round(storyOutputMultiplier * 100)}%`}
+                    />
+                  )}
+                </>
+              }
+              secondary={secondaryText}
+            />
             {open && (
               // Inside the row, so without this every click in the confirmation dialog also
               // lands on the row behind it and toggles the selection

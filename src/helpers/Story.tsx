@@ -2,6 +2,7 @@ import {
   FacilityOperatingType,
   FuelNameType,
   MonthlyHistoryType,
+  StoryPeriodSnapshotType,
   StorySnapshotType,
 } from "../Types";
 import { summarizeHistory } from "./DateTime";
@@ -13,6 +14,25 @@ const VARIABLE_FUELS = new Set<FuelNameType>([
   "Offshore Wind",
   "Airborne Wind",
 ]);
+
+export function buildStoryPeriodSnapshot(
+  monthlyHistory: MonthlyHistoryType[],
+  months: number,
+): StoryPeriodSnapshotType {
+  const summary = summarizeHistory(monthlyHistory.slice(0, months));
+  const expenses =
+    summary.expensesFuel +
+    summary.expensesOM +
+    summary.expensesCarbonFee +
+    summary.expensesInterest;
+  return {
+    deliveredWhByFuel: { ...summary.deliveredWhByFuel },
+    demandWh: summary.demandWh,
+    unservedWh: Math.max(0, summary.demandWh - summary.supplyWh),
+    netIncome: summary.revenue - expenses,
+    peakDemandW: summary.peakDemandW,
+  };
+}
 
 /**
  * Derives the story-facing state from authoritative simulation history and the current fleet.

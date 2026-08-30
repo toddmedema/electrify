@@ -859,7 +859,9 @@ export const SCENARIOS = [
     },
     ownership: "Investor",
     startingYear: 1980,
-    cash: 198000000,
+    // The authored coal derate temporarily avoids loss-making generation. Keep the original
+    // CEO balance gate intact: a passive fleet still runs out of runway before year twenty.
+    cash: 160000000,
     feePerKgCO2e: 0,
     dollarsPerkWh: 0.025,
     durationMonths: 12 * 20,

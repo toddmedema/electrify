@@ -5,7 +5,10 @@ import {
   DifficultyType,
   GameEventImportanceType,
   GameEventKindType,
+  FuelNameType,
   LocationType,
+  StoryAttributeValueType,
+  StoryPeriodSnapshotType,
   StorySnapshotType,
   StoryActionTargetType,
   WorldEventEffectsType,
@@ -20,6 +23,10 @@ export interface StoryContextType {
   date: DateType;
   location: LocationType;
   snapshot: StorySnapshotType;
+  /** Exact completed-month summaries used by short recovery phases. */
+  periodSnapshots?: Partial<Record<number, StoryPeriodSnapshotType>>;
+  /** Previously persisted live resolutions, including expired onsets. */
+  occurrences?: ActiveWorldEventType[];
 }
 
 export type StoryScheduleType =
@@ -39,15 +46,19 @@ export interface StoryPhaseDescriptionType {
   kind: GameEventKindType;
   importance?: GameEventImportanceType;
   actionTarget?: StoryActionTargetType;
-  attributes?: Record<string, string | number>;
+  attributes?: Record<string, StoryAttributeValueType>;
   effects?: WorldEventEffectsType;
+  turningPointPriority?: number;
 }
 
 export interface StoryPhaseDefinitionType {
   id: string;
   schedule: StoryScheduleType;
   /** Zero (the default) logs a point-in-time phase without applying lasting effects. */
-  durationMonths?: number;
+  durationMonths?: number | ((context: StoryContextType) => number);
+  /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
+  scheduleAddress?: string;
+  scheduleOffsetMonths?: number | ((context: StoryContextType) => number);
   describe: (
     context: StoryContextType,
     random: StoryRandomType,
@@ -66,6 +77,41 @@ export interface ResolvedStoryType {
   /** Scheduled phases whose effect window contains the requested date. */
   active: Array<ActiveWorldEventType & StoryPhaseDescriptionType>;
   effects: WorldEventEffectsType;
+}
+
+const DIFFICULTY_ORDER: DifficultyType[] = [
+  "Intern",
+  "Employee",
+  "Manager",
+  "VP",
+  "CEO",
+];
+
+function share(part: number, whole: number): number {
+  return whole > 0 ? Math.max(0, Math.min(1, part / whole)) : 0;
+}
+
+function reliabilityOf(demandWh: number, unservedWh: number): number {
+  return demandWh > 0 ? 1 - share(unservedWh, demandWh) : 1;
+}
+
+function percent(value: number): string {
+  return `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`;
+}
+
+function compactMultiplier(value: number): string {
+  return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function deliveredFrom(
+  snapshot: StorySnapshotType | StoryPeriodSnapshotType,
+  fuels: FuelNameType[],
+): number {
+  const delivered =
+    "deliveredWhByFuel12m" in snapshot
+      ? snapshot.deliveredWhByFuel12m
+      : snapshot.deliveredWhByFuel;
+  return fuels.reduce((total, fuel) => total + (delivered[fuel] || 0), 0);
 }
 
 export interface ShaleBoomBalanceType {
@@ -200,12 +246,360 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "normalization",
       schedule: { atMonth: 122 },
-      describe: () => ({
-        title: "Gas market normalization",
-        message:
-          "Regional natural gas prices return to normal after the shale glut.",
+      describe: ({ snapshot }) => {
+        const gasShare = share(
+          snapshot.deliveredWhByFuel12m["Natural Gas"] || 0,
+          snapshot.demandWh12m,
+        );
+        const reliability = reliabilityOf(
+          snapshot.demandWh12m,
+          snapshot.unservedWh12m,
+        );
+        const resilient = reliability >= 0.999 && gasShare < 0.5;
+        return {
+          title: "Gas market normalization",
+          message: resilient
+            ? "Regional gas prices normalize with the grid reliable and less than half dependent on gas."
+            : "Regional gas prices normalize, exposing how strongly the grid still depends on gas.",
+          details: `Prior 12 months: ${percent(gasShare)} delivered gas share and ${percent(reliability)} reliability.`,
+          concept: "fuel",
+          kind: "WORLD_EVENT",
+          importance: "ROUTINE",
+          actionTarget: FUEL_PRICE_TARGET,
+          attributes: { gasShare, reliability },
+          turningPointPriority: 80,
+        };
+      },
+    },
+    {
+      id: "freeze-recovery",
+      schedule: { atMonth: 99 },
+      describe: ({ difficulty }) => ({
+        title: "Winter gas squeeze ends",
+        message: `Gas output is fully restored and prices return to the continuing ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% shale discount.`,
+        concept: "supply",
+        kind: "WORLD_EVENT",
+        importance: "ROUTINE",
+        actionTarget: FUEL_PRICE_TARGET,
+      }),
+    },
+  ],
+};
+
+export const CARBON_FEE_BALANCE: Record<DifficultyType, number> = {
+  Intern: 80,
+  Employee: 90,
+  Manager: 100,
+  VP: 110,
+  CEO: 120,
+};
+
+export interface ParadiseBalanceType {
+  visitorDemand: number;
+  oilShock: number;
+}
+
+export const PARADISE_BALANCE: Record<DifficultyType, ParadiseBalanceType> = {
+  Intern: { visitorDemand: 1.04, oilShock: 1.3 },
+  Employee: { visitorDemand: 1.05, oilShock: 1.375 },
+  Manager: { visitorDemand: 1.06, oilShock: 1.45 },
+  VP: { visitorDemand: 1.07, oilShock: 1.525 },
+  CEO: { visitorDemand: 1.08, oilShock: 1.6 },
+};
+
+export interface RenewablesBalanceType {
+  solarBuildCost: number;
+  windBuildCost: number;
+  demandLoad: number;
+}
+
+export const RENEWABLES_BALANCE: Record<DifficultyType, RenewablesBalanceType> =
+  {
+    Intern: { solarBuildCost: 0.7, windBuildCost: 0.86, demandLoad: 1.05 },
+    Employee: {
+      solarBuildCost: 0.725,
+      windBuildCost: 0.88,
+      demandLoad: 1.065,
+    },
+    Manager: { solarBuildCost: 0.75, windBuildCost: 0.9, demandLoad: 1.08 },
+    VP: { solarBuildCost: 0.775, windBuildCost: 0.92, demandLoad: 1.095 },
+    CEO: { solarBuildCost: 0.8, windBuildCost: 0.94, demandLoad: 1.11 },
+  };
+
+export interface HurricaneBalanceType {
+  severity: string;
+  targetCapacityShare: number;
+  outputMultiplier: number;
+  durationMonths: number;
+  oilMultiplier: number;
+}
+
+export const HURRICANE_BALANCE: Record<DifficultyType, HurricaneBalanceType> = {
+  Intern: {
+    severity: "Limited",
+    targetCapacityShare: 0.15,
+    outputMultiplier: 0.8,
+    durationMonths: 2,
+    oilMultiplier: 1.15,
+  },
+  Employee: {
+    severity: "Moderate",
+    targetCapacityShare: 0.2,
+    outputMultiplier: 0.7,
+    durationMonths: 3,
+    oilMultiplier: 1.25,
+  },
+  Manager: {
+    severity: "Major",
+    targetCapacityShare: 0.3,
+    outputMultiplier: 0.6,
+    durationMonths: 4,
+    oilMultiplier: 1.4,
+  },
+  VP: {
+    severity: "Severe",
+    targetCapacityShare: 0.4,
+    outputMultiplier: 0.5,
+    durationMonths: 5,
+    oilMultiplier: 1.5,
+  },
+  CEO: {
+    severity: "Extreme",
+    targetCapacityShare: 0.5,
+    outputMultiplier: 0.4,
+    durationMonths: 6,
+    oilMultiplier: 1.6,
+  },
+};
+
+export interface EndOfEraBalanceType {
+  oldCoalOutput: number;
+  coalOM: number;
+}
+
+export const END_OF_ERA_BALANCE: Record<DifficultyType, EndOfEraBalanceType> = {
+  Intern: { oldCoalOutput: 0.9, coalOM: 1.1 },
+  Employee: { oldCoalOutput: 0.875, coalOM: 1.15 },
+  Manager: { oldCoalOutput: 0.85, coalOM: 1.2 },
+  VP: { oldCoalOutput: 0.825, coalOM: 1.25 },
+  CEO: { oldCoalOutput: 0.8, coalOM: 1.3 },
+};
+
+const FLEET_TARGET: StoryActionTargetType = {
+  card: "FACILITIES",
+  view: "FLEET",
+};
+const GENERATOR_TARGET: StoryActionTargetType = {
+  card: "FACILITIES",
+  view: "BUILD_GENERATORS",
+};
+const SUPPLY_DEMAND_TARGET: StoryActionTargetType = {
+  card: "INSIGHTS",
+  layer: "SUPPLY_DEMAND",
+};
+
+const CARBON_FEE_ARC: StoryArcDefinitionType = {
+  id: "carbon-fee-ratchet",
+  scenarioId: 100,
+  phases: [
+    {
+      id: "published-ratchet",
+      schedule: { atMonth: 12 },
+      describe: ({ difficulty }) => {
+        const feePerTon = CARBON_FEE_BALANCE[difficulty];
+        return {
+          title: "Carbon fee ratchet published",
+          message: `The carbon fee rises to $${feePerTon}/t in Jan 2024.`,
+          details: `At representative heat rates, that adds about $${Math.round(feePerTon)}/MWh for coal and $${Math.round(feePerTon * 0.5)}/MWh for gas.`,
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: GENERATOR_TARGET,
+          attributes: { feePerTon },
+        };
+      },
+    },
+    {
+      id: "ratchet-onset",
+      schedule: { atMonth: 48 },
+      durationMonths: 96,
+      describe: ({ difficulty }) => {
+        const feePerTon = CARBON_FEE_BALANCE[difficulty];
+        return {
+          title: "Carbon fee ratchet begins",
+          message: `The carbon fee is now $${feePerTon}/t CO2e through the end of the mission.`,
+          details:
+            "Dispatch, accounting, forecasts, fuel crossovers, generator quotes, and lifetime cost now use the higher fee.",
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: GENERATOR_TARGET,
+          attributes: { feePerTon },
+          effects: { carbonFeePerKgCO2e: feePerTon / 1000 },
+          turningPointPriority: 90,
+        };
+      },
+    },
+    {
+      id: "transition-audit",
+      schedule: { atMonth: 84 },
+      describe: ({ snapshot }) => {
+        const combustion = deliveredFrom(snapshot, [
+          "Coal",
+          "Natural Gas",
+          "Oil",
+          "Biomass",
+        ]);
+        const combustionShare = share(combustion, snapshot.demandWh12m);
+        const unservedShare = share(
+          snapshot.unservedWh12m,
+          snapshot.demandWh12m,
+        );
+        const onTrack =
+          unservedShare <= 0.001 &&
+          combustionShare < 0.5 &&
+          snapshot.netIncome12m > 0;
+        return {
+          title: "Carbon transition audit",
+          message: onTrack
+            ? "The audit finds a reliable, profitable grid with carbon-priced combustion below half of delivered power."
+            : "The audit finds the transition still exposed on reliability, combustion, or income.",
+          details: `${percent(combustionShare)} carbon-priced combustion share · ${percent(1 - unservedShare)} reliability · ${snapshot.netIncome12m >= 0 ? "positive" : "negative"} net income.`,
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: {
+            combustionShare,
+            reliability: 1 - unservedShare,
+            netIncome: snapshot.netIncome12m,
+          },
+          turningPointPriority: 100,
+        };
+      },
+    },
+  ],
+};
+
+const PARADISE_ARC: StoryArcDefinitionType = {
+  id: "island-energy",
+  scenarioId: 105,
+  phases: [
+    {
+      id: "visitor-warning",
+      schedule: { atMonth: 21 },
+      describe: ({ difficulty }) => ({
+        title: "Visitor peak forecast",
+        message: `Visitor demand is expected to lift electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through Oct 2007.`,
+        details: "Usage rises, but customer count does not.",
+        concept: "customers",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: SUPPLY_DEMAND_TARGET,
+      }),
+    },
+    {
+      id: "visitor-peak",
+      schedule: { atMonth: 28 },
+      durationMonths: 18,
+      describe: ({ difficulty }) => {
+        const demandMultiplier = PARADISE_BALANCE[difficulty].visitorDemand;
+        return {
+          title: "Visitor peak",
+          message: `Electricity usage rises ${Math.round((demandMultiplier - 1) * 100)}% through Oct 2007; customer count is unchanged.`,
+          concept: "customers",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { demandMultiplier },
+          effects: { demandMultiplier },
+        };
+      },
+    },
+    {
+      id: "cargo-warning",
+      schedule: { atMonth: 101 },
+      describe: ({ difficulty }) => ({
+        title: "Fuel cargo delay warning",
+        message: `A Sep–Nov 2013 cargo disruption could raise oil prices ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}%.`,
         details:
-          "Review how much of the grid now depends on gas before the next market cycle.",
+          "Prepare local generation or reserves before the shipment window.",
+        concept: "danger",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: FLEET_TARGET,
+      }),
+    },
+    {
+      id: "visitor-recovery",
+      schedule: { atMonth: 46 },
+      describe: () => ({
+        title: "Visitor peak ends",
+        message: "Seasonal visitor electricity usage returns to normal.",
+        concept: "customers",
+        kind: "WORLD_EVENT",
+        importance: "ROUTINE",
+        actionTarget: SUPPLY_DEMAND_TARGET,
+      }),
+    },
+    {
+      id: "oil-shock",
+      schedule: { atMonth: 116 },
+      durationMonths: 3,
+      describe: ({ difficulty }) => {
+        const oilMultiplier = PARADISE_BALANCE[difficulty].oilShock;
+        return {
+          title: "Fuel cargo delayed",
+          message: `Oil prices rise ${Math.round((oilMultiplier - 1) * 100)}% through Nov 2013.`,
+          details: `${compactMultiplier(oilMultiplier)}× oil price multiplier.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: FLEET_TARGET,
+          attributes: { oilMultiplier },
+          effects: { fuelPriceMultipliers: { Oil: oilMultiplier } },
+          turningPointPriority: 95,
+        };
+      },
+    },
+    {
+      id: "local-energy-review",
+      schedule: { atMonth: 120 },
+      describe: ({ snapshot }) => {
+        const shipped = deliveredFrom(snapshot, [
+          "Coal",
+          "Natural Gas",
+          "Oil",
+          "Uranium",
+          "Biomass",
+        ]);
+        const shippedShare = share(shipped, snapshot.demandWh12m);
+        const reliability = reliabilityOf(
+          snapshot.demandWh12m,
+          snapshot.unservedWh12m,
+        );
+        return {
+          title: "Local-energy review",
+          message:
+            reliability >= 0.999 && shippedShare < 0.5
+              ? "The island stayed reliable while local resources supplied most delivered power."
+              : "The review finds the island still exposed to shipped fuels or reliability risk.",
+          details: `${percent(shippedShare)} shipped-fuel share · ${percent(reliability)} reliability. The game conservatively counts Coal, Natural Gas, Oil, Uranium, and Biomass as shipped because feedstock origin is not modeled.`,
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "ROUTINE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { shippedShare, reliability },
+          turningPointPriority: 85,
+        };
+      },
+    },
+    {
+      id: "cargo-restored",
+      schedule: { atMonth: 119 },
+      describe: () => ({
+        title: "Fuel cargo restored",
+        message: "Oil deliveries and prices return to normal after the delay.",
         concept: "fuel",
         kind: "WORLD_EVENT",
         importance: "ROUTINE",
@@ -215,7 +609,513 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
   ],
 };
 
-export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [SHALE_BOOM_ARC];
+const RENEWABLES_ARC: StoryArcDefinitionType = {
+  id: "renewables-scale",
+  scenarioId: 101,
+  phases: [
+    {
+      id: "manufacturing-warning",
+      schedule: { atMonth: 72 },
+      describe: ({ difficulty }) => {
+        const balance = RENEWABLES_BALANCE[difficulty];
+        return {
+          title: "Renewable manufacturing scale",
+          message: `New Solar and Wind quotes fall in Jan 2009 to ${percent(balance.solarBuildCost)} and ${percent(balance.windBuildCost)} of normal cost.`,
+          details:
+            "Already-committed projects keep their signed construction cost.",
+          concept: "build",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: GENERATOR_TARGET,
+        };
+      },
+    },
+    {
+      id: "procurement-step",
+      schedule: { atMonth: 84 },
+      durationMonths: 60,
+      describe: ({ difficulty }) => {
+        const balance = RENEWABLES_BALANCE[difficulty];
+        return {
+          title: "Renewable procurement step",
+          message: `New Solar costs ${Math.round((1 - balance.solarBuildCost) * 100)}% less and new Wind costs ${Math.round((1 - balance.windBuildCost) * 100)}% less through mission end.`,
+          details:
+            "The discount applies once to new quotes after year, inflation, and difficulty pricing; commitments already underway do not change.",
+          concept: "build",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: GENERATOR_TARGET,
+          attributes: {
+            solarBuildCost: balance.solarBuildCost,
+            windBuildCost: balance.windBuildCost,
+          },
+          effects: {
+            buildCostMultipliersByFuel: {
+              Sun: balance.solarBuildCost,
+              Wind: balance.windBuildCost,
+            },
+          },
+          turningPointPriority: 80,
+        };
+      },
+    },
+    {
+      id: "clean-tech-load-warning",
+      schedule: { atMonth: 114 },
+      describe: ({ difficulty }) => ({
+        title: "Clean-tech load warning",
+        message: `A new clean-tech industry raises usage ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from Jan 2012 through Dec 2013.`,
+        concept: "customers",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: SUPPLY_DEMAND_TARGET,
+      }),
+    },
+    {
+      id: "clean-tech-load",
+      schedule: { atMonth: 120 },
+      durationMonths: 24,
+      describe: ({ difficulty }) => {
+        const demandMultiplier = RENEWABLES_BALANCE[difficulty].demandLoad;
+        return {
+          title: "Clean-tech load arrives",
+          message: `Electricity usage rises ${Math.round((demandMultiplier - 1) * 100)}% through Dec 2013.`,
+          concept: "customers",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { demandMultiplier },
+          effects: { demandMultiplier },
+        };
+      },
+    },
+    {
+      id: "integration-review",
+      schedule: { atMonth: 132 },
+      describe: ({ snapshot }) => {
+        const variable = deliveredFrom(snapshot, [
+          "Sun",
+          "Wind",
+          "Offshore Wind",
+          "Airborne Wind",
+        ]);
+        const variableShare = share(variable, snapshot.demandWh12m);
+        const reliability = reliabilityOf(
+          snapshot.demandWh12m,
+          snapshot.unservedWh12m,
+        );
+        const coverage = share(
+          snapshot.firmPeakW + snapshot.storagePeakW,
+          snapshot.peakDemandW12m,
+        );
+        return {
+          title: "Renewable integration review",
+          message:
+            reliability >= 0.999 && coverage >= 0.75
+              ? "Variable renewables grew while firm and storage coverage kept the grid reliable."
+              : "The review flags a gap between variable-renewable growth and dependable peak coverage.",
+          details: `${percent(variableShare)} variable-renewable delivered share · ${percent(reliability)} reliability · ${percent(coverage)} firm/storage peak coverage.`,
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "ROUTINE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { variableShare, reliability, coverage },
+          turningPointPriority: 90,
+        };
+      },
+    },
+  ],
+};
+
+const HURRICANE_ARC: StoryArcDefinitionType = {
+  id: "hurricane-2008",
+  scenarioId: 104,
+  phases: [
+    {
+      id: "outlook",
+      schedule: { atMonth: 96 },
+      describe: ({ difficulty }) => {
+        const balance = HURRICANE_BALANCE[difficulty];
+        return {
+          title: "2008 hurricane outlook",
+          message: `A ${balance.severity.toLowerCase()} landfall may hit between Jun and Nov 2008, derating enough generators to reach ${percent(balance.targetCapacityShare)} of operating capacity for ${balance.durationMonths} months.`,
+          details: `Affected output falls to ${percent(balance.outputMultiplier)} and oil rises ${Math.round((balance.oilMultiplier - 1) * 100)}%. Diversify the fleet and prepare storage.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: FLEET_TARGET,
+        };
+      },
+    },
+    {
+      id: "landfall",
+      schedule: {
+        seededMonthRange: { firstMonth: 101, lastMonth: 106 },
+        randomKey: "landfall-month",
+      },
+      scheduleAddress: "landfall",
+      durationMonths: ({ difficulty }) =>
+        HURRICANE_BALANCE[difficulty].durationMonths,
+      describe: (context, random) => {
+        const balance = HURRICANE_BALANCE[context.difficulty];
+        const candidates = context.snapshot.facilities
+          .filter((facility) => facility.operational && !!facility.fuel)
+          .map((facility) => ({
+            ...facility,
+            score: random(`facility|${facility.id}`),
+          }))
+          .sort((a, b) => a.score - b.score || a.id - b.id);
+        const totalPeakW = candidates.reduce(
+          (total, facility) => total + facility.peakW,
+          0,
+        );
+        const targetPeakW = totalPeakW * balance.targetCapacityShare;
+        const selected: typeof candidates = [];
+        let selectedPeakW = 0;
+        for (const candidate of candidates) {
+          if (selectedPeakW >= targetPeakW) {
+            break;
+          }
+          selected.push(candidate);
+          selectedPeakW += candidate.peakW;
+        }
+        const facilityOutputMultipliersById = Object.fromEntries(
+          selected.map((facility) => [
+            String(facility.id),
+            balance.outputMultiplier,
+          ]),
+        );
+        const selectedNames = selected.map((facility) => facility.name);
+        return {
+          title: `${balance.severity} hurricane landfall`,
+          message:
+            selectedNames.length > 0
+              ? `${selectedNames.join(", ")} ${selectedNames.length === 1 ? "is" : "are"} derated to ${percent(balance.outputMultiplier)} output for ${balance.durationMonths} months.`
+              : `No generator is operating at landfall; the ${Math.round((balance.oilMultiplier - 1) * 100)}% oil surcharge still applies.`,
+          details: `Selected ${percent(share(selectedPeakW, totalPeakW))} of operating generator capacity; oil prices are ${compactMultiplier(balance.oilMultiplier)}×. Storage remains available as prepared backup.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            severity: balance.severity,
+            targetCapacityShare: balance.targetCapacityShare,
+            selectedCapacityShare: share(selectedPeakW, totalPeakW),
+            selectedFacilityIds: selected.map((facility) => facility.id),
+            selectedFacilityNames: selectedNames,
+            outputMultiplier: balance.outputMultiplier,
+            durationMonths: balance.durationMonths,
+            oilMultiplier: balance.oilMultiplier,
+          },
+          effects: {
+            fuelPriceMultipliers: { Oil: balance.oilMultiplier },
+            facilityOutputMultipliersById,
+          },
+          turningPointPriority: 100,
+        };
+      },
+    },
+    {
+      id: "restoration",
+      schedule: {
+        seededMonthRange: { firstMonth: 101, lastMonth: 106 },
+        randomKey: "landfall-month",
+      },
+      scheduleAddress: "landfall",
+      scheduleOffsetMonths: ({ difficulty }) =>
+        HURRICANE_BALANCE[difficulty].durationMonths,
+      describe: (context) => {
+        const balance = HURRICANE_BALANCE[context.difficulty];
+        const period = context.periodSnapshots?.[balance.durationMonths];
+        const demandWh = period?.demandWh || context.snapshot.demandWh12m;
+        const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
+        const reliability = reliabilityOf(demandWh, unservedWh);
+        const onset = context.occurrences?.find(
+          (event) => event.key === "story:104:hurricane-2008:landfall",
+        );
+        const selectedNames = (onset?.attributes.selectedFacilityNames ||
+          []) as string[];
+        return {
+          title: "Storm restoration complete",
+          message: `${selectedNames.length ? `${selectedNames.join(", ")} restored. ` : "Generator output restored. "}${percent(reliability)} of demand was served during the disruption.`,
+          details: `${unservedWh > 0 ? `${unservedWh.toExponential(2)} Wh unserved` : "No unserved energy"} across the exact ${balance.durationMonths}-month event window; oil prices return to normal.`,
+          concept: "supply",
+          kind: "WORLD_EVENT",
+          importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { demandWh, unservedWh, reliability },
+          turningPointPriority: 90,
+        };
+      },
+    },
+  ],
+};
+
+const END_OF_ERA_ARC: StoryArcDefinitionType = {
+  id: "coal-transition",
+  scenarioId: 102,
+  phases: [
+    {
+      id: "aging-warning",
+      schedule: { atMonth: 48 },
+      describe: ({ snapshot, difficulty }) => {
+        const selected = snapshot.facilities.filter(
+          (facility) => facility.fuel === "Coal" && facility.ageYears + 2 >= 30,
+        );
+        return {
+          title: "Aging coal review",
+          message: `${selected.length} coal ${selected.length === 1 ? "unit is" : "units are"} projected to be at least 30 years old by Jan 1986.`,
+          details: `Those units will fall to ${percent(END_OF_ERA_BALANCE[difficulty].oldCoalOutput)} output through Dec 1987. Sold units disappear naturally; newly purchased coal is not classified as old coal.`,
+          concept: "generator",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            selectedFacilityIds: selected.map((facility) => facility.id),
+            selectedFacilityNames: selected.map((facility) => facility.name),
+          },
+        };
+      },
+    },
+    {
+      id: "aging-derate",
+      schedule: { atMonth: 72 },
+      durationMonths: 24,
+      describe: ({ snapshot, difficulty }) => {
+        const outputMultiplier = END_OF_ERA_BALANCE[difficulty].oldCoalOutput;
+        const selected = snapshot.facilities.filter(
+          (facility) =>
+            facility.fuel === "Coal" &&
+            facility.operational &&
+            facility.ageYears >= 30,
+        );
+        return {
+          title: "Old-coal derate",
+          message: `${selected.length} aging coal ${selected.length === 1 ? "unit is" : "units are"} limited to ${percent(outputMultiplier)} output through Dec 1987.`,
+          concept: "generator",
+          kind: "WORLD_EVENT",
+          importance: "NOTABLE",
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            selectedFacilityIds: selected.map((facility) => facility.id),
+            outputMultiplier,
+          },
+          effects: {
+            facilityOutputMultipliersById: Object.fromEntries(
+              selected.map((facility) => [
+                String(facility.id),
+                outputMultiplier,
+              ]),
+            ),
+          },
+        };
+      },
+    },
+    {
+      id: "compliance-warning",
+      schedule: { atMonth: 130 },
+      describe: ({ difficulty }) => ({
+        title: "1995 coal compliance deadline",
+        message: `All coal O&M rises ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in Jan 1995.`,
+        details:
+          "The policy covers fixed O&M, variable O&M, and start maintenance for existing and new coal.",
+        concept: "danger",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: GENERATOR_TARGET,
+      }),
+    },
+    {
+      id: "aging-restoration",
+      schedule: { atMonth: 96 },
+      describe: () => ({
+        title: "Aging review closes",
+        message:
+          "The temporary old-coal derate ends; nameplate output is restored.",
+        concept: "supply",
+        kind: "WORLD_EVENT",
+        importance: "ROUTINE",
+        actionTarget: FLEET_TARGET,
+      }),
+    },
+    {
+      id: "compliance",
+      schedule: { atMonth: 180 },
+      durationMonths: 60,
+      describe: ({ difficulty }) => {
+        const coalOM = END_OF_ERA_BALANCE[difficulty].coalOM;
+        return {
+          title: "Coal compliance deadline",
+          message: `Coal fixed, variable, and start O&M are now ${Math.round((coalOM - 1) * 100)}% higher through mission end.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: GENERATOR_TARGET,
+          attributes: { coalOM },
+          effects: { operatingCostMultipliersByFuel: { Coal: coalOM } },
+          turningPointPriority: 100,
+        };
+      },
+    },
+    {
+      id: "successor-review",
+      schedule: { atMonth: 216 },
+      describe: ({ snapshot }) => {
+        const coalShare = share(
+          snapshot.deliveredWhByFuel12m.Coal || 0,
+          snapshot.demandWh12m,
+        );
+        const reliability = reliabilityOf(
+          snapshot.demandWh12m,
+          snapshot.unservedWh12m,
+        );
+        const legacyCoalW = snapshot.facilities
+          .filter(
+            (facility) =>
+              facility.fuel === "Coal" &&
+              facility.operational &&
+              facility.ageYears >= 30,
+          )
+          .reduce((total, facility) => total + facility.peakW, 0);
+        const allCoalW = snapshot.facilities
+          .filter(
+            (facility) => facility.fuel === "Coal" && facility.operational,
+          )
+          .reduce((total, facility) => total + facility.peakW, 0);
+        const nonCoalFirmW = Math.max(0, snapshot.firmPeakW - allCoalW);
+        return {
+          title: "Successor fleet review",
+          message:
+            reliability >= 0.999 && snapshot.netIncome12m > 0 && coalShare < 0.5
+              ? "A reliable, profitable successor fleet now supplies most power beyond coal."
+              : "The successor review finds the business still exposed to coal, reliability, or profit risk.",
+          details: `${percent(coalShare)} delivered coal share · ${percent(reliability)} reliability · ${snapshot.netIncome12m >= 0 ? "positive" : "negative"} net income · ${(legacyCoalW / 1e6).toFixed(0)} MW legacy coal · ${(nonCoalFirmW / 1e6).toFixed(0)} MW non-coal firm capacity.`,
+          concept: "goal",
+          kind: "WORLD_EVENT",
+          importance: "ROUTINE",
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            coalShare,
+            reliability,
+            netIncome: snapshot.netIncome12m,
+            legacyCoalW,
+            nonCoalFirmW,
+          },
+          turningPointPriority: 95,
+        };
+      },
+    },
+  ],
+};
+
+export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
+  CARBON_FEE_ARC,
+  RENEWABLES_ARC,
+  END_OF_ERA_ARC,
+  SHALE_BOOM_ARC,
+  HURRICANE_ARC,
+  PARADISE_ARC,
+];
+
+/** Content-level difficulty scaling is centralized and mechanically checkable. */
+export function validateStoryDifficultyMonotonicity(): string[] {
+  const problems: string[] = [];
+  const ascending = (name: string, values: number[]) => {
+    if (values.some((value, index) => index > 0 && value < values[index - 1])) {
+      problems.push(`${name} must not decrease from Intern to CEO`);
+    }
+  };
+  const descending = (name: string, values: number[]) => {
+    if (values.some((value, index) => index > 0 && value > values[index - 1])) {
+      problems.push(`${name} must not increase from Intern to CEO`);
+    }
+  };
+  ascending(
+    "Carbon fee",
+    DIFFICULTY_ORDER.map((difficulty) => CARBON_FEE_BALANCE[difficulty]),
+  );
+  ascending(
+    "Shale boom price",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier,
+    ),
+  );
+  ascending(
+    "Shale freeze surcharge",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => SHALE_BOOM_BALANCE[difficulty].freezeSurcharge,
+    ),
+  );
+  descending(
+    "Shale freeze output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => SHALE_BOOM_BALANCE[difficulty].freezeGasOutput,
+    ),
+  );
+  ascending(
+    "Paradise visitor demand",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => PARADISE_BALANCE[difficulty].visitorDemand,
+    ),
+  );
+  ascending(
+    "Paradise oil shock",
+    DIFFICULTY_ORDER.map((difficulty) => PARADISE_BALANCE[difficulty].oilShock),
+  );
+  ascending(
+    "Renewables solar cost",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => RENEWABLES_BALANCE[difficulty].solarBuildCost,
+    ),
+  );
+  ascending(
+    "Renewables wind cost",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => RENEWABLES_BALANCE[difficulty].windBuildCost,
+    ),
+  );
+  ascending(
+    "Renewables demand",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => RENEWABLES_BALANCE[difficulty].demandLoad,
+    ),
+  );
+  ascending(
+    "Hurricane affected capacity",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => HURRICANE_BALANCE[difficulty].targetCapacityShare,
+    ),
+  );
+  descending(
+    "Hurricane output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => HURRICANE_BALANCE[difficulty].outputMultiplier,
+    ),
+  );
+  ascending(
+    "Hurricane duration",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => HURRICANE_BALANCE[difficulty].durationMonths,
+    ),
+  );
+  ascending(
+    "Hurricane oil",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => HURRICANE_BALANCE[difficulty].oilMultiplier,
+    ),
+  );
+  descending(
+    "Old coal output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => END_OF_ERA_BALANCE[difficulty].oldCoalOutput,
+    ),
+  );
+  ascending(
+    "Coal O&M",
+    DIFFICULTY_ORDER.map((difficulty) => END_OF_ERA_BALANCE[difficulty].coalOM),
+  );
+  return problems;
+}
 
 /** Stable 32-bit address for a string, independent of definition and facility array order. */
 export function storyHash(value: string): number {
@@ -325,10 +1225,10 @@ export function resolveStoryPhase(
   context: StoryContextType,
 ): ActiveWorldEventType & StoryPhaseDescriptionType {
   const key = storyPhaseKey(arc.scenarioId, arc.id, phase.id);
-  const scheduledMonth = resolveStoryScheduleMonth(
-    phase.schedule,
-    context.seed,
-    key,
+  const { scheduledMonth, durationMonths } = resolvePhaseTiming(
+    arc,
+    phase,
+    context,
   );
   const random = (attribute: string) =>
     randomAt(
@@ -342,7 +1242,7 @@ export function resolveStoryPhase(
     key,
     definitionId: `${arc.id}:${phase.id}`,
     startsMinute,
-    endsMinute: startsMinute + (phase.durationMonths || 0) * MINUTES_PER_MONTH,
+    endsMinute: startsMinute + durationMonths * MINUTES_PER_MONTH,
     ...description,
     attributes: {
       scheduledMonth,
@@ -350,6 +1250,29 @@ export function resolveStoryPhase(
     },
     effects: description.effects || {},
   };
+}
+
+function resolvePhaseTiming(
+  arc: StoryArcDefinitionType,
+  phase: StoryPhaseDefinitionType,
+  context: StoryContextType,
+) {
+  const key = storyPhaseKey(arc.scenarioId, arc.id, phase.id);
+  const scheduleKey = phase.scheduleAddress
+    ? storyPhaseKey(arc.scenarioId, arc.id, phase.scheduleAddress)
+    : key;
+  const offset =
+    typeof phase.scheduleOffsetMonths === "function"
+      ? phase.scheduleOffsetMonths(context)
+      : phase.scheduleOffsetMonths || 0;
+  const scheduledMonth =
+    resolveStoryScheduleMonth(phase.schedule, context.seed, scheduleKey) +
+    offset;
+  const durationMonths =
+    typeof phase.durationMonths === "function"
+      ? phase.durationMonths(context)
+      : phase.durationMonths || 0;
+  return { scheduledMonth, durationMonths };
 }
 
 /**
@@ -375,15 +1298,24 @@ export function resolveStoryAtDate(
       ),
     )
     .forEach(({ arc, phase }) => {
+      const { scheduledMonth, durationMonths } = resolvePhaseTiming(
+        arc,
+        phase,
+        context,
+      );
+      const occursNow = context.date.monthsElapsed === scheduledMonth;
+      const activeNow =
+        durationMonths > 0 &&
+        context.date.monthsElapsed >= scheduledMonth &&
+        context.date.monthsElapsed < scheduledMonth + durationMonths;
+      if (!occursNow && !activeNow) {
+        return;
+      }
       const resolved = resolveStoryPhase(arc, phase, context);
-      const scheduledMonth = resolved.attributes.scheduledMonth as number;
-      if (context.date.monthsElapsed === scheduledMonth) {
+      if (occursNow) {
         occurrences.push(resolved);
       }
-      if (
-        context.date.minute >= resolved.startsMinute &&
-        context.date.minute < resolved.endsMinute
-      ) {
+      if (activeNow) {
         active.push(resolved);
       }
     });

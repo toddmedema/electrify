@@ -1,4 +1,6 @@
+import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_DAY } from "../Constants";
+import { GENERATORS } from "../data/Facilities";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { generateNewTimeline, tickState } from "./Game";
 import { createGame } from "../testing/Simulator";
@@ -46,6 +48,64 @@ describe("story effects in dispatch", () => {
         ...restored.map((tick) => tick.supplyByFuel["Natural Gas"] || 0),
       ),
     ).toBeGreaterThan(gas.peakW * 0.7);
+  });
+
+  it("applies the renewable discount once to new quotes without repricing commitments", () => {
+    const game = createGame({ scenarioId: 101, difficulty: "Manager" });
+    game.date = getDateFromMinute(84 * MINUTES_PER_MONTH, game.startingYear);
+    const quote = (state: typeof game) =>
+      GENERATORS(state, 100_000_000, [20], [500]).find(
+        (generator) => generator.fuel === "Sun",
+      )!;
+    const baseline = quote({ ...game, storyEffectsDisabled: true });
+    const discounted = quote(game);
+    expect(discounted.buildCost / baseline.buildCost).toBeCloseTo(0.75, 10);
+
+    const committed = cloneDeep(discounted);
+    game.date = getDateFromMinute(100 * MINUTES_PER_MONTH, game.startingYear);
+    expect(committed.buildCost).toBe(discounted.buildCost);
+  });
+
+  it("applies the full coal O&M multiplier to live and forecast costs", () => {
+    const game = createGame({ scenarioId: 102, difficulty: "Manager" });
+    game.date = getDateFromMinute(180 * MINUTES_PER_MONTH, game.startingYear);
+    game.facilities = [game.facilities[0]];
+    const baselineGame = cloneDeep(game);
+    baselineGame.storyEffectsDisabled = true;
+    const story = generateNewTimeline(
+      game,
+      1_000_000_000,
+      2_000_000,
+      TICKS_PER_DAY,
+    );
+    const baseline = generateNewTimeline(
+      baselineGame,
+      1_000_000_000,
+      2_000_000,
+      TICKS_PER_DAY,
+    );
+    const storyOM = story.reduce((total, tick) => total + tick.expensesOM, 0);
+    const baselineOM = baseline.reduce(
+      (total, tick) => total + tick.expensesOM,
+      0,
+    );
+    expect(storyOM / baselineOM).toBeCloseTo(1.2, 6);
+  });
+
+  it("keeps Paradise customer count unchanged while visitor usage rises", () => {
+    const game = createGame({ scenarioId: 105, difficulty: "Manager" });
+    game.date = getDateFromMinute(28 * MINUTES_PER_MONTH, game.startingYear);
+    const baselineGame = cloneDeep(game);
+    baselineGame.storyEffectsDisabled = true;
+    const story = generateNewTimeline(game, 1_000_000_000, 1_000_000, 1)[0];
+    const baseline = generateNewTimeline(
+      baselineGame,
+      1_000_000_000,
+      1_000_000,
+      1,
+    )[0];
+    expect(story.customers).toBe(baseline.customers);
+    expect(story.demandW / baseline.demandW).toBeCloseTo(1.06, 6);
   });
 
   it("pauses exactly once at freeze onset and logs the authored price change once", () => {

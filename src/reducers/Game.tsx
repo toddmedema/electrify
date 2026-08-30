@@ -38,7 +38,7 @@ import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildConsequenceMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
-import { buildStorySnapshot } from "../helpers/Story";
+import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
 import {
   getAirborneWindOutputFactor,
   getAirborneWindReferenceKph,
@@ -129,6 +129,7 @@ import {
   FuelProductionType,
   ReplayActionType,
   VictoryType,
+  WorldEventEffectsType,
 } from "../Types";
 
 interface BuildFacilityAction {
@@ -302,6 +303,7 @@ function generatorCostPerMWh(
   generator: GeneratorOperatingType,
   prices: FuelPricesType,
   feePerKgCO2e: number,
+  operatingCostMultiplier = 1,
 ): number | undefined {
   if (
     generator.yearsToBuildLeft > 0 ||
@@ -323,7 +325,10 @@ function generatorCostPerMWh(
     (FUELS[generator.fuel]?.kgCO2ePerBtu || 0) *
     feePerKgCO2e;
   return (
-    estimatedAnnualOperatingCost(generator) / annualMWh + fuelCost + carbonCost
+    (estimatedAnnualOperatingCost(generator) * operatingCostMultiplier) /
+      annualMWh +
+    fuelCost +
+    carbonCost
   );
 }
 
@@ -332,6 +337,10 @@ function currentFuelCosts(
 ): Partial<Record<FuelNameType, number>> {
   const costs: Partial<Record<FuelNameType, number>> = {};
   const prices = getEffectiveFuelPrices(state.date, state);
+  const operatingCostMultipliers = storyEffectsAt(
+    state.date,
+    state,
+  ).operatingCostMultipliersByFuel;
   state.facilities.forEach((facility: FacilityOperatingType) => {
     const generator = facility as Partial<GeneratorOperatingType>;
     if (!generator.fuel) {
@@ -341,6 +350,7 @@ function currentFuelCosts(
       facility as GeneratorOperatingType,
       prices,
       effectiveCarbonFee(state.date, state),
+      operatingCostMultipliers?.[generator.fuel] || 1,
     );
     if (cost === undefined) {
       return;
@@ -418,6 +428,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
     (event) => event.endsMinute > state.date.minute,
   );
   if (
+    state.storyEffectsDisabled ||
     !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
   ) {
     return storyPriceFuels;
@@ -433,6 +444,13 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       state.facilities,
       state.date.minute,
     ),
+    periodSnapshots: Object.fromEntries(
+      [2, 3, 4, 5, 6].map((months) => [
+        months,
+        buildStoryPeriodSnapshot(state.monthlyHistory, months),
+      ]),
+    ),
+    occurrences: state.worldEvents.occurrences,
   });
   resolved.occurrences.forEach((occurrence) => {
     if (state.worldEvents.checkedKeys.includes(occurrence.key)) {
@@ -440,6 +458,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
     }
     state.worldEvents.checkedKeys.push(occurrence.key);
     state.worldEvents.active.push(occurrence);
+    state.worldEvents.occurrences.push(occurrence);
     Object.keys(occurrence.effects.fuelPriceMultipliers || {}).forEach((fuel) =>
       storyPriceFuels.add(fuel as FuelNameType),
     );
@@ -450,6 +469,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       details: occurrence.details,
       concept: occurrence.concept,
       storyPhaseKey: occurrence.key,
+      turningPointPriority: occurrence.turningPointPriority,
       reportedKey: occurrence.key,
       pause: occurrence.importance === "CRITICAL",
     });
@@ -460,6 +480,12 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       state.worldEvents.checkedKeys.length - MAX_WORLD_EVENT_CHECKS,
     );
   }
+  if (state.worldEvents.occurrences.length > MAX_WORLD_EVENT_CHECKS) {
+    state.worldEvents.occurrences.splice(
+      0,
+      state.worldEvents.occurrences.length - MAX_WORLD_EVENT_CHECKS,
+    );
+  }
   return storyPriceFuels;
 }
 
@@ -467,15 +493,102 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
  * Scheduled effects for any simulated date. Persisted live occurrences win over a newly resolved
  * copy, which is what preserves facility IDs and other onset-time attributes after they are drawn.
  */
+const storyEffectsCache = new WeakMap<
+  GameType,
+  {
+    month: number;
+    scenarioId: number;
+    difficulty: GameType["difficulty"];
+    disabled: boolean;
+    activeKey: string;
+    effects: WorldEventEffectsType;
+  }
+>();
+const scheduledStoryEffectsCache = new Map<string, WorldEventEffectsType>();
+
+function scheduledStoryCacheKey(date: DateType, state: GameType): string {
+  const fleetSensitive =
+    state.scenarioId === 104 ||
+    (state.scenarioId === 102 &&
+      date.monthsElapsed >= 72 &&
+      date.monthsElapsed < 96);
+  const fleetKey = fleetSensitive
+    ? state.facilities
+        .map((facility) =>
+          [
+            facility.id,
+            facility.fuel,
+            facility.peakW,
+            facility.yearsToBuildLeft <= 0,
+            facility.paused,
+            facility.minuteOperational,
+          ].join(":"),
+        )
+        .sort()
+        .join(";")
+    : "";
+  return [
+    state.scenarioId,
+    state.difficulty,
+    state.seed,
+    date.monthsElapsed,
+    fleetKey,
+  ].join("|");
+}
+
 function storyEffectsAt(date: DateType, state: GameType) {
+  const activeKey = state.worldEvents.active
+    .map((event) => event.key)
+    .join("|");
+  const cached = storyEffectsCache.get(state);
+  if (
+    cached?.month === date.monthsElapsed &&
+    cached.scenarioId === state.scenarioId &&
+    cached.difficulty === state.difficulty &&
+    cached.disabled === !!state.storyEffectsDisabled &&
+    cached.activeKey === activeKey
+  ) {
+    return cached.effects;
+  }
   const persisted = state.worldEvents.active.filter(
     (event) =>
       date.minute >= event.startsMinute && date.minute < event.endsMinute,
   );
   if (
+    state.storyEffectsDisabled ||
     !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
   ) {
-    return combineStoryEffects(persisted);
+    const effects = combineStoryEffects(persisted);
+    storyEffectsCache.set(state, {
+      month: date.monthsElapsed,
+      scenarioId: state.scenarioId,
+      difficulty: state.difficulty,
+      disabled: !!state.storyEffectsDisabled,
+      activeKey,
+      effects,
+    });
+    return effects;
+  }
+  // Forecast passes create shallow state copies, so the WeakMap above cannot share their work.
+  // With no persisted live onset to distinguish, the scheduled result is a pure month lookup;
+  // only the two facility-selecting arcs add a stable fleet signature.
+  const scheduledCacheKey =
+    state.worldEvents.active.length === 0
+      ? scheduledStoryCacheKey(date, state)
+      : undefined;
+  const scheduledCached = scheduledCacheKey
+    ? scheduledStoryEffectsCache.get(scheduledCacheKey)
+    : undefined;
+  if (scheduledCached) {
+    storyEffectsCache.set(state, {
+      month: date.monthsElapsed,
+      scenarioId: state.scenarioId,
+      difficulty: state.difficulty,
+      disabled: false,
+      activeKey,
+      effects: scheduledCached,
+    });
+    return scheduledCached;
   }
   const persistedKeys = new Set(persisted.map((event) => event.key));
   const scheduled = resolveStoryAtDate({
@@ -487,10 +600,26 @@ function storyEffectsAt(date: DateType, state: GameType) {
     snapshot: buildStorySnapshot(
       state.monthlyHistory,
       state.facilities,
-      state.date.minute,
+      date.minute,
     ),
+    occurrences: state.worldEvents.occurrences,
   }).active.filter((event) => !persistedKeys.has(event.key));
-  return combineStoryEffects([...persisted, ...scheduled]);
+  const effects = combineStoryEffects([...persisted, ...scheduled]);
+  if (scheduledCacheKey) {
+    if (scheduledStoryEffectsCache.size > 10000) {
+      scheduledStoryEffectsCache.clear();
+    }
+    scheduledStoryEffectsCache.set(scheduledCacheKey, effects);
+  }
+  storyEffectsCache.set(state, {
+    month: date.monthsElapsed,
+    scenarioId: state.scenarioId,
+    difficulty: state.difficulty,
+    disabled: !!state.storyEffectsDisabled,
+    activeKey,
+    effects,
+  });
+  return effects;
 }
 
 function effectiveCarbonFee(date: DateType, state: GameType): number {
@@ -539,7 +668,7 @@ const initialGame: GameType = {
   eventLog: [] as GameEventType[],
   reportedEventKeys: [],
   eventLogReadThroughId: 0,
-  worldEvents: { active: [], checkedKeys: [] },
+  worldEvents: { active: [], occurrences: [], checkedKeys: [] },
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -612,7 +741,7 @@ export const gameSlice = createSlice({
       state.eventLog = [] as GameEventType[];
       state.reportedEventKeys = [];
       state.eventLogReadThroughId = 0;
-      state.worldEvents = { active: [], checkedKeys: [] };
+      state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
@@ -1593,8 +1722,15 @@ function minimumStableOperatingCost(
 ): number {
   const minimumW = generator.peakW * (generator.minimumStableOutput || 0);
   const generatedWh = (minimumW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+  const tickDate = getDateFromMinute(tick.minute, state.startingYear);
+  const operatingCostMultiplier =
+    storyEffectsAt(tickDate, state).operatingCostMultipliersByFuel?.[
+      generator.fuel
+    ] || 1;
   const variableOM =
-    (generatedWh / 1000000) * (generator.variableOperatingCostPerMWh || 0);
+    (generatedWh / 1000000) *
+    (generator.variableOperatingCostPerMWh || 0) *
+    operatingCostMultiplier;
   const fuel = FUELS[generator.fuel];
   if (!fuel) {
     return variableOM;
@@ -1604,12 +1740,7 @@ function minimumStableOperatingCost(
     GAME_TO_REAL_YEARS;
   const fuelCost = (fuelBtu * (tick[generator.fuel] ?? 0)) / 1000000;
   const carbonCost =
-    fuelBtu *
-    fuel.kgCO2ePerBtu *
-    effectiveCarbonFee(
-      getDateFromMinute(tick.minute, state.startingYear),
-      state,
-    );
+    fuelBtu * fuel.kgCO2ePerBtu * effectiveCarbonFee(tickDate, state);
   return variableOM + fuelCost + carbonCost;
 }
 
@@ -1835,7 +1966,11 @@ function updateSupplyFacilitiesFinances(
                     forecast: state.timeline,
                     fromIndex: forecastIndexAt(state, now.minute),
                     startCost:
-                      (generator.costPerStart || 0) * GAME_TO_REAL_YEARS,
+                      (generator.costPerStart || 0) *
+                      GAME_TO_REAL_YEARS *
+                      (tickStoryEffects.operatingCostMultipliersByFuel?.[
+                        generator.fuel
+                      ] || 1),
                     minimumOperatingCost: (futureTick) =>
                       minimumStableOperatingCost(state, generator, futureTick),
                   });
@@ -1969,6 +2104,11 @@ function updateSupplyFacilitiesFinances(
         // represents the same daily start repeated throughout that month.
         facilityOM += (g.costPerStart || 0) * GAME_TO_REAL_YEARS;
       }
+      const operatingFuel = (g as Partial<GeneratorOperatingType>).fuel;
+      facilityOM *=
+        (operatingFuel &&
+          tickStoryEffects.operatingCostMultipliersByFuel?.[operatingFuel]) ||
+        1;
       facilityExpenses += facilityOM;
       expensesOM += facilityOM;
       if (g.fuel && FUELS[g.fuel]) {
