@@ -781,6 +781,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
           <VictoryConditions
             ownership={scenario.ownership}
             dollarsPerkWh={scenario.dollarsPerkWh}
+            minimumCustomerRetention={scenario.minimumCustomerRetention}
           />
         </DialogContent>
         <DialogActions>

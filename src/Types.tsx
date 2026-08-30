@@ -608,6 +608,8 @@ export interface ScenarioType {
   // Absolute loads owned by this scenario. A Data centers schedule replaces the generic regional
   // data-center curve instead of stacking on top of it.
   loadAdditions?: ScenarioLoadAdditionType[];
+  /** Optional mission gate evaluated at the authored end date. */
+  minimumCustomerRetention?: number;
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;

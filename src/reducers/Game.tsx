@@ -162,7 +162,6 @@ let speedBeforeManual: SpeedType | undefined;
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
-let previousMonth = "";
 // Edge-detects the blackout toast, so a sustained blackout announces itself once rather than
 // four times an hour of game time
 let previouslyInBlackout = false;
@@ -734,9 +733,6 @@ export const gameSlice = createSlice({
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
       const a = action.payload;
-      // Without this a second game in the same session inherits the first one's month and skips
-      // its first rollover, which also makes an otherwise identical seed produce a different run
-      previousMonth = "";
       previouslyInBlackout = false;
       blackoutUnservedWh = 0;
       previousFuelPrices = undefined;
@@ -906,10 +902,7 @@ export const gameSlice = createSlice({
     });
     builder.addCase(resume, (_state, action) => {
       const restored = cloneDeep(action.payload);
-      // The tick loop's module-level locals have to line up with the state being restored.
-      // Unlike initGame, this one keeps the month: clearing it would make the first tick record a
-      // second history entry for a month that's already in the log.
-      previousMonth = restored.date.month;
+      // The tick loop's remaining module-level locals have to line up with restored state.
       const now = getTimeFromTimeline(restored.date.minute, restored.timeline);
       previouslyInBlackout = now ? now.supplyW < now.demandW : false;
       blackoutStartMinute = restored.date.minute;
@@ -1303,9 +1296,11 @@ export function tickState(state: GameType) {
       }, 0);
     }
 
-    if (previousMonth !== state.date.month) {
-      previousMonth = state.date.month;
-      const history = state.monthlyHistory;
+    const history = state.monthlyHistory;
+    // One row per completed month is both the rollover signal and the persisted checkpoint. It
+    // avoids module-level calendar state leaking between concurrent simulations or a second game,
+    // and unlike an empty sentinel it cannot count the opening forecast as completed history.
+    if (history.length < state.date.monthsElapsed) {
       const { cash, customers } = now;
       state.customerRate = now.customerRate;
 
@@ -1438,12 +1433,31 @@ export function tickState(state: GameType) {
       };
 
       const chronicBlackouts = hasChronicBlackouts(history);
+      const objectiveFailure =
+        state.date.monthsElapsed === (scenario.durationMonths || 12 * 20)
+          ? scenarioObjectiveFailure(scenario, history)
+          : undefined;
       const failure =
         now.cash < 0
-          ? ({ outcome: "bankrupt", title: "Bankrupt!" } as const)
+          ? ({
+              outcome: "bankrupt",
+              title: "Bankrupt!",
+              reason: undefined,
+            } as const)
           : chronicBlackouts
-            ? ({ outcome: "fired", title: "Fired!" } as const)
-            : undefined;
+            ? ({
+                outcome: "fired",
+                title: "Fired!",
+                reason:
+                  "You've allowed chronic blackouts for 3 months, causing the utility board to remove you from office.",
+              } as const)
+            : objectiveFailure
+              ? ({
+                  outcome: "fired",
+                  title: "Mission objective missed",
+                  reason: objectiveFailure,
+                } as const)
+              : undefined;
 
       if (failure) {
         const summary = summarizeHistory(history);
@@ -1452,7 +1466,7 @@ export function tickState(state: GameType) {
           `${
             failure.outcome === "bankrupt"
               ? "You've run out of money."
-              : "You've allowed chronic blackouts for 3 months, causing shareholders to remove you from office."
+              : failure.reason
           }
                 You survived for ${yearsSurvived} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
@@ -1562,6 +1576,25 @@ export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
     history.length >= 3 &&
     history.slice(0, 3).every((month) => month.supplyWh < month.demandWh * 0.9)
   );
+}
+
+/** A scenario-specific end gate, kept pure so headless QA and the live game agree exactly. */
+export function scenarioObjectiveFailure(
+  scenario: ScenarioType,
+  history: MonthlyHistoryType[],
+): string | undefined {
+  if (
+    scenario.minimumCustomerRetention === undefined ||
+    scenario.startingCustomers === undefined ||
+    history.length === 0
+  ) {
+    return undefined;
+  }
+  const retained = history[0].customers / scenario.startingCustomers;
+  if (retained >= scenario.minimumCustomerRetention) {
+    return undefined;
+  }
+  return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
 }
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand

@@ -6,6 +6,7 @@ import { useUnits } from "./UnitsContext";
 export interface Props {
   ownership: ScenarioType["ownership"];
   dollarsPerkWh: number;
+  minimumCustomerRetention?: number;
 }
 
 /**
@@ -15,7 +16,7 @@ export interface Props {
  * Scoring algorithm should also be updated in helpers/Scoring.tsx and in the Manual.
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
-  const { ownership, dollarsPerkWh } = props;
+  const { ownership, dollarsPerkWh, minimumCustomerRetention } = props;
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
   if (ownership === "Investor") {
@@ -31,6 +32,12 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   }
   return (
     <div>
+      {minimumCustomerRetention !== undefined && (
+        <p>
+          Required: retain at least {Math.round(minimumCustomerRetention * 100)}
+          % of starting customers
+        </p>
+      )}
       <p>
         +/-80 pts per lifetime average $0.01/kWh charged above/below $
         {dollarsPerkWh}/kWh

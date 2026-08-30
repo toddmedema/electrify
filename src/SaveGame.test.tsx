@@ -13,6 +13,7 @@ import {
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
+import { tickState } from "./reducers/Game";
 
 jest.setTimeout(60000);
 
@@ -125,6 +126,21 @@ describe("SaveGame", () => {
         },
       }),
     ).toBeNull();
+  });
+
+  it("repairs the impossible extra opening-history row from older v4 sessions", () => {
+    const advanced = createGame(OPTIONS);
+    while (advanced.date.monthsElapsed < 1) {
+      tickState(advanced);
+    }
+    expect(advanced.monthlyHistory).toHaveLength(1);
+    const legacy = serializeSave({
+      ...advanced,
+      monthlyHistory: [...advanced.monthlyHistory, advanced.monthlyHistory[0]],
+    });
+    expect(parseSave(legacy)!.game.monthlyHistory).toEqual(
+      advanced.monthlyHistory,
+    );
   });
 
   it("rejects a current-version save without current runtime state", () => {

@@ -932,11 +932,17 @@ export default class Insights extends React.Component<Props, State> {
             projection.sampled,
             projection.domain.x[0],
           );
+          const demandTypeLabels = Object.fromEntries(
+            game.loadAdditions.map((addition) => [
+              addition.demandType,
+              addition.label,
+            ]),
+          );
           body = (
             <>
               <ChartLegend
                 items={demandTypes.map((type) => ({
-                  name: type,
+                  name: demandTypeLabels[type] || type,
                   color: demandTypeColors()[type],
                 }))}
               />
@@ -945,6 +951,7 @@ export default class Insights extends React.Component<Props, State> {
                 timeline={projection.sampled}
                 domain={{ x: projection.domain.x }}
                 displayTypes={demandTypes}
+                typeLabels={demandTypeLabels}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}

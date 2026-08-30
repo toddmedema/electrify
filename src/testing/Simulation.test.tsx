@@ -186,6 +186,7 @@ describe("researched public-utility scenarios", () => {
 
   it("calibrates Manassas against its authored weather", () => {
     const result = runSimulation({ scenarioId: 106, months: 12 });
+    expect(result.months).toHaveLength(12);
     const firstYear = result.months.slice(-12);
     const annualDemandWh = firstYear.reduce(
       (total, month) => total + month.demandWh,
@@ -216,6 +217,43 @@ describe("researched public-utility scenarios", () => {
     expect(replayed.startingDemandScale).toBe(7.5);
     expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
     expect(replayed.timeline).toEqual(state.timeline);
+  });
+
+  it("records only completed Manassas months across new game, save and replay", () => {
+    const fresh = createGame({ scenarioId: 106 });
+    expect(fresh.monthlyHistory).toEqual([]);
+    runMonths(fresh, 1);
+    expect(fresh.monthlyHistory).toHaveLength(1);
+    expect(fresh.monthlyHistory[0]).toMatchObject({ year: 2020, month: 1 });
+
+    const uninterrupted = createGame({ scenarioId: 106 });
+    runMonths(uninterrupted, 73);
+    const boundary = createGame({ scenarioId: 106 });
+    runMonths(boundary, 71); // December 2025, immediately before the authored load arrives
+    const restored = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(boundary))),
+    )!.game;
+    runMonths(restored, 2);
+    expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
+
+    const replayed = createGameFromReplay(serializeReplay(boundary)!);
+    runMonths(replayed, 73);
+    expect(replayed.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
+
+    const full = runSimulation({
+      scenarioId: 106,
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 50_000_000,
+        financed: true,
+      },
+    });
+    expect(full.months).toHaveLength(192);
+    expect(full.months[0]).toMatchObject({ year: 2020, month: 1 });
+    expect(full.months[191]).toMatchObject({ year: 2035, month: 12 });
+    expect(
+      new Set(full.months.map((month) => `${month.year}-${month.month}`)).size,
+    ).toBe(192);
   });
 
   it("defaults demand calibration to one and applies it to the whole forecast", () => {
@@ -353,15 +391,31 @@ describe("researched public-utility scenarios", () => {
     "CEO",
   ];
   it.each(difficulties)(
-    "keeps Data Center Boom survivable on %s with a responsive build strategy",
+    "completes Data Center Boom on %s with capacity planned before the arrival",
     (difficulty) => {
       const result = runSimulation({
         scenarioId: 106,
         difficulty,
-        strategy: "keepUp",
+        initialBuild: {
+          name: "Natural Gas",
+          peakW: 50_000_000,
+          financed: true,
+        },
       });
       expectNoViolations(result);
       expect(result.outcome).toBe("completed");
+    },
+  );
+
+  it.each(difficulties)(
+    "rejects passive customer attrition as a Data Center Boom win on %s",
+    (difficulty) => {
+      const result = runSimulation({ scenarioId: 106, difficulty });
+      expectNoViolations(result);
+      expect(result.outcome).toBe("fired");
+      expect(result.months[result.months.length - 1].customers).toBeLessThan(
+        manassas.startingCustomers! * manassas.minimumCustomerRetention!,
+      );
     },
   );
 
@@ -375,24 +429,28 @@ describe("researched public-utility scenarios", () => {
   );
 
   it("supports materially different Manager strategies for Data Center Boom", () => {
-    const responsiveSolar = runSimulation({
-      scenarioId: 106,
-      difficulty: "Manager",
-      strategy: "keepUp",
-    });
-    const plannedGas = runSimulation({
+    const leanPlan = runSimulation({
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {
         name: "Natural Gas",
-        peakW: 100_000_000,
+        peakW: 40_000_000,
         financed: true,
       },
     });
-    expect(responsiveSolar.outcome).toBe("completed");
-    expect(plannedGas.outcome).toBe("completed");
-    expect(responsiveSolar.builds.map((build) => build.name)).not.toEqual(
-      plannedGas.builds.map((build) => build.name),
+    const reservePlan = runSimulation({
+      scenarioId: 106,
+      difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 50_000_000,
+        financed: true,
+      },
+    });
+    expect(leanPlan.outcome).toBe("completed");
+    expect(reservePlan.outcome).toBe("completed");
+    expect(leanPlan.builds[0].buildCost).not.toBe(
+      reservePlan.builds[0].buildCost,
     );
   });
 

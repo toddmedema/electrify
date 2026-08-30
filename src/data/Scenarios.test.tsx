@@ -136,6 +136,7 @@ describe("authored starting fleets", () => {
       startingCustomers: 16_500,
       ownership: "Public",
       dollarsPerkWh: 0.1,
+      minimumCustomerRetention: 0.9,
     });
     expect(manassas.location).toMatchObject({
       id: "Manassas",
@@ -171,6 +172,8 @@ describe("authored starting fleets", () => {
       admin: "TX",
       timeZone: "America/Chicago",
     });
+    expect(austin.briefing?.objective).toMatch(/preserve.*resilience/i);
+    expect(austin.briefing?.objective).not.toMatch(/build/i);
     expect(
       austin.facilities.reduce(
         (total, facility) => total + (facility.peakW || 0),

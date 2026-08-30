@@ -1088,7 +1088,7 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Winter Storm Uri",
         message:
-          "Record cold and ERCOT-wide shortages have forced local load shed. Austin Energy reported that its own diverse generation performed well; these grid-wide availability ratios are an Austin-scale simulation, not failures assigned to specific local plants.",
+          "Record cold and ERCOT-wide shortages have forced emergency operations across Texas. Austin Energy reported that its own diverse generation performed well; these grid-wide availability ratios are an Austin-scale simulation, not failures assigned to specific local plants.",
         details:
           "For February, normal modeled output is available at 62% for natural gas, 73% for coal, 77% for uranium and 44% for wind. Texas natural-gas fuel cost is 2.8×. Solar follows weather without an extra derate.",
         concept: "blackout",
@@ -1119,9 +1119,11 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
         return {
           title: "The thaw",
           message:
-            unservedWh > 0
-              ? "The freeze has ended and normal availability and gas pricing are restored. Your grid now begins a long recovery from ERCOT-wide load shed."
-              : "The freeze has ended and normal availability and gas pricing are restored. Your preparations carried the local grid through ERCOT-wide shortages without unserved energy.",
+            event === undefined
+              ? "After the February emergency, normal availability and gas pricing will return. The outcome will depend on how the local portfolio performs through the freeze."
+              : unservedWh > 0
+                ? "The freeze has ended and normal availability and gas pricing are restored. Your grid now begins a long recovery from ERCOT-wide load shed."
+                : "The freeze has ended and normal availability and gas pricing are restored. Your preparations carried the local grid through ERCOT-wide shortages without unserved energy.",
           details:
             "Historically, ERCOT estimated 76,819 MW of unconstrained peak demand, served a 69,871 MW actual peak and shed roughly 20,000 MW at the worst point; about 200,000-220,000 Austin customers lost power.",
           concept: "weather",
