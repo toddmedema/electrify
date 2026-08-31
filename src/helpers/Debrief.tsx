@@ -136,7 +136,7 @@ function scenarioMetrics(
     );
     return [
       {
-        label: "Blackout months after load arrival",
+        label: "Months with blackouts after data centers arrived",
         value:
           afterArrival.length === 0
             ? "Not reached"
@@ -148,12 +148,12 @@ function scenarioMetrics(
         concept: "blackout",
       },
       {
-        label: "Common rate",
+        label: "Electricity rate",
         value: `${rate(scenario.dollarsPerkWh)} → ${rate(endingRate)}`,
         concept: "rate",
       },
       {
-        label: "Tightest supply margin · 2026",
+        label: "Smallest spare capacity · 2026",
         value:
           minimumMargin === undefined
             ? "Not reached"
@@ -175,19 +175,19 @@ function scenarioMetrics(
     const maximumDeficit = Math.max(0, -(february?.minimumSupplyMarginW || 0));
     return [
       {
-        label: "Uri energy unserved · Feb 2021",
+        label: "Demand not met during Winter Storm Uri · Feb 2021",
         value: february
           ? formatWattHours(Math.max(0, february.demandWh - february.supplyWh))
           : "Not reached",
         concept: "blackout",
       },
       {
-        label: "Maximum Uri supply deficit",
+        label: "Largest shortage during Winter Storm Uri",
         value: february ? formatWatts(maximumDeficit) : "Not reached",
         concept: "supply",
       },
       {
-        label: "Common rate · before → after",
+        label: "Electricity rate · before → after",
         value:
           beforeRate === undefined || afterRate === undefined
             ? "Not reached"
@@ -195,7 +195,7 @@ function scenarioMetrics(
         concept: "rate",
       },
       {
-        label: "Positive cash through Mar 2021",
+        label: "Cash stayed above $0 through Mar 2021",
         value:
           january && february && march
             ? january.cash > 0 && february.cash > 0 && march.cash > 0

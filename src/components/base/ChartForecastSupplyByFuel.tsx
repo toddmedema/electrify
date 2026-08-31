@@ -227,7 +227,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
     return (
       <div id="chartForecastSupplyByFuel">
         <UPlotChart<State>
-          ariaLabel="Chart of forecasted electricity supply by fuel type"
+          ariaLabel="Chart of predicted electricity supply by fuel type"
           formatSummaryValue={formatWatts}
           height={height}
           state={state}

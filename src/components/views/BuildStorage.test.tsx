@@ -35,7 +35,7 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   );
 
   const row = screen.getByRole("row", {
-    name: /Number of viable locations remaining.*648/,
+    name: /Suitable project sites remaining.*648/,
   });
   expect(row).toHaveTextContent("648");
   expect(row).toHaveTextContent("Each project uses one suitable site");

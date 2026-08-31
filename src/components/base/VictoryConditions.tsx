@@ -28,11 +28,11 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   if (ownership === "Investor") {
     return (
       <div>
-        <p>+40 pts per $1B of net worth at the end</p>
-        <p>+2 pts per 100k customers at the end</p>
-        <p>+1 pt per TWh of electricity supplied</p>
-        <p>-2 pts per {perEmissions} of greenhouse gas emissions</p>
-        <p>-8 pts per TWh of blackouts</p>
+        <p>Earn 40 points per $1 billion of net worth at the end.</p>
+        <p>Earn 2 points per 100,000 customers at the end.</p>
+        <p>Earn 1 point per terawatt-hour (TWh) of electricity supplied.</p>
+        <p>Lose 2 points per {perEmissions} of greenhouse gas emissions.</p>
+        <p>Lose 8 points per TWh of customer demand not served.</p>
       </div>
     );
   }
@@ -55,12 +55,16 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
         </p>
       )}
       <p>
-        +/-80 pts per lifetime average $0.01/kWh charged above/below $
-        {dollarsPerkWh}/kWh
+        Earn 80 points for each $0.01/kWh your lifetime average rate is below
+        the ${dollarsPerkWh}/kWh target.
       </p>
-      <p>+10 pts per TWh of electricity supplied</p>
-      <p>-5 pts per {perEmissions} of greenhouse gas emissions</p>
-      <p>-10 pts per TWh of blackouts</p>
+      <p>
+        Lose 80 points for each $0.01/kWh your lifetime average rate is above
+        the target.
+      </p>
+      <p>Earn 10 points per terawatt-hour (TWh) of electricity supplied.</p>
+      <p>Lose 5 points per {perEmissions} of greenhouse gas emissions.</p>
+      <p>Lose 10 points per TWh of customer demand not served.</p>
     </div>
   );
 }

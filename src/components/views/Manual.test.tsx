@@ -49,7 +49,7 @@ describe("Manual", () => {
       ["merit order", MANUAL_ENTRY.FORECASTS],
       ["dispatch order", MANUAL_ENTRY.FORECASTS],
       ["peak shortage", MANUAL_ENTRY.FORECASTS],
-      ["board of directors", MANUAL_ENTRY.BLACKOUTS],
+      ["job security", MANUAL_ENTRY.BLACKOUTS],
       ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
     ]) {
       await search(term);
@@ -96,18 +96,18 @@ describe("Manual", () => {
       "aria-expanded",
       "false",
     );
-    await search("rolling blackouts");
+    await search("available supply");
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
       "true",
     );
     // The phrase is mid-paragraph, so only the highlight wrapper matches it exactly
-    expect(screen.getByText("rolling blackouts").tagName).toBe("MARK");
+    expect(screen.getByText("available supply").tagName).toBe("MARK");
   });
 
   it("lets the player collapse an auto-expanded result", async () => {
     renderManual();
-    await search("rolling blackouts");
+    await search("available supply");
     await userEvent.click(entryHeader(MANUAL_ENTRY.BLACKOUTS));
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
@@ -168,7 +168,9 @@ describe("Manual", () => {
     const row = screen
       .getAllByRole("row")
       .find((r: HTMLElement) =>
-        (r.textContent || "").includes("per TWh of blackouts"),
+        (r.textContent || "").includes(
+          "per TWh of demand not served during blackouts",
+        ),
       );
     expect(row).toBeDefined();
     // The investor penalty, in its own cell rather than run together with the text

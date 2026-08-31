@@ -24,7 +24,7 @@ export function getBuildAvailability(
   if (!siteBuildable) {
     return {
       buildable: false,
-      secondaryText: "No viable locations remaining.",
+      secondaryText: "No suitable project sites remain at this location.",
     };
   }
   if (!sizeBuildable) {
@@ -32,9 +32,9 @@ export function getBuildAvailability(
       buildable: false,
       secondaryText: (
         <div>
-          Too large for current tech.
+          This project size is not available with technology in this year.
           <br />
-          Max size: <strong>{maxSizeLabel}</strong>
+          Maximum available size: <strong>{maxSizeLabel}</strong>
         </div>
       ),
     };
@@ -52,7 +52,7 @@ export function ViableLocationsRow(props: {
   return (
     <TableRow>
       <TableCell>
-        Number of viable locations remaining
+        Suitable project sites remaining
         <Typography variant="body2" color="textSecondary">
           Each project uses one suitable site
         </Typography>

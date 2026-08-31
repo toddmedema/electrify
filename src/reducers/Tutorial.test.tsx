@@ -267,9 +267,9 @@ describe("tutorialGateMiddleware", () => {
     expect(store.getState().ui.dialog).toEqual(
       expect.objectContaining({
         open: true,
-        title: "Capstone needs another try",
+        title: "Final challenge needs another try",
         message: "Construction finished after the forecast peak.",
-        actionLabel: "Retry capstone",
+        actionLabel: "Retry final challenge",
         secondaryLabel: "Exit tutorial",
       }),
     );

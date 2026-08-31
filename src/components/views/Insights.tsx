@@ -126,11 +126,15 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
-  { id: "demandByType", label: "Demand by Load Type", group: "Grid" },
+  {
+    id: "demandByType",
+    label: "Demand by Customer or Use Type",
+    group: "Grid",
+  },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
     id: "storage",
-    label: "Stored Power",
+    label: "Stored Energy",
     group: "Grid",
     availability: "storage",
   },
@@ -141,10 +145,14 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Financial Details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
-  { id: "emissions", label: "CO2e Emitted", group: "Environment" },
+  {
+    id: "emissions",
+    label: "Greenhouse Gas Emissions (CO2e)",
+    group: "Environment",
+  },
   {
     id: "solarCapacityFactor",
-    label: "Renewable Capacity Factors",
+    label: "Expected Renewable Output",
     group: "Environment",
   },
   { id: "weather", label: "Temperature", group: "Environment" },
@@ -183,7 +191,7 @@ export const INSIGHT_PRESETS: Record<
     layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
   },
   decarbonization: {
-    label: "Decarbonization",
+    label: "Cutting emissions",
     layers: [
       "emissions",
       "supplyByFuel",
@@ -743,13 +751,13 @@ export default class Insights extends React.Component<Props, State> {
           ]
         : RATE_MARKS;
     return (
-      <section className="insightsLevers" aria-label="Planning levers">
+      <section className="insightsLevers" aria-label="Planning controls">
         <Button
           startIcon={<TuneIcon />}
           onClick={() => this.setState({ leversOpen: !this.state.leversOpen })}
           aria-expanded={this.state.leversOpen}
         >
-          Levers
+          Rate controls
         </Button>
         <Typography variant="body2" color="textSecondary">
           Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
@@ -951,9 +959,10 @@ export default class Insights extends React.Component<Props, State> {
                     </>
                   ) : (
                     <>
-                      Blackouts forecasted: ~
-                      {formatWattHours(projection.blackoutTotalWh)} · peak
-                      shortage {formatWatts(projection.largestBlackout.peakW)}
+                      Forecast electricity shortfall: ~
+                      {formatWattHours(projection.blackoutTotalWh)} of demand
+                      not met · largest shortage{" "}
+                      {formatWatts(projection.largestBlackout.peakW)}
                     </>
                   )}
                 </Typography>

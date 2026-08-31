@@ -78,7 +78,7 @@ describe("NewGame", () => {
       screen.getByRole("img", { name: "Data Center Boom icon" }),
     ).toHaveAttribute("src", "/images/ai data center boom.svg");
     expect(
-      screen.getByRole("img", { name: "Austin Deep Freeze icon" }),
+      screen.getByRole("img", { name: "Deep Freeze icon" }),
     ).toHaveAttribute("src", "/images/texas deep freeze.svg");
   });
 

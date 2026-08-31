@@ -239,7 +239,7 @@ describe("Insights layers", () => {
       "Cash",
       "Profit",
       "Customers",
-      "CO2e Emitted",
+      "Greenhouse Gas Emissions (CO2e)",
     ];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
@@ -250,7 +250,7 @@ describe("Insights layers", () => {
   it("shows the market benchmark without repeating the rate unit", () => {
     renderInsights();
 
-    const levers = screen.getByRole("region", { name: "Planning levers" });
+    const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/Rate .*\/kWh/);
     expect(levers.textContent).not.toMatch(/market [^·]*\/kWh/);
   });
@@ -258,7 +258,7 @@ describe("Insights layers", () => {
   it("keeps the customer growth rate visible for public utilities", () => {
     renderInsights(107);
 
-    const levers = screen.getByRole("region", { name: "Planning levers" });
+    const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
     expect(levers).not.toHaveTextContent(/market/i);
   });
@@ -333,15 +333,15 @@ describe("Insights layers", () => {
     ).toHaveTextContent("Custom");
   });
 
-  it("offers renewable capacity factors as an insight layer", async () => {
+  it("offers expected renewable output as an insight layer", async () => {
     renderInsights();
     await user.click(screen.getByRole("button", { name: /Layers/ }));
     await user.click(
-      screen.getByRole("checkbox", { name: "Renewable Capacity Factors" }),
+      screen.getByRole("checkbox", { name: "Expected Renewable Output" }),
     );
 
     expect(
-      screen.getByText("Renewable Capacity Factors", { selector: "h6" }),
+      screen.getByText("Expected Renewable Output", { selector: "h6" }),
     ).toBeVisible();
     expect(
       screen.getByTestId("renewable-capacity-factor-chart"),
@@ -362,7 +362,7 @@ describe("Insights layers", () => {
     await user.click(ranges.getByText("All recorded"));
 
     expect(
-      screen.queryByRole("region", { name: "Planning levers" }),
+      screen.queryByRole("region", { name: "Planning controls" }),
     ).toBeNull();
     expect(
       screen.getByText(

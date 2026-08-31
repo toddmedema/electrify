@@ -186,7 +186,7 @@ function RunDebrief({
         {debrief.unservedWh > 0 && (
           <div>
             <ConceptIcon concept="blackout" fontSize="small" />
-            <Typography variant="caption">Energy unserved</Typography>
+            <Typography variant="caption">Customer demand not met</Typography>
             <strong>{formatWattHours(debrief.unservedWh)}</strong>
           </div>
         )}

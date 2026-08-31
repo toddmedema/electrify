@@ -164,13 +164,15 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         ) : (
           <>
             <Stat
-              label="Age / design life"
+              label="Age / expected life"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
             />
             <Stat
               // Capacity factor is the generator's word for it; a battery isn't producing
               // anything, it's being used or it isn't
-              label={isStorage ? "Utilization" : "Capacity factor"}
+              label={
+                isStorage ? "Time in use" : "Average output (capacity factor)"
+              }
               value={
                 lifetime.capacityFactor === undefined
                   ? "—"
@@ -180,7 +182,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </>
         )}
         <Stat
-          label="Cost"
+          label="Lifetime cost per MWh"
           value={
             lifetime.costPerMWh === undefined
               ? "—"
@@ -188,7 +190,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           }
         />
         <Stat
-          label="Earned"
+          label="Revenue per MWh"
           value={
             lifetime.revenuePerMWh === undefined
               ? "—"
@@ -212,13 +214,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {facility.name === "Battery" && equivalentCycles !== undefined && (
           <Stat
-            label="Equivalent cycles"
+            label="Full-charge cycles (equivalent)"
             value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
           />
         )}
         {!isStorage && equivalentOperatingHours !== undefined && (
           <Stat
-            label="Equivalent operating hours"
+            label="Full-output hours (equivalent)"
             value={Math.round(equivalentOperatingHours).toLocaleString()}
           />
         )}
@@ -230,26 +232,26 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {variableOperatingCostPerMWh !== undefined && (
           <Stat
-            label="Fixed O&M"
+            label="Fixed operations & maintenance"
             value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
           />
         )}
         {variableOperatingCostPerMWh !== undefined && (
           <Stat
-            label="Variable O&M"
+            label="Variable operations & maintenance"
             value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh generated`}
           />
         )}
         {facility.tracksStarts && (
           <Stat
-            label="Equivalent starts"
+            label="Full start cycles (equivalent)"
             value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
           />
         )}
         {facility.tracksStarts && fuel === "Natural Gas" && (
           <Stat
-            label="Service intervals"
-            value="HGP 900 · major 1,800 starts"
+            label="Gas-turbine service"
+            value="Hot-gas-path: 900 starts · major: 1,800 starts"
           />
         )}
         {facility.costPerStart !== undefined && (
@@ -260,8 +262,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {facility.tracksStarts && (
           <Stat
-            label="Start accounting"
-            value="Each simulated day represents its month"
+            label="How starts are scaled"
+            value="One displayed operating day represents a full month of starts and costs"
           />
         )}
         {isHydro && (
@@ -275,36 +277,39 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {isHydro && (
           <Stat
-            label="Last inflow"
+            label="Water added last month"
             value={formatWattHours(facility.hydroLastInflowWh || 0)}
           />
         )}
         {isHydro && (
           <Stat
-            label="Last spill"
+            label="Overflow lost last month"
             value={formatWattHours(facility.hydroLastSpillWh || 0)}
           />
         )}
         {isStorage && (
           <Stat
-            label="Round trip"
+            label="Round-trip efficiency"
             value={percent(
               (facility as StorageOperatingType).roundTripEfficiency,
             )}
           />
         )}
         {!isStorage && (
-          <Stat label="Nameplate" value={formatWatts(facility.peakW)} />
+          <Stat
+            label="Rated maximum output"
+            value={formatWatts(facility.peakW)}
+          />
         )}
         {!isStorage && outputFactor < 1 && (
           <Stat
-            label="Effective max"
-            value={`${formatWatts(facility.peakW * outputFactor)} · ${percent(outputFactor)} health`}
+            label="Current maximum output"
+            value={`${formatWatts(facility.peakW * outputFactor)} · limited to ${percent(outputFactor)}`}
           />
         )}
         {facility.loanAmountLeft > 0 && (
           <Stat
-            label="Loan left"
+            label="Loan balance"
             value={formatMoneyConcise(facility.loanAmountLeft)}
           />
         )}

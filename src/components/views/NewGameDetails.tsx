@@ -33,7 +33,7 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
 import VictoryConditions from "../base/VictoryConditions";
 import ConceptIcon, { ConceptNameType } from "../base/ConceptIcon";
-import { DIFFICULTIES } from "../../Constants";
+import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -49,14 +49,6 @@ import {
 } from "../../Types";
 
 import numbro from "numbro";
-
-const DIFFICULTY_LABELS: { [key: string]: string } = {
-  Intern: "Beginner",
-  Employee: "Easy",
-  Manager: "Medium",
-  VP: "Hard",
-  CEO: "Expert",
-};
 
 function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });

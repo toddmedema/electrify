@@ -67,7 +67,7 @@ describe("ChartForecastRenewableCapacityFactor", () => {
 
     expect(
       screen.getByRole("img", {
-        name: /renewable capacity factors.*Wind capacity factor \(%\)/,
+        name: /predicted monthly renewable output.*Wind capacity factor \(%\)/,
       }),
     ).toBeInTheDocument();
   });

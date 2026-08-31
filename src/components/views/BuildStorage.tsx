@@ -215,13 +215,13 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
                 detail:
-                  "Grid flexibility does not change until construction finishes.",
+                  "Stored energy and discharge power do not increase until construction finishes.",
               },
               {
                 concept: "storage",
-                label: "Grid flexibility",
-                value: `+${formatWattHours(storage.peakWh)} storage`,
-                detail: `${formatWatts(storage.peakW)} maximum charge or discharge`,
+                label: "Energy capacity",
+                value: `+${formatWattHours(storage.peakWh)} stored energy`,
+                detail: `${formatWatts(storage.peakW)} maximum charge or discharge rate`,
               },
               {
                 concept: "supply",

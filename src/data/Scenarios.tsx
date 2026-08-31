@@ -108,7 +108,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Blue supply must stay above demand all day. Red means a blackout."
+            text="The supply line must stay at or above the demand line. If demand rises above supply, the chart marks a blackout."
           />
         ),
       },
@@ -153,14 +153,15 @@ export const SCENARIOS = [
             text="Your turn: keep the lights on for a full day with no blackout."
           />
         ),
-        hint: "Check the reserve readout, then choose a speed. Positive reserve means available capacity exceeds demand right now.",
+        hint: "Reserve is unused capacity that could supply the grid right now. Positive reserve means available capacity is greater than demand.",
         capstone: {
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
           failure: hasBlackout,
-          successMessage: "Success!",
+          successMessage:
+            "You kept electricity supply above demand for the full day.",
           failureMessage:
-            "Demand outran available supply, so some electricity went unserved. Watch reserve before running the clock and retry from the same forecast.",
+            "Demand exceeded available supply. Check the reserve and forecast before you retry.",
         },
       },
     ],
@@ -203,7 +204,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare build cost, time, fuel and O&M (Operations & Maintenance)"
+            text="Compare construction cost and time, fuel, and operations and maintenance (O&M)—the cost of keeping a plant running."
           />
         ),
       },
@@ -214,7 +215,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "generator"]}
-            text="Buy one - cash or loan."
+            text="Choose a generator and decide whether to pay with cash or a loan."
             action={["buy"]}
           />
         ),
@@ -225,7 +226,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["construction", "time"]}
-            text="It's being built."
+            text="Construction has started. The generator cannot supply the grid until it is complete."
           />
         ),
       },
@@ -254,7 +255,7 @@ export const SCENARIOS = [
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
           successMessage:
-            "Capstone complete - you built two different types of generator.",
+            "Final challenge complete—you built two different types of generator.",
           failureMessage:
             "Build another generator with a different fuel or technology from your first purchase.",
         },
@@ -276,7 +277,7 @@ export const SCENARIOS = [
     durationMonths: 6,
     endTitle: "Mission complete!",
     endMessage:
-      "You stored spare power and used dispatch order to control the grid.",
+      "You stored extra energy and used the facility order to control the grid.",
     facilities: [
       { name: "Pumped Hydro", peakWh: 500000000, initialAgeYears: 35 },
       { fuel: "Coal", peakW: 480000000, initialAgeYears: 25 },
@@ -302,7 +303,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "storage"]}
-            text="Buy one."
+            text="Choose a storage system and decide whether to pay with cash or a loan."
             action={["buy"]}
           />
         ),
@@ -324,7 +325,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["reorder"]}
-            text="Drag to re-order - the top runs first and charges storage below it."
+            text="Drag facilities to change their dispatch order. Generators higher in the list run first; storage charges when they make more electricity than customers need."
             action={["reorder"]}
           />
         ),
@@ -346,10 +347,10 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["storage", "supply", "time"]}
-            text="Your turn: charge from spare supply, then discharge through an evening peak within two days without a blackout."
+            text="Your turn: store extra energy when demand is low, then use it during the evening peak within two days without a blackout."
           />
         ),
-        hint: "Run the clock and watch the storage bar and power readout. Stored energy should rise off-peak, then fall while storage supplies the grid at peak.",
+        hint: "Run the clock and watch how full the storage is. It should fill when demand is low, then empty while helping meet the evening peak.",
         capstone: {
           checkpoint: {
             facilities: [
@@ -366,9 +367,9 @@ export const SCENARIOS = [
             hasBlackout(s) ||
             (s.game.date.minute >= 2880 && !storageCapstoneSucceeded(s)),
           successMessage:
-            "Capstone complete - surplus charged storage, and its later discharge carried demand through the peak without unserved energy.",
+            "Final challenge complete—the storage charged with extra energy, then supplied the grid during peak demand without a blackout.",
           failureMessage:
-            "Storage did not complete a charge-and-discharge cycle before the deadline, or demand went unserved. Watch its state of charge and dispatch order before retrying.",
+            "The storage did not fill and empty before the deadline, or demand exceeded supply. Check how full it is and the facility order before retrying.",
         },
       },
     ],
@@ -401,7 +402,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["finances", "money"]}
-            text="Your money lives in Insights."
+            text="Insights shows your revenue, expenses, cash, and profit over time."
           />
         ),
         desktop: {
@@ -409,7 +410,7 @@ export const SCENARIOS = [
           content: (
             <TutorialPrompt
               concepts={["finances", "money"]}
-              text="Your money lives in the Insights pane."
+              text="The Insights pane shows your revenue, expenses, cash, and profit over time."
             />
           ),
         },
@@ -420,7 +421,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "money"]}
-            text="Chart any metric, any year."
+            text="Choose a financial measure and time period to see how it changes."
           />
         ),
       },
@@ -430,7 +431,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["finances"]}
-            text="Choose presets or Layers to decide which questions this view answers."
+            text="Choose a preset question, or use Layers to select the information you want to compare."
           />
         ),
       },
@@ -451,19 +452,19 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["finances", "rate", "money"]}
-            text="Your turn: turn the projected loss into a profitable month without causing a blackout."
+            text="Your turn: turn the forecast monthly loss into a profit without causing a blackout."
           />
         ),
-        hint: "Compare revenue with fuel and O&M expenses. The rate control changes revenue per unit sold; choose a rate that makes the next month profitable.",
+        hint: "Compare revenue with fuel and operations and maintenance expenses. The rate control changes revenue for each unit sold; choose a rate that makes the next month profitable.",
         capstone: {
           checkpoint: { dollarsPerkWh: 0.03 },
           success: financesCapstoneSucceeded,
           failure: (s: AppStateType) =>
             s.game.date.monthsElapsed >= 1 && !financesCapstoneSucceeded(s),
           successMessage:
-            "Capstone complete - revenue covered fuel and operating costs, leaving a positive monthly profit while the grid stayed reliable.",
+            "Final challenge complete—revenue covered fuel and operating costs, leaving a monthly profit while the grid stayed reliable.",
           failureMessage:
-            "Revenue did not cover fuel, O&M and financing costs for the month, or demand went unserved. Use the financial layers to set a sustainable rate before retrying.",
+            "Revenue did not cover fuel, operating, and loan costs, or demand exceeded supply. Use the financial layers to set a workable rate before retrying.",
         },
       },
     ],
@@ -515,7 +516,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["rate", "customers"]}
-            text="Lower the rate below market to win customers."
+            text="Lower the rate below the market price so more customers choose your utility."
             action={["rate"]}
           />
         ),
@@ -526,7 +527,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
-            text="The Customers layer shows growth beside the grid consequences."
+            text="The Customers layer shows how customer growth changes demand, revenue, and profit."
           />
         ),
       },
@@ -557,7 +558,7 @@ export const SCENARIOS = [
             hasBlackout(s) ||
             (s.game.date.monthsElapsed >= 6 && !pricingCapstoneSucceeded(s)),
           successMessage:
-            "Capstone complete - the lower rate grew the customer base by 5% while monthly revenue still covered costs and every unit of demand was served.",
+            "Final challenge complete—the lower rate grew the customer base by 5% while monthly revenue covered costs and supply met demand.",
           failureMessage:
             "The customer target, positive monthly profit and reliable supply did not all hold for six months. Balance the rate against both demand growth and cost before retrying.",
         },
@@ -590,7 +591,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["pause", "generator"]}
-            text="Pause your only plant - see what the future thinks."
+            text="Pause your only plant and watch how the supply forecast changes."
             action={["pause"]}
           />
         ),
@@ -601,7 +602,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "blackout"]}
-            text="Blackouts ahead - forecasts show the year to come."
+            text="A blackout is predicted. Forecasts show what may happen during the coming year."
           />
         ),
       },
@@ -613,7 +614,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["play", "blackout"]}
-            text="Tap 1× and let the forecasted blackout begin."
+            text="Tap 1× and let the predicted blackout begin."
             action={["play"]}
           />
         ),
@@ -624,7 +625,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["time", "blackout"]}
-            text="This dated event explains what changed. Fuel cost crossovers appear here too, and only interrupt you the first time each fuel crosses."
+            text="This dated event explains what changed. Events also report the first time one fuel becomes more expensive than another."
           />
         ),
         desktop: {
@@ -632,7 +633,7 @@ export const SCENARIOS = [
           content: (
             <TutorialPrompt
               concepts={["time", "blackout"]}
-              text="This pane keeps dated explanations of important changes. Fuel cost crossovers appear here too, and only interrupt you the first time each fuel crosses."
+              text="This pane keeps dated explanations of important changes. It also reports the first time one fuel becomes more expensive than another."
             />
           ),
         },
@@ -687,7 +688,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "build", "blackout"]}
-            text="Your turn: commission enough generation before the forecast summer shortage, then reach month seven without a blackout."
+            text="Your turn: finish building enough generation before the predicted summer shortage, then reach month seven without a blackout."
           />
         ),
         hint: "Inspect the supply-and-demand forecast, then choose any generator with enough capacity and a construction time shorter than the shortage deadline.",
@@ -698,9 +699,9 @@ export const SCENARIOS = [
             (s.game.date.monthsElapsed >= 7 &&
               !forecastingCapstoneSucceeded(s)),
           successMessage:
-            "Capstone complete - construction finished before the forecast peak, and the added generator prevented the projected summer shortage.",
+            "Final challenge complete—construction finished before peak demand, and the added generator prevented the predicted summer shortage.",
           failureMessage:
-            "Demand reached available capacity before enough new generation was online. Recheck the forecast gap and construction time, then commission earlier.",
+            "Demand exceeded available supply before the new generator was ready. Recheck the forecast shortage and start construction sooner.",
         },
       },
     ],
@@ -714,7 +715,7 @@ export const SCENARIOS = [
     briefing: {
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
-      objective: "Replace dirty power while keeping the lights on.",
+      objective: "Replace high-emission power while keeping the lights on.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
@@ -782,7 +783,8 @@ export const SCENARIOS = [
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
       objective: "Replace aging oil plants with cleaner options.",
-      threat: "Invest too early and overpay; wait too long and demand wins.",
+      threat:
+        "Invest too early and overpay; wait too long and demand may exceed supply.",
     },
     ownership: "Investor",
     startingYear: 2002,
@@ -804,7 +806,8 @@ export const SCENARIOS = [
     briefing: {
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
-      objective: "Build a grid that keeps essential power flowing.",
+      objective:
+        "Build a grid that keeps demand supplied during severe storms.",
       threat: "A major storm can overwhelm a small backup margin.",
     },
     ownership: "Public",
@@ -864,7 +867,8 @@ export const SCENARIOS = [
     briefing: {
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
-      objective: "Get enough reliable power ready before data centers arrive.",
+      objective:
+        "Build enough dependable generation and storage before data-center demand arrives.",
       threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
@@ -904,7 +908,7 @@ export const SCENARIOS = [
   },
   {
     id: 107, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
-    name: "Austin Deep Freeze",
+    name: "Deep Freeze",
     icon: "texas deep freeze",
     locationId: "Austin",
     location: {
@@ -957,7 +961,7 @@ export const SCENARIOS = [
   },
   {
     id: 108, // Scenario IDs are persisted and shared; append rather than renumbering.
-    name: "Heatwave + Drought in Spain",
+    name: "Heatwave + Drought",
     icon: "heatwave-drought",
     locationId: "Madrid",
     location: {
@@ -981,7 +985,7 @@ export const SCENARIOS = [
       objective:
         "Serve every customer through three months of rising demand and falling water availability.",
       threat:
-        "Hydro inflows and nuclear output will decline together as the heat intensifies.",
+        "Water flowing into hydro reservoirs and nuclear output will decline as the heat intensifies.",
     },
     ownership: "Public",
     startingYear: 2024,
@@ -1014,11 +1018,11 @@ export const SCENARIOS = [
     ],
     endTitle: "The heat finally breaks",
     endMessage:
-      "The long hot summer tested whether your portfolio could conserve energy for the days it mattered most.",
+      "The long hot summer tested whether your mix of generators and storage could save energy for the days it mattered most.",
   },
   {
     id: 109,
-    name: "Solar Eclipse in China",
+    name: "Solar Eclipse",
     icon: "solar-eclipse",
     locationId: "Beijing",
     location: {
@@ -1038,9 +1042,9 @@ export const SCENARIOS = [
       fantasy:
         "Turn a rare celestial event into a demonstration of preparation.",
       objective:
-        "Charge storage or add firm capacity before solar output plunges and recovers.",
+        "Charge storage or add generators that can run when solar output drops.",
       threat:
-        "Enough stored energy will not help if its discharge power cannot cover the rapid drop.",
+        "Storage needs enough energy to last (MWh) and enough power to discharge quickly (MW).",
     },
     ownership: "Public",
     startingYear: 2033,
@@ -1082,7 +1086,7 @@ export const SCENARIOS = [
   },
   {
     id: 110,
-    name: "Sudden Nuclear Trip in France",
+    name: "Sudden Nuclear Shutdown",
     icon: "sudden-nuclear-trip",
     locationId: "Paris",
     location: {
@@ -1096,15 +1100,15 @@ export const SCENARIOS = [
       resources: { hydro: false },
     },
     summary:
-      "Carry enough contingency capacity for an unannounced nuclear outage in France.",
+      "Keep enough backup capacity for an unexpected nuclear shutdown in France.",
     briefing: {
       tone: "legacy",
       fantasy:
         "Keep France's grid steady when its largest generator suddenly disappears.",
       objective:
-        "Build a portfolio that can absorb the loss of the main nuclear unit at any time in the risk window.",
+        "Build a mix of resources that can replace the main nuclear unit if it shuts down.",
       threat:
-        "The trip month is hidden, and the reactor will remain offline for the rest of the mission.",
+        "The shutdown date is hidden, and the reactor will remain offline for the rest of the mission.",
     },
     ownership: "Public",
     startingYear: 2024,
@@ -1120,7 +1124,7 @@ export const SCENARIOS = [
       month: 7,
       durationMonths: 18,
       minimumDemandServed: 1,
-      label: "nuclear contingency window and recovery",
+      label: "possible nuclear shutdown period and recovery",
     },
     facilities: [
       {
@@ -1136,7 +1140,7 @@ export const SCENARIOS = [
     ],
     endTitle: "Reserve proved its value",
     endMessage:
-      "The sudden trip tested the contingency capacity your normal operating plan rarely needed.",
+      "The sudden shutdown tested the backup capacity your normal plan rarely needed.",
   },
 ] as ScenarioType[];
 

@@ -121,19 +121,19 @@ it("surfaces the researched Uri outcome metrics", () => {
 
   expect(debrief.scenarioMetrics).toEqual([
     expect.objectContaining({
-      label: "Uri energy unserved · Feb 2021",
+      label: "Demand not met during Winter Storm Uri · Feb 2021",
       value: "100MWh",
     }),
     expect.objectContaining({
-      label: "Maximum Uri supply deficit",
+      label: "Largest shortage during Winter Storm Uri",
       value: "100MW",
     }),
     expect.objectContaining({
-      label: "Common rate · before → after",
+      label: "Electricity rate · before → after",
       value: "$0.09/kWh → $0.1/kWh",
     }),
     expect.objectContaining({
-      label: "Positive cash through Mar 2021",
+      label: "Cash stayed above $0 through Mar 2021",
       value: "Yes",
     }),
   ]);

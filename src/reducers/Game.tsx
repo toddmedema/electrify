@@ -299,7 +299,7 @@ function logFuelPriceMoves(
     logGameEvent(
       state,
       "FUEL_PRICE",
-      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MBTU`,
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MMBtu`,
     );
   });
 }
@@ -1279,7 +1279,7 @@ export function tickState(state: GameType) {
         logGameEvent(
           state,
           "BLACKOUT_OVER",
-          `Blackout over after ${blackoutLength(state.date.minute - blackoutStartMinute)} - ${formatWattHours(blackoutUnservedWh)} unserved`,
+          `Blackout ended after ${blackoutLength(state.date.minute - blackoutStartMinute)}. The grid could not supply ${formatWattHours(blackoutUnservedWh)} of electricity demand.`,
         );
       }
       const message = inBlackout
@@ -1452,7 +1452,7 @@ export function tickState(state: GameType) {
                 outcome: "fired",
                 title: "Fired!",
                 reason:
-                  "You've allowed chronic blackouts for 3 months, causing the utility board to remove you from office.",
+                  "Blackouts continued for 3 months, so the utility board ended your term.",
               } as const)
             : objectiveFailure
               ? ({
@@ -1473,7 +1473,7 @@ export function tickState(state: GameType) {
           }
                 You survived for ${yearsSurvived} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`;
+                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
 
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.

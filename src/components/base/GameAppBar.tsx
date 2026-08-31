@@ -269,7 +269,7 @@ export function GameAppBar(props: Props) {
   const reserveW = Math.max(0, reserveCapacityW(game, now));
   const gridHealth = inBlackout
     ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
-    : `Grid OK · ${formatWatts(reserveW)} reserve`;
+    : `Grid stable · ${formatWatts(reserveW)} spare capacity`;
 
   return (
     <div id="appbar">
@@ -299,7 +299,12 @@ export function GameAppBar(props: Props) {
         aria-label={`Current grid status: ${gridHealth}`}
       >
         <strong>{gridHealth}</strong>
-        {inBlackout && <span>Resume or build generation.</span>}
+        {inBlackout && (
+          <span>
+            Resume available resources, discharge storage, or plan more
+            capacity.
+          </span>
+        )}
       </div>
       <span className="srOnly" aria-live="polite">
         {inBlackout

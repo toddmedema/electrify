@@ -25,7 +25,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
     />,
   );
 
-  expect(screen.getByText("Est O&M")).toBeInTheDocument();
+  expect(screen.getByText("Est. operations & maintenance")).toBeInTheDocument();
   expect(screen.getByText("$13.4M/yr")).toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
   expect(screen.getByText(/typical output/)).toBeInTheDocument();
@@ -35,7 +35,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Base O&M.*45% expected output.*\$4\.93M/,
+      name: /Base operations & maintenance.*45% expected output.*\$4\.93M/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -45,7 +45,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated O&M.*Base O&M plus one start\/day.*\$13\.4M\/yr/,
+      name: /Estimated operations & maintenance.*Base operating cost plus one start per simulated day.*\$13\.4M\/yr/,
     }),
   ).toBeInTheDocument();
 
@@ -56,7 +56,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
   expect(impact).toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent("Online in");
-  expect(impact).toHaveTextContent("Typical supply");
+  expect(impact).toHaveTextContent("Estimated average output");
 });
 
 it("shows Coal's physical and representative-day start charges", () => {
@@ -110,23 +110,23 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     />,
   );
 
-  expect(screen.getByText("Est O&M")).toBeInTheDocument();
+  expect(screen.getByText("Est. operations & maintenance")).toBeInTheDocument();
   expect(screen.getByText("$7.59M/yr")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Show Oil details" }));
 
   expect(
     screen.getByRole("row", {
-      name: /Fixed O&M.*Standing annual expense.*\$3\.09M\/yr/,
+      name: /Fixed operations & maintenance.*Standing annual expense.*\$3\.09M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable O&M.*Per generated MWh.*\$25\.71\/MWh generated/,
+      name: /Variable operations & maintenance.*Per generated MWh.*\$25\.71\/MWh generated/,
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Estimated O&M.*20% expected output.*\$7\.59M\/yr/,
+      name: /Estimated operations & maintenance.*20% expected output.*\$7\.59M\/yr/,
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();

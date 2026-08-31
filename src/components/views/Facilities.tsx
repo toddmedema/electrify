@@ -419,7 +419,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       className="storyDerateBadge"
                       color="warning"
                       size="small"
-                      label={`Derated to ${Math.round(storyOutputMultiplier * 100)}%`}
+                      label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
                     />
                   )}
                 </>

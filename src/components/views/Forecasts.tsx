@@ -281,7 +281,9 @@ export default class Forecasts extends React.Component<Props, State> {
             <Table size="small">
               <TableBody>
                 <TableRow className="bold">
-                  <TableCell colSpan={2}>Blackouts forecasted</TableCell>
+                  <TableCell colSpan={2}>
+                    Predicted electricity shortfalls
+                  </TableCell>
                   <TableCell align="right">
                     ~{formatWattHours(blackoutTotalWh)}
                   </TableCell>

@@ -39,7 +39,7 @@ it("makes every demand category readable without the canvas", () => {
   );
 
   const chart = screen.getByRole("img", {
-    name: /electricity demand by load type/i,
+    name: /electricity demand by customer or use type/i,
   });
   expect(chart).toHaveAccessibleName(/Residential:/);
   expect(chart).toHaveAccessibleName(/Commercial:/);

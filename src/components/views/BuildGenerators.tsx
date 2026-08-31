@@ -210,7 +210,7 @@ export function GeneratorBuildItem(
             <Chip
               size="small"
               color={gapCoverage >= 100 ? "success" : "default"}
-              label={`~${gapCoverage}% of peak forecast gap`}
+              label={`~${gapCoverage}% of largest forecast shortage`}
             />
           )}
           {(props.advantages || []).map((advantage) => (
@@ -236,17 +236,19 @@ export function GeneratorBuildItem(
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
         <GeneratorMetric
-          label="Est O&M"
+          label="Est. operations & maintenance"
           value={`${formatMoneyConcise(estimatedAnnualOperatingCost(generator))}/yr`}
         />
         <GeneratorMetric
-          label="Energy cost"
+          label="Lifetime cost / MWh"
           value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
         />
         <GeneratorMetric
           label="Emissions"
           value={
-            kgCO2ePerMWh > 0 ? `${formatMass(kgCO2ePerMWh, units)}/MWh` : "None"
+            kgCO2ePerMWh > 0
+              ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
+              : "No direct emissions modeled"
           }
         />
       </Box>
@@ -272,11 +274,12 @@ export function GeneratorBuildItem(
               {props.secondaryMetric !== "lcWh" && (
                 <TableRow>
                   <TableCell>
-                    Total energy cost
+                    Estimated lifetime cost per MWh
                     <ManualLink entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY} />
                     <Typography variant="body2" color="textSecondary">
-                      Across life, based on{" "}
-                      {Math.round(generator.capacityFactor * 100)}% uptime
+                      Across its lifetime, assuming a{" "}
+                      {Math.round(generator.capacityFactor * 100)}% capacity
+                      factor
                       {generator.costPerStart !== undefined
                         ? " and one start/day"
                         : ""}
@@ -289,7 +292,7 @@ export function GeneratorBuildItem(
               )}
               <TableRow>
                 <TableCell>
-                  Average output
+                  Estimated average output
                   <ManualLink
                     entry={MANUAL_ENTRY.CAPACITY_FACTOR}
                     label="capacity factor"
@@ -321,7 +324,9 @@ export function GeneratorBuildItem(
               )}
               <TableRow>
                 <TableCell>
-                  {hasVariableOM ? "Fixed O&M" : "Base O&M"}
+                  {hasVariableOM
+                    ? "Fixed operations & maintenance"
+                    : "Base operations & maintenance"}
                   <Typography variant="body2" color="textSecondary">
                     {hasVariableOM
                       ? "Standing annual expense"
@@ -335,7 +340,7 @@ export function GeneratorBuildItem(
               {hasVariableOM && (
                 <TableRow>
                   <TableCell>
-                    Variable O&M
+                    Variable operations & maintenance
                     <Typography variant="body2" color="textSecondary">
                       Per generated MWh
                     </Typography>
@@ -378,11 +383,11 @@ export function GeneratorBuildItem(
               {(hasVariableOM || generator.costPerStart !== undefined) && (
                 <TableRow>
                   <TableCell>
-                    Estimated O&M
+                    Estimated operations & maintenance
                     <Typography variant="body2" color="textSecondary">
                       {hasVariableOM
                         ? `Fixed plus ${formatMoneyConcise(estimatedVariableOM)}/yr variable at ${Math.round(generator.capacityFactor * 100)}% expected output`
-                        : "Base O&M plus one start/day"}
+                        : "Base operating cost plus one start per simulated day"}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -447,19 +452,19 @@ export function GeneratorBuildItem(
               )}
               <TableRow>
                 <TableCell>
-                  Air pollution
+                  Direct greenhouse gas emissions
                   <ManualLink
                     entry={MANUAL_ENTRY.EMISSIONS}
                     label="CO2e emissions"
                   />
                   <Typography variant="body2" color="textSecondary">
-                    Greenhouse gas released per unit generated
+                    CO2e released at the plant for each MWh generated
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {kgCO2ePerMWh > 0
                     ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                    : "None"}
+                    : "No direct emissions modeled"}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -496,12 +501,12 @@ export function GeneratorBuildItem(
               },
               {
                 concept: "supply",
-                label: "Typical supply",
+                label: "Estimated average output",
                 value: `+${formatWatts(typicalOutputW)}`,
                 detail:
                   gapCoverage === undefined
-                    ? `${formatWatts(generator.peakW)} nameplate capacity`
-                    : `About ${gapCoverage}% of the peak forecast gap`,
+                    ? `${formatWatts(generator.peakW)} maximum rated output; average output is not guaranteed during a shortage`
+                    : `About ${gapCoverage}% of the largest forecast shortage, based on average output`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
@@ -509,7 +514,7 @@ export function GeneratorBuildItem(
                 value:
                   kgCO2ePerMWh > 0
                     ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-                    : "None",
+                    : "No direct emissions modeled",
               },
             ]}
           />

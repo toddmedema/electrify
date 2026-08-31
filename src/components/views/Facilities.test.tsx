@@ -94,18 +94,22 @@ describe("the fleet list", () => {
     renderFacilities(game, game.facilities[0].id);
     // One panel, not one per row -- getByText throws if a second facility opened too
     expect(screen.getByText("Lifetime profit")).toBeInTheDocument();
-    expect(screen.getByText("Capacity factor")).toBeInTheDocument();
-    expect(screen.getByText("Cost")).toBeInTheDocument();
-    expect(screen.getByText("Earned")).toBeInTheDocument();
+    expect(
+      screen.getByText("Average output (capacity factor)"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Lifetime cost per MWh")).toBeInTheDocument();
+    expect(screen.getByText("Revenue per MWh")).toBeInTheDocument();
   });
 
   it("shows Coal starts and cost without gas-turbine service intervals", () => {
     const coal = game.facilities.find((facility) => facility.name === "Coal")!;
     renderFacilities(game, coal.id);
 
-    expect(screen.getByText("Equivalent starts")).toBeInTheDocument();
+    expect(
+      screen.getByText("Full start cycles (equivalent)"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Non-fuel start cost")).toBeInTheDocument();
-    expect(screen.queryByText("Service intervals")).toBeNull();
+    expect(screen.queryByText("Gas-turbine service")).toBeNull();
   });
 
   it("keeps gas-turbine service context on Natural Gas", () => {
@@ -114,9 +118,9 @@ describe("the fleet list", () => {
     )!;
     renderFacilities(game, gas.id);
 
-    expect(screen.getByText("Service intervals")).toBeInTheDocument();
+    expect(screen.getByText("Gas-turbine service")).toBeInTheDocument();
     expect(
-      screen.getByText("HGP 900 · major 1,800 starts"),
+      screen.getByText("Hot-gas-path: 900 starts · major: 1,800 starts"),
     ).toBeInTheDocument();
   });
 
@@ -125,14 +129,20 @@ describe("the fleet list", () => {
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
-    expect(screen.getByText("Equivalent operating hours")).toBeInTheDocument();
-    expect(screen.getByText("Fixed O&M")).toBeInTheDocument();
+    expect(
+      screen.getByText("Full-output hours (equivalent)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Fixed operations & maintenance"),
+    ).toBeInTheDocument();
     expect(screen.getByText("$3.09M/yr")).toBeInTheDocument();
-    expect(screen.getByText("Variable O&M")).toBeInTheDocument();
+    expect(
+      screen.getByText("Variable operations & maintenance"),
+    ).toBeInTheDocument();
     expect(screen.getByText("$25.71/MWh generated")).toBeInTheDocument();
-    expect(screen.queryByText("Equivalent starts")).toBeNull();
+    expect(screen.queryByText("Full start cycles (equivalent)")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
-    expect(screen.queryByText("Service intervals")).toBeNull();
+    expect(screen.queryByText("Gas-turbine service")).toBeNull();
   });
 
   it("leaves every row closed when nothing is selected", () => {
@@ -166,7 +176,9 @@ describe("the fleet list", () => {
       },
     ];
     renderFacilities(constrained, null);
-    expect(screen.getByText("Derated to 30%")).toBeInTheDocument();
+    expect(
+      screen.getByText("Temporarily limited to 30% of rated output"),
+    ).toBeInTheDocument();
   });
 
   it("renders the reasonable worst-case fleet size", () => {

@@ -256,7 +256,8 @@ export function GENERATORS(
     {
       name: "Coal",
       fuel: "Coal",
-      description: "On-demand but dirty and slow",
+      description:
+        "Can run on demand, but ramps slowly and produces high direct emissions",
       available: true, // Coal was first type of electric plant
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 3.676 * CPI_2019_TO_2023, 2023, 4.103),
@@ -290,7 +291,8 @@ export function GENERATORS(
     {
       name: "Nuclear",
       fuel: "Uranium",
-      description: "On-demand and clean, but very slow",
+      description:
+        "Low direct emissions and steady output, but very slow to change",
       available: year > 1956, // First full scale plant was Calder Hall in 1956
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 6.041 * CPI_2019_TO_2023, 2023, 7.861),
@@ -317,7 +319,8 @@ export function GENERATORS(
     {
       name: "Natural Gas",
       fuel: "Natural Gas",
-      description: "On-demand, faster and cleaner than coal",
+      description:
+        "Runs on demand and ramps faster than coal, with lower but still significant direct emissions",
       available: year > 1940, // First full scale plant was 4MW in Switzerland in 1940
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 0.713 * CPI_2019_TO_2023, 2023, 0.836),
@@ -346,7 +349,8 @@ export function GENERATORS(
     {
       name: "Oil",
       fuel: "Oil",
-      description: "Fast but dirty",
+      description:
+        "Starts quickly, but fuel is costly and produces direct emissions",
       available: true,
       buildCost: scaledBuildCost(
         costBetween(year, 2019, 1.8 * CPI_2019_TO_2023, 2023, 1.248),
@@ -380,7 +384,8 @@ export function GENERATORS(
     {
       name: "Biomass",
       fuel: "Biomass",
-      description: "Renewable and dispatchable, but fuel-hungry",
+      description:
+        "Can run on demand using renewable fuel, but burns large amounts of material and releases CO2",
       available: true,
       // EIA's 50 MW fluidized-bed reference plant costs $4,843/kW in 2025 dollars. Converted
       // to the table's 2018 base with CPI-U (251.107 / 321.943), then split into the same
@@ -424,7 +429,8 @@ export function GENERATORS(
     {
       name: "Wind",
       fuel: "Wind",
-      description: "Windiest at spring and fall evenings",
+      description:
+        "Output changes with local wind and is often strongest in spring and fall",
       available: year > 1941, // First megawatt-size turbine was in Vermont in 1941
       buildCost: scaledBuildCost(windCostPerW(year), 200000000, peakW),
       // IRENA global installed cost fell from inflation-normalized $1,642/kW in 2020 to
@@ -483,7 +489,7 @@ export function GENERATORS(
       name: "Airborne Wind",
       fuel: "Airborne Wind",
       description:
-        "Higher, steadier winds with light infrastructure, but immature and maintenance-heavy",
+        "Uses steadier high-altitude winds, but the technology is new and needs frequent maintenance",
       // NAWEP's current schedule reaches commissioning in 2028 and mature operation in 2030.
       available: year >= 2030,
       buildCost: scaledBuildCost(airborneWindCostPerW(year), 1200000, peakW),
@@ -502,7 +508,8 @@ export function GENERATORS(
     {
       name: "Solar",
       fuel: "Sun",
-      description: "Sunniest at summer noon",
+      description:
+        "Produces only in daylight and usually peaks near sunny midday",
       available: year > 1982, // First megawatt-sized installations around 1982 https://www1.eere.energy.gov/solar/pdfs/solar_timeline.pdf
       buildCost: scaledBuildCost(solarCostPerW(year), 150000000, peakW),
       // IRENA global installed cost fell from inflation-normalized $1,070/kW in 2020 to
@@ -533,7 +540,8 @@ export function GENERATORS(
     {
       name: "Hydro",
       fuel: "Hydro",
-      description: "Clean and dispatchable, where rivers allow",
+      description:
+        "Low direct emissions and controllable output, but limited by water and suitable sites",
       available: year > 1882 && (hydroLocations || 0) > 0,
       buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
@@ -557,7 +565,8 @@ export function GENERATORS(
     {
       name: "Geothermal",
       fuel: "Geothermal",
-      description: "Consistent, but few locations",
+      description:
+        "Steady low-carbon output, but only at suitable underground heat sources",
       available: (geothermalLocations || 0) > 0,
       buildCost: scaledBuildCost(geothermalCostPerW(year), 50000000, peakW),
       // IRENA global installed cost fell from inflation-normalized $5,415/kW in 2020 to
@@ -579,7 +588,8 @@ export function GENERATORS(
     {
       name: "Enhanced Geothermal",
       fuel: "Geothermal",
-      description: "Clean, firm power nearly anywhere",
+      description:
+        "Steady low-carbon output in more locations than conventional geothermal",
       available: year >= 2030,
       buildCost: enhancedGeothermalCostPerW * peakW,
       // Fervo's $5.5/W Phase II estimate in 2028 declines to its $3/W long-term target
@@ -654,7 +664,8 @@ export function STORAGE(state: GameType, peakWh: number) {
   let storage = [
     {
       name: "Battery",
-      description: "Fast to build and charge / discharge",
+      description:
+        "Builds quickly and responds almost instantly, but stores a limited amount of energy",
       available: year > 2008, // Project Barbados, 2MW - https://en.wikipedia.org/wiki/List_of_energy_storage_projects
       buildCost: 10000 + batteryCostPerWh(year) * peakWh,
       // NREL's 2020 four-hour benchmark was $345/kWh (2020$); IRENA's global fully installed
@@ -683,7 +694,8 @@ export function STORAGE(state: GameType, peakWh: number) {
     },
     {
       name: "Pumped Hydro",
-      description: "Slow to build and charge / discharge",
+      description:
+        "Stores large amounts of energy, but needs a suitable site and takes years to build",
       available: year > 1930 && (pumpedHydroLocations || 0) > 0, // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour
