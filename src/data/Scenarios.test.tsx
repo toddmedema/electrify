@@ -249,7 +249,10 @@ describe("authored starting fleets", () => {
       month: 7,
       durationMonths: 18,
     });
-    expect(trip.name).toBe("Sudden Nuclear Trip in France");
+    expect(trip).toMatchObject({
+      name: "Sudden Nuclear Trip in France",
+      icon: "sudden-nuclear-trip",
+    });
     expect(
       trip.facilities.find(
         (facility) => facility.label === "Grand Nuclear Unit",

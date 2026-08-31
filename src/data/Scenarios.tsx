@@ -1083,7 +1083,7 @@ export const SCENARIOS = [
   {
     id: 110,
     name: "Sudden Nuclear Trip in France",
-    icon: "nuclear",
+    icon: "sudden-nuclear-trip",
     locationId: "Paris",
     location: {
       id: "Paris",
