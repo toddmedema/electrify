@@ -41,7 +41,7 @@ jobs:
       # which fails closed and looks to a player like the game is broken.
       #
       # Refuses to continue without the credential rather than skipping, on the same
-      # reasoning as deploy.sh's REACT_APP_FIREBASE_API_KEY check: a silent skip would
+      # reasoning as scripts/deploy.sh's REACT_APP_FIREBASE_API_KEY check: a silent skip would
       # leave the rules and the bundle out of step with nothing to say so.
       #
       # The secret is the JSON from Firebase Console -> Project settings ->
@@ -74,4 +74,4 @@ jobs:
         env:
           # Baked into the JS bundle at build time by create-react-app.
           REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
-        run: ./deploy.sh ci-prod
+        run: ./scripts/deploy.sh ci-prod

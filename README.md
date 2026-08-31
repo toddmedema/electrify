@@ -106,7 +106,7 @@ in save games and replays, so it can never be changed afterwards; everything els
 
 To release, install and authenticate the AWS CLI.
 
-Before deploying to production, run `./deploy.sh` and have it deploy to beta. Then check that:
+Before deploying to production, run `npm run deploy` and have it deploy to beta. Then check that:
 
 - basic functionality works (app loads, game starts, music plays)
 
