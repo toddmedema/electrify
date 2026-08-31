@@ -523,10 +523,12 @@ export interface TutorialStepType {
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)
   advanceOnAction?: string | string[];
-  // An independent application check. Entering one restarts the authored scenario at this step,
-  // giving it a deterministic, retryable state instead of inheriting whatever the guided portion
-  // changed. Success advances normally; failure pauses for consequence-specific feedback.
+  // An independent application check. By default, entering one restarts the authored scenario at
+  // this step, giving it a deterministic, retryable state instead of inheriting whatever the
+  // guided portion changed. A capstone that explicitly builds on the guided work can preserve it.
+  // Success advances normally; failure pauses for consequence-specific feedback.
   capstone?: {
+    preserveProgress?: boolean;
     // Optional authored checkpoint overrides. The normal tutorial and its capstone can therefore
     // teach with different starting economics while still rebuilding the whole Game slice through
     // initGame on entry/retry. Anything omitted inherits the mission's scenario-level value.
@@ -576,7 +578,6 @@ export interface ScenarioBriefingType {
   tone: ScenarioBriefingToneType;
   fantasy: string;
   objective: string;
-  constraint: string;
   threat: string;
 }
 

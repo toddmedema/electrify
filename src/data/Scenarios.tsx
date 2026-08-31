@@ -8,16 +8,10 @@ const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
 
 const generatorCapstoneSucceeded = (state: AppStateType) => {
-  const now = getTimeFromTimeline(state.game.date.minute, state.game.timeline);
-  return !!(
-    now &&
-    state.game.facilities.length >= 2 &&
-    state.game.facilities
-      .slice(1)
-      .some((facility) => facility.yearsToBuildLeft <= 0) &&
-    now.supplyW >= now.demandW &&
-    now.cash >= 0
-  );
+  const playerBuiltGeneratorTypes = state.game.facilities
+    .slice(1)
+    .flatMap((facility) => ("fuel" in facility ? [facility.name] : []));
+  return new Set(playerBuiltGeneratorTypes).size >= 2;
 };
 
 const latestMonthProfit = (state: AppStateType) => {
@@ -252,19 +246,18 @@ export const SCENARIOS = [
         card: "FACILITIES",
         content: (
           <TutorialPrompt
-            concepts={["forecast", "build", "supply"]}
-            text="Your turn: commission enough capacity to cover demand within nine months and stay solvent."
+            concepts={["build", "generator", "fuel"]}
+            text="Your turn: build one more generator of a different type."
           />
         ),
-        hint: "Compare the forecast peak with your current capacity, then choose any generator whose cost and construction time fit the deadline.",
+        hint: "Open the generator shop and choose a different fuel or technology from the generator you just bought.",
         capstone: {
+          preserveProgress: true,
           success: generatorCapstoneSucceeded,
-          failure: (s: AppStateType) =>
-            s.game.date.monthsElapsed >= 9 && !generatorCapstoneSucceeded(s),
           successMessage:
-            "Capstone complete - new capacity came online before the deadline and covered demand without exhausting cash.",
+            "Capstone complete - you built two different types of generator.",
           failureMessage:
-            "The added capacity was not online and covering demand by the nine-month deadline. Compare construction time, capacity and financing before trying again.",
+            "Build another generator with a different fuel or technology from your first purchase.",
         },
       },
     ],
@@ -722,7 +715,6 @@ export const SCENARIOS = [
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
       objective: "Replace dirty power while keeping the lights on.",
-      constraint: "Burning coal and gas now costs extra.",
       threat: "Old coal plants and tight finances leave little room for delay.",
     },
     ownership: "Investor",
@@ -746,8 +738,6 @@ export const SCENARIOS = [
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
       objective: "Grow with cheaper gas without relying on it alone.",
-      constraint:
-        "Most power comes from coal, and new plants are long-term bets.",
       threat: "Gas prices may rebound before new plants pay off.",
     },
     ownership: "Investor",
@@ -768,7 +758,6 @@ export const SCENARIOS = [
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
       objective: "Use less costly oil while meeting changing demand.",
-      constraint: "Fuel and construction cost more on an island.",
       threat: "One weak link can leave the whole island in the dark.",
     },
     ownership: "Investor",
@@ -793,7 +782,6 @@ export const SCENARIOS = [
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
       objective: "Replace aging oil plants with cleaner options.",
-      constraint: "New technologies arrive at different times and prices.",
       threat: "Invest too early and overpay; wait too long and demand wins.",
     },
     ownership: "Investor",
@@ -817,7 +805,6 @@ export const SCENARIOS = [
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
       objective: "Build a grid that keeps essential power flowing.",
-      constraint: "Fuel is costly, and new plants take time to build.",
       threat: "A major storm can overwhelm a small backup margin.",
     },
     ownership: "Public",
@@ -842,7 +829,6 @@ export const SCENARIOS = [
       tone: "legacy",
       fantasy: "Decide what comes after a century of coal.",
       objective: "Build a new business before old coal plants hold you back.",
-      constraint: "Most of your money and experience are tied to coal.",
       threat: "Old plants, new rivals, and slow construction punish delay.",
     },
     ownership: "Investor",
@@ -879,7 +865,6 @@ export const SCENARIOS = [
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
       objective: "Get enough reliable power ready before data centers arrive.",
-      constraint: "Today's grid is small, old, and short on cash.",
       threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
@@ -920,7 +905,7 @@ export const SCENARIOS = [
   {
     id: 107, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
     name: "Austin Deep Freeze",
-    icon: "wind",
+    icon: "texas deep freeze",
     locationId: "Austin",
     location: {
       id: "Austin",
@@ -937,8 +922,6 @@ export const SCENARIOS = [
       tone: "storm",
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective: "Strengthen the grid before the February 2021 freeze.",
-      constraint:
-        "You manage a citywide mix of power sources, not individual plants.",
       threat: "Extreme cold will cut supplies just as demand surges.",
     },
     ownership: "Public",

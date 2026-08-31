@@ -937,7 +937,7 @@ export default class Finances extends React.Component<Props, State> {
               /kWh
               {scenario.ownership === "Investor" && (
                 <>
-                  &nbsp;&mdash;&nbsp;market {formatMoneyConcise(marketRate)}/kWh
+                  &nbsp;&mdash;&nbsp;market {formatMoneyConcise(marketRate)}
                   &nbsp;&mdash;&nbsp;
                   {numbro(now.customers).format({ average: true })} customers,
                   projected&nbsp;

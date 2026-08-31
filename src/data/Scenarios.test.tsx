@@ -102,10 +102,10 @@ describe("authored scenario briefings", () => {
             tone: expect.any(String),
             fantasy: expect.any(String),
             objective: expect.any(String),
-            constraint: expect.any(String),
             threat: expect.any(String),
           }),
         );
+        expect(scenario.briefing).not.toHaveProperty("constraint");
       },
     );
   });
@@ -178,7 +178,6 @@ describe("authored starting fleets", () => {
         austin.summary,
         austin.briefing?.fantasy,
         austin.briefing?.objective,
-        austin.briefing?.constraint,
         austin.briefing?.threat,
       ].join(" "),
     ).not.toMatch(/ERCOT|PPA|portfolio/i);

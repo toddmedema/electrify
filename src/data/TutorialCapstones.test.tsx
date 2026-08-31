@@ -1,11 +1,13 @@
 import { getStore } from "../StoreRegistry";
 import { AppStateType, GameType, ScenarioType } from "../Types";
 import gameReducer, {
+  buildFacility,
   delta,
   initGame,
   start,
   tickState,
 } from "../reducers/Game";
+import { GENERATORS } from "./Facilities";
 import { createGame } from "../testing/Simulator";
 import { TUTORIALS } from "./Scenarios";
 
@@ -40,6 +42,26 @@ describe("authored tutorial capstones", () => {
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
+  });
+
+  it("completes Mission 2 after buying a second, different generator type", () => {
+    const objective = capstone(1);
+    let game = createGame({
+      scenarioId: 1,
+      initialBuild: { name: "Oil", peakW: 100000000, financed: true },
+    });
+
+    expect(objective.success(appState(game))).toBe(false);
+
+    const differentGenerator = GENERATORS(game, 100000000, [20], [500]).find(
+      (generator) => generator.available && generator.fuel === "Natural Gas",
+    )!;
+    game = gameReducer(
+      game,
+      buildFacility({ facility: differentGenerator, financed: true }),
+    );
+
+    expect(objective.success(appState(game))).toBe(true);
   });
 
   it("cycles storage through charge and discharge before Mission 3's deadline", () => {

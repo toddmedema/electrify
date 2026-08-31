@@ -247,6 +247,14 @@ describe("Insights layers", () => {
     );
   });
 
+  it("shows the market benchmark without repeating the rate unit", () => {
+    renderInsights();
+
+    const levers = screen.getByRole("region", { name: "Planning levers" });
+    expect(levers).toHaveTextContent(/Rate .*\/kWh/);
+    expect(levers.textContent).not.toMatch(/market [^·]*\/kWh/);
+  });
+
   it("offers one rolling 12-month range instead of separate calendar years", async () => {
     localStorage.setItem("insightsRange", "current");
     renderInsights();

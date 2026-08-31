@@ -42,8 +42,9 @@ describe("NewGame", () => {
       (a, b) =>
         b.startingYear - a.startingYear ||
         b.startingYear +
-          b.durationMonths / 12 -
-          (a.startingYear + a.durationMonths / 12),
+          Math.ceil(b.durationMonths / 12) -
+          1 -
+          (a.startingYear + Math.ceil(a.durationMonths / 12) - 1),
     );
     [...TUTORIALS, ...scenariosNewestFirst].forEach((scenario, index) =>
       expect(rows[index]).toHaveTextContent(
@@ -76,6 +77,20 @@ describe("NewGame", () => {
     expect(
       screen.getByRole("img", { name: "Data Center Boom icon" }),
     ).toHaveAttribute("src", "/images/ai data center boom.svg");
+    expect(
+      screen.getByRole("img", { name: "Austin Deep Freeze icon" }),
+    ).toHaveAttribute("src", "/images/texas deep freeze.svg");
+  });
+
+  it("shows the inclusive final calendar year for each scenario", () => {
+    render(<NewGame {...props()} />);
+
+    expect(screen.getByTestId("mission-row-107")).toHaveTextContent(
+      "Austin, TX · 2017–2023",
+    );
+    expect(screen.getByTestId("mission-row-106")).toHaveTextContent(
+      "Manassas, VA · 2020–2035",
+    );
   });
 
   it("highlights the first incomplete tutorial without replacing its subtitle", () => {

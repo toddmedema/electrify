@@ -121,7 +121,9 @@ describe("the customer forecast", () => {
         name: "The rate you charge for electricity generation",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/market \$/)).toBeInTheDocument();
+    const rateSummary = screen.getByText(/market \$/);
+    expect(rateSummary).toBeInTheDocument();
+    expect(rateSummary.textContent).not.toMatch(/market [^—]*\/kWh/);
     cleanup();
   });
 });
