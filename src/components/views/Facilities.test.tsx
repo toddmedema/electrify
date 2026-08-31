@@ -159,11 +159,25 @@ describe("the fleet list", () => {
         attributes: {},
         effects: {
           facilityOutputMultipliersById: { [String(facility.id)]: 0.6 },
+          facilityOutputMultipliersByFuel: { [facility.fuel!]: 0.5 },
         },
       },
     ];
     renderFacilities(constrained, null);
-    expect(screen.getByText("Derated to 60%")).toBeInTheDocument();
+    expect(screen.getByText("Derated to 30%")).toBeInTheDocument();
+  });
+
+  it("renders the reasonable worst-case fleet size", () => {
+    const tenFacilities = createGame({ scenarioId: 103 });
+    const template = tenFacilities.facilities[0];
+    tenFacilities.facilities = Array.from({ length: 10 }, (_, index) => ({
+      ...template,
+      id: index + 1,
+    }));
+
+    renderFacilities(tenFacilities, null);
+
+    expect(rows()).toHaveLength(10);
   });
 
   it("uses compact watt units in the accessible chart summary", () => {

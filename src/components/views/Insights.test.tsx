@@ -269,12 +269,18 @@ describe("Insights layers", () => {
     expect(options.queryByText("Next year")).toBeNull();
   });
 
-  it("uses hourly points for the twenty-year forecast", () => {
-    localStorage.setItem("insightsRange", "next20");
+  it.each([
+    ["next10", "2880"],
+    ["next20", "5760"],
+  ])("uses hourly points for the %s forecast", (range, expectedPoints) => {
+    localStorage.setItem("insightsRange", range);
     localStorage.setItem("insightsLayers", JSON.stringify(["weather"]));
     renderInsights();
 
-    expect(screen.getByRole("img")).toHaveAttribute("data-points", "5760");
+    expect(screen.getByRole("img")).toHaveAttribute(
+      "data-points",
+      expectedPoints,
+    );
     expect(screen.getByRole("img")).toHaveAttribute("data-step", "60");
   });
 

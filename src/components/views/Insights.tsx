@@ -568,7 +568,9 @@ export default class Insights extends React.Component<Props, State> {
     const nextYearMinute =
       (game.date.year - game.startingYear + 1) * 12 * MINUTES_PER_MONTH;
     const projectionStepMinutes =
-      this.state.range === "next20" ? 60 : TICK_MINUTES;
+      this.state.range === "next10" || this.state.range === "next20"
+        ? 60
+        : TICK_MINUTES;
     const tickScale = projectionStepMinutes / TICK_MINUTES;
     const ticks =
       years > 0

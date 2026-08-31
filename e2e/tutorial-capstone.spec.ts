@@ -5,7 +5,9 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 }, testInfo) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await page.getByRole("button", { name: "Start playing" }).click();
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .click();
 
   await expect(
     page.getByRole("heading", { name: "Mission objective" }),

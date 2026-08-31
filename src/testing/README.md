@@ -51,8 +51,9 @@ The forecast performance gate is independently reproducible:
 npm run sim -- --benchmark-stories
 ```
 
-It compares median warmed 20-year Shale forecasts with scheduled story resolution disabled and
-enabled, and fails above a 15% regression.
+It compares median warmed 20-year hourly Shale forecasts with scheduled story resolution disabled
+and enabled across a ten-facility fleet, a reasonable worst case for normal play. It fails above a
+15% regression.
 
 `--year` and `--location` play an authored scenario somewhere or somewhen else, which is the
 only way to exercise a start past the recorded weather from the command line:
