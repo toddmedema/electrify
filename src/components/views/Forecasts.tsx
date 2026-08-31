@@ -107,11 +107,14 @@ export default class Forecasts extends React.Component<Props, State> {
     }
 
     // Generate the forecast
+    const projectionStepMinutes = years >= 10 ? 60 : TICK_MINUTES;
+    const tickScale = projectionStepMinutes / TICK_MINUTES;
     const forecastedTimeline = generateNewTimeline(
       game,
       now.cash,
       now.customers,
-      TICKS_PER_YEAR * years,
+      (TICKS_PER_YEAR * years) / tickScale,
+      projectionStepMinutes,
     );
 
     let hasStorage = false;
