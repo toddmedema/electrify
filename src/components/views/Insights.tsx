@@ -94,6 +94,7 @@ import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { UnitsContext } from "../base/UnitsContext";
 import { formatCustomerChange } from "./Finances";
+import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 
 export type InsightRange =
   "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
@@ -661,15 +662,11 @@ export default class Insights extends React.Component<Props, State> {
     }
 
     const sampleYears = Math.max(1, years);
-    const sampled = timeline.filter(
-      (tick) => tick.minute % (240 * sampleYears) < projectionStepMinutes,
+    const sampled = sampleForecastTimeline(
+      timeline,
+      240 * sampleYears,
+      projectionStepMinutes,
     );
-    if (sampled[0] !== timeline[0]) {
-      sampled.unshift(timeline[0]);
-    }
-    if (sampled[sampled.length - 1] !== timeline[timeline.length - 1]) {
-      sampled.push(timeline[timeline.length - 1]);
-    }
 
     const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
     const projectedMonths = summarizeTimelineByMonth(

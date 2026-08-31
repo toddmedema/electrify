@@ -2421,12 +2421,18 @@ function reforecastSupply(
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
   const baseline = supplyForecastPass(state, true, true, stepMinutes);
+  // Recorded ticks can be Immer drafts when this is called from a reducer. Commitment metadata
+  // is deliberately attached with Object.defineProperty, which Immer forbids on a draft; the
+  // optimizer only reads from the current tick onwards anyway, so leave the recorded past alone.
+  const futureBaseline = baseline.slice(
+    forecastIndexAt(state, state.date.minute),
+  );
   state.facilities.forEach((facility) => {
     const generator = facility as GeneratorOperatingType;
     if (!facility.peakWh && (generator.minimumStableOutput || 0) > 0) {
       prepareGeneratorCommitment({
         facilityId: facility.id,
-        forecast: baseline,
+        forecast: futureBaseline,
         minimumOperatingCost: (futureTick) =>
           minimumStableOperatingCost(state, generator, futureTick, stepMinutes),
       });

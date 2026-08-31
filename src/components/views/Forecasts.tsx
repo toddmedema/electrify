@@ -41,6 +41,7 @@ import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
 import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
+import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 
 const FORECAST_YEARS_KEY = "forecastYears";
 const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
@@ -213,14 +214,12 @@ export default class Forecasts extends React.Component<Props, State> {
       game.startingYear,
     );
 
-    // Downsample the data to 6 per day @ 1 year, less at longer, to make it more vague / forecast-y
-    const sampledForecastedTimeline = forecastedTimeline.filter(
-      (t: TickPresentFutureType) => t.minute % (240 * years) < TICK_MINUTES,
-    );
-    // Make sure it gets the first + last entries for a full chart
-    sampledForecastedTimeline.unshift(forecastedTimeline[0]);
-    sampledForecastedTimeline.push(
-      forecastedTimeline[forecastedTimeline.length - 1],
+    // Keep regular samples plus one significant fuel-mix change between them. That preserves
+    // short events without making every chart draw the full projection.
+    const sampledForecastedTimeline = sampleForecastTimeline(
+      forecastedTimeline,
+      240 * years,
+      projectionStepMinutes,
     );
 
     // Derived here rather than inside the chart, since the legend beside the chart's title has
