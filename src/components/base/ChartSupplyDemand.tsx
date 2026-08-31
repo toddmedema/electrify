@@ -296,4 +296,4 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     />
   );
 };
-export default ChartSupplyDemand;
+export default React.memo(ChartSupplyDemand);

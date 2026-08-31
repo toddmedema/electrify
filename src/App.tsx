@@ -1,6 +1,5 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { useEffect, useLayoutEffect, useState } from "react";
-import { Provider } from "react-redux";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
@@ -231,18 +230,16 @@ export default function App() {
 
   return (
     <StyledEngineProvider injectFirst>
-      <Provider store={store}>
-        <ThemedApp>
-          {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
+      <ThemedApp>
+        {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
               settings change that did not also change the card */}
-          <InstallPromptProvider>
-            <OfflineNotice />
-            <UnitsProvider>
-              <CompositorContainer store={store} />
-            </UnitsProvider>
-          </InstallPromptProvider>
-        </ThemedApp>
-      </Provider>
+        <InstallPromptProvider>
+          <OfflineNotice />
+          <UnitsProvider>
+            <CompositorContainer store={store} />
+          </UnitsProvider>
+        </InstallPromptProvider>
+      </ThemedApp>
     </StyledEngineProvider>
   );
 }

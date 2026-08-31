@@ -92,7 +92,13 @@ import {
   STORAGE,
   windAnnualOutputDegradation,
 } from "../data/Facilities";
-import { shouldKeepGeneratorCommitted } from "../helpers/Commitment";
+import {
+  copyCommitmentMetadata,
+  hasPreparedGeneratorCommitment,
+  prepareGeneratorCommitment,
+  recordDispatchTarget,
+  shouldKeepGeneratorCommitted,
+} from "../helpers/Commitment";
 import { getViableLocationsRemaining } from "../data/FacilitySites";
 import { logEvent } from "../Globals";
 import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
@@ -151,6 +157,9 @@ interface NewGameAction {
 }
 
 let previousTickMs = 0;
+let accumulatedTickMs = 0;
+const MAX_PRESENTATION_FPS = 60;
+const MIN_PRESENTATION_INTERVAL_MS = 1000 / MAX_PRESENTATION_FPS;
 // Only for restoring speed after a blocking dialog (bankrupt/fired/win) closes -- NOT used to
 // decide whether the tick loop needs restarting, since state.speed can change without going
 // through setSpeed (e.g. dialogClose below), which would desync a "previous speed" comparison.
@@ -493,18 +502,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
  * Scheduled effects for any simulated date. Persisted live occurrences win over a newly resolved
  * copy, which is what preserves facility IDs and other onset-time attributes after they are drawn.
  */
-const storyEffectsCache = new WeakMap<
-  GameType,
-  {
-    month: number;
-    scenarioId: number;
-    difficulty: GameType["difficulty"];
-    disabled: boolean;
-    activeKey: string;
-    effects: WorldEventEffectsType;
-  }
->();
-const scheduledStoryEffectsCache = new Map<string, WorldEventEffectsType>();
+const storyEffectsCache = new Map<string, WorldEventEffectsType>();
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
@@ -540,15 +538,21 @@ function storyEffectsAt(date: DateType, state: GameType) {
   const activeKey = state.worldEvents.active
     .map((event) => event.key)
     .join("|");
-  const cached = storyEffectsCache.get(state);
-  if (
-    cached?.month === date.monthsElapsed &&
-    cached.scenarioId === state.scenarioId &&
-    cached.difficulty === state.difficulty &&
-    cached.disabled === !!state.storyEffectsDisabled &&
-    cached.activeKey === activeKey
-  ) {
-    return cached.effects;
+  const lastOccurrence = state.worldEvents.occurrences.at(-1);
+  // Immer produces a fresh draft identity on every reducer call and forecasts use shallow state
+  // copies, so an object-keyed WeakMap missed almost every lookup. These are the stable inputs
+  // that can change a month's resolved effects; using them lets live play and both forecast
+  // passes share one result without changing the authored story decision.
+  const cacheKey = [
+    scheduledStoryCacheKey(date, state),
+    state.storyEffectsDisabled ? 1 : 0,
+    activeKey,
+    state.worldEvents.occurrences.length,
+    lastOccurrence?.key || "",
+  ].join("|");
+  const cached = storyEffectsCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
   const persisted = state.worldEvents.active.filter(
     (event) =>
@@ -559,36 +563,8 @@ function storyEffectsAt(date: DateType, state: GameType) {
     !STORY_ARC_DEFINITIONS.some((arc) => arc.scenarioId === state.scenarioId)
   ) {
     const effects = combineStoryEffects(persisted);
-    storyEffectsCache.set(state, {
-      month: date.monthsElapsed,
-      scenarioId: state.scenarioId,
-      difficulty: state.difficulty,
-      disabled: !!state.storyEffectsDisabled,
-      activeKey,
-      effects,
-    });
+    storyEffectsCache.set(cacheKey, effects);
     return effects;
-  }
-  // Forecast passes create shallow state copies, so the WeakMap above cannot share their work.
-  // With no persisted live onset to distinguish, the scheduled result is a pure month lookup;
-  // only the two facility-selecting arcs add a stable fleet signature.
-  const scheduledCacheKey =
-    state.worldEvents.active.length === 0
-      ? scheduledStoryCacheKey(date, state)
-      : undefined;
-  const scheduledCached = scheduledCacheKey
-    ? scheduledStoryEffectsCache.get(scheduledCacheKey)
-    : undefined;
-  if (scheduledCached) {
-    storyEffectsCache.set(state, {
-      month: date.monthsElapsed,
-      scenarioId: state.scenarioId,
-      difficulty: state.difficulty,
-      disabled: false,
-      activeKey,
-      effects: scheduledCached,
-    });
-    return scheduledCached;
   }
   const persistedKeys = new Set(persisted.map((event) => event.key));
   const scheduled = resolveStoryAtDate({
@@ -605,20 +581,10 @@ function storyEffectsAt(date: DateType, state: GameType) {
     occurrences: state.worldEvents.occurrences,
   }).active.filter((event) => !persistedKeys.has(event.key));
   const effects = combineStoryEffects([...persisted, ...scheduled]);
-  if (scheduledCacheKey) {
-    if (scheduledStoryEffectsCache.size > 10000) {
-      scheduledStoryEffectsCache.clear();
-    }
-    scheduledStoryEffectsCache.set(scheduledCacheKey, effects);
+  if (storyEffectsCache.size > 10000) {
+    storyEffectsCache.clear();
   }
-  storyEffectsCache.set(state, {
-    month: date.monthsElapsed,
-    scenarioId: state.scenarioId,
-    difficulty: state.difficulty,
-    disabled: !!state.storyEffectsDisabled,
-    activeKey,
-    effects,
-  });
+  storyEffectsCache.set(cacheKey, effects);
   return effects;
 }
 
@@ -680,9 +646,10 @@ function ensureTicking(state: GameType) {
   if (state.speed !== "PAUSED" && !tickLoopRunning) {
     tickLoopRunning = true;
     previousTickMs = performance.now();
+    accumulatedTickMs = 0;
     setTimeout(
       () => getStore().dispatch(gameSlice.actions.tick()),
-      TICK_MS[state.speed],
+      Math.max(TICK_MS[state.speed], MIN_PRESENTATION_INTERVAL_MS),
     );
   }
 }
@@ -708,18 +675,27 @@ export const gameSlice = createSlice({
       }
       tickLoopRunning = true;
 
-      // update simulation if accumulated delta exceeds frame time
-      // calculate multiple simulation frames per render if on a slow device
-      let delta = performance.now() - previousTickMs;
-      while (delta > TICK_MS[state.speed]) {
+      // Accumulate wall time before doing any simulation work. The old loop reset its timestamp
+      // inside every iteration, losing both reducer time and the fractional remainder. That made
+      // the clock run slower precisely when a frame was expensive. FAST also dispatched at
+      // 100Hz; batching its 10ms simulation steps behind a 60Hz presentation ceiling preserves
+      // every deterministic tick while giving React at most one update per display frame.
+      const nowMs = performance.now();
+      accumulatedTickMs += Math.max(0, nowMs - previousTickMs);
+      previousTickMs = nowMs;
+      const simulationStepMs = TICK_MS[state.speed];
+      while (accumulatedTickMs >= simulationStepMs) {
         tickState(state);
-        delta -= TICK_MS[state.speed];
-        previousTickMs = performance.now();
+        accumulatedTickMs -= simulationStepMs;
+        if (!state.inGame || (state.speed as SpeedType) === "PAUSED") {
+          tickLoopRunning = false;
+          return;
+        }
       }
 
       setTimeout(
         () => getStore().dispatch(gameSlice.actions.tick()),
-        Math.max(1, TICK_MS[state.speed] - delta),
+        Math.max(simulationStepMs, MIN_PRESENTATION_INTERVAL_MS),
       );
     },
     delta: (state, action: PayloadAction<Partial<GameType>>) => {
@@ -949,6 +925,24 @@ export const gameSlice = createSlice({
       };
     });
     builder.addCase(loaded, (state) => {
+      // Forecast metadata is intentionally absent from JSON saves. Rebuild only that derived
+      // forecast after the data tables have loaded, so a resumed thermal plant makes the same
+      // commitment decision as an uninterrupted one.
+      const currentTick = getTimeFromTimeline(
+        state.date.minute,
+        state.timeline,
+      );
+      const needsCommitmentForecast = state.facilities.some((facility) => {
+        const generator = facility as GeneratorOperatingType;
+        return (
+          !facility.peakWh &&
+          (generator.minimumStableOutput || 0) > 0 &&
+          !hasPreparedGeneratorCommitment(currentTick, facility.id)
+        );
+      });
+      if (needsCommitmentForecast) {
+        state.timeline = reforecastSupply(state, true);
+      }
       // Start ticking in game
       setTimeout(() => {
         return getStore().dispatch(gameSlice.actions.tick());
@@ -1891,7 +1885,6 @@ function updateSupplyFacilitiesFinances(
   let hydroMandatedReleaseW = 0;
   const startedFacilityIds = new Set<number>();
   const tickStoryEffects = storyEffectsAt(tickDate, state);
-  now.dispatchTargetWByFacility = {};
   facilities.forEach((g: FacilityOperatingType, i: number) => {
     const previousW = g.currentW;
     const generator = g as GeneratorOperatingType;
@@ -1966,7 +1959,9 @@ function updateSupplyFacilitiesFinances(
       storageLossWh += lossWh;
     }
     if (g.paused) {
-      now.dispatchTargetWByFacility[g.id] = 0;
+      if (!optimizeCommitment) {
+        recordDispatchTarget(now, g.id, 0);
+      }
       if (hasMinimumStableOutput) {
         generator.committed = false;
       }
@@ -2019,7 +2014,9 @@ function updateSupplyFacilitiesFinances(
                 ? now.demandW + totalChargeNeeded - charge
                 : requiredTargetW,
             );
-            now.dispatchTargetWByFacility[g.id] = dispatchTargetW;
+            if (!optimizeCommitment) {
+              recordDispatchTarget(now, g.id, dispatchTargetW);
+            }
 
             let committedTargetW = dispatchTargetW;
             if (hasMinimumStableOutput) {
@@ -2326,11 +2323,14 @@ function supplyForecastPass(
   const currentCustomers = current?.customers;
   let prev = newState.timeline[0];
   return newState.timeline.map((t: TickPresentFutureType) => {
+    const sourceTick = t;
     if (t.minute >= state.date.minute) {
+      t = { ...t };
+      copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
         newState,
         prev,
-        { ...t },
+        t,
         simulated,
         undefined,
         !withoutMinimumStableOutput,
@@ -2362,6 +2362,17 @@ function reforecastSupply(
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
   const baseline = supplyForecastPass(state, true, true);
+  state.facilities.forEach((facility) => {
+    const generator = facility as GeneratorOperatingType;
+    if (!facility.peakWh && (generator.minimumStableOutput || 0) > 0) {
+      prepareGeneratorCommitment({
+        facilityId: facility.id,
+        forecast: baseline,
+        minimumOperatingCost: (futureTick) =>
+          minimumStableOperatingCost(state, generator, futureTick),
+      });
+    }
+  });
   return supplyForecastPass({ ...state, timeline: baseline }, simulated);
 }
 
@@ -2438,7 +2449,6 @@ export function generateNewTimeline(
       hydroMandatedReleaseW: 0,
       storageLossWh: 0,
       supplyByFuel: {} as FuelProductionType,
-      dispatchTargetWByFacility: {},
       // Asserted because FuelPricesType carries a `[index: string]: number` index signature,
       // which a fresh object literal with a non-number field cannot satisfy. Same reason
       // reforecastWeatherAndPrices asserts its own tick literal.

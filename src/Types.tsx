@@ -311,10 +311,9 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;
-    // The unconstrained dispatch request for each facility in the most recent forecast pass.
-    // Kept on forecast ticks so minimum-load generators can decide whether avoiding a future
-    // start is worth remaining online; it is intentionally not copied into monthly history.
-    dispatchTargetWByFacility: Record<number, number>;
+    // Legacy saves may contain the old enumerable commitment forecast. New forecasts keep this
+    // transient so it cannot inflate saves, chart copies, or Redux development scans.
+    dispatchTargetWByFacility?: Record<number, number>;
   };
 
 export type DerivedHistoryKeysType = Exclude<
