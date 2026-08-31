@@ -51,6 +51,12 @@ export interface StoryPhaseDescriptionType {
   turningPointPriority?: number;
 }
 
+export interface StoryPhasePreviewType {
+  title?: string;
+  message: string;
+  details?: string;
+}
+
 export interface StoryPhaseDefinitionType {
   id: string;
   schedule: StoryScheduleType;
@@ -61,6 +67,11 @@ export interface StoryPhaseDefinitionType {
   /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
   scheduleAddress?: string;
   scheduleOffsetMonths?: number | ((context: StoryContextType) => number);
+  /** Short, future-tense copy for the Events tab. Live logs continue to use `describe`. */
+  preview?: (
+    context: StoryContextType,
+    random: StoryRandomType,
+  ) => StoryPhasePreviewType;
   describe: (
     context: StoryContextType,
     random: StoryRandomType,
@@ -1265,6 +1276,10 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
     {
       id: "advance-warning",
       schedule: { atMonth: 24 },
+      preview: () => ({
+        title: "Eclipse planning ahead",
+        message: "Grid planners will begin preparing for a total eclipse.",
+      }),
       describe: () => ({
         title: "Eclipse preparations begin",
         message:
@@ -1281,6 +1296,10 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
       id: "eclipse",
       schedule: { atMonth: 32 },
       durationMonths: 1,
+      preview: () => ({
+        title: "Total solar eclipse",
+        message: "A total eclipse will briefly reduce solar generation.",
+      }),
       describe: ({ difficulty }) => {
         const minimumOutputMultiplier =
           SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty];
@@ -1776,7 +1795,25 @@ export function upcomingStoryPhases(
     .flatMap((arc) =>
       arc.phases
         .filter((phase) => phase.forecastable !== false)
-        .map((phase) => resolveStoryPhase(arc, phase, context)),
+        .map((phase) => {
+          const resolved = resolveStoryPhase(arc, phase, context);
+          if (!phase.preview) {
+            return resolved;
+          }
+          const random = (attribute: string) =>
+            randomAt(
+              context.seed,
+              RANDOM_STREAM.worldEvents,
+              storyHash(`${resolved.key}|${attribute}`),
+            );
+          const preview = phase.preview(context, random);
+          return {
+            ...resolved,
+            title: preview.title,
+            message: preview.message,
+            details: preview.details,
+          };
+        }),
     )
     .filter(
       (phase) =>

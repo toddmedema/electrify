@@ -2085,18 +2085,33 @@ html[data-theme="dark"] .uplot {
     list-style: none;
   }
 
-  .upcomingEvents,
-  .eventLogHistoryTitle {
+  .eventLogSection {
     padding-top: size(small);
-
-    > .MuiTypography-root {
-      padding: 0 size(base) size(tiny);
-    }
   }
 
-  .eventLogHistoryTitle {
-    padding-right: size(base);
-    padding-left: size(base);
+  .eventLogSectionHeader {
+    display: grid;
+    gap: 1px;
+    padding: 0 size(base) size(small);
+  }
+
+  // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
+  // event should not look like a red, active emergency before it has happened.
+  .upcomingEvents {
+    border-bottom: 1px solid var(--border-strong);
+    background: var(--bg-sunken);
+
+    .eventLogItem {
+      border-style: dashed;
+      border-left: 4px solid $interactive_blue;
+      background: var(--bg-primary);
+
+      &.importance-NOTABLE,
+      &.importance-CRITICAL {
+        border-left-color: $interactive_blue;
+        background: var(--bg-primary);
+      }
+    }
   }
 
   .eventLogItem {

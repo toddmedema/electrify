@@ -101,7 +101,7 @@ function selectUpcoming(state: AppStateType): UpcomingStoryEventType[] {
     const date = getDateFromMinute(event.startsMinute, game.startingYear);
     return {
       ...event,
-      label: `${date.month} ${date.year}`,
+      label: `Expected ${date.month} ${date.year}`,
     };
   });
   upcomingCache = { key, events };

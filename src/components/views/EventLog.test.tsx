@@ -43,7 +43,9 @@ describe("EventLog", () => {
     );
 
     const row = screen.getByRole("button", { name: /winter gas squeeze/i });
-    expect(screen.getByText("Upcoming")).toBeVisible();
+    expect(screen.getByText("Upcoming events")).toBeVisible();
+    expect(screen.getByText(/have not happened yet/i)).toBeVisible();
+    expect(screen.getByText("Event history")).toBeVisible();
     expect(screen.getByText("Jan 2014")).toBeVisible();
     row.focus();
     row.dispatchEvent(
@@ -56,7 +58,7 @@ describe("EventLog", () => {
     expect(screen.queryByText("Critical")).not.toBeInTheDocument();
   });
 
-  it("drops the history label once the log has more than one event", () => {
+  it("keeps upcoming and past events in labeled sections", () => {
     render(
       <EventLog
         events={[
@@ -85,7 +87,8 @@ describe("EventLog", () => {
       />,
     );
 
-    expect(screen.getByText("Upcoming")).toBeVisible();
-    expect(screen.queryByText("History")).not.toBeInTheDocument();
+    expect(screen.getByText("Upcoming events")).toBeVisible();
+    expect(screen.getByText("Event history")).toBeVisible();
+    expect(screen.getByText(/recorded after they happen/i)).toBeVisible();
   });
 });
