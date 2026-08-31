@@ -955,6 +955,166 @@ export const SCENARIOS = [
     endTitle: "After the thaw",
     endMessage: "The storm tested every choice you made to prepare Austin.",
   },
+  {
+    id: 108, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "Heatwave + Drought",
+    icon: "heat",
+    locationId: "Paris",
+    location: {
+      id: "Paris",
+      name: "Paris, France",
+      country: "France",
+      region: "Europe",
+      lat: 48.8566,
+      long: 2.3522,
+      timeZone: "Europe/Paris",
+      watershedId: "Paris",
+      watershedName: "Regional river basin",
+      resources: { hydro: true },
+    },
+    summary:
+      "Conserve water and stored energy through a worsening summer heatwave.",
+    briefing: {
+      tone: "storm",
+      fantasy: "Guide a low-carbon grid through a summer of heat and drought.",
+      objective:
+        "Serve every customer through three months of rising demand and falling water availability.",
+      threat:
+        "Hydro inflows and nuclear output will decline together as the heat intensifies.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    durationMonths: 36,
+    startingCustomers: 900000,
+    dollarsPerkWh: 0.14,
+    cash: 180000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      year: 2026,
+      month: 6,
+      durationMonths: 3,
+      minimumDemandServed: 1,
+      label: "2026 heatwave and drought",
+    },
+    facilities: [
+      { fuel: "Uranium", peakW: 350000000, initialAgeYears: 18 },
+      { fuel: "Hydro", peakW: 200000000, initialAgeYears: 25 },
+      { fuel: "Sun", peakW: 600000000, initialAgeYears: 5 },
+      { fuel: "Natural Gas", peakW: 100000000, initialAgeYears: 12 },
+      { name: "Battery", peakWh: 400000000, initialAgeYears: 3 },
+    ],
+    endTitle: "The heat finally breaks",
+    endMessage:
+      "The long hot summer tested whether your portfolio could conserve energy for the days it mattered most.",
+  },
+  {
+    id: 109,
+    name: "Solar Eclipse",
+    icon: "solar",
+    locationId: "Paris",
+    location: {
+      id: "Paris",
+      name: "Paris, France",
+      country: "France",
+      region: "Europe",
+      lat: 48.8566,
+      long: 2.3522,
+      timeZone: "Europe/Paris",
+      resources: { hydro: false },
+    },
+    summary:
+      "Prepare a solar-heavy grid for the predictable August 2026 eclipse.",
+    briefing: {
+      tone: "innovation",
+      fantasy:
+        "Turn a rare celestial event into a demonstration of preparation.",
+      objective:
+        "Charge storage or add firm capacity before solar output plunges and recovers.",
+      threat:
+        "Enough stored energy will not help if its discharge power cannot cover the rapid drop.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    // January 2024 through the eclipse month of August 2026.
+    durationMonths: 32,
+    startingCustomers: 900000,
+    dollarsPerkWh: 0.14,
+    cash: 150000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      year: 2026,
+      month: 8,
+      minimumDemandServed: 1,
+      label: "August 2026 eclipse",
+    },
+    facilities: [
+      { fuel: "Sun", peakW: 1000000000, initialAgeYears: 4 },
+      { fuel: "Uranium", peakW: 100000000, initialAgeYears: 20 },
+      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
+    ],
+    endTitle: "Sunlight returns",
+    endMessage:
+      "The eclipse showed whether advance warning became real power and energy reserves.",
+  },
+  {
+    id: 110,
+    name: "Sudden Nuclear Trip",
+    icon: "nuclear",
+    locationId: "Paris",
+    location: {
+      id: "Paris",
+      name: "Paris, France",
+      country: "France",
+      region: "Europe",
+      lat: 48.8566,
+      long: 2.3522,
+      timeZone: "Europe/Paris",
+      resources: { hydro: false },
+    },
+    summary:
+      "Carry enough contingency capacity for an unannounced nuclear outage.",
+    briefing: {
+      tone: "legacy",
+      fantasy:
+        "Keep the grid steady when its largest generator suddenly disappears.",
+      objective:
+        "Build a portfolio that can absorb the loss of the main nuclear unit at any time in the risk window.",
+      threat:
+        "The trip month is hidden, and the reactor will remain offline for the rest of the mission.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    durationMonths: 48,
+    startingCustomers: 900000,
+    dollarsPerkWh: 0.14,
+    cash: 180000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      // The trip can occur from July 2026 through January 2027. Requiring the whole window and
+      // its aftermath keeps the hidden seeded month out of the objective text.
+      year: 2026,
+      month: 7,
+      durationMonths: 18,
+      minimumDemandServed: 1,
+      label: "nuclear contingency window and recovery",
+    },
+    facilities: [
+      {
+        fuel: "Uranium",
+        peakW: 500000000,
+        initialAgeYears: 22,
+        label: "Grand Nuclear Unit",
+      },
+      { fuel: "Wind", peakW: 250000000, initialAgeYears: 6 },
+      { fuel: "Sun", peakW: 200000000, initialAgeYears: 5 },
+      { fuel: "Natural Gas", peakW: 50000000, initialAgeYears: 15 },
+      { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
+    ],
+    endTitle: "Reserve proved its value",
+    endMessage:
+      "The sudden trip tested the contingency capacity your normal operating plan rarely needed.",
+  },
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them

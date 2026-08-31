@@ -54,6 +54,8 @@ export interface StoryPhaseDescriptionType {
 export interface StoryPhaseDefinitionType {
   id: string;
   schedule: StoryScheduleType;
+  /** Defaults to true. False keeps a surprise hidden until its onset. */
+  forecastable?: boolean;
   /** Zero (the default) logs a point-in-time phase without applying lasting effects. */
   durationMonths?: number | ((context: StoryContextType) => number);
   /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
@@ -1132,6 +1134,237 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export interface HeatwaveDroughtBalanceType {
+  demandMultipliers: [number, number, number];
+  hydroRunoffMultipliers: [number, number, number];
+  hydroOutputMultipliers: [number, number, number];
+  nuclearOutputMultipliers: [number, number, number];
+}
+
+export const HEATWAVE_DROUGHT_BALANCE: Record<
+  DifficultyType,
+  HeatwaveDroughtBalanceType
+> = {
+  Intern: {
+    demandMultipliers: [1.06, 1.08, 1.1],
+    hydroRunoffMultipliers: [0.7, 0.55, 0.4],
+    hydroOutputMultipliers: [0.9, 0.8, 0.65],
+    nuclearOutputMultipliers: [0.95, 0.85, 0.75],
+  },
+  Employee: {
+    demandMultipliers: [1.07, 1.1, 1.13],
+    hydroRunoffMultipliers: [0.65, 0.45, 0.3],
+    hydroOutputMultipliers: [0.85, 0.72, 0.58],
+    nuclearOutputMultipliers: [0.92, 0.8, 0.68],
+  },
+  Manager: {
+    demandMultipliers: [1.08, 1.12, 1.16],
+    hydroRunoffMultipliers: [0.6, 0.4, 0.22],
+    hydroOutputMultipliers: [0.8, 0.65, 0.5],
+    nuclearOutputMultipliers: [0.9, 0.75, 0.62],
+  },
+  VP: {
+    demandMultipliers: [1.09, 1.14, 1.19],
+    hydroRunoffMultipliers: [0.55, 0.33, 0.16],
+    hydroOutputMultipliers: [0.75, 0.58, 0.43],
+    nuclearOutputMultipliers: [0.87, 0.7, 0.56],
+  },
+  CEO: {
+    demandMultipliers: [1.1, 1.16, 1.22],
+    hydroRunoffMultipliers: [0.5, 0.25, 0.1],
+    hydroOutputMultipliers: [0.7, 0.5, 0.35],
+    nuclearOutputMultipliers: [0.85, 0.65, 0.5],
+  },
+};
+
+export const SOLAR_ECLIPSE_MINIMUM_OUTPUT: Record<DifficultyType, number> = {
+  Intern: 0.15,
+  Employee: 0.12,
+  Manager: 0.08,
+  VP: 0.05,
+  CEO: 0.02,
+};
+
+const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
+  id: "heatwave-drought",
+  scenarioId: 108,
+  phases: [
+    {
+      id: "seasonal-warning",
+      schedule: { atMonth: 24 },
+      describe: () => ({
+        title: "A hot, dry summer ahead",
+        message:
+          "Forecasts warn that heat will raise demand while drought limits hydro and river cooling.",
+        details:
+          "The stress will build from June through August 2026. Preserve energy and add resilient capacity before then.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([29, 30, 31] as const).map((atMonth, index) => ({
+      id: `heatwave-month-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: 1,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = HEATWAVE_DROUGHT_BALANCE[difficulty];
+        const demandMultiplier = balance.demandMultipliers[index];
+        const hydroRunoffMultiplier = balance.hydroRunoffMultipliers[index];
+        const hydroOutputMultiplier = balance.hydroOutputMultipliers[index];
+        const nuclearOutputMultiplier = balance.nuclearOutputMultipliers[index];
+        return {
+          title:
+            index === 0
+              ? "Heatwave begins"
+              : index === 1
+                ? "Rivers keep falling"
+                : "Peak heat and drought",
+          message:
+            "Demand is climbing as low water constrains hydro and nuclear generation.",
+          details: `Demand is ${Math.round((demandMultiplier - 1) * 100)}% above normal; hydro inflow falls to ${Math.round(hydroRunoffMultiplier * 100)}%, hydro power to ${Math.round(hydroOutputMultiplier * 100)}%, and nuclear power to ${Math.round(nuclearOutputMultiplier * 100)}%.`,
+          concept: "weather" as const,
+          kind: "WORLD_EVENT" as const,
+          importance:
+            index === 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            temperatureOffsetC: 4 + index * 2,
+            demandMultiplier,
+            hydroRunoffMultiplier,
+            facilityOutputMultipliersByFuel: {
+              Hydro: hydroOutputMultiplier,
+              Uranium: nuclearOutputMultiplier,
+            },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+    {
+      id: "cooler-weather",
+      schedule: { atMonth: 32 },
+      describe: () => ({
+        title: "The heat breaks",
+        message:
+          "Cooler weather lowers demand, but reservoirs will take time to recover.",
+        concept: "weather",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS" },
+      }),
+    },
+  ],
+};
+
+const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
+  id: "solar-eclipse",
+  scenarioId: 109,
+  phases: [
+    {
+      id: "advance-warning",
+      schedule: { atMonth: 24 },
+      describe: () => ({
+        title: "Eclipse preparations begin",
+        message:
+          "The August 2026 eclipse will sharply reduce solar output around midday before a rapid recovery.",
+        details:
+          "The timing is known. Check both the MW and MWh available from storage before the event.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    {
+      id: "eclipse",
+      schedule: { atMonth: 31 },
+      durationMonths: 1,
+      describe: ({ difficulty }) => {
+        const minimumOutputMultiplier =
+          SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty];
+        return {
+          title: "The eclipse is underway",
+          message:
+            "Solar generation is falling on schedule. Stored and firm power must bridge the gap.",
+          details: `Solar output falls from normal at 10:30 to ${Math.round(minimumOutputMultiplier * 100)}% at noon, then recovers by 13:30.`,
+          concept: "storage",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: { card: "FACILITIES", view: "FLEET" },
+          effects: {
+            solarEclipse: {
+              startsMinuteOfDay: 10 * 60 + 30,
+              totalityMinuteOfDay: 12 * 60,
+              endsMinuteOfDay: 13 * 60 + 30,
+              minimumOutputMultiplier,
+            },
+          },
+          turningPointPriority: 110,
+        };
+      },
+    },
+  ],
+};
+
+const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
+  id: "nuclear-trip",
+  scenarioId: 110,
+  phases: [
+    {
+      id: "contingency-review",
+      schedule: { atMonth: 24 },
+      describe: () => ({
+        title: "Contingency review",
+        message:
+          "The regulator asks whether the grid can lose its largest generator without blackouts.",
+        details:
+          "A trip is possible from July 2026 through January 2027, but its exact timing cannot be forecast.",
+        concept: "danger",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "FACILITIES", view: "FLEET" },
+      }),
+    },
+    {
+      id: "trip",
+      schedule: {
+        seededMonthRange: { firstMonth: 30, lastMonth: 36 },
+        randomKey: "largest-unit-trip",
+      },
+      forecastable: false,
+      durationMonths: 48,
+      describe: ({ snapshot }) => {
+        const unit = snapshot.facilities.find(
+          (facility) =>
+            facility.name === "Grand Nuclear Unit" && facility.operational,
+        );
+        const facilityOutputMultipliersById = unit
+          ? { [String(unit.id)]: 0 }
+          : {};
+        return {
+          title: "Grand Nuclear Unit trips offline",
+          message:
+            "The grid has suddenly lost its largest generator. Contingency resources must carry the system.",
+          details:
+            "The reactor will remain unavailable for the rest of the mission.",
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: { card: "FACILITIES", view: "FLEET" },
+          attributes: {
+            selectedFacilityIds: unit ? [unit.id] : [],
+            selectedFacilityNames: unit ? [unit.name] : [],
+          },
+          effects: { facilityOutputMultipliersById },
+          turningPointPriority: 120,
+        };
+      },
+    },
+  ],
+};
+
 export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   CARBON_FEE_ARC,
   RENEWABLES_ARC,
@@ -1140,6 +1373,9 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   HURRICANE_ARC,
   PARADISE_ARC,
   TEXAS_DEEP_FREEZE_ARC,
+  HEATWAVE_DROUGHT_ARC,
+  SOLAR_ECLIPSE_ARC,
+  NUCLEAR_TRIP_ARC,
 ];
 
 /** Content-level difficulty scaling is centralized and mechanically checkable. */
@@ -1214,6 +1450,42 @@ export function validateStoryDifficultyMonotonicity(): string[] {
   ascending(
     "Texas deep freeze demand",
     DIFFICULTY_ORDER.map((difficulty) => TEXAS_DEEP_FREEZE_DEMAND[difficulty]),
+  );
+  ([0, 1, 2] as const).forEach((month) => {
+    ascending(
+      `Heatwave month ${month + 1} demand`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          HEATWAVE_DROUGHT_BALANCE[difficulty].demandMultipliers[month],
+      ),
+    );
+    descending(
+      `Heatwave month ${month + 1} hydro runoff`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          HEATWAVE_DROUGHT_BALANCE[difficulty].hydroRunoffMultipliers[month],
+      ),
+    );
+    descending(
+      `Heatwave month ${month + 1} hydro output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          HEATWAVE_DROUGHT_BALANCE[difficulty].hydroOutputMultipliers[month],
+      ),
+    );
+    descending(
+      `Heatwave month ${month + 1} nuclear output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          HEATWAVE_DROUGHT_BALANCE[difficulty].nuclearOutputMultipliers[month],
+      ),
+    );
+  });
+  descending(
+    "Solar eclipse minimum output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty],
+    ),
   );
   ascending(
     "Hurricane affected capacity",
@@ -1311,7 +1583,7 @@ function multiplyEffects<T extends Partial<Record<string, number>>>(
   const result = (target || {}) as T;
   Object.entries(source).forEach(([key, multiplier]) => {
     if (multiplier !== undefined) {
-      result[key as keyof T] = ((result[key] || 1) * multiplier) as T[keyof T];
+      result[key as keyof T] = ((result[key] ?? 1) * multiplier) as T[keyof T];
     }
   });
   return result;
@@ -1327,26 +1599,56 @@ export function combineStoryEffects(
       (combined.temperatureOffsetC || 0) + (effects.temperatureOffsetC || 0);
     combined.demandMultiplier =
       (combined.demandMultiplier || 1) * (effects.demandMultiplier || 1);
-    combined.fuelPriceMultipliers = multiplyEffects(
+    if (
+      combined.hydroRunoffMultiplier !== undefined ||
+      effects.hydroRunoffMultiplier !== undefined
+    ) {
+      combined.hydroRunoffMultiplier =
+        (combined.hydroRunoffMultiplier || 1) *
+        (effects.hydroRunoffMultiplier || 1);
+    }
+    if (effects.solarEclipse !== undefined) {
+      if (combined.solarEclipse !== undefined) {
+        throw new Error("Overlapping solar-eclipse effects");
+      }
+      combined.solarEclipse = effects.solarEclipse;
+    }
+    const fuelPriceMultipliers = multiplyEffects(
       combined.fuelPriceMultipliers,
       effects.fuelPriceMultipliers,
     );
-    combined.buildCostMultipliersByFuel = multiplyEffects(
+    if (fuelPriceMultipliers !== undefined) {
+      combined.fuelPriceMultipliers = fuelPriceMultipliers;
+    }
+    const buildCostMultipliersByFuel = multiplyEffects(
       combined.buildCostMultipliersByFuel,
       effects.buildCostMultipliersByFuel,
     );
-    combined.operatingCostMultipliersByFuel = multiplyEffects(
+    if (buildCostMultipliersByFuel !== undefined) {
+      combined.buildCostMultipliersByFuel = buildCostMultipliersByFuel;
+    }
+    const operatingCostMultipliersByFuel = multiplyEffects(
       combined.operatingCostMultipliersByFuel,
       effects.operatingCostMultipliersByFuel,
     );
-    combined.facilityOutputMultipliersByFuel = multiplyEffects(
+    if (operatingCostMultipliersByFuel !== undefined) {
+      combined.operatingCostMultipliersByFuel = operatingCostMultipliersByFuel;
+    }
+    const facilityOutputMultipliersByFuel = multiplyEffects(
       combined.facilityOutputMultipliersByFuel,
       effects.facilityOutputMultipliersByFuel,
     );
-    combined.facilityOutputMultipliersById = multiplyEffects(
+    if (facilityOutputMultipliersByFuel !== undefined) {
+      combined.facilityOutputMultipliersByFuel =
+        facilityOutputMultipliersByFuel;
+    }
+    const facilityOutputMultipliersById = multiplyEffects(
       combined.facilityOutputMultipliersById,
       effects.facilityOutputMultipliersById,
     );
+    if (facilityOutputMultipliersById !== undefined) {
+      combined.facilityOutputMultipliersById = facilityOutputMultipliersById;
+    }
     if (effects.carbonFeePerKgCO2e !== undefined) {
       if (
         combined.carbonFeePerKgCO2e !== undefined &&
@@ -1384,6 +1686,7 @@ export function resolveStoryPhase(
     definitionId: `${arc.id}:${phase.id}`,
     startsMinute,
     endsMinute: startsMinute + durationMonths * MINUTES_PER_MONTH,
+    forecastable: phase.forecastable,
     ...description,
     attributes: {
       scheduledMonth,
@@ -1471,7 +1774,9 @@ export function upcomingStoryPhases(
   return definitions
     .filter((arc) => arc.scenarioId === context.scenarioId)
     .flatMap((arc) =>
-      arc.phases.map((phase) => resolveStoryPhase(arc, phase, context)),
+      arc.phases
+        .filter((phase) => phase.forecastable !== false)
+        .map((phase) => resolveStoryPhase(arc, phase, context)),
     )
     .filter(
       (phase) =>
@@ -1481,6 +1786,37 @@ export function upcomingStoryPhases(
     .sort(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
+}
+
+/** Piecewise-linear loss and recovery across a known eclipse window. */
+export function solarEclipseOutputMultiplier(
+  effects: WorldEventEffectsType,
+  minuteOfDay: number,
+): number {
+  const eclipse = effects.solarEclipse;
+  if (
+    !eclipse ||
+    minuteOfDay <= eclipse.startsMinuteOfDay ||
+    minuteOfDay >= eclipse.endsMinuteOfDay
+  ) {
+    return 1;
+  }
+  if (minuteOfDay === eclipse.totalityMinuteOfDay) {
+    return eclipse.minimumOutputMultiplier;
+  }
+  if (minuteOfDay <= eclipse.totalityMinuteOfDay) {
+    const progress =
+      (minuteOfDay - eclipse.startsMinuteOfDay) /
+      (eclipse.totalityMinuteOfDay - eclipse.startsMinuteOfDay);
+    return 1 - progress * (1 - eclipse.minimumOutputMultiplier);
+  }
+  const recovery =
+    (minuteOfDay - eclipse.totalityMinuteOfDay) /
+    (eclipse.endsMinuteOfDay - eclipse.totalityMinuteOfDay);
+  return (
+    eclipse.minimumOutputMultiplier +
+    recovery * (1 - eclipse.minimumOutputMultiplier)
+  );
 }
 
 export function activeWorldEventEffects(

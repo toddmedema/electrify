@@ -51,6 +51,7 @@ import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import {
   combineStoryEffects,
   resolveStoryAtDate,
+  solarEclipseOutputMultiplier,
   STORY_ARC_DEFINITIONS,
 } from "../data/WorldEvents";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
@@ -579,7 +580,11 @@ function storyEffectsAt(date: DateType, state: GameType) {
       date.minute,
     ),
     occurrences: state.worldEvents.occurrences,
-  }).active.filter((event) => !persistedKeys.has(event.key));
+  }).active.filter(
+    (event) =>
+      !persistedKeys.has(event.key) &&
+      (event.forecastable !== false || date.minute <= state.date.minute),
+  );
   const effects = combineStoryEffects([...persisted, ...scheduled]);
   if (storyEffectsCache.size > 10000) {
     storyEffectsCache.clear();
@@ -1583,12 +1588,17 @@ export function scenarioObjectiveFailure(
 ): string | undefined {
   const reliabilityObjective = scenario.reliabilityObjective;
   if (reliabilityObjective) {
-    const target = history.find(
-      (month) =>
-        month.year === reliabilityObjective.year &&
-        month.month === reliabilityObjective.month,
-    );
-    if (target) {
+    const firstAbsoluteMonth =
+      reliabilityObjective.year * 12 + reliabilityObjective.month - 1;
+    const durationMonths = reliabilityObjective.durationMonths || 1;
+    const targets = history.filter((month) => {
+      const absoluteMonth = month.year * 12 + month.month - 1;
+      return (
+        absoluteMonth >= firstAbsoluteMonth &&
+        absoluteMonth < firstAbsoluteMonth + durationMonths
+      );
+    });
+    for (const target of targets) {
       const demandServed =
         target.demandWh > 0 ? target.supplyWh / target.demandWh : 1;
       if (demandServed < reliabilityObjective.minimumDemandServed) {
@@ -1759,7 +1769,8 @@ function reforecastWeatherAndPrices(
         storedWh: 0,
         precipitationMm: hydrology.precipitationMm,
         snowpackMm: hydrology.snowpackMm,
-        hydroRunoffMm: hydrology.runoffMm,
+        hydroRunoffMm:
+          hydrology.runoffMm * (effects.hydroRunoffMultiplier ?? 1),
         hydroReservoirWh: 0,
         hydroReservoirCapacityWh: 0,
         hydroSpillWh: 0,
@@ -1931,12 +1942,19 @@ function updateSupplyFacilitiesFinances(
         previousW > 0);
     const generatorFuel = generator.fuel as FuelNameType | undefined;
     const fuelOutputMultiplier = generatorFuel
-      ? tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] || 1
+      ? (tickStoryEffects.facilityOutputMultipliersByFuel?.[generatorFuel] ?? 1)
       : 1;
     const facilityOutputMultiplier =
-      tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] || 1;
+      tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1;
+    const solarEclipseMultiplier =
+      generatorFuel === "Sun"
+        ? solarEclipseOutputMultiplier(tickStoryEffects, tickDate.minuteOfDay)
+        : 1;
     const availablePeakW =
-      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
+      g.peakW *
+      fuelOutputMultiplier *
+      facilityOutputMultiplier *
+      solarEclipseMultiplier;
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;

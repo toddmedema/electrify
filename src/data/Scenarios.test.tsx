@@ -209,6 +209,41 @@ describe("authored starting fleets", () => {
     ).toBe(3_827_000_000);
   });
 
+  it("authors three distinct generation and storage resilience challenges", () => {
+    const heatwave = getScenario(108)!;
+    const eclipse = getScenario(109)!;
+    const trip = getScenario(110)!;
+
+    expect(heatwave.reliabilityObjective).toMatchObject({
+      year: 2026,
+      month: 6,
+      durationMonths: 3,
+      minimumDemandServed: 1,
+    });
+    expect(
+      heatwave.facilities.map((facility) => facility.fuel || facility.name),
+    ).toEqual(expect.arrayContaining(["Uranium", "Hydro", "Sun", "Battery"]));
+    expect(eclipse).toMatchObject({
+      startingYear: 2024,
+      durationMonths: 32,
+      reliabilityObjective: { year: 2026, month: 8 },
+    });
+    expect(
+      eclipse.facilities.find((facility) => facility.name === "Battery")
+        ?.peakWh,
+    ).toBe(200_000_000);
+    expect(trip.reliabilityObjective).toMatchObject({
+      year: 2026,
+      month: 7,
+      durationMonths: 18,
+    });
+    expect(
+      trip.facilities.find(
+        (facility) => facility.label === "Grand Nuclear Unit",
+      ),
+    ).toMatchObject({ fuel: "Uranium", peakW: 500_000_000 });
+  });
+
   it("makes every plant in the aging coal fleet at least 20 years old", () => {
     const endOfEra = SCENARIOS.find(
       (scenario) => scenario.name === "The End of an Era",

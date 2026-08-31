@@ -8,6 +8,7 @@ import {
   hasChronicBlackouts,
   quit,
   resume,
+  scenarioObjectiveFailure,
   setSpeed,
   tick as tickAction,
   tickState,
@@ -264,6 +265,33 @@ describe("ending a scenario from inside the reducer", () => {
         score: victory?.score,
       }),
     );
+  });
+});
+
+describe("scenario reliability windows", () => {
+  it("requires every month in a multi-month event to meet the target", () => {
+    const heatwave = SCENARIOS.find((scenario) => scenario.id === 108)!;
+    const failedAugust = [
+      {
+        year: 2026,
+        month: 8,
+        demandWh: 100,
+        supplyWh: 99,
+      } as MonthlyHistoryType,
+    ];
+    expect(scenarioObjectiveFailure(heatwave, failedAugust)).toMatch(
+      /2026 heatwave and drought/,
+    );
+
+    const afterWindow = [
+      {
+        year: 2026,
+        month: 9,
+        demandWh: 100,
+        supplyWh: 99,
+      } as MonthlyHistoryType,
+    ];
+    expect(scenarioObjectiveFailure(heatwave, afterWindow)).toBeUndefined();
   });
 });
 

@@ -75,6 +75,7 @@ function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
 
 function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
   const initialBuildName = process.env.SIM_BUILD;
+  const initialBuildMWh = envNumber("SIM_BUILD_MWH");
   return {
     difficulty: (process.env.SIM_DIFFICULTY as DifficultyType) || undefined,
     months: envNumber("SIM_MONTHS"),
@@ -84,7 +85,9 @@ function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
     initialBuild: initialBuildName
       ? {
           name: initialBuildName,
-          peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000,
+          ...(initialBuildMWh === undefined
+            ? { peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000 }
+            : { peakWh: initialBuildMWh * 1000000 }),
           financed: process.env.SIM_FINANCE === "1",
         }
       : undefined,

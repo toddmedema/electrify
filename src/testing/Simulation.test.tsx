@@ -639,6 +639,30 @@ describe("simulation economics", () => {
     });
   });
 
+  SCENARIOS.filter((scenario) => [108, 109, 110].includes(scenario.id)).forEach(
+    (scenario) => {
+      it(`requires player input but accepts one build on Intern in "${scenario.name}"`, () => {
+        const passive = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+        });
+        expectNoViolations(passive);
+        expect(passive.actionCount).toBe(0);
+        expect(passive.outcome).not.toBe("completed");
+
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect(active.actionCount).toBe(1);
+        expect(active.builds).toHaveLength(1);
+        expect(active.outcome).toBe("completed");
+      });
+    },
+  );
+
   SCENARIOS.filter(
     (scenario) => !scenario.tutorialSteps && scenario.id < 106,
   ).forEach((scenario) => {

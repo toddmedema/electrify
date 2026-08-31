@@ -29,6 +29,8 @@ profit, emissions), the number of recorded player actions, totals for the run, t
 finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
 or fired after three consecutive months below 90% supplied.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
+One explicit storage decision can be replayed with, for example,
+`--build Battery --build-mwh 800 --finance`; generator builds use `--build-mw`.
 Pass `--without-stories` to run the same playthrough as an authored-effects control.
 
 Story balance uses the checked-in seeds 1–20 across all six scored scenarios and five
