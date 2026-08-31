@@ -83,7 +83,7 @@ function buildOptions(showXLabels: boolean) {
       }),
       yAxis(scale, {
         grid: true,
-        label: "Per MMBTU",
+        label: "Price per MMBtu",
         // The label sits outside the axis, so it comes out of the shared gutter too
         size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => formatMoneyConcise(t)),
@@ -147,7 +147,7 @@ export default class ChartForecastFuelPrices extends React.PureComponent<
     return (
       <div id="chartForecastFuelPrices">
         <UPlotChart<State>
-          ariaLabel="Chart of forecasted fuel prices"
+          ariaLabel="Chart of predicted fuel prices"
           formatSummaryValue={formatMoneyStable}
           height={height}
           state={{ prices, minutes, domain, startingYear, multiyear }}

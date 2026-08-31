@@ -97,7 +97,7 @@ function buildChartKeys(units: UnitSystemType): {
       formatTable: formatMoneyStable,
     },
     profitPerkWh: {
-      label: "Unit profit",
+      label: "Profit per kWh",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -111,7 +111,7 @@ function buildChartKeys(units: UnitSystemType): {
       formatTable: formatMoneyStable,
     },
     revenuePerkWh: {
-      label: "Unit revenue",
+      label: "Revenue per kWh",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -119,7 +119,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 1,
     },
     supplyWh: {
-      label: "Power sold",
+      label: "Electricity sold",
       higherIsBetter: true,
       format: (n: number) => `${formatWatts(n, 0)}h`,
       nesting: 1,
@@ -149,7 +149,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 1,
     },
     expensesOM: {
-      label: "Operations",
+      label: "Operations & maintenance",
       higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -184,7 +184,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 2,
     },
     kgco2ePerMWh: {
-      label: "Emissions factor",
+      label: "Emissions per MWh",
       higherIsBetter: false,
       format: (n: number) =>
         numbro(toDisplayMass(n, units)).format({
@@ -195,7 +195,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 2,
     },
     netWorth: {
-      label: "Net Worth",
+      label: "Net worth",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,

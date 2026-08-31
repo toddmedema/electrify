@@ -6,6 +6,7 @@ import {
   normalAt,
   randomAt,
   RANDOM_STREAM,
+  roundToSignificantDigits,
 } from "./Math";
 
 const STREAM = 1;
@@ -21,6 +22,15 @@ describe("getIntersectionX", () => {
   // Parallel lines never meet, so there is no x to return. Callers treat the 0 as "no crossing"
   it("returns zero for parallel lines rather than dividing by zero", () => {
     expect(getIntersectionX(0, 0, 10, 10, 0, 5, 10, 15)).toEqual(0);
+  });
+});
+
+describe("roundToSignificantDigits", () => {
+  it("rounds capacities at their own scale", () => {
+    expect(roundToSignificantDigits(722_225_000, 2)).toBe(720_000_000);
+    expect(roundToSignificantDigits(60_830_000, 2)).toBe(61_000_000);
+    expect(roundToSignificantDigits(1_497_000_000, 2)).toBe(1_500_000_000);
+    expect(roundToSignificantDigits(55_000_000, 2)).toBe(55_000_000);
   });
 });
 

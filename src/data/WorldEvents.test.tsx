@@ -440,6 +440,30 @@ describe("generation and storage reliability scenarios", () => {
       "Grand Nuclear Unit",
     ]);
   });
+
+  it("uses short preview copy before the eclipse and precise copy at onset", () => {
+    const upcoming = upcomingStoryPhases(context(0, 109));
+    const warning = upcoming.find((phase) =>
+      phase.key.endsWith(":advance-warning"),
+    )!;
+    const eclipse = upcoming.find((phase) => phase.key.endsWith(":eclipse"))!;
+
+    expect(warning).toMatchObject({
+      title: "Eclipse planning ahead",
+      message: "Grid planners will begin preparing for a total eclipse.",
+      details: undefined,
+    });
+    expect(eclipse).toMatchObject({
+      title: "Total solar eclipse",
+      message: "A total eclipse will briefly reduce solar generation.",
+      details: undefined,
+    });
+    expect(eclipse.message).not.toMatch(/underway|08:30|10:00|11:30/i);
+
+    const live = resolveStoryAtDate(context(32, 109)).occurrences[0];
+    expect(live.title).toBe("The eclipse is underway");
+    expect(live.details).toMatch(/08:30.*10:00.*11:30/i);
+  });
 });
 
 describe("remaining scored story arcs", () => {

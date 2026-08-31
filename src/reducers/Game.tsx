@@ -33,7 +33,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove, newSeed } from "../helpers/Math";
+import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
@@ -299,7 +299,7 @@ function logFuelPriceMoves(
     logGameEvent(
       state,
       "FUEL_PRICE",
-      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MBTU`,
+      `${fuel} ${change > 0 ? "up" : "down"} ${Math.round(Math.abs(change) * 100)}% to ${formatMoneyConcise(prices[fuel])}/MMBtu`,
     );
   });
 }
@@ -765,6 +765,21 @@ export const gameSlice = createSlice({
         // Age is scenario metadata rather than a catalog property, so exclude it from the exact
         // technology match and pass it to the completed operating asset separately.
         const { initialAgeYears = 0, label, ...facilitySearch } = search;
+        // Scenario research may carry more precision than is useful to a player. Resolve the
+        // catalog quote from the rounded size so its costs and technology-derived fields agree
+        // with the two-significant-digit nameplate the operating facility receives.
+        if (facilitySearch.peakW !== undefined) {
+          facilitySearch.peakW = roundToSignificantDigits(
+            facilitySearch.peakW,
+            2,
+          );
+        }
+        if (facilitySearch.peakWh !== undefined) {
+          facilitySearch.peakWh = roundToSignificantDigits(
+            facilitySearch.peakWh,
+            2,
+          );
+        }
         const generator = GENERATORS(
           state,
           facilitySearch.peakW || 1000000,
@@ -1279,7 +1294,7 @@ export function tickState(state: GameType) {
         logGameEvent(
           state,
           "BLACKOUT_OVER",
-          `Blackout over after ${blackoutLength(state.date.minute - blackoutStartMinute)} - ${formatWattHours(blackoutUnservedWh)} unserved`,
+          `Blackout ended after ${blackoutLength(state.date.minute - blackoutStartMinute)}. The grid could not supply ${formatWattHours(blackoutUnservedWh)} of electricity demand.`,
         );
       }
       const message = inBlackout
@@ -1452,7 +1467,7 @@ export function tickState(state: GameType) {
                 outcome: "fired",
                 title: "Fired!",
                 reason:
-                  "You've allowed chronic blackouts for 3 months, causing the utility board to remove you from office.",
+                  "Blackouts continued for 3 months, so the utility board ended your term.",
               } as const)
             : objectiveFailure
               ? ({
@@ -1473,7 +1488,7 @@ export function tickState(state: GameType) {
           }
                 You survived for ${yearsSurvived} years,
                 earned ${formatMoneyConcise(summary.revenue)} in revenue
-                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of pollution.`;
+                and emitted ${formatLargeMass(summary.kgco2e, getStore().getState().settings.units)} of greenhouse gases, measured as CO2e.`;
 
         // Tutorials are intentionally unscored even when completed, so retain their guided
         // failure dialog rather than putting one tutorial attempt on the global leaderboard.
@@ -2421,12 +2436,18 @@ function reforecastSupply(
   // of remaining online with the cost of the next start. Keeping this as two linear passes avoids
   // recursively re-simulating the fleet for every plant on every tick.
   const baseline = supplyForecastPass(state, true, true, stepMinutes);
+  // Recorded ticks can be Immer drafts when this is called from a reducer. Commitment metadata
+  // is deliberately attached with Object.defineProperty, which Immer forbids on a draft; the
+  // optimizer only reads from the current tick onwards anyway, so leave the recorded past alone.
+  const futureBaseline = baseline.slice(
+    forecastIndexAt(state, state.date.minute),
+  );
   state.facilities.forEach((facility) => {
     const generator = facility as GeneratorOperatingType;
     if (!facility.peakWh && (generator.minimumStableOutput || 0) > 0) {
       prepareGeneratorCommitment({
         facilityId: facility.id,
-        forecast: baseline,
+        forecast: futureBaseline,
         minimumOperatingCost: (futureTick) =>
           minimumStableOperatingCost(state, generator, futureTick, stepMinutes),
       });

@@ -29,7 +29,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES } from "../../Constants";
+import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getViableLocationsRemaining } from "../../data/FacilitySites";
@@ -515,8 +515,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     })
                   }
                 >
-                  <MenuItem value="Investor">Investor-Owned</MenuItem>
-                  <MenuItem value="Public">Public-Owned</MenuItem>
+                  <MenuItem value="Investor">
+                    For-profit utility (investor-owned)
+                  </MenuItem>
+                  <MenuItem value="Public">
+                    Community or government utility (publicly owned)
+                  </MenuItem>
                 </Select>
               </TableCell>
             </TableRow>
@@ -615,7 +619,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                           title={DIFFICULTIES[d].description}
                           placement="right"
                         >
-                          <span>{d}</span>
+                          <span>{DIFFICULTY_LABELS[d as DifficultyType]}</span>
                         </Tooltip>
                       </MenuItem>
                     );
@@ -649,6 +653,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 >
                   <CasinoIcon />
                 </IconButton>
+                <Typography variant="caption" color="textSecondary">
+                  Using the same seed repeats the same weather and fuel-price
+                  pattern.
+                </Typography>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -660,8 +668,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
         {unavailable.length > 0 && (
           <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>
             {unavailable.map(facilityName).join(", ")} can't be built with this
-            location and year, or exceeds the number of viable sites. Remove{" "}
-            {unavailable.length === 1 ? "it" : "them"} or change the setup.
+            location and year, or exceeds the number of suitable build sites.
+            Remove {unavailable.length === 1 ? "it" : "them"} or change the
+            setup.
           </Typography>
         )}
 
@@ -799,9 +808,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
       <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)}>
         <DialogTitle>Carbon fee</DialogTitle>
         <DialogContent>
-          A fee placed on pollution to cover its damage to society. Charged by
-          the amount of greenhouse gas emitted, measured in{" "}
-          {largeMassUnit(units)} of CO2 equivalent.
+          A carbon fee charges for greenhouse gas emissions. The game measures
+          them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
+          common unit for comparing different greenhouse gases.
         </DialogContent>
         <DialogActions>
           <Button

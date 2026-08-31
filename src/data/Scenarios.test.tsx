@@ -77,8 +77,8 @@ describe("tutorial mission metadata", () => {
     )!;
     render(generatorsMission.tutorialSteps![1].content);
 
-    expect(screen.getByText(/Compare build cost/)).toHaveTextContent(
-      "O&M (Operations & Maintenance)",
+    expect(screen.getByText(/Compare construction cost/)).toHaveTextContent(
+      "operations and maintenance (O&M)",
     );
   });
 
@@ -221,7 +221,7 @@ describe("authored starting fleets", () => {
       minimumDemandServed: 1,
     });
     expect(heatwave).toMatchObject({
-      name: "Heatwave + Drought in Spain",
+      name: "Heatwave + Drought",
       locationId: "Madrid",
       startingDemandScale: 0.73,
     });
@@ -232,7 +232,7 @@ describe("authored starting fleets", () => {
       expect.arrayContaining(["Uranium", "Hydro", "Sun", "Wind", "Battery"]),
     );
     expect(eclipse).toMatchObject({
-      name: "Solar Eclipse in China",
+      name: "Solar Eclipse",
       locationId: "Beijing",
       startingYear: 2033,
       durationMonths: 33,
@@ -250,7 +250,7 @@ describe("authored starting fleets", () => {
       durationMonths: 18,
     });
     expect(trip).toMatchObject({
-      name: "Sudden Nuclear Trip in France",
+      name: "Sudden Nuclear Shutdown",
       icon: "sudden-nuclear-trip",
     });
     expect(
@@ -258,6 +258,20 @@ describe("authored starting fleets", () => {
         (facility) => facility.label === "Grand Nuclear Unit",
       ),
     ).toMatchObject({ fuel: "Uranium", peakW: 500_000_000 });
+  });
+
+  it("keeps locations in scenario metadata rather than scenario names", () => {
+    expect(
+      [107, 108, 109, 110].map((id) => ({
+        name: getScenario(id)!.name,
+        location: getScenario(id)!.location?.name,
+      })),
+    ).toEqual([
+      { name: "Deep Freeze", location: "Austin, TX" },
+      { name: "Heatwave + Drought", location: "Madrid, Spain" },
+      { name: "Solar Eclipse", location: "Beijing, China" },
+      { name: "Sudden Nuclear Shutdown", location: "Paris, France" },
+    ]);
   });
 
   it("makes every plant in the aging coal fleet at least 20 years old", () => {

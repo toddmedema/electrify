@@ -13,7 +13,7 @@ export const DIFFICULTIES = {
     buildTime: 0.2,
     blackoutPenalty: 2,
     description:
-      "Most forgiving: much lower costs, very fast building, and gentler outage consequences.",
+      "Most forgiving: much lower game costs, very fast building, and smaller gameplay penalties from outages.",
   },
   Employee: {
     buildCost: 0.7,
@@ -21,21 +21,22 @@ export const DIFFICULTIES = {
     buildTime: 0.3,
     blackoutPenalty: 4,
     description:
-      "Forgiving: lower costs, faster building, and gentler outage consequences.",
+      "Forgiving: lower game costs, faster building, and smaller gameplay penalties from outages.",
   },
   Manager: {
     buildCost: 0.8,
     expensesOM: 0.8,
     buildTime: 0.5,
     blackoutPenalty: 6,
-    description: "Balanced: some help with costs, building time, and outages.",
+    description:
+      "Balanced: some help with game costs, building time, and outage penalties.",
   },
   VP: {
     buildCost: 0.9,
     expensesOM: 0.9,
     buildTime: 0.7,
     blackoutPenalty: 8,
-    description: "Demanding: a little help with costs and building time.",
+    description: "Demanding: a little help with game costs and building time.",
   },
   CEO: {
     buildCost: 1,
@@ -43,9 +44,17 @@ export const DIFFICULTIES = {
     buildTime: 1,
     blackoutPenalty: 10,
     description:
-      "Full challenge: fully realistic costs, building times, and outage consequences.",
+      "Full challenge: unadjusted game costs, building times, and outage penalties.",
   },
 } as { [index: string]: DifficultyMultipliersType };
+
+export const DIFFICULTY_LABELS: Record<string, string> = {
+  Intern: "Beginner",
+  Employee: "Easy",
+  Manager: "Medium",
+  VP: "Hard",
+  CEO: "Expert",
+};
 
 export const LOCATIONS = {
   PIT: {

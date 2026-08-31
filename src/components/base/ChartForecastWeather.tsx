@@ -131,7 +131,7 @@ export default class ChartForecastWeather extends React.PureComponent<
     return (
       <UPlotChart<State>
         id="chartForecastWeather"
-        ariaLabel="Chart of forecasted temperature"
+        ariaLabel="Chart of predicted temperature"
         height={height}
         state={{ data, domain, startingYear, multiyear, units }}
         data={[minutes, temperature]}

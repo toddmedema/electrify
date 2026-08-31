@@ -145,10 +145,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          You're the incoming CEO of an electric utility. Every hour of game
-          time your customers demand a certain amount of power, and every hour
-          your generators have to supply it. Supply too little and you cause{" "}
-          blackouts; spend too much supplying it and you go broke.
+          You run an electric utility: a company that supplies electricity.
+          Every hour, your customers need a certain amount of power and your
+          generators must match it. Supply too little and you cause blackouts;
+          spend too much and the company runs out of money.
         </p>
         <p>
           <strong>Facilities</strong> is your fleet. Generators higher in the
@@ -182,7 +182,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           These symbols mean the same thing in missions, controls, events and
-          results. Learn one once, then follow it everywhere.
+          results. The same symbol always represents the same idea throughout
+          the game.
         </p>
         <ConceptLegend />
       </div>
@@ -195,15 +196,16 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Demand never sits still, so a fleet needs two very different kinds of
-          plant.
+          Electricity demand rises and falls during each day. Power companies
+          often meet it with a mix of plants that run steadily and plants that
+          can start quickly when demand peaks.
         </p>
         <p>
-          <strong>Baseload</strong> plants - nuclear, coal, large hydro - are
-          cheap per unit of energy but slow and expensive to start and stop, so
-          they run flat out around the clock and cover the demand that's always
-          there. They're the wrong answer to a four-hour evening peak: by the
-          time one has ramped up, the peak is over.
+          <strong>Baseload</strong> describes the plants used to cover the
+          demand that is present most of the time. Nuclear and coal plants often
+          fill this role because they can be costly or slow to start and stop.
+          Some hydro plants can also provide steady power, but many can change
+          output quickly.
         </p>
         <p>
           <strong>Peakers</strong> - typically gas turbines - are the opposite.
@@ -212,11 +214,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           their keep on the handful of days when demand spikes.
         </p>
         <p>
-          Most of the cost of a peaker is the fuel it burns, so an idle one
-          costs you little; most of the cost of a baseload plant is paid whether
-          it runs or not. That's why a fleet made only of peakers loses money on
-          fuel, and a fleet made only of baseload plants blacks out every summer
-          afternoon.
+          Most of a peaker's cost comes from the fuel it burns, so an idle one
+          costs relatively little. Much of a baseload plant's cost is paid
+          whether it runs or not. A grid usually needs a mix: steady plants for
+          regular demand and flexible plants for short peaks. These are
+          operating roles, and some generators can serve more than one role.
         </p>
       </div>
     ),
@@ -227,13 +229,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          If you don't supply enough electricity to meet demand, you'll cause
-          rolling blackouts that cost you customers (and thus revenue).
+          In Electrify, a blackout happens when available supply cannot meet
+          demand. Repeated blackouts cost you customers, which lowers revenue.
         </p>
         <p>
-          Like utilities in real life, you aren't financially responsible for
-          blackouts. But, if you have chronic blackouts, your board of directors
-          might fire you!
+          The game does not charge a separate damage bill for each blackout, but
+          outages still reduce customers, revenue, score, and job security.
         </p>
       </div>
     ),
@@ -244,8 +245,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     keywords: "british thermal unit mmbtu heat energy kwh mwh",
     entry: (
       <p>
-        The British Thermal Unit is a measure of heat energy. MMBTU is one
-        million BTU, and equals approximately 300 kWh of electrical energy.
+        A British thermal unit (Btu) measures heat energy. One MMBtu means one
+        million Btu, equal to about 293 kWh of heat. A power plant produces less
+        electricity because some energy is lost during conversion.
       </p>
     ),
   },
@@ -256,18 +258,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Capacity factor is the share of a generator's nameplate capacity it
-          actually delivers over a year. A 100 MW plant at a 45% capacity factor
-          produces as much energy in a year as a 45 MW plant running
-          continuously would.
+          Capacity factor compares how much electricity a generator actually
+          produces with the most it could produce if it ran at full power all
+          year. A 100 MW plant at a 45% capacity factor produces as much energy
+          in a year as a 45 MW plant running continuously.
         </p>
         <p>
-          It's shown in the build screen as "% uptime", and it's why nameplate
-          size alone tells you very little. Nuclear runs above 90%. Coal and gas
-          sit in the middle, limited by fuel cost and by how often you choose to
-          dispatch them. Wind and solar are set by the weather and the seasons
-          at your location, not by you - which is why the same solar farm is a
-          much better deal in one scenario than another.
+          It is shown on the build screen as expected output, and it is why a
+          plant's maximum rated size alone tells you very little. Nuclear often
+          runs above 90%. Coal and gas depend on fuel costs and how often you
+          choose to run them. Wind and solar depend on local weather and
+          seasons, so the same solar farm can perform differently in each
+          scenario.
         </p>
         <p>
           Capacity factor is what turns a build cost into a cost per MWh, so
@@ -283,25 +285,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          A carbon fee is a charge on pollution, meant to cover the damage it
-          does to everyone else. It's billed by the amount of greenhouse gas
-          emitted, measured in <LargeMassUnit /> of CO2 equivalent, and it shows
-          up in your P&amp;L as an operating expense on every dirty MWh you
-          generate.
+          A carbon fee charges power plants for the greenhouse gases they
+          release. Plants with higher emissions pay more for each unit of
+          electricity they generate.
         </p>
         <p>
-          Electricity generation is the 2nd largest source of greenhouse gas in
-          the United States, and without a fee a utility has no financial reason
-          to cut its emissions - the cheapest plant to run wins no matter what
-          comes out of the stack. A fee changes the merit order itself: at{" "}
-          <ExampleCarbonFee /> a coal plant can become more expensive to run
-          than the gas plant beside it, without a single rule telling you to
-          shut it down.
+          The fee is based on greenhouse gas emissions, measured in{" "}
+          <LargeMassUnit /> of carbon dioxide equivalent (CO2e). It appears in
+          the profit-and-loss statement as an operating expense for each
+          megawatt-hour (MWh) generated. At <ExampleCarbonFee />, a coal plant
+          can become more expensive to run than a gas plant, changing the order
+          in which the grid uses them.
         </p>
         <p>
           Scenarios set their own fee, and custom games let you dial it from $0
           upwards. Turning it up is the fastest way to see how much of the
-          fossil fuel fleet is only economic because the pollution is free.
+          fossil fuel fleet remains profitable when its emissions have no price.
         </p>
       </div>
     ),
@@ -314,11 +313,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Conventional hydro is dispatchable, but it is not an unlimited
-          generator. Rain and melting snow create runoff in the upstream
-          watershed, runoff fills the plant's reservoir, and every MWh the
-          turbines generate draws that reservoir down. Water above the dam's
-          capacity spills and cannot be recovered; a drought can empty it.
+          A hydroelectric plant generates power when operators release stored
+          water through its turbines. Its supply depends on rain, melting snow,
+          and the amount of water left in its reservoir.
+        </p>
+        <p>
+          Rain and snowmelt create runoff across the watershed, the land that
+          drains into the reservoir. Every MWh the turbines generate lowers the
+          reservoir. Water above the dam's capacity spills and cannot be
+          recovered, while a drought can empty the usable supply.
         </p>
         <p>
           The <strong>Water</strong> forecast appears once you own conventional
@@ -352,11 +355,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          More customers drives more demand. Although individual customer types
-          (residential, commercial, industrial) have different demand curves,
-          we've aggregated them into a single "customers" number that reflects a
-          blend of customer types. Here's what demand by type looks like in real
-          life:
+          More customers drive up electricity demand. Homes, businesses, and
+          factories use electricity in different patterns, so the game combines
+          them into one customer total. Here is what those patterns look like in
+          real life:
         </p>
         <Figure
           src="/images/manual-demand-customer-types.png"
@@ -401,23 +403,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          CO2e stands for Carbon Dioxide equivalent, a measure of the greenhouse
-          warming impact of various pollutants. Each generator lists the{" "}
-          <MassUnitName /> of CO2e it releases per MWh, which is what makes a
+          CO2e means carbon dioxide equivalent. It puts the warming effects of
+          different greenhouse gases on one common scale, so you can compare
+          power plants.
+        </p>
+        <p>
+          Each generator lists the <MassUnitName /> of CO2e it releases per
+          megawatt-hour (MWh) of electricity. This makes the emissions from a
           coal plant and a gas plant of the same size comparable.
         </p>
         <p>
-          Electricity generation is the 2nd largest source of greenhouse gas in
-          the United States, but our utilities have no financial incentive to
-          reduce their emissions.
-        </p>
-        <p>
-          One of the highest-rated proposals to reduce emissions is a Carbon
-          Fee, which creates a financial incentive for businesses to reduce
-          their carbon footprint through innovation. Electrify lets you
-          experiment with different levels of carbon fees, and see how
-          technology innovation can enable better business decisions than the
-          fossil fuels of the past.
+          A carbon fee is one policy option that gives businesses a financial
+          reason to lower emissions. Electrify lets you test different fee
+          levels and observe how they change costs, investment choices, and the
+          mix of power plants on the grid.
         </p>
       </div>
     ),
@@ -429,16 +428,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Insights projects your company forward, so you can spot problems
-          before they cost you customers. Pick a preset for a common question,
-          or use Layers to build and reorder your own view. Every chart uses the
-          same range and cursor, so a weather change, shortage and profit dip
-          can be read at the same moment.
+          Insights shows what may happen to the grid and the company in the
+          future. Choose a preset question or use Layers to build your own view.
+          Every chart covers the same time period, and a shared marker lets you
+          compare values on the same date.
         </p>
         <p>
           <strong>Supply &amp; Demand</strong> plots your projected output
           against projected demand. Wherever demand rises above supply, the gap
-          is shaded as a blackout. If any are forecasted, the table underneath
+          is shaded as a blackout. If any are predicted, the table underneath
           breaks them down: total energy not served, the size of the single
           worst event, the peak shortage (how much extra capacity you'd need to
           cover it) and when it happens. That "when" is the most useful number
@@ -452,9 +450,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           ones fill the peaks. Re-ordering your facilities changes this chart.
         </p>
         <p>
-          <strong>Stored power</strong> (shown once you own storage) tracks the
-          energy in your batteries and reservoirs as they charge off surplus and
-          discharge into peaks.
+          <strong>Stored Energy</strong> (shown once you own storage) tracks how
+          much energy is available in batteries and reservoirs. Their power
+          rating tells you how quickly they can charge or discharge.
         </p>
         <p>
           <strong>Fuel Prices</strong> projects the cost of each fuel you can
@@ -500,12 +498,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Companies prioritize their generation stack based on how long they
-          take to ramp up and down, their marginal cost (fuel) and whether
-          they're controllable. That ordering is called the merit order, and in
-          Electrify it's simply the order of your Facilities list: the top of
-          the list is asked to generate first, and each plant below only runs
-          once the ones above it are maxed out.
+          Power companies choose which generators run first. In Electrify,
+          plants at the top of the Facilities list are used before plants below
+          them. This ranking is called the dispatch order, or merit order.
+        </p>
+        <p>
+          Companies build that order around each plant's fuel cost, how quickly
+          it can change output, and whether operators can control when it runs.
+          Each plant below another runs only after the plants above reach their
+          maximum output.
         </p>
         <p>
           Here's a real-world generation stack from the PJM
@@ -529,23 +530,24 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Ramp rate is how fast a plant can change its output, shown on the
-          build screen as the ramp up/down time needed to go from zero to full.
+          Ramp rate describes how quickly a generator can raise or lower its
+          power output. The build screen shows the approximate time needed to go
+          from zero to full power.
         </p>
         <p>
-          It's set by physics, not by choice. A gas turbine is essentially a jet
-          engine and reaches full power in a minute or two. A coal or nuclear
-          plant has to heat thousands of tons of metal and water evenly, and
-          rushing it cracks things, so it takes hours. Batteries respond in
-          under a second; pumped hydro needs about ten minutes to get the water
-          moving.
+          It's set by physics, not by choice. A gas turbine works on similar
+          principles to a jet engine and reaches full power in a minute or two.
+          A coal or nuclear plant has to heat thousands of tons of metal and
+          water evenly, and rushing it cracks things, so it takes hours.
+          Batteries respond in under a second; pumped hydro needs about ten
+          minutes to get the water moving.
         </p>
         <p>
           Thermal plants also have a <strong>minimum stable output</strong>.
           While online they cannot sit at a trace output: depending on the
           technology, Electrify holds them at 15% to 50% of nameplate. When
-          demand falls below that level, dispatch compares the forecasted cost
-          of running at minimum with the next start cost, then either keeps the
+          demand falls below that level, dispatch compares the predicted cost of
+          running at minimum with the next start cost, then either keeps the
           plant online or begins shutting it down.
         </p>
         <p>
@@ -566,17 +568,15 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Financing a plant means borrowing most of its cost over 30 years, and
-          the interest on that loan is an operating expense for every one of
-          them. What you're quoted is built from two things: what money costs
-          everybody, and what it costs <em>you</em>.
+          paying interest on that loan. The interest rate depends on two things:
+          economy-wide borrowing costs and your company's financial health.
         </p>
         <p>
-          The first is the <strong>prime rate</strong>, the benchmark banks lend
-          their best customers at. It moves on a cycle of eight to twelve years
-          rather than month to month, and you have no influence over it
-          whatsoever. It has been as low as 3.25% and, in December 1980, as high
-          as 21.5% - so a scenario set in 1980 is playing a genuinely different
-          game to one set in 2020.
+          The first is the <strong>prime rate</strong>, a benchmark interest
+          rate for strong borrowers. It changes with the wider economy, and you
+          cannot control it. It has been as low as 3.25% and, in December 1980,
+          as high as 21.5%, so a scenario set in 1980 plays differently from one
+          set in 2020.
         </p>
         <p>
           The second is your <strong>credit</strong>, and that part is entirely
@@ -586,8 +586,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           take to repay what you owe. Fall short on any of them and the premium
           over prime goes up. The important consequence is that{" "}
           <strong>debt makes debt more expensive</strong>: every plant you
-          finance raises the price of financing the next one, which is exactly
-          how it works for a real utility.
+          finance raises the price of financing the next one. This reflects the
+          real-world idea that heavily indebted companies often pay more to
+          borrow.
         </p>
         <p>
           A loan's rate is fixed on the day you sign it and never changes, so{" "}
@@ -597,12 +598,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           for it thirty years later.
         </p>
         <p>
-          <strong>Inflation</strong> is the other half of the same cycle, and it
-          leads it: prices run away first, and rates are raised to chase them.
-          It pushes up what fuel costs and what it costs to build and operate a
-          plant, year after year. Your rate per kWh does not rise on its own to
-          match, so on a long scenario inflation quietly eats your margin unless
-          you're a public utility and can raise the rate yourself.
+          <strong>Inflation</strong> is a broad rise in prices. Central banks
+          may raise interest rates when inflation is high. In the game,
+          inflation pushes up fuel, construction, and operating costs. Your rate
+          per kWh does not rise automatically, so inflation can reduce your
+          profit margin unless you adjust the rate when the scenario allows it.
         </p>
       </div>
     ),
@@ -615,9 +615,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Your rate is what you charge customers per kWh of electricity, and it
-          multiplied by the energy you supply is essentially all of your
-          revenue. Real US residential rates run somewhere around $0.10-$0.30
-          per kWh depending on the state.
+          creates nearly all of your revenue. Multiply this rate by the
+          electricity you sell to estimate your revenue. Real US residential the
+          game models each scenario's market and rules separately.
         </p>
         <p>
           In <strong>investor-owned</strong> scenarios you compete for
@@ -628,7 +628,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           is finite.
         </p>
         <p>
-          In <strong>public-owned</strong> scenarios you set the rate yourself
+          In <strong>publicly owned</strong> scenarios you set the rate yourself
           in Insights, and it's part of how you're scored: your lifetime average
           rate is compared against the scenario's target, and every cent per kWh
           above or below moves your score. Charging more makes the books easy
@@ -652,11 +652,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           as friction and evaporation moving water uphill and back down.
         </p>
         <p>
-          That loss is what storage costs you, on top of the build cost. It only
-          pays off when the power you charge with is much cheaper than the power
-          you displace, which is why storage earns its keep soaking up surplus
-          wind and solar and discharging into the evening peak, and loses money
-          shuttling energy around for its own sake.
+          That loss is one cost of storage, on top of the build cost. Storage is
+          most valuable when the power used to charge it is cheaper than the
+          power it replaces, such as when it absorbs surplus wind or solar and
+          discharges during the evening peak.
         </p>
       </div>
     ),
@@ -702,7 +701,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             </tr>
             <tr>
               <td>-8</td>
-              <td>per TWh of blackouts</td>
+              <td>per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>
         </table>
@@ -710,10 +709,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <table className="points">
           <tbody>
             <tr>
-              <td>+/-80</td>
+              <td>+80</td>
               <td>
-                per $0.01/kWh that your lifetime average rate lands below/above
-                the scenario's target rate
+                per $0.01/kWh that your lifetime average rate is below the
+                scenario's target rate
+              </td>
+            </tr>
+            <tr>
+              <td>-80</td>
+              <td>
+                per $0.01/kWh that your lifetime average rate is above the
+                scenario's target rate
               </td>
             </tr>
             <tr>
@@ -728,7 +734,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             </tr>
             <tr>
               <td>-10</td>
-              <td>per TWh of blackouts</td>
+              <td>per TWh of demand not served during blackouts</td>
             </tr>
           </tbody>
         </table>
@@ -743,9 +749,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Also known as "Levelized Cost of Energy", it's the expected cost of
-          all energy produced by the plant during its lifetime, including
-          construction, maintenance and fuel.
+          Total cost of energy estimates the average cost of all the electricity
+          a plant will produce during its lifetime. It includes construction,
+          financing, maintenance, and fuel. It is also called the levelized cost
+          of energy (LCOE).
         </p>
         <p>
           Operating and maintenance (O&amp;M) costs can be fixed or depend on

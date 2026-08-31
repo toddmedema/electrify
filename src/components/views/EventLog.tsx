@@ -67,12 +67,17 @@ export default function EventLog(props: Props): React.JSX.Element {
       <div className="scrollable">
         {upcoming.length > 0 && (
           <section
-            className="upcomingEvents"
+            className="eventLogSection upcomingEvents"
             aria-labelledby="upcomingEventsTitle"
           >
-            <Typography id="upcomingEventsTitle" variant="subtitle2">
-              Upcoming
-            </Typography>
+            <header className="eventLogSectionHeader">
+              <Typography id="upcomingEventsTitle" variant="subtitle2">
+                Upcoming events
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                Scheduled scenario events that have not happened yet
+              </Typography>
+            </header>
             <ul className="eventLogList">
               {upcoming.map((event) => (
                 <li
@@ -132,78 +137,86 @@ export default function EventLog(props: Props): React.JSX.Element {
             </ul>
           </section>
         )}
-        {upcoming.length > 0 && events.length < 2 && (
-          <Typography className="eventLogHistoryTitle" variant="subtitle2">
-            History
-          </Typography>
-        )}
-        {events.length === 0 && (
-          <Typography
-            className="eventLogEmpty"
-            variant="body2"
-            color="textSecondary"
-          >
-            Blackouts, finished construction, loans closing and fuel price
-            swings will show up here as they happen.
-          </Typography>
-        )}
-        <ul className="eventLogList">
-          {events.map((event: GameEventType) => (
-            <li
-              className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
-              key={event.id}
-              onClick={() => onSelect(event.actionTarget)}
-              onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
-                if (
-                  event.actionTarget &&
-                  (e.key === "Enter" || e.key === " ")
-                ) {
-                  e.preventDefault();
-                  onSelect(event.actionTarget);
-                }
-              }}
-              role={event.actionTarget ? "button" : undefined}
-              tabIndex={event.actionTarget ? 0 : undefined}
+        <section
+          className="eventLogSection eventHistory"
+          aria-labelledby="eventHistoryTitle"
+        >
+          <header className="eventLogSectionHeader">
+            <Typography id="eventHistoryTitle" variant="subtitle2">
+              Event history
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              Events recorded after they happen
+            </Typography>
+          </header>
+          {events.length === 0 && (
+            <Typography
+              className="eventLogEmpty"
+              variant="body2"
+              color="textSecondary"
             >
-              <span className="eventLogIcon">
-                <ConceptIcon
-                  concept={event.concept || KIND_CONCEPTS[event.kind]}
-                  fontSize="small"
-                />
-              </span>
-              <span>
-                {event.title && <strong>{event.title}</strong>}
-                <span className="eventLogCopy">
-                  <Typography
-                    variant="body2"
-                    component="span"
-                    sx={{ display: "block" }}
-                  >
-                    {event.message}
-                  </Typography>
-                  {event.details && (
+              Blackouts, finished construction, loans closing and fuel price
+              swings will show up here as they happen.
+            </Typography>
+          )}
+          <ul className="eventLogList">
+            {events.map((event: GameEventType) => (
+              <li
+                className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                key={event.id}
+                onClick={() => onSelect(event.actionTarget)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                  if (
+                    event.actionTarget &&
+                    (e.key === "Enter" || e.key === " ")
+                  ) {
+                    e.preventDefault();
+                    onSelect(event.actionTarget);
+                  }
+                }}
+                role={event.actionTarget ? "button" : undefined}
+                tabIndex={event.actionTarget ? 0 : undefined}
+              >
+                <span className="eventLogIcon">
+                  <ConceptIcon
+                    concept={event.concept || KIND_CONCEPTS[event.kind]}
+                    fontSize="small"
+                  />
+                </span>
+                <span>
+                  {event.title && <strong>{event.title}</strong>}
+                  <span className="eventLogCopy">
                     <Typography
-                      variant="caption"
-                      color="textSecondary"
+                      variant="body2"
                       component="span"
                       sx={{ display: "block" }}
                     >
-                      {event.details}
+                      {event.message}
                     </Typography>
-                  )}
+                    {event.details && (
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        component="span"
+                        sx={{ display: "block" }}
+                      >
+                        {event.details}
+                      </Typography>
+                    )}
+                  </span>
                 </span>
-              </span>
-              <Typography
-                className="eventLogWhen"
-                variant="body2"
-                color="textSecondary"
-                component="span"
-              >
-                {event.label}
-              </Typography>
-            </li>
-          ))}
-        </ul>
+                <Typography
+                  className="eventLogWhen"
+                  variant="body2"
+                  color="textSecondary"
+                  component="span"
+                >
+                  {event.label}
+                </Typography>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </GameCard>
   );

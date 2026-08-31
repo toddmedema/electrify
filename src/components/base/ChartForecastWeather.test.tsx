@@ -23,7 +23,7 @@ describe("ChartForecastWeather", () => {
     );
     expect(
       screen.getByRole("img", {
-        name: /Chart of forecasted temperature.*Temperature: latest 16/,
+        name: /Chart of predicted temperature.*Temperature: latest 16/,
       }),
     ).toBeInTheDocument();
   });

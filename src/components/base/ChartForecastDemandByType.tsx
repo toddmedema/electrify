@@ -207,7 +207,7 @@ export default class ChartForecastDemandByType extends React.PureComponent<
     return (
       <div id="chartForecastDemandByType">
         <UPlotChart<State>
-          ariaLabel="Chart of forecasted electricity demand by load type"
+          ariaLabel="Chart of predicted electricity demand by customer or use type"
           formatSummaryValue={formatWatts}
           height={height}
           state={state}

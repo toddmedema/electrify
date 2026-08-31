@@ -175,14 +175,14 @@ export const tutorialGateMiddleware: Middleware =
           (api.dispatch as AppDispatch)(setSpeed("PAUSED"));
           api.dispatch(
             dialogOpen({
-              title: "Capstone needs another try",
+              title: "Final challenge needs another try",
               message: failureMessage,
               open: true,
               notCancellable: true,
               secondaryLabel: "Exit tutorial",
               secondaryAction: () =>
                 (api.dispatch as AppDispatch)(quit({ toScenarioList: true })),
-              actionLabel: "Retry capstone",
+              actionLabel: "Retry final challenge",
               action: () =>
                 restartTutorialAtStep(
                   api.dispatch as AppDispatch,

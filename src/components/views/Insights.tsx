@@ -94,6 +94,7 @@ import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { UnitsContext } from "../base/UnitsContext";
 import { formatCustomerChange } from "./Finances";
+import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 
 export type InsightRange =
   "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
@@ -126,11 +127,15 @@ export interface InsightLayerDefinition {
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
-  { id: "demandByType", label: "Demand by Load Type", group: "Grid" },
+  {
+    id: "demandByType",
+    label: "Demand by Customer or Use Type",
+    group: "Grid",
+  },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
     id: "storage",
-    label: "Stored Power",
+    label: "Stored Energy",
     group: "Grid",
     availability: "storage",
   },
@@ -141,10 +146,14 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Financial Details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
-  { id: "emissions", label: "CO2e Emitted", group: "Environment" },
+  {
+    id: "emissions",
+    label: "Greenhouse Gas Emissions (CO2e)",
+    group: "Environment",
+  },
   {
     id: "solarCapacityFactor",
-    label: "Renewable Capacity Factors",
+    label: "Expected Renewable Output",
     group: "Environment",
   },
   { id: "weather", label: "Temperature", group: "Environment" },
@@ -183,7 +192,7 @@ export const INSIGHT_PRESETS: Record<
     layers: ["customers", "demandByType", "supplyDemand", "revenue", "profit"],
   },
   decarbonization: {
-    label: "Decarbonization",
+    label: "Cutting emissions",
     layers: [
       "emissions",
       "supplyByFuel",
@@ -653,15 +662,11 @@ export default class Insights extends React.Component<Props, State> {
     }
 
     const sampleYears = Math.max(1, years);
-    const sampled = timeline.filter(
-      (tick) => tick.minute % (240 * sampleYears) < projectionStepMinutes,
+    const sampled = sampleForecastTimeline(
+      timeline,
+      240 * sampleYears,
+      projectionStepMinutes,
     );
-    if (sampled[0] !== timeline[0]) {
-      sampled.unshift(timeline[0]);
-    }
-    if (sampled[sampled.length - 1] !== timeline[timeline.length - 1]) {
-      sampled.push(timeline[timeline.length - 1]);
-    }
 
     const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
     const projectedMonths = summarizeTimelineByMonth(
@@ -743,13 +748,13 @@ export default class Insights extends React.Component<Props, State> {
           ]
         : RATE_MARKS;
     return (
-      <section className="insightsLevers" aria-label="Planning levers">
+      <section className="insightsLevers" aria-label="Planning controls">
         <Button
           startIcon={<TuneIcon />}
           onClick={() => this.setState({ leversOpen: !this.state.leversOpen })}
           aria-expanded={this.state.leversOpen}
         >
-          Levers
+          Rate controls
         </Button>
         <Typography variant="body2" color="textSecondary">
           Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
@@ -951,9 +956,10 @@ export default class Insights extends React.Component<Props, State> {
                     </>
                   ) : (
                     <>
-                      Blackouts forecasted: ~
-                      {formatWattHours(projection.blackoutTotalWh)} · peak
-                      shortage {formatWatts(projection.largestBlackout.peakW)}
+                      Forecast electricity shortfall: ~
+                      {formatWattHours(projection.blackoutTotalWh)} of demand
+                      not met · largest shortage{" "}
+                      {formatWatts(projection.largestBlackout.peakW)}
                     </>
                   )}
                 </Typography>

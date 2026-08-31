@@ -51,7 +51,9 @@ describe("GameAppBar", () => {
 
     expect(reserveCapacityW(game, now) - before).toBe(plant.peakW);
     renderAppBar({ game: { ...game, inGame: true } });
-    expect(screen.getByText(/Grid OK · .*W reserve/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Grid stable · .*W spare capacity/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/% reserve/)).not.toBeInTheDocument();
   });
 

@@ -71,8 +71,8 @@ describe("the event log", () => {
       (e: GameEventType) => e.kind === "BLACKOUT_OVER",
     );
     expect(over).toBeDefined();
-    expect(over?.message).toMatch(/unserved/);
-    // Something was actually unserved, rather than the sentence being drawn around a zero
+    expect(over?.message).toMatch(/could not supply/);
+    // Some demand was actually unmet, rather than the sentence being drawn around a zero
     expect(over?.message).not.toMatch(/\b0Wh\b/);
   });
 

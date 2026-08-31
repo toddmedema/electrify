@@ -148,8 +148,8 @@ describe("the Finances chart selectors", () => {
 
       // The second change is the one the throttle used to swallow: the first update after mount
       // always got through, and everything after it waited on the game clock
-      await choose(metricSelect(), "Net Worth");
-      expect(plottedMetric()).toContain("Net Worth");
+      await choose(metricSelect(), "Net worth");
+      expect(plottedMetric()).toContain("Net worth");
 
       await choose(metricSelect(), "Demand");
       expect(plottedMetric()).toContain("Demand");
@@ -193,12 +193,12 @@ describe("the Finances chart selectors", () => {
 
   it("remembers the metric across a remount, dropdown and chart together", async () => {
     const view = renderFinances(game, "PAUSED");
-    await choose(metricSelect(), "Net Worth");
+    await choose(metricSelect(), "Net worth");
     view.unmount();
 
     renderFinances(game, "PAUSED");
-    expect(metricSelect()).toHaveTextContent("Net Worth");
-    expect(plottedMetric()).toContain("Net Worth");
+    expect(metricSelect()).toHaveTextContent("Net worth");
+    expect(plottedMetric()).toContain("Net worth");
   });
 
   // A remount is what going off to build a facility and coming back amounts to, and the period

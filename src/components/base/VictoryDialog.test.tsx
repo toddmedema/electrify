@@ -102,7 +102,7 @@ describe("VictoryDialog", () => {
           kgco2e: 2000000000,
           scenarioMetrics: [
             {
-              label: "Uri energy unserved · Feb 2021",
+              label: "Demand not met during Winter Storm Uri · Feb 2021",
               value: "12GWh",
               concept: "blackout",
             },
@@ -127,7 +127,7 @@ describe("VictoryDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("99.8%")).toBeInTheDocument();
     expect(
-      screen.getByText("Uri energy unserved · Feb 2021"),
+      screen.getByText("Demand not met during Winter Storm Uri · Feb 2021"),
     ).toBeInTheDocument();
     expect(screen.getByText("12GWh")).toBeInTheDocument();
     expect(

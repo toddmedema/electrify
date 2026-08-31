@@ -243,7 +243,7 @@ export default class ChartForecastRenewableCapacityFactor extends React.PureComp
         />
         <UPlotChart<State>
           id="chartForecastRenewableCapacityFactor"
-          ariaLabel="Chart of forecasted monthly renewable capacity factors"
+          ariaLabel="Chart of predicted monthly renewable output"
           height={height}
           state={{
             data,
