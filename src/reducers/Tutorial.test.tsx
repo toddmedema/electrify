@@ -206,7 +206,7 @@ describe("tutorialGateMiddleware", () => {
     expect(store.getState().game.tutorialStep).toBe(0);
   });
 
-  it("records completion and opens the completion snackbar", () => {
+  it("records completion and opens a blocking completion dialog", () => {
     const steps: TutorialStepType[] = [
       { ...informational(), advanceOnAction: "test/finish" },
     ];
@@ -216,8 +216,12 @@ describe("tutorialGateMiddleware", () => {
 
     expect(store.getState().game.tutorialStep).toBe(1);
     expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
-    expect(store.getState().ui.snackbar).toEqual(
-      expect.objectContaining({ open: true, actionLabel: "Missions" }),
+    expect(store.getState().ui.dialog).toEqual(
+      expect.objectContaining({
+        open: true,
+        notCancellable: true,
+        secondaryLabel: "Back to main menu",
+      }),
     );
   });
 
@@ -237,8 +241,8 @@ describe("tutorialGateMiddleware", () => {
     store.dispatch({ type: "test/check-capstone" });
 
     expect(store.getState().game.tutorialStep).toBe(1);
-    expect(store.getState().ui.snackbar.message).toBe(
-      "Capacity arrived before the peak.",
+    expect(store.getState().ui.dialog.message).toEqual(
+      expect.objectContaining({ type: "div" }),
     );
   });
 

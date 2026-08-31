@@ -158,8 +158,7 @@ export const SCENARIOS = [
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
           failure: hasBlackout,
-          successMessage:
-            "Capstone complete - positive reserve kept demand covered for the full day.",
+          successMessage: "Success!",
           failureMessage:
             "Demand outran available supply, so some electricity went unserved. Watch reserve before running the clock and retry from the same forecast.",
         },
@@ -204,7 +203,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare build cost, time, fuel and O&M. Oil pays fixed O&M even when idle, plus variable O&M whenever it generates."
+            text="Compare build cost, time, fuel and O&M (Operations & Maintenance)"
           />
         ),
       },
@@ -291,7 +290,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["build", "storage"]}
-            text="Storage banks spare power for when you need it - open the storage shop."
+            text="Store spare power for when you need it - open the storage shop."
             action={["storage"]}
           />
         ),
@@ -398,6 +397,7 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
+        advanceOn: (s: AppStateType) => s.card.name === "INSIGHTS",
         content: (
           <TutorialPrompt
             concepts={["finances", "money"]}

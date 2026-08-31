@@ -36,6 +36,7 @@ interface Handlers {
   onPause: jest.Mock;
   onSelect: jest.Mock;
   onReprioritize: jest.Mock;
+  onSell: jest.Mock;
 }
 
 function renderFacilities(
@@ -46,6 +47,7 @@ function renderFacilities(
     onPause: jest.fn(),
     onSelect: jest.fn(),
     onReprioritize: jest.fn(),
+    onSell: jest.fn(),
   };
   render(
     <Facilities
@@ -53,7 +55,7 @@ function renderFacilities(
       selectedFacilityId={selectedFacilityId}
       onGeneratorBuild={() => undefined}
       onStorageBuild={() => undefined}
-      onSell={() => undefined}
+      onSell={handlers.onSell}
       onTogglePause={() => undefined}
       onPause={handlers.onPause}
       onReprioritize={handlers.onReprioritize}
@@ -289,6 +291,17 @@ describe("the fleet list", () => {
 
     await user.click(screen.getByLabelText(`Pause ${facility.name}`));
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
+  });
+
+  it("can sell the only facility left in a fleet", async () => {
+    const onePlant = createGame({ scenarioId: 5 });
+    const { onSell } = renderFacilities(onePlant, null);
+    const facility = onePlant.facilities[0];
+
+    await user.click(screen.getByLabelText(`Sell ${facility.name}`));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    expect(onSell).toHaveBeenCalledWith(facility.id);
   });
 
   it("hides the player's controls while a replay is being watched", () => {

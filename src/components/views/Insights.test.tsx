@@ -87,12 +87,12 @@ jest.mock("../base/ChartForecastStorage", () => ({
     <div role="img" data-chart="storage" data-sync-key={syncKey} />
   ),
 }));
-jest.mock("../base/ChartForecastSolarCapacityFactor", () => ({
+jest.mock("../base/ChartForecastRenewableCapacityFactor", () => ({
   __esModule: true,
   default: ({ syncKey }: ChartMockProps) => (
     <div
       role="img"
-      data-testid="solar-capacity-factor-chart"
+      data-testid="renewable-capacity-factor-chart"
       data-sync-key={syncKey}
     />
   ),
@@ -333,20 +333,19 @@ describe("Insights layers", () => {
     ).toHaveTextContent("Custom");
   });
 
-  it("offers a solar capacity factor chart as an insight layer", async () => {
+  it("offers renewable capacity factors as an insight layer", async () => {
     renderInsights();
     await user.click(screen.getByRole("button", { name: /Layers/ }));
     await user.click(
-      screen.getByRole("checkbox", { name: "Solar Capacity Factor" }),
+      screen.getByRole("checkbox", { name: "Renewable Capacity Factors" }),
     );
 
     expect(
-      screen.getByText("Solar Capacity Factor", { selector: "h6" }),
+      screen.getByText("Renewable Capacity Factors", { selector: "h6" }),
     ).toBeVisible();
-    expect(screen.getByTestId("solar-capacity-factor-chart")).toHaveAttribute(
-      "data-sync-key",
-      "insights",
-    );
+    expect(
+      screen.getByTestId("renewable-capacity-factor-chart"),
+    ).toHaveAttribute("data-sync-key", "insights");
   });
 
   it("charts recorded monthly data and disables forecast-only layers", async () => {

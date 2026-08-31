@@ -1,6 +1,6 @@
 import type { Middleware } from "@reduxjs/toolkit";
 import { recordScenarioPlayed } from "../LocalStorage";
-import { getScenario } from "../data/Scenarios";
+import { getNextTutorial, getScenario } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
@@ -9,8 +9,8 @@ import {
   isGatedStep,
 } from "../Types";
 import { navigate } from "./Card";
-import { delta, quit, setSpeed, start } from "./Game";
-import { dialogOpen, snackbarOpen } from "./UI";
+import { delta, quit, setSpeed, start, tutorialCompleteDialog } from "./Game";
+import { dialogOpen } from "./UI";
 
 /**
  * Restores a capstone's authored state while keeping the player on the capstone objective.
@@ -90,15 +90,15 @@ export function changeTutorialStep(
   // scenario is optional practice, and requiring it meant a checkmark cost up to four
   // minutes of watching the sim run
   recordScenarioPlayed(scenarioId);
+  const scenario = getScenario(scenarioId);
   dispatch(
-    snackbarOpen({
+    tutorialCompleteDialog({
+      title: scenario?.endTitle || "Tutorial complete!",
       message:
         leaving?.capstone?.successMessage ||
-        "Walkthrough complete - keep practicing, or move on",
-      actionLabel: "Missions",
-      action: () => dispatch(quit({ toScenarioList: true })),
-      open: true,
-      timeout: 6000,
+        scenario?.endMessage ||
+        "Walkthrough complete.",
+      nextTutorial: getNextTutorial(scenarioId),
     }),
   );
 }
@@ -114,7 +114,7 @@ function matchesActionGate(
 }
 
 // True while a gate-driven advance is mid-flight. changeTutorialStep's own dispatches
-// (onNext, navigate, delta, snackbar) re-enter this middleware before tutorialStep has
+// (onNext, navigate, delta, dialog) re-enter this middleware before tutorialStep has
 // moved off the satisfied step, which would re-advance the same step without end - the
 // loop below does the chaining deliberately instead.
 let advancing = false;

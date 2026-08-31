@@ -2,10 +2,7 @@ import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
-import BuildGenerators, {
-  GeneratorBuildItem,
-  generatorRole,
-} from "./BuildGenerators";
+import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
 
@@ -28,9 +25,9 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
     />,
   );
 
-  expect(screen.getByText("Est. O&M (1 start/day)")).toBeInTheDocument();
+  expect(screen.getByText("Est O&M")).toBeInTheDocument();
   expect(screen.getByText("$13.4M/yr")).toBeInTheDocument();
-  expect(screen.getByText("Flexible power")).toBeInTheDocument();
+  expect(screen.queryByText("Flexible power")).toBeNull();
   expect(screen.getByText(/typical output/)).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
@@ -113,9 +110,7 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     />,
   );
 
-  expect(
-    screen.getByText("Estimated O&M (20% expected output)"),
-  ).toBeInTheDocument();
+  expect(screen.getByText("Est O&M")).toBeInTheDocument();
   expect(screen.getByText("$7.59M/yr")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Show Oil details" }));
 
@@ -135,16 +130,6 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
-});
-
-it("describes clean variable generation as a strategic role", () => {
-  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
-  const solar = GENERATORS(game, 200000000, [], []).find(
-    (candidate) => candidate.name === "Solar",
-  )!;
-  expect(generatorRole(solar)).toEqual(
-    expect.objectContaining({ label: "Clean, weather-led" }),
-  );
 });
 
 it("submits a generator purchase only once on a double-click", () => {
@@ -174,6 +159,71 @@ it("submits a generator purchase only once on a double-click", () => {
   fireEvent.click(takeLoan);
 
   expect(onBuild).toHaveBeenCalledTimes(1);
+});
+
+it("explains affordability and hides comparison when a build is disabled", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 419000000, [], []).find(
+    (candidate) => candidate.name === "Natural Gas",
+  )!;
+
+  render(
+    <GeneratorBuildItem
+      cash={0}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator}
+      location={game.location}
+      seed={game.seed}
+      onCompare={jest.fn()}
+      onBuild={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText(/Can't afford the loan down payment/)).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: /Compare Natural Gas/ }),
+  ).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+  ).toBeDisabled();
+});
+
+it("explains unavailable technologies and hides their comparison button", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "CEO" });
+  const availableGenerator = GENERATORS(game, 1000000, [], [500]).find(
+    (candidate) => candidate.name === "Solar",
+  )!;
+  const generator = {
+    ...availableGenerator,
+    name: "Unavailable Solar",
+    available: false,
+  };
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator}
+      location={game.location}
+      seed={game.seed}
+      onCompare={jest.fn()}
+      onBuild={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText("Not available at this location or point in time."),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: /Compare Unavailable Solar/ }),
+  ).toBeNull();
+  expect(
+    screen.getByRole("button", {
+      name: "Review purchase of Unavailable Solar",
+    }),
+  ).toBeDisabled();
 });
 
 it("pins up to three current-grid choices into a comparison tray", () => {

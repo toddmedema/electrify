@@ -76,38 +76,6 @@ interface GeneratorBuildItemProps {
   onBuild: (financed: boolean) => void;
 }
 
-export interface GeneratorRoleType {
-  label: string;
-  detail: string;
-}
-
-export function generatorRole(
-  generator: GeneratorShoppingType,
-): GeneratorRoleType {
-  if (generator.fuel === "Hydro") {
-    return {
-      label: "Clean & dispatchable",
-      detail: "Weather-fed power that can respond when the grid needs it.",
-    };
-  }
-  if (generator.btuPerWh === 0) {
-    return {
-      label: "Clean, weather-led",
-      detail: "No direct emissions; output follows local conditions.",
-    };
-  }
-  if (generator.spinMinutes <= 30) {
-    return {
-      label: "Flexible power",
-      detail: "Can respond quickly, with fuel and emissions tradeoffs.",
-    };
-  }
-  return {
-    label: "Steady output",
-    detail: "Firm supply with a slower response and long-lived commitment.",
-  };
-}
-
 export function GeneratorBuildItem(
   props: GeneratorBuildItemProps,
 ): React.JSX.Element {
@@ -132,11 +100,17 @@ export function GeneratorBuildItem(
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const { buildable, secondaryText } = getBuildAvailability(
     generator.description,
+    generator.available,
     sizeBuildable,
     formatWatts(generator.maxPeakW),
     generator.viableLocationsRemaining,
   );
   const financingGap = Math.max(0, downpayment - cash);
+  const canBuild = buildable && financingGap === 0;
+  const buildSubtitle =
+    buildable && financingGap > 0
+      ? `Can't afford the loan down payment. Need ${formatMoneyConcise(financingGap)} more cash.`
+      : secondaryText;
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   const estimatedVariableOM = estimatedAnnualVariableOperatingCost(generator);
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
@@ -149,7 +123,6 @@ export function GeneratorBuildItem(
     props.forecastGapW && props.forecastGapW > 0
       ? Math.round((typicalOutputW / props.forecastGapW) * 100)
       : undefined;
-  const role = generatorRole(generator);
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -189,7 +162,7 @@ export function GeneratorBuildItem(
         }
         action={
           <Stack direction="row" spacing={0.5}>
-            {props.onCompare && (
+            {props.onCompare && canBuild && (
               <Button
                 size="small"
                 variant={props.compared ? "contained" : "outlined"}
@@ -210,7 +183,7 @@ export function GeneratorBuildItem(
               variant="contained"
               color="primary"
               onClick={toggleOpen}
-              disabled={financingGap > 0 || !buildable}
+              disabled={!canBuild}
               startIcon={<ConceptIcon concept="buy" fontSize="small" />}
               aria-label={`Review purchase of ${generator.name}`}
             >
@@ -219,15 +192,9 @@ export function GeneratorBuildItem(
           </Stack>
         }
         title={generator.name}
-        subheader={secondaryText}
+        subheader={buildSubtitle}
       />
       <Box className="generatorDecisionLead">
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-          {role.label}
-        </Typography>
-        <Typography variant="caption" color="textSecondary">
-          {role.detail}
-        </Typography>
         <Stack
           direction="row"
           spacing={0.75}
@@ -269,13 +236,7 @@ export function GeneratorBuildItem(
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
         <GeneratorMetric
-          label={
-            hasVariableOM
-              ? `Estimated O&M (${Math.round(generator.capacityFactor * 100)}% expected output)`
-              : generator.costPerStart !== undefined
-                ? "Est. O&M (1 start/day)"
-                : "Operating cost"
-          }
+          label="Est O&M"
           value={`${formatMoneyConcise(estimatedAnnualOperatingCost(generator))}/yr`}
         />
         <GeneratorMetric
@@ -289,16 +250,6 @@ export function GeneratorBuildItem(
           }
         />
       </Box>
-      {buildable && financingGap > 0 && (
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          sx={{ px: 2, pb: 1.5 }}
-        >
-          Need {formatMoneyConcise(financingGap)} more cash for the{" "}
-          {formatMoneyConcise(downpayment)} loan down payment.
-        </Typography>
-      )}
       <Button
         color="primary"
         className="expand-details"

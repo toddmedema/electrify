@@ -82,7 +82,7 @@ import ChartFinances from "../base/ChartFinances";
 import ChartForecastFuelPrices, {
   PRICED_FUELS,
 } from "../base/ChartForecastFuelPrices";
-import ChartForecastSolarCapacityFactor from "../base/ChartForecastSolarCapacityFactor";
+import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastSupplyByFuel, {
   forecastFuels,
@@ -144,10 +144,10 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "emissions", label: "CO2e Emitted", group: "Environment" },
   {
     id: "solarCapacityFactor",
-    label: "Solar Capacity Factor",
+    label: "Renewable Capacity Factors",
     group: "Environment",
   },
-  { id: "weather", label: "Weather", group: "Environment" },
+  { id: "weather", label: "Temperature", group: "Environment" },
   { id: "water", label: "Water", group: "Environment", availability: "hydro" },
 ] as const;
 
@@ -1055,7 +1055,8 @@ export default class Insights extends React.Component<Props, State> {
           break;
         case "solarCapacityFactor":
           body = (
-            <ChartForecastSolarCapacityFactor
+            <ChartForecastRenewableCapacityFactor
+              game={game}
               height={140}
               timeline={projection.timeline}
               domain={{ x: projection.domain.x }}

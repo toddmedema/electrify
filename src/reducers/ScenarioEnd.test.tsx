@@ -308,10 +308,15 @@ describe("finishing a tutorial", () => {
     jest.runOnlyPendingTimers();
 
     const completed = getStore().getState();
-    expect(completed.ui.dialog.open).toBe(false);
-    expect(completed.ui.snackbar.message).toBe(
-      tutorial.tutorialSteps![capstoneIndex].capstone!.successMessage,
+    expect(completed.ui.dialog).toEqual(
+      expect.objectContaining({
+        open: true,
+        notCancellable: true,
+        actionLabel: "Next tutorial",
+        secondaryLabel: "Back to main menu",
+      }),
     );
+    expect(completed.ui.snackbar.open).toBe(false);
     expect(completed.game.speed).toBe("PAUSED");
     expect(getPlayedScenarioIds()).toContain(tutorial.id);
   });

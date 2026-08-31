@@ -463,11 +463,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           watch this chart before committing to a decades-long build.
         </p>
         <p>
-          <strong>Weather</strong> projects temperature and wind for your
-          region. It drives demand (heating and air conditioning) as well as the
-          output of your solar and wind generators. Once you own hydro, a
-          separate <strong>Water</strong> chart shows watershed precipitation,
-          snowpack and reservoir level.
+          <strong>Temperature</strong> projects heating and cooling conditions,
+          while <strong>Renewable Capacity Factors</strong> translates local
+          wind, sunshine and watershed runoff into expected output for every
+          weather-driven technology available there, whether or not you have
+          built it. Once you own hydro, a separate <strong>Water</strong> chart
+          shows watershed precipitation, snowpack and reservoir level.
         </p>
         <p>
           Insight projections assume you make no further changes, so treat them

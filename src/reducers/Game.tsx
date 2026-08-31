@@ -1189,7 +1189,7 @@ export function startTutorial(dispatch: AppDispatch, scenarioId: number) {
  * to report and the useful next step is the next tutorial, so this celebrates, says where the
  * player is in the sequence, and offers that next tutorial rather than a scoreboard.
  */
-function tutorialCompleteDialog({
+export function tutorialCompleteDialog({
   title,
   message,
   nextTutorial,
@@ -1227,13 +1227,12 @@ function tutorialCompleteDialog({
     open: true,
     // Both buttons lead somewhere; dismissing would strand the player in a finished scenario
     notCancellable: true,
-    secondaryLabel: "Main menu",
+    secondaryLabel: "Back to main menu",
     secondaryAction: () => getStore().dispatch(quit()),
-    actionLabel: nextTutorial ? "Next mission" : "Back to missions",
-    action: () =>
-      nextTutorial
-        ? startTutorial(getStore().dispatch, nextTutorial.id)
-        : getStore().dispatch(quit({ toScenarioList: true })),
+    actionLabel: nextTutorial ? "Next tutorial" : undefined,
+    action: nextTutorial
+      ? () => startTutorial(getStore().dispatch, nextTutorial.id)
+      : undefined,
   });
 }
 

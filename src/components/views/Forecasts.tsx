@@ -34,6 +34,7 @@ import ChartForecastSupplyByFuel, {
   forecastFuels,
 } from "../base/ChartForecastSupplyByFuel";
 import ChartForecastWeather from "../base/ChartForecastWeather";
+import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastWater from "../base/ChartForecastWater";
 import ChartLegend from "../base/ChartLegend";
@@ -406,7 +407,22 @@ export default class Forecasts extends React.Component<Props, State> {
           )}
           <Toolbar className="forecastSection">
             <Typography variant="h6">
-              Weather in {game.location.name}
+              Renewable potential in {game.location.name}
+            </Typography>
+          </Toolbar>
+          <ChartForecastRenewableCapacityFactor
+            game={game}
+            height={140}
+            timeline={forecastedTimeline}
+            domain={{ x: [rangeMin, rangeMax] }}
+            startingYear={game.startingYear}
+            multiyear={years > 1}
+            showXLabels={false}
+            syncKey={FORECAST_SYNC_KEY}
+          />
+          <Toolbar className="forecastSection">
+            <Typography variant="h6">
+              Temperature in {game.location.name}
             </Typography>
           </Toolbar>
           {/* Last, so it's the one that draws the month names the whole stack is read against */}

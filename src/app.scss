@@ -319,10 +319,25 @@ button,
     background-color: $bg_primary;
     border: 1px solid var(--border-strong);
     border-radius: 4px;
+    position: relative;
+    touch-action: none;
+    transition: transform 120ms ease-out;
   }
 
   span {
     color: $font_color_primary !important;
+  }
+}
+
+.snackbarClose {
+  position: absolute !important;
+  right: 2px;
+  top: 2px;
+}
+
+@media screen and (max-width: ($desktop_breakpoint - 1px)) {
+  .snackbarClose {
+    display: none !important;
   }
 }
 
