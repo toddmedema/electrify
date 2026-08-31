@@ -63,10 +63,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
   const { buildable, secondaryText } = getBuildAvailability(
     storage.description,
+    storage.available,
     sizeBuildable,
     `${formatWatts(storage.maxPeakWh)}h`,
     storage.viableLocationsRemaining,
   );
+  const financingGap = Math.max(0, downpayment - cash);
+  const buildSubtitle =
+    buildable && financingGap > 0
+      ? `Can't afford the loan down payment. Need ${formatMoneyConcise(financingGap)} more cash.`
+      : secondaryText;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -123,7 +129,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </span>
         }
         title={storage.name}
-        subheader={secondaryText}
+        subheader={buildSubtitle}
       />
       <Button
         color="primary"

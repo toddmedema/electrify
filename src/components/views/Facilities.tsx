@@ -207,7 +207,7 @@ function FacilityActions(props: {
           <ConceptIcon concept="play" />
         </IconButton>
       )}
-      {!readOnly && (underConstruction || listLength > 1) && (
+      {!readOnly && (
         <IconButton
           onClick={(e) => {
             e.stopPropagation();

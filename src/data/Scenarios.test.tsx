@@ -6,7 +6,7 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
-import { ScenarioType } from "../Types";
+import { AppStateType, ScenarioType } from "../Types";
 import { render, screen } from "@testing-library/react";
 
 describe("getScenario", () => {
@@ -71,15 +71,29 @@ describe("tutorial mission metadata", () => {
     });
   });
 
-  it("introduces Oil's fixed and output-dependent O&M", () => {
+  it("expands the O&M abbreviation in the generator tutorial", () => {
     const generatorsMission = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 2: Generators",
     )!;
     render(generatorsMission.tutorialSteps![1].content);
 
+    expect(screen.getByText(/Compare build cost/)).toHaveTextContent(
+      "O&M (Operations & Maintenance)",
+    );
+  });
+
+  it("advances the finances tutorial when the mobile Insights tab opens", () => {
+    const finances = TUTORIALS.find(
+      (tutorial) => tutorial.name === "Mission 4: Finances",
+    )!;
+    const firstStep = finances.tutorialSteps![0];
+
     expect(
-      screen.getByText(/Oil pays fixed O&M even when idle/),
-    ).toHaveTextContent("variable O&M whenever it generates");
+      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+    ).toBe(true);
+    expect(
+      firstStep.advanceOn?.({ card: { name: "FACILITIES" } } as AppStateType),
+    ).toBe(false);
   });
 
   it("gives every mission one deterministic unguided capstone", () => {

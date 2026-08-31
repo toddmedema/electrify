@@ -69,7 +69,11 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   ).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
+  await expect(page.getByText("Success!", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Capstone complete - positive reserve kept demand covered"),
+    page.getByRole("button", { name: "Next tutorial" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Back to main menu" }),
   ).toBeVisible();
 });

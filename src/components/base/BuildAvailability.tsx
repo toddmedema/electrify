@@ -9,10 +9,17 @@ interface BuildAvailability {
 /** Shared availability copy and state for generator and storage purchase cards. */
 export function getBuildAvailability(
   description: string,
+  available: boolean,
   sizeBuildable: boolean,
   maxSizeLabel: React.ReactNode,
   viableLocationsRemaining?: number,
 ): BuildAvailability {
+  if (!available && viableLocationsRemaining !== 0) {
+    return {
+      buildable: false,
+      secondaryText: "Not available at this location or point in time.",
+    };
+  }
   const siteBuildable = viableLocationsRemaining !== 0;
   if (!siteBuildable) {
     return {

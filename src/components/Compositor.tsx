@@ -4,8 +4,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Snackbar,
+  SnackbarContent,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import * as React from "react";
 import { GlobalHotKeys, configure } from "react-hotkeys";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
@@ -284,8 +287,22 @@ export function isNavCard(name: CardNameType) {
   return NAV_CARDS.indexOf(name) !== -1;
 }
 
+const SNACKBAR_SWIPE_DISTANCE = 56;
+
+export function shouldDismissSnackbarSwipe(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): boolean {
+  return (
+    Math.abs(end.x - start.x) >= SNACKBAR_SWIPE_DISTANCE ||
+    end.y - start.y >= SNACKBAR_SWIPE_DISTANCE
+  );
+}
+
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+  private snackbarContentRef = React.createRef<HTMLDivElement>();
+  private snackbarDrag?: { x: number; y: number; pointerId: number };
 
   // react-transition-group falls back to ReactDOM.findDOMNode when no nodeRef is given, and
   // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
@@ -334,6 +351,48 @@ export default class Compositor extends React.Component<Props, {}> {
       this.props.ui.snackbar.action(e);
     }
   }
+
+  private resetSnackbarDrag = () => {
+    this.snackbarDrag = undefined;
+    if (this.snackbarContentRef.current) {
+      this.snackbarContentRef.current.style.transform = "";
+    }
+  };
+
+  private snackbarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+    this.snackbarDrag = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  private snackbarPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = this.snackbarDrag;
+    if (!start || start.pointerId !== event.pointerId) {
+      return;
+    }
+    const x = event.clientX - start.x;
+    const y = Math.max(0, event.clientY - start.y);
+    event.currentTarget.style.transform =
+      Math.abs(x) > y ? `translateX(${x}px)` : `translateY(${y}px)`;
+  };
+
+  private snackbarPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = this.snackbarDrag;
+    if (
+      start &&
+      start.pointerId === event.pointerId &&
+      shouldDismissSnackbarSwipe(start, { x: event.clientX, y: event.clientY })
+    ) {
+      this.props.closeSnackbar();
+    }
+    this.resetSnackbarDrag();
+  };
 
   private renderCard(): React.JSX.Element {
     const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
@@ -537,24 +596,40 @@ export default class Compositor extends React.Component<Props, {}> {
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={ui.snackbar.open}
-          message={<span>{ui.snackbar.message}</span>}
           autoHideDuration={ui.snackbar.timeout}
           onClose={closeSnackbar}
-          action={
-            ui.snackbar.actionLabel
-              ? [
+        >
+          <SnackbarContent
+            ref={this.snackbarContentRef}
+            className="snackbarContent"
+            message={<span>{ui.snackbar.message}</span>}
+            onPointerDown={this.snackbarPointerDown}
+            onPointerMove={this.snackbarPointerMove}
+            onPointerUp={this.snackbarPointerUp}
+            onPointerCancel={this.resetSnackbarDrag}
+            action={
+              <>
+                {ui.snackbar.actionLabel && (
                   <Button
-                    key={1}
                     onClick={(e: React.MouseEvent<HTMLElement>) =>
                       this.snackbarActionClicked(e)
                     }
                   >
                     {ui.snackbar.actionLabel}
-                  </Button>,
-                ]
-              : []
-          }
-        />
+                  </Button>
+                )}
+                <IconButton
+                  className="snackbarClose"
+                  aria-label="Dismiss notification"
+                  size="small"
+                  onClick={closeSnackbar}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </>
+            }
+          />
+        </Snackbar>
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />
