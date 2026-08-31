@@ -610,6 +610,13 @@ export interface ScenarioType {
   loadAdditions?: ScenarioLoadAdditionType[];
   /** Optional mission gate evaluated at the authored end date. */
   minimumCustomerRetention?: number;
+  /** Optional requirement to serve a specific month without falling below a reliability target. */
+  reliabilityObjective?: {
+    year: number;
+    month: number;
+    minimumDemandServed: number;
+    label: string;
+  };
   dollarsPerkWh: number;
   durationMonths: number;
   endTitle?: string;

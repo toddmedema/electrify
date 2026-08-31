@@ -43,7 +43,7 @@ export const DIFFICULTIES = {
     buildTime: 1,
     blackoutPenalty: 10,
     description:
-      "Full challenge: standard costs, building times, and outage consequences.",
+      "Full challenge: fully realistic costs, building times, and outage consequences.",
   },
 } as { [index: string]: DifficultyMultipliersType };
 

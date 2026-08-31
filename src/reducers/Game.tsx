@@ -1582,18 +1582,33 @@ export function scenarioObjectiveFailure(
   scenario: ScenarioType,
   history: MonthlyHistoryType[],
 ): string | undefined {
+  const reliabilityObjective = scenario.reliabilityObjective;
+  if (reliabilityObjective) {
+    const target = history.find(
+      (month) =>
+        month.year === reliabilityObjective.year &&
+        month.month === reliabilityObjective.month,
+    );
+    if (target) {
+      const demandServed =
+        target.demandWh > 0 ? target.supplyWh / target.demandWh : 1;
+      if (demandServed < reliabilityObjective.minimumDemandServed) {
+        return `You served ${(demandServed * 100).toFixed(2)}% of demand during the ${reliabilityObjective.label}; this mission requires ${Math.round(reliabilityObjective.minimumDemandServed * 100)}%.`;
+      }
+    }
+  }
+
   if (
-    scenario.minimumCustomerRetention === undefined ||
-    scenario.startingCustomers === undefined ||
-    history.length === 0
+    scenario.minimumCustomerRetention !== undefined &&
+    scenario.startingCustomers !== undefined &&
+    history.length > 0
   ) {
-    return undefined;
+    const retained = history[0].customers / scenario.startingCustomers;
+    if (retained < scenario.minimumCustomerRetention) {
+      return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
+    }
   }
-  const retained = history[0].customers / scenario.startingCustomers;
-  if (retained >= scenario.minimumCustomerRetention) {
-    return undefined;
-  }
-  return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
+  return undefined;
 }
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand

@@ -73,6 +73,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
           ownership={scenario.ownership}
           dollarsPerkWh={scenario.dollarsPerkWh}
           minimumCustomerRetention={scenario.minimumCustomerRetention}
+          reliabilityObjective={scenario.reliabilityObjective}
         />
         {breakdown && (
           <>
