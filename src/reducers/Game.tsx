@@ -33,7 +33,7 @@ import {
   formatWatts,
   formatWattHours,
 } from "../helpers/Format";
-import { arrayMove, newSeed } from "../helpers/Math";
+import { arrayMove, newSeed, roundToSignificantDigits } from "../helpers/Math";
 import { computeScoreBreakdown, totalScore } from "../helpers/Scoring";
 import { formatLargeMass } from "../helpers/Units";
 import { buildStartedMessage } from "../helpers/BuildConsequences";
@@ -765,6 +765,21 @@ export const gameSlice = createSlice({
         // Age is scenario metadata rather than a catalog property, so exclude it from the exact
         // technology match and pass it to the completed operating asset separately.
         const { initialAgeYears = 0, label, ...facilitySearch } = search;
+        // Scenario research may carry more precision than is useful to a player. Resolve the
+        // catalog quote from the rounded size so its costs and technology-derived fields agree
+        // with the two-significant-digit nameplate the operating facility receives.
+        if (facilitySearch.peakW !== undefined) {
+          facilitySearch.peakW = roundToSignificantDigits(
+            facilitySearch.peakW,
+            2,
+          );
+        }
+        if (facilitySearch.peakWh !== undefined) {
+          facilitySearch.peakWh = roundToSignificantDigits(
+            facilitySearch.peakWh,
+            2,
+          );
+        }
         const generator = GENERATORS(
           state,
           facilitySearch.peakW || 1000000,

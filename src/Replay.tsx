@@ -28,9 +28,9 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// v5 includes the difficulty-scaled Winter Storm Uri demand surge and reliability objective.
+// v6 rounds every scenario's starting facility capacity to two significant digits.
 // Older actions cannot reproduce the same monthly facts and are rejected rather than migrated.
-export const REPLAY_VERSION = 5;
+export const REPLAY_VERSION = 6;
 
 export function replayVersionError(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) {

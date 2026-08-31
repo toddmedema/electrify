@@ -115,6 +115,14 @@ export function newSeed(): number {
   return Math.floor(Math.random() * 2 ** 32);
 }
 
+/** Rounds a finite measurement without tying its precision to a particular display unit. */
+export function roundToSignificantDigits(
+  value: number,
+  digits: number,
+): number {
+  return Number(value.toPrecision(digits));
+}
+
 // https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another
 export function arrayMove<T>(
   arr: Array<T | undefined>,

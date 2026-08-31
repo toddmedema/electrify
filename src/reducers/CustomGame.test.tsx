@@ -81,6 +81,33 @@ describe("a custom game", () => {
     });
   });
 
+  it("rounds starting facility capacities to two significant digits", () => {
+    const facilities = [
+      { name: "Coal", peakW: 722_225_000 },
+      { name: "Battery", peakWh: 243_456_000 },
+    ];
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2033,
+        facilities,
+      } as ScenarioType,
+    });
+
+    expect(
+      state.facilities.find((facility) => facility.name === "Coal")?.peakW,
+    ).toBe(720_000_000);
+    expect(
+      state.facilities.find((facility) => facility.name === "Battery")?.peakWh,
+    ).toBe(240_000_000);
+    // Scenario definitions remain the source record; rounding belongs to created assets.
+    expect(facilities).toEqual([
+      { name: "Coal", peakW: 722_225_000 },
+      { name: "Battery", peakWh: 243_456_000 },
+    ]);
+  });
+
   it("commissions an authored starting facility at its supplied age", () => {
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,

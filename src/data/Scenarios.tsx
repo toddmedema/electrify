@@ -359,7 +359,7 @@ export const SCENARIOS = [
                 peakWh: 500000000,
                 initialAgeYears: 35,
               },
-              { fuel: "Coal", peakW: 375000000, initialAgeYears: 25 },
+              { fuel: "Coal", peakW: 370000000, initialAgeYears: 25 },
             ],
           },
           success: storageCapstoneSucceeded,
