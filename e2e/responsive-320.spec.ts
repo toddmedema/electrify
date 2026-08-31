@@ -14,7 +14,9 @@ test("custom setup and settings stay usable on a 320px phone", async ({
     );
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .click();
   await page.getByRole("button", { name: "View Custom Game details" }).click();
 
   await expect(
@@ -30,7 +32,7 @@ test("custom setup and settings stay usable on a 320px phone", async ({
   expect(setupOverflow).toBeLessThanOrEqual(1);
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Options" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
   await expect(
     page.getByRole("heading", { name: "Keyboard shortcuts" }),
   ).toBeVisible();

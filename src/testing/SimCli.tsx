@@ -6,10 +6,10 @@
  * stack trace after every call.
  */
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, ScenarioType } from "../Types";
+import { DifficultyType, GeneratorOperatingType, ScenarioType } from "../Types";
 import { formatReport } from "./Report";
 import { getSimLocation, simLocationIds } from "./SimData";
-import { TICKS_PER_YEAR } from "../Constants";
+import { TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { generateNewTimeline } from "../reducers/Game";
 import {
@@ -258,6 +258,10 @@ function median(values: number[]): number {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+const BENCHMARK_FACILITY_COUNT = 10;
+const BENCHMARK_FORECAST_YEARS = 20;
+const BENCHMARK_STEP_MINUTES = 60;
+
 function benchmarkForecast(storyEffectsDisabled: boolean): number {
   const samples: number[] = [];
   for (let sample = 0; sample < 5; sample++) {
@@ -267,9 +271,26 @@ function benchmarkForecast(storyEffectsDisabled: boolean): number {
       seed: 7,
     });
     state.storyEffectsDisabled = storyEffectsDisabled;
+    const template = state.facilities[0] as GeneratorOperatingType;
+    state.facilities = Array.from(
+      { length: BENCHMARK_FACILITY_COUNT },
+      (_, index) => ({
+        ...template,
+        id: index + 1,
+        peakW: template.peakW / BENCHMARK_FACILITY_COUNT,
+        currentW: template.currentW / BENCHMARK_FACILITY_COUNT,
+      }),
+    );
     const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
     const started = performance.now();
-    generateNewTimeline(state, now.cash, now.customers, TICKS_PER_YEAR * 20);
+    generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      (TICKS_PER_YEAR * BENCHMARK_FORECAST_YEARS * TICK_MINUTES) /
+        BENCHMARK_STEP_MINUTES,
+      BENCHMARK_STEP_MINUTES,
+    );
     const elapsed = performance.now() - started;
     if (sample > 0) {
       samples.push(elapsed);
@@ -283,8 +304,12 @@ function runStoryBenchmark() {
   const storyMs = benchmarkForecast(false);
   const regression = storyMs / baselineMs - 1;
   write("");
-  write(`  20-year forecast without stories  ${baselineMs.toFixed(1)} ms`);
-  write(`  20-year forecast with stories     ${storyMs.toFixed(1)} ms`);
+  write(
+    `  ${BENCHMARK_FACILITY_COUNT}-facility, 20-year hourly forecast without stories  ${baselineMs.toFixed(1)} ms`,
+  );
+  write(
+    `  ${BENCHMARK_FACILITY_COUNT}-facility, 20-year hourly forecast with stories     ${storyMs.toFixed(1)} ms`,
+  );
   write(
     `  Story resolution regression       ${(regression * 100).toFixed(1)}%`,
   );

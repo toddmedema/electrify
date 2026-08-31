@@ -38,6 +38,7 @@ import {
   FacilityOperatingType,
   GameType,
   GeneratorOperatingType,
+  WorldEventEffectsType,
 } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
 import {
@@ -51,6 +52,7 @@ import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
+import { combineStoryEffects } from "../../data/WorldEvents";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
@@ -58,6 +60,7 @@ interface FacilityListItemProps {
   listLength: number;
   game: GameType;
   selected: boolean;
+  storyOutputMultiplier: number;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   // A replay is a recording of somebody else's decisions; letting the viewer make their own
   // would desync the run from the actions still queued up against it
@@ -66,6 +69,17 @@ interface FacilityListItemProps {
   onPause: DispatchProps["onPause"];
   onSell: DispatchProps["onSell"];
   onReprioritize: DispatchProps["onReprioritize"];
+}
+
+function storyOutputMultiplierForFacility(
+  facility: FacilityOperatingType,
+  effects: WorldEventEffectsType,
+): number {
+  const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
+  return (
+    (effects.facilityOutputMultipliersById?.[String(facility.id)] || 1) *
+    (fuel ? effects.facilityOutputMultipliersByFuel?.[fuel] || 1 : 1)
+  );
 }
 
 const getDraggableStyle = (
@@ -248,6 +262,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     readOnly,
     selected,
     spotInList,
+    storyOutputMultiplier,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
@@ -273,20 +288,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   }
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
-  const storyOutputMultiplier = game.worldEvents.active
-    .filter(
-      (event) =>
-        game.date.minute >= event.startsMinute &&
-        game.date.minute < event.endsMinute,
-    )
-    .reduce(
-      (multiplier, event) =>
-        multiplier *
-        (event.effects.facilityOutputMultipliersById?.[String(facility.id)] ||
-          (fuel && event.effects.facilityOutputMultipliersByFuel?.[fuel]) ||
-          1),
-      1,
-    );
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
@@ -578,6 +579,13 @@ export default class Facilities extends React.Component<Props, {}> {
     } = this.props;
     const facilitiesCount = game.facilities.length;
     const readOnly = !!game.replayPlayback;
+    const storyEffects = combineStoryEffects(
+      game.worldEvents.active.filter(
+        (event) =>
+          game.date.minute >= event.startsMinute &&
+          game.date.minute < event.endsMinute,
+      ),
+    );
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
@@ -639,6 +647,10 @@ export default class Facilities extends React.Component<Props, {}> {
                         onReprioritize={onReprioritize}
                         onSelect={onSelect}
                         selected={selectedFacilityId === g.id}
+                        storyOutputMultiplier={storyOutputMultiplierForFacility(
+                          g,
+                          storyEffects,
+                        )}
                         spotInList={i}
                         listLength={facilitiesCount}
                         readOnly={readOnly}
