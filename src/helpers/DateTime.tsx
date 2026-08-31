@@ -109,13 +109,17 @@ function accumulateTick(
   summary: MonthlyHistoryType,
   t: TickPresentFutureType,
   startingYear: number,
+  tickScale: number,
 ) {
   const date = getMonthYearFromMinute(t.minute, startingYear);
   // Integrate instantaneous electricity (watts) to watt hours
   // Only electricity isn't multiplied by this during tick calculations (financials are)
   summary.supplyWh +=
-    (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-  summary.demandWh += (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) *
+    GAME_TO_REAL_YEARS *
+    tickScale;
+  summary.demandWh +=
+    (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * tickScale;
   // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
   // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
   // excess. Storage is deliberately absent because it is not a fuel.
@@ -124,7 +128,9 @@ function accumulateTick(
     if (watts !== undefined) {
       summary.deliveredWhByFuel[fuel] =
         (summary.deliveredWhByFuel[fuel] || 0) +
-        ((watts * deliveredShare) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+        ((watts * deliveredShare) / TICKS_PER_HOUR) *
+          GAME_TO_REAL_YEARS *
+          tickScale;
     }
   });
   summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
@@ -156,13 +162,17 @@ export function summarizeTimeline(
   filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
   const summary = emptyHistory();
+  const tickScale =
+    timeline.length > 1
+      ? Math.max(1, (timeline[1].minute - timeline[0].minute) / TICK_MINUTES)
+      : 1;
   // Ticks are ordered oldest first, so walk forwards: reduceHistories keeps the last value it
   // sees for the point-in-time fields, and the period should report the balances it ended on.
   // Note that summarizeHistory below walks the other way, because monthlyHistory is newest first.
   for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     if (!filter || filter(t)) {
-      accumulateTick(summary, t, startingYear);
+      accumulateTick(summary, t, startingYear, tickScale);
     }
   }
   return summary;
@@ -182,6 +192,10 @@ export function summarizeTimelineByMonth(
   startingYear: number,
 ): MonthlyHistoryType[] {
   const byMonth = new Map<number, MonthlyHistoryType>();
+  const tickScale =
+    timeline.length > 1
+      ? Math.max(1, (timeline[1].minute - timeline[0].minute) / TICK_MINUTES)
+      : 1;
   // Forwards, with each tick overwriting the ending values, for the same reason summarizeTimeline
   // does it -- so a month summarized here reads the same way as one recorded during play, and
   // each one reports the balances it ended on rather than the ones it opened with
@@ -195,7 +209,7 @@ export function summarizeTimelineByMonth(
       summary = emptyHistory();
       byMonth.set(month, summary);
     }
-    accumulateTick(summary, t, startingYear);
+    accumulateTick(summary, t, startingYear, tickScale);
   }
   return [...byMonth.keys()]
     .sort((a, b) => a - b)

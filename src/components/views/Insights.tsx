@@ -567,9 +567,12 @@ export default class Insights extends React.Component<Props, State> {
     const years = rangeYears(this.state.range);
     const nextYearMinute =
       (game.date.year - game.startingYear + 1) * 12 * MINUTES_PER_MONTH;
+    const projectionStepMinutes =
+      this.state.range === "next20" ? 60 : TICK_MINUTES;
+    const tickScale = projectionStepMinutes / TICK_MINUTES;
     const ticks =
       years > 0
-        ? TICKS_PER_YEAR * years
+        ? (TICKS_PER_YEAR * years) / tickScale
         : Math.max(
             1,
             Math.ceil((nextYearMinute - game.date.minute) / TICK_MINUTES),
@@ -593,7 +596,13 @@ export default class Insights extends React.Component<Props, State> {
       return projection;
     }
 
-    const timeline = generateNewTimeline(game, now.cash, now.customers, ticks);
+    const timeline = generateNewTimeline(
+      game,
+      now.cash,
+      now.customers,
+      ticks,
+      projectionStepMinutes,
+    );
     let domainMin = Number.POSITIVE_INFINITY;
     let domainMax = 0;
     for (const tick of timeline) {
@@ -620,8 +629,10 @@ export default class Insights extends React.Component<Props, State> {
           current = { wh: 0, peakW: 0, start: tick.minute, end: tick.minute };
         }
         const amount = tick.demandW - tick.supplyW;
-        blackoutTotalWh += amount;
-        current.wh += amount;
+        const amountWh =
+          amount * (projectionStepMinutes / 60) * GAME_TO_REAL_YEARS;
+        blackoutTotalWh += amountWh;
+        current.wh += amountWh;
         current.peakW = Math.max(current.peakW, amount);
       } else if (isBlackout) {
         blackouts.push({ minute: tick.minute, value: domainMax });
@@ -640,7 +651,7 @@ export default class Insights extends React.Component<Props, State> {
 
     const sampleYears = Math.max(1, years);
     const sampled = timeline.filter(
-      (tick) => tick.minute % (240 * sampleYears) < TICK_MINUTES,
+      (tick) => tick.minute % (240 * sampleYears) < projectionStepMinutes,
     );
     if (sampled[0] !== timeline[0]) {
       sampled.unshift(timeline[0]);

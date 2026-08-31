@@ -208,6 +208,18 @@ describe("summarizeTimeline", () => {
       ),
     ).toBeCloseTo(summary.supplyWh);
   });
+
+  it("integrates hourly forecast points across their full duration", () => {
+    const hourly = ticks([100, 200]);
+    hourly[1].minute = 60;
+
+    const summary = summarizeTimeline(hourly, 2020);
+
+    expect(summary.demandWh).toBeCloseTo(
+      ((200 + 300) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * 4,
+    );
+    expect(summary.revenue).toBe(20);
+  });
 });
 
 describe("summarizeHistory", () => {

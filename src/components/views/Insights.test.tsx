@@ -105,8 +105,19 @@ jest.mock("../base/ChartForecastWater", () => ({
 }));
 jest.mock("../base/ChartForecastWeather", () => ({
   __esModule: true,
-  default: ({ syncKey }: ChartMockProps) => (
-    <div role="img" data-chart="weather" data-sync-key={syncKey} />
+  default: ({ syncKey, timeline }: ChartMockProps) => (
+    <div
+      role="img"
+      data-chart="weather"
+      data-sync-key={syncKey}
+      data-points={timeline?.length}
+      data-step={
+        timeline && timeline.length > 1
+          ? (timeline[1] as { minute: number }).minute -
+            (timeline[0] as { minute: number }).minute
+          : undefined
+      }
+    />
   ),
 }));
 
@@ -248,6 +259,15 @@ describe("Insights layers", () => {
     expect(options.getByText("Next 12 months")).toBeVisible();
     expect(options.queryByText("Current year")).toBeNull();
     expect(options.queryByText("Next year")).toBeNull();
+  });
+
+  it("uses hourly points for the twenty-year forecast", () => {
+    localStorage.setItem("insightsRange", "next20");
+    localStorage.setItem("insightsLayers", JSON.stringify(["weather"]));
+    renderInsights();
+
+    expect(screen.getByRole("img")).toHaveAttribute("data-points", "5760");
+    expect(screen.getByRole("img")).toHaveAttribute("data-step", "60");
   });
 
   it("keeps tutorial targets visible without duplicating stored layers", () => {
