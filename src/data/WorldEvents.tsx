@@ -1051,11 +1051,22 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export const TEXAS_DEEP_FREEZE_DEMAND: Record<DifficultyType, number> = {
+  // The joint FERC/NERC report measured actual ERCOT peak load 20% above the normal-weather
+  // forecast and estimated unconstrained demand 33% above it. Difficulty spans that observed
+  // range while leaving the researched Austin portfolio and plant availability anchors intact.
+  Intern: 1.2,
+  Employee: 1.23,
+  Manager: 1.27,
+  VP: 1.3,
+  CEO: 1.33,
+};
+
 /**
- * Austin-scale simulation of ERCOT-wide Winter Storm Uri conditions. The availability ratios are
- * system abstractions from FERC/NERC actual-versus-expected output, not outage claims about named
- * Austin Energy plants. Wind uses this one explicit availability adjustment; no icing derate is
- * applied elsewhere, and solar follows only the event weather.
+ * Austin-scale simulation of ERCOT-wide Winter Storm Uri conditions. The demand and availability
+ * ratios are system abstractions from FERC/NERC actual-versus-forecast output, not outage claims
+ * about named Austin Energy plants. Wind uses this one explicit availability adjustment; no icing
+ * derate is applied elsewhere, and solar follows only the event weather.
  */
 const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
   id: "texas-deep-freeze",
@@ -1066,30 +1077,33 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       // January 2017 is month zero, so February 2021 is month 49.
       schedule: { atMonth: 49 },
       durationMonths: 1,
-      describe: () => ({
-        title: "The deep freeze",
-        message:
-          "Record cold is straining power supplies across Texas just as demand surges.",
-        details:
-          "This month, gas, coal, nuclear, and wind plants can produce less while gas costs spike.",
-        concept: "blackout",
-        kind: "WORLD_EVENT",
-        importance: "CRITICAL",
-        actionTarget: { card: "FACILITIES", view: "FLEET" },
-        effects: {
-          // Calibrated against the fixed scenario seed so the representative February day reaches
-          // approximately 6°F (-14.4°C) for several game hours.
-          temperatureOffsetC: -20,
-          fuelPriceMultipliers: { "Natural Gas": 2.8 },
-          facilityOutputMultipliersByFuel: {
-            "Natural Gas": 0.62,
-            Coal: 0.73,
-            Uranium: 0.77,
-            Wind: 0.44,
+      describe: ({ difficulty }) => {
+        const demandMultiplier = TEXAS_DEEP_FREEZE_DEMAND[difficulty];
+        return {
+          title: "The deep freeze",
+          message:
+            "Record cold is straining power supplies across Texas just as demand surges.",
+          details: `Demand is ${Math.round((demandMultiplier - 1) * 100)}% above normal this month while gas, coal, nuclear, and wind plants can produce less and gas costs spike.`,
+          concept: "blackout",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: { card: "FACILITIES", view: "FLEET" },
+          effects: {
+            // Calibrated against the fixed scenario seed so the representative February day
+            // reaches approximately 6°F (-14.4°C) for several game hours.
+            temperatureOffsetC: -20,
+            demandMultiplier,
+            fuelPriceMultipliers: { "Natural Gas": 2.8 },
+            facilityOutputMultipliersByFuel: {
+              "Natural Gas": 0.62,
+              Coal: 0.73,
+              Uranium: 0.77,
+              Wind: 0.44,
+            },
           },
-        },
-        turningPointPriority: 110,
-      }),
+          turningPointPriority: 110,
+        };
+      },
     },
     {
       id: "thaw",
@@ -1196,6 +1210,10 @@ export function validateStoryDifficultyMonotonicity(): string[] {
     DIFFICULTY_ORDER.map(
       (difficulty) => RENEWABLES_BALANCE[difficulty].demandLoad,
     ),
+  );
+  ascending(
+    "Texas deep freeze demand",
+    DIFFICULTY_ORDER.map((difficulty) => TEXAS_DEEP_FREEZE_DEMAND[difficulty]),
   );
   ascending(
     "Hurricane affected capacity",

@@ -28,9 +28,9 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// v4 includes calibrated demand and authored absolute-load schedules in scenario reconstruction.
+// v5 includes the difficulty-scaled Winter Storm Uri demand surge and reliability objective.
 // Older actions cannot reproduce the same monthly facts and are rejected rather than migrated.
-export const REPLAY_VERSION = 4;
+export const REPLAY_VERSION = 5;
 
 export function replayVersionError(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) {

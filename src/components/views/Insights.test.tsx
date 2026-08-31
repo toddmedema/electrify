@@ -255,6 +255,14 @@ describe("Insights layers", () => {
     expect(levers.textContent).not.toMatch(/market [^·]*\/kWh/);
   });
 
+  it("keeps the customer growth rate visible for public utilities", () => {
+    renderInsights(107);
+
+    const levers = screen.getByRole("region", { name: "Planning levers" });
+    expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
+    expect(levers).not.toHaveTextContent(/market/i);
+  });
+
   it("offers one rolling 12-month range instead of separate calendar years", async () => {
     localStorage.setItem("insightsRange", "current");
     renderInsights();

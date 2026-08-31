@@ -420,11 +420,33 @@ describe("researched public-utility scenarios", () => {
   );
 
   it.each(difficulties)(
-    "keeps Texas Deep Freeze mathematically survivable on %s",
+    "rejects an unattended Texas Deep Freeze run on %s",
     (difficulty) => {
       const result = runSimulation({ scenarioId: 107, difficulty });
       expectNoViolations(result);
+      expect(result.outcome).toBe("fired");
+      const uri = result.months.find(
+        (month) => month.year === 2021 && month.month === 2,
+      )!;
+      expect(uri.supplyWh).toBeLessThan(uri.demandWh);
+    },
+  );
+
+  it.each(difficulties)(
+    "keeps Texas Deep Freeze winnable with planned firm capacity on %s",
+    (difficulty) => {
+      const result = runSimulation({
+        scenarioId: 107,
+        difficulty,
+        initialBuild: {
+          name: "Natural Gas",
+          peakW: 1_000_000_000,
+          financed: true,
+        },
+      });
+      expectNoViolations(result);
       expect(result.outcome).toBe("completed");
+      expect(result.actionCount).toBeGreaterThan(0);
     },
   );
 
@@ -455,19 +477,24 @@ describe("researched public-utility scenarios", () => {
   });
 
   it("supports materially different Manager strategies for Texas Deep Freeze", () => {
-    const existingPortfolio = runSimulation({
+    const gasPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 1_000_000_000,
+        financed: true,
+      },
     });
-    const extraWind = runSimulation({
+    const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
-      initialBuild: { name: "Wind", peakW: 250_000_000, financed: true },
+      initialBuild: { name: "Oil", peakW: 500_000_000, financed: true },
     });
-    expect(existingPortfolio.outcome).toBe("completed");
-    expect(extraWind.outcome).toBe("completed");
-    expect(existingPortfolio.builds).toHaveLength(0);
-    expect(extraWind.builds).toHaveLength(1);
+    expect(gasPlan.outcome).toBe("completed");
+    expect(oilPlan.outcome).toBe("completed");
+    expect(gasPlan.builds[0].name).toBe("Natural Gas");
+    expect(oilPlan.builds[0].name).toBe("Oil");
   });
 });
 

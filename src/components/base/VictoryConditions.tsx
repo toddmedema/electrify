@@ -7,6 +7,7 @@ export interface Props {
   ownership: ScenarioType["ownership"];
   dollarsPerkWh: number;
   minimumCustomerRetention?: number;
+  reliabilityObjective?: ScenarioType["reliabilityObjective"];
 }
 
 /**
@@ -16,7 +17,12 @@ export interface Props {
  * Scoring algorithm should also be updated in helpers/Scoring.tsx and in the Manual.
  */
 export default function VictoryConditions(props: Props): React.JSX.Element {
-  const { ownership, dollarsPerkWh, minimumCustomerRetention } = props;
+  const {
+    ownership,
+    dollarsPerkWh,
+    minimumCustomerRetention,
+    reliabilityObjective,
+  } = props;
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
   if (ownership === "Investor") {
@@ -32,6 +38,13 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   }
   return (
     <div>
+      {reliabilityObjective !== undefined && (
+        <p>
+          Required: serve at least{" "}
+          {Math.round(reliabilityObjective.minimumDemandServed * 100)}% of
+          demand during the {reliabilityObjective.label}
+        </p>
+      )}
       {minimumCustomerRetention !== undefined && (
         <p>
           Required: retain at least {Math.round(minimumCustomerRetention * 100)}

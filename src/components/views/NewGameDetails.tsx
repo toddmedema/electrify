@@ -501,6 +501,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 ownership={scenario.ownership}
                 dollarsPerkWh={scenario.dollarsPerkWh}
                 minimumCustomerRetention={scenario.minimumCustomerRetention}
+                reliabilityObjective={scenario.reliabilityObjective}
               />
             </DialogContent>
             <DialogActions>

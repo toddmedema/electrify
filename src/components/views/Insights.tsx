@@ -22,6 +22,7 @@ import LayersIcon from "@mui/icons-material/Layers";
 import TuneIcon from "@mui/icons-material/Tune";
 import {
   GAME_TO_REAL_YEARS,
+  ORGANIC_GROWTH_MAX_ANNUAL,
   TICK_MINUTES,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -758,6 +759,16 @@ export default class Insights extends React.Component<Props, State> {
               · market {formatMoneyConcise(marketRate)} · projected customers{" "}
               <strong>
                 {formatCustomerChange(customerChange, now.customers)}
+              </strong>{" "}
+              next month
+            </>
+          )}
+          {scenario.ownership === "Public" && (
+            <>
+              {" "}
+              · customer growth{" "}
+              <strong>
+                +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
               </strong>
             </>
           )}

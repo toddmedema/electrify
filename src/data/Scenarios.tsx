@@ -921,7 +921,8 @@ export const SCENARIOS = [
     briefing: {
       tone: "storm",
       fantasy: "Keep Austin powered through a brutal winter storm.",
-      objective: "Strengthen the grid before the February 2021 freeze.",
+      objective:
+        "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
       threat: "Extreme cold will cut supplies just as demand surges.",
     },
     ownership: "Public",
@@ -934,6 +935,12 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,
+    reliabilityObjective: {
+      year: 2021,
+      month: 2,
+      minimumDemandServed: 1,
+      label: "February 2021 freeze",
+    },
     // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. The solar
     // residual balances the published 1,287 MW renewable total; it is not a separately audited
     // solar nameplate.

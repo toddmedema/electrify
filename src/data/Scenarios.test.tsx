@@ -165,6 +165,12 @@ describe("authored starting fleets", () => {
       startingCustomers: 472_701,
       ownership: "Public",
       dollarsPerkWh: 0.09,
+      reliabilityObjective: {
+        year: 2021,
+        month: 2,
+        minimumDemandServed: 1,
+        label: "February 2021 freeze",
+      },
     });
     expect(austin.location).toMatchObject({
       id: "Austin",

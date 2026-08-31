@@ -425,6 +425,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         )}
       </DialogContent>
       <DialogActions
+        className="victoryDialogActions"
         sx={{
           px: { xs: 2, sm: 3 },
           pb: 2,

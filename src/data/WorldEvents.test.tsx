@@ -14,6 +14,7 @@ import {
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
+  TEXAS_DEEP_FREEZE_DEMAND,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
 } from "./WorldEvents";
@@ -282,6 +283,16 @@ describe("The Shale Boom pilot arc", () => {
 });
 
 describe("Texas Deep Freeze", () => {
+  it("uses the observed-to-unconstrained ERCOT demand range by difficulty", () => {
+    expect(TEXAS_DEEP_FREEZE_DEMAND).toEqual({
+      Intern: 1.2,
+      Employee: 1.23,
+      Manager: 1.27,
+      VP: 1.3,
+      CEO: 1.33,
+    });
+  });
+
   it("starts only in February 2021 and expires completely in March", () => {
     const january = resolveStoryAtDate(context(48, 107));
     const february = resolveStoryAtDate(context(49, 107));
@@ -294,7 +305,7 @@ describe("Texas Deep Freeze", () => {
     });
     expect(february.effects).toEqual({
       temperatureOffsetC: -20,
-      demandMultiplier: 1,
+      demandMultiplier: 1.27,
       fuelPriceMultipliers: { "Natural Gas": 2.8 },
       facilityOutputMultipliersByFuel: {
         "Natural Gas": 0.62,
@@ -311,10 +322,11 @@ describe("Texas Deep Freeze", () => {
     expect(resolveStoryAtDate(context(49, 999)).effects).toEqual({});
   });
 
-  it("uses exactly one explicit wind availability adjustment", () => {
+  it("raises cold-weather demand and uses exactly one wind adjustment", () => {
     const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
     expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
-    expect(uri.effects.demandMultiplier).toBeUndefined();
+    expect(uri.effects.demandMultiplier).toBe(1.27);
+    expect(uri.details).toMatch(/demand is 27% above normal/i);
     expect(uri.details).toMatch(/plants can produce less/i);
   });
 
