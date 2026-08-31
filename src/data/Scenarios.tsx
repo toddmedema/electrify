@@ -958,7 +958,7 @@ export const SCENARIOS = [
   {
     id: 108, // Scenario IDs are persisted and shared; append rather than renumbering.
     name: "Heatwave + Drought",
-    icon: "heat",
+    icon: "heatwave-drought",
     locationId: "Paris",
     location: {
       id: "Paris",
@@ -1010,7 +1010,7 @@ export const SCENARIOS = [
   {
     id: 109,
     name: "Solar Eclipse",
-    icon: "solar",
+    icon: "solar-eclipse",
     locationId: "Paris",
     location: {
       id: "Paris",
@@ -1059,7 +1059,7 @@ export const SCENARIOS = [
   },
   {
     id: 110,
-    name: "Sudden Nuclear Trip",
+    name: "Sudden Nuclear Trip in France",
     icon: "nuclear",
     locationId: "Paris",
     location: {
@@ -1073,11 +1073,11 @@ export const SCENARIOS = [
       resources: { hydro: false },
     },
     summary:
-      "Carry enough contingency capacity for an unannounced nuclear outage.",
+      "Carry enough contingency capacity for an unannounced nuclear outage in France.",
     briefing: {
       tone: "legacy",
       fantasy:
-        "Keep the grid steady when its largest generator suddenly disappears.",
+        "Keep France's grid steady when its largest generator suddenly disappears.",
       objective:
         "Build a portfolio that can absorb the loss of the main nuclear unit at any time in the risk window.",
       threat:

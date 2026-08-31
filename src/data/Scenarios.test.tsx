@@ -220,12 +220,14 @@ describe("authored starting fleets", () => {
       durationMonths: 3,
       minimumDemandServed: 1,
     });
+    expect(heatwave.icon).toBe("heatwave-drought");
     expect(
       heatwave.facilities.map((facility) => facility.fuel || facility.name),
     ).toEqual(expect.arrayContaining(["Uranium", "Hydro", "Sun", "Battery"]));
     expect(eclipse).toMatchObject({
       startingYear: 2024,
       durationMonths: 32,
+      icon: "solar-eclipse",
       reliabilityObjective: { year: 2026, month: 8 },
     });
     expect(
@@ -237,6 +239,7 @@ describe("authored starting fleets", () => {
       month: 7,
       durationMonths: 18,
     });
+    expect(trip.name).toBe("Sudden Nuclear Trip in France");
     expect(
       trip.facilities.find(
         (facility) => facility.label === "Grand Nuclear Unit",
