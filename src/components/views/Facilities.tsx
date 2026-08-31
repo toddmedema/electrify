@@ -112,11 +112,131 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   DISCHARGING: "discharging",
 };
 
+function FacilityActions(props: {
+  facility: FacilityOperatingType;
+  listLength: number;
+  readOnly: boolean;
+  spotInList: number;
+  onPause: DispatchProps["onPause"];
+  onReprioritize: DispatchProps["onReprioritize"];
+  onTogglePause: DispatchProps["onTogglePause"];
+  onOpenSell: () => void;
+}) {
+  const {
+    facility,
+    listLength,
+    onOpenSell,
+    onPause,
+    onReprioritize,
+    onTogglePause,
+    readOnly,
+    spotInList,
+  } = props;
+  const underConstruction = facility.yearsToBuildLeft > 0;
+  return (
+    <span className="facilityActions">
+      {!readOnly && listLength > 1 && (
+        <>
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              onReprioritize(spotInList, -1);
+            }}
+            aria-label={`Move ${facility.name} earlier in the dispatch order`}
+            disabled={spotInList === 0}
+            edge="end"
+            color="primary"
+            size="small"
+          >
+            <KeyboardArrowUpIcon />
+          </IconButton>
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              onReprioritize(spotInList, 1);
+            }}
+            aria-label={`Move ${facility.name} later in the dispatch order`}
+            disabled={spotInList === listLength - 1}
+            edge="end"
+            color="primary"
+            size="small"
+          >
+            <KeyboardArrowDownIcon />
+          </IconButton>
+        </>
+      )}
+      {!readOnly && !underConstruction && !facility.paused && (
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            onPause(facility.id, facility.name);
+          }}
+          aria-label={`Pause ${facility.name}`}
+          edge="end"
+          color="primary"
+          size="small"
+        >
+          <ConceptIcon concept="pause" />
+        </IconButton>
+      )}
+      {!readOnly && facility.paused && (
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePause(facility.id);
+          }}
+          aria-label={`Resume ${facility.name}`}
+          edge="end"
+          color="primary"
+          size="small"
+        >
+          <ConceptIcon concept="play" />
+        </IconButton>
+      )}
+      {!readOnly && (underConstruction || listLength > 1) && (
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSell();
+          }}
+          aria-label={`${underConstruction ? "Cancel construction of" : "Sell"} ${facility.name}`}
+          edge="end"
+          color="primary"
+          size="small"
+        >
+          {underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
+        </IconButton>
+      )}
+    </span>
+  );
+}
+
+const MemoizedFacilityActions = React.memo(
+  FacilityActions,
+  (previous, next) => {
+    const previousUnderConstruction = previous.facility.yearsToBuildLeft > 0;
+    const nextUnderConstruction = next.facility.yearsToBuildLeft > 0;
+    return (
+      previous.facility.id === next.facility.id &&
+      previous.facility.name === next.facility.name &&
+      previous.facility.paused === next.facility.paused &&
+      previousUnderConstruction === nextUnderConstruction &&
+      previous.listLength === next.listLength &&
+      previous.readOnly === next.readOnly &&
+      previous.spotInList === next.spotInList &&
+      previous.onPause === next.onPause &&
+      previous.onReprioritize === next.onReprioritize &&
+      previous.onTogglePause === next.onTogglePause &&
+      previous.onOpenSell === next.onOpenSell
+    );
+  },
+);
+
 function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
-  const toggleDialog = () => {
-    setOpen(!open);
-  };
+  const toggleDialog = React.useCallback(() => {
+    setOpen((value) => !value);
+  }, []);
 
   const {
     facility,
@@ -230,101 +350,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 : undefined
             }
             secondaryAction={
-              // Hidden until the row is hovered, focused or selected (desktop only - see
-              // app.scss), because a permanent cluster of buttons takes the width the numbers
-              // below want. Each one stops its click short of the row, which would otherwise
-              // read the same click as "select this facility" on the way past
-              <span className="facilityActions">
-                {!readOnly && props.listLength > 1 && (
-                  <>
-                    {/* Dispatch order is a core mechanic, and dragging was the only way to set
-                        it - undiscoverable with a mouse, and unusable once the list has
-                        scrolled. These move one place at a time, the way a drag does */}
-                    <IconButton
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onReprioritize(spotInList, -1);
-                      }}
-                      aria-label={`Move ${facility.name} earlier in the dispatch order`}
-                      disabled={spotInList === 0}
-                      edge="end"
-                      color="primary"
-                      size="small"
-                    >
-                      <KeyboardArrowUpIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onReprioritize(spotInList, 1);
-                      }}
-                      aria-label={`Move ${facility.name} later in the dispatch order`}
-                      disabled={spotInList === props.listLength - 1}
-                      edge="end"
-                      color="primary"
-                      size="small"
-                    >
-                      <KeyboardArrowDownIcon />
-                    </IconButton>
-                  </>
-                )}
-                {!readOnly && !underConstruction && !facility.paused && (
-                  <IconButton
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      onPause(facility.id, facility.name);
-                    }}
-                    aria-label={`Pause ${facility.name}`}
-                    edge="end"
-                    color="primary"
-                    size="small"
-                  >
-                    <ConceptIcon concept="pause" />
-                  </IconButton>
-                )}
-                {!readOnly && facility.paused && (
-                  <IconButton
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      onTogglePause(facility.id);
-                    }}
-                    aria-label={`Resume ${facility.name}`}
-                    edge="end"
-                    color="primary"
-                    size="small"
-                  >
-                    <ConceptIcon concept="play" />
-                  </IconButton>
-                )}
-                {!readOnly && !underConstruction && props.listLength > 1 && (
-                  <IconButton
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      toggleDialog();
-                    }}
-                    aria-label={`Sell ${facility.name}`}
-                    edge="end"
-                    color="primary"
-                    size="small"
-                  >
-                    <DeleteForeverIcon />
-                  </IconButton>
-                )}
-                {!readOnly && underConstruction && (
-                  <IconButton
-                    onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
-                      toggleDialog();
-                    }}
-                    aria-label={`Cancel construction of ${facility.name}`}
-                    edge="end"
-                    color="primary"
-                    size="small"
-                  >
-                    <CancelIcon />
-                  </IconButton>
-                )}
-              </span>
+              <MemoizedFacilityActions
+                facility={facility}
+                listLength={props.listLength}
+                readOnly={readOnly}
+                spotInList={spotInList}
+                onPause={onPause}
+                onReprioritize={onReprioritize}
+                onTogglePause={onTogglePause}
+                onOpenSell={toggleDialog}
+              />
             }
           >
             {!readOnly && (
@@ -339,7 +374,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               <div
                 className="outputProgressBar"
                 style={{
-                  width: `${outputFraction * 100}%`,
+                  transform: `scaleX(${outputFraction})`,
                   background: withAlpha(accentColor, 0.18),
                 }}
               />
@@ -352,16 +387,18 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   src={`/images/${facility.name.toLowerCase()}.svg`}
                 />
                 {facility.peakWh > 0 && !underConstruction && (
-                  <div
-                    className="capacityProgressBar"
-                    style={{
-                      height: `${(facility.currentWh / facility.peakWh) * 100}%`,
-                      backgroundColor:
-                        activity === "CHARGING"
-                          ? chartPalette().storage
-                          : undefined,
-                    }}
-                  />
+                  <div className="capacityProgressBar">
+                    <div
+                      className="capacityProgressBarFill"
+                      style={{
+                        transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                        backgroundColor:
+                          activity === "CHARGING"
+                            ? chartPalette().storage
+                            : undefined,
+                      }}
+                    />
+                  </div>
                 )}
                 <div
                   className="facilityActivity"
@@ -488,10 +525,8 @@ export default class Facilities extends React.Component<Props, {}> {
   private dragging = false;
   private speedBeforeDrag: GameType["speed"] = "PAUSED";
 
-  // In fast mode, skip frames so that CPU can focus on simulation. This used to be 1 frame in
-  // 8, when the supply/demand chart was on Victory and one pane render cost 18ms; on uPlot the
-  // same render is 3.6ms, so 1 in 2 refreshes the pane four times as often and still costs less
-  // per tick than the old setting did.
+  // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
+  // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
   public shouldComponentUpdate(nextProps: Props) {
     if (this.dragging) {
       return false;
@@ -507,7 +542,7 @@ export default class Facilities extends React.Component<Props, {}> {
     ) {
       return true;
     }
-    return this.throttle.due(nextProps.game.date.minute, 2);
+    return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
   public componentDidUpdate() {

@@ -130,7 +130,24 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const equivalentCycles = facilityEquivalentCycles(facility);
   const equivalentOperatingHours = facilityEquivalentOperatingHours(facility);
 
-  const trend = fuel ? fuelPriceTrend(fuel, date, seed, location) : [];
+  // Price history only changes at a month boundary. Selected-facility lifetime totals still
+  // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
+  const trend = React.useMemo(
+    () =>
+      fuel
+        ? fuelPriceTrend(
+            fuel,
+            {
+              year: date.year,
+              monthNumber: date.monthNumber,
+              monthsElapsed: date.monthsElapsed,
+            } as DateType,
+            seed,
+            location,
+          )
+        : [],
+    [fuel, date.year, date.monthNumber, date.monthsElapsed, seed, location],
+  );
   const trendChange =
     trend.length > 1 && trend[0] > 0
       ? trend[trend.length - 1] / trend[0] - 1

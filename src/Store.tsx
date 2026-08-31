@@ -18,6 +18,12 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
+      // Timeline/history dominate the state by several orders of magnitude and are replaced only
+      // by reducer-owned simulation code. Walking every tick of both after every 1x/20x action
+      // made development builds spend more time validating forecasts than running them.
+      immutableCheck: {
+        ignoredPaths: ["game.timeline", "game.monthlyHistory"],
+      },
       // The shared dialog/snackbar layer predates this store and deliberately carries React
       // content and click callbacks. Those values never leave the live UI state, but Redux
       // Toolkit otherwise reports them on every simulation tick, burying actionable warnings
@@ -29,6 +35,9 @@ export const store = configureStore({
           "ui.dialog.action",
           "ui.dialog.secondaryAction",
           "ui.snackbar.action",
+          "game.timeline",
+          "game.monthlyHistory",
+          "game.replayLog",
         ],
       },
     }).concat(tutorialGateMiddleware),

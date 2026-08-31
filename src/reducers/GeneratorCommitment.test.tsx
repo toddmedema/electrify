@@ -34,7 +34,7 @@ describe("minimum stable generator dispatch", () => {
   it("holds an online plant at its minimum when avoiding the next start is cheaper", () => {
     const { state, coal, nextIndex } = isolatedOnlineCoal();
     coal.costPerStart = 1000000000;
-    state.timeline[nextIndex + 2].dispatchTargetWByFacility[coal.id] = 1;
+    state.timeline[nextIndex + 2].dispatchTargetWByFacility![coal.id] = 1;
 
     tickState(state);
 
@@ -52,7 +52,7 @@ describe("minimum stable generator dispatch", () => {
     const { state, coal, nextIndex } = isolatedOnlineCoal();
     coal.costPerStart = 1;
     coal.variableOperatingCostPerMWh = 1000000000;
-    state.timeline[nextIndex + 3].dispatchTargetWByFacility[coal.id] = 1;
+    state.timeline[nextIndex + 3].dispatchTargetWByFacility![coal.id] = 1;
     const minimumW = coal.currentW;
 
     tickState(state);

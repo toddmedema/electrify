@@ -1,10 +1,14 @@
-import { shouldKeepGeneratorCommitted } from "./Commitment";
+import {
+  prepareGeneratorCommitment,
+  recordDispatchTarget,
+  shouldKeepGeneratorCommitted,
+} from "./Commitment";
 import { TickPresentFutureType } from "../Types";
 
 function tick(target: number | undefined): TickPresentFutureType {
-  return {
-    dispatchTargetWByFacility: target === undefined ? {} : { 7: target },
-  } as TickPresentFutureType;
+  return (
+    target === undefined ? {} : { dispatchTargetWByFacility: { 7: target } }
+  ) as TickPresentFutureType;
 }
 
 describe("generator commitment optimization", () => {
@@ -63,5 +67,31 @@ describe("generator commitment optimization", () => {
         minimumOperatingCost: () => 20,
       }),
     ).toBe(false);
+  });
+
+  it("precomputes the same decisions without serializing forecast targets", () => {
+    const forecast = [tick(undefined), tick(undefined), tick(undefined)];
+    forecast.forEach((item, index) =>
+      recordDispatchTarget(item, 7, index === 2 ? 1 : 0),
+    );
+    const minimumOperatingCost = jest.fn(() => 20);
+
+    prepareGeneratorCommitment({
+      facilityId: 7,
+      forecast,
+      minimumOperatingCost,
+    });
+
+    expect(
+      shouldKeepGeneratorCommitted({
+        facilityId: 7,
+        forecast,
+        fromIndex: 0,
+        startCost: 50,
+        minimumOperatingCost,
+      }),
+    ).toBe(true);
+    expect(minimumOperatingCost).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(forecast)).not.toContain("dispatchTarget");
   });
 });

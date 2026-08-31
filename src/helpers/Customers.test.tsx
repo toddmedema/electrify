@@ -85,6 +85,15 @@ describe("customer price competition", () => {
     expect(perceived).toBeCloseTo(0.0683, 3);
   });
 
+  it("preserves bill-memory decay when an hourly forecast advances four ticks", () => {
+    let quarterHourly = 0.1;
+    for (let i = 0; i < 4; i++) {
+      quarterHourly = updateCustomerRate(quarterHourly, 0.05);
+    }
+
+    expect(updateCustomerRate(0.1, 0.05, 4)).toBeCloseTo(quarterHourly, 12);
+  });
+
   it("projects the same gradual response used by the tick model", () => {
     const common = {
       customers: 1_000_000,

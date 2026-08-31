@@ -38,14 +38,20 @@ export interface CustomerTickInputType {
   marketSize: number;
   ownership: "Investor" | "Public";
   organicGrowthRate?: number;
+  tickScale?: number;
 }
 
 export function updateCustomerRate(
   previousRate: number,
   currentRate: number,
+  tickScale = 1,
 ): number {
   const ticksOfMemory = CUSTOMER_RATE_MEMORY_MONTHS * TICKS_PER_MONTH;
-  return previousRate + (currentRate - previousRate) / ticksOfMemory;
+  if (tickScale === 1) {
+    return previousRate + (currentRate - previousRate) / ticksOfMemory;
+  }
+  const retained = Math.pow(1 - 1 / ticksOfMemory, tickScale);
+  return previousRate + (currentRate - previousRate) * (1 - retained);
 }
 
 /** Annual fraction of the relevant customer pool that switches to or from the company. */
@@ -79,15 +85,16 @@ export function nextCustomerCount({
   marketSize,
   ownership,
   organicGrowthRate = ORGANIC_GROWTH_MAX_ANNUAL,
+  tickScale = 1,
 }: CustomerTickInputType): number {
-  let change = (customers * organicGrowthRate) / TICKS_PER_YEAR;
+  let change = (customers * organicGrowthRate * tickScale) / TICKS_PER_YEAR;
   if (ownership === "Investor") {
     const switchingRate = customerSwitchingRate(customerRate, marketRate);
     const switchingBase =
       switchingRate >= 0
         ? Math.max(0, marketSize - customers)
         : Math.max(0, customers);
-    change += (switchingBase * switchingRate) / TICKS_PER_YEAR;
+    change += (switchingBase * switchingRate * tickScale) / TICKS_PER_YEAR;
   }
   const next = Math.max(0, Math.round(customers + change));
   return ownership === "Investor"
