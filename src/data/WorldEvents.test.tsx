@@ -5,12 +5,15 @@ import {
   combineStoryEffects,
   CARBON_FEE_BALANCE,
   END_OF_ERA_BALANCE,
+  HEATWAVE_DROUGHT_BALANCE,
   HURRICANE_BALANCE,
   PARADISE_BALANCE,
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
   SHALE_BOOM_BALANCE,
+  solarEclipseOutputMultiplier,
+  SOLAR_ECLIPSE_MINIMUM_OUTPUT,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
@@ -277,7 +280,7 @@ describe("The Shale Boom pilot arc", () => {
   it("authors every scenario with deterministic story events and no custom game", () => {
     expect(
       [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105, 107]);
+    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 109, 110]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
 });
@@ -359,6 +362,83 @@ describe("Texas Deep Freeze", () => {
     const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
     expect(uri.message).toMatch(/power supplies across Texas/i);
     expect(uri.message).not.toMatch(/load shed|ERCOT/i);
+  });
+});
+
+describe("generation and storage reliability scenarios", () => {
+  it("progressively reduces hydro and nuclear output through the heatwave", () => {
+    const june = resolveStoryAtDate(context(29, 108));
+    const july = resolveStoryAtDate(context(30, 108));
+    const august = resolveStoryAtDate(context(31, 108));
+
+    expect(june.effects).toMatchObject({
+      demandMultiplier: 1.08,
+      hydroRunoffMultiplier: 0.6,
+      facilityOutputMultipliersByFuel: { Hydro: 0.8, Uranium: 0.9 },
+    });
+    expect(july.effects.hydroRunoffMultiplier).toBe(0.4);
+    expect(august.effects).toMatchObject({
+      demandMultiplier: 1.16,
+      hydroRunoffMultiplier: 0.22,
+      facilityOutputMultipliersByFuel: { Hydro: 0.5, Uranium: 0.62 },
+    });
+    expect(resolveStoryAtDate(context(32, 108)).effects).toEqual({});
+    expect(HEATWAVE_DROUGHT_BALANCE.Intern.demandMultipliers[2]).toBeLessThan(
+      HEATWAVE_DROUGHT_BALANCE.CEO.demandMultipliers[2],
+    );
+  });
+
+  it("models the eclipse as a known intraday fall and recovery", () => {
+    const effects = resolveStoryAtDate(context(32, 109)).effects;
+    expect(effects.solarEclipse).toMatchObject({
+      startsMinuteOfDay: 510,
+      totalityMinuteOfDay: 600,
+      endsMinuteOfDay: 690,
+      minimumOutputMultiplier: SOLAR_ECLIPSE_MINIMUM_OUTPUT.Manager,
+    });
+    expect(solarEclipseOutputMultiplier(effects, 510)).toBe(1);
+    expect(solarEclipseOutputMultiplier(effects, 555)).toBeCloseTo(0.54);
+    expect(solarEclipseOutputMultiplier(effects, 600)).toBe(0.08);
+    expect(solarEclipseOutputMultiplier(effects, 645)).toBeCloseTo(0.54);
+    expect(solarEclipseOutputMultiplier(effects, 690)).toBe(1);
+  });
+
+  it("keeps the seeded nuclear trip hidden until it occurs", () => {
+    const snapshot: StorySnapshotType = {
+      ...EMPTY_SNAPSHOT,
+      facilities: [
+        {
+          id: 7,
+          name: "Grand Nuclear Unit",
+          fuel: "Uranium",
+          ageYears: 22,
+          peakW: 500_000_000,
+          operational: true,
+        },
+      ],
+    };
+    const before = { ...context(0, 110, 77), snapshot };
+    expect(
+      upcomingStoryPhases(before).some((phase) => phase.key.endsWith(":trip")),
+    ).toBe(false);
+    const arc = STORY_ARC_DEFINITIONS.find((item) => item.scenarioId === 110)!;
+    const tripPhase = arc.phases.find((phase) => phase.id === "trip")!;
+    const month = resolveStoryScheduleMonth(
+      tripPhase.schedule,
+      77,
+      storyPhaseKey(110, arc.id, tripPhase.id),
+    );
+    expect(month).toBeGreaterThanOrEqual(30);
+    expect(month).toBeLessThanOrEqual(36);
+    const trip = resolveStoryAtDate({
+      ...context(month, 110, 77),
+      snapshot,
+    }).occurrences[0];
+    expect(trip.forecastable).toBe(false);
+    expect(trip.effects.facilityOutputMultipliersById).toEqual({ "7": 0 });
+    expect(trip.attributes.selectedFacilityNames).toEqual([
+      "Grand Nuclear Unit",
+    ]);
   });
 });
 

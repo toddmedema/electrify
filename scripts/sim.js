@@ -21,6 +21,7 @@ const FLAGS = {
   "--rate": "SIM_RATE",
   "--build": "SIM_BUILD",
   "--build-mw": "SIM_BUILD_MW",
+  "--build-mwh": "SIM_BUILD_MWH",
   "--sell-id": "SIM_SELL_ID",
   "--sell-month": "SIM_SELL_MONTH",
 };
@@ -51,8 +52,10 @@ Runs the game's simulation headlessly and reports what happened.
   --seed <n>             Pin the run's randomness (default 12345)
   --strategy <name>      none (default) or keepUp, which buys generators when short on supply
   --rate <dollars>       $/kWh charged to customers (default: whatever a real game starts at)
-  --build <name>         Build one generator immediately (a real recorded player action)
-  --build-mw <n>         Size for --build in MW (default 300)
+  --build <name>         Build one generator or storage facility immediately
+                         (a real recorded player action)
+  --build-mw <n>         Generator size for --build in MW (default 300)
+  --build-mwh <n>        Storage energy size for --build in MWh
   --finance              Finance --build instead of paying cash
   --sell-id <n>          Sell one starting facility by facility id
   --sell-month <n>       Wait until this month to apply --sell-id (default 0)

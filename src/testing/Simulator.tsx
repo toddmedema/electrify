@@ -15,7 +15,7 @@ import gameReducer, {
   tickState,
 } from "../reducers/Game";
 import { DIFFICULTIES } from "../Constants";
-import { GENERATORS } from "../data/Facilities";
+import { GENERATORS, STORAGE } from "../data/Facilities";
 import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
@@ -42,11 +42,13 @@ import { loadSimData } from "./SimData";
 
 export type StrategyType = "none" | "keepUp";
 
-export interface InitialBuildType {
+interface InitialBuildBaseType {
   name: string;
-  peakW: number;
   financed: boolean;
 }
+
+export type InitialBuildType = InitialBuildBaseType &
+  ({ peakW: number; peakWh?: never } | { peakWh: number; peakW?: never });
 
 /**
  * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
@@ -184,19 +186,27 @@ function setUpGame(
     state = gameReducer(state, delta({ storyEffectsDisabled: true }));
   }
   if (options.initialBuild) {
-    const build = GENERATORS(
-      state,
-      options.initialBuild.peakW,
-      state.timeline.map((tick) => tick.windKph),
-      state.timeline.map((tick) => tick.solarIrradianceWM2),
-      state.timeline
-        .map((tick) => tick.windOffshoreKph)
-        .filter((wind): wind is number => wind !== undefined),
-      state.timeline.map((tick) => tick.windAirborneKph),
-    ).find(
-      (facility) =>
-        facility.available && facility.name === options.initialBuild?.name,
-    );
+    const build =
+      options.initialBuild.peakWh !== undefined
+        ? STORAGE(state, options.initialBuild.peakWh).find(
+            (facility) =>
+              facility.available &&
+              facility.name === options.initialBuild?.name,
+          )
+        : GENERATORS(
+            state,
+            options.initialBuild.peakW,
+            state.timeline.map((tick) => tick.windKph),
+            state.timeline.map((tick) => tick.solarIrradianceWM2),
+            state.timeline
+              .map((tick) => tick.windOffshoreKph)
+              .filter((wind): wind is number => wind !== undefined),
+            state.timeline.map((tick) => tick.windAirborneKph),
+          ).find(
+            (facility) =>
+              facility.available &&
+              facility.name === options.initialBuild?.name,
+          );
     if (!build) {
       throw new Error(
         `Cannot build ${options.initialBuild.name} in ${scenario.name}`,

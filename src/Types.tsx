@@ -614,6 +614,8 @@ export interface ScenarioType {
   reliabilityObjective?: {
     year: number;
     month: number;
+    /** Consecutive calendar months that must each meet the target. Defaults to one. */
+    durationMonths?: number;
     minimumDemandServed: number;
     label: string;
   };
@@ -694,6 +696,15 @@ export interface WorldEventEffectsType {
   fuelPriceMultipliers?: Partial<Record<FuelNameType, number>>;
   temperatureOffsetC?: number;
   demandMultiplier?: number;
+  /** Multiplies modeled watershed inflow before it reaches a hydro reservoir. */
+  hydroRunoffMultiplier?: number;
+  /** Intraday solar reduction used for a predictable eclipse profile. */
+  solarEclipse?: {
+    startsMinuteOfDay: number;
+    totalityMinuteOfDay: number;
+    endsMinuteOfDay: number;
+    minimumOutputMultiplier: number;
+  };
   // An override rather than a multiplier. Content validation rejects overlapping policy phases.
   carbonFeePerKgCO2e?: number;
   buildCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
@@ -740,6 +751,8 @@ export interface ActiveWorldEventType {
   endsMinute: number;
   attributes: Record<string, StoryAttributeValueType>;
   effects: WorldEventEffectsType;
+  /** False for surprises that must not appear in the event list or forward forecasts. */
+  forecastable?: boolean;
 }
 
 export interface WorldEventStateType {

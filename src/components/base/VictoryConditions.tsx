@@ -43,6 +43,9 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
           Required: serve at least{" "}
           {Math.round(reliabilityObjective.minimumDemandServed * 100)}% of
           demand during the {reliabilityObjective.label}
+          {(reliabilityObjective.durationMonths || 1) > 1
+            ? " in every event month"
+            : ""}
         </p>
       )}
       {minimumCustomerRetention !== undefined && (

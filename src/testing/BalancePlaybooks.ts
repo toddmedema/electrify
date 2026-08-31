@@ -96,4 +96,13 @@ export const INTERN_ONE_BUILD_PLAYS: Record<
   105: {
     initialBuild: { name: "Natural Gas", peakW: 525000000, financed: true },
   },
+  108: {
+    initialBuild: { name: "Natural Gas", peakW: 250000000, financed: true },
+  },
+  109: {
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+  },
+  110: {
+    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
+  },
 };

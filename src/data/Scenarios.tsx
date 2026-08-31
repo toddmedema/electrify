@@ -955,6 +955,189 @@ export const SCENARIOS = [
     endTitle: "After the thaw",
     endMessage: "The storm tested every choice you made to prepare Austin.",
   },
+  {
+    id: 108, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "Heatwave + Drought in Spain",
+    icon: "heatwave-drought",
+    locationId: "Madrid",
+    location: {
+      id: "Madrid",
+      name: "Madrid, Spain",
+      country: "Spain",
+      region: "Europe",
+      lat: 40.4168,
+      long: -3.7038,
+      timeZone: "Europe/Madrid",
+      watershedId: "Madrid",
+      watershedName: "Spanish river basins",
+      resources: { hydro: true },
+    },
+    summary:
+      "Conserve water and stored energy across Spain through a worsening summer heatwave.",
+    briefing: {
+      tone: "storm",
+      fantasy:
+        "Guide Spain's renewable-rich grid through a summer of heat and drought.",
+      objective:
+        "Serve every customer through three months of rising demand and falling water availability.",
+      threat:
+        "Hydro inflows and nuclear output will decline together as the heat intensifies.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    durationMonths: 36,
+    startingCustomers: 900000,
+    // Calibrates the game's account-based demand to 1% of Spain's 248.811TWh 2024 demand.
+    // https://www.ree.es/es/sala-de-prensa/actualidad/nota-de-prensa/2025/03/la-produccion-renovable-crece-en-Espana-un-10-3-por-ciento-2024-alcanza-mayores-registros
+    startingDemandScale: 0.73,
+    dollarsPerkWh: 0.24,
+    cash: 180000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      year: 2026,
+      month: 6,
+      durationMonths: 3,
+      minimumDemandServed: 1,
+      label: "2026 heatwave and drought",
+    },
+    // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
+    // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
+    // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
+    facilities: [
+      { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
+      { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
+      { fuel: "Natural Gas", peakW: 263160000, initialAgeYears: 12 },
+      { fuel: "Hydro", peakW: 171570000, initialAgeYears: 30 },
+      { fuel: "Uranium", peakW: 71170000, initialAgeYears: 30 },
+      // 1% of national storage power, represented as a four-hour equivalent.
+      { name: "Battery", peakWh: 134240000, initialAgeYears: 3 },
+    ],
+    endTitle: "The heat finally breaks",
+    endMessage:
+      "The long hot summer tested whether your portfolio could conserve energy for the days it mattered most.",
+  },
+  {
+    id: 109,
+    name: "Solar Eclipse in China",
+    icon: "solar-eclipse",
+    locationId: "Beijing",
+    location: {
+      id: "Beijing",
+      name: "Beijing, China",
+      country: "China",
+      region: "East Asia",
+      lat: 39.9042,
+      long: 116.4074,
+      timeZone: "Asia/Shanghai",
+      resources: { hydro: true },
+    },
+    summary:
+      "Prepare China's solar-heavy grid for the total eclipse of September 2035.",
+    briefing: {
+      tone: "innovation",
+      fantasy:
+        "Turn a rare celestial event into a demonstration of preparation.",
+      objective:
+        "Charge storage or add firm capacity before solar output plunges and recovers.",
+      threat:
+        "Enough stored energy will not help if its discharge power cannot cover the rapid drop.",
+    },
+    ownership: "Public",
+    startingYear: 2033,
+    // January 2033 through China's total eclipse on September 2, 2035.
+    // https://eclipse.gsfc.nasa.gov/SEdecade/SEdecade2031.html
+    durationMonths: 33,
+    startingCustomers: 1800000,
+    // Calibrates the account model to the demand served by this solar-heavy balancing area.
+    startingDemandScale: 1.05,
+    // Beijing's first-tier residential rate is CNY0.4883/kWh, about US$0.07/kWh.
+    // https://www.beijing.gov.cn/fwcj/jiage/ggfw1/65b8999311a82834a863952a.html
+    dollarsPerkWh: 0.07,
+    cash: 150000000,
+    // China's national ETS closed 2024 at CNY97.49/tCO2, about US$14/tCO2.
+    // https://www.mee.gov.cn/ywgz/ydqhbh/syqhbh/202501/t20250105_1099975.shtml
+    feePerKgCO2e: 14 / 1000,
+    reliabilityObjective: {
+      year: 2035,
+      month: 9,
+      minimumDemandServed: 1,
+      label: "September 2035 total eclipse in China",
+    },
+    // Low-carbon capacity is a 0.1%-scale model of China's 2024 national fleet. This
+    // solar-heavy balancing area receives 0.05% of national thermal capacity; the 240MWh
+    // battery represents 0.1% of China's 60GW new-storage fleet at four-hour duration.
+    // https://www.nea.gov.cn/20250121/097bfd7c1cd3498897639857d86d5dac/c.html
+    // https://www.nea.gov.cn/20241220/39938141b6e74baaa4601e940d12b022/c.html
+    facilities: [
+      { fuel: "Sun", peakW: 886660000, initialAgeYears: 4 },
+      { fuel: "Wind", peakW: 520680000, initialAgeYears: 6 },
+      { fuel: "Hydro", peakW: 435950000, initialAgeYears: 20 },
+      { fuel: "Coal", peakW: 722225000, initialAgeYears: 15 },
+      { fuel: "Uranium", peakW: 60830000, initialAgeYears: 12 },
+      { name: "Battery", peakWh: 240000000, initialAgeYears: 3 },
+    ],
+    endTitle: "Sunlight returns",
+    endMessage:
+      "The eclipse showed whether advance warning became real power and energy reserves.",
+  },
+  {
+    id: 110,
+    name: "Sudden Nuclear Trip in France",
+    icon: "sudden-nuclear-trip",
+    locationId: "Paris",
+    location: {
+      id: "Paris",
+      name: "Paris, France",
+      country: "France",
+      region: "Europe",
+      lat: 48.8566,
+      long: 2.3522,
+      timeZone: "Europe/Paris",
+      resources: { hydro: false },
+    },
+    summary:
+      "Carry enough contingency capacity for an unannounced nuclear outage in France.",
+    briefing: {
+      tone: "legacy",
+      fantasy:
+        "Keep France's grid steady when its largest generator suddenly disappears.",
+      objective:
+        "Build a portfolio that can absorb the loss of the main nuclear unit at any time in the risk window.",
+      threat:
+        "The trip month is hidden, and the reactor will remain offline for the rest of the mission.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    durationMonths: 48,
+    startingCustomers: 900000,
+    dollarsPerkWh: 0.14,
+    cash: 180000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      // The trip can occur from July 2026 through January 2027. Requiring the whole window and
+      // its aftermath keeps the hidden seeded month out of the objective text.
+      year: 2026,
+      month: 7,
+      durationMonths: 18,
+      minimumDemandServed: 1,
+      label: "nuclear contingency window and recovery",
+    },
+    facilities: [
+      {
+        fuel: "Uranium",
+        peakW: 500000000,
+        initialAgeYears: 22,
+        label: "Grand Nuclear Unit",
+      },
+      { fuel: "Wind", peakW: 250000000, initialAgeYears: 6 },
+      { fuel: "Sun", peakW: 200000000, initialAgeYears: 5 },
+      { fuel: "Natural Gas", peakW: 50000000, initialAgeYears: 15 },
+      { name: "Battery", peakWh: 200000000, initialAgeYears: 3 },
+    ],
+    endTitle: "Reserve proved its value",
+    endMessage:
+      "The sudden trip tested the contingency capacity your normal operating plan rarely needed.",
+  },
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them
