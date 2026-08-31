@@ -83,7 +83,6 @@ describe("NewGameDetails leaderboard", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Your goal")).toBeInTheDocument();
-    expect(screen.getByText("The catch")).toBeInTheDocument();
     expect(screen.getByText("Watch out")).toBeInTheDocument();
     expect(screen.queryByText("Winning looks like")).not.toBeInTheDocument();
     expect(

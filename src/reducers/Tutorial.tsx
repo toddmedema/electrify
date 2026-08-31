@@ -19,6 +19,7 @@ import { dialogOpen, snackbarOpen } from "./UI";
  * faster and safer than maintaining a second partial snapshot format: cash, clock, fleet, event
  * log and all derived forecasts are rebuilt together, and a scenario seed makes the rebuild
  * deterministic. LoadingContainer preserves the requested step instead of reopening step zero.
+ * Capstones that build directly on guided progress do not use this path on entry.
  */
 export function restartTutorialAtStep(
   dispatch: AppDispatch,
@@ -64,7 +65,11 @@ export function changeTutorialStep(
     }
   }
 
-  if (toStep > fromStep && entering?.capstone) {
+  if (
+    toStep > fromStep &&
+    entering?.capstone &&
+    !entering.capstone.preserveProgress
+  ) {
     restartTutorialAtStep(dispatch, scenarioId, toStep);
     return;
   }

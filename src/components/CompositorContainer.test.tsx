@@ -169,7 +169,7 @@ describe("onTutorialStep", () => {
     });
   });
 
-  it("starts an unguided capstone from its authored scenario state", () => {
+  it("carries the guided generator purchase into its capstone", () => {
     const capstone = generators.findIndex((candidate) => candidate.capstone);
     expect(capstone).toBeGreaterThan(0);
 
@@ -180,12 +180,26 @@ describe("onTutorialStep", () => {
       currentCard: "FACILITIES",
     });
 
+    expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
+    expect(dispatched[0].payload).toEqual({ tutorialStep: capstone });
+  });
+
+  it("still rebuilds capstones that require an authored checkpoint", () => {
+    const storage = walkthrough("Mission 3: Storage");
+    const capstone = storage.findIndex((candidate) => candidate.capstone);
+
+    const dispatched = step({
+      steps: storage,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
     expect(dispatched.map((action) => action.type)).toEqual([
       "game/quit",
       "game/start",
       "game/delta",
     ]);
-    expect(dispatched[1].payload).toBe(1);
     expect(dispatched[2].payload).toEqual({ tutorialStep: capstone });
   });
 });

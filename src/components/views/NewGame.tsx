@@ -41,7 +41,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 function scenarioEndYear(scenario: ScenarioType): number {
-  return scenario.startingYear + scenario.durationMonths / 12;
+  return scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
 }
 
 interface MissionListItemProps {

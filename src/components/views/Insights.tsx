@@ -753,8 +753,7 @@ export default class Insights extends React.Component<Props, State> {
           {scenario.ownership === "Investor" && (
             <>
               {" "}
-              · market {formatMoneyConcise(marketRate)}/kWh · projected
-              customers{" "}
+              · market {formatMoneyConcise(marketRate)} · projected customers{" "}
               <strong>
                 {formatCustomerChange(customerChange, now.customers)}
               </strong>

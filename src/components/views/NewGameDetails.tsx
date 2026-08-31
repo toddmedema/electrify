@@ -359,7 +359,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
     const briefing = scenario.briefing || {
       fantasy: scenario.summary || scenario.name,
       objective: "Keep the lights on and finish the term.",
-      constraint: `${scenario.ownership}-owned scoring rewards a balanced grid.`,
       threat: "Blackouts and insolvency can end the run early.",
     };
     const endYear =
@@ -427,9 +426,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   }
                 >
                   {briefing.objective}
-                </BriefingFact>
-                <BriefingFact concept="finances" label="The catch">
-                  {briefing.constraint}
                 </BriefingFact>
                 <BriefingFact concept="danger" label="Watch out">
                   {briefing.threat}
