@@ -1268,7 +1268,7 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Eclipse preparations begin",
         message:
-          "The August 2026 eclipse will sharply reduce solar output around midday before a rapid recovery.",
+          "China's September 2035 total eclipse will sharply reduce morning solar output before a rapid recovery.",
         details:
           "The timing is known. Check both the MW and MWh available from storage before the event.",
         concept: "forecast",
@@ -1279,7 +1279,7 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
     },
     {
       id: "eclipse",
-      schedule: { atMonth: 31 },
+      schedule: { atMonth: 32 },
       durationMonths: 1,
       describe: ({ difficulty }) => {
         const minimumOutputMultiplier =
@@ -1288,16 +1288,16 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
           title: "The eclipse is underway",
           message:
             "Solar generation is falling on schedule. Stored and firm power must bridge the gap.",
-          details: `Solar output falls from normal at 10:30 to ${Math.round(minimumOutputMultiplier * 100)}% at noon, then recovers by 13:30.`,
+          details: `Solar output falls from normal at 08:30 to ${Math.round(minimumOutputMultiplier * 100)}% at 10:00, then recovers by 11:30.`,
           concept: "storage",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
           actionTarget: { card: "FACILITIES", view: "FLEET" },
           effects: {
             solarEclipse: {
-              startsMinuteOfDay: 10 * 60 + 30,
-              totalityMinuteOfDay: 12 * 60,
-              endsMinuteOfDay: 13 * 60 + 30,
+              startsMinuteOfDay: 8 * 60 + 30,
+              totalityMinuteOfDay: 10 * 60,
+              endsMinuteOfDay: 11 * 60 + 30,
               minimumOutputMultiplier,
             },
           },

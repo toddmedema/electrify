@@ -220,20 +220,30 @@ describe("authored starting fleets", () => {
       durationMonths: 3,
       minimumDemandServed: 1,
     });
+    expect(heatwave).toMatchObject({
+      name: "Heatwave + Drought in Spain",
+      locationId: "Madrid",
+      startingDemandScale: 0.73,
+    });
     expect(heatwave.icon).toBe("heatwave-drought");
     expect(
       heatwave.facilities.map((facility) => facility.fuel || facility.name),
-    ).toEqual(expect.arrayContaining(["Uranium", "Hydro", "Sun", "Battery"]));
+    ).toEqual(
+      expect.arrayContaining(["Uranium", "Hydro", "Sun", "Wind", "Battery"]),
+    );
     expect(eclipse).toMatchObject({
-      startingYear: 2024,
-      durationMonths: 32,
+      name: "Solar Eclipse in China",
+      locationId: "Beijing",
+      startingYear: 2033,
+      durationMonths: 33,
+      startingDemandScale: 1.05,
       icon: "solar-eclipse",
-      reliabilityObjective: { year: 2026, month: 8 },
+      reliabilityObjective: { year: 2035, month: 9 },
     });
     expect(
       eclipse.facilities.find((facility) => facility.name === "Battery")
         ?.peakWh,
-    ).toBe(200_000_000);
+    ).toBe(240_000_000);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,

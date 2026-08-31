@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Manual, { clearManualMemory } from "./Manual";
 import { MANUAL_ENTRY } from "../../data/Manual";
@@ -13,10 +13,9 @@ function entryHeader(title: string): HTMLElement {
   return screen.getByRole("button", { name: new RegExp(title, "i") });
 }
 
-async function search(term: string) {
+function search(term: string) {
   const box = screen.getByLabelText("Search the manual");
-  await userEvent.clear(box);
-  await userEvent.type(box, term);
+  fireEvent.change(box, { target: { value: term } });
 }
 
 // The headers of every entry currently listed, in the order they're shown

@@ -29,6 +29,8 @@ describe("finite facility sites", () => {
     expect(getViableLocationCount(location("Reykjavik"), "Pumped Hydro")).toBe(
       648,
     );
+    expect(getViableLocationCount(location("Madrid"), "Pumped Hydro")).toBe(0);
+    expect(getViableLocationCount(location("Beijing"), "Pumped Hydro")).toBe(0);
   });
 
   it("keeps pumped hydro separate from conventional hydro geography", () => {

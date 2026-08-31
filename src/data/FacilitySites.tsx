@@ -67,6 +67,10 @@ export const PUMPED_HYDRO_SITES_BY_LOCATION: Readonly<Record<string, number>> =
     Paris: 0,
     Berlin: 2,
     Reykjavik: 648,
+    // Keep newly playable global locations explicit. Detailed ANU point exports for these
+    // regions are available only by request, so do not invent buildable sites from the map.
+    Madrid: 0,
+    Beijing: 0,
   });
 
 /** Total sites for a finite-site technology, or undefined for an unconstrained technology. */

@@ -389,18 +389,18 @@ describe("generation and storage reliability scenarios", () => {
   });
 
   it("models the eclipse as a known intraday fall and recovery", () => {
-    const effects = resolveStoryAtDate(context(31, 109)).effects;
+    const effects = resolveStoryAtDate(context(32, 109)).effects;
     expect(effects.solarEclipse).toMatchObject({
-      startsMinuteOfDay: 630,
-      totalityMinuteOfDay: 720,
-      endsMinuteOfDay: 810,
+      startsMinuteOfDay: 510,
+      totalityMinuteOfDay: 600,
+      endsMinuteOfDay: 690,
       minimumOutputMultiplier: SOLAR_ECLIPSE_MINIMUM_OUTPUT.Manager,
     });
-    expect(solarEclipseOutputMultiplier(effects, 630)).toBe(1);
-    expect(solarEclipseOutputMultiplier(effects, 675)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 720)).toBe(0.08);
-    expect(solarEclipseOutputMultiplier(effects, 765)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 810)).toBe(1);
+    expect(solarEclipseOutputMultiplier(effects, 510)).toBe(1);
+    expect(solarEclipseOutputMultiplier(effects, 555)).toBeCloseTo(0.54);
+    expect(solarEclipseOutputMultiplier(effects, 600)).toBe(0.08);
+    expect(solarEclipseOutputMultiplier(effects, 645)).toBeCloseTo(0.54);
+    expect(solarEclipseOutputMultiplier(effects, 690)).toBe(1);
   });
 
   it("keeps the seeded nuclear trip hidden until it occurs", () => {
