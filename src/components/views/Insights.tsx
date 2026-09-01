@@ -2,8 +2,15 @@ import * as React from "react";
 import {
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControlLabel,
   IconButton,
+  ListSubheader,
+  Menu,
   MenuItem,
   Select,
   SelectChangeEvent,
@@ -12,13 +19,17 @@ import {
   TableBody,
   TableCell,
   TableRow,
+  TextField,
   Toolbar,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CloseIcon from "@mui/icons-material/Close";
 import LayersIcon from "@mui/icons-material/Layers";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SaveIcon from "@mui/icons-material/Save";
 import TuneIcon from "@mui/icons-material/Tune";
 import {
   GAME_TO_REAL_YEARS,
@@ -65,6 +76,7 @@ import {
 import {
   getStorageChoice,
   getStorageJson,
+  getStorageString,
   setStorageKeyValue,
 } from "../../LocalStorage";
 import { generateNewTimeline } from "../../reducers/Game";
@@ -160,16 +172,25 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "water", label: "Water", group: "Environment", availability: "hydro" },
 ] as const;
 
+export type DefaultInsightPresetId =
+  "overview" | "reliability" | "profitability" | "growth" | "decarbonization";
+
 export type InsightPresetId =
-  | "overview"
-  | "reliability"
-  | "profitability"
-  | "growth"
-  | "decarbonization"
-  | "custom";
+  DefaultInsightPresetId | "custom" | `saved:${string}`;
+
+export interface CustomInsightPreset {
+  id: string;
+  name: string;
+  layers: InsightLayerId[];
+}
+
+interface InsightPresetLibrary {
+  defaults: Partial<Record<DefaultInsightPresetId, InsightLayerId[]>>;
+  custom: CustomInsightPreset[];
+}
 
 export const INSIGHT_PRESETS: Record<
-  Exclude<InsightPresetId, "custom">,
+  DefaultInsightPresetId,
   { label: string; layers: InsightLayerId[] }
 > = {
   // Each preset reads from the outcome a player is trying to protect into the causes they can
@@ -205,6 +226,10 @@ export const INSIGHT_PRESETS: Record<
 
 const RANGE_KEY = "insightsRange";
 const LAYERS_KEY = "insightsLayers";
+const ACTIVE_PRESET_KEY = "insightsActivePreset";
+const PRESET_LIBRARY_KEY = "insightsPresetLibrary";
+export const MAX_CUSTOM_INSIGHT_PRESETS = 10;
+const MAX_PRESET_NAME_LENGTH = 40;
 const FORECAST_RANGE_OPTIONS: readonly InsightRange[] = [
   "next1",
   "next5",
@@ -267,16 +292,140 @@ interface State {
   range: InsightRange;
   layers: InsightLayerId[];
   preset: InsightPresetId;
+  presetDirty: boolean;
+  presetLibrary: InsightPresetLibrary;
+  presetMenuAnchor: HTMLElement | null;
+  presetDialog: "saveAs" | "rename" | "delete" | "restore" | null;
+  presetName: string;
+  presetNameError: string;
   layersOpen: boolean;
   leversOpen: boolean;
 }
 
-function storedLayers(): InsightLayerId[] {
-  const value = getStorageJson<string[]>(LAYERS_KEY, []);
-  const valid = value.filter(
-    (id, index): id is InsightLayerId =>
-      ALL_LAYER_IDS.has(id as InsightLayerId) && value.indexOf(id) === index,
+function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((layer, index) => layer === right[index])
   );
+}
+
+function validLayers(value: unknown): InsightLayerId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (id, index): id is InsightLayerId =>
+      typeof id === "string" &&
+      ALL_LAYER_IDS.has(id as InsightLayerId) &&
+      value.indexOf(id) === index,
+  );
+}
+
+function storedPresetLibrary(): InsightPresetLibrary {
+  const stored = getStorageJson<{
+    defaults?: Partial<Record<DefaultInsightPresetId, unknown>>;
+    custom?: unknown[];
+  }>(PRESET_LIBRARY_KEY, {});
+  const defaults: InsightPresetLibrary["defaults"] = {};
+  for (const id of Object.keys(INSIGHT_PRESETS) as DefaultInsightPresetId[]) {
+    const layers = validLayers(stored.defaults?.[id]);
+    if (layers.length) {
+      defaults[id] = layers;
+    }
+  }
+
+  const names = new Set<string>();
+  const ids = new Set<string>();
+  const custom: CustomInsightPreset[] = [];
+  for (const value of stored.custom || []) {
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+    const candidate = value as Partial<CustomInsightPreset>;
+    const id = typeof candidate.id === "string" ? candidate.id : "";
+    const name =
+      typeof candidate.name === "string" ? candidate.name.trim() : "";
+    const layers = validLayers(candidate.layers);
+    const normalizedName = name.toLocaleLowerCase();
+    if (
+      !id ||
+      !name ||
+      name.length > MAX_PRESET_NAME_LENGTH ||
+      !layers.length ||
+      ids.has(id) ||
+      names.has(normalizedName)
+    ) {
+      continue;
+    }
+    ids.add(id);
+    names.add(normalizedName);
+    custom.push({ id, name, layers });
+    if (custom.length === MAX_CUSTOM_INSIGHT_PRESETS) {
+      break;
+    }
+  }
+  return { defaults, custom };
+}
+
+function presetDefinition(
+  id: InsightPresetId,
+  library: InsightPresetLibrary,
+): { label: string; layers: InsightLayerId[] } | undefined {
+  if (id === "custom") {
+    return undefined;
+  }
+  if (id.startsWith("saved:")) {
+    const saved = library.custom.find(
+      (preset) => preset.id === id.slice("saved:".length),
+    );
+    return saved ? { label: saved.name, layers: saved.layers } : undefined;
+  }
+  const defaultPreset = INSIGHT_PRESETS[id as DefaultInsightPresetId];
+  return defaultPreset
+    ? {
+        label: defaultPreset.label,
+        layers:
+          library.defaults[id as DefaultInsightPresetId] ||
+          defaultPreset.layers,
+      }
+    : undefined;
+}
+
+function matchingPreset(
+  layers: InsightLayerId[],
+  library: InsightPresetLibrary,
+): InsightPresetId {
+  for (const id of Object.keys(INSIGHT_PRESETS) as DefaultInsightPresetId[]) {
+    if (sameLayers(layers, presetDefinition(id, library)!.layers)) {
+      return id;
+    }
+  }
+  const custom = library.custom.find((preset) =>
+    sameLayers(layers, preset.layers),
+  );
+  return custom ? `saved:${custom.id}` : "custom";
+}
+
+function isStoredPreset(
+  id: string,
+  library: InsightPresetLibrary,
+): id is InsightPresetId {
+  return !!presetDefinition(id as InsightPresetId, library);
+}
+
+function nextCustomPresetId(custom: CustomInsightPreset[]): string {
+  return String(
+    custom.reduce((highest, preset) => {
+      const numericId = Number(preset.id);
+      return Number.isInteger(numericId)
+        ? Math.max(highest, numericId)
+        : highest;
+    }, 0) + 1,
+  );
+}
+
+function storedLayers(): InsightLayerId[] {
+  const valid = validLayers(getStorageJson<string[]>(LAYERS_KEY, []));
   return valid.length ? valid : [...INSIGHT_PRESETS.overview.layers];
 }
 
@@ -432,14 +581,26 @@ export default class Insights extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
+    const presetLibrary = storedPresetLibrary();
     const layers = withRequiredLayers(storedLayers(), props.game.scenarioId);
     if (props.focusLayer && !layers.includes(props.focusLayer)) {
       layers.push(props.focusLayer);
     }
+    const storedPreset = getStorageString(ACTIVE_PRESET_KEY, "");
+    const preset = isStoredPreset(storedPreset, presetLibrary)
+      ? storedPreset
+      : matchingPreset(layers, presetLibrary);
+    const savedLayers = presetDefinition(preset, presetLibrary)?.layers;
     this.state = {
       range: getStorageChoice(RANGE_KEY, rangeOptions(props.game), "next1"),
       layers,
-      preset: presetForLayers(layers),
+      preset,
+      presetDirty: !savedLayers || !sameLayers(layers, savedLayers),
+      presetLibrary,
+      presetMenuAnchor: null,
+      presetDialog: null,
+      presetName: "",
+      presetNameError: "",
       layersOpen: false,
       leversOpen: true,
     };
@@ -485,11 +646,20 @@ export default class Insights extends React.Component<Props, State> {
 
   private setLayers(
     layers: InsightLayerId[],
-    preset: InsightPresetId = "custom",
+    preset: InsightPresetId = this.state.preset,
   ) {
     const required = withRequiredLayers(layers, this.props.game.scenarioId);
+    const savedLayers = presetDefinition(
+      preset,
+      this.state.presetLibrary,
+    )?.layers;
     setStorageKeyValue(LAYERS_KEY, required);
-    this.setState({ layers: required, preset });
+    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    this.setState({
+      layers: required,
+      preset,
+      presetDirty: !savedLayers || !sameLayers(required, savedLayers),
+    });
   }
 
   private toggleLayer(id: InsightLayerId) {
@@ -504,7 +674,17 @@ export default class Insights extends React.Component<Props, State> {
   }
 
   private applyPreset(id: Exclude<InsightPresetId, "custom">) {
-    this.setLayers([...INSIGHT_PRESETS[id].layers], id);
+    const preset = presetDefinition(id, this.state.presetLibrary);
+    if (!preset) {
+      return;
+    }
+    const layers = withRequiredLayers(
+      preset.layers,
+      this.props.game.scenarioId,
+    );
+    setStorageKeyValue(LAYERS_KEY, layers);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    this.setState({ layers, preset: id, presetDirty: false });
   }
 
   private moveLayer(id: InsightLayerId, neighbour: InsightLayerId) {
@@ -516,6 +696,192 @@ export default class Insights extends React.Component<Props, State> {
     }
     [layers[from], layers[to]] = [layers[to], layers[from]];
     this.setLayers(layers);
+  }
+
+  private savePresetLibrary(library: InsightPresetLibrary) {
+    setStorageKeyValue(PRESET_LIBRARY_KEY, library);
+  }
+
+  private selectedCustomPreset(): CustomInsightPreset | undefined {
+    if (!this.state.preset.startsWith("saved:")) {
+      return undefined;
+    }
+    return this.state.presetLibrary.custom.find(
+      (preset) => preset.id === this.state.preset.slice("saved:".length),
+    );
+  }
+
+  private savePresetChanges() {
+    const { layers, preset, presetLibrary } = this.state;
+    if (!layers.length || preset === "custom") {
+      this.openPresetDialog("saveAs");
+      return;
+    }
+
+    let library: InsightPresetLibrary;
+    if (preset.startsWith("saved:")) {
+      const id = preset.slice("saved:".length);
+      library = {
+        ...presetLibrary,
+        custom: presetLibrary.custom.map((saved) =>
+          saved.id === id ? { ...saved, layers: [...layers] } : saved,
+        ),
+      };
+    } else {
+      const defaultId = preset as DefaultInsightPresetId;
+      const defaults = { ...presetLibrary.defaults };
+      if (sameLayers(layers, INSIGHT_PRESETS[defaultId].layers)) {
+        delete defaults[defaultId];
+      } else {
+        defaults[defaultId] = [...layers];
+      }
+      library = { ...presetLibrary, defaults };
+    }
+    this.savePresetLibrary(library);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    this.setState({ presetLibrary: library, presetDirty: false });
+  }
+
+  private openPresetDialog(dialog: Exclude<State["presetDialog"], null>) {
+    const selected = this.selectedCustomPreset();
+    this.setState({
+      presetMenuAnchor: null,
+      presetDialog: dialog,
+      presetName: dialog === "rename" ? selected?.name || "" : "",
+      presetNameError: "",
+    });
+  }
+
+  private closePresetDialog() {
+    this.setState({
+      presetDialog: null,
+      presetName: "",
+      presetNameError: "",
+    });
+  }
+
+  private validatedPresetName(excludeId?: string): string | null {
+    const name = this.state.presetName.trim();
+    if (!name) {
+      this.setState({ presetNameError: "Enter a name." });
+      return null;
+    }
+    const duplicateDefault = Object.values(INSIGHT_PRESETS).some(
+      (preset) => preset.label.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    );
+    const duplicateCustom = this.state.presetLibrary.custom.some(
+      (preset) =>
+        preset.id !== excludeId &&
+        preset.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    );
+    if (duplicateDefault || duplicateCustom) {
+      this.setState({ presetNameError: "That name is already in use." });
+      return null;
+    }
+    return name;
+  }
+
+  private createCustomPreset() {
+    if (
+      !this.state.layers.length ||
+      this.state.presetLibrary.custom.length >= MAX_CUSTOM_INSIGHT_PRESETS
+    ) {
+      return;
+    }
+    const name = this.validatedPresetName();
+    if (!name) {
+      return;
+    }
+    const id = nextCustomPresetId(this.state.presetLibrary.custom);
+    const preset: CustomInsightPreset = {
+      id,
+      name,
+      layers: [...this.state.layers],
+    };
+    const library = {
+      ...this.state.presetLibrary,
+      custom: [...this.state.presetLibrary.custom, preset],
+    };
+    const presetId = `saved:${id}` as const;
+    this.savePresetLibrary(library);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, presetId);
+    this.setState({
+      presetLibrary: library,
+      preset: presetId,
+      presetDirty: false,
+      presetDialog: null,
+      presetName: "",
+      presetNameError: "",
+    });
+  }
+
+  private renameCustomPreset() {
+    const selected = this.selectedCustomPreset();
+    if (!selected) {
+      return;
+    }
+    const name = this.validatedPresetName(selected.id);
+    if (!name) {
+      return;
+    }
+    const library = {
+      ...this.state.presetLibrary,
+      custom: this.state.presetLibrary.custom.map((preset) =>
+        preset.id === selected.id ? { ...preset, name } : preset,
+      ),
+    };
+    this.savePresetLibrary(library);
+    this.setState({
+      presetLibrary: library,
+      presetDialog: null,
+      presetName: "",
+      presetNameError: "",
+    });
+  }
+
+  private deleteCustomPreset() {
+    const selected = this.selectedCustomPreset();
+    if (!selected) {
+      return;
+    }
+    const library = {
+      ...this.state.presetLibrary,
+      custom: this.state.presetLibrary.custom.filter(
+        (preset) => preset.id !== selected.id,
+      ),
+    };
+    this.savePresetLibrary(library);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, "custom");
+    this.setState({
+      presetLibrary: library,
+      preset: "custom",
+      presetDirty: true,
+      presetDialog: null,
+    });
+  }
+
+  private restoreDefaultPreset() {
+    const { preset, presetLibrary } = this.state;
+    if (preset === "custom" || preset.startsWith("saved:")) {
+      return;
+    }
+    const defaultId = preset as DefaultInsightPresetId;
+    const defaults = { ...presetLibrary.defaults };
+    delete defaults[defaultId];
+    const library = { ...presetLibrary, defaults };
+    const layers = withRequiredLayers(
+      INSIGHT_PRESETS[defaultId].layers,
+      this.props.game.scenarioId,
+    );
+    this.savePresetLibrary(library);
+    setStorageKeyValue(LAYERS_KEY, layers);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    this.setState({
+      presetLibrary: library,
+      layers,
+      presetDirty: false,
+      presetDialog: null,
+    });
   }
 
   private getHistoricalProjection(now: TickPresentFutureType): ProjectionView {
@@ -809,7 +1175,11 @@ export default class Insights extends React.Component<Props, State> {
     }
     const required = requiredTutorialLayers(this.props.game.scenarioId);
     return (
-      <section className="insightsLayerPanel" aria-label="Data layers">
+      <section
+        id="insightsLayerPanel"
+        className="insightsLayerPanel"
+        aria-label="Data layers"
+      >
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
             (layer) =>
@@ -1160,6 +1530,110 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  private renderPresetDialogs() {
+    const { presetDialog, presetName, presetNameError, presetLibrary } =
+      this.state;
+    if (!presetDialog) {
+      return <></>;
+    }
+    const selected =
+      presetDefinition(this.state.preset, presetLibrary)?.label || "preset";
+    const naming = presetDialog === "saveAs" || presetDialog === "rename";
+    const title =
+      presetDialog === "saveAs"
+        ? "Save as a new preset"
+        : presetDialog === "rename"
+          ? "Rename preset"
+          : presetDialog === "delete"
+            ? `Delete “${selected}”?`
+            : `Restore “${selected}”?`;
+    const description =
+      presetDialog === "saveAs"
+        ? `Save the current ${this.state.layers.length} charts and their order as a reusable preset.`
+        : presetDialog === "rename"
+          ? "Give this preset a short, recognizable name."
+          : presetDialog === "delete"
+            ? "The charts stay open as an unsaved view, but this named preset will be removed."
+            : "This replaces your saved changes with the original charts and order. Your custom presets are not affected.";
+
+    return (
+      <Dialog
+        className="insightsPresetDialog"
+        open={presetDialog !== null}
+        onClose={() => this.closePresetDialog()}
+        fullWidth
+        maxWidth="xs"
+        aria-labelledby="insight-preset-dialog-title"
+        aria-describedby="insight-preset-dialog-description"
+      >
+        <DialogTitle id="insight-preset-dialog-title">{title}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="insight-preset-dialog-description">
+            {description}
+          </DialogContentText>
+          {naming ? (
+            <TextField
+              autoFocus
+              fullWidth
+              margin="dense"
+              label="Preset name"
+              value={presetName}
+              error={!!presetNameError}
+              helperText={
+                presetNameError ||
+                (presetDialog === "saveAs"
+                  ? `${presetName.length}/${MAX_PRESET_NAME_LENGTH} characters · ${presetLibrary.custom.length}/${MAX_CUSTOM_INSIGHT_PRESETS} custom presets`
+                  : `${presetName.length}/${MAX_PRESET_NAME_LENGTH} characters`)
+              }
+              slotProps={{ htmlInput: { maxLength: MAX_PRESET_NAME_LENGTH } }}
+              onChange={(event) =>
+                this.setState({
+                  presetName: event.target.value,
+                  presetNameError: "",
+                })
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  if (presetDialog === "saveAs") {
+                    this.createCustomPreset();
+                  } else {
+                    this.renameCustomPreset();
+                  }
+                }
+              }}
+            />
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => this.closePresetDialog()}>Cancel</Button>
+          <Button
+            variant="contained"
+            color={presetDialog === "delete" ? "error" : "primary"}
+            onClick={() => {
+              if (presetDialog === "saveAs") {
+                this.createCustomPreset();
+              } else if (presetDialog === "rename") {
+                this.renameCustomPreset();
+              } else if (presetDialog === "delete") {
+                this.deleteCustomPreset();
+              } else {
+                this.restoreDefaultPreset();
+              }
+            }}
+          >
+            {presetDialog === "saveAs"
+              ? "Save preset"
+              : presetDialog === "rename"
+                ? "Rename"
+                : presetDialog === "delete"
+                  ? "Delete"
+                  : "Restore"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
   public render() {
     const { game } = this.props;
     const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -1172,66 +1646,205 @@ export default class Insights extends React.Component<Props, State> {
       const definition = INSIGHT_LAYERS.find((layer) => layer.id === id);
       return !!definition && this.available(definition, projection);
     });
+    const selectedPreset = presetDefinition(
+      this.state.preset,
+      this.state.presetLibrary,
+    );
+    const selectedCustom = this.selectedCustomPreset();
+    const selectedDefault =
+      this.state.preset !== "custom" && !this.state.preset.startsWith("saved:")
+        ? (this.state.preset as DefaultInsightPresetId)
+        : null;
+    const customLimitReached =
+      this.state.presetLibrary.custom.length >= MAX_CUSTOM_INSIGHT_PRESETS;
+    const selectedDefaultCustomized =
+      !!selectedDefault &&
+      !!this.state.presetLibrary.defaults[selectedDefault] &&
+      !this.state.presetDirty;
 
     return (
       <GameCard className="insights" id="insightsPane">
         <div className="scrollable">
           <Toolbar className="paneHeader insightsHeader">
             <Typography variant="h6">Insights</Typography>
-            <Select
-              id="insightsRange"
-              value={this.state.range}
-              onChange={(event: SelectChangeEvent<InsightRange>) =>
-                this.setRange(event.target.value as InsightRange)
-              }
-              className="headerControl"
-              aria-label="Insight range"
-            >
-              <MenuItem value="next1">Next 12 months</MenuItem>
-              <MenuItem value="next5">Next 5 years</MenuItem>
-              <MenuItem value="next10">Next 10 years</MenuItem>
-              <MenuItem value="next20">Next 20 years</MenuItem>
-              {!!game.monthlyHistory.length && (
-                <MenuItem value="all">All recorded</MenuItem>
-              )}
-              {years.map((year) => (
-                <MenuItem value={historyRange(year)} key={year}>
-                  {year}
-                </MenuItem>
-              ))}
-            </Select>
-            <Select
-              id="insightsPreset"
-              value={this.state.preset}
-              onChange={(event: SelectChangeEvent<InsightPresetId>) => {
-                const preset = event.target.value as InsightPresetId;
-                if (preset !== "custom") {
-                  this.applyPreset(preset);
+            <div className="insightsHeaderControls">
+              <Select
+                id="insightsRange"
+                value={this.state.range}
+                onChange={(event: SelectChangeEvent<InsightRange>) =>
+                  this.setRange(event.target.value as InsightRange)
                 }
-              }}
-              className="insightsPreset"
-              aria-label="Insight preset"
+                className="headerControl insightsRange"
+                aria-label="Insight range"
+              >
+                <MenuItem value="next1">Next 12 months</MenuItem>
+                <MenuItem value="next5">Next 5 years</MenuItem>
+                <MenuItem value="next10">Next 10 years</MenuItem>
+                <MenuItem value="next20">Next 20 years</MenuItem>
+                {!!game.monthlyHistory.length && (
+                  <MenuItem value="all">All recorded</MenuItem>
+                )}
+                {years.map((year) => (
+                  <MenuItem value={historyRange(year)} key={year}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </Select>
+              <div
+                className={`insightsPresetControls${
+                  this.state.presetDirty ? " insightsPresetControls-edited" : ""
+                }`}
+                aria-label="Preset controls"
+              >
+                <Select
+                  id="insightsPreset"
+                  value={this.state.preset}
+                  onChange={(event: SelectChangeEvent<InsightPresetId>) => {
+                    const preset = event.target.value as InsightPresetId;
+                    if (preset !== "custom") {
+                      this.applyPreset(preset);
+                    }
+                  }}
+                  className="insightsPreset"
+                  aria-label="Insight preset"
+                  renderValue={() => (
+                    <span className="insightsPresetValue">
+                      <span className="insightsPresetName">
+                        {selectedPreset?.label || "Unsaved view"}
+                      </span>
+                      {this.state.presetDirty && selectedPreset && (
+                        <span
+                          className="insightsPresetEdited"
+                          role="status"
+                          aria-label="Unsaved changes"
+                        >
+                          Edited
+                        </span>
+                      )}
+                      {selectedDefaultCustomized && (
+                        <span className="insightsPresetCustomized">
+                          Customized
+                        </span>
+                      )}
+                    </span>
+                  )}
+                >
+                  <ListSubheader>Default presets</ListSubheader>
+                  {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => {
+                    const modified =
+                      !!this.state.presetLibrary.defaults[
+                        id as DefaultInsightPresetId
+                      ];
+                    return (
+                      <MenuItem key={id} value={id}>
+                        <span>{preset.label}</span>
+                        {modified && (
+                          <span className="insightsPresetMenuHint">
+                            Modified
+                          </span>
+                        )}
+                      </MenuItem>
+                    );
+                  })}
+                  {!!this.state.presetLibrary.custom.length && (
+                    <ListSubheader>
+                      Your presets ({this.state.presetLibrary.custom.length}/
+                      {MAX_CUSTOM_INSIGHT_PRESETS})
+                    </ListSubheader>
+                  )}
+                  {this.state.presetLibrary.custom.map((preset) => (
+                    <MenuItem key={preset.id} value={`saved:${preset.id}`}>
+                      <span className="insightsPresetMenuName">
+                        {preset.name}
+                      </span>
+                    </MenuItem>
+                  ))}
+                  <MenuItem value="custom" disabled>
+                    Unsaved view
+                  </MenuItem>
+                </Select>
+                <Button
+                  className="insightsPresetSave"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  disabled={
+                    !this.state.layers.length ||
+                    (this.state.preset !== "custom" &&
+                      !this.state.presetDirty) ||
+                    (this.state.preset === "custom" && customLimitReached)
+                  }
+                  title={
+                    this.state.preset === "custom" && customLimitReached
+                      ? `Limit of ${MAX_CUSTOM_INSIGHT_PRESETS} custom presets reached`
+                      : undefined
+                  }
+                  onClick={() => this.savePresetChanges()}
+                >
+                  {this.state.preset === "custom" ? "Save as" : "Save"}
+                </Button>
+                <Tooltip title="Rename, save a copy, restore, or delete">
+                  <Button
+                    className="insightsPresetActions"
+                    size="small"
+                    startIcon={<MoreVertIcon />}
+                    aria-label="Preset actions"
+                    aria-haspopup="menu"
+                    aria-controls={
+                      this.state.presetMenuAnchor
+                        ? "insightsPresetActionsMenu"
+                        : undefined
+                    }
+                    aria-expanded={!!this.state.presetMenuAnchor}
+                    onClick={(event) =>
+                      this.setState({ presetMenuAnchor: event.currentTarget })
+                    }
+                  >
+                    More
+                  </Button>
+                </Tooltip>
+              </div>
+              <Button
+                id="insightsLayersButton"
+                className="insightsLayerControls"
+                startIcon={<LayersIcon />}
+                onClick={() =>
+                  this.setState({ layersOpen: !this.state.layersOpen })
+                }
+                aria-expanded={this.state.layersOpen}
+                aria-controls="insightsLayerPanel"
+              >
+                Layers ({visible.length})
+              </Button>
+            </div>
+            <Menu
+              id="insightsPresetActionsMenu"
+              anchorEl={this.state.presetMenuAnchor}
+              open={!!this.state.presetMenuAnchor}
+              onClose={() => this.setState({ presetMenuAnchor: null })}
             >
-              {Object.entries(INSIGHT_PRESETS).map(([id, preset]) => (
-                <MenuItem key={id} value={id}>
-                  {preset.label}
-                </MenuItem>
-              ))}
-              <MenuItem value="custom" disabled>
-                Custom
+              <MenuItem
+                disabled={customLimitReached || !this.state.layers.length}
+                onClick={() => this.openPresetDialog("saveAs")}
+              >
+                Save as new preset…
               </MenuItem>
-            </Select>
-            <Button
-              id="insightsLayersButton"
-              className="insightsLayerControls"
-              startIcon={<LayersIcon />}
-              onClick={() =>
-                this.setState({ layersOpen: !this.state.layersOpen })
-              }
-              aria-expanded={this.state.layersOpen}
-            >
-              Layers ({visible.length})
-            </Button>
+              {selectedCustom && (
+                <MenuItem onClick={() => this.openPresetDialog("rename")}>
+                  Rename preset…
+                </MenuItem>
+              )}
+              {selectedCustom && (
+                <MenuItem onClick={() => this.openPresetDialog("delete")}>
+                  Delete preset…
+                </MenuItem>
+              )}
+              {selectedDefault &&
+                this.state.presetLibrary.defaults[selectedDefault] && (
+                  <MenuItem onClick={() => this.openPresetDialog("restore")}>
+                    Restore original preset…
+                  </MenuItem>
+                )}
+            </Menu>
           </Toolbar>
           {this.renderLayerPanel(projection)}
           {projection.historical ? (
@@ -1252,6 +1865,7 @@ export default class Insights extends React.Component<Props, State> {
             )}
           </div>
         </div>
+        {this.renderPresetDialogs()}
       </GameCard>
     );
   }
