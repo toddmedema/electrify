@@ -1095,6 +1095,42 @@
       "startingYear": 1980,
       "endingYear": 2025
     },
+    "Belem": {
+      "id": "Belem",
+      "name": "Belem, Brazil",
+      "region": "South America",
+      "country": "Brazil",
+      "lat": -1.4558,
+      "long": -48.4902,
+      "timeZone": "America/Belem",
+      "elevation": 19,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Georgetown": {
+      "id": "Georgetown",
+      "name": "Georgetown, Guyana",
+      "region": "South America",
+      "country": "Guyana",
+      "lat": 6.8013,
+      "long": -58.1551,
+      "timeZone": "America/Guyana",
+      "elevation": 1,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Paramaribo": {
+      "id": "Paramaribo",
+      "name": "Paramaribo, Suriname",
+      "region": "South America",
+      "country": "Suriname",
+      "lat": 5.852,
+      "long": -55.2038,
+      "timeZone": "America/Paramaribo",
+      "elevation": 3,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
     "London": {
       "id": "London",
       "name": "London, United Kingdom",
@@ -1107,6 +1143,42 @@
       "startingYear": 1980,
       "endingYear": 2019
     },
+    "Manchester": {
+      "id": "Manchester",
+      "name": "Manchester, United Kingdom",
+      "region": "Europe",
+      "country": "United Kingdom",
+      "lat": 53.4808,
+      "long": -2.2426,
+      "timeZone": "Europe/London",
+      "elevation": 52,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Edinburgh": {
+      "id": "Edinburgh",
+      "name": "Edinburgh, United Kingdom",
+      "region": "Europe",
+      "country": "United Kingdom",
+      "lat": 55.9533,
+      "long": -3.1883,
+      "timeZone": "Europe/London",
+      "elevation": 69,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Dublin": {
+      "id": "Dublin",
+      "name": "Dublin, Ireland",
+      "region": "Europe",
+      "country": "Ireland",
+      "lat": 53.3498,
+      "long": -6.2603,
+      "timeZone": "Europe/Dublin",
+      "elevation": 11,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
     "Paris": {
       "id": "Paris",
       "name": "Paris, France",
@@ -1118,6 +1190,30 @@
       "elevation": 36,
       "startingYear": 1980,
       "endingYear": 2019
+    },
+    "Marseille": {
+      "id": "Marseille",
+      "name": "Marseille, France",
+      "region": "Europe",
+      "country": "France",
+      "lat": 43.2965,
+      "long": 5.3698,
+      "timeZone": "Europe/Paris",
+      "elevation": 6,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Lyon": {
+      "id": "Lyon",
+      "name": "Lyon, France",
+      "region": "Europe",
+      "country": "France",
+      "lat": 45.764,
+      "long": 4.8357,
+      "timeZone": "Europe/Paris",
+      "elevation": 184,
+      "startingYear": 1980,
+      "endingYear": 2025
     },
     "Berlin": {
       "id": "Berlin",
