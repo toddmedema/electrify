@@ -295,9 +295,17 @@ button,
 }
 
 .app_container {
-  &,
-  & > div:first-child {
-    height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  width: 100%;
+
+  // TransitionGroup renders this wrapper around the active card. Keep it in the flexible row so
+  // game chrome such as the tutorial objective can reserve space without covering the card.
+  & > .cardTransitions {
+    position: relative;
+    grid-row: 2;
+    min-height: 0;
     width: 100%;
   }
 }
@@ -914,6 +922,13 @@ $pane_header_height: 40px;
   padding: 0 16px 12px;
 }
 
+.generatorBuildSubtitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .generatorComparison {
   padding: 8px 16px 10px;
   border-bottom: 1px solid var(--border-selected);
@@ -957,6 +972,39 @@ $pane_header_height: 40px;
   .decisionImpactFacts,
   .generatorComparisonChoices {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .build-list-item .MuiCardHeader-root {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+
+    .MuiCardHeader-action {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      width: 100%;
+      margin: 8px 0 0 !important;
+
+      & > span,
+      .MuiStack-root {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+    }
+  }
+
+  .tutorialHudContent .tutorialPrompt {
+    grid-template-columns: minmax(0, 1fr);
+
+    .tutorialPromptAction {
+      grid-column: auto;
+    }
   }
 }
 
@@ -2365,29 +2413,29 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-// A mission objective is game chrome, not a modal: it stays out of the bottom navigation,
-// leaves the whole grid interactive and collapses to one progress-marked concept.
+// A mission objective is game chrome, not a modal. It occupies its own row above the active card,
+// so its instructions never cover the control they name and the whole grid remains interactive.
 .tutorialHud {
-  position: fixed;
+  position: relative;
+  grid-row: 1;
   z-index: 1250;
-  right: max(8px, env(safe-area-inset-right));
-  bottom: calc(56px + env(safe-area-inset-bottom) + 8px);
-  left: max(8px, env(safe-area-inset-left));
   box-sizing: border-box;
-  max-height: calc(100vh - 80px - env(safe-area-inset-bottom));
+  width: 100%;
+  max-height: min(42vh, 360px);
   overflow: auto;
-  padding: 8px 10px;
-  border: 1px solid var(--tooltip-border);
-  border-radius: 12px;
+  padding: calc(6px + env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right)) 6px
+    max(10px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--tooltip-border);
   background: var(--tooltip-bg);
-  box-shadow: 0 8px 24px var(--tooltip-shadow);
+  box-shadow: 0 3px 12px var(--tooltip-shadow);
   color: $font_color_primary;
   backdrop-filter: blur(10px);
 }
 
 .tutorialHud-collapsed {
-  left: auto;
-  width: min(230px, calc(100vw - 16px));
+  width: 100%;
+  max-height: none;
   overflow: hidden;
 }
 
@@ -2446,9 +2494,14 @@ html[data-theme="dark"] .uplot {
 }
 
 .tutorialHudContent {
+  min-width: 0;
   margin-top: 6px;
+  overflow-wrap: anywhere;
 
   .tutorialPrompt {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
     gap: 4px !important;
   }
 
@@ -2459,6 +2512,7 @@ html[data-theme="dark"] .uplot {
   }
 
   .tutorialPromptAction {
+    grid-column: 1 / -1;
     margin-top: 2px;
   }
 }
@@ -2528,18 +2582,34 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-@media screen and (min-width: $desktop_breakpoint) {
-  .tutorialHud {
-    top: calc(82px + env(safe-area-inset-top));
-    right: max(16px, env(safe-area-inset-right));
-    bottom: auto;
-    left: auto;
-    width: min(360px, calc(100vw - 32px));
-    max-height: calc(100vh - 98px - env(safe-area-inset-top));
+@media screen and (min-width: 700px) {
+  .tutorialHud-expanded {
+    display: grid;
+    grid-template-areas:
+      "header content footer"
+      "hint hint hint";
+    grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1.6fr) auto;
+    align-items: center;
+    column-gap: 16px;
+    padding-top: calc(6px + env(safe-area-inset-top));
   }
 
-  .tutorialHud-collapsed {
-    width: 230px;
+  .tutorialHudHeader {
+    grid-area: header;
+  }
+
+  .tutorialHudContent {
+    grid-area: content;
+    margin-top: 0;
+  }
+
+  .tutorialHudHint {
+    grid-area: hint;
+  }
+
+  .tutorialHudFooter {
+    grid-area: footer;
+    margin-top: 0;
   }
 }
 
@@ -2574,7 +2644,7 @@ $sizemap: (
 
   .app_container {
     position: relative;
-    display: block;
+    display: grid;
     width: 100%;
     height: 100%;
     max-width: 100%;

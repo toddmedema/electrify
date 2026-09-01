@@ -52,6 +52,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const [financingExpanded, setFinancingExpanded] = React.useState(false);
+  const financingTermsId = React.useId();
   const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
@@ -79,12 +81,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   };
 
   const toggleOpen = (e: React.SyntheticEvent) => {
-    setOpen((wasOpen: boolean) => {
-      if (!wasOpen) {
-        purchaseSubmitted.current = false;
-      }
-      return !wasOpen;
-    });
+    if (!open) {
+      purchaseSubmitted.current = false;
+      setFinancingExpanded(false);
+    }
+    setOpen(!open);
     e.stopPropagation();
   };
 
@@ -208,7 +209,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 concept: "money",
                 label: "Cash purchase",
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
-                detail: `Loan: ${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - downpayment)}, then ${formatMoneyConcise(monthlyPayment)}/mo`,
               },
               {
                 concept: "time",
@@ -230,57 +230,59 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               },
             ]}
           />
-          <TableContainer>
-            <Table size="small">
-              <TableBody>
-                <TableRow>
-                  <TableCell>Time to build</TableCell>
-                  <TableCell align="right">
-                    {Math.round(storage.yearsToBuild * 12)} mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Cash cost</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(storage.buildCost)}
-                  </TableCell>
-                </TableRow>
-                <TableRow className="bold">
-                  <TableCell colSpan={2}>Loan info</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Downpayment</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(downpayment)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    Interest rate
-                    <ManualLink
-                      entry={MANUAL_ENTRY.INTEREST_RATES}
-                      label="interest rate"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {(props.interestRate * 100).toFixed(2)}%
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Monthly payments</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(monthlyPayment)}/mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Loan duration</TableCell>
-                  <TableCell align="right">
-                    Construction + {LOAN_MONTHS / 12} years
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Button
+            color="primary"
+            size="small"
+            fullWidth
+            aria-expanded={financingExpanded}
+            aria-controls={financingTermsId}
+            endIcon={
+              financingExpanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
+            }
+            onClick={() => setFinancingExpanded((value) => !value)}
+          >
+            {financingExpanded
+              ? "Hide financing terms"
+              : "Show financing terms"}
+          </Button>
+          <Collapse in={financingExpanded} timeout="auto" unmountOnExit>
+            <TableContainer id={financingTermsId}>
+              <Table size="small" aria-label="Financing terms">
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Downpayment</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(downpayment)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      Interest rate
+                      <ManualLink
+                        entry={MANUAL_ENTRY.INTEREST_RATES}
+                        label="interest rate"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {(props.interestRate * 100).toFixed(2)}%
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Monthly payments</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(monthlyPayment)}/mo
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Loan duration</TableCell>
+                    <TableCell align="right">
+                      Construction + {LOAN_MONTHS / 12} years
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
         </DialogContent>
         <DialogActions>
           <Button

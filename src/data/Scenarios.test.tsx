@@ -77,7 +77,7 @@ describe("tutorial mission metadata", () => {
     )!;
     render(generatorsMission.tutorialSteps![1].content);
 
-    expect(screen.getByText(/Compare construction cost/)).toHaveTextContent(
+    expect(screen.getByText(/Compare cost and build time/)).toHaveTextContent(
       "operations and maintenance (O&M)",
     );
   });

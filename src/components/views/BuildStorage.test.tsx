@@ -1,5 +1,11 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
 import BuildStorage from "./BuildStorage";
@@ -121,4 +127,46 @@ it("submits a storage purchase only once on a double-click", () => {
   fireEvent.click(takeLoan);
 
   expect(onBuildStorage).toHaveBeenCalledTimes(1);
+});
+
+it("deduplicates storage purchase impact and discloses financing terms", async () => {
+  render(
+    <BuildStorage
+      game={game()}
+      onBuildStorage={jest.fn()}
+      onBack={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+
+  const impact = screen.getByRole("region", { name: "Expected impact" });
+  expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent("Online in");
+  expect(impact).not.toHaveTextContent("Loan:");
+  expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time to build")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("table", { name: "Financing terms" }),
+  ).not.toBeInTheDocument();
+
+  const toggle = screen.getByRole("button", { name: "Show financing terms" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(toggle);
+
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const terms = screen.getByRole("table", { name: "Financing terms" });
+  expect(terms).toHaveTextContent("Downpayment");
+  expect(terms).toHaveTextContent("Interest rate");
+  expect(terms).toHaveTextContent("Monthly payments");
+  expect(terms).toHaveTextContent("Loan duration");
+
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  expect(
+    screen.getByRole("button", { name: "Show financing terms" }),
+  ).toHaveAttribute("aria-expanded", "false");
 });

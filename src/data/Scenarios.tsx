@@ -204,7 +204,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare construction cost and time, fuel, and operations and maintenance (O&M)—the cost of keeping a plant running."
+            text="Compare cost and build time. Open Show details for fuel and operations and maintenance (O&M)."
           />
         ),
       },

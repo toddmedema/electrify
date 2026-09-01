@@ -513,6 +513,7 @@ export default class Compositor extends React.Component<Props, {}> {
       <div className="app_container">
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
+          className="cardTransitions"
           childFactory={(child) =>
             // @types/react 19 defaults ReactElement's props to unknown rather than any,
             // so the element has to be named before cloneElement will accept classNames

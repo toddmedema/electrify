@@ -36,6 +36,18 @@ export default defineConfig({
         viewport: { width: 320, height: 568 },
       },
     },
+    {
+      name: "tablet-768px",
+      use: {
+        browserName: "chromium",
+        hasTouch: true,
+        viewport: { width: 768, height: 1024 },
+      },
+    },
+    {
+      name: "desktop-1440px",
+      use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
+    },
   ],
   webServer: {
     command: "npm start",
