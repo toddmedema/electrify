@@ -34,6 +34,14 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await expect(map).toBeVisible();
   await expect(selectedSanFrancisco).toHaveAttribute("aria-pressed", "true");
 
+  await page
+    .getByRole("button", { name: "Select Honolulu, HI, United States" })
+    .click();
+  await expect(search).toHaveValue("Honolulu, HI");
+  await search.fill("San Francisco");
+  await page.getByRole("option", { name: "San Francisco, CA" }).click();
+  await expect(search).toHaveValue("San Francisco, CA");
+
   const tabbableMapControls = await map
     .locator(".worldMapMarker")
     .evaluateAll(
@@ -150,7 +158,7 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await expect(zoomOut).toBeDisabled();
 });
 
-test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
+test("pointer, touch, pinch, and wheel interactions stay within the map", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -182,6 +190,8 @@ test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
       .poll(() => land.getAttribute("transform"))
       .not.toBe(startingTransform);
     await expect(search).toHaveValue(startingSelection);
+    const scroller = page.locator(".scrollable");
+    const before = await scroller.evaluate((element) => element.scrollTop);
 
     await page.getByRole("button", { name: "Show world" }).click();
     const worldTransform = await land.getAttribute("transform");
@@ -194,6 +204,9 @@ test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
       .poll(() => land.getAttribute("transform"))
       .not.toBe(worldTransform);
     await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBe(before);
     return;
   }
 
@@ -243,7 +256,7 @@ test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
   await expect.poll(() => land.getAttribute("transform")).not.toBe(beforePinch);
 
   await page.getByRole("button", { name: "Show world" }).click();
-  await expect(map).toHaveCSS("touch-action", "pan-y");
+  await expect(map).toHaveCSS("touch-action", "none");
   await map.scrollIntoViewIfNeeded();
   const worldMapBox = await map.boundingBox();
   expect(worldMapBox).not.toBeNull();
@@ -266,7 +279,7 @@ test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
   });
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollTop))
-    .toBeGreaterThan(before);
+    .toBe(before);
 });
 
 test("location constraints keep Play valid only where the starting fleet is viable", async ({

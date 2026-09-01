@@ -1399,11 +1399,18 @@ html[data-theme="dark"] .uplot {
 
 .scenarioStartControls {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin-top: 4px;
   padding-top: 12px;
+}
+
+.scenarioStartButton.MuiButton-root {
+  justify-self: center;
+  min-width: 190px;
+  min-height: 52px;
+  padding-inline: 28px;
 }
 
 .difficultyPicker {
@@ -1450,6 +1457,11 @@ html[data-theme="dark"] .uplot {
 
   .scenarioStartControls {
     grid-template-columns: 1fr;
+  }
+
+  .scenarioStartButton.MuiButton-root {
+    justify-self: stretch;
+    width: 100%;
   }
 
   .difficultyPicker .MuiToggleButton-root {
@@ -2073,10 +2085,11 @@ html[data-theme="dark"] .uplot {
     border: 1px solid var(--border-tile);
     border-radius: 8px;
     background: var(--bg-sunken);
-    touch-action: pan-y;
+    // Prevent a tap from turning into a scroll gesture and cancelling marker activation. The
+    // setup pane remains scrollable everywhere outside this bounded interactive surface.
+    touch-action: none;
 
     &.zoomed {
-      touch-action: none;
       cursor: grab;
     }
 
