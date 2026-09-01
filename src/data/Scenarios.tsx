@@ -1065,15 +1065,15 @@ export const SCENARIOS = [
       label: "September 2035 total eclipse in China",
     },
     // Low-carbon capacity is a 0.1%-scale model of China's 2024 national fleet. This
-    // solar-heavy balancing area receives 0.05% of national thermal capacity; the 240MWh
-    // battery represents 0.1% of China's 60GW new-storage fleet at four-hour duration.
+    // solar-heavy balancing area receives 625MW (about 0.04%) of national thermal capacity;
+    // the 240MWh battery represents 0.1% of China's 60GW new-storage fleet at four-hour duration.
     // https://www.nea.gov.cn/20250121/097bfd7c1cd3498897639857d86d5dac/c.html
     // https://www.nea.gov.cn/20241220/39938141b6e74baaa4601e940d12b022/c.html
     facilities: [
       { fuel: "Sun", peakW: 886660000, initialAgeYears: 4 },
       { fuel: "Wind", peakW: 520680000, initialAgeYears: 6 },
       { fuel: "Hydro", peakW: 435950000, initialAgeYears: 20 },
-      { fuel: "Coal", peakW: 722225000, initialAgeYears: 15 },
+      { fuel: "Coal", peakW: 625000000, initialAgeYears: 15 },
       { fuel: "Uranium", peakW: 60830000, initialAgeYears: 12 },
       { name: "Battery", peakWh: 240000000, initialAgeYears: 3 },
     ],

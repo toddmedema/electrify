@@ -244,6 +244,9 @@ describe("authored starting fleets", () => {
       eclipse.facilities.find((facility) => facility.name === "Battery")
         ?.peakWh,
     ).toBe(240_000_000);
+    expect(
+      eclipse.facilities.find((facility) => facility.fuel === "Coal")?.peakW,
+    ).toBe(625_000_000);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,

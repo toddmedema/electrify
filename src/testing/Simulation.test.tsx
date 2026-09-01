@@ -12,7 +12,7 @@ import {
 } from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
+import { getDateFromMinute, getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
@@ -382,6 +382,52 @@ describe("researched public-utility scenarios", () => {
       expect(tick["Natural Gas"]).toBe(control.timeline[index]["Natural Gas"]);
     });
   });
+
+  it.each(["Intern", "Employee"] as DifficultyType[])(
+    "blackouts during the eclipse when the player takes no action on %s",
+    (difficulty) => {
+      const eclipse = createGame({ scenarioId: 109, difficulty });
+      const control = createGame({
+        scenarioId: 109,
+        difficulty,
+        storyEffectsEnabled: false,
+      });
+      runMonths(eclipse, 32);
+      runMonths(control, 32);
+
+      expect(eclipse.date).toMatchObject({ year: 2035, monthNumber: 9 });
+      expect(eclipse.replayLog).toHaveLength(0);
+      const eclipseTickIndexes = eclipse.timeline
+        .map((tick, index) => ({
+          index,
+          minuteOfDay: getDateFromMinute(tick.minute, eclipse.startingYear)
+            .minuteOfDay,
+        }))
+        .filter(
+          ({ minuteOfDay }) =>
+            minuteOfDay >= 8 * 60 + 30 && minuteOfDay <= 11 * 60 + 30,
+        )
+        .map(({ index }) => index);
+
+      expect(eclipseTickIndexes).not.toHaveLength(0);
+      expect(
+        Math.min(
+          ...eclipseTickIndexes.map(
+            (index) =>
+              eclipse.timeline[index].supplyW - eclipse.timeline[index].demandW,
+          ),
+        ),
+      ).toBeLessThan(0);
+      expect(
+        Math.min(
+          ...eclipseTickIndexes.map(
+            (index) =>
+              control.timeline[index].supplyW - control.timeline[index].demandW,
+          ),
+        ),
+      ).toBeGreaterThanOrEqual(0);
+    },
+  );
 
   const difficulties: DifficultyType[] = [
     "Intern",
