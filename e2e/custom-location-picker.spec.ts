@@ -114,9 +114,6 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await expect(honolulu).toBeFocused();
   await honolulu.press(" ");
   await expect(search).toHaveValue("Honolulu, HI");
-  await expect(page.getByLabel("Selected location")).toContainText(
-    "Honolulu, HI",
-  );
 
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();

@@ -2,6 +2,7 @@ import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CityType } from "../../data/Cities";
+import { WORLD_LAND_PATH } from "../../data/WorldLand";
 import LocationPicker from "./LocationPicker";
 
 const cities: CityType[] = [
@@ -23,7 +24,7 @@ const cities: CityType[] = [
   },
 ];
 
-it("exposes the selected city and one roving map stop", () => {
+it("combines the selected city and search in one field on an aligned detailed map", () => {
   render(
     <LocationPicker
       locations={cities}
@@ -35,6 +36,9 @@ it("exposes the selected city and one roving map stop", () => {
   expect(
     screen.getByRole("combobox", { name: "Search playable cities" }),
   ).toHaveValue("West City");
+  expect(screen.queryByLabelText("Selected location")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Choose a playable city/)).not.toBeInTheDocument();
+  expect(WORLD_LAND_PATH.match(/M/g)?.length).toBeGreaterThan(100);
   expect(
     screen.getByRole("button", { name: /Select West City/ }),
   ).toHaveAttribute("aria-pressed", "true");

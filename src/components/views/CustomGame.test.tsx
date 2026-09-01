@@ -166,9 +166,7 @@ it("preserves and exposes a playable custom location that is absent from the cat
   expect(
     screen.getByRole("combobox", { name: "Search playable cities" }),
   ).toHaveValue("Unlisted Grid");
-  expect(screen.getByLabelText("Selected location")).toHaveTextContent(
-    "Unlisted Grid",
-  );
+  expect(screen.queryByLabelText("Selected location")).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Select Unlisted Grid" }),
   ).toHaveAttribute("aria-pressed", "true");

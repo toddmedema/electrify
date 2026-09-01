@@ -1902,18 +1902,6 @@ html[data-theme="dark"] .uplot {
     min-width: 0;
   }
 
-  .locationPickerSelection {
-    margin-top: 12px;
-    padding: 10px 12px;
-    border: 1px solid var(--border-tile);
-    border-radius: 8px;
-    background: var(--bg-raised);
-
-    p {
-      font-weight: 600;
-    }
-  }
-
   .locationPickerCount {
     display: block;
     margin-top: 8px;

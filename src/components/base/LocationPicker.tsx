@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
+import { WORLD_LAND_PATH } from "../../data/WorldLand";
 import {
   clampViewport,
   clusterLocations,
@@ -220,10 +221,6 @@ export default function LocationPicker({
         <Typography id="location-picker-title" variant="h6" component="h2">
           Location
         </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Choose a playable city. Location changes weather, demand, fuel prices,
-          and available build sites.
-        </Typography>
       </div>
 
       <div className="locationPickerDetails">
@@ -248,19 +245,6 @@ export default function LocationPicker({
             />
           )}
         />
-        {value && (
-          <div
-            className="locationPickerSelection"
-            aria-label="Selected location"
-          >
-            <Typography variant="subtitle1" component="p">
-              {value.name}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              {locationDetail(value)}
-            </Typography>
-          </div>
-        )}
         <Typography
           className="locationPickerCount"
           variant="caption"
@@ -296,12 +280,7 @@ export default function LocationPicker({
               <path d="M0 125H1000M0 250H1000M0 375H1000M250 0V500M500 0V500M750 0V500" />
             </g>
             <g className="worldMapContinents">
-              <path d="M45 86L115 42 230 54 286 102 258 145 204 157 170 211 118 196 92 145 48 127Z" />
-              <path d="M219 232L279 249 300 310 270 420 235 463 224 361 190 281Z" />
-              <path d="M430 92L492 69 548 92 572 128 645 112 715 69 862 78 953 130 905 188 804 180 745 226 670 211 620 165 569 173 525 143 468 151 420 125Z" />
-              <path d="M462 177L551 174 602 232 573 343 524 411 485 329 451 253Z" />
-              <path d="M797 315L861 289 929 325 912 388 846 405 800 364Z" />
-              <path d="M950 228L968 243 958 277 944 251Z" />
+              <path d={WORLD_LAND_PATH} />
             </g>
           </g>
         </svg>
