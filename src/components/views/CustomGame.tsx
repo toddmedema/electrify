@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  Autocomplete,
   Button,
   Card,
   CardHeader,
@@ -28,6 +27,7 @@ import CasinoIcon from "@mui/icons-material/Casino";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
+import LocationPicker from "../base/LocationPicker";
 import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
@@ -248,11 +248,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // Every place that can be picked: the six in the bundle to begin with, and every city with
   // downloaded weather once the index arrives, which is a download rather than a rebuild
   const [cities, setCities] = React.useState<CityType[]>(getCities);
+  const [citiesLoading, setCitiesLoading] = React.useState(true);
   React.useEffect(() => {
     let live = true;
     initCities().then((loaded: CityType[]) => {
       if (live) {
         setCities(loaded);
+        setCitiesLoading(false);
       }
     });
     return () => {
@@ -374,54 +376,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
       </div>
 
       <div className="scrollable">
+        <LocationPicker
+          locations={selectableLocations}
+          value={location}
+          loading={citiesLoading}
+          onChange={(picked: CityType) => {
+            changeStartingCustomers(getStartingCustomers(picked), {
+              locationId: picked.id,
+              location: picked,
+            });
+          }}
+        />
         <Table size="small" id="gameSetupTable">
           <TableBody>
-            <TableRow>
-              <TableCell>Location</TableCell>
-              <TableCell>
-                {/* The scenario carries the whole location rather than just its id, so a custom
-                    game stays playable even if the catalogue it was picked from changes
-                    underneath it - and so it can hold somewhere the catalogue never listed.
-                    Typed rather than scrolled: a few hundred cities is well past what a menu of
-                    them is any use for. */}
-                <Autocomplete
-                  id="location"
-                  options={selectableLocations}
-                  groupBy={(l: CityType) => l.region}
-                  getOptionLabel={(l: CityType) => l.name}
-                  isOptionEqualToValue={(a: CityType, b: CityType) =>
-                    a.id === b.id
-                  }
-                  value={location}
-                  onChange={(_e: unknown, picked: CityType | null) => {
-                    if (picked) {
-                      changeStartingCustomers(getStartingCustomers(picked), {
-                        locationId: picked.id,
-                        location: picked,
-                      });
-                    }
-                  }}
-                  disableClearable
-                  autoHighlight
-                  openOnFocus
-                  sx={{ minWidth: 0, width: "100%" }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      variant="standard"
-                      placeholder="Search cities"
-                      slotProps={{
-                        ...params.slotProps,
-                        htmlInput: {
-                          ...params.slotProps.htmlInput,
-                          "aria-label": "Location",
-                        },
-                      }}
-                    />
-                  )}
-                />
-              </TableCell>
-            </TableRow>
             <TableRow>
               <TableCell>Customers</TableCell>
               <TableCell>
