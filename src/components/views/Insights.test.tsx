@@ -239,7 +239,7 @@ describe("Insights layers", () => {
       "Cash",
       "Profit",
       "Customers",
-      "Greenhouse Gas Emissions (CO2e)",
+      "Emissions (CO2e)",
     ];
     expect(headings).toHaveLength(expected.length);
     expected.forEach((label, index) =>
@@ -337,11 +337,11 @@ describe("Insights layers", () => {
     renderInsights();
     await user.click(screen.getByRole("button", { name: /Layers/ }));
     await user.click(
-      screen.getByRole("checkbox", { name: "Expected Renewable Output" }),
+      screen.getByRole("checkbox", { name: "Renewable output" }),
     );
 
     expect(
-      screen.getByText("Expected Renewable Output", { selector: "h6" }),
+      screen.getByText("Renewable output", { selector: "h6" }),
     ).toBeVisible();
     expect(
       screen.getByTestId("renewable-capacity-factor-chart"),

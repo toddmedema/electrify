@@ -28,7 +28,7 @@ it("opens after economic data is loaded and names every setup control", () => {
   );
 
   expect(
-    screen.getByRole("heading", { name: "Custom Game Setup" }),
+    screen.getByRole("heading", { name: "Custom setup" }),
   ).toBeInTheDocument();
   [
     "Location",

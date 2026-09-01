@@ -74,9 +74,6 @@ export default function EventLog(props: Props): React.JSX.Element {
               <Typography id="upcomingEventsTitle" variant="subtitle2">
                 Upcoming events
               </Typography>
-              <Typography variant="caption" color="textSecondary">
-                Scheduled scenario events that have not happened yet
-              </Typography>
             </header>
             <ul className="eventLogList">
               {upcoming.map((event) => (
@@ -145,9 +142,6 @@ export default function EventLog(props: Props): React.JSX.Element {
             <Typography id="eventHistoryTitle" variant="subtitle2">
               Event history
             </Typography>
-            <Typography variant="caption" color="textSecondary">
-              Events recorded after they happen
-            </Typography>
           </header>
           {events.length === 0 && (
             <Typography
@@ -155,8 +149,8 @@ export default function EventLog(props: Props): React.JSX.Element {
               variant="body2"
               color="textSecondary"
             >
-              Blackouts, finished construction, loans closing and fuel price
-              swings will show up here as they happen.
+              Blackouts, completed builds, loans, and fuel-price changes appear
+              here.
             </Typography>
           )}
           <ul className="eventLogList">

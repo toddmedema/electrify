@@ -419,7 +419,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       className="storyDerateBadge"
                       color="warning"
                       size="small"
-                      label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                      label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
+                      aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
                     />
                   )}
                 </>
@@ -603,9 +604,8 @@ export default class Facilities extends React.Component<Props, {}> {
                 className="button-buildGenerator"
                 startIcon={<ConceptIcon concept="generator" fontSize="small" />}
               >
-                + Generator
+                Generator
               </Button>
-              &nbsp;&nbsp;&nbsp;
               <Button
                 size="small"
                 variant="outlined"
@@ -614,7 +614,7 @@ export default class Facilities extends React.Component<Props, {}> {
                 className="button-buildStorage"
                 startIcon={<ConceptIcon concept="storage" fontSize="small" />}
               >
-                + Storage
+                Storage
               </Button>
             </>
           )}

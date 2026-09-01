@@ -129,7 +129,7 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
   {
     id: "demandByType",
-    label: "Demand by Customer or Use Type",
+    label: "Demand by use",
     group: "Grid",
   },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
@@ -144,16 +144,16 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "revenue", label: "Revenue", group: "Economics" },
   { id: "expenses", label: "Expenses", group: "Economics" },
   { id: "cash", label: "Cash", group: "Economics" },
-  { id: "financeDetails", label: "Financial Details", group: "Economics" },
+  { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
   {
     id: "emissions",
-    label: "Greenhouse Gas Emissions (CO2e)",
+    label: "Emissions (CO2e)",
     group: "Environment",
   },
   {
     id: "solarCapacityFactor",
-    label: "Expected Renewable Output",
+    label: "Renewable output",
     group: "Environment",
   },
   { id: "weather", label: "Temperature", group: "Environment" },

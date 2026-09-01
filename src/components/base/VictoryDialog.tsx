@@ -27,7 +27,6 @@ import {
   shareText,
 } from "../../helpers/Share";
 import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
-import InstallAppButton from "./InstallAppButton";
 import { fuelColors } from "../../Theme";
 import {
   formatMoneyConcise,
@@ -329,9 +328,8 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         paper: {
           sx: {
             overflow: "hidden",
-            backgroundImage: failed
-              ? "radial-gradient(circle at 50% -20%, rgba(211, 47, 47, 0.2), transparent 45%)"
-              : "radial-gradient(circle at 50% -20%, rgba(255, 193, 7, 0.28), transparent 45%)",
+            borderTop: "6px solid",
+            borderColor: failed ? "error.main" : "warning.main",
           },
         },
       }}
@@ -436,17 +434,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
       >
         {canShare() && (
           <Button color="primary" onClick={onShare} startIcon={<ShareIcon />}>
-            Share score
+            Share
           </Button>
         )}
-        <InstallAppButton label="Install for later" afterMilestone />
         {!failed && (
           <Button color="primary" onClick={onClose}>
-            Review final grid
+            Review grid
           </Button>
         )}
         <Button color="primary" onClick={onQuit}>
-          Choose scenario
+          Choose game
         </Button>
         <Button
           color="primary"

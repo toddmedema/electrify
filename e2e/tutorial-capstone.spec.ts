@@ -16,7 +16,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
-    page.getByText("Blue supply must stay above demand"),
+    page.getByText(/supply line must stay at or above the demand line/i),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Your plants make electricity")).toBeVisible();
@@ -56,11 +56,13 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
-    page.getByRole("heading", { name: "Capstone needs another try" }),
+    page.getByRole("heading", { name: "Final challenge needs another try" }),
   ).toBeVisible();
-  await expect(page.getByText("Demand outran available supply")).toBeVisible();
+  await expect(
+    page.getByText("Demand exceeded available supply"),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "Retry capstone" }).click();
+  await page.getByRole("button", { name: "Retry final challenge" }).click();
   await expect(
     page.getByText("Your turn: keep the lights on for a full day"),
   ).toBeVisible();
@@ -69,7 +71,9 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   ).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText("Success!", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Mission complete!/ }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Next tutorial" }),
   ).toBeVisible();

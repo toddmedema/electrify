@@ -4,7 +4,6 @@
   --brand-strong: #0967b8;
   --brand-deep: #064a87;
   --brand-wash: rgba(0, 132, 248, 0.1);
-  --energy: #f4b942;
   --page: #f2f7fb;
   --surface: rgba(255, 255, 255, 0.9);
   --surface-solid: #ffffff;
@@ -24,7 +23,6 @@
     --brand-strong: #8bc8f8;
     --brand-deep: #b8ddfa;
     --brand-wash: rgba(100, 181, 246, 0.13);
-    --energy: #ffd166;
     --page: #0d141a;
     --surface: rgba(23, 32, 40, 0.92);
     --surface-solid: #172028;
@@ -51,14 +49,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 8% 5%, var(--brand-wash), transparent 27rem),
-    radial-gradient(
-      circle at 92% 24%,
-      rgba(244, 185, 66, 0.1),
-      transparent 22rem
-    ),
-    var(--page);
+  background: var(--page);
   color: var(--text);
   font-family:
     Inter,
@@ -185,34 +176,6 @@ a:hover {
   border-bottom: 1px solid var(--border);
 }
 
-.hero::before,
-.hero::after {
-  position: absolute;
-  border-radius: 999px;
-  content: "";
-  pointer-events: none;
-}
-
-.hero::before {
-  top: -10rem;
-  right: -6rem;
-  width: 25rem;
-  height: 25rem;
-  border: 1px solid var(--border);
-  box-shadow: 0 0 0 3.5rem var(--brand-wash);
-}
-
-.hero::after {
-  right: 16%;
-  bottom: 2.4rem;
-  width: 0.8rem;
-  height: 0.8rem;
-  background: var(--energy);
-  box-shadow:
-    2.3rem -1.3rem 0 -0.15rem var(--brand),
-    4.2rem 0.2rem 0 -0.3rem var(--energy);
-}
-
 .hero__inner {
   position: relative;
   z-index: 1;
@@ -333,8 +296,7 @@ a:hover {
 
 .panel--impact {
   grid-column: span 5;
-  background:
-    linear-gradient(145deg, var(--brand-wash), transparent 55%), var(--surface);
+  background: var(--surface-soft);
 }
 
 .panel--contact {
@@ -376,20 +338,6 @@ a:hover {
   display: inline-block;
   margin-top: 0.75rem;
   font-size: 0.85rem;
-}
-
-.panel__number {
-  width: 2.4rem;
-  height: 2.4rem;
-  margin-bottom: 1.4rem;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 0.7rem;
-  background: var(--brand-wash);
-  color: var(--brand-strong);
-  font-size: 0.78rem;
-  font-weight: 850;
-  letter-spacing: 0.05em;
 }
 
 .panel h2,
@@ -580,10 +528,6 @@ a:hover {
   .summary-card {
     position: static;
     grid-row: 1;
-  }
-
-  .hero::before {
-    right: -13rem;
   }
 }
 

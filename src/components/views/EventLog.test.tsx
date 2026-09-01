@@ -17,7 +17,7 @@ describe("EventLog", () => {
     );
 
     expect(onOpen).toHaveBeenCalled();
-    expect(screen.getByText(/Blackouts, finished construction/)).toBeVisible();
+    expect(screen.getByText(/Blackouts, completed builds/)).toBeVisible();
     expect(() => view.unmount()).not.toThrow();
   });
 
@@ -44,7 +44,9 @@ describe("EventLog", () => {
 
     const row = screen.getByRole("button", { name: /winter gas squeeze/i });
     expect(screen.getByText("Upcoming events")).toBeVisible();
-    expect(screen.getByText(/have not happened yet/i)).toBeVisible();
+    expect(
+      screen.queryByText(/have not happened yet/i),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Event history")).toBeVisible();
     expect(screen.getByText("Jan 2014")).toBeVisible();
     row.focus();
@@ -89,6 +91,8 @@ describe("EventLog", () => {
 
     expect(screen.getByText("Upcoming events")).toBeVisible();
     expect(screen.getByText("Event history")).toBeVisible();
-    expect(screen.getByText(/recorded after they happen/i)).toBeVisible();
+    expect(
+      screen.queryByText(/recorded after they happen/i),
+    ).not.toBeInTheDocument();
   });
 });
