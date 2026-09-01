@@ -18,7 +18,6 @@
   --bg-raised: #fafafa; /* grey50 - hover, one step off the page */
   --bg-sunken: #eceff1; /* blueGray50 - behind lists of cards */
   --bg-selected: #e3f2fd; /* blue50 */
-  --bg-fade-start: rgba(255, 255, 255, 0);
   --border-selected: #bbdefb; /* blue100 */
   --border-subtle: #eeeeee; /* grey200 */
   --border-strong: #bdbdbd; /* grey400 */
@@ -55,7 +54,6 @@
   --bg-raised: #18212b;
   --bg-sunken: #070a0f;
   --bg-selected: #132f46;
-  --bg-fade-start: rgba(11, 16, 22, 0);
   --border-selected: #285f86;
   --border-subtle: #202b38;
   --border-strong: #48586b;
@@ -687,6 +685,14 @@ $pane_header_height: 40px;
   border-bottom: $border_accent;
 }
 
+.facilities .paneHeader {
+  gap: 8px;
+
+  .button-buildGenerator {
+    margin-left: auto;
+  }
+}
+
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
 // the flex equivalent of .manual-search, for headers with a dropdown instead of a search box
 .headerControl {
@@ -865,7 +871,7 @@ $pane_header_height: 40px;
   // blackout signal rather than freeze it - pin it to the shade the pulse peaks at instead
   .blackout-pulsing:before {
     animation: none;
-    background-color: $blackout_red;
+    background-color: var(--blackout-tint);
   }
 }
 
@@ -984,17 +990,6 @@ $pane_header_height: 40px;
     position: absolute;
     top: 0;
     bottom: -4px;
-    left: 0;
-    right: 0;
-    z-index: -2;
-  }
-
-  &:after {
-    content: "";
-    background-image: linear-gradient(var(--bg-fade-start), var(--bg-primary));
-    position: absolute;
-    top: 0;
-    bottom: -6px;
     left: 0;
     right: 0;
     z-index: -1;
@@ -1421,13 +1416,7 @@ html[data-theme="dark"] .uplot {
 
   .empty {
     width: 100%;
-    background: repeating-linear-gradient(
-      135deg,
-      var(--border-tile),
-      var(--border-tile) 4px,
-      transparent 4px,
-      transparent 8px
-    );
+    background: var(--border-tile);
   }
 }
 
@@ -1781,12 +1770,6 @@ html[data-theme="dark"] .uplot {
       font-size: 0.75rem;
       opacity: 0.7;
       margin-top: size(small);
-    }
-
-    .manual-intro {
-      display: block;
-      padding: 0 size(base) size(base) size(base);
-      opacity: 0.7;
     }
 
     .manual-empty {
@@ -2723,12 +2706,12 @@ $sizemap: (
 
 @keyframes pulsered {
   0% {
-    background-color: $bg_primary;
+    background-color: transparent;
   }
   50% {
-    background-color: $blackout_red;
+    background-color: var(--blackout-tint);
   }
   100% {
-    background-color: $bg_primary;
+    background-color: transparent;
   }
 }

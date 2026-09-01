@@ -369,7 +369,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
           >
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Custom Game Setup</Typography>
+          <Typography variant="h6">Custom setup</Typography>
         </Toolbar>
       </div>
 
@@ -423,7 +423,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Starting customers</TableCell>
+              <TableCell>Customers</TableCell>
               <TableCell>
                 <Slider
                   aria-label="Starting customers"
@@ -451,7 +451,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Starting year</TableCell>
+              <TableCell>Start year</TableCell>
               <TableCell>
                 <Select
                   id="startingYear"
@@ -515,17 +515,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     })
                   }
                 >
-                  <MenuItem value="Investor">
-                    For-profit utility (investor-owned)
-                  </MenuItem>
-                  <MenuItem value="Public">
-                    Community or government utility (publicly owned)
-                  </MenuItem>
+                  <MenuItem value="Investor">Investor-owned utility</MenuItem>
+                  <MenuItem value="Public">Publicly owned utility</MenuItem>
                 </Select>
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Starting cash</TableCell>
+              <TableCell>Cash</TableCell>
               <TableCell>
                 <Select
                   id="cash"
@@ -654,8 +650,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   <CasinoIcon />
                 </IconButton>
                 <Typography variant="caption" color="textSecondary">
-                  Using the same seed repeats the same weather and fuel-price
-                  pattern.
+                  Same seed, same weather and fuel prices.
                 </Typography>
               </TableCell>
             </TableRow>
@@ -663,7 +658,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </Table>
 
         <Typography variant="h6" sx={{ paddingLeft: 1, paddingTop: 1 }}>
-          Starting facilities
+          Facilities
         </Typography>
         {unavailable.length > 0 && (
           <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>

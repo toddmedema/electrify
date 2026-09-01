@@ -176,8 +176,9 @@ describe("the fleet list", () => {
       },
     ];
     renderFacilities(constrained, null);
+    expect(screen.getByText("Limited to 30%")).toBeInTheDocument();
     expect(
-      screen.getByText("Temporarily limited to 30% of rated output"),
+      screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
   });
 

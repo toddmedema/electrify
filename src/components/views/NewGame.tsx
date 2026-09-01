@@ -5,7 +5,6 @@ import {
   Card,
   CardActionArea,
   CardHeader,
-  Chip,
   IconButton,
   List,
   ListSubheader,
@@ -115,17 +114,7 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
           }
           title={<span>{name}</span>}
           subheader={<span>{summary}</span>}
-          action={
-            isTutorial ? (
-              <Chip
-                label={completed ? "Review" : "Start"}
-                variant={completed ? "outlined" : "filled"}
-                color="primary"
-              />
-            ) : (
-              <ArrowRightIcon color="primary" aria-hidden />
-            )
-          }
+          action={!isTutorial && <ArrowRightIcon color="primary" aria-hidden />}
         />
       </CardActionArea>
     </Card>
@@ -190,10 +179,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             variant="subtitle2"
             sx={{ fontWeight: 700 }}
           >
-            New here?
-          </Typography>
-          <Typography variant="caption" component="p">
-            Learn the basics in six short lessons.
+            Learn the basics
           </Typography>
         </ListSubheader>
         {TUTORIALS.map((s) => (
@@ -220,9 +206,6 @@ export default function NewGame(props: Props): React.JSX.Element {
           >
             Challenges
           </Typography>
-          <Typography variant="caption" component="p">
-            Put your skills to work in a real place and time.
-          </Typography>
         </ListSubheader>
         {scenarios.map((s) => (
           <MissionListItem
@@ -246,10 +229,7 @@ export default function NewGame(props: Props): React.JSX.Element {
             variant="subtitle2"
             sx={{ fontWeight: 700 }}
           >
-            Make it your own
-          </Typography>
-          <Typography variant="caption" component="p">
-            Choose the city, time period and rules.
+            Custom game
           </Typography>
         </ListSubheader>
         <MissionListItem

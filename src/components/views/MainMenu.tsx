@@ -55,7 +55,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
       </Typography>
       <Box id="centeredMenu" sx={{ px: 3 }}>
         <Typography className="gameSubtitle" variant="body1" component="p">
-          Keep the lights on. Build a cleaner energy future.
+          Keep the lights on. Build a cleaner grid.
         </Typography>
         <Stack
           component="section"

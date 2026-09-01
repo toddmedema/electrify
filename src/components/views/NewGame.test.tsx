@@ -61,9 +61,9 @@ describe("NewGame", () => {
         .map((scenario) => scenario.name),
     ).toEqual(["Data Center Boom", "Carbon Fee"]);
     expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
-    expect(screen.getByText("New here?")).toBeInTheDocument();
+    expect(screen.getByText("Learn the basics")).toBeInTheDocument();
     expect(screen.getByText("Challenges")).toBeInTheDocument();
-    expect(screen.getByText("Make it your own")).toBeInTheDocument();
+    expect(screen.getByText("Custom game")).toBeInTheDocument();
     expect(
       screen.getByRole("list", { name: "Available games" }),
     ).toContainElement(rows[0]);

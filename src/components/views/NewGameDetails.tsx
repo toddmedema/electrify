@@ -388,8 +388,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
             />
             <div className="scenarioDossierCopy">
               <Typography variant="overline" component="div">
-                {location.name} · {scenario.startingYear}-{endYear} ·{" "}
-                {scenario.durationMonths / 12} years
+                {location.name} · {scenario.startingYear}-{endYear}
               </Typography>
               <Typography
                 id="scenario-title"
@@ -426,14 +425,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <div className="scenarioStartControls">
                 <div className="difficultyPicker">
                   <Typography variant="caption" component="div">
-                    Challenge level
+                    Difficulty
                   </Typography>
                   <ToggleButtonGroup
                     exclusive
                     value={game.difficulty}
                     size="small"
                     color="primary"
-                    aria-label="Challenge level"
+                    aria-label="Difficulty"
                     onChange={(_event, difficulty: DifficultyType | null) => {
                       if (difficulty) {
                         onDelta({ difficulty });
@@ -467,7 +466,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
-                  Start game
+                  Start
                 </Button>
               </div>
             </div>

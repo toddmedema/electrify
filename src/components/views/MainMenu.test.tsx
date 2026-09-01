@@ -22,7 +22,7 @@ describe("MainMenu", () => {
     render(<MainMenu {...props()} />);
 
     expect(
-      screen.getByText(/Keep the lights on. Build a cleaner energy future/i),
+      screen.getByText(/Keep the lights on. Build a cleaner grid/i),
     ).toHaveClass("gameSubtitle", "MuiTypography-body1");
     expect(screen.queryByText(/no energy or gaming experience/i)).toBeNull();
   });

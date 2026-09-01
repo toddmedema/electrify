@@ -200,7 +200,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("clipboard");
     renderDialog({ onShared });
 
-    await userEvent.click(screen.getByText("Share score"));
+    await userEvent.click(screen.getByText("Share"));
     await waitFor(() => expect(onShared).toHaveBeenCalled());
     expect(onShared.mock.calls[0][1]).toBe("clipboard");
   });
@@ -212,7 +212,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("cancelled");
     renderDialog({ onShared, onShareFailed });
 
-    await userEvent.click(screen.getByText("Share score"));
+    await userEvent.click(screen.getByText("Share"));
     await waitFor(() => expect(mockShareText).toHaveBeenCalled());
     expect(onShared).not.toHaveBeenCalled();
     expect(onShareFailed).not.toHaveBeenCalled();
@@ -223,9 +223,9 @@ describe("VictoryDialog", () => {
     const onQuit = jest.fn();
     renderDialog({ onClose, onQuit });
 
-    await userEvent.click(screen.getByText("Review final grid"));
+    await userEvent.click(screen.getByText("Review grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Choose scenario"));
+    await userEvent.click(screen.getByText("Choose game"));
     expect(onQuit).toHaveBeenCalled();
   });
 
@@ -241,7 +241,7 @@ describe("VictoryDialog", () => {
       expect(screen.getByText(title)).toBeInTheDocument();
       expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
       expect(screen.getByText(/Final score/)).toBeInTheDocument();
-      expect(screen.queryByText("Review final grid")).not.toBeInTheDocument();
+      expect(screen.queryByText("Review grid")).not.toBeInTheDocument();
       await userEvent.keyboard("{Escape}");
       expect(onClose).not.toHaveBeenCalled();
       cleanup();

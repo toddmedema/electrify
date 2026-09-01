@@ -802,7 +802,7 @@ export const SCENARIOS = [
     name: "Hurricane Season",
     icon: "hurricane season",
     locationId: "SJU",
-    summary: "Prepare an isolated grid for expensive fuel and severe storms.",
+    summary: "Prepare an island grid for storms and costly fuel.",
     briefing: {
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
@@ -862,8 +862,7 @@ export const SCENARIOS = [
       long: -77.4753,
       timeZone: "America/New_York",
     },
-    summary:
-      "Huge new data centers are coming. Grow without pricing out residents.",
+    summary: "Prepare for data-center growth without pricing out residents.",
     briefing: {
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
@@ -976,8 +975,7 @@ export const SCENARIOS = [
       watershedName: "Spanish river basins",
       resources: { hydro: true },
     },
-    summary:
-      "Conserve water and stored energy across Spain through a worsening summer heatwave.",
+    summary: "Keep Spain powered through a worsening heatwave and drought.",
     briefing: {
       tone: "storm",
       fantasy:
@@ -1035,8 +1033,7 @@ export const SCENARIOS = [
       timeZone: "Asia/Shanghai",
       resources: { hydro: true },
     },
-    summary:
-      "Prepare China's solar-heavy grid for the total eclipse of September 2035.",
+    summary: "Prepare China's solar-heavy grid for a total eclipse.",
     briefing: {
       tone: "innovation",
       fantasy:
@@ -1099,8 +1096,7 @@ export const SCENARIOS = [
       timeZone: "Europe/Paris",
       resources: { hydro: false },
     },
-    summary:
-      "Keep enough backup capacity for an unexpected nuclear shutdown in France.",
+    summary: "Cover an unexpected nuclear shutdown in France.",
     briefing: {
       tone: "legacy",
       fantasy:
