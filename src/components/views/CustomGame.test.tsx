@@ -6,6 +6,8 @@ import {
   DEFAULT_CUSTOM_SCENARIO,
 } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
+import { LOCATIONS } from "../../Constants";
+import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { createGame } from "../../testing/Simulator";
 import CustomGame from "./CustomGame";
 
@@ -31,7 +33,7 @@ it("opens after economic data is loaded and names every setup control", () => {
     screen.getByRole("heading", { name: "Custom setup" }),
   ).toBeInTheDocument();
   [
-    "Location",
+    "Search playable cities",
     "Starting year",
     "Duration",
     "Ownership",
@@ -109,5 +111,73 @@ it("scales starting nameplate capacity with starting customers", () => {
   );
   expect(totalNameplateW).toBeGreaterThanOrEqual(
     state.timeline[0].demandW * (1 + RESERVE_MARGIN),
+  );
+});
+
+it("commits the complete location object when a map marker is selected", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /Select Honolulu, HI/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      locationId: LOCATIONS.HNL.id,
+      location: expect.objectContaining(LOCATIONS.HNL),
+    }),
+  );
+  expect(prefetchScenarioData).toHaveBeenCalledWith(
+    expect.objectContaining({ id: LOCATIONS.HNL.id }),
+  );
+});
+
+it("preserves and exposes a playable custom location that is absent from the catalogue", () => {
+  const onStart = jest.fn();
+  const customLocation = {
+    id: "unlisted-grid",
+    name: "Unlisted Grid",
+    lat: 12.5,
+    long: 35.5,
+    timeZone: "Etc/UTC",
+  };
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: customLocation.id,
+        location: customLocation,
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  expect(
+    screen.getByRole("combobox", { name: "Search playable cities" }),
+  ).toHaveValue("Unlisted Grid");
+  expect(screen.getByLabelText("Selected location")).toHaveTextContent(
+    "Unlisted Grid",
+  );
+  expect(
+    screen.getByRole("button", { name: "Select Unlisted Grid" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      locationId: customLocation.id,
+      location: customLocation,
+    }),
   );
 });

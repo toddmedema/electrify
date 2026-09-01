@@ -22,7 +22,9 @@ test("custom setup and settings stay usable on a 320px phone", async ({
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),
   ).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Location" })).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Search playable cities" }),
+  ).toBeVisible();
   const setupOverflow = await page
     .locator("#gameSetupTable")
     .locator("..")
