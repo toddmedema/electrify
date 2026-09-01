@@ -1691,9 +1691,8 @@ export default class Insights extends React.Component<Props, State> {
                 ))}
               </Select>
               <div
-                className={`insightsPresetControls${
-                  this.state.presetDirty ? " insightsPresetControls-edited" : ""
-                }`}
+                className="insightsPresetControls"
+                role="group"
                 aria-label="Preset controls"
               >
                 <Select
@@ -1705,7 +1704,7 @@ export default class Insights extends React.Component<Props, State> {
                       this.applyPreset(preset);
                     }
                   }}
-                  className="insightsPreset"
+                  className="headerControl insightsPreset"
                   aria-label="Insight preset"
                   renderValue={() => (
                     <span className="insightsPresetValue">
@@ -1763,10 +1762,12 @@ export default class Insights extends React.Component<Props, State> {
                     Unsaved view
                   </MenuItem>
                 </Select>
-                <Button
+                <IconButton
                   className="insightsPresetSave"
                   size="small"
-                  startIcon={<SaveIcon />}
+                  aria-label={
+                    this.state.preset === "custom" ? "Save as" : "Save"
+                  }
                   disabled={
                     !this.state.layers.length ||
                     (this.state.preset !== "custom" &&
@@ -1780,13 +1781,12 @@ export default class Insights extends React.Component<Props, State> {
                   }
                   onClick={() => this.savePresetChanges()}
                 >
-                  {this.state.preset === "custom" ? "Save as" : "Save"}
-                </Button>
+                  <SaveIcon fontSize="small" />
+                </IconButton>
                 <Tooltip title="Rename, save a copy, restore, or delete">
-                  <Button
+                  <IconButton
                     className="insightsPresetActions"
                     size="small"
-                    startIcon={<MoreVertIcon />}
                     aria-label="Preset actions"
                     aria-haspopup="menu"
                     aria-controls={
@@ -1799,8 +1799,8 @@ export default class Insights extends React.Component<Props, State> {
                       this.setState({ presetMenuAnchor: event.currentTarget })
                     }
                   >
-                    More
-                  </Button>
+                    <MoreVertIcon fontSize="small" />
+                  </IconButton>
                 </Tooltip>
               </div>
               <Button

@@ -739,38 +739,19 @@ $pane_header_height: 40px;
   display: flex;
   min-width: 218px;
   flex: 1.35 1 284px;
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px solid var(--border-tile);
-  border-radius: 6px;
-  background: var(--bg-raised);
-
-  &.insightsPresetControls-edited {
-    border-color: $interactive_blue;
-    box-shadow: inset 3px 0 0 $interactive_blue;
-  }
+  align-items: center;
+  gap: 4px;
 
   .insightsPreset {
     min-width: 0;
     flex: 1 1 138px;
+    margin-left: 0;
   }
 
   .insightsPresetSave,
   .insightsPresetActions {
-    min-width: auto;
-    min-height: 36px;
     flex: 0 0 auto;
-    border-left: 1px solid var(--border-tile);
-    border-radius: 0;
-  }
-
-  .insightsPresetSave:not(:disabled) {
-    background: var(--interactive-tint);
-  }
-
-  .insightsPresetActions {
-    padding-right: 8px;
-    padding-left: 8px;
+    color: $interactive_blue;
   }
 }
 
@@ -908,8 +889,7 @@ $pane_header_height: 40px;
   }
 
   .insightsHeader > h6 {
-    width: 100%;
-    margin-bottom: 6px;
+    display: none;
   }
 
   .insightsHeaderControls {
@@ -932,6 +912,11 @@ $pane_header_height: 40px;
       grid-area: preset;
       width: 100%;
       min-width: 0;
+
+      .headerControl {
+        width: 100%;
+        min-width: 0;
+      }
     }
 
     .insightsLayerControls {
@@ -940,12 +925,8 @@ $pane_header_height: 40px;
     }
   }
 
-  .insightsPresetControls {
-    .insightsPreset,
-    .insightsPresetSave,
-    .insightsPresetActions {
-      min-height: 44px;
-    }
+  .insightsPresetControls .insightsPreset {
+    min-height: 44px;
   }
 
   .insightsPresetDialog {
