@@ -299,6 +299,64 @@ a:hover {
   background: var(--surface-soft);
 }
 
+.panel--signup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.72fr) minmax(20rem, 1.28fr);
+  align-items: center;
+  gap: 2rem;
+  background: var(--surface-soft);
+}
+
+.signup-form {
+  position: relative;
+  min-width: 0;
+}
+
+.signup-form > label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.signup-form__fields {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.signup-form__fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.2;
+}
+
+.signup-form__fields input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.signup-form__fields input:hover {
+  border-color: var(--brand);
+}
+
+.signup-form__bot-field {
+  position: absolute;
+  left: -5000px;
+}
+
+.panel .signup-form__note {
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+}
+
 .panel--contact {
   grid-column: 1 / -1;
   display: grid;
@@ -508,6 +566,7 @@ a:hover {
   }
 
   .panel--contact,
+  .panel--signup,
   .privacy-layout {
     grid-template-columns: 1fr;
   }
@@ -553,6 +612,11 @@ a:hover {
   .panel__actions,
   .button {
     width: 100%;
+  }
+
+  .signup-form__fields {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .site-footer__inner {
