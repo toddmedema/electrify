@@ -24,6 +24,7 @@ import {
   MAP_ZOOM_SCALES,
   panViewport,
   projectLocation,
+  zoomViewportAt,
 } from "../../helpers/WorldMap";
 
 interface Props {
@@ -42,6 +43,14 @@ interface MapDrag {
   y: number;
   moved: boolean;
 }
+
+interface MapPinch {
+  distance: number;
+}
+
+const PINCH_ZOOM_IN_RATIO = 1.25;
+const PINCH_ZOOM_OUT_RATIO = 0.8;
+const WHEEL_ZOOM_THRESHOLD = 40;
 
 function locationDetail(location: CityType): string {
   return [location.admin, location.country, location.region]
@@ -92,7 +101,11 @@ export default function LocationPicker({
   const [focusAfterZoom, setFocusAfterZoom] = React.useState<MapPoint>();
   const [panning, setPanning] = React.useState(false);
   const mapRef = React.useRef<HTMLDivElement>(null);
+  const viewportRef = React.useRef(viewport);
   const dragRef = React.useRef<MapDrag>();
+  const pinchRef = React.useRef<MapPinch>();
+  const pointersRef = React.useRef(new Map<number, MapPoint>());
+  const wheelDeltaRef = React.useRef(0);
   const suppressClickRef = React.useRef(false);
   const controlRefs = React.useRef<Record<string, HTMLButtonElement | null>>(
     {},
@@ -144,15 +157,46 @@ export default function LocationPicker({
     }
   }, [controls, rovingId, value?.id, focusAfterZoom]);
 
-  const setZoom = (zoom: number, center = viewport.center, focus = false) => {
-    const next = clampViewport({ center, zoom });
+  viewportRef.current = viewport;
+
+  const applyViewport = (next: MapViewport) => {
+    viewportRef.current = next;
     setViewport(next);
+  };
+
+  const announceZoom = (zoom: number) => {
     setAnnouncement(
-      next.zoom === 0
-        ? "Showing the whole world"
-        : `Map zoom level ${next.zoom + 1}`,
+      zoom === 0 ? "Showing the whole world" : `Map zoom level ${zoom + 1}`,
     );
+  };
+
+  const setZoom = (
+    zoom: number,
+    center = viewportRef.current.center,
+    focus = false,
+  ) => {
+    const next = clampViewport({ center, zoom });
+    applyViewport(next);
+    announceZoom(next.zoom);
     if (focus) setFocusAfterZoom({ x: 0.5, y: 0.5 });
+  };
+
+  const zoomAtPoint = (delta: number, point: MapPoint) => {
+    const current = viewportRef.current;
+    const next = zoomViewportAt(current, current.zoom + delta, point);
+    if (next.zoom === current.zoom) return;
+    applyViewport(next);
+    announceZoom(next.zoom);
+  };
+
+  const screenPoint = (clientX: number, clientY: number): MapPoint => {
+    const rect = mapRef.current?.getBoundingClientRect();
+    const width = rect?.width || mapSize.width;
+    const height = rect?.height || mapSize.height;
+    return {
+      x: (clientX - (rect?.left || 0)) / width,
+      y: (clientY - (rect?.top || 0)) / height,
+    };
   };
 
   const select = (location: CityType, centerSearch = false) => {
@@ -160,7 +204,7 @@ export default function LocationPicker({
     setAnnouncement(`${location.name} selected`);
     setRovingId(`location-${location.id}`);
     if (centerSearch) {
-      setViewport(
+      applyViewport(
         clampViewport({ center: projectLocation(location), zoom: 2 }),
       );
     }
@@ -228,12 +272,28 @@ export default function LocationPicker({
 
   const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (
-      viewport.zoom === 0 ||
       event.button !== 0 ||
       (event.target as Element).closest(".worldMapControls")
     ) {
       return;
     }
+    pointersRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+    if (pointersRef.current.size >= 2) {
+      const [a, b] = Array.from(pointersRef.current.values());
+      pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) };
+      dragRef.current = undefined;
+      suppressClickRef.current = true;
+      pointersRef.current.forEach((_point, pointerId) =>
+        event.currentTarget.setPointerCapture?.(pointerId),
+      );
+      setPanning(true);
+      event.preventDefault();
+      return;
+    }
+    if (viewportRef.current.zoom === 0) return;
     dragRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -245,6 +305,29 @@ export default function LocationPicker({
   };
 
   const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointersRef.current.has(event.pointerId)) {
+      pointersRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    }
+    if (pinchRef.current && pointersRef.current.size >= 2) {
+      event.preventDefault();
+      const [a, b] = Array.from(pointersRef.current.values());
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      const ratio = distance / Math.max(1, pinchRef.current.distance);
+      const delta =
+        ratio >= PINCH_ZOOM_IN_RATIO
+          ? 1
+          : ratio <= PINCH_ZOOM_OUT_RATIO
+            ? -1
+            : 0;
+      if (delta !== 0) {
+        zoomAtPoint(delta, screenPoint((a.x + b.x) / 2, (a.y + b.y) / 2));
+        pinchRef.current.distance = distance;
+      }
+      return;
+    }
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - drag.x;
@@ -254,14 +337,46 @@ export default function LocationPicker({
     drag.x = event.clientX;
     drag.y = event.clientY;
     drag.moved = true;
-    setViewport((current: MapViewport) =>
-      panViewport(current, -deltaX, -deltaY, mapSize.width, mapSize.height),
+    applyViewport(
+      panViewport(
+        viewportRef.current,
+        -deltaX,
+        -deltaY,
+        mapSize.width,
+        mapSize.height,
+      ),
     );
   };
 
+  const resetClickSuppression = () => {
+    if (pointersRef.current.size === 0 && suppressClickRef.current) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
   const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const wasPinching = !!pinchRef.current || pointersRef.current.size > 1;
+    pointersRef.current.delete(event.pointerId);
+    if (wasPinching) {
+      suppressClickRef.current = true;
+      dragRef.current = undefined;
+      if (pointersRef.current.size < 2) {
+        pinchRef.current = undefined;
+        setPanning(false);
+      }
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      resetClickSuppression();
+      return;
+    }
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      resetClickSuppression();
+      return;
+    }
     suppressClickRef.current = drag.moved;
     dragRef.current = undefined;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -273,18 +388,26 @@ export default function LocationPicker({
     }, 0);
   };
 
-  const scrollPan = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (viewport.zoom === 0) return;
+  const wheelZoom = (event: React.WheelEvent<HTMLDivElement>) => {
+    const rawDelta = event.deltaY || event.deltaX;
+    if (rawDelta === 0) return;
     event.preventDefault();
-    setViewport((current: MapViewport) =>
-      panViewport(
-        current,
-        event.deltaX,
-        event.deltaY,
-        mapSize.width,
-        mapSize.height,
-      ),
+    const modeScale =
+      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
+    const delta = rawDelta * modeScale;
+    if (
+      wheelDeltaRef.current !== 0 &&
+      Math.sign(wheelDeltaRef.current) !== Math.sign(delta)
+    ) {
+      wheelDeltaRef.current = 0;
+    }
+    wheelDeltaRef.current += delta;
+    if (Math.abs(wheelDeltaRef.current) < WHEEL_ZOOM_THRESHOLD) return;
+    zoomAtPoint(
+      wheelDeltaRef.current < 0 ? 1 : -1,
+      screenPoint(event.clientX, event.clientY),
     );
+    wheelDeltaRef.current = 0;
   };
 
   return (
@@ -338,16 +461,22 @@ export default function LocationPicker({
         onPointerMove={movePan}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        onLostPointerCapture={() => {
-          dragRef.current = undefined;
-          setPanning(false);
+        onLostPointerCapture={(event) => {
+          pointersRef.current.delete(event.pointerId);
+          if (dragRef.current?.pointerId === event.pointerId) {
+            dragRef.current = undefined;
+          }
+          if (pointersRef.current.size < 2) pinchRef.current = undefined;
+          if (!dragRef.current && !pinchRef.current) setPanning(false);
+          resetClickSuppression();
         }}
-        onWheel={scrollPan}
+        onWheel={wheelZoom}
       >
         <span id="location-map-instructions" className="visuallyHidden">
           Use arrow keys to move between map locations. Press Enter or Space to
           select a city or zoom into a cluster. When zoomed in, drag, swipe, or
-          scroll to pan the map. Press Home to show the world.
+          pinch to explore the map. Scroll to zoom in or out. Press Home to show
+          the world.
         </span>
         <svg
           className="worldMapLand"

@@ -47,6 +47,31 @@ describe("MainMenu", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("places transient account actions after the fixed menu actions", () => {
+    render(
+      <MainMenu
+        {...props({
+          audioEnabled: undefined,
+          hasSavedGame: false,
+          uid: undefined,
+        })}
+      />,
+    );
+
+    const discovery = screen.getByRole("region", {
+      name: "Discovery actions",
+    });
+    const account = screen.getByRole("region", { name: "Account actions" });
+    expect(
+      discovery.compareDocumentPosition(account) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(account).getByText("Free · no sign-up needed")).toBeVisible();
+    expect(
+      within(account).getByRole("button", { name: "Sign in" }),
+    ).toBeVisible();
+  });
+
   it("prioritizes continuing a save while offering mission selection", () => {
     render(<MainMenu {...props({ hasSavedGame: true })} />);
 
