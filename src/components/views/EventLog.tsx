@@ -1,5 +1,15 @@
 import * as React from "react";
-import { Typography } from "@mui/material";
+import {
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import CheckIcon from "@mui/icons-material/Check";
+import FilterListIcon from "@mui/icons-material/FilterList";
 import GameCard from "../base/GameCard";
 import {
   ConceptNameType,
@@ -31,6 +41,42 @@ const KIND_CONCEPTS: { [k in GameEventKindType]: ConceptNameType } = {
   WORLD_EVENT: "forecast",
 };
 
+type EventHistoryFilterType =
+  "ALL" | "SCENARIO" | "BLACKOUTS" | "PROJECTS" | "MARKET_FINANCE";
+
+const EVENT_HISTORY_FILTERS: {
+  value: EventHistoryFilterType;
+  label: string;
+  emptyMessage?: string;
+  kinds?: GameEventKindType[];
+}[] = [
+  { value: "ALL", label: "All events" },
+  {
+    value: "SCENARIO",
+    label: "Scenario",
+    emptyMessage: "No scenario events yet.",
+    kinds: ["WORLD_EVENT"],
+  },
+  {
+    value: "BLACKOUTS",
+    label: "Blackouts",
+    emptyMessage: "No blackout events yet.",
+    kinds: ["BLACKOUT", "BLACKOUT_OVER"],
+  },
+  {
+    value: "PROJECTS",
+    label: "Projects",
+    emptyMessage: "No project events yet.",
+    kinds: ["BUILD", "CONSTRUCTION", "SELL"],
+  },
+  {
+    value: "MARKET_FINANCE",
+    label: "Market & finance",
+    emptyMessage: "No market or finance events yet.",
+    kinds: ["FUEL_PRICE", "FUEL_CROSSOVER", "LOAN"],
+  },
+];
+
 export interface UpcomingStoryEventType {
   key: string;
   label: string;
@@ -56,6 +102,17 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
   const { events, onOpen, onSelect, upcoming = [] } = props;
+  const [historyFilter, setHistoryFilter] =
+    React.useState<EventHistoryFilterType>("ALL");
+  const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(
+    null,
+  );
+  const activeFilter = EVENT_HISTORY_FILTERS.find(
+    (filter) => filter.value === historyFilter,
+  )!;
+  const visibleEvents = activeFilter.kinds
+    ? events.filter((event) => activeFilter.kinds?.includes(event.kind))
+    : events;
   // An effect may only return a cleanup function. Redux dispatch returns the dispatched action,
   // so the expression-bodied form returned an object here; React later tried to call that object
   // while unmounting this phone-only pane and crashed the app to a blank screen.
@@ -142,6 +199,59 @@ export default function EventLog(props: Props): React.JSX.Element {
             <Typography id="eventHistoryTitle" variant="subtitle2">
               Event history
             </Typography>
+            <Tooltip
+              title={
+                historyFilter === "ALL"
+                  ? "Filter event history"
+                  : `Filter: ${activeFilter.label}`
+              }
+            >
+              <IconButton
+                id="eventHistoryFilterButton"
+                className={`eventHistoryFilterButton${historyFilter === "ALL" ? "" : " active"}`}
+                size="small"
+                onClick={(event) => setFilterAnchor(event.currentTarget)}
+                aria-label={`Filter event history, ${activeFilter.label}`}
+                aria-controls={
+                  filterAnchor ? "eventHistoryFilterMenu" : undefined
+                }
+                aria-expanded={filterAnchor ? true : undefined}
+                aria-haspopup="menu"
+              >
+                <FilterListIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              id="eventHistoryFilterMenu"
+              anchorEl={filterAnchor}
+              open={Boolean(filterAnchor)}
+              onClose={() => setFilterAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              slotProps={{
+                list: { "aria-labelledby": "eventHistoryFilterButton" },
+              }}
+            >
+              {EVENT_HISTORY_FILTERS.map((filter) => (
+                <MenuItem
+                  key={filter.value}
+                  role="menuitemradio"
+                  aria-checked={historyFilter === filter.value}
+                  selected={historyFilter === filter.value}
+                  onClick={() => {
+                    setHistoryFilter(filter.value);
+                    setFilterAnchor(null);
+                  }}
+                >
+                  <ListItemIcon className="eventHistoryFilterCheck">
+                    {historyFilter === filter.value && (
+                      <CheckIcon fontSize="small" />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText>{filter.label}</ListItemText>
+                </MenuItem>
+              ))}
+            </Menu>
           </header>
           {events.length === 0 && (
             <Typography
@@ -153,8 +263,17 @@ export default function EventLog(props: Props): React.JSX.Element {
               here.
             </Typography>
           )}
+          {events.length > 0 && visibleEvents.length === 0 && (
+            <Typography
+              className="eventLogEmpty"
+              variant="body2"
+              color="textSecondary"
+            >
+              {activeFilter.emptyMessage}
+            </Typography>
+          )}
           <ul className="eventLogList">
-            {events.map((event: GameEventType) => (
+            {visibleEvents.map((event: GameEventType) => (
               <li
                 className={`eventLogItem kind-${event.kind} importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
                 key={event.id}

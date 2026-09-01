@@ -2475,8 +2475,24 @@ html[data-theme="dark"] .uplot {
 
   .eventLogSectionHeader {
     display: grid;
+    grid-template-columns: 1fr auto;
     gap: 1px;
+    align-items: center;
     padding: 0 size(base) size(small);
+  }
+
+  .eventHistoryFilterButton {
+    margin: -5px -8px -5px 0;
+    color: $font_color_faded;
+
+    &.active {
+      background: var(--interactive-tint);
+      color: $interactive_blue;
+    }
+  }
+
+  .eventHistoryFilterCheck {
+    width: 24px;
   }
 
   // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
