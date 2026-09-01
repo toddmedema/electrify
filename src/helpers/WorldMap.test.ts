@@ -5,6 +5,7 @@ import {
   panViewport,
   pointInViewport,
   projectLocation,
+  zoomViewportAt,
 } from "./WorldMap";
 
 const world = { center: { x: 0.5, y: 0.5 }, zoom: 0 };
@@ -39,6 +40,15 @@ it("pans zoomed viewports in screen pixels and stops at the world edge", () => {
     ),
   ).toEqual({ center: { x: 0.9375, y: 0.9375 }, zoom: 3 });
   expect(panViewport(world, 100, 100, 400, 200)).toEqual(world);
+});
+
+it("zooms around a screen point and keeps its world location stationary", () => {
+  const anchor = { x: 0.75, y: 0.25 };
+  const zoomed = zoomViewportAt(world, 1, anchor);
+
+  expect(zoomed).toEqual({ center: { x: 0.625, y: 0.375 }, zoom: 1 });
+  expect(pointInViewport({ x: 0.75, y: 0.25 }, zoomed)).toEqual(anchor);
+  expect(zoomViewportAt(zoomed, 99, anchor).zoom).toBe(3);
 });
 
 it("clusters close locations deterministically but keeps selection visible", () => {

@@ -150,7 +150,7 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await expect(zoomOut).toBeDisabled();
 });
 
-test("pointer and touch interactions pan when zoomed and leave page scrolling available", async ({
+test("pointer, touch, pinch, and wheel interactions navigate the map", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -182,6 +182,18 @@ test("pointer and touch interactions pan when zoomed and leave page scrolling av
       .poll(() => land.getAttribute("transform"))
       .not.toBe(startingTransform);
     await expect(search).toHaveValue(startingSelection);
+
+    await page.getByRole("button", { name: "Show world" }).click();
+    const worldTransform = await land.getAttribute("transform");
+    await page.mouse.move(
+      mapBox!.x + mapBox!.width / 2,
+      mapBox!.y + mapBox!.height / 2,
+    );
+    await page.mouse.wheel(0, -100);
+    await expect
+      .poll(() => land.getAttribute("transform"))
+      .not.toBe(worldTransform);
+    await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
     return;
   }
 
@@ -205,6 +217,30 @@ test("pointer and touch interactions pan when zoomed and leave page scrolling av
     .poll(() => land.getAttribute("transform"))
     .not.toBe(startingTransform);
   await expect(search).toHaveValue(startingSelection);
+
+  await page.getByRole("button", { name: "Show world" }).click();
+  const beforePinch = await land.getAttribute("transform");
+  const pinchY = Math.round(mapBox!.y + mapBox!.height / 2);
+  const pinchCenterX = Math.round(mapBox!.x + mapBox!.width / 2);
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { x: pinchCenterX - 40, y: pinchY },
+      { x: pinchCenterX + 40, y: pinchY },
+    ],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [
+      { x: pinchCenterX - 70, y: pinchY },
+      { x: pinchCenterX + 70, y: pinchY },
+    ],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect.poll(() => land.getAttribute("transform")).not.toBe(beforePinch);
 
   await page.getByRole("button", { name: "Show world" }).click();
   await expect(map).toHaveCSS("touch-action", "pan-y");
