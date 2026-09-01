@@ -218,7 +218,6 @@ function logGameEvent(
     importance?: GameEventImportanceType;
     actionTarget?: GameEventType["actionTarget"];
     title?: string;
-    details?: string;
     concept?: GameEventType["concept"];
     storyPhaseKey?: string;
     turningPointPriority?: number;
@@ -241,7 +240,6 @@ function logGameEvent(
     importance: options.importance,
     actionTarget: options.actionTarget,
     title: options.title,
-    details: options.details,
     concept: options.concept,
     storyPhaseKey: options.storyPhaseKey,
     turningPointPriority: options.turningPointPriority,
@@ -476,7 +474,6 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
       importance: occurrence.importance,
       actionTarget: occurrence.actionTarget,
       title: occurrence.title,
-      details: occurrence.details,
       concept: occurrence.concept,
       storyPhaseKey: occurrence.key,
       turningPointPriority: occurrence.turningPointPriority,
