@@ -198,6 +198,15 @@ describe("story effect composition", () => {
       ]),
     ).toThrow(/overlapping story carbon-fee/i);
   });
+
+  it("preserves a complete hydro-inflow cutoff when effects are combined", () => {
+    expect(
+      combineStoryEffects([
+        { effects: { hydroRunoffMultiplier: 0 } },
+        { effects: { hydroRunoffMultiplier: 0.5 } },
+      ]).hydroRunoffMultiplier,
+    ).toBe(0);
+  });
 });
 
 describe("The Shale Boom pilot arc", () => {
@@ -403,7 +412,7 @@ describe("generation and storage reliability scenarios", () => {
     expect(solarEclipseOutputMultiplier(effects, 690)).toBe(1);
   });
 
-  it("keeps the seeded nuclear trip hidden until it occurs", () => {
+  it("keeps the seeded nuclear trip hidden and targets a paused unit at onset", () => {
     const snapshot: StorySnapshotType = {
       ...EMPTY_SNAPSHOT,
       facilities: [
@@ -413,7 +422,8 @@ describe("generation and storage reliability scenarios", () => {
           fuel: "Uranium",
           ageYears: 22,
           peakW: 500_000_000,
-          operational: true,
+          // Pausing the reactor must not let it escape a mechanical shutdown and resume later.
+          operational: false,
         },
       ],
     };

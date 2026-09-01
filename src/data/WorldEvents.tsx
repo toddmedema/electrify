@@ -1356,8 +1356,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
       durationMonths: 48,
       describe: ({ snapshot }) => {
         const unit = snapshot.facilities.find(
-          (facility) =>
-            facility.name === "Grand Nuclear Unit" && facility.operational,
+          (facility) => facility.name === "Grand Nuclear Unit",
         );
         const facilityOutputMultipliersById = unit
           ? { [String(unit.id)]: 0 }
@@ -1623,8 +1622,8 @@ export function combineStoryEffects(
       effects.hydroRunoffMultiplier !== undefined
     ) {
       combined.hydroRunoffMultiplier =
-        (combined.hydroRunoffMultiplier || 1) *
-        (effects.hydroRunoffMultiplier || 1);
+        (combined.hydroRunoffMultiplier ?? 1) *
+        (effects.hydroRunoffMultiplier ?? 1);
     }
     if (effects.solarEclipse !== undefined) {
       if (combined.solarEclipse !== undefined) {
