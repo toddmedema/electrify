@@ -1,12 +1,18 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
 
-it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
+it("shows natural-gas base, per-start, and daily-start estimated O&M", async () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 419000000, [], []).find(
     (candidate) => candidate.name === "Natural Gas",
@@ -25,8 +31,10 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
     />,
   );
 
-  expect(screen.getByText("Est. operations & maintenance")).toBeInTheDocument();
-  expect(screen.getByText("$13.4M/yr")).toBeInTheDocument();
+  expect(
+    screen.queryByText("Est. operations & maintenance"),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
   expect(screen.getByText(/typical output/)).toBeInTheDocument();
   fireEvent.click(
@@ -57,6 +65,52 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", () => {
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).toHaveTextContent("Estimated average output");
+  expect(impact).not.toHaveTextContent("Loan:");
+  expect(
+    screen.queryByRole("table", { name: "Financing terms" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
+  expect(screen.queryByText("Time to build")).not.toBeInTheDocument();
+
+  const showFinancing = screen.getByRole("button", {
+    name: "Show financing terms",
+  });
+  expect(showFinancing).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(showFinancing);
+
+  const financingTerms = screen.getByRole("table", {
+    name: "Financing terms",
+  });
+  expect(
+    screen.getByRole("row", { name: /Downpayment \$[\d.]+[kMB]?/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", { name: /Interest rate.*\d+\.\d+%/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", { name: /Monthly payments \$[\d.]+[kMB]?\/mo/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("row", {
+      name: /Loan duration Construction \+ \d+ years/,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Hide financing terms" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(financingTerms).not.toHaveTextContent("Cash cost");
+  expect(financingTerms).not.toHaveTextContent("Time to build");
+
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Show financing terms" }),
+  ).toHaveAttribute("aria-expanded", "false");
 });
 
 it("shows Coal's physical and representative-day start charges", () => {
@@ -110,8 +164,10 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     />,
   );
 
-  expect(screen.getByText("Est. operations & maintenance")).toBeInTheDocument();
-  expect(screen.getByText("$7.59M/yr")).toBeInTheDocument();
+  expect(
+    screen.queryByText("Est. operations & maintenance"),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("$7.59M/yr")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Show Oil details" }));
 
   expect(
@@ -130,6 +186,68 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
     }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Non-fuel start cost")).toBeNull();
+});
+
+it("keeps primary generator metrics visible and discloses secondary details", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 419000000, [], []).find(
+    (candidate) => candidate.name === "Natural Gas",
+  )!;
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator}
+      location={game.location}
+      seed={game.seed}
+      forecastGapW={generator.peakW}
+      advantages={["Fastest online", "Lowest lifetime cost"]}
+      onBuild={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText("Natural Gas")).toBeInTheDocument();
+  expect(screen.getByText(/typical output/)).toBeInTheDocument();
+  expect(screen.getByText(/largest forecast shortage/)).toBeInTheDocument();
+  expect(screen.getByText("Build cost")).toBeInTheDocument();
+  expect(screen.getByText("Build time")).toBeInTheDocument();
+  expect(screen.queryByText("Fastest online")).not.toBeInTheDocument();
+  expect(screen.queryByText("Lifetime cost / MWh")).not.toBeInTheDocument();
+  expect(screen.queryByText("Emissions")).not.toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Show Natural Gas details" }),
+  );
+
+  expect(
+    screen.getByRole("group", { name: "Generator advantages" }),
+  ).toHaveTextContent("Fastest online");
+  expect(screen.getByText("Estimated lifetime cost per MWh")).toBeVisible();
+  expect(screen.getByText("Direct greenhouse gas emissions")).toBeVisible();
+});
+
+it("keeps the active lifetime-cost sort metric visible on collapsed cards", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  const generator = GENERATORS(game, 419000000, [], []).find(
+    (candidate) => candidate.name === "Natural Gas",
+  )!;
+
+  render(
+    <GeneratorBuildItem
+      cash={1000000000}
+      date={game.date}
+      interestRate={game.interestRate}
+      generator={generator}
+      location={game.location}
+      seed={game.seed}
+      secondaryMetric="lcWh"
+      onBuild={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText("Lifetime cost / MWh")).toBeVisible();
 });
 
 it("submits a generator purchase only once on a double-click", () => {

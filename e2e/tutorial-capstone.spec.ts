@@ -14,6 +14,31 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   ).toBeVisible();
   await expect(page.getByText("Your goal: keep the lights on")).toBeVisible();
 
+  const expectObjectiveDocked = async () => {
+    const objective = page.locator(".tutorialHud");
+    const game = page.locator(".cardTransitions");
+    const [objectiveBox, gameBox] = await Promise.all([
+      objective.boundingBox(),
+      game.boundingBox(),
+    ]);
+    expect(objectiveBox).not.toBeNull();
+    expect(gameBox).not.toBeNull();
+    expect(objectiveBox!.y + objectiveBox!.height).toBeLessThanOrEqual(
+      gameBox!.y + 1,
+    );
+    expect(
+      await objective.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+  };
+  await expectObjectiveDocked();
+
+  if (testInfo.project.name === "desktop-1440px") {
+    await expect(page.locator(".desktop-layout")).toHaveCount(1);
+    await expect(page.locator(".pane-layout")).toHaveCount(0);
+  }
+
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
     page.getByText(/supply line must stay at or above the demand line/i),
@@ -43,16 +68,11 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     page.getByText("Your turn: keep the lights on for a full day"),
   ).toBeVisible();
 
-  // Remove firm capacity so the first attempt demonstrates consequence feedback and retry.
-  if (testInfo.project.name === "mobile-320px") {
-    await page.getByRole("button", { name: "Collapse objective" }).click();
-  }
+  // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
+  // expanded objective is docked outside the game surface, so the same control remains operable at
+  // every viewport without a small-screen workaround.
   const naturalGas = page.locator(".facilityRow", { hasText: "Natural Gas" });
-  if (testInfo.project.name === "mobile-320px") {
-    await naturalGas.click({ position: { x: 12, y: 12 } });
-  } else {
-    await naturalGas.click();
-  }
+  await naturalGas.click();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(

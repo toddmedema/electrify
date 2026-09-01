@@ -89,6 +89,8 @@ export function GeneratorBuildItem(
   );
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const [financingExpanded, setFinancingExpanded] = React.useState(false);
+  const financingTermsId = React.useId();
   const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.generator.buildCost;
   const loanAmount = props.generator.buildCost - downpayment;
@@ -128,12 +130,11 @@ export function GeneratorBuildItem(
   };
 
   const toggleOpen = (e: React.SyntheticEvent) => {
-    setOpen((wasOpen: boolean) => {
-      if (!wasOpen) {
-        purchaseSubmitted.current = false;
-      }
-      return !wasOpen;
-    });
+    if (!open) {
+      purchaseSubmitted.current = false;
+      setFinancingExpanded(false);
+    }
+    setOpen(!open);
     e.stopPropagation();
   };
 
@@ -192,7 +193,17 @@ export function GeneratorBuildItem(
           </Stack>
         }
         title={generator.name}
-        subheader={buildSubtitle}
+        subheader={
+          <span
+            className={
+              buildable && financingGap === 0
+                ? "generatorBuildSubtitle"
+                : undefined
+            }
+          >
+            {buildSubtitle}
+          </span>
+        }
       />
       <Box className="generatorDecisionLead">
         <Stack
@@ -213,9 +224,6 @@ export function GeneratorBuildItem(
               label={`~${gapCoverage}% of largest forecast shortage`}
             />
           )}
-          {(props.advantages || []).map((advantage) => (
-            <Chip key={advantage} size="small" label={advantage} />
-          ))}
         </Stack>
       </Box>
       <Box
@@ -235,22 +243,12 @@ export function GeneratorBuildItem(
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
-        <GeneratorMetric
-          label="Est. operations & maintenance"
-          value={`${formatMoneyConcise(estimatedAnnualOperatingCost(generator))}/yr`}
-        />
-        <GeneratorMetric
-          label="Lifetime cost / MWh"
-          value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
-        />
-        <GeneratorMetric
-          label="Emissions"
-          value={
-            kgCO2ePerMWh > 0
-              ? `${formatMass(kgCO2ePerMWh, units)}/MWh`
-              : "No direct emissions modeled"
-          }
-        />
+        {props.secondaryMetric === "lcWh" && (
+          <GeneratorMetric
+            label="Lifetime cost / MWh"
+            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+          />
+        )}
       </Box>
       <Button
         color="primary"
@@ -268,6 +266,22 @@ export function GeneratorBuildItem(
       </Button>
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        {(props.advantages || []).length > 0 && (
+          <Box sx={{ px: 2, pb: 1 }}>
+            <Stack
+              direction="row"
+              spacing={0.75}
+              useFlexGap
+              sx={{ flexWrap: "wrap" }}
+              role="group"
+              aria-label="Generator advantages"
+            >
+              {(props.advantages || []).map((advantage) => (
+                <Chip key={advantage} size="small" label={advantage} />
+              ))}
+            </Stack>
+          </Box>
+        )}
         <TableContainer>
           <Table size="small" aria-label="generator properties">
             <TableBody>
@@ -290,21 +304,6 @@ export function GeneratorBuildItem(
                   </TableCell>
                 </TableRow>
               )}
-              <TableRow>
-                <TableCell>
-                  Estimated average output
-                  <ManualLink
-                    entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-                    label="capacity factor"
-                  />
-                  <Typography variant="body2" color="textSecondary">
-                    Across a year
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  {formatWatts(generator.peakW * generator.capacityFactor)}
-                </TableCell>
-              </TableRow>
               {generator.minimumStableOutput !== undefined && (
                 <TableRow>
                   <TableCell>
@@ -442,14 +441,6 @@ export function GeneratorBuildItem(
               <ViableLocationsRow
                 remaining={generator.viableLocationsRemaining}
               />
-              {props.secondaryMetric !== "yearsToBuild" && (
-                <TableRow>
-                  <TableCell>Time to build</TableCell>
-                  <TableCell align="right">
-                    {Math.round(generator.yearsToBuild * 12)} mo
-                  </TableCell>
-                </TableRow>
-              )}
               <TableRow>
                 <TableCell>
                   Direct greenhouse gas emissions
@@ -491,7 +482,6 @@ export function GeneratorBuildItem(
                 concept: "money",
                 label: "Cash purchase",
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - generator.buildCost)}`,
-                detail: `Loan: ${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - downpayment)}, then ${formatMoneyConcise(monthlyPayment)}/mo`,
               },
               {
                 concept: "time",
@@ -518,57 +508,59 @@ export function GeneratorBuildItem(
               },
             ]}
           />
-          <TableContainer>
-            <Table size="small">
-              <TableBody>
-                <TableRow>
-                  <TableCell>Time to build</TableCell>
-                  <TableCell align="right">
-                    {Math.round(generator.yearsToBuild * 12)} mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Cash cost</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(generator.buildCost)}
-                  </TableCell>
-                </TableRow>
-                <TableRow className="bold">
-                  <TableCell colSpan={2}>Loan info</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Downpayment</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(downpayment)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    Interest rate
-                    <ManualLink
-                      entry={MANUAL_ENTRY.INTEREST_RATES}
-                      label="interest rate"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {(props.interestRate * 100).toFixed(2)}%
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Monthly payments</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(monthlyPayment)}/mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Loan duration</TableCell>
-                  <TableCell align="right">
-                    Construction + {LOAN_MONTHS / 12} years
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Button
+            color="primary"
+            size="small"
+            fullWidth
+            aria-expanded={financingExpanded}
+            aria-controls={financingTermsId}
+            endIcon={
+              financingExpanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
+            }
+            onClick={() => setFinancingExpanded((value) => !value)}
+          >
+            {financingExpanded
+              ? "Hide financing terms"
+              : "Show financing terms"}
+          </Button>
+          <Collapse in={financingExpanded} timeout="auto" unmountOnExit>
+            <TableContainer id={financingTermsId}>
+              <Table size="small" aria-label="Financing terms">
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Downpayment</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(downpayment)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      Interest rate
+                      <ManualLink
+                        entry={MANUAL_ENTRY.INTEREST_RATES}
+                        label="interest rate"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {(props.interestRate * 100).toFixed(2)}%
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Monthly payments</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(monthlyPayment)}/mo
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Loan duration</TableCell>
+                    <TableCell align="right">
+                      Construction + {LOAN_MONTHS / 12} years
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
         </DialogContent>
         <DialogActions>
           <Button
