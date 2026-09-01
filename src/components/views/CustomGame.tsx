@@ -127,6 +127,26 @@ const GENERATOR_SIZES_W = [
 ];
 const STORAGE_SIZES_WH = [100000000, 500000000, 1000000000, 2000000000];
 
+function startingCashOptions(startingYear: number): number[] {
+  return STARTING_CASH.map((cash: number) => inEraMoney(cash, startingYear));
+}
+
+/**
+ * Bring a saved cash choice forward when opening a setup recorded before cash started scaling
+ * with the game's year. Without this migration, the saved amount is absent from the Select's
+ * options and MUI renders the control as an empty dropdown.
+ */
+function normalizeStartingCash(scenario: ScenarioType): ScenarioType {
+  const options = startingCashOptions(scenario.startingYear);
+  if (options.includes(scenario.cash)) {
+    return scenario;
+  }
+  const legacyIndex = STARTING_CASH.indexOf(scenario.cash);
+  const index =
+    legacyIndex === -1 ? nearestIndex(options, scenario.cash) : legacyIndex;
+  return { ...scenario, cash: options[index] };
+}
+
 interface TechnologyType {
   name: string;
   storage: boolean;
@@ -212,7 +232,9 @@ function facilitiesForStartingCustomers(
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
-  const [scenario, setScenario] = React.useState<ScenarioType>(props.scenario);
+  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
+    normalizeStartingCash(props.scenario),
+  );
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
@@ -231,8 +253,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // which is why changing that year has to re-quote whatever was already chosen rather than
   // leaving a 2020 amount on a 2080 game -- see changeStartingYear below.
   const cashOptions = React.useMemo(
-    () =>
-      STARTING_CASH.map((c: number) => inEraMoney(c, scenario.startingYear)),
+    () => startingCashOptions(scenario.startingYear),
     [scenario.startingYear],
   );
   const rateOptions = React.useMemo(
