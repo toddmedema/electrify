@@ -88,7 +88,7 @@ describe("NewGameDetails leaderboard", () => {
     expect(
       screen.getByRole("button", { name: "What counts as a win" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Start game" })).toBeVisible();
     expect(screen.getByText(/Forgiving: lower game costs/)).toBeVisible();
     await screen.findByText("Finish this game to join the leaderboard");
   });

@@ -34,6 +34,14 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await expect(map).toBeVisible();
   await expect(selectedSanFrancisco).toHaveAttribute("aria-pressed", "true");
 
+  await page
+    .getByRole("button", { name: "Select Honolulu, HI, United States" })
+    .click();
+  await expect(search).toHaveValue("Honolulu, HI");
+  await search.fill("San Francisco");
+  await page.getByRole("option", { name: "San Francisco, CA" }).click();
+  await expect(search).toHaveValue("San Francisco, CA");
+
   const tabbableMapControls = await map
     .locator(".worldMapMarker")
     .evaluateAll(
@@ -72,7 +80,7 @@ test("world map location picker works with pointer, touch, search, and keyboard"
       Math.max(0, element.scrollWidth - element.clientWidth),
     );
   expect(overflow).toBeLessThanOrEqual(1);
-  await expect(map).toHaveCSS("touch-action", "pan-y");
+  await expect(map).toHaveCSS("touch-action", "none");
 
   const mapBox = await map.boundingBox();
   const searchBox = await search.boundingBox();
@@ -150,7 +158,7 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await expect(zoomOut).toBeDisabled();
 });
 
-test("pointer and touch interactions leave vertical scrolling available", async ({
+test("pointer and touch interactions stay within the map", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -164,6 +172,13 @@ test("pointer and touch interactions leave vertical scrolling available", async 
     await cluster.hover();
     await expect(search).toHaveValue(startingSelection);
     await expect(cluster).toHaveCSS("cursor", "pointer");
+
+    const scroller = page.locator(".scrollable");
+    const before = await scroller.evaluate((element) => element.scrollTop);
+    await page.mouse.wheel(0, 240);
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBe(before);
     return;
   }
 
@@ -201,7 +216,7 @@ test("pointer and touch interactions leave vertical scrolling available", async 
   });
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollTop))
-    .toBeGreaterThan(before);
+    .toBe(before);
 });
 
 test("location constraints keep Play valid only where the starting fleet is viable", async ({

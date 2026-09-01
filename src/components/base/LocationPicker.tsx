@@ -101,6 +101,20 @@ export default function LocationPicker({
     return () => observer.disconnect();
   }, []);
 
+  React.useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // A wheel gesture begun over the map belongs to the map, even though zoom is exposed through
+    // explicit controls. A non-passive native listener is required here: delegated wheel handlers
+    // may be passive in browsers, which lets the setup pane scroll underneath the interaction.
+    const captureWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    map.addEventListener("wheel", captureWheel, { passive: false });
+    return () => map.removeEventListener("wheel", captureWheel);
+  }, []);
+
   const controls = React.useMemo(
     () =>
       clusterLocations(

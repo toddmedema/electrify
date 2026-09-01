@@ -616,9 +616,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 >
                   <CasinoIcon />
                 </IconButton>
-                <Typography variant="caption" color="textSecondary">
-                  Same seed, same weather and fuel prices.
-                </Typography>
               </TableCell>
             </TableRow>
           </TableBody>

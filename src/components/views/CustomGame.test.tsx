@@ -47,6 +47,9 @@ it("opens after economic data is loaded and names every setup control", () => {
     expect(screen.getByRole("combobox", { name })).toBeInTheDocument();
   });
   expect(screen.getByRole("textbox", { name: "Seed" })).toBeInTheDocument();
+  expect(
+    screen.queryByText("Same seed, same weather and fuel prices."),
+  ).not.toBeInTheDocument();
 });
 
 it("re-quotes starting cash when the starting year changes", () => {

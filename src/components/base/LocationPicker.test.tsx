@@ -72,6 +72,22 @@ it("selects the same city from the map and searchable list", async () => {
   expect(onChange).toHaveBeenLastCalledWith(cities[0]);
 });
 
+it("captures wheel gestures inside the map", () => {
+  render(
+    <LocationPicker
+      locations={cities}
+      value={cities[0]}
+      onChange={jest.fn()}
+    />,
+  );
+
+  const wheel = new WheelEvent("wheel", { bubbles: true, cancelable: true });
+  screen
+    .getByRole("group", { name: "Playable locations map" })
+    .dispatchEvent(wheel);
+  expect(wheel.defaultPrevented).toBe(true);
+});
+
 it("supports arrow navigation, Enter and Space activation, and Home", () => {
   const onChange = jest.fn();
   render(
