@@ -710,12 +710,121 @@ $pane_header_height: 40px;
 .insightsHeader {
   gap: 8px;
 
+  > h6 {
+    flex: 0 0 auto;
+  }
+}
+
+.insightsHeaderControls {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+
   .headerControl {
-    min-width: 132px;
+    min-width: 112px;
+    flex: 1 1 132px;
+    margin-left: 0;
+  }
+
+  .insightsLayerControls {
+    min-height: 36px;
+    flex: 0 0 auto;
+  }
+}
+
+.insightsPresetControls {
+  display: flex;
+  min-width: 218px;
+  flex: 1.35 1 284px;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--border-tile);
+  border-radius: 6px;
+  background: var(--bg-raised);
+
+  &.insightsPresetControls-edited {
+    border-color: $interactive_blue;
+    box-shadow: inset 3px 0 0 $interactive_blue;
   }
 
   .insightsPreset {
-    min-width: 138px;
+    min-width: 0;
+    flex: 1 1 138px;
+  }
+
+  .insightsPresetSave,
+  .insightsPresetActions {
+    min-width: auto;
+    min-height: 36px;
+    flex: 0 0 auto;
+    border-left: 1px solid var(--border-tile);
+    border-radius: 0;
+  }
+
+  .insightsPresetSave:not(:disabled) {
+    background: var(--interactive-tint);
+  }
+
+  .insightsPresetActions {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+}
+
+.insightsPresetValue {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.insightsPresetName,
+.insightsPresetMenuName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightsPresetEdited,
+.insightsPresetCustomized,
+.insightsPresetMenuHint {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.insightsPresetEdited {
+  background: $interactive_blue;
+  color: $bg_primary;
+}
+
+.insightsPresetCustomized,
+.insightsPresetMenuHint {
+  background: var(--interactive-tint);
+  color: $interactive_blue;
+}
+
+.insightsPresetMenuHint {
+  margin-left: auto;
+}
+
+.insightsPresetDialog {
+  .MuiDialogContentText-root + .MuiTextField-root {
+    margin-top: 16px;
+  }
+
+  .MuiDialogActions-root {
+    padding: 8px 24px 16px;
+  }
+
+  .MuiButton-root {
+    min-height: 40px;
   }
 }
 
@@ -793,22 +902,61 @@ $pane_header_height: 40px;
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
     min-height: auto !important;
-    flex-wrap: wrap;
-    padding-top: 4px;
-    padding-bottom: 4px;
-
-    .headerControl {
-      margin-left: 0;
-    }
+    display: block;
+    padding-top: 6px;
+    padding-bottom: 8px;
   }
 
   .insightsHeader > h6 {
     width: 100%;
+    margin-bottom: 6px;
   }
 
-  .insightsHeader .MuiSelect-root,
-  .insightsHeader .MuiButton-root {
-    flex: 1 1 120px;
+  .insightsHeaderControls {
+    display: grid;
+    grid-template-areas:
+      "range layers"
+      "preset preset";
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    gap: 8px;
+    margin-left: 0;
+
+    .headerControl {
+      grid-area: range;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .insightsPresetControls {
+      grid-area: preset;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .insightsLayerControls {
+      grid-area: layers;
+      min-height: 44px;
+    }
+  }
+
+  .insightsPresetControls {
+    .insightsPreset,
+    .insightsPresetSave,
+    .insightsPresetActions {
+      min-height: 44px;
+    }
+  }
+
+  .insightsPresetDialog {
+    .MuiDialogActions-root {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+
+    .MuiButton-root {
+      min-height: 44px;
+    }
   }
 }
 
@@ -1752,6 +1900,11 @@ html[data-theme="dark"] .uplot {
         margin-top: 2px;
       }
 
+      .accountActions {
+        align-items: center;
+        margin-top: 2px;
+      }
+
       button {
         margin: 0;
       }
@@ -1933,6 +2086,15 @@ html[data-theme="dark"] .uplot {
     // Prevent a tap from turning into a scroll gesture and cancelling marker activation. The
     // setup pane remains scrollable everywhere outside this bounded interactive surface.
     touch-action: none;
+
+    &.zoomed {
+      cursor: grab;
+    }
+
+    &.panning {
+      cursor: grabbing;
+      user-select: none;
+    }
   }
 
   .worldMapLand,
@@ -2127,14 +2289,25 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  .missionItem {
+  .build-list-item.missionItem {
     margin: 0 12px 8px;
     border: 1px solid var(--border-tile);
     border-radius: 10px;
     box-shadow: none;
 
     .MuiCardHeader-root {
+      grid-template-columns: auto minmax(0, 1fr) auto;
       padding: 10px 12px;
+    }
+
+    // A chevron is part of this compact row, unlike the multi-button build-card actions that
+    // deliberately wrap below 520px.
+    .MuiCardHeader-root .MuiCardHeader-action {
+      grid-row: 1;
+      grid-column: 3;
+      align-self: center;
+      width: auto;
+      margin: 0 0 0 8px !important;
     }
 
     .MuiCardHeader-title {

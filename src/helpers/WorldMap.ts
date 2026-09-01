@@ -52,6 +52,58 @@ export function clampViewport(viewport: MapViewport): MapViewport {
   };
 }
 
+/** Changes zoom while keeping the world point under a screen-space anchor stationary. */
+export function zoomViewportAt(
+  viewport: MapViewport,
+  zoom: number,
+  anchor: MapPoint,
+): MapViewport {
+  const current = clampViewport(viewport);
+  const targetZoom = Math.max(
+    0,
+    Math.min(MAP_ZOOM_SCALES.length - 1, Math.round(zoom)),
+  );
+  const currentScale = MAP_ZOOM_SCALES[current.zoom];
+  const targetScale = MAP_ZOOM_SCALES[targetZoom];
+  const screen = {
+    x: Math.max(0, Math.min(1, anchor.x)),
+    y: Math.max(0, Math.min(1, anchor.y)),
+  };
+  const world = {
+    x: current.center.x + (screen.x - 0.5) / currentScale,
+    y: current.center.y + (screen.y - 0.5) / currentScale,
+  };
+  return clampViewport({
+    zoom: targetZoom,
+    center: {
+      x: world.x - (screen.x - 0.5) / targetScale,
+      y: world.y - (screen.y - 0.5) / targetScale,
+    },
+  });
+}
+
+/** Moves a zoomed viewport by screen pixels, clamping it at the edge of the world. */
+export function panViewport(
+  viewport: MapViewport,
+  deltaX: number,
+  deltaY: number,
+  width: number,
+  height: number,
+): MapViewport {
+  const clamped = clampViewport(viewport);
+  if (clamped.zoom === 0 || width <= 0 || height <= 0) {
+    return clamped;
+  }
+  const scale = MAP_ZOOM_SCALES[clamped.zoom];
+  return clampViewport({
+    zoom: clamped.zoom,
+    center: {
+      x: clamped.center.x + deltaX / (width * scale),
+      y: clamped.center.y + deltaY / (height * scale),
+    },
+  });
+}
+
 export function pointInViewport(
   point: MapPoint,
   viewport: MapViewport,

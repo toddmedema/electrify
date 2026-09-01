@@ -24,6 +24,20 @@ const cities: CityType[] = [
   },
 ];
 
+function firePointer(
+  element: Element,
+  type: string,
+  init: MouseEventInit & { pointerId: number },
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
+  Object.defineProperty(event, "pointerId", { value: init.pointerId });
+  fireEvent(element, event);
+}
+
 it("combines the selected city and search in one field on an aligned detailed map", () => {
   render(
     <LocationPicker
@@ -105,6 +119,72 @@ it("supports arrow navigation, Enter and Space activation, and Home", () => {
   expect(onChange).toHaveBeenCalledWith(cities[0]);
   fireEvent.keyDown(east, { key: "Home" });
   expect(screen.getByText("Showing the whole world")).toBeInTheDocument();
+});
+
+it("zooms in and out with the scroll wheel", () => {
+  render(
+    <LocationPicker
+      locations={cities}
+      value={cities[0]}
+      onChange={jest.fn()}
+    />,
+  );
+  const map = screen.getByRole("group", { name: "Playable locations map" });
+  const content = screen.getByTestId("world-map-content");
+  const before = content.getAttribute("transform");
+
+  fireEvent.wheel(map, { deltaY: -100, clientX: 300, clientY: 150 });
+  expect(content).not.toHaveAttribute("transform", before);
+  expect(screen.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+
+  fireEvent.wheel(map, { deltaY: 100, clientX: 300, clientY: 150 });
+  expect(content).toHaveAttribute("transform", before);
+  expect(screen.getByRole("button", { name: "Zoom out" })).toBeDisabled();
+});
+
+it("zooms with a two-pointer pinch gesture and restores marker clicks", async () => {
+  const onChange = jest.fn();
+  render(
+    <LocationPicker locations={cities} value={cities[0]} onChange={onChange} />,
+  );
+  const map = screen.getByRole("group", { name: "Playable locations map" });
+  const content = screen.getByTestId("world-map-content");
+  const before = content.getAttribute("transform");
+
+  firePointer(map, "pointerdown", {
+    pointerId: 1,
+    button: 0,
+    clientX: 200,
+    clientY: 150,
+  });
+  firePointer(map, "pointerdown", {
+    pointerId: 2,
+    button: 0,
+    clientX: 400,
+    clientY: 150,
+  });
+  firePointer(map, "pointermove", {
+    pointerId: 2,
+    clientX: 480,
+    clientY: 150,
+  });
+
+  expect(content).not.toHaveAttribute("transform", before);
+  expect(screen.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+
+  firePointer(map, "pointerup", {
+    pointerId: 2,
+    clientX: 480,
+    clientY: 150,
+  });
+  firePointer(map, "pointerup", {
+    pointerId: 1,
+    clientX: 200,
+    clientY: 150,
+  });
+  await act(() => new Promise((resolve) => window.setTimeout(resolve, 0)));
+  fireEvent.click(screen.getByRole("button", { name: /Select East City/ }));
+  expect(onChange).toHaveBeenCalledWith(cities[1]);
 });
 
 it("drills into a cluster and lists unresolved cities at maximum zoom", async () => {
