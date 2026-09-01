@@ -1919,6 +1919,16 @@ html[data-theme="dark"] .uplot {
     border-radius: 8px;
     background: var(--bg-sunken);
     touch-action: pan-y;
+
+    &.zoomed {
+      touch-action: none;
+      cursor: grab;
+    }
+
+    &.panning {
+      cursor: grabbing;
+      user-select: none;
+    }
   }
 
   .worldMapLand,
@@ -2113,14 +2123,25 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  .missionItem {
+  .build-list-item.missionItem {
     margin: 0 12px 8px;
     border: 1px solid var(--border-tile);
     border-radius: 10px;
     box-shadow: none;
 
     .MuiCardHeader-root {
+      grid-template-columns: auto minmax(0, 1fr) auto;
       padding: 10px 12px;
+    }
+
+    // A chevron is part of this compact row, unlike the multi-button build-card actions that
+    // deliberately wrap below 520px.
+    .MuiCardHeader-root .MuiCardHeader-action {
+      grid-row: 1;
+      grid-column: 3;
+      align-self: center;
+      width: auto;
+      margin: 0 0 0 8px !important;
     }
 
     .MuiCardHeader-title {

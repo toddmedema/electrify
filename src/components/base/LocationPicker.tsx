@@ -22,6 +22,7 @@ import {
   MapPoint,
   MapViewport,
   MAP_ZOOM_SCALES,
+  panViewport,
   projectLocation,
 } from "../../helpers/WorldMap";
 
@@ -34,6 +35,13 @@ interface Props {
 
 const WORLD_VIEW: MapViewport = { center: { x: 0.5, y: 0.5 }, zoom: 0 };
 const MAX_ZOOM = 3;
+
+interface MapDrag {
+  pointerId: number;
+  x: number;
+  y: number;
+  moved: boolean;
+}
 
 function locationDetail(location: CityType): string {
   return [location.admin, location.country, location.region]
@@ -82,7 +90,10 @@ export default function LocationPicker({
   const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [menuLocations, setMenuLocations] = React.useState<CityType[]>([]);
   const [focusAfterZoom, setFocusAfterZoom] = React.useState<MapPoint>();
+  const [panning, setPanning] = React.useState(false);
   const mapRef = React.useRef<HTMLDivElement>(null);
+  const dragRef = React.useRef<MapDrag>();
+  const suppressClickRef = React.useRef(false);
   const controlRefs = React.useRef<Record<string, HTMLButtonElement | null>>(
     {},
   );
@@ -215,6 +226,67 @@ export default function LocationPicker({
     }
   };
 
+  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (
+      viewport.zoom === 0 ||
+      event.button !== 0 ||
+      (event.target as Element).closest(".worldMapControls")
+    ) {
+      return;
+    }
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setPanning(true);
+  };
+
+  const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.x;
+    const deltaY = event.clientY - drag.y;
+    if (deltaX === 0 && deltaY === 0) return;
+    event.preventDefault();
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    drag.moved = true;
+    setViewport((current: MapViewport) =>
+      panViewport(current, -deltaX, -deltaY, mapSize.width, mapSize.height),
+    );
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    suppressClickRef.current = drag.moved;
+    dragRef.current = undefined;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setPanning(false);
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const scrollPan = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (viewport.zoom === 0) return;
+    event.preventDefault();
+    setViewport((current: MapViewport) =>
+      panViewport(
+        current,
+        event.deltaX,
+        event.deltaY,
+        mapSize.width,
+        mapSize.height,
+      ),
+    );
+  };
+
   return (
     <section className="locationPicker" aria-labelledby="location-picker-title">
       <div className="locationPickerHeading">
@@ -257,15 +329,25 @@ export default function LocationPicker({
       </div>
 
       <div
-        className="worldMap"
+        className={`worldMap${viewport.zoom > 0 ? " zoomed" : ""}${panning ? " panning" : ""}`}
         ref={mapRef}
         role="group"
         aria-label="Playable locations map"
         aria-describedby="location-map-instructions"
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onLostPointerCapture={() => {
+          dragRef.current = undefined;
+          setPanning(false);
+        }}
+        onWheel={scrollPan}
       >
         <span id="location-map-instructions" className="visuallyHidden">
           Use arrow keys to move between map locations. Press Enter or Space to
-          select a city or zoom into a cluster. Press Home to show the world.
+          select a city or zoom into a cluster. When zoomed in, drag, swipe, or
+          scroll to pan the map. Press Home to show the world.
         </span>
         <svg
           className="worldMapLand"
@@ -274,6 +356,7 @@ export default function LocationPicker({
           aria-hidden="true"
         >
           <g
+            data-testid="world-map-content"
             transform={`translate(${500 - viewport.center.x * 1000 * MAP_ZOOM_SCALES[viewport.zoom]} ${250 - viewport.center.y * 500 * MAP_ZOOM_SCALES[viewport.zoom]}) scale(${MAP_ZOOM_SCALES[viewport.zoom]})`}
           >
             <g className="worldMapGrid">
@@ -318,7 +401,11 @@ export default function LocationPicker({
                 }
                 onFocus={() => setRovingId(control.id)}
                 onKeyDown={(event) => handleMapKey(event, control)}
-                onClick={(event) => activate(control, event.currentTarget)}
+                onClick={(event) => {
+                  if (!suppressClickRef.current) {
+                    activate(control, event.currentTarget);
+                  }
+                }}
               >
                 {control.kind === "cluster"
                   ? control.locations.length

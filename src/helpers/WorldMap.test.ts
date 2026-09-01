@@ -2,6 +2,7 @@ import {
   clampViewport,
   clusterLocations,
   directionalNeighbor,
+  panViewport,
   pointInViewport,
   projectLocation,
 } from "./WorldMap";
@@ -22,6 +23,22 @@ it("clamps zoom and map centers to visible bounds", () => {
     center: { x: 0.0625, y: 0.9375 },
     zoom: 3,
   });
+});
+
+it("pans zoomed viewports in screen pixels and stops at the world edge", () => {
+  expect(
+    panViewport({ center: { x: 0.5, y: 0.5 }, zoom: 1 }, 100, -50, 400, 200),
+  ).toEqual({ center: { x: 0.625, y: 0.375 }, zoom: 1 });
+  expect(
+    panViewport(
+      { center: { x: 0.5, y: 0.5 }, zoom: 3 },
+      10000,
+      10000,
+      400,
+      200,
+    ),
+  ).toEqual({ center: { x: 0.9375, y: 0.9375 }, zoom: 3 });
+  expect(panViewport(world, 100, 100, 400, 200)).toEqual(world);
 });
 
 it("clusters close locations deterministically but keeps selection visible", () => {

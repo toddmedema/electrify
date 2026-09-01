@@ -72,7 +72,7 @@ test("world map location picker works with pointer, touch, search, and keyboard"
       Math.max(0, element.scrollWidth - element.clientWidth),
     );
   expect(overflow).toBeLessThanOrEqual(1);
-  await expect(map).toHaveCSS("touch-action", "pan-y");
+  await expect(map).toHaveCSS("touch-action", "none");
 
   const mapBox = await map.boundingBox();
   const searchBox = await search.boundingBox();
@@ -150,7 +150,7 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await expect(zoomOut).toBeDisabled();
 });
 
-test("pointer and touch interactions leave vertical scrolling available", async ({
+test("pointer and touch interactions pan when zoomed and leave page scrolling available", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -159,34 +159,63 @@ test("pointer and touch interactions leave vertical scrolling available", async 
   const search = page.getByRole("combobox", { name: "Search playable cities" });
   const startingSelection = await search.inputValue();
   const cluster = map.locator(".worldMapMarker.cluster").first();
+  await cluster.click();
+  await expect(map).toHaveClass(/zoomed/);
+  await expect(map).toHaveCSS("touch-action", "none");
+  const land = map.locator(".worldMapLand > g");
+  const startingTransform = await land.getAttribute("transform");
+  const mapBox = await map.boundingBox();
+  expect(mapBox).not.toBeNull();
 
   if (testInfo.project.name.startsWith("desktop")) {
-    await cluster.hover();
+    await page.mouse.move(
+      mapBox!.x + mapBox!.width / 2,
+      mapBox!.y + mapBox!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      mapBox!.x + mapBox!.width / 2 - 80,
+      mapBox!.y + mapBox!.height / 2 - 30,
+    );
+    await page.mouse.up();
+    await expect
+      .poll(() => land.getAttribute("transform"))
+      .not.toBe(startingTransform);
     await expect(search).toHaveValue(startingSelection);
-    await expect(cluster).toHaveCSS("cursor", "pointer");
     return;
   }
 
   await map.scrollIntoViewIfNeeded();
-  const clusterBox = await cluster.boundingBox();
-  expect(clusterBox).not.toBeNull();
-  await page.touchscreen.tap(
-    clusterBox!.x + clusterBox!.width / 2,
-    clusterBox!.y + clusterBox!.height / 2,
-  );
-  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+  const session = await page.context().newCDPSession(page);
+  const panStartX = Math.round(mapBox!.x + mapBox!.width / 2);
+  const panStartY = Math.round(mapBox!.y + mapBox!.height / 2);
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: panStartX, y: panStartY }],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: panStartX - 60, y: panStartY - 30 }],
+  });
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect
+    .poll(() => land.getAttribute("transform"))
+    .not.toBe(startingTransform);
   await expect(search).toHaveValue(startingSelection);
 
   await page.getByRole("button", { name: "Show world" }).click();
+  await expect(map).toHaveCSS("touch-action", "pan-y");
   await map.scrollIntoViewIfNeeded();
-  const mapBox = await map.boundingBox();
-  expect(mapBox).not.toBeNull();
+  const worldMapBox = await map.boundingBox();
+  expect(worldMapBox).not.toBeNull();
   const scroller = page.locator(".scrollable");
   const before = await scroller.evaluate((element) => element.scrollTop);
-  const session = await page.context().newCDPSession(page);
-  const x = Math.round(mapBox!.x + mapBox!.width / 2);
-  const startY = Math.round(mapBox!.y + mapBox!.height - 20);
-  const endY = Math.round(mapBox!.y + 20);
+  const x = Math.round(worldMapBox!.x + worldMapBox!.width / 2);
+  const startY = Math.round(worldMapBox!.y + worldMapBox!.height - 20);
+  const endY = Math.round(worldMapBox!.y + 20);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [{ x, y: startY }],

@@ -17,7 +17,25 @@ test("custom setup and settings stay usable on a 320px phone", async ({
   await page
     .getByRole("button", { name: "Start playing", exact: true })
     .click();
-  await page.getByRole("button", { name: "View Custom Game details" }).click();
+  const customGame = page.getByRole("button", {
+    name: "View Custom Game details",
+  });
+  await customGame.scrollIntoViewIfNeeded();
+  const avatarBox = await customGame
+    .locator(".MuiCardHeader-avatar")
+    .boundingBox();
+  const actionBox = await customGame
+    .locator(".MuiCardHeader-action")
+    .boundingBox();
+  expect(avatarBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(
+    Math.min(
+      avatarBox!.y + avatarBox!.height,
+      actionBox!.y + actionBox!.height,
+    ) - Math.max(avatarBox!.y, actionBox!.y),
+  ).toBeGreaterThan(0);
+  await customGame.click();
 
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),

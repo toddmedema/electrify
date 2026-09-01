@@ -52,6 +52,28 @@ export function clampViewport(viewport: MapViewport): MapViewport {
   };
 }
 
+/** Moves a zoomed viewport by screen pixels, clamping it at the edge of the world. */
+export function panViewport(
+  viewport: MapViewport,
+  deltaX: number,
+  deltaY: number,
+  width: number,
+  height: number,
+): MapViewport {
+  const clamped = clampViewport(viewport);
+  if (clamped.zoom === 0 || width <= 0 || height <= 0) {
+    return clamped;
+  }
+  const scale = MAP_ZOOM_SCALES[clamped.zoom];
+  return clampViewport({
+    zoom: clamped.zoom,
+    center: {
+      x: clamped.center.x + deltaX / (width * scale),
+      y: clamped.center.y + deltaY / (height * scale),
+    },
+  });
+}
+
 export function pointInViewport(
   point: MapPoint,
   viewport: MapViewport,

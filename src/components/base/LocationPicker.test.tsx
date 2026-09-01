@@ -91,6 +91,23 @@ it("supports arrow navigation, Enter and Space activation, and Home", () => {
   expect(screen.getByText("Showing the whole world")).toBeInTheDocument();
 });
 
+it("pans with scrolling while zoomed", () => {
+  render(
+    <LocationPicker
+      locations={cities}
+      value={cities[0]}
+      onChange={jest.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+  const map = screen.getByRole("group", { name: "Playable locations map" });
+  const content = screen.getByTestId("world-map-content");
+  const before = content.getAttribute("transform");
+
+  fireEvent.wheel(map, { deltaX: -30, deltaY: -20 });
+  expect(content).not.toHaveAttribute("transform", before);
+});
+
 it("drills into a cluster and lists unresolved cities at maximum zoom", async () => {
   const user = userEvent.setup();
   const closeCities: CityType[] = [
