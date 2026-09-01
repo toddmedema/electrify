@@ -1773,11 +1773,13 @@ function reforecastWeatherAndPrices(
       const forecast = {
         ...t,
         ...fuelPrices,
-        solarIrradianceWM2: getRawSolarIrradianceWM2(
-          date,
-          state.location,
-          weather.CLOUD_PCT,
-        ),
+        // Keep the forecast weather series aligned with dispatch. An eclipse physically reduces
+        // the irradiance available to solar generators, so recording the effective irradiance
+        // here lets renewable-output charts and build estimates show the same known event without
+        // applying the loss a second time in the supply pass.
+        solarIrradianceWM2:
+          getRawSolarIrradianceWM2(date, state.location, weather.CLOUD_PCT) *
+          solarEclipseOutputMultiplier(effects, date.minuteOfDay),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
@@ -1961,15 +1963,8 @@ function updateSupplyFacilitiesFinances(
       : 1;
     const facilityOutputMultiplier =
       tickStoryEffects.facilityOutputMultipliersById?.[String(g.id)] ?? 1;
-    const solarEclipseMultiplier =
-      generatorFuel === "Sun"
-        ? solarEclipseOutputMultiplier(tickStoryEffects, tickDate.minuteOfDay)
-        : 1;
     const availablePeakW =
-      g.peakW *
-      fuelOutputMultiplier *
-      facilityOutputMultiplier *
-      solarEclipseMultiplier;
+      g.peakW * fuelOutputMultiplier * facilityOutputMultiplier;
     let dispatchPeakW = availablePeakW;
     const outputFactor = facilityOutputFactor(g, now.minute);
     let mandatedW = 0;
