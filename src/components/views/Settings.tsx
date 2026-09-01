@@ -1,26 +1,28 @@
 import * as React from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
-  Checkbox,
-  FormControl,
-  FormControlLabel,
+  Divider,
   IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
+  Paper,
   Slider,
   Stack,
+  Switch,
   Toolbar,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { SettingsType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import { UNIT_SYSTEMS, UNIT_SYSTEM_LABELS } from "../../helpers/Units";
 import { THEME_CHOICES, THEME_LABELS } from "../../Theme";
-import KeyboardShortcuts from "../base/KeyboardShortcuts";
-import InstallAppButton, { useIsInstalledApp } from "../base/InstallAppButton";
+import KeyboardShortcuts, { SHORTCUTS } from "../base/KeyboardShortcuts";
+import InstallAppButton, { useCanInstallApp } from "../base/InstallAppButton";
 import packageJson from "../../../package.json";
 import { clearAppCache } from "../../helpers/Cache";
 
@@ -49,52 +51,136 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-interface SettingsSectionProps {
+interface SettingsGroupProps {
   id: string;
   title: string;
   children: React.ReactNode;
 }
 
-function SettingsSection({
+function SettingsGroup({
   id,
   title,
   children,
-}: SettingsSectionProps): React.JSX.Element {
+}: SettingsGroupProps): React.JSX.Element {
   return (
-    <Box
-      component="section"
-      className="settingsSection"
-      aria-labelledby={id}
-      sx={{
-        display: "grid",
-        gridTemplateColumns: {
-          xs: "88px minmax(0, 1fr)",
-          sm: "160px minmax(0, 1fr)",
-        },
-        gap: { xs: 1.5, sm: 2 },
-        alignItems: "start",
-        py: 1.25,
-        borderBottom: 1,
-        borderColor: "divider",
-      }}
-    >
+    <Box component="section" className="settingsGroup" aria-labelledby={id}>
       <Typography
         id={id}
         component="h2"
-        variant="subtitle2"
-        sx={{ pt: 0.75, fontWeight: 700 }}
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block", mb: 0.75, px: 0.5, fontWeight: 700 }}
       >
         {title}
       </Typography>
-      <Stack spacing={0.75} sx={{ alignItems: "flex-start", minWidth: 0 }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden" }}>
         {children}
-      </Stack>
+      </Paper>
+    </Box>
+  );
+}
+
+interface SettingRowProps {
+  label: string;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+  stackOnMobile?: boolean;
+}
+
+function SettingRow({
+  label,
+  description,
+  children,
+  stackOnMobile = false,
+}: SettingRowProps): React.JSX.Element {
+  return (
+    <Box
+      className="settingsRow"
+      sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: stackOnMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
+          sm: "minmax(180px, 1fr) minmax(260px, auto)",
+        },
+        alignItems: "center",
+        gap: { xs: stackOnMobile ? 1.5 : 1, sm: 3 },
+        minHeight: 56,
+        px: 2,
+        py: 1.5,
+      }}
+    >
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 600 }}>{label}</Typography>
+        {description && (
+          <Typography
+            component="div"
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 0.25, lineHeight: 1.45 }}
+          >
+            {description}
+          </Typography>
+        )}
+      </Box>
+      <Box
+        sx={{
+          minWidth: 0,
+          width: stackOnMobile ? "100%" : "auto",
+          justifySelf: { xs: stackOnMobile ? "stretch" : "end", sm: "end" },
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+function VolumeSlider(props: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}): React.JSX.Element {
+  const value = Math.round(props.value * 100);
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "64px minmax(0, 1fr) 42px",
+          sm: "140px minmax(0, 1fr) 46px",
+        },
+        alignItems: "center",
+        gap: 1.5,
+        minHeight: 48,
+        px: 2,
+      }}
+    >
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        {props.label}
+      </Typography>
+      <Slider
+        aria-label={`${props.label} volume`}
+        getAriaValueText={(sliderValue: number) => `${sliderValue} percent`}
+        value={value}
+        onChange={(_e: Event, sliderValue: number | number[]) =>
+          props.onChange((sliderValue as number) / 100)
+        }
+        sx={{ width: "100% !important" }}
+      />
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        aria-hidden="true"
+        sx={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+      >
+        {value}%
+      </Typography>
     </Box>
   );
 }
 
 export default function Settings(props: Props): React.JSX.Element {
-  const installedApp = useIsInstalledApp();
+  const canInstallApp = useCanInstallApp();
   // The file picker is driven by the Import button rather than wrapping it, so that both buttons
   // are plainly buttons and the disabled Export one behaves like one
   const fileInput = React.useRef<HTMLInputElement>(null);
@@ -119,17 +205,27 @@ export default function Settings(props: Props): React.JSX.Element {
   return (
     <div className="flexContainer" id="gameCard">
       <div id="topbar">
-        <Toolbar>
+        <Toolbar
+          sx={{ position: "relative", borderBottom: 1, borderColor: "divider" }}
+        >
           <IconButton
             onClick={onBack}
-            aria-label="back"
+            aria-label="Back"
             edge="start"
             color="primary"
             size="large"
           >
             <ChevronLeftIcon />
           </IconButton>
-          <Typography component="h1" variant="h6">
+          <Typography
+            component="h1"
+            variant="h6"
+            sx={{
+              position: { xs: "absolute", sm: "static" },
+              left: { xs: "50%", sm: "auto" },
+              transform: { xs: "translateX(-50%)", sm: "none" },
+            }}
+          >
             Settings
           </Typography>
         </Toolbar>
@@ -138,247 +234,300 @@ export default function Settings(props: Props): React.JSX.Element {
         className="scrollable"
         sx={{
           width: "100%",
-          maxWidth: 720,
-          mx: "auto",
-          px: { xs: 2, sm: 3 },
-          py: 0.5,
           boxSizing: "border-box",
           overflowY: "auto",
+          backgroundColor: "var(--bg-sunken)",
         }}
       >
-        <Stack spacing={0}>
-          <SettingsSection id="sound-settings" title="Sound">
-            <FormControlLabel
-              control={
-                <Checkbox
+        <Stack
+          spacing={2.5}
+          sx={{
+            width: "100%",
+            maxWidth: 760,
+            mx: "auto",
+            px: { xs: 2, sm: 3 },
+            pt: { xs: 2, sm: 3 },
+            pb: "max(24px, env(safe-area-inset-bottom))",
+            boxSizing: "border-box",
+          }}
+        >
+          <SettingsGroup id="preferences-settings" title="Preferences">
+            <Stack divider={<Divider flexItem />}>
+              <SettingRow
+                label="Appearance"
+                description={
+                  props.settings.theme === "system"
+                    ? "Uses your device setting."
+                    : undefined
+                }
+                stackOnMobile
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={props.settings.theme}
+                  aria-label="Appearance"
+                  onChange={(
+                    _e: React.MouseEvent<HTMLElement>,
+                    value: ThemeChoiceType | null,
+                  ) => value && props.onThemeChange(value)}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    "& .MuiToggleButton-root": {
+                      flex: { xs: 1, sm: "0 0 auto" },
+                      minWidth: { sm: 76 },
+                      px: { xs: 1, sm: 1.5 },
+                      textTransform: "none",
+                    },
+                  }}
+                >
+                  {THEME_CHOICES.map((choice: ThemeChoiceType) => (
+                    <ToggleButton value={choice} key={choice}>
+                      {choice === "system" ? "System" : THEME_LABELS[choice]}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </SettingRow>
+
+              <SettingRow label="Sound" description="Music and effects">
+                <Switch
                   color="primary"
                   id="sound"
+                  slotProps={{ input: { "aria-label": "Sound" } }}
                   checked={!!props.settings.audioEnabled}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     props.onAudioChange(e.target.checked)
                   }
                 />
-              }
-              label={
-                props.settings.audioEnabled
-                  ? "Music and sound effects enabled"
-                  : "Music and sound effects disabled"
-              }
-            />
-            {!!props.settings.audioEnabled && (
-              <Box sx={{ width: "100%", maxWidth: 360, px: 1 }}>
-                <Typography id="music-volume-label" variant="body2">
-                  Music volume: {Math.round(props.settings.musicVolume * 100)}%
-                </Typography>
-                <Slider
-                  aria-labelledby="music-volume-label"
-                  value={Math.round(props.settings.musicVolume * 100)}
-                  onChange={(_e: Event, value: number | number[]) =>
-                    props.onMusicVolumeChange((value as number) / 100)
-                  }
-                />
-                <Typography id="effects-volume-label" variant="body2">
-                  Sound effects volume:{" "}
-                  {Math.round(props.settings.soundEffectsVolume * 100)}%
-                </Typography>
-                <Slider
-                  aria-labelledby="effects-volume-label"
-                  value={Math.round(props.settings.soundEffectsVolume * 100)}
-                  onChange={(_e: Event, value: number | number[]) =>
-                    props.onSoundEffectsVolumeChange((value as number) / 100)
-                  }
-                />
-              </Box>
-            )}
-          </SettingsSection>
+              </SettingRow>
 
-          <SettingsSection id="account-settings" title="Account">
-            <Typography variant="body2" color="textSecondary">
-              {props.loggedIn
-                ? props.displayName
-                  ? `On the leaderboard as ${props.displayName}.`
-                  : "You're logged in, but haven't picked a leaderboard name yet."
-                : "Optional: sign in with Google to put a public display name and score on the leaderboard."}
-            </Typography>
-            <Stack
-              direction="row"
-              spacing={1}
-              useFlexGap
-              sx={{ flexWrap: "wrap" }}
+              {!!props.settings.audioEnabled && (
+                <Box>
+                  <VolumeSlider
+                    label="Music"
+                    value={props.settings.musicVolume}
+                    onChange={props.onMusicVolumeChange}
+                  />
+                  <VolumeSlider
+                    label="Effects"
+                    value={props.settings.soundEffectsVolume}
+                    onChange={props.onSoundEffectsVolumeChange}
+                  />
+                </Box>
+              )}
+
+              <SettingRow
+                label="Units"
+                description={
+                  props.settings.units === "imperial"
+                    ? "°F · mph · lb · tons"
+                    : "°C · km/h · kg · tonnes"
+                }
+                stackOnMobile
+              >
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={props.settings.units}
+                  aria-label="Units"
+                  onChange={(
+                    _e: React.MouseEvent<HTMLElement>,
+                    value: UnitSystemType | null,
+                  ) => value && props.onUnitsChange(value)}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    "& .MuiToggleButton-root": {
+                      flex: { xs: 1, sm: "0 0 auto" },
+                      minWidth: { sm: 112 },
+                      textTransform: "none",
+                    },
+                  }}
+                >
+                  {UNIT_SYSTEMS.map((system: UnitSystemType) => (
+                    <ToggleButton value={system} key={system}>
+                      {UNIT_SYSTEM_LABELS[system]}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </SettingRow>
+            </Stack>
+          </SettingsGroup>
+
+          <SettingsGroup id="leaderboard-settings" title="Leaderboard">
+            <SettingRow
+              label={props.loggedIn ? "Leaderboard name" : "Public profile"}
+              description={
+                props.loggedIn
+                  ? props.displayName
+                    ? props.displayName
+                    : "Choose a name to appear with your scores."
+                  : "Sign in to add a public name and score to the leaderboard."
+              }
+              stackOnMobile
             >
-              {props.loggedIn ? (
-                <>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={props.onChangeName}
-                  >
-                    {props.displayName ? "Change name" : "Pick a name"}
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{
+                  width: { xs: "100%", sm: "auto" },
+                  flexWrap: "wrap",
+                  "& .MuiButton-root": {
+                    flex: { xs: "1 1 140px", sm: "0 0 auto" },
+                  },
+                }}
+              >
+                {props.loggedIn ? (
+                  <>
+                    <Button variant="outlined" onClick={props.onChangeName}>
+                      {props.displayName ? "Edit name" : "Choose a name"}
+                    </Button>
+                    <Button variant="text" onClick={props.onLogout}>
+                      Sign out
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outlined" onClick={props.onLogin}>
+                    Sign in with Google
                   </Button>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={props.onLogout}
-                  >
-                    Log out
-                  </Button>
-                </>
-              ) : (
+                )}
+              </Stack>
+            </SettingRow>
+          </SettingsGroup>
+
+          <SettingsGroup id="saved-game-settings" title="Game data">
+            <SettingRow
+              label="Saved game"
+              description={
+                props.savedGame
+                  ? `Export “${props.savedGame}” to keep or share. Importing replaces your current save.`
+                  : "Start a game to enable export. You can still import a shared save."
+              }
+              stackOnMobile
+            >
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{
+                  width: { xs: "100%", sm: "auto" },
+                  flexWrap: "wrap",
+                  "& .MuiButton-root": {
+                    flex: { xs: "1 1 120px", sm: "0 0 auto" },
+                  },
+                }}
+              >
                 <Button
                   variant="outlined"
-                  color="primary"
-                  onClick={props.onLogin}
+                  disabled={!props.savedGame}
+                  onClick={props.onExportSave}
                 >
-                  Sign in with Google
+                  Export save
                 </Button>
-              )}
-            </Stack>
-          </SettingsSection>
+                <Button
+                  variant="outlined"
+                  onClick={() => fileInput.current?.click()}
+                >
+                  Import save
+                </Button>
+              </Stack>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                aria-label="Save game file"
+                onChange={onFileChosen}
+              />
+            </SettingRow>
+          </SettingsGroup>
 
-          <SettingsSection id="units-settings" title="Units">
-            <FormControl fullWidth>
-              <InputLabel id="units-label">Measurement system</InputLabel>
-              <Select
-                labelId="units-label"
-                id="units"
-                label="Measurement system"
-                value={props.settings.units}
-                onChange={(e: SelectChangeEvent<UnitSystemType>) =>
-                  props.onUnitsChange(e.target.value as UnitSystemType)
-                }
+          {canInstallApp && (
+            <SettingsGroup id="app-settings" title="Install Electrify">
+              <SettingRow
+                label="Install app"
+                description="Play full screen and offline."
               >
-                {UNIT_SYSTEMS.map((system: UnitSystemType) => (
-                  <MenuItem value={system} key={system}>
-                    {UNIT_SYSTEM_LABELS[system]}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Typography variant="body2" color="textSecondary">
-              {props.settings.units === "imperial"
-                ? "Temperatures in °F, wind in mph, emissions in pounds and tons."
-                : "Temperatures in °C, wind in km/h, emissions in kilograms and tonnes."}
-            </Typography>
-          </SettingsSection>
-
-          <SettingsSection id="appearance-settings" title="Appearance">
-            <FormControl fullWidth>
-              <InputLabel id="theme-label">Color theme</InputLabel>
-              <Select
-                labelId="theme-label"
-                id="theme"
-                label="Color theme"
-                value={props.settings.theme}
-                onChange={(e: SelectChangeEvent<ThemeChoiceType>) =>
-                  props.onThemeChange(e.target.value as ThemeChoiceType)
-                }
-              >
-                {THEME_CHOICES.map((choice: ThemeChoiceType) => (
-                  <MenuItem value={choice} key={choice}>
-                    {THEME_LABELS[choice]}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Typography variant="body2" color="textSecondary">
-              {props.settings.theme === "system"
-                ? "Follows whatever your device is set to, and changes with it."
-                : "Sessions run long; the charts are drawn for both."}
-            </Typography>
-          </SettingsSection>
-
-          {!installedApp && (
-            <SettingsSection id="app-settings" title="App">
-              <InstallAppButton />
-              <Typography variant="body2" color="textSecondary">
-                Install availability depends on your browser. Once installed,
-                Electrify opens like an app and caches every location for
-                offline play.
-              </Typography>
-            </SettingsSection>
+                <InstallAppButton label="Install" />
+              </SettingRow>
+            </SettingsGroup>
           )}
 
-          <SettingsSection id="saved-game-settings" title="Saved Game">
-            <Stack
-              direction="row"
-              spacing={1}
-              useFlexGap
-              sx={{ flexWrap: "wrap" }}
+          <SettingsGroup id="keyboard-settings" title="Keyboard shortcuts">
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{
+                "&::before": { display: "none" },
+                backgroundColor: "transparent",
+              }}
             >
-              <Button
-                variant="outlined"
-                color="primary"
-                disabled={!props.savedGame}
-                onClick={props.onExportSave}
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls="keyboard-shortcuts-content"
+                id="keyboard-shortcuts-summary"
+                sx={{ minHeight: 56, px: 2 }}
               >
-                Export
-              </Button>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => fileInput.current?.click()}
+                <Box>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    Keys for faster play
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    View {SHORTCUTS.length} shortcuts
+                  </Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails
+                id="keyboard-shortcuts-content"
+                sx={{ px: 2, pt: 0 }}
               >
-                Import
-              </Button>
-            </Stack>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              style={{ display: "none" }}
-              aria-label="Save game file"
-              onChange={onFileChosen}
-            />
-            <Typography variant="body2" color="textSecondary">
-              {props.savedGame
-                ? `Export downloads your saved game (${props.savedGame}) to keep or share. Importing one replaces it.`
-                : "You need a game in progress to export one - start a game, then come back here. You can still import a save that someone shared with you."}
-            </Typography>
-          </SettingsSection>
-
-          <SettingsSection id="keyboard-settings" title="Keyboard Shortcuts">
-            <KeyboardShortcuts />
-          </SettingsSection>
+                <KeyboardShortcuts />
+              </AccordionDetails>
+            </Accordion>
+          </SettingsGroup>
 
           <Stack
             component="footer"
             direction="row"
-            spacing={2}
+            spacing={0.5}
             useFlexGap
-            sx={{ justifyContent: "center", flexWrap: "wrap", py: 1.5 }}
+            sx={{
+              alignItems: "center",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              color: "text.secondary",
+            }}
           >
-            <Typography variant="caption">
-              Electrify App v{packageJson.version}
+            <Typography variant="caption" sx={{ px: 1 }}>
+              Electrify v{packageJson.version}
             </Typography>
-            <Typography variant="caption">
-              <a
-                href="https://github.com/toddmedema/electrify"
-                target="_blank"
-                rel="noreferrer"
-              >
-                GitHub
-              </a>
-            </Typography>
-            <Typography variant="caption">
-              <a href="/privacy.html">Privacy</a>
-            </Typography>
+            <Button
+              component="a"
+              href="https://github.com/toddmedema/electrify"
+              target="_blank"
+              rel="noreferrer"
+              variant="text"
+              size="small"
+              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
+            >
+              GitHub
+            </Button>
+            <Button
+              component="a"
+              href="/privacy.html"
+              variant="text"
+              size="small"
+              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
+            >
+              Privacy
+            </Button>
             <Button
               variant="text"
               size="small"
               onClick={() => void clearAppCache()}
-              sx={{
-                color: "text.secondary",
-                display: "block",
-                fontSize: "0.75rem",
-                minWidth: 0,
-                mx: "auto",
-                mt: 0.5,
-                opacity: 0.75,
-                px: 0.5,
-                textTransform: "none",
-              }}
+              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
             >
-              Clear cache
+              Clear cached data
             </Button>
           </Stack>
         </Stack>

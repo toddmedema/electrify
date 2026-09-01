@@ -1471,12 +1471,14 @@ html[data-theme="dark"] .uplot {
   border-collapse: collapse;
   text-align: left;
 
-  td {
+  td,
+  th {
     padding: 4px 8px;
+    font-weight: inherit;
     vertical-align: middle;
   }
 
-  td:first-child {
+  th:first-child {
     text-align: right;
     white-space: nowrap;
   }
@@ -2729,20 +2731,6 @@ html[data-theme="dark"] .uplot {
       width: 100%;
       min-width: 0 !important;
       max-width: 100%;
-    }
-  }
-
-  .settingsSection {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 4px !important;
-
-    .shortcuts {
-      width: 100%;
-      margin: 0;
-
-      td {
-        padding: 4px;
-      }
     }
   }
 

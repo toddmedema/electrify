@@ -38,14 +38,15 @@ export const SHORTCUTS_SEARCH_TEXT = SHORTCUTS.map(
 export default function KeyboardShortcuts(): React.JSX.Element {
   return (
     <table className="shortcuts">
+      <caption className="srOnly">Keyboard shortcuts</caption>
       <tbody>
         {SHORTCUTS.map((shortcut: ShortcutType) => (
           <tr key={shortcut.description}>
-            <td>
+            <th scope="row">
               {shortcut.keys.map((key: string) => (
                 <kbd key={key}>{key}</kbd>
               ))}
-            </td>
+            </th>
             <td>{shortcut.description}</td>
           </tr>
         ))}
