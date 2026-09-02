@@ -351,7 +351,7 @@ export function GameAppBar(props: Props) {
       >
         <div className="gridHealthSummary">
           <span className="gridHealthState">
-            <span aria-hidden="true">
+            <span className="gridHealthIcon" aria-hidden="true">
               <ConceptIcon
                 concept={
                   inBlackout

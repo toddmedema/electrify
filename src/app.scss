@@ -699,6 +699,13 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 
+// Remove the inline SVG's baseline space so its visual center matches the adjacent label.
+.gridHealthIcon {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
 .gridHealthMetric {
   min-width: 8.5rem;
   text-align: left;
