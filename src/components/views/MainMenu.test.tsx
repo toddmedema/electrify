@@ -39,14 +39,14 @@ describe("MainMenu", () => {
 
   it("only advertises account-free play before sign-in", () => {
     const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
-    const signInOptions = screen.getByRole("group", {
-      name: "Sign-in options",
+    const accountActions = screen.getByRole("region", {
+      name: "Account actions",
     });
     expect(
-      within(signInOptions).getByRole("button", { name: "Sign in" }),
+      within(accountActions).getByRole("button", { name: "Sign in" }),
     ).toBeInTheDocument();
     expect(
-      within(signInOptions).getByText("Free · no sign-up needed"),
+      within(accountActions).getByText("Free · no sign-up needed"),
     ).toBeInTheDocument();
 
     rerender(<MainMenu {...props({ uid: "player" })} />);
@@ -93,6 +93,9 @@ describe("MainMenu", () => {
 
     expect(primary).toHaveStyle({ flexDirection: "column" });
     expect(resources).toHaveStyle({ flexDirection: "row", gap: "6px" });
+    expect(
+      within(resources).queryByRole("button", { name: "Sign in" }),
+    ).not.toBeInTheDocument();
     expect(discovery).toHaveStyle({ flexDirection: "row", gap: "6px" });
   });
 

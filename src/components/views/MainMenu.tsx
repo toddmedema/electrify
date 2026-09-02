@@ -109,24 +109,24 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             Settings
           </Button>
-          {!props.uid && (
-            <Stack
-              role="group"
-              aria-label="Sign-in options"
-              spacing={0}
-              sx={{ alignItems: "center" }}
-            >
-              <Button variant="text" color="primary" onClick={login}>
-                Sign in
-              </Button>
-              {!props.hasSavedGame && (
-                <Typography variant="caption">
-                  Free · no sign-up needed
-                </Typography>
-              )}
-            </Stack>
-          )}
         </Stack>
+        {!props.uid && (
+          <Stack
+            component="section"
+            aria-label="Account actions"
+            className="accountActions"
+            spacing={0}
+          >
+            <Button variant="text" color="primary" onClick={login}>
+              Sign in
+            </Button>
+            {!props.hasSavedGame && (
+              <Typography variant="caption" color="text.secondary">
+                Free · no sign-up needed
+              </Typography>
+            )}
+          </Stack>
+        )}
         <Stack
           component="section"
           aria-label="Discovery actions"
