@@ -653,22 +653,30 @@ $topbar_height: 56px;
 // Never squeezed by whatever is below it, on either layout
 #appbar {
   flex: 0 0 auto;
+  position: relative;
 }
 
 .gridHealth {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 18px;
-  padding: 0 max(12px, env(safe-area-inset-left));
+  gap: 12px;
+  min-height: 32px;
+  padding: 0 max(12px, env(safe-area-inset-right)) 0
+    max(12px, env(safe-area-inset-left));
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-raised);
   color: $font_color_primary;
-  font-size: 0.7rem;
-  line-height: 18px;
+  font-size: 0.75rem;
+  line-height: 1.25;
   text-align: center;
+
+  &.gridHealth-low-reserve,
+  &.gridHealth-at-limit {
+    border-color: var(--mark-bg);
+    background: var(--mark-bg);
+  }
 
   &.gridHealth-blackout {
     background: var(--blackout-tint);
@@ -676,9 +684,82 @@ $topbar_height: 56px;
   }
 }
 
-@media screen and (max-width: 420px) {
+.gridHealthSummary,
+.gridHealthState {
+  display: flex;
+  align-items: center;
+}
+
+.gridHealthSummary {
+  gap: 8px;
+}
+
+.gridHealthState {
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.gridHealthMetric {
+  min-width: 8.5rem;
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.gridHealth-stable .conceptIcon {
+  color: $interactive_blue;
+}
+
+// On a wide layout, the routine state belongs to the toolbar rather than consuming another
+// horizontal strip. Actionable states deliberately break out into a banner below it.
+@media screen and (min-width: $pane_breakpoint) {
+  .gridHealth-stable {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 13px);
+    left: 50%;
+    z-index: 1;
+    min-height: 30px;
+    padding: 0 10px;
+    transform: translateX(-50%);
+    border: 1px solid var(--border-selected);
+    border-radius: 999px;
+    background: var(--bg-selected);
+    color: $interactive_blue;
+
+    .gridHealthMetric {
+      min-width: 7.75rem;
+    }
+  }
+}
+
+// Phones and narrow tablets keep the readout in its own intentional row: state on the left,
+// operational cushion on the right. Emergency guidance gets the row to itself.
+@media screen and (max-width: ($pane_breakpoint - 1px)) {
   .gridHealth {
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+
+    .gridHealthSummary {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      width: 100%;
+    }
+
+    .gridHealthSeparator {
+      display: none;
+    }
+
+    .gridHealthMetric {
+      min-width: 0;
+      text-align: right;
+    }
+
+    .gridHealthAdvice {
+      width: 100%;
+      text-align: left;
+    }
   }
 }
 
