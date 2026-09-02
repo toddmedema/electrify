@@ -717,10 +717,12 @@ $topbar_height: 56px;
   color: $interactive_blue;
 }
 
-// On a wide layout, the routine state belongs to the toolbar rather than consuming another
-// horizontal strip. Actionable states deliberately break out into a banner below it.
+// On a wide layout, stable and low reserve share one fixed chip in the toolbar, so crossing the
+// warning threshold changes emphasis without shifting the game beneath it. More severe states
+// still break out into a banner below the toolbar.
 @media screen and (min-width: $pane_breakpoint) {
-  .gridHealth-stable {
+  .gridHealth-stable,
+  .gridHealth-low-reserve {
     position: absolute;
     top: calc(env(safe-area-inset-top) + 13px);
     left: 50%;
@@ -728,14 +730,23 @@ $topbar_height: 56px;
     min-height: 30px;
     padding: 0 10px;
     transform: translateX(-50%);
-    border: 1px solid var(--border-selected);
     border-radius: 999px;
-    background: var(--bg-selected);
-    color: $interactive_blue;
 
     .gridHealthMetric {
       min-width: 7.75rem;
     }
+  }
+
+  .gridHealth-stable {
+    border: 1px solid var(--border-selected);
+    background: var(--bg-selected);
+    color: $interactive_blue;
+  }
+
+  .gridHealth-low-reserve {
+    border: 1px solid var(--mark-bg);
+    background: var(--mark-bg);
+    color: $font_color_primary;
   }
 }
 
@@ -2100,6 +2111,54 @@ html[data-theme="dark"] .uplot {
 
     tr {
       height: 60px;
+    }
+  }
+
+  .customSetupColumns {
+    width: 100%;
+    max-width: 960px;
+    margin: 8px auto 0;
+
+    > section {
+      min-width: 0;
+    }
+  }
+
+  .customSetupSectionHeading {
+    margin: 0;
+    padding: 8px;
+  }
+
+  .customSetupActions {
+    padding: 12px;
+    text-align: center;
+  }
+
+  @media screen and (min-width: $pane_breakpoint) {
+    .customSetupColumns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      gap: 24px;
+      width: calc(100% - 32px);
+    }
+
+    .customSetupSettings #gameSetupTable {
+      width: 100%;
+      margin: 0;
+    }
+
+    .customSetupFacilities {
+      .build-list-item {
+        margin-right: 0;
+        margin-left: 0;
+      }
+
+      .customFacilityPicker {
+        justify-content: flex-start;
+        padding-right: 0;
+        padding-left: 0;
+      }
     }
   }
 

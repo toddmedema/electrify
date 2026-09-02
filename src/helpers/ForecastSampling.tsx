@@ -2,10 +2,9 @@ import { FuelNameType, TickPresentFutureType } from "../Types";
 
 /**
  * Keeps regularly spaced forecast points plus the fuel-mix point that differs most from a
- * straight line between each pair. A periodic-only sample can completely skip a short event --
- * notably the solar eclipse between the 08:00 and 12:00 points -- even though the simulation
- * modeled it. One extra point per interval preserves those meaningful shapes without handing
- * every chart the full forecast timeline.
+ * straight line between each pair. A periodic-only sample can completely skip a short event even
+ * though the simulation modeled it. One extra point per interval preserves those meaningful
+ * shapes without handing every chart the full forecast timeline.
  */
 export function sampleForecastTimeline(
   timeline: TickPresentFutureType[],

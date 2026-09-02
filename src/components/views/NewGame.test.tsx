@@ -125,7 +125,7 @@ describe("NewGame", () => {
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Data Center Boom"),
       expect.stringContaining("Carbon Fee"),
-      expect.stringContaining("Solar Eclipse"),
+      expect.stringContaining("Sudden Nuclear Shutdown"),
     ]);
   });
 

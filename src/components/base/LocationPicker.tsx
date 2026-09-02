@@ -286,7 +286,7 @@ export default function LocationPicker({
   const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (
       event.button !== 0 ||
-      (event.target as Element).closest(".worldMapControls")
+      (event.target as Element).closest(".worldMapControls, .worldMapMarker")
     ) {
       return;
     }

@@ -51,7 +51,6 @@ import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import {
   combineStoryEffects,
   resolveStoryAtDate,
-  solarEclipseOutputMultiplier,
   STORY_ARC_DEFINITIONS,
 } from "../data/WorldEvents";
 import { getWeather, getRawSolarIrradianceWM2 } from "../data/Weather";
@@ -1784,13 +1783,11 @@ function reforecastWeatherAndPrices(
       const forecast = {
         ...t,
         ...fuelPrices,
-        // Keep the forecast weather series aligned with dispatch. An eclipse physically reduces
-        // the irradiance available to solar generators, so recording the effective irradiance
-        // here lets renewable-output charts and build estimates show the same known event without
-        // applying the loss a second time in the supply pass.
-        solarIrradianceWM2:
-          getRawSolarIrradianceWM2(date, state.location, weather.CLOUD_PCT) *
-          solarEclipseOutputMultiplier(effects, date.minuteOfDay),
+        solarIrradianceWM2: getRawSolarIrradianceWM2(
+          date,
+          state.location,
+          weather.CLOUD_PCT,
+        ),
         windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
         windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),

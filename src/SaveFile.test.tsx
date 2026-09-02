@@ -1,5 +1,5 @@
 import { LOCATIONS } from "./Constants";
-import { CUSTOM_SCENARIO_ID } from "./data/Scenarios";
+import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import {
   describeSave,
   downloadSave,
@@ -9,7 +9,7 @@ import {
   saveFilename,
 } from "./SaveFile";
 import { clearSave, SAVE_VERSION, serializeSave, writeSave } from "./SaveGame";
-import { GameType } from "./Types";
+import { GameType, ScenarioType } from "./Types";
 
 // Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
 // crash on, not the whole of GameType, and building a real game here would cost a minute of setup
@@ -140,6 +140,43 @@ describe("SaveFile", () => {
       const exported = resumableSave()!.save;
       const { save } = await readSaveFile(saveFile(exported));
       expect(save).toEqual(exported);
+    });
+
+    it("round trips every custom setup choice through export and import", async () => {
+      const customScenario: ScenarioType = {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: LOCATIONS.HNL.id,
+        location: LOCATIONS.HNL,
+        ownership: "Public",
+        startingYear: 2080,
+        cash: 1_700_000_000,
+        startingCustomers: 2_350_000,
+        dollarsPerkWh: 0.42,
+        durationMonths: 60 * 12,
+        feePerKgCO2e: 0.31,
+        seed: 8675309,
+        facilities: [
+          { name: "Offshore Wind", peakW: 500_000_000 },
+          { name: "Battery", peakWh: 1_000_000_000 },
+        ],
+      };
+      writeSave(
+        fakeGame({
+          scenarioId: CUSTOM_SCENARIO_ID,
+          customScenario,
+          location: customScenario.location!,
+          startingYear: customScenario.startingYear,
+          seed: customScenario.seed!,
+          difficulty: "CEO",
+        }),
+      );
+
+      const exported = resumableSave()!.save;
+      const { save, error } = await readSaveFile(saveFile(exported));
+
+      expect(error).toBeUndefined();
+      expect(save?.game.difficulty).toBe("CEO");
+      expect(save?.game.customScenario).toEqual(customScenario);
     });
 
     it("rejects a file that isn't JSON", async () => {

@@ -289,14 +289,12 @@ describe("authored starting fleets", () => {
       ["Data Center Boom", "Natural Gas"],
       ["Deep Freeze", "Natural Gas"],
       ["Heatwave + Drought", "Hydro"],
-      ["Solar Eclipse", "Sun"],
       ["Sudden Nuclear Shutdown", "Uranium"],
     ]);
   });
 
-  it("authors three distinct generation and storage resilience challenges", () => {
+  it("authors distinct heatwave and generation-loss resilience challenges", () => {
     const heatwave = getScenario(108)!;
-    const eclipse = getScenario(109)!;
     const trip = getScenario(110)!;
 
     expect(heatwave.reliabilityObjective).toMatchObject({
@@ -316,25 +314,6 @@ describe("authored starting fleets", () => {
     ).toEqual(
       expect.arrayContaining(["Uranium", "Hydro", "Sun", "Wind", "Battery"]),
     );
-    expect(eclipse).toMatchObject({
-      name: "Solar Eclipse",
-      locationId: "Beijing",
-      startingYear: 2033,
-      durationMonths: 33,
-      startingDemandScale: 1.11,
-      icon: "solar-eclipse",
-      reliabilityObjective: { year: 2035, month: 9 },
-    });
-    expect(
-      eclipse.facilities.find((facility) => facility.name === "Battery")
-        ?.peakWh,
-    ).toBe(240_000_000);
-    expect(
-      eclipse.facilities.find((facility) => facility.fuel === "Coal")?.peakW,
-    ).toBe(685_830_000);
-    expect(
-      eclipse.facilities.some((facility) => facility.fuel === "Uranium"),
-    ).toBe(false);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,
@@ -353,14 +332,13 @@ describe("authored starting fleets", () => {
 
   it("keeps locations in scenario metadata rather than scenario names", () => {
     expect(
-      [107, 108, 109, 110].map((id) => ({
+      [107, 108, 110].map((id) => ({
         name: getScenario(id)!.name,
         location: getScenario(id)!.location?.name,
       })),
     ).toEqual([
       { name: "Deep Freeze", location: "Austin, TX" },
       { name: "Heatwave + Drought", location: "Madrid, Spain" },
-      { name: "Solar Eclipse", location: "Beijing, China" },
       { name: "Sudden Nuclear Shutdown", location: "Paris, France" },
     ]);
   });

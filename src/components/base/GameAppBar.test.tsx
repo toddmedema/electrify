@@ -93,6 +93,10 @@ describe("GameAppBar", () => {
       label: "Low reserve",
       metric: expect.stringMatching(/reserve \(5%\)/),
     });
+    renderAppBar({ game: { ...lowReserveGame, inGame: true } });
+    expect(
+      screen.getByLabelText(/Current grid status: Low reserve/),
+    ).toHaveTextContent("Low reserve");
   });
 
   it("distinguishes an exhausted reserve from a blackout", () => {

@@ -696,13 +696,6 @@ export interface WorldEventEffectsType {
   demandMultiplier?: number;
   /** Multiplies modeled watershed inflow before it reaches a hydro reservoir. */
   hydroRunoffMultiplier?: number;
-  /** Intraday solar reduction used for a predictable eclipse profile. */
-  solarEclipse?: {
-    startsMinuteOfDay: number;
-    totalityMinuteOfDay: number;
-    endsMinuteOfDay: number;
-    minimumOutputMultiplier: number;
-  };
   // An override rather than a multiplier. Content validation rejects overlapping policy phases.
   carbonFeePerKgCO2e?: number;
   buildCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;

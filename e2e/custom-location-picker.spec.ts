@@ -34,10 +34,16 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await expect(map).toBeVisible();
   await expect(selectedSanFrancisco).toHaveAttribute("aria-pressed", "true");
 
-  await page
-    .getByRole("button", { name: "Select Honolulu, HI, United States" })
-    .click();
-  await expect(search).toHaveValue("Honolulu, HI");
+  const alternateMarker = map
+    .locator(".worldMapMarker.marker:not(.selected)")
+    .first();
+  const alternateMarkerLabel = await alternateMarker.getAttribute("aria-label");
+  expect(alternateMarkerLabel).not.toBeNull();
+  await alternateMarker.click();
+  await expect(
+    page.getByRole("button", { name: alternateMarkerLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue("San Francisco, CA");
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await expect(search).toHaveValue("San Francisco, CA");
@@ -61,8 +67,6 @@ test("world map location picker works with pointer, touch, search, and keyboard"
     () => document.activeElement?.getAttribute("aria-label") || "",
   );
   expect(focusedLabel).not.toBe("Select San Francisco, CA, United States");
-  await page.keyboard.press("Enter");
-  await expect(search).toHaveValue("Honolulu, HI");
 
   await expect(page.locator(".locationPickerCount")).toHaveText(
     /\d+ playable locations/,
@@ -103,6 +107,66 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   }
 });
 
+test("a city marker still selects after the map has zoomed", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop"));
+  await openCustomSetup(page);
+
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await expect(page.locator(".locationPickerCount")).toHaveText(
+    /\d{3} playable locations/,
+  );
+  const map = page.getByRole("group", { name: "Playable locations map" });
+  const startingSelection = await search.inputValue();
+  await map.locator(".worldMapMarker.cluster").first().click();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+  const zoomedMarker = map
+    .locator(".worldMapMarker.marker:not(.selected)")
+    .first();
+  const zoomedMarkerLabel = await zoomedMarker.getAttribute("aria-label");
+  expect(zoomedMarkerLabel).not.toBeNull();
+  await zoomedMarker.click();
+
+  await expect(
+    page.getByRole("button", { name: zoomedMarkerLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue(startingSelection);
+});
+
+test("custom setup uses side-by-side settings and facilities only at desktop widths", async ({
+  page,
+}, testInfo) => {
+  await openCustomSetup(page);
+  // Measure the settled setup, not its translated position during the outgoing card transition.
+  await expect(page.getByRole("list", { name: "Available games" })).toHaveCount(
+    0,
+  );
+
+  const settings = page.getByRole("region", { name: "Game setup" });
+  const facilities = page.getByRole("region", { name: "Facilities" });
+  const settingsBox = await settings.boundingBox();
+  const facilitiesBox = await facilities.boundingBox();
+  expect(settingsBox).not.toBeNull();
+  expect(facilitiesBox).not.toBeNull();
+
+  if (testInfo.project.name.startsWith("desktop")) {
+    expect(Math.abs(settingsBox!.y - facilitiesBox!.y)).toBeLessThanOrEqual(1);
+    expect(settingsBox!.x + settingsBox!.width).toBeLessThan(facilitiesBox!.x);
+  } else {
+    expect(facilitiesBox!.y).toBeGreaterThanOrEqual(
+      settingsBox!.y + settingsBox!.height,
+    );
+  }
+
+  const overflow = await page
+    .locator(".scrollable")
+    .evaluate((element) =>
+      Math.max(0, element.scrollWidth - element.clientWidth),
+    );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test("keyboard navigation retains one map stop and honors activation and zoom bounds", async ({
   page,
 }) => {
@@ -113,24 +177,39 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   const sanFrancisco = page.getByRole("button", {
     name: "Select San Francisco, CA, United States",
   });
-  const honolulu = page.getByRole("button", {
-    name: "Select Honolulu, HI, United States",
-  });
 
+  await expect(page.locator(".locationPickerCount")).toHaveText(
+    /\d{3} playable locations/,
+  );
   await sanFrancisco.focus();
   await sanFrancisco.press("ArrowLeft");
-  await expect(honolulu).toBeFocused();
-  await honolulu.press(" ");
-  await expect(search).toHaveValue("Honolulu, HI");
+  await expect(page.locator(":focus")).toHaveClass(/worldMapMarker/);
+  const spaceMarker = map
+    .locator(".worldMapMarker.marker:not(.selected)")
+    .first();
+  const spaceMarkerLabel = await spaceMarker.getAttribute("aria-label");
+  expect(spaceMarkerLabel).not.toBeNull();
+  await spaceMarker.focus();
+  await spaceMarker.press(" ");
+  await expect(
+    page.getByRole("button", { name: spaceMarkerLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue("San Francisco, CA");
 
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await page.getByRole("button", { name: "Show world" }).click();
-  await sanFrancisco.focus();
-  await sanFrancisco.press("ArrowLeft");
-  await expect(honolulu).toBeFocused();
-  await honolulu.press("Enter");
-  await expect(search).toHaveValue("Honolulu, HI");
+  const enterMarker = map
+    .locator(".worldMapMarker.marker:not(.selected)")
+    .first();
+  const enterMarkerLabel = await enterMarker.getAttribute("aria-label");
+  expect(enterMarkerLabel).not.toBeNull();
+  await enterMarker.focus();
+  await enterMarker.press("Enter");
+  await expect(
+    page.getByRole("button", { name: enterMarkerLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue("San Francisco, CA");
 
   const cluster = map.locator(".worldMapMarker.cluster").first();
   await cluster.focus();
@@ -211,16 +290,22 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   }
 
   await map.scrollIntoViewIfNeeded();
+  const touchMapBox = await map.boundingBox();
+  expect(touchMapBox).not.toBeNull();
+  // Start over the open ocean in the lower-left. Coarse-pointer marker hit areas deliberately
+  // reach 44px, so the geometric center can belong to a marker on a 320px map.
+  const panStart = {
+    x: Math.round(touchMapBox!.x + 24),
+    y: Math.round(touchMapBox!.y + touchMapBox!.height - 24),
+  };
   const session = await page.context().newCDPSession(page);
-  const panStartX = Math.round(mapBox!.x + mapBox!.width / 2);
-  const panStartY = Math.round(mapBox!.y + mapBox!.height / 2);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: panStartX, y: panStartY }],
+    touchPoints: [panStart],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchMove",
-    touchPoints: [{ x: panStartX - 60, y: panStartY - 30 }],
+    touchPoints: [{ x: panStart.x - 20, y: panStart.y - 20 }],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
@@ -233,20 +318,21 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
 
   await page.getByRole("button", { name: "Show world" }).click();
   const beforePinch = await land.getAttribute("transform");
-  const pinchY = Math.round(mapBox!.y + mapBox!.height / 2);
-  const pinchCenterX = Math.round(mapBox!.x + mapBox!.width / 2);
+  const pinchY = Math.round(touchMapBox!.y + touchMapBox!.height - 20);
+  const pinchLeftX = Math.round(touchMapBox!.x + 25);
+  const pinchRightX = Math.round(touchMapBox!.x + 75);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [
-      { x: pinchCenterX - 40, y: pinchY },
-      { x: pinchCenterX + 40, y: pinchY },
+      { x: pinchLeftX, y: pinchY },
+      { x: pinchRightX, y: pinchY },
     ],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchMove",
     touchPoints: [
-      { x: pinchCenterX - 70, y: pinchY },
-      { x: pinchCenterX + 70, y: pinchY },
+      { x: pinchLeftX - 20, y: pinchY },
+      { x: pinchRightX + 20, y: pinchY },
     ],
   });
   await session.send("Input.dispatchTouchEvent", {

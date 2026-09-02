@@ -32,6 +32,12 @@ it("opens after economic data is loaded and names every setup control", () => {
   expect(
     screen.getByRole("heading", { name: "Custom setup" }),
   ).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Game setup" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Facilities" }),
+  ).toBeInTheDocument();
   [
     "Search playable cities",
     "Starting year",
@@ -130,6 +136,9 @@ it("commits the complete location object when a map marker is selected", () => {
   );
 
   fireEvent.click(screen.getByRole("button", { name: /Select Honolulu, HI/ }));
+  expect(
+    screen.getByRole("combobox", { name: "Search playable cities" }),
+  ).toHaveValue(LOCATIONS.HNL.name);
   fireEvent.click(screen.getByRole("button", { name: "Play" }));
 
   expect(onStart).toHaveBeenCalledWith(
