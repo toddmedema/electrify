@@ -683,7 +683,6 @@ export interface GameEventType {
   importance?: GameEventImportanceType;
   actionTarget?: StoryActionTargetType;
   title?: string;
-  details?: string;
   concept?: ConceptNameType;
   storyPhaseKey?: string;
   turningPointPriority?: number;

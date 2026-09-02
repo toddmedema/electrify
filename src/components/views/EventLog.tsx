@@ -82,7 +82,6 @@ export interface UpcomingStoryEventType {
   label: string;
   title?: string;
   message: string;
-  details?: string;
   concept?: ConceptNameType;
   importance?: GameEventImportanceType;
   actionTarget?: StoryActionTargetType;
@@ -166,16 +165,6 @@ export default function EventLog(props: Props): React.JSX.Element {
                       >
                         {event.message}
                       </Typography>
-                      {event.details && (
-                        <Typography
-                          variant="caption"
-                          color="textSecondary"
-                          component="span"
-                          sx={{ display: "block" }}
-                        >
-                          {event.details}
-                        </Typography>
-                      )}
                     </span>
                   </span>
                   <Typography
@@ -306,16 +295,6 @@ export default function EventLog(props: Props): React.JSX.Element {
                     >
                       {event.message}
                     </Typography>
-                    {event.details && (
-                      <Typography
-                        variant="caption"
-                        color="textSecondary"
-                        component="span"
-                        sx={{ display: "block" }}
-                      >
-                        {event.details}
-                      </Typography>
-                    )}
                   </span>
                 </span>
                 <Typography
