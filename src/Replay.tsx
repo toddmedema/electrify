@@ -28,8 +28,9 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// Initial public schema. Increment this when a post-release change becomes incompatible.
-export const REPLAY_VERSION = 1;
+// Version 2 changes authored starting fleets and their facility IDs, so older action streams can
+// no longer reproduce the run they recorded.
+export const REPLAY_VERSION = 2;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
