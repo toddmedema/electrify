@@ -78,15 +78,15 @@ works.
 ### Add a city to play in
 
 Every location is a single file in `public/data/weather`: hourly readings from 1980 through 2025
-for the twelve days a year the game actually simulates, packed into about 66KB. Whichever cities have been
-downloaded are exactly the ones the custom game screen offers - `public/data/weather/index.json`
-is written by the same script and is what the picker reads.
+for the twelve days a year the game actually simulates, packed into about 66KB, or 80KB with
+offshore wind. Whichever cities have been downloaded are exactly the ones the custom game screen
+offers - `public/data/weather/index.json` is written by the same script and is what the picker reads.
 
 ```sh
 npm run fetch-weather -- --list
 ```
 
-lists the 282 cities in `scripts/cities.json` and marks the ones already downloaded; naming some
+lists the 285 cities in `scripts/cities.json` and marks the ones already downloaded; naming some
 of them fetches them, and naming none fetches everything still missing:
 
 ```sh
@@ -114,6 +114,11 @@ resumed.
 
 To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. An `id` ends up
 in save games and replays, so it can never be changed afterwards; everything else can.
+
+To enable offshore wind for a location, add a representative sea coordinate in its `offshore`
+field. Fetching a location that has no weather file downloads both points. If its onshore weather
+already exists, the fetcher downloads only the offshore history and adds it to the existing binary,
+preserving every established onshore reading.
 
 ### Release checklist
 
