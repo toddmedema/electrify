@@ -109,11 +109,9 @@ describe("NewGame", () => {
       "Extreme weather",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Island grids" }));
-    expect(challengeRows().map((row) => row.textContent)).toEqual([
-      expect.stringContaining("Paradise"),
-      expect.stringContaining("Hurricane Season"),
-    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Energy transition" }));
+    expect(screen.getByTestId("mission-row-105")).toHaveTextContent("Paradise");
+    expect(screen.queryByTestId("mission-row-104")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "For you" }));
     expect(challengeRows()).toHaveLength(3);

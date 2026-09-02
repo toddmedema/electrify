@@ -142,19 +142,14 @@ describe("authored scenario briefings", () => {
     );
   });
 
-  it("uses the four player-facing challenge themes", () => {
+  it("uses the three player-facing challenge themes", () => {
     const themes = new Set(
       SCENARIOS.filter((scenario) => !scenario.tutorialSteps).flatMap(
         (scenario) => scenario.themes ?? [],
       ),
     );
     expect(themes).toEqual(
-      new Set([
-        "Extreme weather",
-        "Energy transition",
-        "Rapid growth",
-        "Island grids",
-      ]),
+      new Set(["Extreme weather", "Energy transition", "Rapid growth"]),
     );
   });
 });

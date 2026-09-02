@@ -564,7 +564,7 @@ export type ScenarioBriefingToneType =
   "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
 
 export type ScenarioThemeType =
-  "Extreme weather" | "Energy transition" | "Rapid growth" | "Island grids";
+  "Extreme weather" | "Energy transition" | "Rapid growth";
 
 /**
  * The authored promise of a scenario, kept beside its simulation setup so the mission list and

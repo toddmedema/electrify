@@ -52,7 +52,6 @@ const CHALLENGE_THEMES: ScenarioThemeType[] = [
   "Extreme weather",
   "Energy transition",
   "Rapid growth",
-  "Island grids",
 ];
 
 function scenarioEndYear(scenario: ScenarioType): number {

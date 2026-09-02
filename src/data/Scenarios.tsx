@@ -720,7 +720,7 @@ export const SCENARIOS = [
     icon: "paradise",
     locationId: "HNL",
     summary: "Power an island where every shipment and outage matters.",
-    themes: ["Island grids"],
+    themes: ["Energy transition"],
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
@@ -770,7 +770,7 @@ export const SCENARIOS = [
     icon: "hurricane season",
     locationId: "SJU",
     summary: "Prepare an island grid for storms and costly fuel.",
-    themes: ["Extreme weather", "Island grids"],
+    themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
