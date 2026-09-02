@@ -81,6 +81,26 @@ describe("a custom game", () => {
     });
   });
 
+  it("preserves the authored dispatch order for starting generators", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        facilities: [
+          { name: "Natural Gas", peakW: 100000000 },
+          { name: "Coal", peakW: 200000000 },
+          { name: "Pumped Hydro", peakWh: 500000000 },
+        ],
+      },
+    });
+
+    expect(state.facilities.map((facility) => facility.name)).toEqual([
+      "Natural Gas",
+      "Coal",
+      "Pumped Hydro",
+    ]);
+  });
+
   it("rounds starting facility capacities to two significant digits", () => {
     const facilities = [
       { name: "Coal", peakW: 722_225_000 },

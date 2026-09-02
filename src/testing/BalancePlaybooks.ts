@@ -13,7 +13,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       peakW: 150000000,
       financed: true,
     },
-    sellFacilityId: 1,
+    sellFacilityId: 2,
     sellAtMonth: 37,
   },
   101: {
@@ -23,7 +23,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       peakW: 300000000,
       financed: true,
     },
-    sellFacilityId: 1,
+    sellFacilityId: 2,
     sellAtMonth: 39,
   },
   102: {
@@ -65,7 +65,7 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       peakW: 300000000,
       financed: true,
     },
-    sellFacilityId: 1,
+    sellFacilityId: 3,
     sellAtMonth: 39,
   },
 };
@@ -91,7 +91,7 @@ export const INTERN_ONE_BUILD_PLAYS: Record<
     initialBuild: { name: "Natural Gas", peakW: 600000000, financed: true },
   },
   104: {
-    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    initialBuild: { name: "Natural Gas", peakW: 500000000, financed: true },
   },
   105: {
     initialBuild: { name: "Natural Gas", peakW: 525000000, financed: true },

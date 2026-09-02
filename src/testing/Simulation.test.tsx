@@ -486,7 +486,7 @@ describe("researched public-utility scenarios", () => {
         difficulty,
         initialBuild: {
           name: "Natural Gas",
-          peakW: 1_000_000_000,
+          peakW: 1_100_000_000,
           financed: true,
         },
       });
@@ -528,14 +528,14 @@ describe("researched public-utility scenarios", () => {
       difficulty: "Manager",
       initialBuild: {
         name: "Natural Gas",
-        peakW: 1_000_000_000,
+        peakW: 1_100_000_000,
         financed: true,
       },
     });
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
-      initialBuild: { name: "Oil", peakW: 500_000_000, financed: true },
+      initialBuild: { name: "Oil", peakW: 600_000_000, financed: true },
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");
