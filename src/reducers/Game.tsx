@@ -834,6 +834,20 @@ export const gameSlice = createSlice({
         }
       });
 
+      if (!scenario.tutorialSteps) {
+        // buildFacilityHelper prepends generators because player-built capacity should dispatch
+        // by default. For authored starting fleets, however, the scenario order is deliberate:
+        // reverse just the resulting generator block back into that order while storage remains
+        // at the bottom. Building in the original sequence keeps IDs tied to authored entries.
+        const generators = state.facilities.filter(
+          (facility) => facility.peakWh === undefined,
+        );
+        const storage = state.facilities.filter(
+          (facility) => facility.peakWh !== undefined,
+        );
+        state.facilities = [...generators.reverse(), ...storage];
+      }
+
       // The first blank timeline is created before the authored fleet is resolved. Hydrology is
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.

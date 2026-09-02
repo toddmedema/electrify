@@ -687,8 +687,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.05,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
       { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 10 },
+      { fuel: "Coal", peakW: 300000000, initialAgeYears: 30 },
     ],
   },
   {
@@ -730,9 +730,9 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.07,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Oil", peakW: 450000000, initialAgeYears: 20 },
-      { fuel: "Wind", peakW: 150000000, initialAgeYears: 8 },
       { fuel: "Sun", peakW: 50000000, initialAgeYears: 5 },
+      { fuel: "Wind", peakW: 150000000, initialAgeYears: 8 },
+      { fuel: "Oil", peakW: 450000000, initialAgeYears: 20 },
     ],
   },
   {
@@ -755,8 +755,8 @@ export const SCENARIOS = [
     dollarsPerkWh: 0.02,
     durationMonths: 12 * 12,
     facilities: [
-      { fuel: "Oil", peakW: 100000000, initialAgeYears: 20 },
       { fuel: "Uranium", peakW: 400000000, initialAgeYears: 15 },
+      { fuel: "Oil", peakW: 100000000, initialAgeYears: 20 },
     ],
   },
   {
@@ -846,12 +846,12 @@ export const SCENARIOS = [
     cash: 25000000,
     feePerKgCO2e: 0,
     facilities: [
-      { fuel: "Oil", peakW: 55000000, initialAgeYears: 27 },
       {
         fuel: "Natural Gas",
         peakW: 75000000,
         initialAgeYears: 0,
       },
+      { fuel: "Oil", peakW: 55000000, initialAgeYears: 27 },
     ],
     loadAdditions: [
       {
@@ -906,16 +906,14 @@ export const SCENARIOS = [
       minimumDemandServed: 1,
       label: "February 2021 freeze",
     },
-    // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. The solar
-    // residual balances the published 1,287 MW renewable total; it is not a separately audited
-    // solar nameplate.
+    // Aggregate Austin Energy resource/PPA portfolio, not a plant ownership table. To keep the
+    // starting fleet legible, the sub-5% biomass share is grouped with coal and the sub-5% solar
+    // share with wind; the published 3,827 MW total is unchanged.
     facilities: [
       { fuel: "Natural Gas", peakW: 1497000000 },
-      { fuel: "Coal", peakW: 600000000 },
+      { fuel: "Coal", peakW: 700000000 },
       { fuel: "Uranium", peakW: 430000000 },
-      { fuel: "Wind", peakW: 1145000000 },
-      { fuel: "Biomass", peakW: 100000000 },
-      { fuel: "Sun", peakW: 55000000 },
+      { fuel: "Wind", peakW: 1200000000 },
     ],
     endTitle: "After the thaw",
     endMessage: "The storm tested every choice you made to prepare Austin.",
@@ -968,10 +966,10 @@ export const SCENARIOS = [
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
     facilities: [
+      { fuel: "Hydro", peakW: 171570000, initialAgeYears: 30 },
       { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
       { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
       { fuel: "Natural Gas", peakW: 263160000, initialAgeYears: 12 },
-      { fuel: "Hydro", peakW: 171570000, initialAgeYears: 30 },
       { fuel: "Uranium", peakW: 71170000, initialAgeYears: 30 },
       // 1% of national storage power, represented as a four-hour equivalent.
       { name: "Battery", peakWh: 134240000, initialAgeYears: 3 },
@@ -1012,7 +1010,7 @@ export const SCENARIOS = [
     durationMonths: 33,
     startingCustomers: 1800000,
     // Calibrates the account model to the demand served by this solar-heavy balancing area.
-    startingDemandScale: 1.05,
+    startingDemandScale: 1.11,
     // Beijing's first-tier residential rate is CNY0.4883/kWh, about US$0.07/kWh.
     // https://www.beijing.gov.cn/fwcj/jiage/ggfw1/65b8999311a82834a863952a.html
     dollarsPerkWh: 0.07,
@@ -1026,17 +1024,17 @@ export const SCENARIOS = [
       minimumDemandServed: 1,
       label: "September 2035 total eclipse in China",
     },
-    // Low-carbon capacity is a 0.1%-scale model of China's 2024 national fleet. This
-    // solar-heavy balancing area receives 625MW (about 0.04%) of national thermal capacity;
-    // the 240MWh battery represents 0.1% of China's 60GW new-storage fleet at four-hour duration.
+    // Renewable capacity is a 0.1%-scale model of China's 2024 national fleet. This solar-heavy
+    // balancing area groups the sub-5% nuclear share into coal for a simpler 685.83MW thermal
+    // fleet; the 240MWh battery represents 0.1% of China's 60GW new-storage fleet at four-hour
+    // duration.
     // https://www.nea.gov.cn/20250121/097bfd7c1cd3498897639857d86d5dac/c.html
     // https://www.nea.gov.cn/20241220/39938141b6e74baaa4601e940d12b022/c.html
     facilities: [
       { fuel: "Sun", peakW: 886660000, initialAgeYears: 4 },
       { fuel: "Wind", peakW: 520680000, initialAgeYears: 6 },
       { fuel: "Hydro", peakW: 435950000, initialAgeYears: 20 },
-      { fuel: "Coal", peakW: 625000000, initialAgeYears: 15 },
-      { fuel: "Uranium", peakW: 60830000, initialAgeYears: 12 },
+      { fuel: "Coal", peakW: 685830000, initialAgeYears: 15 },
       { name: "Battery", peakWh: 240000000, initialAgeYears: 3 },
     ],
     endTitle: "Sunlight returns",

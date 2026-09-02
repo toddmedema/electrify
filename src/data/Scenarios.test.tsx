@@ -178,11 +178,11 @@ describe("authored starting fleets", () => {
       }),
     ]);
     expect(manassas.facilities).toEqual([
-      expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
       expect.objectContaining({
         fuel: "Natural Gas",
         peakW: 75_000_000,
       }),
+      expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
     ]);
 
     expect(austin).toMatchObject({
@@ -219,6 +219,62 @@ describe("authored starting fleets", () => {
         0,
       ),
     ).toBe(3_827_000_000);
+    expect(
+      austin.facilities.map((facility) => ({
+        fuel: facility.fuel,
+        peakW: facility.peakW,
+      })),
+    ).toEqual([
+      { fuel: "Natural Gas", peakW: 1_497_000_000 },
+      { fuel: "Coal", peakW: 700_000_000 },
+      { fuel: "Uranium", peakW: 430_000_000 },
+      { fuel: "Wind", peakW: 1_200_000_000 },
+    ]);
+  });
+
+  it("keeps every scored-scenario generator at least 5% of its starting fleet", () => {
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => {
+        const generators = scenario.facilities.filter(
+          (facility) => facility.peakW !== undefined,
+        );
+        const totalPeakW = generators.reduce(
+          (total, facility) => total + facility.peakW!,
+          0,
+        );
+
+        generators.forEach((facility) => {
+          expect({
+            scenario: scenario.name,
+            fuel: facility.fuel,
+            meetsMinimum: facility.peakW! / totalPeakW >= 0.05,
+          }).toEqual(expect.objectContaining({ meetsMinimum: true }));
+        });
+      },
+    );
+  });
+
+  it("puts each scored scenario's defining facility first", () => {
+    expect(
+      SCENARIOS.filter((scenario) => !scenario.tutorialSteps).map(
+        (scenario) => [
+          scenario.name,
+          scenario.facilities[0].fuel || scenario.facilities[0].name,
+        ],
+      ),
+    ).toEqual([
+      ["Carbon Fee", "Natural Gas"],
+      ["The Shale Boom", "Coal"],
+      ["Paradise", "Sun"],
+      ["Rise of Renewables", "Uranium"],
+      ["Hurricane Season", "Oil"],
+      ["The End of an Era", "Coal"],
+      ["Data Center Boom", "Natural Gas"],
+      ["Deep Freeze", "Natural Gas"],
+      ["Heatwave + Drought", "Hydro"],
+      ["Solar Eclipse", "Sun"],
+      ["Sudden Nuclear Shutdown", "Uranium"],
+    ]);
   });
 
   it("authors three distinct generation and storage resilience challenges", () => {
@@ -248,7 +304,7 @@ describe("authored starting fleets", () => {
       locationId: "Beijing",
       startingYear: 2033,
       durationMonths: 33,
-      startingDemandScale: 1.05,
+      startingDemandScale: 1.11,
       icon: "solar-eclipse",
       reliabilityObjective: { year: 2035, month: 9 },
     });
@@ -258,7 +314,10 @@ describe("authored starting fleets", () => {
     ).toBe(240_000_000);
     expect(
       eclipse.facilities.find((facility) => facility.fuel === "Coal")?.peakW,
-    ).toBe(625_000_000);
+    ).toBe(685_830_000);
+    expect(
+      eclipse.facilities.some((facility) => facility.fuel === "Uranium"),
+    ).toBe(false);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,
