@@ -278,7 +278,6 @@ describe("The Shale Boom pilot arc", () => {
     const upcoming = upcomingStoryPhases(shaleContext(47));
     expect(upcoming.map((phase) => phase.key)).toEqual([
       "story:103:shale-boom:regional-glut",
-      "story:103:shale-boom:freeze-warning",
       "story:103:shale-boom:freeze",
       "story:103:shale-boom:freeze-recovery",
       "story:103:shale-boom:normalization",
@@ -293,13 +292,39 @@ describe("The Shale Boom pilot arc", () => {
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
 
+  it("omits warning-only phases from upcoming events in every scenario", () => {
+    const warningIds = new Set([
+      "published-ratchet",
+      "manufacturing-warning",
+      "clean-tech-load-warning",
+      "aging-warning",
+      "compliance-warning",
+      "regional-glut-warning",
+      "freeze-warning",
+      "outlook",
+      "visitor-warning",
+      "cargo-warning",
+      "seasonal-warning",
+      "advance-warning",
+      "contingency-review",
+    ]);
+
+    STORY_ARC_DEFINITIONS.forEach((arc) => {
+      const upcomingIds = upcomingStoryPhases(context(0, arc.scenarioId)).map(
+        (phase) => phase.key.split(":").at(-1),
+      );
+      expect(upcomingIds.filter((id) => id && warningIds.has(id))).toEqual([]);
+    });
+  });
+
   it("keeps every authored event body to one sentence and one text level", () => {
     const entries = STORY_ARC_DEFINITIONS.flatMap((arc) =>
       arc.phases.flatMap((phase) => {
         const storyContext = context(0, arc.scenarioId);
+        const preview = phase.preview?.(storyContext, () => 0.5);
         return [
           phase.describe(storyContext, () => 0.5),
-          ...(phase.preview ? [phase.preview(storyContext, () => 0.5)] : []),
+          ...(preview ? [preview] : []),
         ];
       }),
     );
@@ -468,17 +493,14 @@ describe("generation and storage reliability scenarios", () => {
     ]);
   });
 
-  it("uses short preview copy before the eclipse and precise copy at onset", () => {
+  it("previews the actual eclipse but not its separate warning phase", () => {
     const upcoming = upcomingStoryPhases(context(0, 109));
     const warning = upcoming.find((phase) =>
       phase.key.endsWith(":advance-warning"),
-    )!;
+    );
     const eclipse = upcoming.find((phase) => phase.key.endsWith(":eclipse"))!;
 
-    expect(warning).toMatchObject({
-      title: "Eclipse planning ahead",
-      message: "Grid planners will begin preparing for a total eclipse.",
-    });
+    expect(warning).toBeUndefined();
     expect(eclipse).toMatchObject({
       title: "Total solar eclipse",
       message: "A total eclipse will briefly reduce solar generation.",

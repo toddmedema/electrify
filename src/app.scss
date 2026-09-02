@@ -724,21 +724,28 @@ $pane_header_height: 40px;
   margin-left: auto;
 
   .headerControl {
+    width: 180px;
     min-width: 112px;
-    flex: 1 1 132px;
+    height: 36px;
+    flex: 0 1 180px;
     margin-left: 0;
   }
 
   .insightsLayerControls {
-    min-height: 36px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px !important;
+    min-height: 36px !important;
     flex: 0 0 auto;
+    color: $interactive_blue;
   }
 }
 
 .insightsPresetControls {
   display: flex;
-  min-width: 218px;
-  flex: 1.35 1 284px;
+  width: 260px;
+  min-width: 0;
+  flex: 0 1 260px;
   align-items: center;
   gap: 4px;
 
@@ -750,6 +757,10 @@ $pane_header_height: 40px;
 
   .insightsPresetSave,
   .insightsPresetActions {
+    width: 36px;
+    height: 36px;
+    min-width: 36px !important;
+    min-height: 36px !important;
     flex: 0 0 auto;
     color: $interactive_blue;
   }
@@ -882,10 +893,8 @@ $pane_header_height: 40px;
 
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
-    min-height: auto !important;
-    display: block;
-    padding-top: 6px;
-    padding-bottom: 8px;
+    min-height: 52px !important;
+    padding: 8px !important;
   }
 
   .insightsHeader > h6 {
@@ -894,22 +903,17 @@ $pane_header_height: 40px;
 
   .insightsHeaderControls {
     display: grid;
-    grid-template-areas:
-      "range layers"
-      "preset preset";
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 96px minmax(0, 1fr) 36px;
     width: 100%;
-    gap: 8px;
+    gap: 4px;
     margin-left: 0;
 
     .headerControl {
-      grid-area: range;
       width: 100%;
       min-width: 0;
     }
 
     .insightsPresetControls {
-      grid-area: preset;
       width: 100%;
       min-width: 0;
 
@@ -920,13 +924,22 @@ $pane_header_height: 40px;
     }
 
     .insightsLayerControls {
-      grid-area: layers;
-      min-height: 44px;
+      width: 36px;
+      height: 36px;
     }
   }
 
-  .insightsPresetControls .insightsPreset {
-    min-height: 44px;
+  .insightsPresetEdited,
+  .insightsPresetCustomized {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
   }
 
   .insightsPresetDialog {

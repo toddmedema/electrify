@@ -379,7 +379,7 @@ describe("Insights layers", () => {
 
     await user.click(screen.getByRole("button", { name: "Preset actions" }));
     await user.click(
-      screen.getByRole("menuitem", { name: /Restore original preset/ }),
+      screen.getByRole("menuitem", { name: "Restore original preset" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
@@ -394,7 +394,7 @@ describe("Insights layers", () => {
     renderInsights();
     await user.click(screen.getByRole("button", { name: "Preset actions" }));
     await user.click(
-      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+      screen.getByRole("menuitem", { name: "Save as new preset" }),
     );
     await user.type(
       screen.getByRole("textbox", { name: "Preset name" }),
@@ -474,7 +474,7 @@ describe("Insights layers", () => {
 
     await user.click(screen.getByRole("button", { name: "Preset actions" }));
     expect(
-      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+      screen.getByRole("menuitem", { name: "Save as new preset" }),
     ).toHaveAttribute("aria-disabled", "true");
   });
 
