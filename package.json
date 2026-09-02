@@ -139,6 +139,9 @@
     }
   },
   "overrides": {
+    "@svgr/plugin-svgo": {
+      "svgo": "^2.8.3"
+    },
     "react-scripts": {
       "typescript": "$typescript"
     }
