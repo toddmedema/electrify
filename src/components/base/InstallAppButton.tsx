@@ -42,6 +42,28 @@ export function useIsInstalledApp(): boolean {
   return React.useContext(InstallContext).installed || standalone();
 }
 
+/** Whether this visit can currently offer a real install action. */
+export function useCanInstallApp(afterMilestone = false): boolean {
+  const install = React.useContext(InstallContext);
+  const [repeatVisit] = React.useState(() => {
+    let visits = Number(localStorage.getItem(INSTALL_VISITS_KEY) || 0);
+    if (!sessionStorage.getItem(INSTALL_VISIT_COUNTED_KEY)) {
+      visits += 1;
+      localStorage.setItem(INSTALL_VISITS_KEY, String(visits));
+      sessionStorage.setItem(INSTALL_VISIT_COUNTED_KEY, "1");
+    }
+    return visits > 1;
+  });
+  const iosEligible =
+    afterMilestone || repeatVisit || getPlayedScenarioIds().length > 0;
+
+  return (
+    !install.installed &&
+    !install.snoozed &&
+    Boolean(install.installPrompt || (install.isIos && iosEligible))
+  );
+}
+
 const INSTALL_SNOOZE_KEY = "installPromptSnoozedAt";
 const INSTALL_VISITS_KEY = "installVisits";
 const INSTALL_VISIT_COUNTED_KEY = "installVisitCounted";
@@ -136,21 +158,7 @@ export default function InstallAppButton(props: {
 }): React.JSX.Element | null {
   const install = React.useContext(InstallContext);
   const [instructionsOpen, setInstructionsOpen] = React.useState(false);
-  const [repeatVisit] = React.useState(() => {
-    let visits = Number(localStorage.getItem(INSTALL_VISITS_KEY) || 0);
-    if (!sessionStorage.getItem(INSTALL_VISIT_COUNTED_KEY)) {
-      visits += 1;
-      localStorage.setItem(INSTALL_VISITS_KEY, String(visits));
-      sessionStorage.setItem(INSTALL_VISIT_COUNTED_KEY, "1");
-    }
-    return visits > 1;
-  });
-  const iosEligible =
-    props.afterMilestone || repeatVisit || getPlayedScenarioIds().length > 0;
-  const visible =
-    !install.installed &&
-    !install.snoozed &&
-    Boolean(install.installPrompt || (install.isIos && iosEligible));
+  const visible = useCanInstallApp(props.afterMilestone);
 
   if (!visible) {
     return null;

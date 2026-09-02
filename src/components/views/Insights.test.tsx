@@ -7,6 +7,7 @@ import { GameType } from "../../Types";
 import Insights, {
   INSIGHT_LAYERS,
   INSIGHT_PRESETS,
+  MAX_CUSTOM_INSIGHT_PRESETS,
   presetForLayers,
   withRequiredLayers,
 } from "./Insights";
@@ -180,6 +181,19 @@ async function choosePreset(label: string) {
   await user.click(within(await screen.findByRole("listbox")).getByText(label));
 }
 
+function storeCustomPreset(name: string) {
+  const layers = [...INSIGHT_PRESETS.overview.layers];
+  localStorage.setItem(
+    "insightsPresetLibrary",
+    JSON.stringify({
+      defaults: {},
+      custom: [{ id: "1", name, layers }],
+    }),
+  );
+  localStorage.setItem("insightsLayers", JSON.stringify(layers));
+  localStorage.setItem("insightsActivePreset", "saved:1");
+}
+
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
@@ -330,7 +344,138 @@ describe("Insights layers", () => {
     expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
     expect(
       screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Custom");
+    ).toHaveTextContent("OverviewEdited");
+  });
+
+  it("saves changes back to a default preset and restores them on remount", async () => {
+    const view = renderInsights();
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const library = JSON.parse(
+      localStorage.getItem("insightsPresetLibrary") || "{}",
+    );
+    expect(library.defaults.overview).toContain("revenue");
+    view.unmount();
+
+    renderInsights();
+    expect(screen.getByText("Revenue", { selector: "h6" })).toBeVisible();
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Overview");
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).not.toHaveTextContent("Edited");
+  });
+
+  it("restores a modified default preset to its original layers", async () => {
+    renderInsights();
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(
+      screen.getByRole("menuitem", { name: /Restore original preset/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Restore" }));
+
+    expect(screen.queryByText("Revenue", { selector: "h6" })).toBeNull();
+    const library = JSON.parse(
+      localStorage.getItem("insightsPresetLibrary") || "{}",
+    );
+    expect(library.defaults.overview).toBeUndefined();
+  });
+
+  it("creates and updates a named preset", async () => {
+    renderInsights();
+    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(
+      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Preset name" }),
+      "Peak watch",
+    );
+    await user.click(screen.getByRole("button", { name: "Save preset" }));
+
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Peak watch");
+
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const library = JSON.parse(
+      localStorage.getItem("insightsPresetLibrary") || "{}",
+    );
+    expect(library.custom[0]).toMatchObject({
+      name: "Peak watch",
+      layers: expect.arrayContaining(["revenue"]),
+    });
+  });
+
+  it("renames a named preset and restores it across mounts", async () => {
+    storeCustomPreset("Peak watch");
+    const view = renderInsights();
+
+    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(screen.getByRole("menuitem", { name: /Rename preset/ }));
+    const name = screen.getByRole("textbox", { name: "Preset name" });
+    await user.clear(name);
+    await user.type(name, "Morning peak");
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Morning peak");
+
+    view.unmount();
+    renderInsights();
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Morning peak");
+  });
+
+  it("deletes a named preset", async () => {
+    storeCustomPreset("Morning peak");
+    renderInsights();
+
+    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(screen.getByRole("menuitem", { name: /Delete preset/ }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(
+      screen.getByRole("combobox", { name: "Insight preset" }),
+    ).toHaveTextContent("Unsaved view");
+    const library = JSON.parse(
+      localStorage.getItem("insightsPresetLibrary") || "{}",
+    );
+    expect(library.custom).toEqual([]);
+  });
+
+  it("caps the custom preset library at ten entries", async () => {
+    localStorage.setItem(
+      "insightsPresetLibrary",
+      JSON.stringify({
+        defaults: {},
+        custom: Array.from(
+          { length: MAX_CUSTOM_INSIGHT_PRESETS },
+          (_, index) => ({
+            id: String(index + 1),
+            name: `Preset ${index + 1}`,
+            layers: ["supplyDemand"],
+          }),
+        ),
+      }),
+    );
+    renderInsights();
+
+    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    expect(
+      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("offers expected renewable output as an insight layer", async () => {

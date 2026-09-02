@@ -1,5 +1,4 @@
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import TouchAppIcon from "@mui/icons-material/TouchApp";
 import { Box, Stack, Typography } from "@mui/material";
 import * as React from "react";
 import ConceptIcon, { CONCEPT_LABELS, ConceptNameType } from "./ConceptIcon";
@@ -9,20 +8,12 @@ export interface TutorialPromptProps {
   concepts: ConceptNameType[];
   // At most one short sentence - the symbols carry the teaching, the words only confirm it
   text?: string;
-  // For gated steps: the deed being asked for, as a "do this" chip matching the pulsing
-  // affordance in the objective HUD
-  action?: ConceptNameType[];
 }
 
 export default function TutorialPrompt({
   concepts,
   text,
-  action,
 }: TutorialPromptProps): React.JSX.Element {
-  const actionLabel = action
-    ?.map((concept) => CONCEPT_LABELS[concept].toLowerCase())
-    .join(" then ");
-
   return (
     <Stack
       className="tutorialPrompt"
@@ -59,34 +50,6 @@ export default function TutorialPrompt({
         <Typography variant="body1" sx={{ lineHeight: 1.45 }}>
           {text}
         </Typography>
-      )}
-      {action && (
-        <Box
-          className="tutorialPromptAction"
-          role="status"
-          aria-label={`Required action: ${actionLabel}`}
-          sx={{
-            alignSelf: "stretch",
-            justifyContent: "flex-start",
-            bgcolor: "action.selected",
-            borderColor: "primary.main !important",
-          }}
-        >
-          <TouchAppIcon fontSize="small" color="primary" aria-hidden />
-          <Typography
-            variant="caption"
-            component="span"
-            sx={{ fontWeight: 700, mr: 0.5 }}
-          >
-            Do this to continue:
-          </Typography>
-          {action.map((concept, i) => (
-            <ConceptIcon key={i} concept={concept} fontSize="small" />
-          ))}
-          <Typography variant="caption" component="span">
-            {actionLabel}
-          </Typography>
-        </Box>
       )}
     </Stack>
   );

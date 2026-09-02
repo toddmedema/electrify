@@ -82,6 +82,14 @@ function storyOutputMultiplierForFacility(
   );
 }
 
+function facilityIconName(facility: FacilityOperatingType): string {
+  // Authored scenarios may give a plant a narrative label, but uranium facilities still use
+  // the standard Nuclear artwork instead of looking for an image named after that label.
+  return "fuel" in facility && facility.fuel === "Uranium"
+    ? "nuclear"
+    : facility.name.toLowerCase();
+}
+
 const getDraggableStyle = (
   isDragging: boolean,
   draggableStyle: DraggingStyle | NotDraggingStyle | undefined,
@@ -385,7 +393,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <Avatar
                   className={facility.currentWh === 0 ? "offline" : ""}
                   alt={facility.name}
-                  src={`/images/${facility.name.toLowerCase()}.svg`}
+                  src={`/images/${facilityIconName(facility)}.svg`}
                 />
                 {facility.peakWh > 0 && !underConstruction && (
                   <div className="capacityProgressBar">

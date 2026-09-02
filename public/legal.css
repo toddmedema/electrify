@@ -184,6 +184,25 @@ a:hover {
   padding: clamp(4rem, 9vw, 7.5rem) 0 clamp(3.5rem, 8vw, 6rem);
 }
 
+.hero--illustrated .hero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.85fr);
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+}
+
+.hero__copy {
+  min-width: 0;
+}
+
+.hero__art {
+  width: 100%;
+  max-width: 32rem;
+  height: auto;
+  display: block;
+  justify-self: end;
+}
+
 .eyebrow {
   margin: 0 0 0.8rem;
   color: var(--brand-strong);
@@ -297,6 +316,64 @@ a:hover {
 .panel--impact {
   grid-column: span 5;
   background: var(--surface-soft);
+}
+
+.panel--signup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.72fr) minmax(20rem, 1.28fr);
+  align-items: center;
+  gap: 2rem;
+  background: var(--surface-soft);
+}
+
+.signup-form {
+  position: relative;
+  min-width: 0;
+}
+
+.signup-form > label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.signup-form__fields {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.signup-form__fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-solid);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.2;
+}
+
+.signup-form__fields input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.signup-form__fields input:hover {
+  border-color: var(--brand);
+}
+
+.signup-form__bot-field {
+  position: absolute;
+  left: -5000px;
+}
+
+.panel .signup-form__note {
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
 }
 
 .panel--contact {
@@ -502,12 +579,23 @@ a:hover {
 }
 
 @media (max-width: 48rem) {
+  .hero--illustrated .hero__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .hero__art {
+    width: min(24rem, 82%);
+    margin-top: 1rem;
+    justify-self: center;
+  }
+
   .panel--story,
   .panel--impact {
     grid-column: 1 / -1;
   }
 
   .panel--contact,
+  .panel--signup,
   .privacy-layout {
     grid-template-columns: 1fr;
   }
@@ -553,6 +641,15 @@ a:hover {
   .panel__actions,
   .button {
     width: 100%;
+  }
+
+  .hero--illustrated .hero__art {
+    display: none;
+  }
+
+  .signup-form__fields {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .site-footer__inner {

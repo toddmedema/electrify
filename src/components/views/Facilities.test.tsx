@@ -182,6 +182,16 @@ describe("the fleet list", () => {
     ).toBeInTheDocument();
   });
 
+  it("uses the nuclear icon for the France scenario's named reactor", () => {
+    const france = createGame({ scenarioId: 110 });
+    renderFacilities(france, null);
+
+    expect(screen.getByAltText("Grand Nuclear Unit")).toHaveAttribute(
+      "src",
+      "/images/nuclear.svg",
+    );
+  });
+
   it("renders the reasonable worst-case fleet size", () => {
     const tenFacilities = createGame({ scenarioId: 103 });
     const template = tenFacilities.facilities[0];

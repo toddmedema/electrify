@@ -38,7 +38,9 @@ function renderSettings(overrides: Partial<Props> = {}) {
 }
 
 function exportButton(): HTMLButtonElement {
-  return screen.getByText("Export").closest("button") as HTMLButtonElement;
+  return screen.getByRole("button", {
+    name: "Export save",
+  }) as HTMLButtonElement;
 }
 
 function fileInput(): HTMLInputElement {
@@ -49,20 +51,27 @@ describe("Settings", () => {
   it("groups controls into labeled, scannable sections", () => {
     renderSettings();
 
-    ["Sound", "Account", "Units", "Appearance", "Saved Game"].forEach((name) =>
-      expect(screen.getByRole("region", { name })).toBeInTheDocument(),
+    ["Preferences", "Leaderboard", "Game data", "Keyboard shortcuts"].forEach(
+      (name) =>
+        expect(screen.getByRole("region", { name })).toBeInTheDocument(),
     );
+    expect(screen.getByRole("switch", { name: "Sound" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Units" })).toBeInTheDocument();
     expect(
-      screen.getByRole("checkbox", {
-        name: "Music and sound effects disabled",
-      }),
+      screen.getByRole("group", { name: "Appearance" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("combobox", { name: "Measurement system" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("combobox", { name: "Color theme" }),
-    ).toBeInTheDocument();
+  });
+
+  it("changes appearance and units with direct choices", async () => {
+    const onThemeChange = jest.fn();
+    const onUnitsChange = jest.fn();
+    renderSettings({ onThemeChange, onUnitsChange });
+
+    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
+    await userEvent.click(screen.getByRole("button", { name: "Imperial" }));
+
+    expect(onThemeChange).toHaveBeenCalledWith("dark");
+    expect(onUnitsChange).toHaveBeenCalledWith("imperial");
   });
 
   it("controls music and sound-effects volume independently", () => {
@@ -83,10 +92,9 @@ describe("Settings", () => {
     fireEvent.change(screen.getByRole("slider", { name: /music volume/i }), {
       target: { value: 35 },
     });
-    fireEvent.change(
-      screen.getByRole("slider", { name: /sound effects volume/i }),
-      { target: { value: 80 } },
-    );
+    fireEvent.change(screen.getByRole("slider", { name: /effects volume/i }), {
+      target: { value: 80 },
+    });
     expect(onMusicVolumeChange).toHaveBeenCalledWith(0.35);
     expect(onSoundEffectsVolumeChange).toHaveBeenCalledWith(0.8);
   });
@@ -96,7 +104,7 @@ describe("Settings", () => {
 
     expect(screen.queryByRole("slider", { name: /music volume/i })).toBeNull();
     expect(
-      screen.queryByRole("slider", { name: /sound effects volume/i }),
+      screen.queryByRole("slider", { name: /effects volume/i }),
     ).toBeNull();
 
     view.unmount();
@@ -112,7 +120,21 @@ describe("Settings", () => {
 
     expect(screen.getByRole("slider", { name: /music volume/i })).toBeVisible();
     expect(
-      screen.getByRole("slider", { name: /sound effects volume/i }),
+      screen.getByRole("slider", { name: /effects volume/i }),
+    ).toBeVisible();
+  });
+
+  it("keeps keyboard shortcuts available without letting them dominate the page", async () => {
+    renderSettings();
+
+    expect(
+      screen.queryByRole("table", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Keys for faster play/ }),
+    );
+    expect(
+      screen.getByRole("table", { name: "Keyboard shortcuts" }),
     ).toBeVisible();
   });
 
@@ -133,7 +155,7 @@ describe("Settings", () => {
     renderSettings();
     expect(exportButton().disabled).toBe(true);
     expect(
-      screen.getByText(/need a game in progress to export/),
+      screen.getByText(/Start a game to enable export/),
     ).toBeInTheDocument();
   });
 
@@ -147,8 +169,8 @@ describe("Settings", () => {
     const onChangeName = jest.fn();
     renderSettings({ loggedIn: true, displayName: "Ada", onChangeName });
 
-    expect(screen.getByText(/On the leaderboard as Ada/)).toBeInTheDocument();
-    await userEvent.click(screen.getByText("Change name"));
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Edit name"));
     expect(onChangeName).toHaveBeenCalled();
   });
 
@@ -157,9 +179,9 @@ describe("Settings", () => {
   it("prompts for a name when a logged-in player hasn't picked one", () => {
     renderSettings({ loggedIn: true });
     expect(
-      screen.getByText(/haven't picked a leaderboard name/),
+      screen.getByText(/Choose a name to appear with your scores/),
     ).toBeInTheDocument();
-    expect(screen.getByText("Pick a name")).toBeInTheDocument();
+    expect(screen.getByText("Choose a name")).toBeInTheDocument();
   });
 
   it("imports whichever file the player picks, saved game or not", async () => {
@@ -174,7 +196,7 @@ describe("Settings", () => {
     expect(fileInput().value).toBe("");
   });
 
-  it("hides installation controls when already running as an installed app", () => {
+  it("does not show an install group when no install action is available", () => {
     const originalMatchMedia = window.matchMedia;
     window.matchMedia = jest.fn().mockReturnValue({
       matches: true,
@@ -190,7 +212,7 @@ describe("Settings", () => {
     renderSettings();
 
     expect(
-      screen.queryByRole("region", { name: "App" }),
+      screen.queryByRole("region", { name: "Install Electrify" }),
     ).not.toBeInTheDocument();
     window.matchMedia = originalMatchMedia;
   });
@@ -198,10 +220,10 @@ describe("Settings", () => {
   it("offers a subtle cache reset at the bottom", async () => {
     renderSettings();
 
-    const button = screen.getByRole("button", { name: "Clear cache" });
+    const button = screen.getByRole("button", { name: "Clear cached data" });
     expect(
       within(screen.getByRole("contentinfo")).getByRole("button", {
-        name: "Clear cache",
+        name: "Clear cached data",
       }),
     ).toBe(button);
     await userEvent.click(button);
@@ -217,7 +239,7 @@ describe("Settings", () => {
     const onBack = jest.fn();
     renderSettings({ onBack });
 
-    fireEvent.click(screen.getByRole("button", { name: "back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     act(() => jest.advanceTimersByTime(350));
 
     expect(onBack).toHaveBeenCalled();

@@ -105,6 +105,18 @@ describe("tutorial mission metadata", () => {
       expect(capstones[0].hint).toBeTruthy();
     });
   });
+
+  it("ends the electricity mission after a single one-day challenge", () => {
+    const electricity = TUTORIALS.find(
+      (tutorial) => tutorial.name === "Mission 1: Electricity",
+    )!;
+    const steps = electricity.tutorialSteps!;
+
+    expect(steps).toHaveLength(5);
+    expect(steps[3].advanceOn).toBeDefined();
+    expect(steps[4].advanceOn).toBeUndefined();
+    expect(steps[4].capstone).toBeDefined();
+  });
 });
 
 describe("authored scenario briefings", () => {
@@ -244,6 +256,9 @@ describe("authored starting fleets", () => {
       eclipse.facilities.find((facility) => facility.name === "Battery")
         ?.peakWh,
     ).toBe(240_000_000);
+    expect(
+      eclipse.facilities.find((facility) => facility.fuel === "Coal")?.peakW,
+    ).toBe(625_000_000);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,

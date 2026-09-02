@@ -710,12 +710,102 @@ $pane_header_height: 40px;
 .insightsHeader {
   gap: 8px;
 
+  > h6 {
+    flex: 0 0 auto;
+  }
+}
+
+.insightsHeaderControls {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+
   .headerControl {
-    min-width: 132px;
+    min-width: 112px;
+    flex: 1 1 132px;
+    margin-left: 0;
   }
 
+  .insightsLayerControls {
+    min-height: 36px;
+    flex: 0 0 auto;
+  }
+}
+
+.insightsPresetControls {
+  display: flex;
+  min-width: 218px;
+  flex: 1.35 1 284px;
+  align-items: center;
+  gap: 4px;
+
   .insightsPreset {
-    min-width: 138px;
+    min-width: 0;
+    flex: 1 1 138px;
+    margin-left: 0;
+  }
+
+  .insightsPresetSave,
+  .insightsPresetActions {
+    flex: 0 0 auto;
+    color: $interactive_blue;
+  }
+}
+
+.insightsPresetValue {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.insightsPresetName,
+.insightsPresetMenuName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightsPresetEdited,
+.insightsPresetCustomized,
+.insightsPresetMenuHint {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.insightsPresetEdited {
+  background: $interactive_blue;
+  color: $bg_primary;
+}
+
+.insightsPresetCustomized,
+.insightsPresetMenuHint {
+  background: var(--interactive-tint);
+  color: $interactive_blue;
+}
+
+.insightsPresetMenuHint {
+  margin-left: auto;
+}
+
+.insightsPresetDialog {
+  .MuiDialogContentText-root + .MuiTextField-root {
+    margin-top: 16px;
+  }
+
+  .MuiDialogActions-root {
+    padding: 8px 24px 16px;
+  }
+
+  .MuiButton-root {
+    min-height: 40px;
   }
 }
 
@@ -793,22 +883,61 @@ $pane_header_height: 40px;
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
     min-height: auto !important;
-    flex-wrap: wrap;
-    padding-top: 4px;
-    padding-bottom: 4px;
-
-    .headerControl {
-      margin-left: 0;
-    }
+    display: block;
+    padding-top: 6px;
+    padding-bottom: 8px;
   }
 
   .insightsHeader > h6 {
-    width: 100%;
+    display: none;
   }
 
-  .insightsHeader .MuiSelect-root,
-  .insightsHeader .MuiButton-root {
-    flex: 1 1 120px;
+  .insightsHeaderControls {
+    display: grid;
+    grid-template-areas:
+      "range layers"
+      "preset preset";
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    gap: 8px;
+    margin-left: 0;
+
+    .headerControl {
+      grid-area: range;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .insightsPresetControls {
+      grid-area: preset;
+      width: 100%;
+      min-width: 0;
+
+      .headerControl {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .insightsLayerControls {
+      grid-area: layers;
+      min-height: 44px;
+    }
+  }
+
+  .insightsPresetControls .insightsPreset {
+    min-height: 44px;
+  }
+
+  .insightsPresetDialog {
+    .MuiDialogActions-root {
+      padding-right: 16px;
+      padding-left: 16px;
+    }
+
+    .MuiButton-root {
+      min-height: 44px;
+    }
   }
 }
 
@@ -1001,10 +1130,6 @@ $pane_header_height: 40px;
 
   .tutorialHudContent .tutorialPrompt {
     grid-template-columns: minmax(0, 1fr);
-
-    .tutorialPromptAction {
-      grid-column: auto;
-    }
   }
 }
 
@@ -1251,11 +1376,18 @@ html[data-theme="dark"] .uplot {
 
 .scenarioStartControls {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin-top: 4px;
   padding-top: 12px;
+}
+
+.scenarioStartButton.MuiButton-root {
+  justify-self: center;
+  min-width: 190px;
+  min-height: 52px;
+  padding-inline: 28px;
 }
 
 .difficultyPicker {
@@ -1304,6 +1436,11 @@ html[data-theme="dark"] .uplot {
     grid-template-columns: 1fr;
   }
 
+  .scenarioStartButton.MuiButton-root {
+    justify-self: stretch;
+    width: 100%;
+  }
+
   .difficultyPicker .MuiToggleButton-root {
     padding-inline: 2px;
   }
@@ -1323,12 +1460,14 @@ html[data-theme="dark"] .uplot {
   border-collapse: collapse;
   text-align: left;
 
-  td {
+  td,
+  th {
     padding: 4px 8px;
+    font-weight: inherit;
     vertical-align: middle;
   }
 
-  td:first-child {
+  th:first-child {
     text-align: right;
     white-space: nowrap;
   }
@@ -1655,8 +1794,7 @@ html[data-theme="dark"] .uplot {
     border-radius: 0;
   }
 
-  // Icon-led step content: symbols on top, one confirming line of text, and for gated
-  // steps a "do this" chip naming the deed in the same symbols
+  // Icon-led step content: symbols on top and one confirming line of text
   .tutorialPrompt {
     text-align: center;
 
@@ -1670,16 +1808,6 @@ html[data-theme="dark"] .uplot {
 
     .tutorialPromptArrow {
       opacity: 0.5;
-    }
-
-    .tutorialPromptAction {
-      display: inline-flex;
-      align-items: center;
-      gap: size(tiny);
-      margin-top: size(small);
-      padding: size(tiny) size(small);
-      border: 1px solid var(--border-strong);
-      border-radius: 100px;
     }
   }
 
@@ -1928,7 +2056,18 @@ html[data-theme="dark"] .uplot {
     border: 1px solid var(--border-tile);
     border-radius: 8px;
     background: var(--bg-sunken);
-    touch-action: pan-y;
+    // Prevent a tap from turning into a scroll gesture and cancelling marker activation. The
+    // setup pane remains scrollable everywhere outside this bounded interactive surface.
+    touch-action: none;
+
+    &.zoomed {
+      cursor: grab;
+    }
+
+    &.panning {
+      cursor: grabbing;
+      user-select: none;
+    }
   }
 
   .worldMapLand,
@@ -2123,14 +2262,25 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  .missionItem {
+  .build-list-item.missionItem {
     margin: 0 12px 8px;
     border: 1px solid var(--border-tile);
     border-radius: 10px;
     box-shadow: none;
 
     .MuiCardHeader-root {
+      grid-template-columns: auto minmax(0, 1fr) auto;
       padding: 10px 12px;
+    }
+
+    // A chevron is part of this compact row, unlike the multi-button build-card actions that
+    // deliberately wrap below 520px.
+    .MuiCardHeader-root .MuiCardHeader-action {
+      grid-row: 1;
+      grid-column: 3;
+      align-self: center;
+      width: auto;
+      margin: 0 0 0 8px !important;
     }
 
     .MuiCardHeader-title {
@@ -2315,8 +2465,24 @@ html[data-theme="dark"] .uplot {
 
   .eventLogSectionHeader {
     display: grid;
+    grid-template-columns: 1fr auto;
     gap: 1px;
+    align-items: center;
     padding: 0 size(base) size(small);
+  }
+
+  .eventHistoryFilterButton {
+    margin: -5px -8px -5px 0;
+    color: $font_color_faded;
+
+    &.active {
+      background: var(--interactive-tint);
+      color: $interactive_blue;
+    }
+  }
+
+  .eventHistoryFilterCheck {
+    width: 24px;
   }
 
   // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
@@ -2568,20 +2734,6 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  .settingsSection {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 4px !important;
-
-    .shortcuts {
-      width: 100%;
-      margin: 0;
-
-      td {
-        padding: 4px;
-      }
-    }
-  }
-
   .build-list-item .MuiCardHeader-root {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -2626,12 +2778,6 @@ html[data-theme="dark"] .uplot {
   backdrop-filter: blur(10px);
 }
 
-.tutorialHud-collapsed {
-  width: 100%;
-  max-height: none;
-  overflow: hidden;
-}
-
 .tutorialHudHeader {
   display: flex;
   min-width: 0;
@@ -2659,33 +2805,6 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-.tutorialHudToggle {
-  flex: 0 0 auto;
-}
-
-.tutorialHudProgressRing {
-  position: relative;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  place-items: center;
-}
-
-.tutorialHudProgressRing > * {
-  grid-area: 1 / 1;
-}
-
-.tutorialHudProgressIcon {
-  display: grid;
-  place-items: center;
-
-  .conceptIcon {
-    width: 20px;
-    height: 20px;
-  }
-}
-
 .tutorialHudContent {
   min-width: 0;
   margin-top: 6px;
@@ -2702,11 +2821,6 @@ html[data-theme="dark"] .uplot {
     min-height: 32px;
     margin-bottom: 0;
     padding: 4px 8px;
-  }
-
-  .tutorialPromptAction {
-    grid-column: 1 / -1;
-    margin-top: 2px;
   }
 }
 
@@ -2731,52 +2845,41 @@ html[data-theme="dark"] .uplot {
   flex: 1 1 auto;
 }
 
-.tutorialHudGate {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: $interactive_blue;
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.tutorialHudScreenReader {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  clip-path: inset(50%) !important;
-  white-space: nowrap !important;
-}
-
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
-// surrounding choices. Capstones never receive this class.
+// surrounding choices. If the player has not acted after ten seconds, a short pulse repeats every
+// ten seconds. Capstones never receive either class.
 .tutorialTarget {
-  outline: 3px solid var(--interactive-blue) !important;
+  outline: 2px solid var(--interactive-blue) !important;
   outline-offset: 3px;
-  animation: tutorialTargetPulse 1.6s ease-in-out infinite;
+}
+
+.tutorialTargetReminder {
+  animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
 
 @keyframes tutorialTargetPulse {
   0%,
+  16%,
   100% {
     box-shadow: 0 0 0 0 var(--interactive-tint);
   }
-  50% {
+  8% {
     box-shadow: 0 0 0 7px transparent;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTarget {
+  .tutorialTargetReminder {
     animation: none;
+  }
+
+  .tutorialTarget {
+    outline-width: 3px !important;
   }
 }
 
 @media screen and (min-width: 700px) {
-  .tutorialHud-expanded {
+  .tutorialHud {
     display: grid;
     grid-template-areas:
       "header content footer"

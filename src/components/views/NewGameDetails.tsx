@@ -459,6 +459,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   </Typography>
                 </div>
                 <Button
+                  className="scenarioStartButton"
                   size="large"
                   variant="contained"
                   color="primary"
@@ -466,7 +467,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
-                  Start
+                  Start game
                 </Button>
               </div>
             </div>

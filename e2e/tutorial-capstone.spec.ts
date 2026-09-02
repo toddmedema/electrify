@@ -63,14 +63,13 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   }
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText("Watch one full day go by")).toBeVisible();
   await expect(
     page.getByText("Your turn: keep the lights on for a full day"),
   ).toBeVisible();
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
-  // expanded objective is docked outside the game surface, so the same control remains operable at
-  // every viewport without a small-screen workaround.
+  // objective is docked outside the game surface, so the same control remains operable at every
+  // viewport without a small-screen workaround.
   const naturalGas = page.locator(".facilityRow", { hasText: "Natural Gas" });
   await naturalGas.click();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();

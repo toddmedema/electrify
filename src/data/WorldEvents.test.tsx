@@ -292,6 +292,23 @@ describe("The Shale Boom pilot arc", () => {
     ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 109, 110]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
+
+  it("keeps every authored event body to one sentence and one text level", () => {
+    const entries = STORY_ARC_DEFINITIONS.flatMap((arc) =>
+      arc.phases.flatMap((phase) => {
+        const storyContext = context(0, arc.scenarioId);
+        return [
+          phase.describe(storyContext, () => 0.5),
+          ...(phase.preview ? [phase.preview(storyContext, () => 0.5)] : []),
+        ];
+      }),
+    );
+
+    entries.forEach((entry) => {
+      expect(entry).not.toHaveProperty("details");
+      expect(entry.message.match(/[.!?](?=\s|$)/g) || []).toHaveLength(1);
+    });
+  });
 });
 
 describe("Texas Deep Freeze", () => {
@@ -338,8 +355,8 @@ describe("Texas Deep Freeze", () => {
     const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
     expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
     expect(uri.effects.demandMultiplier).toBe(1.27);
-    expect(uri.details).toMatch(/demand is 27% above normal/i);
-    expect(uri.details).toMatch(/plants can produce less/i);
+    expect(uri.message).toMatch(/demand runs 27% above normal/i);
+    expect(uri.message).toMatch(/plants produce less/i);
   });
 
   it("keeps the future thaw neutral, then reports the recorded outcome", () => {
@@ -461,18 +478,16 @@ describe("generation and storage reliability scenarios", () => {
     expect(warning).toMatchObject({
       title: "Eclipse planning ahead",
       message: "Grid planners will begin preparing for a total eclipse.",
-      details: undefined,
     });
     expect(eclipse).toMatchObject({
       title: "Total solar eclipse",
       message: "A total eclipse will briefly reduce solar generation.",
-      details: undefined,
     });
     expect(eclipse.message).not.toMatch(/underway|08:30|10:00|11:30/i);
 
     const live = resolveStoryAtDate(context(32, 109)).occurrences[0];
     expect(live.title).toBe("The eclipse is underway");
-    expect(live.details).toMatch(/08:30.*10:00.*11:30/i);
+    expect(live.message).toMatch(/08:30.*10:00.*11:30/i);
   });
 });
 
