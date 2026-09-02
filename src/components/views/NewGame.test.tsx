@@ -106,7 +106,7 @@ describe("NewGame", () => {
       expect.stringContaining("Hurricane Season"),
     ]);
     expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
-      "Extreme weatherSudden disruption",
+      "Extreme weather",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Island grids" }));
@@ -128,6 +128,50 @@ describe("NewGame", () => {
       expect.stringContaining("Data Center Boom"),
       expect.stringContaining("Carbon Fee"),
       expect.stringContaining("Solar Eclipse"),
+    ]);
+  });
+
+  it("fills fewer than three unplayed recommendations with the most-played challenge", () => {
+    const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+    const unplayedNames = new Set(["Deep Freeze", "Data Center Boom"]);
+    const playedIds = challenges
+      .filter((scenario) => !unplayedNames.has(scenario.name))
+      .map((scenario) => scenario.id);
+    const paradiseId = challenges.find(
+      (scenario) => scenario.name === "Paradise",
+    )!.id;
+    recordPlayed(...playedIds, paradiseId, paradiseId, paradiseId);
+
+    render(<NewGame {...props()} />);
+
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Paradise"),
+    ]);
+  });
+
+  it("recommends the most-played challenges after every challenge has been played", () => {
+    const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+    const dataCenterId = challenges.find(
+      (scenario) => scenario.name === "Data Center Boom",
+    )!.id;
+    const deepFreezeId = challenges.find(
+      (scenario) => scenario.name === "Deep Freeze",
+    )!.id;
+    recordPlayed(
+      ...challenges.map((scenario) => scenario.id),
+      dataCenterId,
+      dataCenterId,
+      deepFreezeId,
+    );
+
+    render(<NewGame {...props()} />);
+
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Carbon Fee"),
     ]);
   });
 

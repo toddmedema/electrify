@@ -770,7 +770,7 @@ export const SCENARIOS = [
     icon: "hurricane season",
     locationId: "SJU",
     summary: "Prepare an island grid for storms and costly fuel.",
-    themes: ["Extreme weather", "Island grids", "Sudden disruption"],
+    themes: ["Extreme weather", "Island grids"],
     briefing: {
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
@@ -892,7 +892,7 @@ export const SCENARIOS = [
       timeZone: "America/Chicago",
     },
     summary: "Prepare Austin's grid for a historic winter emergency.",
-    themes: ["Extreme weather", "Sudden disruption"],
+    themes: ["Extreme weather"],
     recommendationOrder: 1,
     briefing: {
       tone: "storm",
@@ -947,7 +947,7 @@ export const SCENARIOS = [
       resources: { hydro: true },
     },
     summary: "Keep Spain powered through a worsening heatwave and drought.",
-    themes: ["Extreme weather", "Sudden disruption"],
+    themes: ["Extreme weather"],
     briefing: {
       tone: "storm",
       fantasy:
@@ -1006,7 +1006,7 @@ export const SCENARIOS = [
       resources: { hydro: true },
     },
     summary: "Prepare China's solar-heavy grid for a total eclipse.",
-    themes: ["Energy transition", "Sudden disruption"],
+    themes: ["Energy transition"],
     briefing: {
       tone: "innovation",
       fantasy:
@@ -1070,7 +1070,7 @@ export const SCENARIOS = [
       resources: { hydro: false },
     },
     summary: "Cover an unexpected nuclear shutdown in France.",
-    themes: ["Sudden disruption"],
+    themes: ["Energy transition"],
     briefing: {
       tone: "legacy",
       fantasy:

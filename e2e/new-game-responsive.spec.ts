@@ -62,6 +62,6 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     page.getByRole("button", { name: "View Data Center Boom details" }),
   ).toHaveCount(0);
   await expect(page.getByLabel("Deep Freeze themes")).toContainText(
-    "Sudden disruption",
+    "Extreme weather",
   );
 });

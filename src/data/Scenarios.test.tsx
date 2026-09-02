@@ -141,6 +141,22 @@ describe("authored scenario briefings", () => {
       (scenario) => expect(scenario.themes?.length).toBeGreaterThan(0),
     );
   });
+
+  it("uses the four player-facing challenge themes", () => {
+    const themes = new Set(
+      SCENARIOS.filter((scenario) => !scenario.tutorialSteps).flatMap(
+        (scenario) => scenario.themes ?? [],
+      ),
+    );
+    expect(themes).toEqual(
+      new Set([
+        "Extreme weather",
+        "Energy transition",
+        "Rapid growth",
+        "Island grids",
+      ]),
+    );
+  });
 });
 
 describe("authored starting fleets", () => {

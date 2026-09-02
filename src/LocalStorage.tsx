@@ -90,20 +90,40 @@ function getPlays(): LocalStoragePlayedType[] {
 // The scenarios (tutorials included) the player has finished, used for the completion
 // markers and progress in the scenario list
 export function getPlayedScenarioIds(): number[] {
-  return getPlays().map((p) => p.scenarioId);
+  return Object.keys(getScenarioPlayCounts()).map(Number);
 }
 
-// Only recorded the first time: nothing reads the repeats, so appending one entry per
-// replay would grow this list forever
+// Counts completed plays without appending one entry per replay, which would grow this list
+// forever. Records written before counts were introduced represent one completed play.
+export function getScenarioPlayCounts(): Record<number, number> {
+  return getPlays().reduce<Record<number, number>>((counts, play) => {
+    counts[play.scenarioId] =
+      (counts[play.scenarioId] ?? 0) + (play.timesPlayed ?? 1);
+    return counts;
+  }, {});
+}
+
 export function recordScenarioPlayed(scenarioId: number) {
   const plays = getPlays();
-  if (plays.some((p) => p.scenarioId === scenarioId)) {
+  const existingIndex = plays.findIndex((p) => p.scenarioId === scenarioId);
+  if (existingIndex !== -1) {
+    const existing = plays[existingIndex];
+    const updated = [...plays];
+    updated[existingIndex] = {
+      ...existing,
+      timesPlayed: (existing.timesPlayed ?? 1) + 1,
+    };
+    setStorageKeyValue("plays", { plays: updated });
     return;
   }
   setStorageKeyValue("plays", {
     plays: [
       ...plays,
-      { scenarioId, date: new Date().toString() } as LocalStoragePlayedType,
+      {
+        scenarioId,
+        date: new Date().toString(),
+        timesPlayed: 1,
+      } as LocalStoragePlayedType,
     ],
   });
 }

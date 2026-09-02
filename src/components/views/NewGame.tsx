@@ -22,7 +22,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
-import { getPlayedScenarioIds } from "../../LocalStorage";
+import { getScenarioPlayCounts } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   CUSTOM_SCENARIO_ID,
@@ -53,7 +53,6 @@ const CHALLENGE_THEMES: ScenarioThemeType[] = [
   "Energy transition",
   "Rapid growth",
   "Island grids",
-  "Sudden disruption",
 ];
 
 function scenarioEndYear(scenario: ScenarioType): number {
@@ -220,7 +219,8 @@ export default function NewGame(props: Props): React.JSX.Element {
   const [showAllTutorials, setShowAllTutorials] = React.useState(false);
   const [challengeFilter, setChallengeFilter] =
     React.useState<ChallengeFilterType>("For you");
-  const ids = getPlayedScenarioIds();
+  const playCounts = getScenarioPlayCounts();
+  const ids = Object.keys(playCounts).map(Number);
   const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
   const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
@@ -232,11 +232,15 @@ export default function NewGame(props: Props): React.JSX.Element {
     return scenario.recommendationOrder ?? Number.MAX_SAFE_INTEGER;
   };
   const recommendedScenarios = [...scenarios]
-    .sort(
-      (a, b) =>
-        Number(ids.includes(a.id)) - Number(ids.includes(b.id)) ||
-        recommendationRank(a) - recommendationRank(b),
-    )
+    .sort((a, b) => {
+      const aPlays = playCounts[a.id] ?? 0;
+      const bPlays = playCounts[b.id] ?? 0;
+      return (
+        Number(aPlays > 0) - Number(bPlays > 0) ||
+        (aPlays > 0 && bPlays > 0 ? bPlays - aPlays : 0) ||
+        recommendationRank(a) - recommendationRank(b)
+      );
+    })
     .slice(0, 3);
   const visibleScenarios =
     challengeFilter === "For you"

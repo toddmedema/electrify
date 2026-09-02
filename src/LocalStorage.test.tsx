@@ -1,4 +1,10 @@
-import { getStorageChoice, setStorageKeyValue } from "./LocalStorage";
+import {
+  getPlayedScenarioIds,
+  getScenarioPlayCounts,
+  getStorageChoice,
+  recordScenarioPlayed,
+  setStorageKeyValue,
+} from "./LocalStorage";
 import { getLocalStorage } from "./Globals";
 
 const KEY = "testChoice";
@@ -31,5 +37,37 @@ describe("getStorageChoice", () => {
   it("keeps negative and zero choices distinct from the fallback", () => {
     setStorageKeyValue(KEY, 0);
     expect(getStorageChoice(KEY, [0, -1, 2020], -1)).toBe(0);
+  });
+});
+
+describe("scenario play history", () => {
+  beforeEach(() => {
+    getLocalStorage().removeItem("plays");
+  });
+
+  it("treats legacy records without counts as one play", () => {
+    setStorageKeyValue("plays", {
+      plays: [
+        { scenarioId: 100, date: "2026-08-27" },
+        { scenarioId: 101, date: "2026-08-28", timesPlayed: 3 },
+      ],
+    });
+
+    expect(getScenarioPlayCounts()).toEqual({ 100: 1, 101: 3 });
+    expect(getPlayedScenarioIds()).toEqual([100, 101]);
+
+    recordScenarioPlayed(100);
+    expect(getScenarioPlayCounts()).toEqual({ 100: 2, 101: 3 });
+  });
+
+  it("increments a compact count instead of appending repeat plays", () => {
+    recordScenarioPlayed(100);
+    recordScenarioPlayed(100);
+    recordScenarioPlayed(100);
+
+    expect(getScenarioPlayCounts()).toEqual({ 100: 3 });
+    expect(
+      JSON.parse(getLocalStorage().getItem("plays") as string).plays,
+    ).toEqual([expect.objectContaining({ scenarioId: 100, timesPlayed: 3 })]);
   });
 });
