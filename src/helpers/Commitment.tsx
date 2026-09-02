@@ -55,13 +55,7 @@ function dispatchTarget(
   tick: TickPresentFutureType,
   facilityId: number,
 ): number | undefined {
-  return (
-    // Compatibility with timelines loaded from saves written before forecast metadata became
-    // transient. Prefer it when present so an old save (or focused simulation fixture) remains
-    // authoritative rather than being shadowed by metadata from an earlier forecast.
-    tick.dispatchTargetWByFacility?.[facilityId] ??
-    metadata(tick)?.dispatchTargets[facilityId]
-  );
+  return metadata(tick)?.dispatchTargets[facilityId];
 }
 
 /** Copies transient metadata when a forecast pass clones a tick with object spread. */
@@ -138,9 +132,9 @@ export function shouldKeepGeneratorCommitted({
     return false;
   }
 
-  const preparedCost = forecast[fromIndex].dispatchTargetWByFacility
-    ? undefined
-    : metadata(forecast[fromIndex])?.runningCostToNextDispatch[facilityId];
+  const preparedCost = metadata(forecast[fromIndex])?.runningCostToNextDispatch[
+    facilityId
+  ];
   if (preparedCost !== undefined) {
     return preparedCost < startCost;
   }

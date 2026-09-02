@@ -148,20 +148,12 @@ describe("SaveFile", () => {
       expect(error).toMatch(/isn't an Electrify save/);
     });
 
-    it("rejects an incompatible save", async () => {
+    it("rejects a save from a different schema", async () => {
       const { save, error } = await readSaveFile(
         saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
       );
       expect(save).toBeUndefined();
-      expect(error).toMatch(/newer simulation version/);
-    });
-
-    it("explains that an older simulation save cannot be migrated", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION - 1 }),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/created by an older simulation version/);
+      expect(error).toMatch(/isn't a valid Electrify save/);
     });
 
     it("rejects a save whose scenario this build doesn't have", async () => {

@@ -52,36 +52,6 @@ it("opens after economic data is loaded and names every setup control", () => {
   ).not.toBeInTheDocument();
 });
 
-it("populates cash from a saved setup that predates year-adjusted cash", () => {
-  const onStart = jest.fn();
-  const inflation = getFuelEscalation(2040) / getFuelEscalation(2020);
-  render(
-    <CustomGame
-      game={createGame({ scenarioId: 100 })}
-      scenario={{
-        ...DEFAULT_CUSTOM_SCENARIO,
-        startingYear: 2040,
-        cash: 200000000,
-        dollarsPerkWh: Number((0.07 * inflation).toPrecision(2)),
-      }}
-      onBack={jest.fn()}
-      onDelta={jest.fn()}
-      onStart={onStart}
-    />,
-  );
-
-  expect(
-    screen.getByRole("combobox", { name: "Starting cash" }),
-  ).toHaveTextContent(/\$\d/);
-
-  fireEvent.click(screen.getByRole("button", { name: "Play" }));
-  expect(onStart).toHaveBeenCalledWith(
-    expect.objectContaining({
-      cash: Number((200000000 * inflation).toPrecision(2)),
-    }),
-  );
-});
-
 it("re-quotes starting cash when the starting year changes", () => {
   const onStart = jest.fn();
   render(

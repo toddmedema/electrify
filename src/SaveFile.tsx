@@ -1,10 +1,5 @@
 import { getScenario } from "./data/Scenarios";
-import {
-  parseSave,
-  readSave,
-  SaveGameType,
-  saveVersionError,
-} from "./SaveGame";
+import { parseSave, readSave, SaveGameType } from "./SaveGame";
 import { ScenarioType } from "./Types";
 
 /**
@@ -106,14 +101,10 @@ export async function readSaveFile(file: File): Promise<ImportedSaveType> {
   } catch (_err) {
     return { error: "That file isn't an Electrify save game." };
   }
-  const versionError = saveVersionError(parsed);
-  if (versionError) {
-    return { error: versionError };
-  }
   const save = parseSave(parsed);
   if (!save) {
     return {
-      error: "That file isn't a compatible Electrify save game.",
+      error: "That file isn't a valid Electrify save game.",
     };
   }
   if (!getScenario(save.game.scenarioId, save.game.customScenario)) {

@@ -1,4 +1,8 @@
 import { TICK_MINUTES } from "../Constants";
+import {
+  prepareGeneratorCommitment,
+  recordDispatchTarget,
+} from "../helpers/Commitment";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
 import { GeneratorOperatingType, GameType } from "../Types";
@@ -25,7 +29,7 @@ function isolatedOnlineCoal(): {
   );
   for (let i = nextIndex; i < state.timeline.length; i++) {
     state.timeline[i].demandW = 0;
-    state.timeline[i].dispatchTargetWByFacility = { [coal.id]: 0 };
+    recordDispatchTarget(state.timeline[i], coal.id, 0);
   }
   return { state, coal, nextIndex };
 }
@@ -34,7 +38,12 @@ describe("minimum stable generator dispatch", () => {
   it("holds an online plant at its minimum when avoiding the next start is cheaper", () => {
     const { state, coal, nextIndex } = isolatedOnlineCoal();
     coal.costPerStart = 1000000000;
-    state.timeline[nextIndex + 2].dispatchTargetWByFacility![coal.id] = 1;
+    recordDispatchTarget(state.timeline[nextIndex + 2], coal.id, 1);
+    prepareGeneratorCommitment({
+      facilityId: coal.id,
+      forecast: state.timeline,
+      minimumOperatingCost: () => 1,
+    });
 
     tickState(state);
 
@@ -52,7 +61,12 @@ describe("minimum stable generator dispatch", () => {
     const { state, coal, nextIndex } = isolatedOnlineCoal();
     coal.costPerStart = 1;
     coal.variableOperatingCostPerMWh = 1000000000;
-    state.timeline[nextIndex + 3].dispatchTargetWByFacility![coal.id] = 1;
+    recordDispatchTarget(state.timeline[nextIndex + 3], coal.id, 1);
+    prepareGeneratorCommitment({
+      facilityId: coal.id,
+      forecast: state.timeline,
+      minimumOperatingCost: () => 1000000000,
+    });
     const minimumW = coal.currentW;
 
     tickState(state);

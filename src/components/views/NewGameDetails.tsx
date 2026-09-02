@@ -38,7 +38,7 @@ import { getDb, login } from "../../Globals";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
-import { decodeReplay, replayVersionError } from "../../Replay";
+import { decodeReplay } from "../../Replay";
 import {
   DifficultyType,
   GameType,
@@ -244,9 +244,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       if (replay) {
         this.props.onWatchReplay(replay);
       } else {
-        this.props.onReplayError(
-          replayVersionError(data) || "Sorry, that replay couldn't be loaded.",
-        );
+        this.props.onReplayError("Sorry, that replay couldn't be loaded.");
       }
     } catch (err) {
       console.warn("Couldn't load the replay: ", err);

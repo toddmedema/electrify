@@ -223,18 +223,6 @@ describe("the Finances chart selectors", () => {
     expect(periodSelect()).toHaveTextContent("Current year");
   });
 
-  // The sentinels the dropdown used to store its two non-year options as. They aren't options
-  // any more, and a returning player has one of them sitting in storage
-  it("falls back when storage holds either old range sentinel", () => {
-    ["-1", "0"].forEach((stored) => {
-      localStorage.setItem("financesChartYear", stored);
-
-      renderFinances(game, "PAUSED");
-      expect(periodSelect()).toHaveTextContent("Current year");
-      cleanup();
-    });
-  });
-
   it("plots further than the game has reached when a forward range is chosen", async () => {
     renderFinances(game, "PAUSED");
     const thisYear = summarised("Revenue");

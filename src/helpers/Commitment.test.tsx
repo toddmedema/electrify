@@ -6,9 +6,11 @@ import {
 import { TickPresentFutureType } from "../Types";
 
 function tick(target: number | undefined): TickPresentFutureType {
-  return (
-    target === undefined ? {} : { dispatchTargetWByFacility: { 7: target } }
-  ) as TickPresentFutureType;
+  const result = {} as TickPresentFutureType;
+  if (target !== undefined) {
+    recordDispatchTarget(result, 7, target);
+  }
+  return result;
 }
 
 describe("generator commitment optimization", () => {

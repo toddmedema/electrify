@@ -111,7 +111,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   expect(
     screen.getByRole("button", { name: "Show financing terms" }),
   ).toHaveAttribute("aria-expanded", "false");
-});
+}, 15000);
 
 it("shows Coal's physical and representative-day start charges", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });

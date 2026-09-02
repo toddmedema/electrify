@@ -76,10 +76,16 @@ describe("SaveGame", () => {
     expect(readSave()).toBeNull();
   });
 
-  it("ignores a save from a different schema version", () => {
+  it("rejects a save from a different schema version", () => {
     expect(
       parseSave({ ...serializeSave(game), version: SAVE_VERSION + 1 }),
     ).toBeNull();
+  });
+
+  it("rejects a save without current envelope metadata", () => {
+    const save = serializeSave(game);
+    expect(parseSave({ ...save, savedAt: undefined })).toBeNull();
+    expect(parseSave({ ...save, appVersion: undefined })).toBeNull();
   });
 
   it("rejects a current-version save without customer-market state", () => {
@@ -128,19 +134,17 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  it("repairs the impossible extra opening-history row from older v4 sessions", () => {
+  it("rejects history from beyond the save's elapsed time", () => {
     const advanced = createGame(OPTIONS);
     while (advanced.date.monthsElapsed < 1) {
       tickState(advanced);
     }
     expect(advanced.monthlyHistory).toHaveLength(1);
-    const legacy = serializeSave({
+    const impossible = serializeSave({
       ...advanced,
       monthlyHistory: [...advanced.monthlyHistory, advanced.monthlyHistory[0]],
     });
-    expect(parseSave(legacy)!.game.monthlyHistory).toEqual(
-      advanced.monthlyHistory,
-    );
+    expect(parseSave(impossible)).toBeNull();
   });
 
   it("rejects a current-version save without current runtime state", () => {

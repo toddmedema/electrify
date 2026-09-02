@@ -1,7 +1,6 @@
 import {
   decodeReplay,
   encodeReplay,
-  replayVersionError,
   MAX_REPLAY_ACTIONS,
   recordReplayAction,
   recordedDelta,
@@ -26,9 +25,7 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
     scenarioId: 101,
     difficulty: "Employee",
     seed: 12345,
-    startingYear: 2020,
     location: LOCATIONS.SF,
-    durationMinutes: 43200,
     actions: [
       { minute: 0, type: "delta", payload: { dollarsPerkWh: 0.12 } },
       { minute: 1440, type: "sellFacility", payload: 3 },
@@ -196,22 +193,21 @@ describe("decodeReplay", () => {
     expect(decodeReplay({})).toBeNull();
   });
 
-  it("ignores a replay from a schema it doesn't understand", () => {
+  it("rejects a replay from a different schema", () => {
     expect(
       decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
     ).toBeNull();
   });
 
-  it("explains that older simulation replays cannot be migrated", () => {
-    const old = encodeReplay(aReplay({ version: REPLAY_VERSION - 1 }));
-    expect(replayVersionError(old)).toMatch(
-      /created by an older simulation version/,
-    );
-  });
-
   it("ignores a replay missing the fields the run is rebuilt from", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.seed;
+    expect(decodeReplay(doc)).toBeNull();
+  });
+
+  it("rejects a replay without current envelope metadata", () => {
+    const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
+    delete doc.appVersion;
     expect(decodeReplay(doc)).toBeNull();
   });
 
