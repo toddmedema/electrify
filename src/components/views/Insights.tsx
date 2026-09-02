@@ -1147,9 +1147,14 @@ export default class Insights extends React.Component<Props, State> {
         {this.state.leversOpen && (
           <div className="budgetSlider flex-newline">
             <Slider
+              // Keep the thumb local while it is moving. Dispatching every pointer step makes
+              // the entire workbench reconcile and regenerate its long-range projection before
+              // the browser can paint the next thumb position. The committed rate remounts this
+              // uncontrolled slider through its key, so external changes still stay in sync.
+              key={game.dollarsPerkWh}
               id="rateSlider"
               disabled={!!game.replayPlayback}
-              value={game.dollarsPerkWh}
+              defaultValue={game.dollarsPerkWh}
               aria-label="The rate you charge for electricity generation"
               valueLabelDisplay="auto"
               valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
@@ -1157,7 +1162,7 @@ export default class Insights extends React.Component<Props, State> {
               min={0}
               step={scenario.ownership === "Investor" ? 0.001 : 0.01}
               max={max}
-              onChange={(_event, value) =>
+              onChangeCommitted={(_event, value) =>
                 onDelta({
                   dollarsPerkWh: Array.isArray(value) ? value[0] : value,
                 })
