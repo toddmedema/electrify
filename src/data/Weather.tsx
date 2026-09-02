@@ -10,7 +10,9 @@ import { decodeWeather } from "./WeatherBinary";
 // game may start -- which is why the custom game screen builds its year list off it.
 export const WEATHER_STARTING_YEAR = 1980;
 const STARTING_YEAR = WEATHER_STARTING_YEAR; // assumed to be the same for all locations
-const ENDING_YEAR = 2019; // for weather data, Dec 31st, assumed to be the same for all locations
+// Keep the simulation's calibrated historical window stable even when shipped binaries include
+// newer years. The additional rows are retained on disk for a future deliberate recalibration.
+const ENDING_YEAR = 2019;
 const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
@@ -29,7 +31,7 @@ const DRAWS_PER_FORECAST_DAY = 3;
 const ANOMALY_PERSISTENCE = 0.3;
 
 // How far past the range the location has actually recorded a forecast is allowed to go, as a
-// multiple of that month's standard deviation. Some headroom matters -- forty years is not every
+// multiple of that month's standard deviation. Some headroom matters -- decades are not every
 // heatwave there will ever be -- but not so much that a forecast invents a climate.
 const FORECAST_HEADROOM_SDS = 1.5;
 
@@ -122,7 +124,7 @@ interface MonthClimatologyType {
 }
 
 // One entry per calendar month, built once per load from whatever was loaded. Every location gets
-// its seasonality from its own forty years rather than from anything written per location here,
+// its seasonality from its own multi-decade record rather than from anything written per location here,
 // which is what makes this scale with the weather catalogue.
 // Bumped by every initWeather call, so an earlier download that lands after a later one can tell
 // that it is no longer the load anybody is waiting on
@@ -243,10 +245,11 @@ export function initWeatherFromRows(
   } else if (!loadedLocation) {
     loadedLocation = location;
   }
+  const calibratedRows = rows.slice(0, EXPECTED_ROWS);
   weatherSeries.set(location, {
-    weather: rows,
-    climatology: buildClimatology(rows),
-    recordedRows: rows.length,
+    weather: calibratedRows,
+    climatology: buildClimatology(calibratedRows),
+    recordedRows: calibratedRows.length,
   });
   if (rows.length < EXPECTED_ROWS) {
     console.warn(
@@ -348,7 +351,7 @@ export function initWeather(
  * Generating in order matters twice over: each forecast day is last year's same day nudged, so
  * skipping days would forecast off a day that was never written; and going one day per call, the
  * way this used to, left every lookup past the data returning DUMMY_WEATHER until the array
- * happened to catch up -- which a game loaded straight into a year past 2019 never would.
+ * happened to catch up -- which a game loaded straight beyond the dataset never would.
  */
 function forecastThroughDay(
   series: WeatherSeriesType,

@@ -5,7 +5,7 @@
  * src/data/WeatherBinary.tsx for the decoder that has to agree with encodeWeather below.
  *
  * The game only simulates DAYS_PER_MONTH = 1, so a location's entire record is twelve days a year
- * for forty years: 11,520 hourly readings, 57KB packed, or 69KB with offshore wind. That is also
+ * from 1980 through 2025: 13,248 hourly readings, 65KB packed, or 78KB with offshore wind. That is also
  * why this fetches one day per month rather than the whole forty years - the archive API is billed
  * by location-days, and the days that are never simulated would cost thirty times as much as the
  * ones that are.
@@ -23,6 +23,8 @@
  *   node scripts/fetch-weather.js --limit 10      # at most ten cities this run
  *   node scripts/fetch-weather.js --force PIT     # refetch one that already has data
  *   node scripts/fetch-weather.js --list          # what is fetched, what is missing
+ *   node scripts/update-weather.js                 # extend existing files through last year
+ *   node scripts/update-weather.js --through 2030  # extend through a fixed complete year
  */
 const fs = require("fs");
 const path = require("path");
@@ -35,7 +37,7 @@ const API = "https://archive-api.open-meteo.com/v1/archive";
 // The record every location is expected to have. STARTING_YEAR has to match WEATHER_STARTING_YEAR
 // in src/data/Weather.tsx: the game turns a date into a row offset by counting years from it.
 const STARTING_YEAR = 1980;
-const ENDING_YEAR = 2019;
+const ENDING_YEAR = 2025;
 const MONTHS_PER_YEAR = 12;
 const HOURS_PER_DAY = 24;
 // Which day of each month stands in for the month. Mid-month is unbiased within the month, and
@@ -90,7 +92,14 @@ function usage() {
 }
 
 const args = process.argv.slice(2);
-const options = { force: false, list: false, limit: Infinity, ids: [] };
+const options = {
+  force: false,
+  list: false,
+  limit: Infinity,
+  ids: [],
+  update: false,
+  through: ENDING_YEAR,
+};
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
   if (arg === "--help" || arg === "-h") {
@@ -100,6 +109,13 @@ for (let i = 0; i < args.length; i++) {
     options.force = true;
   } else if (arg === "--list") {
     options.list = true;
+  } else if (arg === "--update") {
+    options.update = true;
+  } else if (arg === "--through") {
+    options.through = Number(args[++i]);
+    if (!Number.isInteger(options.through) || options.through < STARTING_YEAR) {
+      fail(`--through needs a year no earlier than ${STARTING_YEAR}`);
+    }
   } else if (arg === "--limit") {
     options.limit = Number(args[++i]);
     if (!Number.isFinite(options.limit) || options.limit < 1) {
@@ -110,6 +126,9 @@ for (let i = 0; i < args.length; i++) {
   } else {
     options.ids.push(arg);
   }
+}
+if (options.update && options.through >= new Date().getFullYear()) {
+  fail("--through must name a fully completed calendar year");
 }
 
 function fail(message) {
@@ -163,7 +182,7 @@ function readIndex() {
  * Built by listing the directory rather than by appending to whatever was there before, so a
  * hand-deleted .bin drops out of the picker instead of turning into a 404 on the loading screen.
  */
-function writeIndex(fetched) {
+function writeIndex(fetched, endingYears = {}) {
   const previous = readIndex().cities;
   const cities = {};
   CATALOGUE.cities.forEach((city) => {
@@ -174,6 +193,13 @@ function writeIndex(fetched) {
     if (!entry || !fs.existsSync(binaryPath(city.id))) {
       return;
     }
+    const header = fs
+      .readFileSync(binaryPath(city.id))
+      .subarray(0, HEADER_BYTES);
+    const fileEndingYear =
+      header.length === HEADER_BYTES && header.toString("ascii", 0, 4) === MAGIC
+        ? header.readUInt16LE(8) + header.readUInt16LE(10) - 1
+        : undefined;
     cities[city.id] = {
       id: city.id,
       name: displayName(city),
@@ -187,7 +213,11 @@ function writeIndex(fetched) {
       ...(city.offshore ? { offshore: true } : {}),
       ...(city.weatherSource ? { source: city.weatherSource } : {}),
       startingYear: STARTING_YEAR,
-      endingYear: ENDING_YEAR,
+      endingYear:
+        endingYears[city.id] ??
+        fileEndingYear ??
+        entry.endingYear ??
+        ENDING_YEAR,
     };
   });
   fs.writeFileSync(
@@ -345,7 +375,7 @@ function clamp(value, min, max) {
  * steps and precipitation in fifths of a millimetre, both far finer than anything the simulation
  * can tell apart. 57-69KB a location, against 265KB of CSV, and no parser on the loading screen.
  */
-function encodeWeather(rows) {
+function encodeWeather(rows, endingYear = ENDING_YEAR) {
   const offshore = rows.every((row) => typeof row.windOffshoreKph === "number");
   if (
     !offshore &&
@@ -361,7 +391,7 @@ function encodeWeather(rows) {
   buffer.writeUInt8(HOURS_PER_DAY, 6);
   buffer.writeUInt8(bytesPerRow, 7);
   buffer.writeUInt16LE(STARTING_YEAR, 8);
-  buffer.writeUInt16LE(ENDING_YEAR - STARTING_YEAR + 1, 10);
+  buffer.writeUInt16LE(endingYear - STARTING_YEAR + 1, 10);
   buffer.writeUInt8(TEMP_SCALE, 12);
   buffer.writeUInt8(WIND_SCALE, 13);
   buffer.writeUInt8(PRECIP_SCALE, 14);
@@ -400,7 +430,11 @@ function encodeWeather(rows) {
  * Batching this way rather than city by city is what keeps the request count down: one request
  * carries the same calendar day for every city in the batch.
  */
-async function fetchBatch(batch) {
+async function fetchBatch(
+  batch,
+  firstYear = STARTING_YEAR,
+  lastYear = ENDING_YEAR,
+) {
   const rows = new Map(batch.map((city) => [city.id, []]));
   const meta = new Map();
   const points = batch.flatMap((city) => [
@@ -418,7 +452,7 @@ async function fetchBatch(batch) {
       : []),
   ]);
 
-  for (let year = STARTING_YEAR; year <= ENDING_YEAR; year++) {
+  for (let year = firstYear; year <= lastYear; year++) {
     for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
       const daily = new Map();
       for (let at = 0; at < points.length; at += LOCATIONS_PER_REQUEST) {
@@ -501,11 +535,147 @@ async function fetchBatch(batch) {
         }
       });
     }
-    if ((year - STARTING_YEAR + 1) % 10 === 0) {
+    if ((year - firstYear + 1) % 10 === 0 || year === lastYear) {
       log(`  through ${year}`);
     }
   }
   return { rows, meta };
+}
+
+function readPackedWeather(city) {
+  const file = fs.readFileSync(binaryPath(city.id));
+  if (file.length < HEADER_BYTES || file.toString("ascii", 0, 4) !== MAGIC) {
+    throw new Error(`${city.id}: existing file is not ${MAGIC} weather data`);
+  }
+  const version = file.readUInt8(4);
+  const months = file.readUInt8(5);
+  const hours = file.readUInt8(6);
+  const bytesPerRow = file.readUInt8(7);
+  const startingYear = file.readUInt16LE(8);
+  const yearCount = file.readUInt16LE(10);
+  const offshore =
+    version >= 2 && (file.readUInt8(15) & FLAG_OFFSHORE_WIND) !== 0;
+  const expectedRowBytes = offshore
+    ? OFFSHORE_BYTES_PER_ROW
+    : BASE_BYTES_PER_ROW;
+  if (
+    (version !== 1 && version !== VERSION) ||
+    months !== MONTHS_PER_YEAR ||
+    hours !== HOURS_PER_DAY ||
+    bytesPerRow !== expectedRowBytes ||
+    startingYear !== STARTING_YEAR ||
+    file.readUInt8(12) !== TEMP_SCALE ||
+    file.readUInt8(13) !== WIND_SCALE ||
+    file.readUInt8(14) !== PRECIP_SCALE ||
+    Boolean(city.offshore) !== offshore
+  ) {
+    throw new Error(
+      `${city.id}: existing weather layout is incompatible with this updater`,
+    );
+  }
+  const expectedBytes =
+    HEADER_BYTES + yearCount * MONTHS_PER_YEAR * HOURS_PER_DAY * bytesPerRow;
+  if (file.length !== expectedBytes) {
+    throw new Error(
+      `${city.id}: existing file has ${file.length} bytes; its header describes ${expectedBytes}`,
+    );
+  }
+  return {
+    file,
+    bytesPerRow,
+    endingYear: startingYear + yearCount - 1,
+  };
+}
+
+function extendPackedWeather(entry, newRows, endingYear) {
+  const encoded = encodeWeather(newRows, endingYear);
+  if (encoded.readUInt8(7) !== entry.bytesPerRow) {
+    throw new Error("Fetched weather layout does not match the existing file");
+  }
+  const extended = Buffer.concat([entry.file, encoded.subarray(HEADER_BYTES)]);
+  extended.writeUInt16LE(endingYear - STARTING_YEAR + 1, 10);
+  return extended;
+}
+
+async function updateExisting(catalogue) {
+  const existing = catalogue
+    .filter((city) => fs.existsSync(binaryPath(city.id)))
+    .map((city) => ({ city, ...readPackedWeather(city) }))
+    .filter((entry) => entry.endingYear < options.through)
+    .filter(
+      (entry) =>
+        options.ids.length === 0 || options.ids.includes(entry.city.id),
+    )
+    .slice(0, options.limit);
+
+  if (existing.length === 0) {
+    log(
+      `Nothing to update: requested weather files already run through ${options.through}`,
+    );
+    return;
+  }
+
+  const groups = new Map();
+  existing.forEach((entry) => {
+    const firstYear = entry.endingYear + 1;
+    if (!groups.has(firstYear)) groups.set(firstYear, []);
+    groups.get(firstYear).push(entry);
+  });
+  const locationDays = existing.reduce(
+    (total, entry) =>
+      total +
+      (options.through - entry.endingYear) *
+        MONTHS_PER_YEAR *
+        (entry.city.offshore ? 2 : 1),
+    0,
+  );
+  log(
+    `Updating ${existing.length} existing cities through ${options.through} ` +
+      `(${locationDays} location-days).`,
+  );
+
+  const fetched = {};
+  const endingYears = {};
+  let done = 0;
+  try {
+    for (const [firstYear, entries] of groups) {
+      for (let at = 0; at < entries.length; at += CITIES_PER_BATCH) {
+        const batch = entries.slice(at, at + CITIES_PER_BATCH);
+        const cities = batch.map((entry) => entry.city);
+        log(
+          `\n${cities.map((city) => city.id).join(", ")} (${firstYear}-${options.through})`,
+        );
+        const { rows, meta } = await fetchBatch(
+          cities,
+          firstYear,
+          options.through,
+        );
+        for (const entry of batch) {
+          const cityRows = rows.get(entry.city.id);
+          fs.writeFileSync(
+            binaryPath(entry.city.id),
+            extendPackedWeather(entry, cityRows, options.through),
+          );
+          fetched[entry.city.id] = meta.get(entry.city.id);
+          endingYears[entry.city.id] = options.through;
+          done++;
+          log(
+            `  ${entry.city.id}: added ${summarise(entry.city.id, cityRows)}`,
+          );
+        }
+        writeIndex(fetched, endingYears);
+      }
+    }
+  } catch (e) {
+    writeIndex(fetched, endingYears);
+    if (e instanceof DailyLimitReached) {
+      log(`\n${e.message}`);
+    } else {
+      process.stderr.write(`\n${e.stack || e.message}\n`);
+      process.exitCode = 1;
+    }
+  }
+  log(`\nUpdated ${done} cities through ${options.through}`);
 }
 
 /**
@@ -546,6 +716,11 @@ async function main() {
       fail(`"${id}" is not in scripts/cities.json`);
     }
   });
+
+  if (options.update) {
+    await updateExisting(catalogue);
+    return;
+  }
 
   const have = new Set(catalogue.filter(hasRequiredWeather).map((c) => c.id));
 

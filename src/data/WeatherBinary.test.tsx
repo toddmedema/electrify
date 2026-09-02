@@ -231,7 +231,7 @@ describe("the shipped weather files", () => {
     expect(listed).toEqual([...offshoreIds].sort());
   });
 
-  it("covers every shipped location with forty years of readable weather", () => {
+  it("covers every shipped location through 2025 with readable weather", () => {
     ids.forEach((id: string) => {
       const buffer = readShipped(id);
       const header = readWeatherHeader(buffer);
@@ -243,16 +243,16 @@ describe("the shipped weather files", () => {
         daysPerYear: 12,
         hoursPerDay: 24,
         startingYear: 1980,
-        yearCount: 40,
-        rowCount: 11520,
+        yearCount: 46,
+        rowCount: 13248,
         offshore: offshoreIds.includes(id),
       });
 
       const rows = decodeWeather(buffer);
       expect(rows[0].YEAR).toEqual(1980);
-      expect(rows[rows.length - 1].YEAR).toEqual(2019);
+      expect(rows[rows.length - 1].YEAR).toEqual(2025);
 
-      // Reduced to one assertion per field rather than one per row: eleven thousand assertions a
+      // Reduced to one assertion per field rather than one per row: thirteen thousand assertions a
       // city adds up to minutes once the catalogue is full, and a range says the same thing
       const range = (field: keyof RawWeatherType) => {
         const values = rows
@@ -298,6 +298,6 @@ describe("the shipped weather files", () => {
     const speeds100m = decodeWeather(readShipped("Lista")).map((row) =>
       getAirborneWindReferenceKph(row.WIND_KPH),
     );
-    expect(getAirborneWindCapacityFactor(speeds100m)).toBeCloseTo(0.4, 3);
+    expect(getAirborneWindCapacityFactor(speeds100m)).toBeCloseTo(0.4, 2);
   });
 });

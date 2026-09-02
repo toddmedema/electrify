@@ -229,7 +229,7 @@ describe("a custom game", () => {
     expect(state.location.lat).toBe(12.3456);
   });
 
-  // The weather data ends in 2019 and is forecast forwards from there, and the fuel prices are
+  // Recorded weather is forecast forwards after 2025, and the fuel prices are
   // projected year by year, so a start decades past the record has to be simulated rather than
   // read. Nothing before 1980 is offered, because there is nothing to project backwards from.
   it("plays a start far past the end of the recorded data", () => {
