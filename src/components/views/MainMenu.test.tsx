@@ -39,7 +39,15 @@ describe("MainMenu", () => {
 
   it("only advertises account-free play before sign-in", () => {
     const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
-    expect(screen.getByText("Free · no sign-up needed")).toBeInTheDocument();
+    const accountActions = screen.getByRole("region", {
+      name: "Account actions",
+    });
+    expect(
+      within(accountActions).getByRole("button", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(
+      within(accountActions).getByText("Free · no sign-up needed"),
+    ).toBeInTheDocument();
 
     rerender(<MainMenu {...props({ uid: "player" })} />);
     expect(
@@ -47,7 +55,7 @@ describe("MainMenu", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("places transient account actions after the fixed menu actions", () => {
+  it("places account actions between resources and discovery actions", () => {
     render(
       <MainMenu
         {...props({
@@ -58,12 +66,19 @@ describe("MainMenu", () => {
       />,
     );
 
+    const resources = screen.getByRole("navigation", {
+      name: "Game resources",
+    });
+    const account = screen.getByRole("region", { name: "Account actions" });
     const discovery = screen.getByRole("region", {
       name: "Discovery actions",
     });
-    const account = screen.getByRole("region", { name: "Account actions" });
     expect(
-      discovery.compareDocumentPosition(account) &
+      resources.compareDocumentPosition(account) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      account.compareDocumentPosition(discovery) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(within(account).getByText("Free · no sign-up needed")).toBeVisible();
@@ -110,6 +125,9 @@ describe("MainMenu", () => {
 
     expect(primary).toHaveStyle({ flexDirection: "column" });
     expect(resources).toHaveStyle({ flexDirection: "row", gap: "6px" });
+    expect(
+      within(resources).queryByRole("button", { name: "Sign in" }),
+    ).not.toBeInTheDocument();
     expect(discovery).toHaveStyle({ flexDirection: "row", gap: "6px" });
   });
 

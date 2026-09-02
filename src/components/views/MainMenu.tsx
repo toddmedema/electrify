@@ -110,6 +110,23 @@ const MainMenu = (props: Props): React.JSX.Element => {
             Settings
           </Button>
         </Stack>
+        {!props.uid && (
+          <Stack
+            component="section"
+            aria-label="Account actions"
+            className="accountActions"
+            spacing={0}
+          >
+            <Button variant="text" color="primary" onClick={login}>
+              Sign in
+            </Button>
+            {!props.hasSavedGame && (
+              <Typography variant="caption" color="text.secondary">
+                Free · no sign-up needed
+              </Typography>
+            )}
+          </Stack>
+        )}
         <Stack
           component="section"
           aria-label="Discovery actions"
@@ -134,24 +151,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
             </Button>
           )}
         </Stack>
-        {!props.uid && (
-          <Stack
-            component="section"
-            aria-label="Account actions"
-            className="accountActions"
-            spacing={0.25}
-            useFlexGap
-          >
-            {!props.hasSavedGame && (
-              <Typography variant="caption">
-                Free · no sign-up needed
-              </Typography>
-            )}
-            <Button variant="text" color="primary" onClick={login}>
-              Sign in
-            </Button>
-          </Stack>
-        )}
         <Typography className="srOnly" role="status" aria-live="polite">
           {shareStatus}
         </Typography>

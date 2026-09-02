@@ -14,6 +14,16 @@ files are large, so broad rewrites create expensive review diffs.
 - Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and
   run with `npm run test:e2e` when the changed path warrants them.
 
+## Pull requests
+
+- When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
+  finished interface and embed them in the pull request description. Choose views that clearly
+  show the change, including both desktop and mobile layouts when responsive behavior is relevant.
+- Review screenshots before uploading them: exclude sensitive or user-specific data, transient
+  errors, debug UI, and unrelated windows or overlays. Non-UI changes do not need screenshots.
+- If the current environment cannot capture or upload images, say so in the pull request
+  description and tell the user instead of silently omitting the screenshots.
+
 ## Repository map
 
 - `src/Store.tsx` assembles the `card`, `game`, `settings`, `ui`, and `user` slices. Use the typed
