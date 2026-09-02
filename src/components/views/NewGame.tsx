@@ -6,6 +6,7 @@ import {
   Card,
   CardActionArea,
   CardHeader,
+  Chip,
   IconButton,
   LinearProgress,
   List,
@@ -45,7 +46,7 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-type ChallengeFilterType = "All" | ScenarioThemeType;
+type ChallengeFilterType = "For you" | "All challenges" | ScenarioThemeType;
 
 const CHALLENGE_THEMES: ScenarioThemeType[] = [
   "Extreme weather",
@@ -63,6 +64,7 @@ interface MissionListItemProps {
   s: ScenarioType;
   completed: boolean;
   onSelect: () => void;
+  showThemes?: boolean;
 }
 
 function displayName(s: ScenarioType): string {
@@ -90,7 +92,7 @@ function MissionSectionHeader(
 // One row for everything: tutorial missions, scenarios, and the custom game all share the
 // list now - the only differences are the action control and what the subheader shows
 function MissionListItem(props: MissionListItemProps): React.JSX.Element {
-  const { s, completed, onSelect } = props;
+  const { s, completed, onSelect, showThemes = false } = props;
   const isTutorial = !!s.tutorialSteps;
   const name = displayName(s);
   const location = getScenarioLocation(s) || { name: "UNKNOWN" };
@@ -104,6 +106,20 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
         <span className="missionMeta">
           {location.name} · {s.startingYear}–{scenarioEndYear(s)}
         </span>
+        {showThemes && s.themes && (
+          <span className="missionThemes" aria-label={`${name} themes`}>
+            {s.themes.map((theme) => (
+              <Chip
+                component="span"
+                className="missionThemeTag"
+                key={theme}
+                label={theme}
+                size="small"
+                variant="outlined"
+              />
+            ))}
+          </span>
+        )}
       </span>
     );
   return (
@@ -202,9 +218,8 @@ function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
 
 export default function NewGame(props: Props): React.JSX.Element {
   const [showAllTutorials, setShowAllTutorials] = React.useState(false);
-  const [showAllChallenges, setShowAllChallenges] = React.useState(false);
   const [challengeFilter, setChallengeFilter] =
-    React.useState<ChallengeFilterType>("All");
+    React.useState<ChallengeFilterType>("For you");
   const ids = getPlayedScenarioIds();
   const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
@@ -223,13 +238,14 @@ export default function NewGame(props: Props): React.JSX.Element {
         recommendationRank(a) - recommendationRank(b),
     )
     .slice(0, 3);
-  const visibleScenarios = showAllChallenges
-    ? scenarios.filter(
-        (scenario) =>
-          challengeFilter === "All" ||
-          scenario.themes?.includes(challengeFilter),
-      )
-    : recommendedScenarios;
+  const visibleScenarios =
+    challengeFilter === "For you"
+      ? recommendedScenarios
+      : challengeFilter === "All challenges"
+        ? scenarios
+        : scenarios.filter((scenario) =>
+            scenario.themes?.includes(challengeFilter),
+          );
 
   return (
     <div id="listCard" className="flexContainer">
@@ -324,53 +340,30 @@ export default function NewGame(props: Props): React.JSX.Element {
             ))}
           </div>
         )}
-        <MissionSectionHeader
-          action={
-            <Button
-              size="small"
-              onClick={() => {
-                setShowAllChallenges(!showAllChallenges);
-                setChallengeFilter("All");
-              }}
-              aria-expanded={showAllChallenges}
-              aria-controls="challenge-catalog"
-              endIcon={
-                showAllChallenges ? <ExpandLessIcon /> : <ExpandMoreIcon />
-              }
-            >
-              {showAllChallenges
-                ? "Show recommendations"
-                : `View all ${scenarios.length}`}
-            </Button>
-          }
+        <MissionSectionHeader>Challenges</MissionSectionHeader>
+        <ToggleButtonGroup
+          className="challengeFilters"
+          value={challengeFilter}
+          exclusive
+          onChange={(
+            _event: React.MouseEvent<HTMLElement>,
+            value: ChallengeFilterType | null,
+          ) => value && setChallengeFilter(value)}
+          aria-label="Browse challenges"
+          size="small"
         >
-          Challenges
-        </MissionSectionHeader>
-        {showAllChallenges ? (
-          <ToggleButtonGroup
-            className="challengeFilters"
-            value={challengeFilter}
-            exclusive
-            onChange={(
-              _event: React.MouseEvent<HTMLElement>,
-              value: ChallengeFilterType | null,
-            ) => value && setChallengeFilter(value)}
-            aria-label="Filter challenges by theme"
-            size="small"
-          >
-            {(["All", ...CHALLENGE_THEMES] as ChallengeFilterType[]).map(
-              (theme) => (
-                <ToggleButton key={theme} value={theme} aria-label={theme}>
-                  {theme}
-                </ToggleButton>
-              ),
-            )}
-          </ToggleButtonGroup>
-        ) : (
-          <Typography className="challengeBrowseCaption" variant="body2">
-            Recommended for you
-          </Typography>
-        )}
+          {(
+            [
+              "For you",
+              ...CHALLENGE_THEMES,
+              "All challenges",
+            ] as ChallengeFilterType[]
+          ).map((filter) => (
+            <ToggleButton key={filter} value={filter} aria-label={filter}>
+              {filter}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
         <div id="challenge-catalog" data-testid="challenge-list">
           {visibleScenarios.map((s) => (
             <MissionListItem
@@ -378,6 +371,7 @@ export default function NewGame(props: Props): React.JSX.Element {
               s={s}
               completed={ids.indexOf(s.id) !== -1}
               onSelect={() => props.onDetails({ scenarioId: s.id })}
+              showThemes={challengeFilter !== "For you"}
             />
           ))}
         </div>

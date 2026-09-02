@@ -2348,22 +2348,27 @@ html[data-theme="dark"] .uplot {
     padding-top: 4px;
   }
 
-  .challengeBrowseCaption {
-    margin: 0 16px 8px;
-    color: $font_color_faded;
-  }
-
   .challengeFilters {
     display: flex !important;
+    gap: 6px;
     width: calc(100% - 24px);
     margin: 0 12px 10px;
     overflow-x: auto;
+    padding-bottom: 2px;
 
     .MuiToggleButton-root {
       flex: 0 0 auto;
       padding: 5px 10px;
+      border: 1px solid var(--border-tile) !important;
+      border-radius: 999px !important;
       font-size: 0.75rem;
       text-transform: none;
+
+      &.Mui-selected {
+        border-color: $interactive_blue !important;
+        color: $interactive_blue;
+        font-weight: 700;
+      }
     }
   }
 
@@ -2416,6 +2421,23 @@ html[data-theme="dark"] .uplot {
       display: block;
       margin-top: 2px;
       color: $font_color_faded;
+    }
+
+    .missionThemes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .missionThemeTag {
+      height: 20px;
+      color: $font_color_faded;
+      font-size: 0.68rem;
+
+      .MuiChip-label {
+        padding: 0 7px;
+      }
     }
   }
 

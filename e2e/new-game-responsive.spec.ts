@@ -33,7 +33,10 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
   await expect(
     page.getByTestId("challenge-list").getByRole("button"),
   ).toHaveCount(3);
-  await expect(page.getByText("Recommended for you")).toBeVisible();
+  await expect(page.getByRole("button", { name: "For you" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(
     page.getByRole("button", { name: "View Solar Eclipse details" }),
   ).toHaveCount(0);
@@ -45,7 +48,6 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     );
   expect(pageOverflow).toBeLessThanOrEqual(1);
 
-  await page.getByRole("button", { name: "View all 11" }).click();
   await page.getByRole("button", { name: "Extreme weather" }).click();
   await expect(
     page.getByRole("button", { name: "View Heatwave + Drought details" }),
@@ -59,4 +61,7 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
   await expect(
     page.getByRole("button", { name: "View Data Center Boom details" }),
   ).toHaveCount(0);
+  await expect(page.getByLabel("Deep Freeze themes")).toContainText(
+    "Sudden disruption",
+  );
 });

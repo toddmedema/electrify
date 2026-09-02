@@ -49,12 +49,12 @@ describe("NewGame", () => {
       expect.stringContaining("Data Center Boom"),
       expect.stringContaining("Carbon Fee"),
     ]);
-    expect(screen.getByText("Recommended for you")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View all 6" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    expect(screen.getByRole("button", { name: "View all 11" })).toHaveAttribute(
+    expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
+    expect(screen.getByRole("button", { name: "View all 6" })).toHaveAttribute(
       "aria-expanded",
       "false",
     );
@@ -63,7 +63,7 @@ describe("NewGame", () => {
     ).toHaveTextContent("Custom Game");
   });
 
-  it("expands tutorials in authored order and challenges by latest timeframe", () => {
+  it("expands tutorials in authored order and shows all challenges by latest timeframe", () => {
     render(<NewGame {...props()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
@@ -78,7 +78,7 @@ describe("NewGame", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "View all 11" }));
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     const scenariosNewestFirst = SCENARIOS.filter(
       (scenario) => !scenario.tutorialSteps,
     ).sort(
@@ -98,7 +98,6 @@ describe("NewGame", () => {
 
   it("filters the full challenge catalog by player-facing themes", () => {
     render(<NewGame {...props()} />);
-    fireEvent.click(screen.getByRole("button", { name: "View all 11" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Extreme weather" }));
     expect(challengeRows().map((row) => row.textContent)).toEqual([
@@ -106,12 +105,19 @@ describe("NewGame", () => {
       expect.stringContaining("Deep Freeze"),
       expect.stringContaining("Hurricane Season"),
     ]);
+    expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
+      "Extreme weatherSudden disruption",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Island grids" }));
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Paradise"),
       expect.stringContaining("Hurricane Season"),
     ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "For you" }));
+    expect(challengeRows()).toHaveLength(3);
+    expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
   });
 
   it("moves completed recommendations behind unplayed challenges", () => {
@@ -183,7 +189,7 @@ describe("NewGame", () => {
     render(<NewGame {...props()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
-    fireEvent.click(screen.getByRole("button", { name: "View all 11" }));
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     expect(
       screen.getByTestId(`mission-complete-${TUTORIALS[0].id}`),
     ).toBeInTheDocument();
