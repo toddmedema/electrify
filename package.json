@@ -143,6 +143,7 @@
       "svgo": "^2.8.3"
     },
     "react-scripts": {
+      "resolve-url-loader": "5.0.0",
       "typescript": "$typescript"
     }
   }
