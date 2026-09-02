@@ -25,21 +25,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// v4 persists calibrated demand and authored absolute-load schedules on the live game slice.
-export const SAVE_VERSION = 4;
-
-export function saveVersionError(raw: unknown): string | undefined {
-  if (typeof raw !== "object" || raw === null) {
-    return undefined;
-  }
-  const version = (raw as { version?: unknown }).version;
-  if (typeof version !== "number" || version === SAVE_VERSION) {
-    return undefined;
-  }
-  return version < SAVE_VERSION
-    ? "That save was created by an older simulation version and can't be resumed."
-    : "That save was created by a newer simulation version and can't be resumed.";
-}
+// Initial public schema. Increment this when a post-release change becomes incompatible.
+export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
   version: number;
@@ -73,7 +60,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (save.version !== SAVE_VERSION) {
+  if (
+    save.version !== SAVE_VERSION ||
+    typeof save.savedAt !== "string" ||
+    typeof save.appVersion !== "string"
+  ) {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -173,6 +164,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
     }) ||
     !Array.isArray(game.timeline) ||
     !Array.isArray(game.monthlyHistory) ||
+    game.monthlyHistory.length >
+      Math.floor(game.date.minute / MINUTES_PER_MONTH) ||
     game.monthlyHistory.some((month) => {
       if (typeof month !== "object" || month === null) {
         return true;
@@ -209,12 +202,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
     !Array.isArray(worldEvents.checkedKeys)
   ) {
     return null;
-  }
-  // Older v4 sessions could record the opening forecast as an extra completed month. History is
-  // newest-first, so any impossible excess is the oldest tail and can be repaired losslessly.
-  const completedMonths = Math.floor(game.date.minute / MINUTES_PER_MONTH);
-  if (game.monthlyHistory.length > completedMonths) {
-    game.monthlyHistory = game.monthlyHistory.slice(0, completedMonths);
   }
   return save as SaveGameType;
 }

@@ -224,16 +224,10 @@ export interface ReplayType {
   scenarioId: number;
   difficulty: DifficultyType;
   seed: number;
-  // Recorded for bug reports, alongside appVersion, and deliberately not read back: playback
-  // reloads the scenario and takes the year from it, so a replay that disagreed with its own
-  // scenario would be describing a run that could not be reproduced anyway. Not required on the
-  // way in for the same reason
-  startingYear?: number;
   // Where the run was played. A scenario id no longer pins this down -- a custom game carries its
   // own location, and an authored one could be given a location that isn't in LOCATIONS -- so
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
-  durationMinutes: number; // How far the recorded run got
   actions: ReplayActionType[];
 }
 
@@ -311,9 +305,6 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;
-    // Legacy saves may contain the old enumerable commitment forecast. New forecasts keep this
-    // transient so it cannot inflate saves, chart copies, or Redux development scans.
-    dispatchTargetWByFacility?: Record<number, number>;
   };
 
 export type DerivedHistoryKeysType = Exclude<
@@ -602,8 +593,7 @@ export interface ScenarioType {
   // When absent, the location profile supplies the starting grid size.
   startingCustomers?: number;
   // Customer count and utility-scale load are not interchangeable. Authored scenarios can
-  // calibrate the ordinary customer-driven baseline while the absent default preserves every
-  // legacy scenario and custom game.
+  // calibrate the ordinary customer-driven baseline; otherwise the location profile is enough.
   startingDemandScale?: number;
   // Absolute loads owned by this scenario. A Data centers schedule replaces the generic regional
   // data-center curve instead of stacking on top of it.

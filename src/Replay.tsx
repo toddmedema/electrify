@@ -28,22 +28,8 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// v6 rounds every scenario's starting facility capacity to two significant digits.
-// Older actions cannot reproduce the same monthly facts and are rejected rather than migrated.
-export const REPLAY_VERSION = 6;
-
-export function replayVersionError(raw: unknown): string | undefined {
-  if (typeof raw !== "object" || raw === null) {
-    return undefined;
-  }
-  const version = (raw as { version?: unknown }).version;
-  if (typeof version !== "number" || version === REPLAY_VERSION) {
-    return undefined;
-  }
-  return version < REPLAY_VERSION
-    ? "That replay was created by an older simulation version and can't be played."
-    : "That replay was created by a newer simulation version and can't be played.";
-}
+// Initial public schema. Increment this when a post-release change becomes incompatible.
+export const REPLAY_VERSION = 1;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -145,9 +131,7 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     seed: game.seed,
-    startingYear: game.startingYear,
     location: cloneDeep(game.location),
-    durationMinutes: game.date.minute,
     actions: cloneDeep(game.replayLog),
   };
 }
@@ -225,6 +209,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
+    typeof doc.appVersion !== "string" ||
     typeof doc.difficulty !== "string" ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
@@ -238,18 +223,11 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   }
   return {
     version: REPLAY_VERSION,
-    appVersion: typeof doc.appVersion === "string" ? doc.appVersion : "unknown",
+    appVersion: doc.appVersion,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
-    // Diagnostic only (see ReplayType), so a document without one is still a replay
-    startingYear: isFiniteNumber(doc.startingYear)
-      ? doc.startingYear
-      : undefined,
     location: doc.location,
-    durationMinutes: isFiniteNumber(doc.durationMinutes)
-      ? doc.durationMinutes
-      : 0,
     actions,
   };
 }

@@ -58,9 +58,7 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
     scenarioId: 101,
     difficulty: "Employee",
     seed: 12345,
-    startingYear: 2020,
     location: LOCATIONS.SF,
-    durationMinutes: 43200,
     actions: [{ minute: 1440, type: "sellFacility", payload: 3 }],
     ...overrides,
   };
