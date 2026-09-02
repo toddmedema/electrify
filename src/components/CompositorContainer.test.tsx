@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as React from "react";
-import { UnknownAction } from "redux";
+import { UnknownAction } from "@reduxjs/toolkit";
 import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";

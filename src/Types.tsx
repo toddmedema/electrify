@@ -1,6 +1,6 @@
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
-import Redux from "redux";
+import type { Action } from "@reduxjs/toolkit";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 export interface AudioType {
@@ -498,7 +498,7 @@ export interface TutorialStepType {
   // A one-way side effect of leaving this step forwards, such as starting the clock. It
   // isn't replayed when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
-  onNext?: () => Redux.Action;
+  onNext?: () => Action;
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;

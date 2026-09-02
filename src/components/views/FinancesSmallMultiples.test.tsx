@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { produce } from "immer";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import Finances from "./Finances";
 import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";

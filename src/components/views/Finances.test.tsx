@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { produce } from "immer";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import Finances, {
   formatCustomerChange,
   getComparison,
