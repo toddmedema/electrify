@@ -1,5 +1,6 @@
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import EventLog from "./EventLog";
 
 jest.mock("../base/GameCard", () => (props: { children: React.ReactNode }) => (
@@ -94,5 +95,114 @@ describe("EventLog", () => {
     expect(
       screen.queryByText(/recorded after they happen/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("filters event history into useful event groups", async () => {
+    const user = userEvent.setup();
+    render(
+      <EventLog
+        events={[
+          {
+            id: 1,
+            kind: "WORLD_EVENT",
+            label: "Jan 2024",
+            message: "A scenario event happened.",
+          },
+          {
+            id: 2,
+            kind: "BLACKOUT",
+            label: "Feb 2024",
+            message: "A blackout started.",
+          },
+          {
+            id: 3,
+            kind: "BUILD",
+            label: "Mar 2024",
+            message: "A solar project started.",
+          },
+          {
+            id: 4,
+            kind: "LOAN",
+            label: "Apr 2024",
+            message: "A loan was issued.",
+          },
+          {
+            id: 5,
+            kind: "FUEL_PRICE",
+            label: "May 2024",
+            message: "Gas became more expensive.",
+          },
+        ]}
+        upcoming={[
+          {
+            key: "next",
+            label: "Jun 2024",
+            message: "An upcoming event remains visible.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Filter event history, All events" }),
+    );
+    expect(
+      screen.getByRole("menuitemradio", { name: "All events" }),
+    ).toBeChecked();
+    await user.click(screen.getByRole("menuitemradio", { name: "Blackouts" }));
+
+    expect(screen.getByText("A blackout started.")).toBeVisible();
+    expect(screen.queryByText("A scenario event happened.")).toBeNull();
+    expect(screen.queryByText("A solar project started.")).toBeNull();
+    expect(
+      screen.getByRole("button", {
+        name: "Filter event history, Blackouts",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("An upcoming event remains visible."),
+    ).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Filter event history, Blackouts",
+      }),
+    );
+    expect(
+      screen.getByRole("menuitemradio", { name: "Blackouts" }),
+    ).toBeChecked();
+    await user.click(screen.getByRole("menuitemradio", { name: "All events" }));
+
+    expect(screen.getByText("A scenario event happened.")).toBeVisible();
+    expect(screen.getByText("A solar project started.")).toBeVisible();
+    expect(screen.getByText("A loan was issued.")).toBeVisible();
+    expect(screen.getByText("Gas became more expensive.")).toBeVisible();
+  });
+
+  it("explains when the selected event group is empty", async () => {
+    const user = userEvent.setup();
+    render(
+      <EventLog
+        events={[
+          {
+            id: 1,
+            kind: "WORLD_EVENT",
+            label: "Jan 2024",
+            message: "A scenario event happened.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Filter event history, All events" }),
+    );
+    await user.click(screen.getByRole("menuitemradio", { name: "Projects" }));
+
+    expect(screen.getByText("No project events yet.")).toBeVisible();
   });
 });
