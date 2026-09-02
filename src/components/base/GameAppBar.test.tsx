@@ -1,7 +1,12 @@
 import * as React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
-import { GameAppBar, Props, reserveCapacityW } from "./GameAppBar";
+import {
+  GameAppBar,
+  getGridHealth,
+  Props,
+  reserveCapacityW,
+} from "./GameAppBar";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { FacilityOperatingType, TickPresentFutureType } from "../../Types";
 
@@ -9,6 +14,13 @@ jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
   isBigScreen: () => true,
 }));
+
+const WEATHER_DRIVEN_TEST_FUELS = [
+  "Sun",
+  "Wind",
+  "Offshore Wind",
+  "Airborne Wind",
+];
 
 function renderAppBar(overrides: Partial<Props> = {}) {
   const game = createGame({ scenarioId: 101 });
@@ -38,7 +50,7 @@ describe("GameAppBar", () => {
     expect(onSpeedChange).toHaveBeenCalledWith("FAST");
   });
 
-  it("reports unused available capacity in MW and grows when a plant is added", () => {
+  it("reports reserve and grows when a plant is added", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
     const plant = game.facilities.find(
@@ -51,10 +63,73 @@ describe("GameAppBar", () => {
 
     expect(reserveCapacityW(game, now) - before).toBe(plant.peakW);
     renderAppBar({ game: { ...game, inGame: true } });
+    expect(screen.getByText(/\+.*W reserve/)).toBeInTheDocument();
+    expect(screen.getByText("Stable")).toBeInTheDocument();
+  });
+
+  it("warns when reserve falls to ten percent of demand", () => {
+    const game = createGame({ scenarioId: 101 });
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    const plant = game.facilities.find(
+      (facility: FacilityOperatingType) =>
+        facility.fuel &&
+        !facility.peakWh &&
+        !WEATHER_DRIVEN_TEST_FUELS.includes(facility.fuel),
+    )!;
+    const lowReserveGame = {
+      ...game,
+      facilities: [
+        {
+          ...plant,
+          paused: false,
+          yearsToBuildLeft: 0,
+          peakW: now.demandW * 1.05,
+        },
+      ],
+    };
+
+    expect(getGridHealth(lowReserveGame, now)).toMatchObject({
+      state: "low-reserve",
+      label: "Low reserve",
+      metric: expect.stringMatching(/reserve \(5%\)/),
+    });
+  });
+
+  it("distinguishes an exhausted reserve from a blackout", () => {
+    const game = createGame({ scenarioId: 101 });
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    const plant = game.facilities.find(
+      (facility: FacilityOperatingType) =>
+        facility.fuel &&
+        !facility.peakWh &&
+        !WEATHER_DRIVEN_TEST_FUELS.includes(facility.fuel),
+    )!;
+    const atLimitGame = {
+      ...game,
+      facilities: [
+        {
+          ...plant,
+          paused: false,
+          yearsToBuildLeft: 0,
+          peakW: now.demandW,
+        },
+      ],
+    };
+
+    expect(getGridHealth(atLimitGame, now)).toMatchObject({
+      state: "at-limit",
+      metric: "0W reserve",
+    });
     expect(
-      screen.getByText(/Grid stable · .*W spare capacity/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/% reserve/)).not.toBeInTheDocument();
+      getGridHealth(game, {
+        ...now,
+        supplyW: now.demandW - 373000000,
+      } as TickPresentFutureType),
+    ).toMatchObject({
+      state: "blackout",
+      label: "Blackout",
+      metric: "373MW short",
+    });
   });
 
   it("counts only current weather-limited Airborne Wind output as reserve", () => {

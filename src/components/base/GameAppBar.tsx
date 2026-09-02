@@ -77,6 +77,17 @@ const WEATHER_DRIVEN_FUELS = new Set([
   "Airborne Wind",
 ]);
 
+const LOW_RESERVE_RATIO = 0.1;
+
+type GridHealthState = "stable" | "low-reserve" | "at-limit" | "blackout";
+
+interface GridHealth {
+  state: GridHealthState;
+  label: string;
+  metric: string;
+  announcement: string;
+}
+
 /** Capacity that could serve demand now, rather than the deliberately dispatched output. */
 export function reserveCapacityW(
   game: GameType,
@@ -106,6 +117,49 @@ export function reserveCapacityW(
     0,
   );
   return available - now.demandW;
+}
+
+/** Turns the live supply margin into the few states a player can act on at a glance. */
+export function getGridHealth(
+  game: GameType,
+  now: TickPresentFutureType,
+): GridHealth {
+  if (now.supplyW < now.demandW) {
+    return {
+      state: "blackout",
+      label: "Blackout",
+      metric: `${formatWatts(now.demandW - now.supplyW)} short`,
+      announcement: "Blackout. Demand is higher than supply.",
+    };
+  }
+
+  const reserveW = Math.max(0, reserveCapacityW(game, now));
+  if (reserveW === 0) {
+    return {
+      state: "at-limit",
+      label: "At limit",
+      metric: "0W reserve",
+      announcement: "Grid at limit. No reserve remains.",
+    };
+  }
+
+  const reserveRatio = now.demandW > 0 ? reserveW / now.demandW : Infinity;
+  if (reserveRatio <= LOW_RESERVE_RATIO) {
+    const reservePercent = Math.round(reserveRatio * 100);
+    return {
+      state: "low-reserve",
+      label: "Low reserve",
+      metric: `+${formatWatts(reserveW)} reserve (${reservePercent}%)`,
+      announcement: "Low reserve.",
+    };
+  }
+
+  return {
+    state: "stable",
+    label: "Stable",
+    metric: `+${formatWatts(reserveW)} reserve`,
+    announcement: "Grid stable.",
+  };
 }
 
 const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
@@ -265,11 +319,8 @@ export function GameAppBar(props: Props) {
     return <span />;
   }
 
-  const inBlackout = now.supplyW < now.demandW;
-  const reserveW = Math.max(0, reserveCapacityW(game, now));
-  const gridHealth = inBlackout
-    ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
-    : `Grid stable · ${formatWatts(reserveW)} spare capacity`;
+  const gridHealth = getGridHealth(game, now);
+  const inBlackout = gridHealth.state === "blackout";
 
   return (
     <div id="appbar">
@@ -295,21 +346,38 @@ export function GameAppBar(props: Props) {
         </Toolbar>
       </div>
       <div
-        className={`gridHealth ${inBlackout ? "gridHealth-blackout" : ""}`}
-        aria-label={`Current grid status: ${gridHealth}`}
+        className={`gridHealth gridHealth-${gridHealth.state}`}
+        aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
       >
-        <strong>{gridHealth}</strong>
+        <div className="gridHealthSummary">
+          <span className="gridHealthState">
+            <span className="gridHealthIcon" aria-hidden="true">
+              <ConceptIcon
+                concept={
+                  inBlackout
+                    ? "blackout"
+                    : gridHealth.state === "stable"
+                      ? "supply"
+                      : "danger"
+                }
+                fontSize="small"
+              />
+            </span>
+            <strong>{gridHealth.label}</strong>
+          </span>
+          <span className="gridHealthSeparator" aria-hidden="true">
+            |
+          </span>
+          <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+        </div>
         {inBlackout && (
-          <span>
-            Resume available resources, discharge storage, or plan more
-            capacity.
+          <span className="gridHealthAdvice">
+            Resume generation or discharge storage now.
           </span>
         )}
       </div>
       <span className="srOnly" aria-live="polite">
-        {inBlackout
-          ? "Blackout. Demand is higher than supply."
-          : `Grid stable. Game speed ${speed.toLowerCase()}.`}
+        {gridHealth.announcement}
       </span>
       <div
         id="yearProgressBar"

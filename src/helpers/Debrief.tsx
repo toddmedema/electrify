@@ -153,7 +153,7 @@ function scenarioMetrics(
         concept: "rate",
       },
       {
-        label: "Smallest spare capacity · 2026",
+        label: "Smallest reserve · 2026",
         value:
           minimumMargin === undefined
             ? "Not reached"
