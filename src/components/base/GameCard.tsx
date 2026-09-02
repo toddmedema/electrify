@@ -2,7 +2,7 @@ import * as React from "react";
 import { connect } from "react-redux";
 import { Toolbar, Typography } from "@mui/material";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { isDesktopScreen } from "../../Globals";
+import { isPaneLayout } from "../../Globals";
 import { AppStateType, GameType } from "../../Types";
 import GameAppBarContainer from "./GameAppBar";
 import NavigationContainer from "./NavigationContainer";
@@ -11,17 +11,17 @@ import NavigationContainer from "./NavigationContainer";
  * The frame the three in-game panes sit in.
  *
  * On a phone there is one pane on screen at a time, so the card carries the app bar and the
- * bottom nav that switches between them. On desktop all three are already on screen and the app
- * bar spans them (see Compositor.renderCard), so a card is just a pane: a header naming it and
- * its own contents.
+ * bottom nav that switches between them. Anything wider puts at least two of them on screen at
+ * once with the app bar spanning them (see Compositor.renderCard), so a card is just a pane
+ * there: a header naming it and its own contents.
  */
 
 export interface GameCardProps extends React.ComponentPropsWithoutRef<"div"> {
   children?: React.JSX.Element | React.JSX.Element[] | undefined;
   className?: string | undefined;
   game: GameType;
-  // Shown as this pane's own header in the desktop layout, since there's no bottom nav there to
-  // tell the panes apart. Panes whose contents already lead with a header of their own (see
+  // Shown as this pane's own header in the side-by-side layouts, since there's no bottom nav
+  // above the desktop breakpoint to tell the panes apart. Panes whose contents already lead with a header of their own (see
   // Facilities, whose header carries the build buttons) leave this unset.
   title?: string;
 }
@@ -38,7 +38,7 @@ export function GameCard(props: Props) {
 
   const classes = ["flexContainer", props.className].filter(Boolean).join(" ");
 
-  if (isDesktopScreen()) {
+  if (isPaneLayout()) {
     return (
       // id is how tutorial steps address an individual pane, since the bottom nav they'd
       // otherwise point at is hidden in this layout

@@ -159,11 +159,14 @@ export function formatReport(
   lines.push("TOTALS");
   lines.push(
     `  Outcome          ${
-      result.wentBankrupt
+      result.outcome === "bankrupt"
         ? `BANKRUPT at month ${result.bankruptAtMonth} of ${opts.months}`
-        : `survived all ${opts.months} months`
+        : result.outcome === "fired"
+          ? `FIRED at month ${result.firedAtMonth} of ${opts.months}`
+          : `completed all ${opts.months} months`
     }`,
   );
+  lines.push(`  Player actions   ${result.actionCount}`);
   if (first && last) {
     lines.push(
       `  Cash             ${formatMoneyConcise(first.cash)} -> ${formatMoneyConcise(last.cash)}`,
@@ -181,8 +184,7 @@ export function formatReport(
   lines.push(
     `  Expenses         ${formatMoneyConcise(derived.expenses)}  ` +
       `[fuel ${formatMoneyConcise(summary.expensesFuel)} · O&M ${formatMoneyConcise(summary.expensesOM)} · ` +
-      `interest ${formatMoneyConcise(summary.expensesInterest)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee)} · ` +
-      `marketing ${formatMoneyConcise(summary.expensesMarketing)}]`,
+      `interest ${formatMoneyConcise(summary.expensesInterest)} · carbon ${formatMoneyConcise(summary.expensesCarbonFee)}]`,
   );
   lines.push(`  Profit           ${formatMoneyConcise(derived.profit)}`);
   lines.push(

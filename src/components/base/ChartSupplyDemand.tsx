@@ -8,12 +8,13 @@ import {
   LegendItem,
   padRange,
   spansFromEdges,
-  TICK_LABEL_FILL,
+  tickLabelFill,
   verticalLinePlugin,
   xAxis,
   yAxis,
 } from "./UPlotHelpers";
 import {
+  formatHour,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
@@ -21,7 +22,7 @@ import {
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { getIntersectionX } from "../../helpers/Math";
-import { blackoutColor, demandColor, supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 import { LocationType } from "../../Types";
 
 interface ChartData {
@@ -55,10 +56,10 @@ interface State {
   blackoutSpans: Array<[number, number]>;
   currentMinute: number | null;
   legendItems: LegendItem[];
+  startingYear: number;
 }
 
 const SUN_LABELS = ["🌅", "☀️ ", "🌇"];
-const HISTORIC_FILL = "#e3f2fd"; // blue50
 
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
   return {
@@ -86,7 +87,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         // Sunrise and sunset ride a second axis so the hours stay evenly spaced and readable
         scale: "x",
         side: 2,
-        stroke: TICK_LABEL_FILL,
+        stroke: tickLabelFill(),
         font: chartFont(scale),
         grid: { show: false },
         ticks: { show: false },
@@ -103,27 +104,31 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     series: [
       {},
       {
-        stroke: supplyColor,
+        stroke: chartPalette().supply,
         width: 1.75,
-        fill: HISTORIC_FILL,
+        fill: chartPalette().historicFill,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: supplyColor,
+        stroke: chartPalette().supply,
         width: 1,
         points: { show: false },
         spanGaps: false,
       },
       {
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2.5,
         points: { show: false },
       },
     ],
     plugins: [
-      bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3),
-      verticalLinePlugin(() => getState().currentMinute, "#000000", 0.5),
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+      verticalLinePlugin(
+        () => getState().currentMinute,
+        chartPalette().axis,
+        0.5,
+      ),
       // Flush with the plot's own right edge, wherever the y axis leaves it
       legendPlugin(() => getState().legendItems, 0, 18, "right"),
     ],
@@ -132,11 +137,10 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const time = formatHour(getDateFromMinute(d.minute, state.startingYear));
+  return `${time}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
-// TODO how to indicate history vs reality vs forecast? Perhaps current time as a prop, and then split it in the chart
-// and don't actually differentiate between reality +  forecast in data?
 const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const { startingYear, height, legend, timeline, location } = props;
   // Figure out the boundaries of the chart data
@@ -153,28 +157,31 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const date = getDateFromMinute(rangeMin, startingYear);
   const midnight = Math.floor(rangeMin / 1440) * 1440;
 
-  let sunrise = midnight + getSunriseSunset(date, location).sunrise;
-  let sunset = midnight + getSunriseSunset(date, location).sunset;
-  if (sunrise < rangeMin) {
-    sunrise =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunrise;
+  const sun = getSunriseSunset(date, location);
+  let sunTicks: number[] = [];
+  if (sun.daylight === "normal") {
+    let sunrise = midnight + sun.sunrise;
+    let sunset = midnight + sun.sunset;
+    if (sunrise < rangeMin) {
+      sunrise =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunrise;
+    }
+    if (sunset < rangeMin) {
+      sunset =
+        midnight +
+        1440 +
+        getSunriseSunset(
+          getDateFromMinute(rangeMin + 1440, startingYear),
+          location,
+        ).sunset;
+    }
+    sunTicks = [sunrise, sunrise + (sunset - sunrise) / 2, sunset];
   }
-  if (sunset < rangeMin) {
-    sunset =
-      midnight +
-      1440 +
-      getSunriseSunset(
-        getDateFromMinute(rangeMin + 1440, startingYear),
-        location,
-      ).sunset;
-  }
-
-  const noon = sunrise + (sunset - sunrise) / 2;
 
   // "Demand peaks in the early evening" only lands if you can read the clock off the axis
   const hourTicks = getHourTicks(rangeMin, rangeMax);
@@ -255,11 +262,11 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   const legendItems: LegendItem[] = [];
   if (legend) {
     legendItems.push(
-      { name: "Supply", fill: supplyColor },
-      { name: "Demand", fill: demandColor },
+      { name: "Supply", fill: chartPalette().supply },
+      { name: "Demand", fill: chartPalette().demand },
     );
     if (blackoutCount > 0) {
-      legendItems.push({ name: "Blackout", fill: blackoutColor });
+      legendItems.push({ name: "Blackout", fill: chartPalette().blackout });
     }
   }
 
@@ -268,22 +275,25 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
     domain: padRange(domainMin, domainMax),
     range: [rangeMin, rangeMax],
     hourTicks,
-    sunTicks: [sunrise, noon, sunset],
+    sunTicks,
     blackoutSpans: spansFromEdges(blackouts),
     currentMinute: currentMinute === rangeMax ? null : currentMinute,
     legendItems,
+    startingYear,
   };
 
   return (
     <UPlotChart<State>
       ariaLabel="Chart of electricity supply and demand over the day"
+      formatSummaryValue={formatWatts}
       id="chartSupplyDemand"
       height={height}
       state={state}
       data={[minutes, supplyHistoric, supplyForecast, demand]}
+      seriesLabels={["Past supply", "Forecast supply", "Demand"]}
       buildOptions={buildOptions}
       tooltip={tooltip}
     />
   );
 };
-export default ChartSupplyDemand;
+export default React.memo(ChartSupplyDemand);

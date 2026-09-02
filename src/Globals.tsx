@@ -111,12 +111,13 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * This function checks if the screen size is small, based on the width of the document being < 375
+ * Compact phone chrome belongs on every common phone width, not just devices narrower than an
+ * old 375px breakpoint. Larger controls also matter most on coarse-pointer devices.
  *
  * @returns {boolean} - Returns true if the screen width is less than 375, otherwise false.
  */
 export function isSmallScreen(): boolean {
-  return getViewportWidth() < 375;
+  return getViewportWidth() < 600;
 }
 
 /**
@@ -130,14 +131,28 @@ export function isBigScreen(): boolean {
 }
 
 /**
- * This function checks if the screen is wide enough to show Facilities, Finances and Forecasts
- * side by side instead of one at a time -- keep in sync with $desktop_breakpoint in app.scss.
- * Below this, panes render too narrow to be worth splitting into three columns.
+ * This function checks if the screen is wide enough to show Facilities and Insights side by
+ * side without the bottom navigation -- keep in sync with $desktop_breakpoint in app.scss.
  *
  * @returns {boolean} - Returns true if the screen width is at least 1300, otherwise false.
  */
 export function isDesktopScreen(): boolean {
   return getViewportWidth() >= 1300;
+}
+
+/**
+ * Whether the in-game cards render as panes side by side -- with the app bar, and below the
+ * desktop breakpoint the bottom nav, supplied by the layout around them -- rather than as one
+ * full-screen card carrying its own chrome.
+ *
+ * True from $pane_breakpoint up: between there and the desktop breakpoint the layout is
+ * Facilities pinned beside Insights or Events. Narrower portrait tablets keep the single-pane
+ * navigation because a facility row and its controls do not fit in the default split.
+ *
+ * @returns {boolean} - Returns true if the screen is at least 1024px wide, otherwise false.
+ */
+export function isPaneLayout(): boolean {
+  return getViewportWidth() >= 1024;
 }
 
 export function getHistoryApi(): HistoryApi {

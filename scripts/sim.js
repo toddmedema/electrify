@@ -18,12 +18,20 @@ const FLAGS = {
   "--months": "SIM_MONTHS",
   "--seed": "SIM_SEED",
   "--strategy": "SIM_STRATEGY",
-  "--marketing": "SIM_MARKETING",
   "--rate": "SIM_RATE",
+  "--build": "SIM_BUILD",
+  "--build-mw": "SIM_BUILD_MW",
+  "--build-mwh": "SIM_BUILD_MWH",
+  "--sell-id": "SIM_SELL_ID",
+  "--sell-month": "SIM_SELL_MONTH",
 };
 const BOOLEAN_FLAGS = {
   "--all": "SIM_ALL",
   "--full": "SIM_FULL",
+  "--finance": "SIM_FINANCE",
+  "--matrix": "SIM_MATRIX",
+  "--benchmark-stories": "SIM_STORY_BENCHMARK",
+  "--without-stories": "SIM_WITHOUT_STORIES",
 };
 
 const USAGE = `
@@ -33,6 +41,7 @@ Runs the game's simulation headlessly and reports what happened.
   npm run sim -- --all                     every scenario, one line each
   npm run sim -- --scenario 103 --full     every month of "The Shale Boom"
   npm run sim -- --year 2080 --months 240  a twenty-year run starting in 2080
+  npm run sim -- --matrix                 6 scenarios × 5 difficulties × 20 seeds, with/without stories
 
   --scenario <id>        Scenario to play (default 101). --list shows the ids
   --year <n>             Override the scenario's starting year (1980 and up)
@@ -42,9 +51,18 @@ Runs the game's simulation headlessly and reports what happened.
   --months <n>           Override the scenario's own duration
   --seed <n>             Pin the run's randomness (default 12345)
   --strategy <name>      none (default) or keepUp, which buys generators when short on supply
-  --marketing <dollars>  Monthly marketing spend (default 0)
   --rate <dollars>       $/kWh charged to customers (default: whatever a real game starts at)
+  --build <name>         Build one generator or storage facility immediately
+                         (a real recorded player action)
+  --build-mw <n>         Generator size for --build in MW (default 300)
+  --build-mwh <n>        Storage energy size for --build in MWh
+  --finance              Finance --build instead of paying cash
+  --sell-id <n>          Sell one starting facility by facility id
+  --sell-month <n>       Wait until this month to apply --sell-id (default 0)
   --all                  Sweep every scenario instead of reporting on one
+  --matrix               Run the deterministic story balance matrix
+  --benchmark-stories    Compare a 20-year forecast with stories enabled/disabled
+  --without-stories      Disable authored story effects for a control run
   --full                 Print every month rather than a sample
   --list                 List the scenarios and exit
 `;
@@ -106,14 +124,11 @@ function requireScenarios() {
 const result = spawnSync(
   process.execPath,
   [
-    path.resolve(
-      __dirname,
-      "..",
-      "node_modules",
-      "react-scripts",
-      "bin",
-      "react-scripts.js",
-    ),
+    // Let Node walk parent module directories. A git worktree may have only CRA's local cache in
+    // its own node_modules while sharing the repository's installed dependencies one level up.
+    require.resolve("react-scripts/bin/react-scripts.js", {
+      paths: [path.resolve(__dirname, "..")],
+    }),
     "test",
     "--watchAll=false",
     "--testMatch",

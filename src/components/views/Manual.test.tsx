@@ -1,8 +1,9 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Manual, { clearManualMemory } from "./Manual";
 import { MANUAL_ENTRY } from "../../data/Manual";
+import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
 
 function renderManual(focusEntry?: string) {
   return render(<Manual onBack={() => undefined} focusEntry={focusEntry} />);
@@ -12,10 +13,9 @@ function entryHeader(title: string): HTMLElement {
   return screen.getByRole("button", { name: new RegExp(title, "i") });
 }
 
-async function search(term: string) {
+function search(term: string) {
   const box = screen.getByLabelText("Search the manual");
-  await userEvent.clear(box);
-  await userEvent.type(box, term);
+  fireEvent.change(box, { target: { value: term } });
 }
 
 // The headers of every entry currently listed, in the order they're shown
@@ -43,15 +43,18 @@ describe("Manual", () => {
 
   // The old filter only looked at children that were plain strings, so any paragraph
   // containing an element (<strong>, a nested list, ...) was invisible to search
-  it.each([
-    ["merit order", MANUAL_ENTRY.FORECASTS],
-    ["dispatch order", MANUAL_ENTRY.FORECASTS],
-    ["peak shortage", MANUAL_ENTRY.FORECASTS],
-    ["board of directors", MANUAL_ENTRY.BLACKOUTS],
-  ])("finds %s inside mixed markup", async (term: string, title: string) => {
+  it("finds representative terms inside mixed markup", async () => {
     renderManual();
-    await search(term);
-    expect(entryHeader(title)).toBeInTheDocument();
+    for (const [term, title] of [
+      ["merit order", MANUAL_ENTRY.FORECASTS],
+      ["dispatch order", MANUAL_ENTRY.FORECASTS],
+      ["peak shortage", MANUAL_ENTRY.FORECASTS],
+      ["job security", MANUAL_ENTRY.BLACKOUTS],
+      ["variable O&M", MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    ]) {
+      await search(term);
+      expect(entryHeader(title)).toBeInTheDocument();
+    }
   });
 
   it("finds terms by keyword as well as by title", async () => {
@@ -75,6 +78,17 @@ describe("Manual", () => {
     }
   });
 
+  it("includes every shared game symbol in the symbol guide", async () => {
+    renderManual();
+    await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
+    const legend = screen.getByTestId("concept-legend");
+    CONCEPT_NAMES.forEach((concept) => {
+      expect(
+        within(legend).getByLabelText(CONCEPT_LABELS[concept]),
+      ).toHaveAttribute("data-concept", concept);
+    });
+  });
+
   it("expands matched entries and highlights the match", async () => {
     renderManual();
     // Collapsed to start with, so the body isn't in the DOM at all
@@ -82,18 +96,18 @@ describe("Manual", () => {
       "aria-expanded",
       "false",
     );
-    await search("rolling blackouts");
+    await search("available supply");
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
       "true",
     );
     // The phrase is mid-paragraph, so only the highlight wrapper matches it exactly
-    expect(screen.getByText("rolling blackouts").tagName).toBe("MARK");
+    expect(screen.getByText("available supply").tagName).toBe("MARK");
   });
 
   it("lets the player collapse an auto-expanded result", async () => {
     renderManual();
-    await search("rolling blackouts");
+    await search("available supply");
     await userEvent.click(entryHeader(MANUAL_ENTRY.BLACKOUTS));
     expect(entryHeader(MANUAL_ENTRY.BLACKOUTS)).toHaveAttribute(
       "aria-expanded",
@@ -110,7 +124,7 @@ describe("Manual", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Let us know" })).toHaveAttribute(
       "href",
-      expect.stringContaining("mailto:"),
+      "/about.html#feedback",
     );
   });
 
@@ -154,7 +168,9 @@ describe("Manual", () => {
     const row = screen
       .getAllByRole("row")
       .find((r: HTMLElement) =>
-        (r.textContent || "").includes("per TWh of blackouts"),
+        (r.textContent || "").includes(
+          "per TWh of demand not served during blackouts",
+        ),
       );
     expect(row).toBeDefined();
     // The investor penalty, in its own cell rather than run together with the text

@@ -1,8 +1,16 @@
 import * as React from "react";
-import { Button, IconButton } from "@mui/material";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import InfoIcon from "@mui/icons-material/Info";
+import ShareIcon from "@mui/icons-material/Share";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import { login } from "../../Globals";
+import {
+  buildGameShareContent,
+  canShare,
+  shareText,
+} from "../../helpers/Share";
+import InstallAppButton from "../base/InstallAppButton";
 
 export interface StateProps {
   audioEnabled?: boolean;
@@ -21,66 +29,151 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 const MainMenu = (props: Props): React.JSX.Element => {
+  const startLabel = props.hasSavedGame ? "Start a new game" : "Start playing";
+  const [shareStatus, setShareStatus] = React.useState("");
+
+  const onShare = async () => {
+    const result = await shareText(buildGameShareContent());
+    if (result === "clipboard") {
+      setShareStatus("Game link copied. Paste it wherever you like.");
+    } else if (result === "unavailable") {
+      setShareStatus("Sharing isn't available in this browser.");
+    }
+  };
+
   return (
     <div id="menuCard">
       <div id="logo">
-        <img src="images/logo.svg" alt="Logo"></img>
+        <img
+          src="images/logo.svg"
+          alt="Electrify"
+          style={{ maxWidth: 680 }}
+        ></img>
       </div>
-      <div id="centeredMenu">
-        {props.hasSavedGame && (
-          <Button
-            size="large"
-            variant="contained"
-            color="primary"
-            onClick={props.onContinue}
-            autoFocus={true}
-          >
-            Continue
-          </Button>
-        )}
-        <Button
-          size="large"
-          variant={props.hasSavedGame ? "outlined" : "contained"}
-          color="primary"
-          onClick={props.onStart}
-          autoFocus={!props.hasSavedGame}
+      <Typography component="h1" className="srOnly">
+        Electrify
+      </Typography>
+      <Box id="centeredMenu" sx={{ px: 3 }}>
+        <Typography className="gameSubtitle" variant="body1" component="p">
+          Keep the lights on. Build a cleaner grid.
+        </Typography>
+        <Stack
+          component="section"
+          aria-label="Primary actions"
+          className="mainActions"
+          spacing={1.25}
+          useFlexGap
         >
-          Play
-        </Button>
-        <Button variant="outlined" color="primary" onClick={props.onManual}>
-          Manual
-        </Button>
-        <Button variant="outlined" color="primary" onClick={props.onSettings}>
-          Options
-        </Button>
-        {!props.uid && (
-          <Button variant="outlined" color="primary" onClick={login}>
-            Log in
-          </Button>
-        )}
-        {props.audioEnabled === undefined && (
+          {props.hasSavedGame && (
+            <Button
+              data-main-action
+              size="large"
+              variant="contained"
+              color="primary"
+              onClick={props.onContinue}
+            >
+              Continue
+            </Button>
+          )}
           <Button
-            variant="outlined"
+            data-main-action
+            size="large"
+            variant={props.hasSavedGame ? "outlined" : "contained"}
             color="primary"
-            onClick={() => props.onAudioChange(true)}
-            style={{ display: "inline", marginRight: "12px", marginTop: "4px" }}
+            onClick={props.onStart}
           >
-            Enable music
+            {startLabel}
           </Button>
+        </Stack>
+        <Stack
+          component="nav"
+          aria-label="Game resources"
+          className="resourceActions"
+          direction="row"
+          spacing={0.75}
+          useFlexGap
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <Button variant="text" color="primary" onClick={props.onManual}>
+            How to play
+          </Button>
+          <Button
+            data-settings-trigger
+            variant="text"
+            color="primary"
+            onClick={props.onSettings}
+          >
+            Settings
+          </Button>
+        </Stack>
+        {!props.uid && (
+          <Stack
+            component="section"
+            aria-label="Account actions"
+            className="accountActions"
+            spacing={0}
+          >
+            <Button variant="text" color="primary" onClick={login}>
+              Sign in
+            </Button>
+            {!props.hasSavedGame && (
+              <Typography variant="caption" color="text.secondary">
+                Free · no sign-up needed
+              </Typography>
+            )}
+          </Stack>
         )}
-      </div>
-      <div
+        <Stack
+          component="section"
+          aria-label="Discovery actions"
+          className="discoveryActions"
+          direction="row"
+          spacing={0.75}
+          useFlexGap
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <InstallAppButton />
+          {props.audioEnabled === undefined && (
+            <Button
+              color="primary"
+              startIcon={<VolumeUpIcon />}
+              onClick={() => props.onAudioChange(true)}
+            >
+              Turn on sound
+            </Button>
+          )}
+        </Stack>
+        <Typography className="srOnly" role="status" aria-live="polite">
+          {shareStatus}
+        </Typography>
+      </Box>
+      <footer
+        className="mainMenuFooter"
         style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
           opacity: 0.7,
         }}
       >
+        {canShare() && (
+          <IconButton
+            color="primary"
+            onClick={onShare}
+            aria-label="Share Electrify"
+            size="large"
+          >
+            <ShareIcon />
+          </IconButton>
+        )}
         <IconButton
           color="primary"
-          href="mailto:todd@fabricate.io"
+          href="/about.html#feedback"
           aria-label="Send feedback"
           size="large"
         >
@@ -94,7 +187,10 @@ const MainMenu = (props: Props): React.JSX.Element => {
         >
           <InfoIcon />
         </IconButton>
-      </div>
+        <Button color="primary" href="/privacy.html" size="small">
+          Privacy
+        </Button>
+      </footer>
     </div>
   );
 };

@@ -4,7 +4,6 @@ import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   AXIS_LABEL_SIZE,
   FORECAST_AXIS_LEFT,
-  FORECAST_AXIS_RIGHT,
   padRange,
   SPLINE,
   stepTicks,
@@ -15,15 +14,13 @@ import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
-import { temperatureAxisColor, temperatureColor, windColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 import {
-  formatSpeed,
   formatTemperature,
-  speedUnit,
   temperatureUnit,
-  toDisplaySpeed,
   toDisplayTemperature,
 } from "../../helpers/Units";
 import { UnitsContext } from "./UnitsContext";
@@ -46,17 +43,19 @@ interface State {
   units: UnitSystemType;
 }
 
-// A scale each, labelled on its own side and coloured to match its line: degrees and km/h only
-// looked like one axis because the numbers happened to overlap, and sharing it flattened whichever
-// of the two had the narrower spread.
-const WIND_SCALE = "wind";
-
 function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
+  const series: uPlot.Series[] = [
+    {},
+    {
+      stroke: chartPalette().temperature,
+      width: 1,
+      points: { show: false },
+      paths: SPLINE,
+    },
+  ];
   return {
     width: 0, // set by UPlotChart
     height: 0,
-    // No right padding: unlike the charts above it, this one's right gutter is a second axis,
-    // and anything on top of that would push its plot in from where theirs end
     padding: [5 * scale, 0, 0, 0],
     cursor: {
       x: true,
@@ -68,7 +67,6 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
     scales: {
       x: { time: false, range: () => getState().domain.x },
       y: { range: (_u, min, max) => padRange(min, max) },
-      [WIND_SCALE]: { range: (_u, min, max) => padRange(min, max) },
     },
     axes: [
       xAxis(scale, {
@@ -83,46 +81,22 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
           );
         },
       }),
-      // Sized rather than fitted, so this plot starts and ends exactly where the charts stacked
-      // above it do and the month names below it line up with all of them
       yAxis(scale, {
         grid: true,
         label: `Heat (${temperatureUnit(getState().units)})`,
-        stroke: temperatureAxisColor,
+        stroke: chartPalette().temperatureAxis,
         size: FORECAST_AXIS_LEFT - AXIS_LABEL_SIZE,
         values: (_u, splits) => splits.map((t) => String(Math.round(t))),
       }),
-      yAxis(scale, {
-        scale: WIND_SCALE,
-        side: 1,
-        label: `Wind (${speedUnit(getState().units)})`,
-        stroke: windColor,
-        size: FORECAST_AXIS_RIGHT - AXIS_LABEL_SIZE,
-        values: (_u, splits) => splits.map((t) => String(Math.round(t))),
-      }),
     ],
-    series: [
-      {},
-      {
-        stroke: temperatureColor,
-        width: 1,
-        points: { show: false },
-        paths: SPLINE,
-      },
-      {
-        scale: WIND_SCALE,
-        stroke: windColor,
-        width: 1,
-        points: { show: false },
-        paths: SPLINE,
-      },
-    ],
+    series,
   };
 }
 
 function tooltip(idx: number, state: State): string {
   const d = state.data[idx];
-  return `Temperature: ${formatTemperature(d.temperatureC, state.units)}\nWind: ${formatSpeed(d.windKph, state.units)}`;
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  return `${header}\nTemperature: ${formatTemperature(d.temperatureC, state.units)}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders.
@@ -149,20 +123,19 @@ export default class ChartForecastWeather extends React.PureComponent<
 
     const minutes = new Array<number>(data.length);
     const temperature = new Array<number>(data.length);
-    const wind = new Array<number>(data.length);
     data.forEach((t: TickPresentFutureType, i: number) => {
       minutes[i] = t.minute;
       temperature[i] = toDisplayTemperature(t.temperatureC, units);
-      wind[i] = toDisplaySpeed(t.windKph, units);
     });
 
     return (
       <UPlotChart<State>
         id="chartForecastWeather"
-        ariaLabel="Chart of forecasted temperature and wind"
+        ariaLabel="Chart of predicted temperature"
         height={height}
         state={{ data, domain, startingYear, multiyear, units }}
-        data={[minutes, temperature, wind]}
+        data={[minutes, temperature]}
+        seriesLabels={["Temperature"]}
         buildOptions={buildOptions}
         // The axis labels are baked into the options, so a change of system rebuilds the plot
         structureKey={units}

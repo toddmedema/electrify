@@ -1,4 +1,4 @@
-import { getTimes } from "suncalc";
+import { getPosition, getTimes } from "suncalc";
 import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
@@ -23,6 +23,8 @@ export const EMPTY_HISTORY = {
   year: 0,
   supplyWh: 0,
   demandWh: 0,
+  deliveredWhByFuel: {},
+  peakDemandW: 0,
   customers: 0,
   cash: 0,
   kgco2e: 0,
@@ -31,24 +33,43 @@ export const EMPTY_HISTORY = {
   expensesOM: 0,
   expensesCarbonFee: 0,
   expensesInterest: 0,
-  expensesMarketing: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
 } as MonthlyHistoryType;
+
+function emptyHistory(): MonthlyHistoryType {
+  return { ...EMPTY_HISTORY, deliveredWhByFuel: {} };
+}
 
 // edits acc in place to avoid making tons of extra objects
 export function reduceHistories(
   acc: MonthlyHistoryType,
   t: MonthlyHistoryType,
 ): MonthlyHistoryType {
+  // Several chart reducers seed with `{ ...EMPTY_HISTORY }`. Clone the nested map on first use so
+  // one summary cannot write fuel totals into the exported constant or another summary.
+  if (acc.deliveredWhByFuel === EMPTY_HISTORY.deliveredWhByFuel) {
+    acc.deliveredWhByFuel = {};
+  }
   acc.supplyWh += t.supplyWh;
   acc.demandWh += t.demandWh;
+  Object.entries(t.deliveredWhByFuel || {}).forEach(([fuel, wh]) => {
+    if (wh !== undefined) {
+      acc.deliveredWhByFuel[fuel] = (acc.deliveredWhByFuel[fuel] || 0) + wh;
+    }
+  });
+  acc.peakDemandW = Math.max(acc.peakDemandW, t.peakDemandW || 0);
+  if (t.minimumSupplyMarginW !== undefined) {
+    acc.minimumSupplyMarginW =
+      acc.minimumSupplyMarginW === undefined
+        ? t.minimumSupplyMarginW
+        : Math.min(acc.minimumSupplyMarginW, t.minimumSupplyMarginW);
+  }
   acc.kgco2e += t.kgco2e;
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
-  acc.expensesMarketing += t.expensesMarketing;
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
   acc.cash = t.cash;
@@ -67,11 +88,7 @@ export function deriveExpandedSummary(
   s: MonthlyHistoryType,
 ): DerivedHistoryType {
   const expenses =
-    s.expensesFuel +
-    s.expensesOM +
-    s.expensesMarketing +
-    s.expensesCarbonFee +
-    s.expensesInterest;
+    s.expensesFuel + s.expensesOM + s.expensesCarbonFee + s.expensesInterest;
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
     ...s,
@@ -92,18 +109,40 @@ function accumulateTick(
   summary: MonthlyHistoryType,
   t: TickPresentFutureType,
   startingYear: number,
+  tickScale: number,
 ) {
   const date = getMonthYearFromMinute(t.minute, startingYear);
   // Integrate instantaneous electricity (watts) to watt hours
   // Only electricity isn't multiplied by this during tick calculations (financials are)
   summary.supplyWh +=
-    (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
-  summary.demandWh += (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS;
+    (Math.min(t.demandW, t.supplyW) / TICKS_PER_HOUR) *
+    GAME_TO_REAL_YEARS *
+    tickScale;
+  summary.demandWh +=
+    (t.demandW / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * tickScale;
+  // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
+  // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
+  // excess. Storage is deliberately absent because it is not a fuel.
+  const deliveredShare = t.supplyW > 0 ? Math.min(1, t.demandW / t.supplyW) : 0;
+  Object.entries(t.supplyByFuel).forEach(([fuel, watts]) => {
+    if (watts !== undefined) {
+      summary.deliveredWhByFuel[fuel] =
+        (summary.deliveredWhByFuel[fuel] || 0) +
+        ((watts * deliveredShare) / TICKS_PER_HOUR) *
+          GAME_TO_REAL_YEARS *
+          tickScale;
+    }
+  });
+  summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
+  const supplyMarginW = t.supplyW - t.demandW;
+  summary.minimumSupplyMarginW =
+    summary.minimumSupplyMarginW === undefined
+      ? supplyMarginW
+      : Math.min(summary.minimumSupplyMarginW, supplyMarginW);
   summary.kgco2e += t.kgco2e;
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;
-  summary.expensesMarketing += t.expensesMarketing;
   summary.expensesCarbonFee += t.expensesCarbonFee;
   summary.expensesInterest += t.expensesInterest;
   summary.cash = t.cash;
@@ -122,14 +161,18 @@ export function summarizeTimeline(
   startingYear: number,
   filter?: (t: TickPresentFutureType) => boolean,
 ): MonthlyHistoryType {
-  const summary = { ...EMPTY_HISTORY };
+  const summary = emptyHistory();
+  const tickScale =
+    timeline.length > 1
+      ? Math.max(1, (timeline[1].minute - timeline[0].minute) / TICK_MINUTES)
+      : 1;
   // Ticks are ordered oldest first, so walk forwards: reduceHistories keeps the last value it
   // sees for the point-in-time fields, and the period should report the balances it ended on.
   // Note that summarizeHistory below walks the other way, because monthlyHistory is newest first.
   for (let i = 0; i < timeline.length; i++) {
     const t = timeline[i];
     if (!filter || filter(t)) {
-      accumulateTick(summary, t, startingYear);
+      accumulateTick(summary, t, startingYear, tickScale);
     }
   }
   return summary;
@@ -149,6 +192,10 @@ export function summarizeTimelineByMonth(
   startingYear: number,
 ): MonthlyHistoryType[] {
   const byMonth = new Map<number, MonthlyHistoryType>();
+  const tickScale =
+    timeline.length > 1
+      ? Math.max(1, (timeline[1].minute - timeline[0].minute) / TICK_MINUTES)
+      : 1;
   // Forwards, with each tick overwriting the ending values, for the same reason summarizeTimeline
   // does it -- so a month summarized here reads the same way as one recorded during play, and
   // each one reports the balances it ended on rather than the ones it opened with
@@ -159,10 +206,10 @@ export function summarizeTimelineByMonth(
     const month = Math.floor(t.minute / MINUTES_PER_MONTH);
     let summary = byMonth.get(month);
     if (!summary) {
-      summary = { ...EMPTY_HISTORY };
+      summary = emptyHistory();
       byMonth.set(month, summary);
     }
-    accumulateTick(summary, t, startingYear);
+    accumulateTick(summary, t, startingYear, tickScale);
   }
   return [...byMonth.keys()]
     .sort((a, b) => a - b)
@@ -173,7 +220,7 @@ export function summarizeHistory(
   timeline: MonthlyHistoryType[],
   filter?: (t: MonthlyHistoryType) => boolean,
 ): MonthlyHistoryType {
-  const summary = { ...EMPTY_HISTORY };
+  const summary = emptyHistory();
   // Months are ordered newest first (state.monthlyHistory is built by unshifting), so walking
   // backwards is what ends on the most recent one - the opposite direction to summarizeTimeline
   // above, for the opposite array order.
@@ -225,7 +272,7 @@ export function formatMinuteAsMonthAxis(
   multiyear: boolean,
 ): string {
   return formatMonthChartAxis(
-    getDateFromMinute(minute, startingYear).monthsEllapsed + 12 * startingYear,
+    getDateFromMinute(minute, startingYear).monthsElapsed + 12 * startingYear,
     multiyear,
   );
 }
@@ -235,6 +282,18 @@ export function formatHour(date: DateType): string {
     `${date.year}-${date.monthNumber}-1 ${Math.floor(date.minuteOfDay / 60)}:00`,
   );
   return time.toLocaleString("en-US", { hour: "numeric", hour12: true });
+}
+
+/**
+ * "Jan 2030, 4 PM" -- the header line every tooltip on a minute-based chart leads with, matching
+ * the month/year/time the app bar shows for the current instant.
+ */
+export function formatMinuteAsTooltipHeader(
+  minute: number,
+  startingYear: number,
+): string {
+  const date = getDateFromMinute(minute, startingYear);
+  return `${date.month} ${date.year}, ${formatHour(date)}`;
 }
 
 // Faster subset of getDateFromMinute
@@ -251,9 +310,10 @@ export function getMonthYearFromMinute(minute: number, startingYear: number) {
   };
 }
 
-interface SunriseSunsetType {
+export interface SunriseSunsetType {
   sunrise: number;
   sunset: number;
+  daylight: "normal" | "polar-day" | "polar-night";
 }
 
 /**
@@ -273,16 +333,28 @@ const sunriseSunsetCache = new Map<string, SunriseSunsetType>();
  * runner's zone, which for a player outside the scenario's own timezone put sunrise after sunset
  * and left the sun switched off for the whole game.
  */
-function minuteOfDayIn(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const value = (type: string) =>
-    Number(parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value);
-  return value("hour") * 60 + value("minute");
+function minuteOfDayIn(date: Date, location: LocationType): number {
+  if (location.timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: location.timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(date);
+      const value = (type: string) =>
+        Number(
+          parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value,
+        );
+      return value("hour") * 60 + value("minute");
+    } catch (_error) {
+      // Hand-authored coordinates can carry a stale or misspelled zone. They are still playable:
+      // fall through to the same solar-time approximation used when no zone was supplied.
+    }
+  }
+  const offsetMinutes = Math.round(location.long / 15) * 60;
+  const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+  return (utcMinutes + offsetMinutes + 1440) % 1440;
 }
 
 // returns minutes since midnight, in the location's own timezone
@@ -290,7 +362,7 @@ export function getSunriseSunset(
   date: DateType,
   location: LocationType,
 ): SunriseSunsetType {
-  const key = `${date.monthNumber}|${date.year}|${location.id}`;
+  const key = `${date.monthNumber}|${date.year}|${location.id}|${location.lat}|${location.long}|${location.timeZone || "solar"}`;
   const cached = sunriseSunsetCache.get(key);
   if (cached) {
     return cached;
@@ -305,17 +377,27 @@ export function getSunriseSunset(
     location.long,
   );
 
-  // suncalc returns null above the polar circles, where the sun may never rise or never set
-  // on a given day. None of the locations the game ships get anywhere near that, so
-  // these fallbacks are only here to keep a hypothetical high-latitude location from
-  // crashing the simulation
-  const minuteOfDay = (d: Date | null, fallback: number) =>
-    d && !isNaN(d.getTime()) ? minuteOfDayIn(d, location.timeZone) : fallback;
-
-  const times = {
-    sunrise: minuteOfDay(calc.sunrise, 6 * 60),
-    sunset: minuteOfDay(calc.sunset, 18 * 60),
-  };
+  const valid = (d: Date | null): d is Date => !!d && !isNaN(d.getTime());
+  let times: SunriseSunsetType;
+  if (!valid(calc.sunrise) || !valid(calc.sunset)) {
+    // There is no sunrise or sunset during a polar day/night. SunCalc's altitude tells which one
+    // it is; sentinels keep every existing daylight calculation simple and truthful.
+    const sunUp =
+      getPosition(
+        new Date(Date.UTC(date.year, date.monthNumber - 1, 1, 12)),
+        location.lat,
+        location.long,
+      ).altitude > 0;
+    times = sunUp
+      ? { sunrise: 0, sunset: 1440, daylight: "polar-day" }
+      : { sunrise: 0, sunset: 0, daylight: "polar-night" };
+  } else {
+    times = {
+      sunrise: minuteOfDayIn(calc.sunrise, location),
+      sunset: minuteOfDayIn(calc.sunset, location),
+      daylight: "normal",
+    };
+  }
   sunriseSunsetCache.set(key, times);
   return times;
 }
@@ -328,7 +410,7 @@ export function getDateFromMinute(
   const hourOfDay = Math.floor(minuteOfDay / 60);
   const dayOfGame = Math.floor(minute / 1440);
   const dayOfYear = dayOfGame % DAYS_PER_YEAR;
-  const monthsEllapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
+  const monthsElapsed = Math.floor(dayOfGame / DAYS_PER_MONTH);
   const yearsEllapsed = Math.floor(dayOfGame / DAYS_PER_YEAR);
   const year = yearsEllapsed + startingYear;
   const monthNumber = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1;
@@ -347,7 +429,7 @@ export function getDateFromMinute(
     percentOfYear: percentOfYear || 0.00001,
     month,
     monthNumber,
-    monthsEllapsed,
+    monthsElapsed,
     year,
   };
 }

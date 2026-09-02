@@ -1,19 +1,33 @@
 import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import { connect } from "react-redux";
-import { IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import FastForwardIcon from "@mui/icons-material/FastForward";
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  ToggleButton,
+  ToggleButtonGroup,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import { TICKS_PER_HOUR, TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatMoneyStable } from "../../helpers/Format";
+import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
-import { isBigScreen, isSmallScreen, openWindow } from "../../Globals";
-import { getNextTutorial } from "../../data/Scenarios";
+import { isBigScreen, openWindow } from "../../Globals";
+import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
-import { AppStateType, GameType, SpeedType } from "../../Types";
+import {
+  AppStateType,
+  FacilityOperatingType,
+  GameType,
+  SpeedType,
+  TickPresentFutureType,
+} from "../../Types";
+import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
+import ConceptIcon from "./ConceptIcon";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -31,6 +45,7 @@ export interface StateProps {
 
 export interface DispatchProps {
   onManual: () => void;
+  onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
   onNextTutorial: (scenarioId: number) => void;
   onQuit: () => void;
@@ -39,162 +54,112 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 interface SpeedOptionsProps {
-  smallScreen: boolean;
   speed: SpeedType;
   onSpeedChange: (speed: SpeedType) => void;
-  speedAnchorEl: HTMLElement | null;
-  handleSpeedClick: (event: React.MouseEvent<HTMLElement>) => void;
-  handleSpeedClose: () => void;
 }
+
+/**
+ * The speeds, in the order the clock runs them, labelled with how many times faster than SLOW
+ * each one is. Derived from the tick rate rather than written down beside it, so the labels
+ * cannot drift from what the clock actually does -- and a player picking a speed can see what
+ * they are picking rather than inferring it from the number of chevrons on an icon.
+ */
+const RUNNING_SPEEDS: SpeedType[] = ["SLOW", "NORMAL", "FAST"];
+
+function speedMultiplier(speed: SpeedType): string {
+  return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
+}
+
+const WEATHER_DRIVEN_FUELS = new Set([
+  "Sun",
+  "Wind",
+  "Offshore Wind",
+  "Airborne Wind",
+]);
+
+/** Capacity that could serve demand now, rather than the deliberately dispatched output. */
+export function reserveCapacityW(
+  game: GameType,
+  now: TickPresentFutureType,
+): number {
+  const available = game.facilities.reduce(
+    (total: number, facility: FacilityOperatingType) => {
+      if (facility.paused || facility.yearsToBuildLeft > 0) {
+        return total;
+      }
+      if (facility.peakWh) {
+        return (
+          total +
+          Math.min(
+            facility.peakW,
+            Math.max(0, facility.currentWh) * TICKS_PER_HOUR,
+          )
+        );
+      }
+      return (
+        total +
+        (WEATHER_DRIVEN_FUELS.has(facility.fuel)
+          ? Math.max(0, facility.currentW)
+          : facility.peakW)
+      );
+    },
+    0,
+  );
+  return available - now.demandW;
+}
+
+const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
+  PAUSED: "pause",
+  SLOW: "slow speed",
+  NORMAL: "normal speed",
+  FAST: "fast speed",
+};
 
 // Pulled out of the component so it can be memoised on the handful of things it actually
 // depends on, rather than rebuilt on every tick along with the cash readout beside it
 function buildSpeedOptions({
-  smallScreen,
   speed,
   onSpeedChange,
-  speedAnchorEl,
-  handleSpeedClick,
-  handleSpeedClose,
 }: SpeedOptionsProps): React.JSX.Element {
-  if (!smallScreen) {
-    return (
-      <span>
-        <IconButton
-          onClick={() => onSpeedChange("PAUSED")}
-          disabled={speed === "PAUSED"}
-          aria-label="pause"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <PauseIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("SLOW")}
-          disabled={speed === "SLOW"}
-          aria-label="slow speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <ChevronRightIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("NORMAL")}
-          disabled={speed === "NORMAL"}
-          aria-label="normal speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <PlayArrowIcon />
-        </IconButton>
-        <IconButton
-          onClick={() => onSpeedChange("FAST")}
-          disabled={speed === "FAST"}
-          aria-label="fast speed"
-          edge="end"
-          color="primary"
-          size="large"
-        >
-          <FastForwardIcon />
-        </IconButton>
-      </span>
-    );
-  }
-
-  let speedIcon = <PlayArrowIcon />;
-  switch (speed) {
-    case "PAUSED":
-      speedIcon = <PlayArrowIcon />;
-      break;
-    case "SLOW":
-      speedIcon = <ChevronRightIcon />;
-      break;
-    case "NORMAL":
-      speedIcon = <PlayArrowIcon />;
-      break;
-    case "FAST":
-      speedIcon = <FastForwardIcon />;
-      break;
-    default:
-      break;
-  }
+  // Keep every speed one tap away at every viewport width. The selected treatment says where
+  // the clock is now without turning the current speed into a misleading disabled control.
   return (
-    <span>
-      {speed !== "PAUSED" && (
-        <IconButton
-          onClick={() => onSpeedChange("PAUSED")}
-          aria-label="pause"
-          size="large"
-        >
-          <PauseIcon color="primary" />
-        </IconButton>
-      )}
-      <IconButton
-        onClick={handleSpeedClick}
-        aria-label="change speed"
-        edge="end"
-        color="primary"
-        size="large"
-      >
-        {speedIcon}
-      </IconButton>
-      <Menu
-        id="speedMenu"
-        anchorEl={speedAnchorEl}
-        keepMounted
-        open={Boolean(speedAnchorEl)}
-        onClose={handleSpeedClose}
-      >
-        <MenuItem
-          onClick={() => {
-            onSpeedChange("SLOW");
-            handleSpeedClose();
-          }}
-          disabled={speed === "SLOW"}
-          aria-label="slow-speed"
-        >
-          <ChevronRightIcon color="primary" />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            onSpeedChange("NORMAL");
-            handleSpeedClose();
-          }}
-          disabled={speed === "NORMAL"}
-          aria-label="normal-speed"
-        >
-          <PlayArrowIcon color="primary" />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            onSpeedChange("FAST");
-            handleSpeedClose();
-          }}
-          disabled={speed === "FAST"}
-          aria-label="fast-speed"
-        >
-          <FastForwardIcon color="primary" />
-        </MenuItem>
-      </Menu>
-    </span>
+    <ToggleButtonGroup
+      className="speedToggles"
+      exclusive
+      size="small"
+      value={speed}
+      onChange={(_e: React.MouseEvent<HTMLElement>, next: SpeedType | null) => {
+        // Null is the group reporting that the button already selected was clicked again.
+        // The clock is always running at some speed, so there is nothing to deselect to.
+        if (next) {
+          onSpeedChange(next);
+        }
+      }}
+      aria-label="game speed"
+    >
+      <ToggleButton value="PAUSED" aria-label={SPEED_ARIA_LABELS.PAUSED}>
+        <PauseIcon fontSize="small" />
+      </ToggleButton>
+      {RUNNING_SPEEDS.map((s: SpeedType) => (
+        <ToggleButton key={s} value={s} aria-label={SPEED_ARIA_LABELS[s]}>
+          {speedMultiplier(s)}
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
   );
 }
 
 export function GameAppBar(props: Props) {
-  const { game, onManual, onNextTutorial, onQuit, onSpeedChange } = props;
+  const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
+    props;
   const date = game.date;
   const now = getTimeFromTimeline(date.minute, game.timeline);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<HTMLElement | null>(
     null,
   );
-  const [speedAnchorEl, setSpeedAnchorEl] = React.useState<HTMLElement | null>(
-    null,
-  );
+  const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
 
-  const smallScreen = isSmallScreen();
   const bigScreen = isBigScreen();
   const speed = game.speed;
   // Watching somebody else's run rather than playing your own. The speed controls stay live --
@@ -204,39 +169,43 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
-
+  // A tutorial's progress isn't worth resuming, so its menu item stays "Quit" - only a real run
+  // gets the "Save & Quit" reminder that leaving keeps it around to come back to
+  const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
+    ?.tutorialSteps;
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
     setMenuAnchorEl(event.currentTarget);
   const handleMenuClose = () => setMenuAnchorEl(null);
-  const handleSpeedClick = (event: React.MouseEvent<HTMLElement>) =>
-    setSpeedAnchorEl(event.currentTarget);
-  const handleSpeedClose = () => setSpeedAnchorEl(null);
+  const handleQuit = React.useCallback(() => {
+    onQuit();
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>("[data-main-action]")?.focus();
+    }, 350);
+  }, [onQuit]);
 
   /**
    * The bar has to re-render every tick to keep the cash and the clock honest, which at FAST is
-   * a hundred times a second. Everything else in it -- five icon buttons and a kept-mounted menu
-   * -- only changes when the player clicks something, so those subtrees are built once per actual
-   * change and handed back as the same elements. React then skips them entirely on the frames in
-   * between, which is where a good quarter of the frame budget went.
+   * a hundred times a second. Everything else in it -- the speed toggles, menu button and
+   * kept-mounted menu -- only changes when the player clicks something, so those subtrees are
+   * built once per actual change and handed back as the same elements. React then skips them
+   * entirely on the frames in between, which is where a good quarter of the frame budget went.
    */
   const speedOptions = React.useMemo(
     () =>
       buildSpeedOptions({
-        smallScreen,
         speed,
         onSpeedChange,
-        speedAnchorEl,
-        handleSpeedClick,
-        handleSpeedClose,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [smallScreen, speed, onSpeedChange, speedAnchorEl],
+    [speed, onSpeedChange],
   );
 
   const menu = React.useMemo(
     () => (
       <>
         <IconButton
+          data-settings-trigger
+          className="gameMenuButton"
           onClick={handleMenuClick}
           aria-label="menu"
           edge="start"
@@ -253,7 +222,16 @@ export function GameAppBar(props: Props) {
           onClose={handleMenuClose}
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={() => openWindow("mailto:todd@fabricate.io")}>
+          <MenuItem onClick={onSettings}>Options</MenuItem>
+          <MenuItem
+            onClick={() => {
+              setScenarioDetailsOpen(true);
+              handleMenuClose();
+            }}
+          >
+            Scenario details
+          </MenuItem>
+          <MenuItem onClick={() => openWindow("/about.html#feedback")}>
             Send feedback
           </MenuItem>
           {/* Mid-tutorial, the thing a player who has seen enough wants is the next tutorial,
@@ -263,14 +241,24 @@ export function GameAppBar(props: Props) {
               Next tutorial
             </MenuItem>
           )}
-          <MenuItem onClick={onQuit}>
-            {isReplay ? "Exit replay" : "Quit"}
+          <MenuItem onClick={handleQuit}>
+            {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
           </MenuItem>
         </Menu>
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuAnchorEl, onManual, onNextTutorial, onQuit, nextTutorial, isReplay],
+    [
+      menuAnchorEl,
+      onManual,
+      onSettings,
+      onNextTutorial,
+      handleQuit,
+      nextTutorial,
+      isReplay,
+      isTutorial,
+      setScenarioDetailsOpen,
+    ],
   );
 
   if (!game.inGame || !now) {
@@ -278,28 +266,61 @@ export function GameAppBar(props: Props) {
   }
 
   const inBlackout = now.supplyW < now.demandW;
+  const reserveW = Math.max(0, reserveCapacityW(game, now));
+  const gridHealth = inBlackout
+    ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
+    : `Grid stable · ${formatWatts(reserveW)} spare capacity`;
 
   return (
     <div id="appbar">
       <div id="topbar">
         <Toolbar className={inBlackout ? "blackout-pulsing" : ""}>
           {menu}
-          <Typography variant="h6">
-            {formatMoneyStable(now.cash)}&nbsp;
-            <span className="weak">
+          <Typography variant="h6" className="gameStatus">
+            <span className="gameStatusValue">
+              {formatMoneyStable(now.cash)}
+            </span>
+            <span className="weak gameStatusValue">
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
+            {inBlackout && (
+              <span className="gameStatusBlackout">
+                <ConceptIcon concept="blackout" fontSize="small" />
+              </span>
+            )}
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
       <div
+        className={`gridHealth ${inBlackout ? "gridHealth-blackout" : ""}`}
+        aria-label={`Current grid status: ${gridHealth}`}
+      >
+        <strong>{gridHealth}</strong>
+        {inBlackout && (
+          <span>
+            Resume available resources, discharge storage, or plan more
+            capacity.
+          </span>
+        )}
+      </div>
+      <span className="srOnly" aria-live="polite">
+        {inBlackout
+          ? "Blackout. Demand is higher than supply."
+          : `Grid stable. Game speed ${speed.toLowerCase()}.`}
+      </span>
+      <div
         id="yearProgressBar"
         style={{
           width: `${date.percentOfYear * 100}%`,
         }}
+      />
+      <ScenarioDetailsDialog
+        open={scenarioDetailsOpen}
+        game={game}
+        onClose={() => setScenarioDetailsOpen(false)}
       />
     </div>
   );
@@ -313,6 +334,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onManual: () => {
       dispatch(navigate("MANUAL"));
+    },
+    onSettings: () => {
+      dispatch(navigate("SETTINGS"));
     },
     onSpeedChange: (speed: SpeedType) => {
       dispatch(setSpeed(speed));

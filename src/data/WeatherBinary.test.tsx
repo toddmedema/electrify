@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { decodeWeather, readWeatherHeader } from "./WeatherBinary";
 import { RawWeatherType } from "../Types";
+import {
+  getAirborneWindCapacityFactor,
+  getAirborneWindReferenceKph,
+  getOffshoreWindCapacityFactor,
+} from "../helpers/Energy";
 
 const DATA_DIR = path.resolve(
   __dirname,
@@ -12,7 +17,8 @@ const DATA_DIR = path.resolve(
   "weather",
 );
 const HEADER_BYTES = 16;
-const BYTES_PER_ROW = 5;
+const BASE_BYTES_PER_ROW = 5;
+const OFFSHORE_BYTES_PER_ROW = 6;
 
 function readShipped(id: string): ArrayBuffer {
   const bytes = fs.readFileSync(path.join(DATA_DIR, `${id}.bin`));
@@ -33,30 +39,52 @@ function buildFile(
     bytesPerRow?: number;
     yearCount?: number;
     tempScale?: number;
+    flags?: number;
   } = {},
-  rows: { temp: number; cloud: number; wind: number; precip: number }[] = [],
+  rows: {
+    temp: number;
+    cloud: number;
+    wind: number;
+    precip: number;
+    offshoreWind?: number;
+  }[] = [],
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(HEADER_BYTES + rows.length * BYTES_PER_ROW);
+  const rowBytes =
+    overrides.bytesPerRow ??
+    (rows.some((row) => row.offshoreWind !== undefined)
+      ? OFFSHORE_BYTES_PER_ROW
+      : BASE_BYTES_PER_ROW);
+  const buffer = new ArrayBuffer(HEADER_BYTES + rows.length * rowBytes);
   const view = new DataView(buffer);
   const magic = overrides.magic ?? "EWX1";
   for (let i = 0; i < 4; i++) {
     view.setUint8(i, magic.charCodeAt(i));
   }
-  view.setUint8(4, overrides.version ?? 1);
+  view.setUint8(
+    4,
+    overrides.version ?? (rowBytes === OFFSHORE_BYTES_PER_ROW ? 2 : 1),
+  );
   view.setUint8(5, overrides.daysPerYear ?? 1);
   view.setUint8(6, overrides.hoursPerDay ?? rows.length);
-  view.setUint8(7, overrides.bytesPerRow ?? BYTES_PER_ROW);
+  view.setUint8(7, rowBytes);
   view.setUint16(8, 1980, true);
   view.setUint16(10, overrides.yearCount ?? 1, true);
   view.setUint8(12, overrides.tempScale ?? 10);
   view.setUint8(13, 2);
   view.setUint8(14, 5);
+  view.setUint8(
+    15,
+    overrides.flags ?? (rowBytes === OFFSHORE_BYTES_PER_ROW ? 1 : 0),
+  );
   rows.forEach((row, index) => {
-    const at = HEADER_BYTES + index * BYTES_PER_ROW;
+    const at = HEADER_BYTES + index * rowBytes;
     view.setInt16(at, row.temp, true);
     view.setUint8(at + 2, row.cloud);
     view.setUint8(at + 3, row.wind);
     view.setUint8(at + 4, row.precip);
+    if (row.offshoreWind !== undefined && rowBytes > BASE_BYTES_PER_ROW) {
+      view.setUint8(at + 5, row.offshoreWind);
+    }
   });
   return buffer;
 }
@@ -107,15 +135,42 @@ describe("decodeWeather", () => {
     ]);
   });
 
+  it("decodes the optional offshore column in v2 files", () => {
+    expect(
+      decodeWeather(
+        buildFile({}, [
+          { temp: 100, cloud: 20, wind: 18, precip: 0, offshoreWind: 55 },
+        ]),
+      )[0],
+    ).toMatchObject({
+      WIND_KPH: 9,
+      WIND_OFFSHORE_KPH: 27.5,
+    });
+  });
+
+  it("allows v2 files to keep the compact inland row", () => {
+    const buffer = buildFile({ version: 2 }, [
+      { temp: 100, cloud: 20, wind: 18, precip: 0 },
+    ]);
+    expect(readWeatherHeader(buffer)).toMatchObject({
+      version: 2,
+      offshore: false,
+    });
+    expect(decodeWeather(buffer)[0].WIND_OFFSHORE_KPH).toBeUndefined();
+  });
+
   // Every one of these would otherwise decode into a plausible looking array of nonsense, and a
   // game played on nonsense weather runs perfectly well and is simply wrong
   it("refuses a file it cannot vouch for", () => {
     expect(() => decodeWeather(buildFile({ magic: "CSV," }))).toThrow(/EWX1/);
-    expect(() => decodeWeather(buildFile({ version: 2 }))).toThrow(/version 2/);
+    expect(() => decodeWeather(buildFile({ version: 3 }))).toThrow(/version 3/);
     expect(() => decodeWeather(buildFile({ bytesPerRow: 3 }))).toThrow(
       /3 byte rows/,
     );
     expect(() => decodeWeather(new ArrayBuffer(4))).toThrow(/too short/);
+    expect(() =>
+      decodeWeather(buildFile({ version: 2, bytesPerRow: 6, flags: 0 })),
+    ).toThrow(/describes 5/);
     // A truncated download: the header promises a day of readings, the body holds most of one
     expect(() =>
       decodeWeather(
@@ -147,6 +202,15 @@ describe("decodeWeather", () => {
 // decoder still agree about the format: they are written in different languages against the same
 // sixteen byte header, and nothing but a shipped file exercises both halves at once
 describe("the shipped weather files", () => {
+  const offshoreIds = [
+    "SF",
+    "LA",
+    "HNL",
+    "SJU",
+    "NewYork",
+    "London",
+    "Reykjavik",
+  ];
   const ids = fs
     .readdirSync(DATA_DIR)
     .filter((file: string) => file.endsWith(".bin"))
@@ -156,38 +220,55 @@ describe("the shipped weather files", () => {
     expect(ids).toEqual(expect.arrayContaining(["PIT", "SF", "HNL", "SJU"]));
   });
 
-  it.each(ids)("%s covers complete years of readable weather", (id: string) => {
-    const buffer = readShipped(id);
-    const header = readWeatherHeader(buffer);
-    expect(header).toMatchObject({
-      version: 1,
-      daysPerYear: 12,
-      hoursPerDay: 24,
-      startingYear: 1980,
+  it("keeps the catalogue flags in sync with the binary headers", () => {
+    const index = JSON.parse(
+      fs.readFileSync(path.join(DATA_DIR, "index.json"), "utf8"),
+    );
+    const listed = Object.values(index.cities)
+      .filter((city) => (city as { offshore?: boolean }).offshore)
+      .map((city) => (city as { id: string }).id)
+      .sort();
+    expect(listed).toEqual([...offshoreIds].sort());
+  });
+
+  it("covers every shipped location through 2025 with readable weather", () => {
+    ids.forEach((id: string) => {
+      const buffer = readShipped(id);
+      const header = readWeatherHeader(buffer);
+      expect([1, 2]).toContain(header.version);
+      expect(header.version).toBeGreaterThanOrEqual(
+        offshoreIds.includes(id) ? 2 : 1,
+      );
+      expect(header).toMatchObject({
+        daysPerYear: 12,
+        hoursPerDay: 24,
+        startingYear: 1980,
+        yearCount: 46,
+        rowCount: 13248,
+        offshore: offshoreIds.includes(id),
+      });
+
+      const rows = decodeWeather(buffer);
+      expect(rows[0].YEAR).toEqual(1980);
+      expect(rows[rows.length - 1].YEAR).toEqual(2025);
+
+      // Reduced to one assertion per field rather than one per row: thirteen thousand assertions a
+      // city adds up to minutes once the catalogue is full, and a range says the same thing
+      const range = (field: keyof RawWeatherType) => {
+        const values = rows
+          .map((row: RawWeatherType) => row[field])
+          .filter((value): value is number => value !== undefined);
+        return { min: Math.min(...values), max: Math.max(...values) };
+      };
+      // Deliberately generous: these are the bounds that catch a byte order or a scale being
+      // wrong, not a claim about any particular city's climate
+      expect(range("TEMP_C").min).toBeGreaterThan(-80);
+      expect(range("TEMP_C").max).toBeLessThan(60);
+      expect(range("CLOUD_PCT").min).toBeGreaterThanOrEqual(0);
+      expect(range("CLOUD_PCT").max).toBeLessThanOrEqual(100);
+      expect(range("WIND_KPH").min).toBeGreaterThanOrEqual(0);
+      expect(range("PRECIP_MM").min).toBeGreaterThanOrEqual(0);
     });
-    // Rate-limited update runs replace each file atomically, so a branch being filled over
-    // several days can safely contain both the old complete record and the new complete record.
-    expect([40, 46]).toContain(header.yearCount);
-    expect(header.rowCount).toBe(header.yearCount * 12 * 24);
-
-    const rows = decodeWeather(buffer);
-    expect(rows[0].YEAR).toEqual(1980);
-    expect(rows[rows.length - 1].YEAR).toEqual(1979 + header.yearCount);
-
-    // Reduced to one assertion per field rather than one per row: eleven thousand assertions a
-    // city adds up to minutes once the catalogue is full, and a range says the same thing
-    const range = (field: keyof RawWeatherType) => {
-      const values = rows.map((row: RawWeatherType) => row[field]);
-      return { min: Math.min(...values), max: Math.max(...values) };
-    };
-    // Deliberately generous: these are the bounds that catch a byte order or a scale being
-    // wrong, not a claim about any particular city's climate
-    expect(range("TEMP_C").min).toBeGreaterThan(-80);
-    expect(range("TEMP_C").max).toBeLessThan(60);
-    expect(range("CLOUD_PCT").min).toBeGreaterThanOrEqual(0);
-    expect(range("CLOUD_PCT").max).toBeLessThanOrEqual(100);
-    expect(range("WIND_KPH").min).toBeGreaterThanOrEqual(0);
-    expect(range("PRECIP_MM").min).toBeGreaterThanOrEqual(0);
   });
 
   it("puts Pittsburgh's rows in season order", () => {
@@ -200,5 +281,23 @@ describe("the shipped weather files", () => {
     // either direction and January stops being the cold one.
     expect(monthMean(1)).toBeLessThan(0);
     expect(monthMean(7)).toBeGreaterThan(20);
+  });
+
+  it("gives every offshore location a usable wind resource", () => {
+    offshoreIds.forEach((id) => {
+      const speeds = decodeWeather(readShipped(id)).map(
+        (row) => row.WIND_OFFSHORE_KPH as number,
+      );
+      const capacityFactor = getOffshoreWindCapacityFactor(speeds);
+      expect(capacityFactor).toBeGreaterThan(0.2);
+      expect(capacityFactor).toBeLessThan(0.7);
+    });
+  });
+
+  it("calibrates Airborne Wind to Lista's 3,500 full-load-hour target", () => {
+    const speeds100m = decodeWeather(readShipped("Lista")).map((row) =>
+      getAirborneWindReferenceKph(row.WIND_KPH),
+    );
+    expect(getAirborneWindCapacityFactor(speeds100m)).toBeCloseTo(0.4, 2);
   });
 });

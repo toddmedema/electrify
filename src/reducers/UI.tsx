@@ -15,6 +15,7 @@ export const initialUI: UIType = {
   },
   victory: null,
   selectedFacilityId: null,
+  facilityDragActive: false,
 };
 
 export const uiSlice = createSlice({
@@ -70,6 +71,9 @@ export const uiSlice = createSlice({
     selectFacility: (state, action: PayloadAction<number | null>) => {
       state.selectedFacilityId = action.payload;
     },
+    setFacilityDragActive: (state, action: PayloadAction<boolean>) => {
+      state.facilityDragActive = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
@@ -77,6 +81,7 @@ export const uiSlice = createSlice({
       state.dialog = { ...initialUI.dialog };
       state.victory = null;
       state.selectedFacilityId = null;
+      state.facilityDragActive = false;
     });
   },
 });
@@ -90,6 +95,7 @@ export const {
   victoryOpen,
   victoryClose,
   selectFacility,
+  setFacilityDragActive,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

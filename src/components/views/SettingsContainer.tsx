@@ -1,6 +1,6 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { navigate } from "../../reducers/Card";
+import { navigateBack } from "../../reducers/Card";
 import { resume } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
 import { snackbarOpen } from "../../reducers/UI";
@@ -12,7 +12,7 @@ import {
   readSaveFile,
   resumableSave,
 } from "../../SaveFile";
-import { AppStateType, UnitSystemType } from "../../Types";
+import { AppStateType, ThemeChoiceType, UnitSystemType } from "../../Types";
 import Settings, { DispatchProps, StateProps } from "./Settings";
 import { confirmReplacingSave } from "./StartGame";
 
@@ -42,8 +42,19 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     onAudioChange: (v: boolean) => {
       dispatch(changeSettings({ audioEnabled: v }));
     },
+    onMusicVolumeChange: (v: number) => {
+      dispatch(changeSettings({ musicVolume: v }));
+    },
+    onSoundEffectsVolumeChange: (v: number) => {
+      dispatch(changeSettings({ soundEffectsVolume: v }));
+    },
     onUnitsChange: (v: UnitSystemType) => {
       dispatch(changeSettings({ units: v }));
+    },
+    // The palette itself is applied above the store, in App's ThemedApp, which is the only
+    // place that can also hear the system changing its mind while the game is open
+    onThemeChange: (v: ThemeChoiceType) => {
+      dispatch(changeSettings({ theme: v }));
     },
     onExportSave: () => {
       // Read again rather than trusting the render: the button is only enabled when there's a
@@ -70,8 +81,10 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         );
       });
     },
+    // Mirrors Manual: Options can now be reached mid-game too, so back has to return wherever
+    // the player came from rather than always dropping them at the main menu
     onBack: () => {
-      dispatch(navigate("MAIN_MENU"));
+      dispatch(navigateBack());
     },
   };
 };

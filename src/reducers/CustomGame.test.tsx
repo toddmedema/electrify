@@ -1,6 +1,7 @@
 import { LOCATIONS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { facilityAgeYears, facilityOutputFactor } from "../helpers/Financials";
 import { getPlayedScenarioIds } from "../LocalStorage";
 import { createGame, runSimulation } from "../testing/Simulator";
 import {
@@ -49,6 +50,16 @@ describe("a custom game", () => {
     expect(cash).toBeLessThan(501000000);
   });
 
+  it("starts with the customer scale selected in custom setup", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: { ...CUSTOM, startingCustomers: 250000 },
+    });
+    expect(
+      getTimeFromTimeline(state.date.minute, state.timeline)!.customers,
+    ).toBeCloseTo(250000, -4);
+  });
+
   it("builds the starting facilities it was given", () => {
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
@@ -68,6 +79,96 @@ describe("a custom game", () => {
       expect(f.yearsToBuildLeft).toBe(0);
       expect(f.loanAmountLeft).toBe(0);
     });
+  });
+
+  it("rounds starting facility capacities to two significant digits", () => {
+    const facilities = [
+      { name: "Coal", peakW: 722_225_000 },
+      { name: "Battery", peakWh: 243_456_000 },
+    ];
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2033,
+        facilities,
+      } as ScenarioType,
+    });
+
+    expect(
+      state.facilities.find((facility) => facility.name === "Coal")?.peakW,
+    ).toBe(720_000_000);
+    expect(
+      state.facilities.find((facility) => facility.name === "Battery")?.peakWh,
+    ).toBe(240_000_000);
+    // Scenario definitions remain the source record; rounding belongs to created assets.
+    expect(facilities).toEqual([
+      { name: "Coal", peakW: 722_225_000 },
+      { name: "Battery", peakWh: 243_456_000 },
+    ]);
+  });
+
+  it("commissions an authored starting facility at its supplied age", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2020,
+        facilities: [{ fuel: "Sun", peakW: 100000000, initialAgeYears: 20 }],
+      },
+    });
+    const solar = state.facilities[0];
+
+    expect(facilityAgeYears(solar, state.date.minute)).toBeCloseTo(20, 10);
+    expect(facilityOutputFactor(solar, state.date.minute)).toBeCloseTo(
+      Math.pow(0.995, 20),
+      10,
+    );
+    expect(solar.currentW).toBeLessThan(solar.peakW);
+  });
+
+  it("dispatches an offshore wind starting facility from offshore weather", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        locationId: "SF",
+        startingYear: 2020,
+        facilities: [{ name: "Offshore Wind", peakW: 500000000 }],
+      },
+    });
+    const offshore = state.facilities[0];
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    expect(offshore.name).toBe("Offshore Wind");
+    expect(now.windOffshoreKph).toBeGreaterThan(0);
+    expect(offshore.currentW).toBeGreaterThan(0);
+    expect(offshore.currentW).toBeLessThanOrEqual(offshore.peakW);
+  });
+
+  it("runs a biomass starting facility with finite fuel costs and emissions", () => {
+    const state = createGame({
+      scenarioId: CUSTOM_SCENARIO_ID,
+      scenario: {
+        ...CUSTOM,
+        startingYear: 2019,
+        facilities: [{ name: "Biomass", peakW: 50000000 }],
+      },
+    });
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    expect(state.facilities[0]).toMatchObject({
+      name: "Biomass",
+      fuel: "Biomass",
+      peakW: 50000000,
+      yearsToBuildLeft: 0,
+    });
+    expect(now.supplyByFuel.Biomass).toBeGreaterThan(0);
+    expect(now.expensesFuel).toBeGreaterThan(0);
+    expect(now.kgco2e).toBeGreaterThan(0);
+    expect(Number.isFinite(now.cash)).toBe(true);
+    expect(Number.isFinite(now.expensesFuel)).toBe(true);
+    expect(Number.isFinite(now.kgco2e)).toBe(true);
   });
 
   it("runs on the seed the player pinned, and replays identically from it", () => {
@@ -99,10 +200,10 @@ describe("a custom game", () => {
     });
     expect(getPlayedScenarioIds()).not.toContain(CUSTOM_SCENARIO_ID);
 
-    // The same run of an authored scenario does get recorded, so the assertion above isn't
-    // passing because nothing reaches the end
-    runSimulation({ scenarioId: 4 }); // 104: Finances, also one month long
-    expect(getPlayedScenarioIds()).toContain(4);
+    // A tutorial is also withheld until its final objective succeeds. Letting the one-month
+    // Finances clock expire must not award completion or bypass a future capstone.
+    runSimulation({ scenarioId: 4 });
+    expect(getPlayedScenarioIds()).not.toContain(4);
   });
 
   // The point of a scenario carrying a whole location rather than an id: a place the game has
@@ -116,6 +217,7 @@ describe("a custom game", () => {
       lat: 12.3456,
       long: 65.4321,
       timeZone: "Etc/UTC",
+      resources: { hydro: true },
     };
     const state = createGame({
       scenarioId: CUSTOM_SCENARIO_ID,
@@ -143,6 +245,9 @@ describe("a custom game", () => {
         // its first quarter -- which is what this test caught when the escalation went in.
         dollarsPerkWh: 1.1,
         feePerKgCO2e: 530 / 1000,
+        // Enough firm capacity that this weather-projection test is not cut short by the real
+        // game's chronic-blackout firing rule, which the simulator also enforces.
+        facilities: [{ name: "Natural Gas", peakW: 500000000 }],
       } as ScenarioType,
     });
 

@@ -18,11 +18,19 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     scenarioId: 101, // Rise of Renewables
     seed: 31337,
     startingYear: 2020,
+    customerMarketSize: 2_000_000,
+    customerRate: 0.07,
+    startingDemandScale: 1,
+    loadAdditions: [],
     location: LOCATIONS.PIT,
     date: { minute: 1000, year: 2035, month: 6 },
     facilities: [],
     timeline: [],
     monthlyHistory: [],
+    eventLog: [],
+    reportedEventKeys: [],
+    eventLogReadThroughId: 0,
+    worldEvents: { active: [], occurrences: [], checkedKeys: [] },
     ...overrides,
   } as unknown as GameType;
 }
@@ -140,12 +148,12 @@ describe("SaveFile", () => {
       expect(error).toMatch(/isn't an Electrify save/);
     });
 
-    it("rejects a save from an incompatible version", async () => {
+    it("rejects a save from a different schema", async () => {
       const { save, error } = await readSaveFile(
         saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
       );
       expect(save).toBeUndefined();
-      expect(error).toMatch(/incompatible version/);
+      expect(error).toMatch(/isn't a valid Electrify save/);
     });
 
     it("rejects a save whose scenario this build doesn't have", async () => {

@@ -3,10 +3,10 @@ import { RawWeatherType } from "../Types";
 /**
  * Reader for the packed weather files in public/data/weather, written by scripts/fetch-weather.js.
  *
- * A location's whole record is twelve days a year for several decades, and as CSV that would be
- * hundreds of KB of text to download and parse before the first frame of a game. Packed it is
- * about 66KB through 2025 and a single pass over a DataView, which is what makes hundreds of cities
- * affordable rather than a megabyte apiece.
+ * A location's whole record is twelve days a year across multiple decades, and
+ * as CSV that was 265KB of text to download and parse before the first frame of a game. Packed it
+ * is 57KB (69KB with offshore wind) and a single pass over a DataView, which is what makes
+ * shipping hundreds of cities affordable rather than a megabyte apiece.
  *
  * The layout is deliberately self-describing: the header carries the scale each field was
  * quantised with, so this file and the fetch script cannot quietly disagree about whether wind is
@@ -15,9 +15,11 @@ import { RawWeatherType } from "../Types";
  */
 
 const MAGIC = "EWX1";
-const SUPPORTED_VERSION = 1;
+const SUPPORTED_VERSIONS = [1, 2];
 const HEADER_BYTES = 16;
-const BYTES_PER_ROW = 5;
+const BASE_BYTES_PER_ROW = 5;
+const OFFSHORE_BYTES_PER_ROW = 6;
+const FLAG_OFFSHORE_WIND = 1;
 // decodeWeather works out which month a row belongs to from its position -- one recorded day per
 // calendar month -- so a file claiming more days than a year has months would number rows MONTH
 // 13 and up, which is not a month and which every reader of RawWeatherType would go on to
@@ -31,6 +33,7 @@ export interface WeatherFileHeaderType {
   startingYear: number;
   yearCount: number;
   rowCount: number;
+  offshore: boolean;
 }
 
 function readHeader(view: DataView, byteLength: number): WeatherFileHeaderType {
@@ -47,15 +50,20 @@ function readHeader(view: DataView, byteLength: number): WeatherFileHeaderType {
     throw new Error(`Weather file does not start with ${MAGIC}`);
   }
   const version = view.getUint8(4);
-  if (version !== SUPPORTED_VERSION) {
+  if (!SUPPORTED_VERSIONS.includes(version)) {
     throw new Error(
-      `Weather file is version ${version}, and this build reads version ${SUPPORTED_VERSION}`,
+      `Weather file is version ${version}, and this build reads versions ${SUPPORTED_VERSIONS.join(" and ")}`,
     );
   }
   const bytesPerRow = view.getUint8(7);
-  if (bytesPerRow !== BYTES_PER_ROW) {
+  const flags = version >= 2 ? view.getUint8(15) : 0;
+  const offshore = (flags & FLAG_OFFSHORE_WIND) !== 0;
+  const expectedBytesPerRow = offshore
+    ? OFFSHORE_BYTES_PER_ROW
+    : BASE_BYTES_PER_ROW;
+  if (bytesPerRow !== expectedBytesPerRow) {
     throw new Error(
-      `Weather file has ${bytesPerRow} byte rows, and this build reads ${BYTES_PER_ROW}`,
+      `Weather file has ${bytesPerRow} byte rows, but its header describes ${expectedBytesPerRow}`,
     );
   }
   const header = {
@@ -64,7 +72,8 @@ function readHeader(view: DataView, byteLength: number): WeatherFileHeaderType {
     hoursPerDay: view.getUint8(6),
     startingYear: view.getUint16(8, true),
     yearCount: view.getUint16(10, true),
-    rowCount: Math.floor((byteLength - HEADER_BYTES) / BYTES_PER_ROW),
+    rowCount: Math.floor((byteLength - HEADER_BYTES) / bytesPerRow),
+    offshore,
   };
   if (header.daysPerYear < 1 || header.daysPerYear > MAX_DAYS_PER_YEAR) {
     throw new Error(
@@ -75,9 +84,9 @@ function readHeader(view: DataView, byteLength: number): WeatherFileHeaderType {
     throw new Error("Weather file holds no hours a day");
   }
   const bodyBytes = byteLength - HEADER_BYTES;
-  if (bodyBytes % BYTES_PER_ROW !== 0) {
+  if (bodyBytes % bytesPerRow !== 0) {
     throw new Error(
-      `Weather file has ${bodyBytes % BYTES_PER_ROW} bytes left over after its ${header.rowCount} rows`,
+      `Weather file has ${bodyBytes % bytesPerRow} bytes left over after its ${header.rowCount} rows`,
     );
   }
   const expected = header.daysPerYear * header.hoursPerDay * header.yearCount;
@@ -108,10 +117,13 @@ export function decodeWeather(buffer: ArrayBuffer): RawWeatherType[] {
   }
 
   const rowsPerYear = header.daysPerYear * header.hoursPerDay;
+  const bytesPerRow = header.offshore
+    ? OFFSHORE_BYTES_PER_ROW
+    : BASE_BYTES_PER_ROW;
   const rows: RawWeatherType[] = new Array(header.rowCount);
   for (let row = 0; row < header.rowCount; row++) {
-    const at = HEADER_BYTES + row * BYTES_PER_ROW;
-    rows[row] = {
+    const at = HEADER_BYTES + row * bytesPerRow;
+    const decoded: RawWeatherType = {
       YEAR: header.startingYear + Math.floor(row / rowsPerYear),
       MONTH: Math.floor((row % rowsPerYear) / header.hoursPerDay) + 1,
       TEMP_C: view.getInt16(at, true) / tempScale,
@@ -119,6 +131,10 @@ export function decodeWeather(buffer: ArrayBuffer): RawWeatherType[] {
       WIND_KPH: view.getUint8(at + 3) / windScale,
       PRECIP_MM: view.getUint8(at + 4) / precipScale,
     };
+    if (header.offshore) {
+      decoded.WIND_OFFSHORE_KPH = view.getUint8(at + 5) / windScale;
+    }
+    rows[row] = decoded;
   }
   return rows;
 }

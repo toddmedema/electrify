@@ -27,11 +27,8 @@ describe("parseCsv", () => {
 
   // The blank row a file ending in a newline leaves behind. EconomyRaw.csv ends in one and
   // FuelPricesRaw.csv does not, and neither should be able to tell the difference here
-  it("skips the blank line left by a file ending in a newline", () => {
+  it("skips blank lines at the end or in the middle", () => {
     expect(parseCsv(`${HEADER}\n12,2019,4.75,0.0180\n`)).toHaveLength(1);
-  });
-
-  it("skips blank lines in the middle of a file", () => {
     expect(
       parseCsv(`${HEADER}\n12,2019,4.75,0.0180\n\n11,2019,4.75,0.0180`),
     ).toHaveLength(2);
@@ -55,11 +52,8 @@ describe("parseCsv", () => {
     expect(() => parseCsv(`${HEADER}\n12,2019,"4,75",0.0180`)).toThrow(/quote/);
   });
 
-  it("throws on a row whose field count has drifted from the header's", () => {
+  it("rejects rows whose field count drifted and reports their source line", () => {
     expect(() => parseCsv(`${HEADER}\n12,2019,4.75`)).toThrow(/line 2/);
-  });
-
-  it("names the line a short row is actually on, counting blank lines", () => {
     expect(() => parseCsv(`${HEADER}\n\n12,2019,4.75`)).toThrow(/line 3/);
   });
 

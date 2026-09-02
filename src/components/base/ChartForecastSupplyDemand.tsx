@@ -14,10 +14,11 @@ import {
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
-import { blackoutColor, demandColor, supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 interface BlackoutEdges {
   minute: number;
@@ -89,16 +90,19 @@ function buildOptions(showXLabels: boolean) {
     ],
     series: [
       {},
-      { stroke: supplyColor, width: 1, points: { show: false } },
-      { stroke: demandColor, width: 2, points: { show: false } },
+      { stroke: chartPalette().supply, width: 1, points: { show: false } },
+      { stroke: chartPalette().demand, width: 2, points: { show: false } },
     ],
-    plugins: [bandsPlugin(() => getState().blackoutSpans, blackoutColor, 0.3)],
+    plugins: [
+      bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
+    ],
   });
 }
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
-  return `Supply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -138,10 +142,12 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
     return (
       <UPlotChart<State>
         id="chartForecastSupplyDemand"
-        ariaLabel="Chart of forecasted electricity supply and demand"
+        ariaLabel="Chart of predicted electricity supply and demand"
+        formatSummaryValue={formatWatts}
         height={height}
         state={state}
         data={[minutes, supply, demand]}
+        seriesLabels={["Supply", "Demand"]}
         buildOptions={buildOptions(showXLabels !== false)}
         structureKey={String(showXLabels !== false)}
         syncKey={syncKey}

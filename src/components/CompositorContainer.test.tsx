@@ -1,12 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as React from "react";
-import type { UnknownAction } from "redux";
-import { ACTIONS, EVENTS, type EventData } from "react-joyride";
+import { UnknownAction } from "redux";
 import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
+import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
-import Compositor, { type Props as CompositorProps } from "./Compositor";
 import { mapDispatchToProps } from "./CompositorContainer";
 
 // Where `loaded` drops the player, and so where every walkthrough starts
@@ -70,7 +69,7 @@ function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
 }
 
 describe("onTutorialStep", () => {
-  const generators = walkthrough("102: Generators");
+  const generators = walkthrough("Mission 2: Generators");
 
   it("moves the walkthrough to the new step", () => {
     const dispatched = step({
@@ -97,8 +96,8 @@ describe("onTutorialStep", () => {
   /**
    * Regression test. Back used to dispatch the previous step's onNext, which only ever modelled
    * moving forwards, so nothing undid the navigation the forward step performed: the player was
-   * left on the build screen while the step's target lived on Facilities, Joyride found no
-   * target, and the walkthrough appeared to die with no tooltip anywhere.
+   * left on the build screen while the step's target lived on Facilities, so the objective had
+   * no relevant control to identify.
    */
   it("navigates back onto the card holding the previous step's target", () => {
     const dispatched = step({
@@ -113,15 +112,20 @@ describe("onTutorialStep", () => {
     );
   });
 
-  // The mirror of the case above: the last step closes the build screen, so stepping back into
-  // it has to reopen it
+  // The mirror of the case above: a later step closes the build screen, so stepping back into
+  // the preceding shop step has to reopen it
   it("navigates back into a screen a later step closed", () => {
-    const last = generators.length - 1;
-    expect(cardOf(generators[last])).toBe(STARTING_CARD);
+    const facilitiesStep = generators.findIndex(
+      (candidate, index) =>
+        index > 0 &&
+        cardOf(candidate) === STARTING_CARD &&
+        cardOf(generators[index - 1]) === "BUILD_GENERATORS",
+    );
+    expect(facilitiesStep).toBeGreaterThan(0);
     const dispatched = step({
       steps: generators,
-      fromStep: last,
-      toStep: last - 1,
+      fromStep: facilitiesStep,
+      toStep: facilitiesStep - 1,
       currentCard: STARTING_CARD,
     });
     expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
@@ -149,7 +153,7 @@ describe("onTutorialStep", () => {
         content: <span />,
         onNext: () => sideEffect,
       },
-      { card: "FINANCES", target: "#second", content: <span /> },
+      { card: "INSIGHTS", target: "#second", content: <span /> },
     ];
 
     it("fires onNext when leaving a step forwards", () => {
@@ -160,9 +164,43 @@ describe("onTutorialStep", () => {
 
     it("doesn't replay onNext when stepping backwards", () => {
       expect(
-        step({ steps, fromStep: 1, toStep: 0, currentCard: "FINANCES" }),
+        step({ steps, fromStep: 1, toStep: 0, currentCard: "INSIGHTS" }),
       ).not.toContainEqual(sideEffect);
     });
+  });
+
+  it("carries the guided generator purchase into its capstone", () => {
+    const capstone = generators.findIndex((candidate) => candidate.capstone);
+    expect(capstone).toBeGreaterThan(0);
+
+    const dispatched = step({
+      steps: generators,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
+    expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
+    expect(dispatched[0].payload).toEqual({ tutorialStep: capstone });
+  });
+
+  it("still rebuilds capstones that require an authored checkpoint", () => {
+    const storage = walkthrough("Mission 3: Storage");
+    const capstone = storage.findIndex((candidate) => candidate.capstone);
+
+    const dispatched = step({
+      steps: storage,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
+    expect(dispatched.map((action) => action.type)).toEqual([
+      "game/quit",
+      "game/start",
+      "game/delta",
+    ]);
+    expect(dispatched[2].payload).toEqual({ tutorialStep: capstone });
   });
 });
 
@@ -210,23 +248,59 @@ function declares(simple: string): boolean {
 
 describe("walkthrough steps", () => {
   const tutorials = SCENARIOS.filter((s) => s.tutorialSteps);
+  const actionGateTypes = new Set<string>([
+    reprioritizeFacility.type,
+    togglePauseFacility.type,
+  ]);
 
   it("covers every walkthrough", () => {
     expect(tutorials.length).toBeGreaterThan(0);
   });
 
-  tutorials.forEach((scenario) => {
-    const steps = scenario.tutorialSteps as TutorialStepType[];
+  it("uses real game actions for every action gate", () => {
+    const declared = tutorials.flatMap(
+      (scenario) =>
+        scenario.tutorialSteps?.flatMap((tutorialStep) =>
+          tutorialStep.advanceOnAction
+            ? ([] as string[]).concat(tutorialStep.advanceOnAction)
+            : [],
+        ) || [],
+    );
+    expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
+  });
 
-    it(`${scenario.name} declares the card every step's target lives on`, () => {
+  it("uses the same symbols as the generator and storage buttons it highlights", () => {
+    const conceptsOf = (step: TutorialStepType) =>
+      React.isValidElement<{ concepts?: string[] }>(step.content)
+        ? step.content.props.concepts
+        : undefined;
+    const generatorStep = walkthrough("Mission 2: Generators").find(
+      (step) => step.target === ".button-buildGenerator",
+    )!;
+    const storageStep = walkthrough("Mission 3: Storage").find(
+      (step) => step.target === ".button-buildStorage",
+    )!;
+
+    expect(conceptsOf(generatorStep)).toEqual(["build", "generator"]);
+    expect(conceptsOf(storageStep)).toEqual(["build", "storage"]);
+  });
+
+  it("declares the card every tutorial target lives on", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       steps.forEach((s, i) => {
-        expect([`step ${i}`, cardOf(s)]).not.toContainEqual(undefined);
+        expect([scenario.name, `step ${i}`, cardOf(s)]).not.toContainEqual(
+          undefined,
+        );
       });
     });
+  });
 
-    // Walk the whole thing forwards and then all the way back, tracking the card the store
-    // would be showing. Any step whose target isn't on the current card would show no tooltip
-    it(`${scenario.name} shows each step's card in both directions`, () => {
+  // Walk each walkthrough forwards and then all the way back, tracking the card the store
+  // would be showing. Any step whose target isn't on the current card would point at nothing
+  it("shows each guided step's card in both directions", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       let card: CardNameType = STARTING_CARD;
       expect(cardOf(steps[0])).toBe(card);
 
@@ -239,11 +313,14 @@ describe("walkthrough steps", () => {
       }
 
       moves.forEach(([fromStep, toStep]) => {
-        const destination = navigatedTo(
-          step({ steps, fromStep, toStep, currentCard: card }),
-        );
+        const dispatched = step({ steps, fromStep, toStep, currentCard: card });
+        const destination = navigatedTo(dispatched);
         if (destination) {
           card = destination;
+        } else if (dispatched.some((action) => action.type === "game/start")) {
+          // Capstones restart through Loading; its eventual card is outside this dispatch unit.
+          card = STARTING_CARD;
+          return;
         }
         expect([scenario.name, toStep, card]).toEqual([
           scenario.name,
@@ -252,70 +329,25 @@ describe("walkthrough steps", () => {
         ]);
       });
     });
+  });
 
-    /**
-     * Joyride reports a selector matching nothing as TARGET_NOT_FOUND, which the walkthrough
-     * handles by moving straight on - so a step pointing at markup that has since been renamed
-     * quietly vanishes rather than failing. The move off Victory took `.VictoryContainer` with
-     * it exactly that way, and the tutorial lost its tour of the supply/demand graph without a
-     * single red test. Rendering every card would be the airtight check; scanning the source
-     * for the id or class each selector names catches the same kind of rename far cheaper.
-     */
-    it(`${scenario.name} points every step at markup that still exists`, () => {
+  /**
+   * A selector matching nothing silently loses the restrained target treatment. Rendering every
+   * card would be the airtight check; scanning the source for the id or class each selector names
+   * catches that kind of rename far cheaper.
+   */
+  it("points every tutorial step at markup that still exists", () => {
+    tutorials.forEach((scenario) => {
+      const steps = scenario.tutorialSteps as TutorialStepType[];
       targetsOf(steps).forEach((target) => {
         target.split(/\s+/).forEach((simple) => {
-          expect([target, declares(simple)]).toEqual([target, true]);
+          expect([scenario.name, target, declares(simple)]).toEqual([
+            scenario.name,
+            target,
+            true,
+          ]);
         });
       });
     });
-  });
-});
-
-describe("handleJoyrideCallback", () => {
-  const steps = walkthrough("102: Generators");
-
-  function fire(tutorialStep: number, event: Partial<EventData>) {
-    const onTutorialStep = jest.fn();
-    const onTutorialEnd = jest.fn();
-    const compositor = new Compositor({
-      tutorialStep,
-      tutorialSteps: steps,
-      scenarioId: 1,
-      card: { name: STARTING_CARD, ts: 0 },
-      onTutorialStep,
-      onTutorialEnd,
-    } as unknown as CompositorProps);
-    compositor.handleJoyrideCallback(event as EventData);
-    return { onTutorialStep, onTutorialEnd };
-  }
-
-  it("advances past a target that never turns up mid-walkthrough", () => {
-    const { onTutorialStep } = fire(2, {
-      action: ACTIONS.NEXT,
-      index: 2,
-      type: EVENTS.TARGET_NOT_FOUND,
-    });
-    expect(onTutorialStep).toHaveBeenCalled();
-  });
-
-  // Quitting takes the targets out of the DOM, which Joyride reports the same way. Acting on it
-  // navigated the freshly reset game back onto the walkthrough's card, which had nothing left to
-  // render - a blank screen where the main menu should be
-  it("ignores targets disappearing once the walkthrough is over", () => {
-    const { onTutorialStep } = fire(-1, {
-      action: ACTIONS.NEXT,
-      index: 2,
-      type: EVENTS.TARGET_NOT_FOUND,
-    });
-    expect(onTutorialStep).not.toHaveBeenCalled();
-  });
-
-  it("still ends the walkthrough when the player closes it", () => {
-    const { onTutorialEnd } = fire(2, {
-      action: ACTIONS.CLOSE,
-      index: 2,
-      type: EVENTS.STEP_AFTER,
-    });
-    expect(onTutorialEnd).toHaveBeenCalledWith(steps);
   });
 });

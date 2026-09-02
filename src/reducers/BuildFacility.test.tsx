@@ -1,8 +1,9 @@
-import gameReducer, { buildFacility } from "./Game";
+import gameReducer, { buildFacility, generateNewTimeline } from "./Game";
 import { GENERATORS } from "../data/Facilities";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { GameType, GeneratorShoppingType } from "../Types";
 import { createGame } from "../testing/Simulator";
+import { TICKS_PER_MONTH } from "../Constants";
 
 function aGeneratorToBuild(state: GameType): GeneratorShoppingType {
   const generator = GENERATORS(state, 500000000, [20], [500]).find(
@@ -80,5 +81,70 @@ describe("buildFacility", () => {
         .filter((t) => t.minute < after.date.minute)
         .map((t) => t.cash),
     ).toEqual(pastBefore);
+  });
+
+  it("rejects a stale purchase after the last viable site has been claimed", () => {
+    let state = createGame({ scenarioId: 103 });
+    const hydro = GENERATORS(state, 50000000, [20], [500]).find(
+      (g: GeneratorShoppingType) => g.name === "Hydro",
+    );
+    expect(hydro?.viableLocationsRemaining).toBe(3);
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      state = gameReducer(
+        state,
+        buildFacility({ facility: hydro!, financed: true }),
+      );
+    }
+
+    expect(
+      state.facilities.filter((facility) => facility.name === "Hydro"),
+    ).toHaveLength(3);
+    state.facilities.forEach((facility) => {
+      expect(facility).not.toHaveProperty("viableLocationsRemaining");
+    });
+  });
+
+  it("rejects a stale purchase when current cash no longer covers it", () => {
+    const before = createGame({ scenarioId: 103 });
+    const generator = aGeneratorToBuild(before);
+    getTimeFromTimeline(before.date.minute, before.timeline)!.cash = 0;
+
+    const after = gameReducer(
+      before,
+      buildFacility({ facility: generator, financed: true }),
+    );
+
+    expect(after.facilities).toHaveLength(before.facilities.length);
+  });
+
+  it("keeps a long cash forecast finite when hydro finishes construction", () => {
+    const before = createGame({ scenarioId: 103 });
+    const hydro = GENERATORS(before, 50000000, [20], [500]).find(
+      (g: GeneratorShoppingType) => g.name === "Hydro",
+    );
+    expect(hydro).toBeDefined();
+
+    const after = gameReducer(
+      before,
+      buildFacility({ facility: hydro!, financed: true }),
+    );
+    const now = getTimeFromTimeline(after.date.minute, after.timeline)!;
+    const forecast = generateNewTimeline(
+      after,
+      now.cash,
+      now.customers,
+      TICKS_PER_MONTH * 24,
+    );
+
+    // Hydro finishes inside this horizon. It has an emissions entry but no purchased-fuel price;
+    // that combination used to turn its first fuel expense, and then the Cash chart, into NaN.
+    expect(
+      after.facilities.find((f) => f.name === "Hydro")!.yearsToBuildLeft,
+    ).toBeGreaterThan(0);
+    expect(forecast.every((tick) => Number.isFinite(tick.cash))).toBe(true);
+    expect(forecast.every((tick) => Number.isFinite(tick.expensesFuel))).toBe(
+      true,
+    );
   });
 });

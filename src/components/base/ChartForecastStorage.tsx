@@ -12,10 +12,11 @@ import {
 import { TickPresentFutureType } from "../../Types";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
-import { supplyColor } from "../../Theme";
+import { chartPalette } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -74,12 +75,17 @@ function buildOptions(showXLabels: boolean) {
           splits.map((t) => formatWattHoursAxis(t, splits)),
       }),
     ],
-    series: [{}, { stroke: supplyColor, width: 1, points: { show: false } }],
+    series: [
+      {},
+      { stroke: chartPalette().supply, width: 1, points: { show: false } },
+    ],
   });
 }
 
 function tooltip(idx: number, state: State): string {
-  return formatWattHours(state.timeline[idx].storedWh);
+  const d = state.timeline[idx];
+  const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
+  return `${header}\n${formatWattHours(d.storedWh)}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -108,10 +114,12 @@ export default class chartForecastStorage extends React.PureComponent<
     return (
       <UPlotChart<State>
         id="chartForecastStorage"
-        ariaLabel="Chart of forecasted stored power"
+        ariaLabel="Chart of predicted stored energy"
+        formatSummaryValue={formatWattHours}
         height={height}
         state={{ timeline, domain, startingYear, multiyear }}
         data={[minutes, stored]}
+        seriesLabels={["Stored energy"]}
         buildOptions={buildOptions(showXLabels !== false)}
         structureKey={String(showXLabels !== false)}
         syncKey={syncKey}

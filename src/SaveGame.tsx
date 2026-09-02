@@ -1,4 +1,5 @@
 import packageJson from "../package.json";
+import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import {
   getStorageJson,
@@ -24,10 +25,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Bump on any breaking schema change. Mismatched saves are ignored rather than migrated.
-// 2: facilities carry the rate their loan was signed at, and the game carries the rate a new one
-// would cost. A version 1 save has neither, and a loan with no rate cannot be repaid.
-export const SAVE_VERSION = 2;
+// Initial public schema. Increment this when a post-release change becomes incompatible.
+export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
   version: number;
@@ -61,7 +60,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (save.version !== SAVE_VERSION) {
+  if (
+    save.version !== SAVE_VERSION ||
+    typeof save.savedAt !== "string" ||
+    typeof save.appVersion !== "string"
+  ) {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -72,6 +75,38 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
+    typeof game.customerMarketSize !== "number" ||
+    !Number.isFinite(game.customerMarketSize) ||
+    game.customerMarketSize <= 0 ||
+    typeof game.startingDemandScale !== "number" ||
+    !Number.isFinite(game.startingDemandScale) ||
+    game.startingDemandScale <= 0 ||
+    !Array.isArray(game.loadAdditions) ||
+    game.loadAdditions.some(
+      (addition) =>
+        typeof addition !== "object" ||
+        addition === null ||
+        typeof addition.id !== "string" ||
+        typeof addition.label !== "string" ||
+        typeof addition.startsYear !== "number" ||
+        !Number.isInteger(addition.startsYear) ||
+        (addition.startsMonth !== undefined &&
+          (typeof addition.startsMonth !== "number" ||
+            !Number.isInteger(addition.startsMonth) ||
+            addition.startsMonth < 1 ||
+            addition.startsMonth > 12)) ||
+        typeof addition.peakW !== "number" ||
+        !Number.isFinite(addition.peakW) ||
+        addition.peakW < 0 ||
+        typeof addition.loadFactor !== "number" ||
+        !Number.isFinite(addition.loadFactor) ||
+        addition.loadFactor < 0 ||
+        addition.loadFactor > 1 ||
+        addition.demandType !== "Data centers",
+    ) ||
+    typeof game.customerRate !== "number" ||
+    !Number.isFinite(game.customerRate) ||
+    game.customerRate < 0 ||
     // Checked in full rather than trusted, the same way decodeReplay checks a replay's: the
     // location's id becomes the path of the weather file the loading screen fetches, and its
     // lat/long and time zone drive the sun model. A save is hand-editable too
@@ -86,10 +121,85 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  if (!Array.isArray(game.facilities)) {
+    return null;
+  }
   if (
-    !Array.isArray(game.facilities) ||
+    game.facilities.some((facility) => {
+      if (typeof facility !== "object" || facility === null) {
+        return true;
+      }
+      const current = facility as Record<string, unknown>;
+      const requiredNumbersInvalid = [
+        current.annualOperatingCost,
+        current.lifespanYears,
+        current.lifetimeWh,
+        current.lifetimePotentialWh,
+        current.lifetimeRevenue,
+        current.lifetimeExpenses,
+        current.peakW,
+      ].some((value) => typeof value !== "number" || !Number.isFinite(value));
+      const optionalNumbersInvalid = [
+        current.costPerStart,
+        current.lifetimeStarts,
+        current.minimumStableOutput,
+        current.variableOperatingCostPerMWh,
+      ].some(
+        (value) =>
+          value !== undefined &&
+          (typeof value !== "number" || !Number.isFinite(value) || value < 0),
+      );
+      const optionalBooleansInvalid = [
+        current.committed,
+        current.tracksStarts,
+        current.generatingLastRealTick,
+      ].some((value) => value !== undefined && typeof value !== "boolean");
+      return (
+        requiredNumbersInvalid ||
+        optionalNumbersInvalid ||
+        (typeof current.minimumStableOutput === "number" &&
+          current.minimumStableOutput > 1) ||
+        optionalBooleansInvalid
+      );
+    }) ||
     !Array.isArray(game.timeline) ||
-    !Array.isArray(game.monthlyHistory)
+    !Array.isArray(game.monthlyHistory) ||
+    game.monthlyHistory.length >
+      Math.floor(game.date.minute / MINUTES_PER_MONTH) ||
+    game.monthlyHistory.some((month) => {
+      if (typeof month !== "object" || month === null) {
+        return true;
+      }
+      const record = month as Partial<GameType["monthlyHistory"][number]>;
+      return (
+        typeof record.deliveredWhByFuel !== "object" ||
+        record.deliveredWhByFuel === null ||
+        Object.values(record.deliveredWhByFuel).some(
+          (value) =>
+            typeof value !== "number" || !Number.isFinite(value) || value < 0,
+        ) ||
+        typeof record.peakDemandW !== "number" ||
+        !Number.isFinite(record.peakDemandW) ||
+        record.peakDemandW < 0 ||
+        (record.minimumSupplyMarginW !== undefined &&
+          (typeof record.minimumSupplyMarginW !== "number" ||
+            !Number.isFinite(record.minimumSupplyMarginW)))
+      );
+    }) ||
+    !Array.isArray(game.eventLog) ||
+    !Array.isArray(game.reportedEventKeys) ||
+    typeof game.eventLogReadThroughId !== "number"
+  ) {
+    return null;
+  }
+  const worldEvents = game.worldEvents as
+    Partial<GameType["worldEvents"]> | undefined;
+  if (
+    typeof worldEvents !== "object" ||
+    worldEvents === null ||
+    !Array.isArray(worldEvents.active) ||
+    !Array.isArray(worldEvents.occurrences) ||
+    !Array.isArray(worldEvents.checkedKeys)
   ) {
     return null;
   }
@@ -151,7 +261,7 @@ export function isResumedGame(game: GameType): boolean {
  *
  * isSaveableScenario is injected rather than looked up here (see the note at the top of the file);
  * pass a predicate that rejects tutorials, which are short enough not to be worth saving and would
- * need their mid-Joyride step restored too.
+ * otherwise need their short-lived objective state restored too.
  */
 export function startAutosave(
   store: AppStore,
@@ -161,15 +271,17 @@ export function startAutosave(
   // the subscriber sees it, so flushing on the way out needs the state as it was, not as it is.
   let live: GameType | undefined;
   let savedYear = -1;
-  // What was actually written, so the flush below can tell whether anything has happened since
-  let savedMinute = -1;
+  // The exact Redux snapshot that was written. Time is not enough to identify a change: while
+  // paused, a player can still build, sell, reorder, change rates, or pause a facility without
+  // advancing the minute.
+  let saved: GameType | undefined;
   // A full disk fails every year; saying so once is a warning, saying so every year is a bug
   let warnedAboutFailure = false;
 
   const write = (game: GameType) => {
     if (writeSave(game)) {
       savedYear = game.date.year;
-      savedMinute = game.date.minute;
+      saved = game;
     } else if (!warnedAboutFailure) {
       warnedAboutFailure = true;
       store.dispatch(
@@ -188,7 +300,7 @@ export function startAutosave(
    * back from the dead.
    */
   const flush = () => {
-    if (!live || live.date.minute === savedMinute) {
+    if (!live || live === saved) {
       return;
     }
     if (readSave()?.game.scenarioId !== live.scenarioId) {
@@ -214,7 +326,7 @@ export function startAutosave(
       // A game just started or resumed, and nothing of it is written yet. Saving immediately is
       // what lets the flush above treat a missing save as "the scenario ended".
       savedYear = -1;
-      savedMinute = -1;
+      saved = undefined;
     }
     live = game;
     if (game.date.year !== savedYear) {

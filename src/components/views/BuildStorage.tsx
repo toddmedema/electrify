@@ -11,34 +11,35 @@ import {
   DialogTitle,
   IconButton,
   List,
-  Menu,
-  MenuItem,
-  Slider,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableRow,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import CloseIcon from "@mui/icons-material/Close";
-import PauseIcon from "@mui/icons-material/Pause";
-import SortIcon from "@mui/icons-material/Sort";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { getMonthlyPayment } from "../../helpers/Financials";
 import {
   formatMoneyConcise,
-  formatMoneyStable,
+  formatWattHours,
   formatWatts,
 } from "../../helpers/Format";
 import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import ManualLink from "../base/ManualLink";
-import { GameType, SpeedType, StorageShoppingType } from "../../Types";
+import ConceptIcon from "../base/ConceptIcon";
+import DecisionImpactPreview from "../base/DecisionImpactPreview";
+import {
+  getBuildAvailability,
+  ViableLocationsRow,
+} from "../base/BuildAvailability";
+import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import { GameType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
@@ -51,6 +52,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const [financingExpanded, setFinancingExpanded] = React.useState(false);
+  const financingTermsId = React.useId();
+  const purchaseSubmitted = React.useRef(false);
   const downpayment = DOWNPAYMENT_PERCENT * props.storage.buildCost;
   const loanAmount = props.storage.buildCost - downpayment;
   const monthlyPayment = getMonthlyPayment(
@@ -58,34 +62,47 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     props.interestRate,
     LOAN_MONTHS,
   );
-  const buildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const secondaryText = buildable ? (
-    storage.description
-  ) : (
-    <div>
-      Too large for current tech.
-      <br />
-      Max size: <strong>{formatWatts(props.storage.maxPeakWh)}h</strong>
-    </div>
+  const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
+  const { buildable, secondaryText } = getBuildAvailability(
+    storage.description,
+    storage.available,
+    sizeBuildable,
+    `${formatWatts(storage.maxPeakWh)}h`,
+    storage.viableLocationsRemaining,
   );
+  const financingGap = Math.max(0, downpayment - cash);
+  const buildSubtitle =
+    buildable && financingGap > 0
+      ? `Can't afford the loan down payment. Need ${formatMoneyConcise(financingGap)} more cash.`
+      : secondaryText;
 
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
 
   const toggleOpen = (e: React.SyntheticEvent) => {
+    if (!open) {
+      purchaseSubmitted.current = false;
+      setFinancingExpanded(false);
+    }
     setOpen(!open);
     e.stopPropagation();
   };
 
-  // const monthlyInterest = getPaymentInterest(loanAmount, props.interestRate);
-  // <TableRow>
-  // <TableCell>Payments during construction (interest only)</TableCell>
-  // <TableCell align="right">{formatMoneyConcise(monthlyInterest)}/mo</TableCell>
-  // </TableRow>
+  const submitPurchase = (
+    financed: boolean,
+    e: React.MouseEvent<HTMLElement>,
+  ) => {
+    if (purchaseSubmitted.current) {
+      return;
+    }
+    purchaseSubmitted.current = true;
+    props.onBuild(financed);
+    toggleOpen(e);
+  };
 
   return (
-    <Card onClick={toggleExpand} className="build-list-item expandable">
+    <Card className="build-list-item">
       <CardHeader
         avatar={
           <Avatar
@@ -101,6 +118,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               color="primary"
               onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
               {formatMoneyConcise(storage.buildCost)}
             </Button>
@@ -112,12 +130,19 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </span>
         }
         title={storage.name}
-        subheader={secondaryText}
+        subheader={buildSubtitle}
       />
-      {!expanded && (
-        <ArrowDropDownIcon color="primary" className="expand-icon" />
-      )}
-      {expanded && <ArrowDropUpIcon color="primary" className="expand-icon" />}
+      <Button
+        color="primary"
+        className="expand-details"
+        size="small"
+        aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
+        aria-expanded={expanded}
+        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+        onClick={toggleExpand}
+      >
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
@@ -157,6 +182,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
+              <ViableLocationsRow
+                remaining={storage.viableLocationsRemaining}
+              />
             </TableBody>
           </Table>
         </TableContainer>
@@ -175,77 +203,106 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </IconButton>
         </DialogTitle>
         <DialogContent className="noPadding">
-          <TableContainer>
-            <Table size="small">
-              <TableBody>
-                <TableRow>
-                  <TableCell>Time to build</TableCell>
-                  <TableCell align="right">
-                    {Math.round(storage.yearsToBuild * 12)} mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Cash cost</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(storage.buildCost)}
-                  </TableCell>
-                </TableRow>
-                <TableRow className="bold">
-                  <TableCell colSpan={2}>Loan info</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Downpayment</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(downpayment)}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    Interest rate
-                    <ManualLink
-                      entry={MANUAL_ENTRY.INTEREST_RATES}
-                      label="interest rate"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {(props.interestRate * 100).toFixed(2)}%
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Monthly payments</TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(monthlyPayment)}/mo
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Loan duration</TableCell>
-                  <TableCell align="right">
-                    Construction + {LOAN_MONTHS / 12} years
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <DecisionImpactPreview
+            facts={[
+              {
+                concept: "money",
+                label: "Cash purchase",
+                value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
+              },
+              {
+                concept: "time",
+                label: "Online in",
+                value: `${Math.round(storage.yearsToBuild * 12)} months`,
+                detail:
+                  "Stored energy and discharge power do not increase until construction finishes.",
+              },
+              {
+                concept: "storage",
+                label: "Energy capacity",
+                value: `+${formatWattHours(storage.peakWh)} stored energy`,
+                detail: `${formatWatts(storage.peakW)} maximum charge or discharge rate`,
+              },
+              {
+                concept: "supply",
+                label: "Round-trip efficiency",
+                value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
+              },
+            ]}
+          />
+          <Button
+            color="primary"
+            size="small"
+            fullWidth
+            aria-expanded={financingExpanded}
+            aria-controls={financingTermsId}
+            endIcon={
+              financingExpanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />
+            }
+            onClick={() => setFinancingExpanded((value) => !value)}
+          >
+            {financingExpanded
+              ? "Hide financing terms"
+              : "Show financing terms"}
+          </Button>
+          <Collapse in={financingExpanded} timeout="auto" unmountOnExit>
+            <TableContainer id={financingTermsId}>
+              <Table size="small" aria-label="Financing terms">
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Downpayment</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(downpayment)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      Interest rate
+                      <ManualLink
+                        entry={MANUAL_ENTRY.INTEREST_RATES}
+                        label="interest rate"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {(props.interestRate * 100).toFixed(2)}%
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Monthly payments</TableCell>
+                    <TableCell align="right">
+                      {formatMoneyConcise(monthlyPayment)}/mo
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Loan duration</TableCell>
+                    <TableCell align="right">
+                      Construction + {LOAN_MONTHS / 12} years
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Collapse>
         </DialogContent>
         <DialogActions>
           <Button
             color="primary"
             disabled={cash < storage.buildCost}
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(false);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(false, e)
+            }
+            startIcon={<ConceptIcon concept="money" fontSize="small" />}
           >
             Pay cash
           </Button>
           <Button
             color="primary"
             variant="contained"
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              props.onBuild(true);
-              toggleOpen(e);
-            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) =>
+              submitPurchase(true, e)
+            }
+            startIcon={<ConceptIcon concept="finances" fontSize="small" />}
           >
             Take loan
           </Button>
@@ -255,7 +312,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   );
 }
 
-const sortOptions = [
+type StorageSortKey = "buildCost" | "yearsToBuild";
+
+const sortOptions: ReadonlyArray<readonly [StorageSortKey, string]> = [
   ["buildCost", "Build Cost"],
   ["yearsToBuild", "Build Time"],
 ];
@@ -284,7 +343,6 @@ export interface StateProps {
 export interface DispatchProps {
   onBuildStorage: (storage: StorageShoppingType, financed: boolean) => void;
   onBack: () => void;
-  onSpeedChange: (speed: SpeedType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -299,122 +357,33 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
-  const [sort, setSort] = React.useState<string>("buildCost");
-  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+  const [sort, setSort] = React.useState<StorageSortKey>("buildCost");
 
   if (!now) {
     return <span />;
   }
 
   const cash = now.cash;
-  const storage = STORAGE(game, getW(sliderTick)).sort((a, b) =>
-    a[sort] > b[sort] ? 1 : -1,
+  const storage = STORAGE(game, getW(sliderTick)).sort(
+    (a, b) => a[sort] - b[sort],
   );
-
-  const handleSliderChange = (_event: Event, newValue: number | number[]) => {
-    if (Array.isArray(newValue)) {
-      newValue = newValue[0];
-    }
-    setSliderTick(newValue);
-  };
-
-  const onSort = (newValue: string) => {
-    setSort(newValue);
-    onSortClose();
-  };
-
-  const onSortOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const onSortClose = () => {
-    setAnchorEl(null);
-  };
 
   return (
     <div id="topbar" className="flexContainer">
-      <Toolbar className="bottomBorder">
-        <Typography variant="h6">
-          {formatMoneyStable(cash)} <span className="weak">Build Storage</span>
-        </Typography>
-        {game.speed !== "PAUSED" && (
-          <IconButton
-            onClick={() => props.onSpeedChange("PAUSED")}
-            aria-label="pause"
-            edge="end"
-            color="primary"
-            size="large"
-          >
-            <PauseIcon />
-          </IconButton>
-        )}
-        <IconButton
-          id="close-button"
-          edge="end"
-          color="primary"
-          onClick={onBack}
-          aria-label="close"
-          size="large"
-        >
-          <CloseIcon />
-        </IconButton>
-        <div className="flex-newline"></div>
-        <div
-          id="yearProgressBar"
-          style={{
-            width: `${game.date.percentOfYear * 100}%`,
-          }}
-        />
-        <Typography
-          id="peak-output"
-          className="flex-newline"
-          variant="body2"
-          color="textSecondary"
-        >
-          Capacity:{" "}
-          <Typography color="primary" component="strong">
-            {valueLabelFormat(sliderTick)}h
-          </Typography>{" "}
-          {filtered.length <= 0 && "(slide to change)"}
-        </Typography>
-        <Slider
-          value={sliderTick}
-          aria-labelledby="peak-output"
-          valueLabelDisplay="off"
-          min={4}
-          step={1}
-          max={37}
-          onChange={handleSliderChange}
-        />
-        <IconButton
-          edge="end"
-          color="primary"
-          onClick={onSortOpen}
-          aria-label="sort"
-          size="large"
-        >
-          <SortIcon />
-        </IconButton>
-        <Menu
-          id="sort-menu"
-          anchorEl={anchorEl}
-          keepMounted
-          open={Boolean(anchorEl)}
-          onClose={onSortClose}
-        >
-          {sortOptions.map((option) => {
-            return (
-              <MenuItem onClick={() => onSort(option[0])} key={option[0]}>
-                {sort === option[0] ? (
-                  <strong>{option[1]}</strong>
-                ) : (
-                  <span className="weak">{option[1]}</span>
-                )}
-              </MenuItem>
-            );
-          })}
-        </Menu>
-      </Toolbar>
+      <ConstructionBuildHeader
+        concept="storage"
+        title="Build Storage"
+        cash={cash}
+        capacity={`${valueLabelFormat(sliderTick)}h`}
+        sliderValue={sliderTick}
+        sliderMin={4}
+        sliderMax={37}
+        sort={sort}
+        sortOptions={sortOptions}
+        onClose={onBack}
+        onSliderChange={setSliderTick}
+        onSortChange={(value) => setSort(value as StorageSortKey)}
+      />
       <List dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem

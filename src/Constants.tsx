@@ -13,7 +13,7 @@ export const DIFFICULTIES = {
     buildTime: 0.2,
     blackoutPenalty: 2,
     description:
-      "Easiest: 40% cheaper facilities, 40% lower operating costs, 80% faster construction, and blackouts cost you the least growth.",
+      "Most forgiving: much lower game costs, very fast building, and smaller gameplay penalties from outages.",
   },
   Employee: {
     buildCost: 0.7,
@@ -21,7 +21,7 @@ export const DIFFICULTIES = {
     buildTime: 0.3,
     blackoutPenalty: 4,
     description:
-      "Easy: 30% cheaper facilities, 30% lower operating costs, 70% faster construction, and lighter blackout penalties.",
+      "Forgiving: lower game costs, faster building, and smaller gameplay penalties from outages.",
   },
   Manager: {
     buildCost: 0.8,
@@ -29,15 +29,14 @@ export const DIFFICULTIES = {
     buildTime: 0.5,
     blackoutPenalty: 6,
     description:
-      "Medium: 20% cheaper facilities, 20% lower operating costs, 50% faster construction, and moderate blackout penalties.",
+      "Balanced: some help with game costs, building time, and outage penalties.",
   },
   VP: {
     buildCost: 0.9,
     expensesOM: 0.9,
     buildTime: 0.7,
     blackoutPenalty: 8,
-    description:
-      "Hard: 10% cheaper facilities, 10% lower operating costs, 30% faster construction, and heavier blackout penalties.",
+    description: "Demanding: a little help with game costs and building time.",
   },
   CEO: {
     buildCost: 1,
@@ -45,9 +44,17 @@ export const DIFFICULTIES = {
     buildTime: 1,
     blackoutPenalty: 10,
     description:
-      "Hardest: full-price facilities, full-price operations, full construction time, and the harshest blackout penalties.",
+      "Full challenge: unadjusted game costs, building times, and outage penalties.",
   },
 } as { [index: string]: DifficultyMultipliersType };
+
+export const DIFFICULTY_LABELS: Record<string, string> = {
+  Intern: "Beginner",
+  Employee: "Easy",
+  Manager: "Medium",
+  VP: "Hard",
+  CEO: "Expert",
+};
 
 export const LOCATIONS = {
   PIT: {
@@ -56,6 +63,12 @@ export const LOCATIONS = {
     lat: 40.4406,
     long: -79.9959,
     timeZone: "America/New_York",
+    region: "North America",
+    country: "United States",
+    admin: "PA",
+    watershedId: "AlleghenyUpper",
+    watershedName: "Upper Allegheny watershed",
+    resources: { hydro: true },
   },
   SF: {
     id: "SF",
@@ -63,6 +76,13 @@ export const LOCATIONS = {
     lat: 37.7749,
     long: -122.4194,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    offshore: true,
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
+    resources: { geothermal: true, hydro: true },
   },
   LA: {
     id: "LA",
@@ -70,16 +90,25 @@ export const LOCATIONS = {
     lat: 34.0522,
     long: -118.2437,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    offshore: true,
+    resources: { geothermal: true },
   },
-  // Named for where its data was read as coming from, back when it was a CSV of unknown
-  // provenance. It now genuinely is the Santa Cruz Mountains: every location is fetched from
-  // these coordinates, so the name and the weather can no longer disagree
+  // Echo Summit stands in for the snow-fed Sierra headwaters supplying California hydro.
   CAMountains: {
     id: "CAMountains",
-    name: "Santa Cruz Mountains, CA",
-    lat: 37.1041,
-    long: -122.0308,
+    name: "Echo Summit, CA",
+    lat: 38.93,
+    long: -120.03,
     timeZone: "America/Los_Angeles",
+    region: "North America",
+    country: "United States",
+    admin: "CA",
+    watershedId: "CAMountains",
+    watershedName: "Sierra Nevada watershed",
+    resources: { geothermal: true, hydro: true },
   },
   HNL: {
     id: "HNL",
@@ -87,6 +116,11 @@ export const LOCATIONS = {
     lat: 21.3099,
     long: -157.8581,
     timeZone: "Pacific/Honolulu",
+    region: "North America",
+    country: "United States",
+    admin: "HI",
+    offshore: true,
+    resources: { geothermal: true },
   },
   SJU: {
     id: "SJU",
@@ -94,6 +128,11 @@ export const LOCATIONS = {
     lat: 18.4671,
     long: -66.1185,
     timeZone: "America/Puerto_Rico",
+    region: "North America",
+    country: "United States",
+    admin: "Puerto Rico",
+    offshore: true,
+    resources: { hydro: true },
   },
 } as { [id: string]: LocationType };
 export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
@@ -110,9 +149,8 @@ export const TICK_MS = {
 // Fallbacks for the screens that run before any economic data has been loaded, and the anchor
 // the projected cycles rest near. The played game reads its rates from data/Economy instead.
 export const INFLATION = 0.03;
-export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% 2018 -> 2019, and that's with some marketing spending
+export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
 export const RESERVE_MARGIN = 0.05;
-export const GENERATOR_SELL_MULTIPLIER = 0.5;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;
@@ -151,6 +189,12 @@ export const FUELS = {
   Coal: {
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
+  Biomass: {
+    // 195 lb CO2/MMBtu for biomass, converted to kg/Btu. This is direct combustion CO2:
+    // net biogenic emissions depend on the feedstock and regrowth and cannot be assumed zero.
+    // https://www.eia.gov/outlooks/capitalcost/pdf/updated_capcost.pdf
+    kgCO2ePerBtu: 0.000088451,
+  },
   "Natural Gas": {
     kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
   },
@@ -160,17 +204,15 @@ export const FUELS = {
   Oil: {
     kgCO2ePerBtu: 0.00002031, // https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references
   },
-  // TODO https://www.planete-energies.com/en/medias/close/incineration-heating-power-refuse
-  // 'Trash': {
-  //   kgCO2ePerBtu: 999,
-  // },
+  Geothermal: {
+    kgCO2ePerBtu: 0,
+  },
+  Hydro: {
+    kgCO2ePerBtu: 0,
+  },
 } as { [fuel: string]: FuelType };
 
-export const NAV_CARDS = [
-  "FACILITIES",
-  "FINANCES",
-  "FORECASTS",
-] as CardNameType[];
+export const NAV_CARDS = ["FACILITIES", "INSIGHTS", "EVENTS"] as CardNameType[];
 export const CARD_TRANSITION_ANIMATION_MS = 300;
 export const NAVIGATION_DEBOUNCE_MS = 600;
 export const DOUBLE_TAP_MS = 500; // Maximum ms between tap / clicks to count as a double click

@@ -1,18 +1,25 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
-import { useEffect } from "react";
-import { Provider } from "react-redux";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
-import { navigateBack } from "./reducers/Card";
+import { navigate, navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
+import { delta as gameDelta } from "./reducers/Game";
 import { startAutosave } from "./SaveGame";
-import { store } from "./Store";
-import theme from "./Theme";
+import { store, useAppSelector } from "./Store";
+import {
+  createAppTheme,
+  prefersDarkMode,
+  resolveThemeMode,
+  setThemeMode,
+} from "./Theme";
+import { ThemeChoiceType } from "./Types";
+import { InstallPromptProvider } from "./components/base/InstallAppButton";
 
 // Cordova's lifecycle events, only ever fired in an app build. Returns its own teardown so the
 // listeners go away with the rest of them rather than outliving the component that added them.
@@ -55,6 +62,77 @@ function setupStorage(document: Document) {
   }
 }
 
+/**
+ * Paints the app in the palette the player asked for.
+ *
+ * Three things have to agree on it and none of them can be reached the same way: MUI's own
+ * components read a theme through context, everything styled by hand reads custom properties off
+ * <html>, and the charts paint to a canvas and so have to be told in JavaScript (see Theme.tsx).
+ * This is the one place that knows, so it sets all three.
+ *
+ * Inside the Provider because it reads the setting from the store, and above everything else
+ * because a palette change has to reach the whole tree.
+ */
+function ThemedApp(props: { children: React.JSX.Element }): React.JSX.Element {
+  const choice: ThemeChoiceType = useAppSelector(
+    (state) => state.settings.theme,
+  );
+  // "System" is a standing instruction rather than a value, and the system can change its mind
+  // while the game is open - at sunset, on a schedule, or because the player just flipped it
+  const [systemDark, setSystemDark] = useState(prefersDarkMode);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemDark(query.matches);
+    query.addEventListener("change", onChange);
+    // The listener can only have missed something between the first render and here
+    onChange();
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  const mode =
+    choice === "system"
+      ? systemDark
+        ? "dark"
+        : "light"
+      : resolveThemeMode(choice);
+  // In a layout effect rather than in the render body: telling Theme.tsx wakes every chart
+  // that subscribed to it, and waking a component while another one is rendering is exactly
+  // what React warns about. Before paint, so neither of the two lands a frame late
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = mode;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", mode === "dark" ? "#121212" : "#ffffff");
+    setThemeMode(mode);
+  }, [mode]);
+
+  return (
+    <ThemeProvider theme={createAppTheme(mode)}>{props.children}</ThemeProvider>
+  );
+}
+
+function OfflineNotice(): React.JSX.Element | null {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online ? null : (
+    <div className="offlineBanner" role="status">
+      Offline — your game stays saved on this device. Online features will
+      reconnect automatically.
+    </div>
+  );
+}
+
 export default function App() {
   /**
    * All of this used to run in the component body. A function component's body runs on every
@@ -66,6 +144,19 @@ export default function App() {
    */
   useEffect(() => {
     setupStorage(document);
+
+    // Shared score links land on the relevant challenge instead of dropping a new player at an
+    // unexplained title screen. Tutorial ids still use the guided mission list.
+    const sharedScenarioId = Number(
+      new URLSearchParams(window.location.search).get("scenario"),
+    );
+    const sharedScenario = SCENARIOS.find(
+      (scenario) => scenario.id === sharedScenarioId && !scenario.tutorialSteps,
+    );
+    if (sharedScenario) {
+      store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+      store.dispatch(navigate("NEW_GAME_DETAILS"));
+    }
 
     const onPopState = (e: PopStateEvent) => {
       store.dispatch(navigateBack());
@@ -139,15 +230,16 @@ export default function App() {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <Provider store={store}>
-          {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
+      <ThemedApp>
+        {/* Above the compositor, whose shouldComponentUpdate would otherwise swallow a
               settings change that did not also change the card */}
+        <InstallPromptProvider>
+          <OfflineNotice />
           <UnitsProvider>
             <CompositorContainer store={store} />
           </UnitsProvider>
-        </Provider>
-      </ThemeProvider>
+        </InstallPromptProvider>
+      </ThemedApp>
     </StyledEngineProvider>
   );
 }

@@ -10,12 +10,15 @@ import { decodeWeather } from "./WeatherBinary";
 // game may start -- which is why the custom game screen builds its year list off it.
 export const WEATHER_STARTING_YEAR = 1980;
 const STARTING_YEAR = WEATHER_STARTING_YEAR; // assumed to be the same for all locations
-const ENDING_YEAR = 2025; // for weather data, Dec 31st, assumed to be the same for all locations
+// Keep the simulation's calibrated historical window stable even when shipped binaries include
+// newer years. The additional rows are retained on disk for a future deliberate recalibration.
+const ENDING_YEAR = 2019;
 const ROWS_PER_DAY = 24;
 const ROWS_PER_YEAR = DAYS_PER_YEAR * ROWS_PER_DAY;
 const EXPECTED_ROWS = (ENDING_YEAR - STARTING_YEAR + 1) * ROWS_PER_YEAR;
 const MONTHS_PER_YEAR = 12;
-// One normal each for temperature, wind and cloud cover. The uniform that picks which recorded
+// One normal each for temperature, wind and cloud cover. Offshore wind uses its own stream, so
+// adding it cannot shift any of these three established draws. The uniform that picks which recorded
 // day a forecast borrows its shape from is addressed by day index on a stream of its own, since
 // normalAt and randomAt cannot share one (see RANDOM_STREAM).
 // (kept a literal rather than FORECAST_FIELDS.length, which is declared further down this file)
@@ -28,7 +31,7 @@ const DRAWS_PER_FORECAST_DAY = 3;
 const ANOMALY_PERSISTENCE = 0.3;
 
 // How far past the range the location has actually recorded a forecast is allowed to go, as a
-// multiple of that month's standard deviation. Some headroom matters -- forty years is not every
+// multiple of that month's standard deviation. Some headroom matters -- decades are not every
 // heatwave there will ever be -- but not so much that a forecast invents a climate.
 const FORECAST_HEADROOM_SDS = 1.5;
 
@@ -42,8 +45,16 @@ const WARMING_HALF_MEGATONS = 115;
 // snaps, and a wider gap between them. Shares the saturating curve, so a clean run gets neither.
 const MAX_VARIANCE_GAIN = 0.35;
 
-// Ordered oldest first
-let weather: RawWeatherType[] = [];
+interface WeatherSeriesType {
+  // Ordered oldest first. Forecast rows are appended to this series only, so a watershed and the
+  // city it supplies can be walked independently without one replacing the other.
+  weather: RawWeatherType[];
+  climatology: MonthClimatologyType[];
+  recordedRows: number;
+}
+
+const weatherSeries = new Map<string, WeatherSeriesType>();
+let loadedLocation: string | undefined;
 const DUMMY_WEATHER = {
   YEAR: 0,
   MONTH: 0,
@@ -53,17 +64,50 @@ const DUMMY_WEATHER = {
   PRECIP_MM: 0,
 };
 
-// The three fields that are forecast, and the physical floor and ceiling each one has to respect
+// The fields that are forecast, and the physical floor and ceiling each one has to respect
 // whatever the data says. Keyed this way so climatology, the forecast and the emissions coupling
-// can all walk the same three fields rather than repeating themselves three times over.
+// can all walk the same fields rather than repeating themselves for each one.
 const FORECAST_FIELDS = ["TEMP_C", "CLOUD_PCT", "WIND_KPH"] as const;
-type ForecastFieldType = (typeof FORECAST_FIELDS)[number];
+const OFFSHORE_FIELD = "WIND_OFFSHORE_KPH" as const;
+type ForecastFieldType =
+  (typeof FORECAST_FIELDS)[number] | typeof OFFSHORE_FIELD;
 const PHYSICAL_BOUNDS: Record<ForecastFieldType, { min: number; max: number }> =
   {
     TEMP_C: { min: -60, max: 60 },
     CLOUD_PCT: { min: 0, max: 100 },
     WIND_KPH: { min: 0, max: Infinity },
+    WIND_OFFSHORE_KPH: { min: 0, max: Infinity },
   };
+
+function activeForecastFields(
+  series: WeatherSeriesType,
+): readonly ForecastFieldType[] {
+  return series.weather[0]?.WIND_OFFSHORE_KPH !== undefined
+    ? [...FORECAST_FIELDS, OFFSHORE_FIELD]
+    : FORECAST_FIELDS;
+}
+
+function getSeries(seriesId?: string): WeatherSeriesType | undefined {
+  return weatherSeries.get(seriesId || loadedLocation || "");
+}
+
+/**
+ * Whether offshore wind can safely be offered for a location.
+ *
+ * Before that location is loaded, its catalogue flag drives the build picker. Once its file has
+ * been decoded, the column itself is the safety net, so a stale index cannot offer a generator
+ * whose output the simulation cannot calculate.
+ */
+export function hasOffshoreWind(location?: LocationType): boolean {
+  const decoded = getSeries()?.weather[0]?.WIND_OFFSHORE_KPH !== undefined;
+  if (!location) {
+    return decoded;
+  }
+  if (location.offshore !== true) {
+    return false;
+  }
+  return loadedLocation === location.id ? decoded : true;
+}
 
 interface FieldStatsType {
   mean: number; // Of the daily mean, across every year that has this month
@@ -81,9 +125,7 @@ interface MonthClimatologyType {
 
 // One entry per calendar month, built once per load from whatever was loaded. Every location gets
 // its seasonality from its own multi-decade record rather than from anything written per location here,
-// which is what makes this scale to a seventh city.
-let climatology: MonthClimatologyType[] = [];
-
+// which is what makes this scale with the weather catalogue.
 // Bumped by every initWeather call, so an earlier download that lands after a later one can tell
 // that it is no longer the load anybody is waiting on
 let loadGeneration = 0;
@@ -94,10 +136,14 @@ function monthSlotOf(dayIndex: number): number {
   return Math.floor((dayIndex % DAYS_PER_YEAR) / DAYS_PER_MONTH);
 }
 
-function dailyMean(row: number, field: ForecastFieldType): number {
+function dailyMean(
+  rows: RawWeatherType[],
+  row: number,
+  field: ForecastFieldType,
+): number {
   let total = 0;
   for (let hour = 0; hour < ROWS_PER_DAY; hour++) {
-    total += weather[row + hour][field];
+    total += rows[row + hour][field] as number;
   }
   return total / ROWS_PER_DAY;
 }
@@ -111,20 +157,24 @@ function dailyMean(row: number, field: ForecastFieldType): number {
  * Augusts come out clearer (41%), calmer (2.8kph) and steadier (2.3C), without a line of code
  * knowing anything about Pittsburgh.
  */
-function buildClimatology() {
+function buildClimatology(rows: RawWeatherType[]): MonthClimatologyType[] {
   // Built up locally and assigned at the end, so the closures below capture a const and
   // no-loop-func stays satisfied -- the same reason resetFuelPrices empties in place
   const months: MonthClimatologyType[] = [];
-  const rows = weather;
+  const fields = activeForecastFields({
+    weather: rows,
+    climatology: [],
+    recordedRows: rows.length,
+  });
   const loadedDays = Math.floor(rows.length / ROWS_PER_DAY);
   const dailyMeans: number[][][] = [];
   for (let slot = 0; slot < MONTHS_PER_YEAR; slot++) {
     const stats = {} as Record<ForecastFieldType, FieldStatsType>;
-    FORECAST_FIELDS.forEach((field) => {
+    fields.forEach((field) => {
       stats[field] = { mean: 0, sd: 0, min: Infinity, max: -Infinity };
     });
     months.push({ historicRows: [], stats });
-    dailyMeans.push(FORECAST_FIELDS.map(() => []));
+    dailyMeans.push(fields.map(() => []));
   }
 
   for (let day = 0; day < loadedDays; day++) {
@@ -132,11 +182,11 @@ function buildClimatology() {
     const month = months[slot];
     const row = day * ROWS_PER_DAY;
     month.historicRows.push(row);
-    FORECAST_FIELDS.forEach((field, fieldIndex) => {
-      dailyMeans[slot][fieldIndex].push(dailyMean(row, field));
+    fields.forEach((field, fieldIndex) => {
+      dailyMeans[slot][fieldIndex].push(dailyMean(rows, row, field));
       const stats = month.stats[field];
       for (let hour = 0; hour < ROWS_PER_DAY; hour++) {
-        const value = rows[row + hour][field];
+        const value = rows[row + hour][field] as number;
         stats.min = Math.min(stats.min, value);
         stats.max = Math.max(stats.max, value);
       }
@@ -144,7 +194,7 @@ function buildClimatology() {
   }
 
   months.forEach((month, slot) => {
-    FORECAST_FIELDS.forEach((field, fieldIndex) => {
+    fields.forEach((field, fieldIndex) => {
       const samples = dailyMeans[slot][fieldIndex];
       const stats = month.stats[field];
       if (samples.length === 0) {
@@ -161,7 +211,7 @@ function buildClimatology() {
       );
     });
   });
-  climatology = months;
+  return months;
 }
 
 /**
@@ -178,37 +228,61 @@ function buildClimatology() {
 export function initWeatherFromRows(
   location: string,
   rows: RawWeatherType[],
+  append = false,
 ): void {
   if (rows.length < ROWS_PER_YEAR) {
-    weather = [];
-    climatology = [];
+    if (!append) {
+      weatherSeries.clear();
+      loadedLocation = undefined;
+    }
     throw new Error(
       `Weather data for ${location} holds ${rows.length} rows, and a forecast needs at least the ${ROWS_PER_YEAR} of one year`,
     );
   }
-  weather = rows; // replaced rather than appended to, so a second game doesn't inherit the first's
-  if (weather.length < EXPECTED_ROWS) {
+  if (!append) {
+    weatherSeries.clear();
+    loadedLocation = location;
+  } else if (!loadedLocation) {
+    loadedLocation = location;
+  }
+  const calibratedRows = rows.slice(0, EXPECTED_ROWS);
+  weatherSeries.set(location, {
+    weather: calibratedRows,
+    climatology: buildClimatology(calibratedRows),
+    recordedRows: calibratedRows.length,
+  });
+  if (rows.length < EXPECTED_ROWS) {
     console.warn(
-      `Weather data for ${location} appears to be incomplete. Found ${weather.length} rows, expected ${EXPECTED_ROWS}`,
+      `Weather data for ${location} appears to be incomplete. Found ${rows.length} rows, expected ${EXPECTED_ROWS}`,
     );
   }
-  // Has to run while the array still holds only recorded data, before anything is forecast
-  buildClimatology();
 }
 
 /**
  * Synchronous counterpart to initWeather, for callers that already hold the file
  * (the headless simulator reads it off disk; the browser has to download it).
  */
-export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
-  initWeatherFromRows(location, decodeWeather(buffer));
+export function initWeatherFromBinary(
+  location: string,
+  buffer: ArrayBuffer,
+  append = false,
+) {
+  initWeatherFromRows(location, decodeWeather(buffer), append);
+}
+
+/** The immutable recorded portion of a loaded series, used to calibrate hydro inflow. */
+export function getRecordedWeatherRows(
+  seriesId?: string,
+): readonly RawWeatherType[] {
+  const series = getSeries(seriesId) || getSeries();
+  return series ? series.weather.slice(0, series.recordedRows) : [];
 }
 
 /**
  * Downloads a location's record, for the browser.
  *
  * TODO download several locations at start with a 2s init delay, like loading audio (but after
- * audio) for offline play. At about 66KB apiece rather than hundreds of KB of CSV that is far cheaper than it
+ * audio) for offline play. At 57-69KB apiece rather than 265KB of CSV that is far cheaper than it
  * was, though at 282 catalogued locations it can no longer be all of them.
  *
  * @param callback - Called once, with the reason if the record could not be loaded. A caller that
@@ -216,14 +290,14 @@ export function initWeatherFromBinary(location: string, buffer: ArrayBuffer) {
  *   year 0C and still, which runs perfectly well and is not a game anyone meant to play.
  */
 export function initWeather(
-  location: string,
+  location: string | LocationType,
   callback?: (failure?: string) => void,
 ) {
   // Reset immediately, so a failed load can't be played on the last game's weather. The
   // climatology goes with it: leaving the last location's monthly means behind would let
   // applyClimateForcing bend a reading against a city it never came from.
-  weather = [];
-  climatology = [];
+  weatherSeries.clear();
+  loadedLocation = undefined;
   // Two loads can be in flight at once -- backing out of the loading screen and picking somewhere
   // else -- and without this the slower one wins simply by finishing last, handing the player a
   // game played somewhere they didn't choose
@@ -236,27 +310,38 @@ export function initWeather(
       callback(failure);
     }
   };
-  if (!isValidLocationId(location)) {
+  const localId = typeof location === "string" ? location : location.id;
+  const watershedId =
+    typeof location === "string" ? undefined : location.watershedId;
+  const ids = [...new Set([localId, watershedId].filter(Boolean))] as string[];
+  if (ids.some((id) => !isValidLocationId(id))) {
     // A location id is now any string rather than a checked union, and it arrives here from a
     // saved game or a replay document on its way into a URL
-    return done(`"${location}" is not a location id weather can be loaded for`);
+    return done(
+      `"${ids.join(", ")}" is not a location id weather can be loaded for`,
+    );
   }
-  fetch(`/data/weather/${location}.bin`)
-    .then((response: Response) => {
-      if (!response.ok) {
-        throw new Error(`${response.status} fetching the weather file`);
-      }
-      return response.arrayBuffer();
-    })
-    .then((buffer: ArrayBuffer) => {
+  Promise.all(
+    ids.map((id) =>
+      fetch(`/data/weather/${id}.bin`).then((response: Response) => {
+        if (!response.ok) {
+          throw new Error(`${response.status} fetching ${id}'s weather file`);
+        }
+        return response.arrayBuffer().then((buffer) => ({ id, buffer }));
+      }),
+    ),
+  )
+    .then((loaded) => {
       if (generation !== loadGeneration) {
         return; // A later load is already the one that counts; don't overwrite its rows
       }
-      initWeatherFromBinary(location, buffer);
+      loaded.forEach(({ id, buffer }, index) =>
+        initWeatherFromBinary(id, buffer, index > 0),
+      );
       done();
     })
     .catch((e: Error) => {
-      done(`Could not load the weather for ${location}: ${e.message}`);
+      done(`Could not load the weather for ${localId}: ${e.message}`);
     });
 }
 
@@ -266,32 +351,45 @@ export function initWeather(
  * Generating in order matters twice over: each forecast day is last year's same day nudged, so
  * skipping days would forecast off a day that was never written; and going one day per call, the
  * way this used to, left every lookup past the data returning DUMMY_WEATHER until the array
- * happened to catch up -- which a game loaded straight into a year past the record never would.
+ * happened to catch up -- which a game loaded straight beyond the dataset never would.
  */
-function forecastThroughDay(seed: number, throughDay: number) {
-  if (weather.length === 0) {
+function forecastThroughDay(
+  series: WeatherSeriesType,
+  seed: number,
+  throughDay: number,
+) {
+  if (series.weather.length === 0) {
     return; // Nothing loaded to extrapolate from
   }
   // A partially loaded final day gets regenerated rather than half-read
   for (
-    let day = Math.floor(weather.length / ROWS_PER_DAY);
+    let day = Math.floor(series.weather.length / ROWS_PER_DAY);
     day <= throughDay;
     day++
   ) {
-    forecastDay(seed, day);
+    forecastDay(series, seed, day);
   }
 }
 
 /**
  * @param cumulativeMegatons - Greenhouse gas the player has emitted so far, in megatons of CO2e,
- *   which warms the temperature and widens the spread of all three fields. Defaults to zero, the
+ *   which warms the temperature and widens the spread of every forecast field. Defaults to zero, the
  *   weather the location's own record describes.
  */
 export function getWeather(
   date: DateType,
   seed: number,
   cumulativeMegatons = 0,
+  seriesId?: string,
 ): RawWeatherType {
+  // A custom location generally has no separate basin, so callers may request its own id. If a
+  // curated watershed was not loaded, falling back to the primary series is safer than returning
+  // a dry dummy and silently making every hydro plant useless.
+  const series = getSeries(seriesId) || getSeries();
+  if (!series) {
+    return DUMMY_WEATHER;
+  }
+  const weather = series.weather;
   const minuteOfHour = date.minuteOfDay % 60;
   const dayIndex =
     (date.year - STARTING_YEAR) * DAYS_PER_YEAR +
@@ -300,11 +398,11 @@ export function getWeather(
   const nextRow = row + 1;
 
   // Forecast whatever is missing, including the next row's day when blending across midnight
-  forecastThroughDay(seed, Math.floor(nextRow / ROWS_PER_DAY));
+  forecastThroughDay(series, seed, Math.floor(nextRow / ROWS_PER_DAY));
 
   if (!weather[row] || !weather[nextRow]) {
     return weather[row]
-      ? applyClimateForcing(weather[row], dayIndex, cumulativeMegatons)
+      ? applyClimateForcing(series, weather[row], dayIndex, cumulativeMegatons)
       : DUMMY_WEATHER;
   }
 
@@ -313,15 +411,21 @@ export function getWeather(
   // and it slides to the next hour's reading as the minutes tick over.
   // Each row is forced against its own month before blending, because the last hour of a month
   // blends into the first hour of the next one -- they do not share a climatology.
-  const prev = applyClimateForcing(weather[row], dayIndex, cumulativeMegatons);
+  const prev = applyClimateForcing(
+    series,
+    weather[row],
+    dayIndex,
+    cumulativeMegatons,
+  );
   const next = applyClimateForcing(
+    series,
     weather[nextRow],
     Math.floor(nextRow / ROWS_PER_DAY),
     cumulativeMegatons,
   );
   const nextPerc = minuteOfHour / 60;
   const prevPerc = 1 - nextPerc;
-  return {
+  const blended: RawWeatherType = {
     // The blended reading is stamped with the hour it starts in, not the one it is heading towards
     YEAR: prev.YEAR,
     MONTH: prev.MONTH,
@@ -330,13 +434,22 @@ export function getWeather(
     WIND_KPH: prev.WIND_KPH * prevPerc + next.WIND_KPH * nextPerc,
     PRECIP_MM: prev.PRECIP_MM * prevPerc + next.PRECIP_MM * nextPerc,
   };
+  if (
+    prev.WIND_OFFSHORE_KPH !== undefined &&
+    next.WIND_OFFSHORE_KPH !== undefined
+  ) {
+    blended.WIND_OFFSHORE_KPH =
+      prev.WIND_OFFSHORE_KPH * prevPerc + next.WIND_OFFSHORE_KPH * nextPerc;
+  }
+  return blended;
 }
 
 // TODO verify that it's returning reasonably accurate values per location and season
 // (hoping that day length alone is a sufficient proxy / ideally don't need to make it any more complex)
 // https://earthobservatory.nasa.gov/features/EnergyBalance/page2.php
 // indicates a roughly linear correlation that each degree off from 0*N/S = 0.7% less sunlight
-// TODO fix the pointiness, esp in shorter winter months - Maybe by factoring in day lenght to determine the shape of the curve?
+// Monthly interpolation remains visibly sharp in short winter months; daylight length should be
+// part of the eventual smoothing model.
 // Day length / minutes from dark used as proxy for season / max sun height
 // Rough approximation of solar output: https://www.wolframalpha.com/input?i=plot+1%2F%281+%2B+e+%5E+%28-0.015+*+%28x+-+200%29%29%29+from+0+to+420
 // Potential more complex model for solar panels: https://pro.arcgis.com/en/pro-app/3.1/tool-reference/spatial-analyst/how-solar-radiation-is-calculated.htm
@@ -359,9 +472,15 @@ export function getRawSolarIrradianceWM2(
   location: LocationType,
   cloudCoverPercent: number,
 ) {
-  let irradiance = EQUATOR_RADIANCE; //* (1 - 0.007 * Math.abs(lat)); // w/m2 - redundant with day length bell curve?
+  // Day length alone does not capture how much atmosphere the lower high-latitude sun crosses.
+  // Keep the original simple 0.7%/degree approximation, now that locations span the globe.
+  let irradiance = EQUATOR_RADIANCE * (1 - 0.007 * Math.abs(location.lat));
   irradiance *= 1 - cloudCoverPercent / 400; // Very cloudy days = 25% reduction
-  const { sunrise, sunset } = getSunriseSunset(date, location);
+  const sun = getSunriseSunset(date, location);
+  if (sun.daylight === "polar-night") {
+    return 0;
+  }
+  const { sunrise, sunset } = sun;
   if (date.minuteOfDay >= sunrise && date.minuteOfDay <= sunset) {
     const minutesFromDark = Math.min(
       date.minuteOfDay - sunrise,
@@ -402,11 +521,17 @@ function clampToField(
  * Addressing the draws by day index rather than taking the next few off a running generator is
  * what lets a day be regenerated later, or in a fresh process, and come out identical.
  */
-function forecastDay(seed: number, dayIndex: number) {
+function forecastDay(
+  series: WeatherSeriesType,
+  seed: number,
+  dayIndex: number,
+) {
+  const weather = series.weather;
   const slot = monthSlotOf(dayIndex);
-  const month = climatology[slot];
+  const month = series.climatology[slot];
   const previousYearRow = (dayIndex - DAYS_PER_YEAR) * ROWS_PER_DAY;
   const draw = dayIndex * DRAWS_PER_FORECAST_DAY;
+  const fields = activeForecastFields(series);
 
   // A real day of this same month, whose hour to hour shape this day borrows. Addressed by day
   // index on its own stream: a uniform drawn from the anomalies' stream would land on one of the
@@ -425,15 +550,22 @@ function forecastDay(seed: number, dayIndex: number) {
   const shockScale = Math.sqrt(1 - Math.pow(ANOMALY_PERSISTENCE, 2));
   const anomaly = {} as Record<ForecastFieldType, number>;
   const shapeMean = {} as Record<ForecastFieldType, number>;
-  FORECAST_FIELDS.forEach((field, fieldIndex) => {
+  fields.forEach((field, fieldIndex) => {
     const stats = month.stats[field];
-    const previousAnomaly = dailyMean(previousYearRow, field) - stats.mean;
+    const previousAnomaly =
+      dailyMean(weather, previousYearRow, field) - stats.mean;
     anomaly[field] =
       ANOMALY_PERSISTENCE * previousAnomaly +
       stats.sd *
         shockScale *
-        normalAt(seed, RANDOM_STREAM.weather, draw + fieldIndex);
-    shapeMean[field] = dailyMean(shapeRow, field);
+        normalAt(
+          seed,
+          field === OFFSHORE_FIELD
+            ? RANDOM_STREAM.weatherOffshore
+            : RANDOM_STREAM.weather,
+          field === OFFSHORE_FIELD ? dayIndex : draw + fieldIndex,
+        );
+    shapeMean[field] = dailyMean(weather, shapeRow, field);
   });
 
   for (let row = 0; row < ROWS_PER_DAY; row++) {
@@ -444,18 +576,20 @@ function forecastDay(seed: number, dayIndex: number) {
       YEAR: previous.YEAR + 1,
       MONTH: previous.MONTH,
       // Precipitation is taken from the borrowed day whole, rather than being given an anomaly of
-      // its own like the three fields below. Rain is mostly zeroes with a long tail rather than
+      // its own like the forecast fields below. Rain is mostly zeroes with a long tail rather than
       // anything a normal distribution describes, so a real wet or dry day of the right month is
       // a better forecast than a mean plus a shock - and it costs no draw, which is what keeps
       // adding it from shifting every temperature and wind number that came before it.
       PRECIP_MM: shape.PRECIP_MM,
     } as RawWeatherType;
-    FORECAST_FIELDS.forEach((field) => {
+    fields.forEach((field) => {
       const stats = month.stats[field];
       // The shape day contributes only its within-day departure from its own average, so none of
       // its year comes along with it
       forecast[field] = clampToField(
-        stats.mean + anomaly[field] + (shape[field] - shapeMean[field]),
+        stats.mean +
+          anomaly[field] +
+          ((shape[field] as number) - shapeMean[field]),
         field,
         stats,
       );
@@ -493,29 +627,34 @@ function climateShift(cumulativeMegatons: number) {
  * gap between them widens, which is what the demand curve and the wind fleet actually feel.
  */
 function applyClimateForcing(
+  series: WeatherSeriesType,
   reading: RawWeatherType,
   dayIndex: number,
   cumulativeMegatons: number,
 ): RawWeatherType {
-  if (cumulativeMegatons <= 0 || climatology.length === 0) {
+  if (cumulativeMegatons <= 0 || series.climatology.length === 0) {
     return reading;
   }
-  const month = climatology[monthSlotOf(dayIndex)];
+  const month = series.climatology[monthSlotOf(dayIndex)];
   const { warmingC, spread } = climateShift(cumulativeMegatons);
-  // Precipitation passes through untouched. A warmer atmosphere does carry more water, but
-  // nothing simulates rain yet, and a coupling no one can feel is a coupling no one can check
+  // Precipitation passes through untouched. Hydro still feels warming through the phase and
+  // timing of snow accumulation and melt; changing rainfall totals would require a separate,
+  // defensible regional precipitation response rather than a single global multiplier.
   const forced = {
     YEAR: reading.YEAR,
     MONTH: reading.MONTH,
     PRECIP_MM: reading.PRECIP_MM,
   } as RawWeatherType;
-  FORECAST_FIELDS.forEach((field) => {
+  activeForecastFields(series).forEach((field) => {
     const { mean } = month.stats[field];
     const physical = PHYSICAL_BOUNDS[field];
     const bias = field === "TEMP_C" ? warmingC : 0;
     forced[field] = Math.min(
       physical.max,
-      Math.max(physical.min, mean + (reading[field] - mean) * spread + bias),
+      Math.max(
+        physical.min,
+        mean + ((reading[field] as number) - mean) * spread + bias,
+      ),
     );
   });
   return forced;

@@ -1,8 +1,11 @@
 import {
-  customersFromMarketingSpend,
   CreditInputsType,
+  degradedLifetimeYears,
   facilityCashBack,
+  facilityEquivalentCycles,
   facilityLifetime,
+  facilityOutputFactor,
+  estimatedAnnualOperatingCost,
   getCompanyInterestRate,
   getCreditInputs,
   getCreditPremium,
@@ -12,11 +15,7 @@ import {
   MAX_CREDIT_POINTS,
   LCWH,
 } from "./Financials";
-import {
-  GENERATOR_SELL_MULTIPLIER,
-  HOURS_PER_YEAR_REAL,
-  LOAN_MONTHS,
-} from "../Constants";
+import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL, LOAN_MONTHS } from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -31,6 +30,13 @@ function aFacility(
     loanAmountLeft: 0,
     yearsToBuild: 4,
     yearsToBuildLeft: 0,
+    lifespanYears: 40,
+    minuteCreated: 0,
+    minuteOperational: 0,
+    lifetimeWh: 0,
+    lifetimePotentialWh: 0,
+    lifetimeRevenue: 0,
+    lifetimeExpenses: 0,
     ...overrides,
   } as FacilityOperatingType;
 }
@@ -59,19 +65,13 @@ describe("getMonthlyPayment", () => {
     expect(balance).toBeCloseTo(0, 6);
   });
 
-  it("charges more per month over a shorter term", () => {
+  it("charges more for a shorter term or a higher rate", () => {
     expect(getMonthlyPayment(1000000, 0.06, 60)).toBeGreaterThan(
       getMonthlyPayment(1000000, 0.06, 120),
     );
-  });
-
-  it("charges more per month at a higher rate", () => {
     expect(getMonthlyPayment(1000000, 0.1, LOAN_MONTHS)).toBeGreaterThan(
       getMonthlyPayment(1000000, 0.05, LOAN_MONTHS),
     );
-  });
-
-  it("always repays at least the principal", () => {
     const principal = 1000000;
     const total = getMonthlyPayment(principal, 0.06, LOAN_MONTHS) * LOAN_MONTHS;
     expect(total).toBeGreaterThan(principal);
@@ -79,15 +79,9 @@ describe("getMonthlyPayment", () => {
 });
 
 describe("getPaymentInterest", () => {
-  it("charges the monthly share of the annual rate on the balance", () => {
+  it("charges the monthly share of the rate and falls with the balance", () => {
     expect(getPaymentInterest(120000, 0.06)).toBeCloseTo(600, 6);
-  });
-
-  it("charges nothing once the loan is paid off", () => {
     expect(getPaymentInterest(0, 0.06)).toBe(0);
-  });
-
-  it("falls as the balance falls", () => {
     expect(getPaymentInterest(50000, 0.06)).toBeLessThan(
       getPaymentInterest(100000, 0.06),
     );
@@ -95,79 +89,30 @@ describe("getPaymentInterest", () => {
 });
 
 describe("facilityCashBack", () => {
-  it("returns the full build cost for a facility that was never started", () => {
+  it("returns the committed equity throughout construction", () => {
     // Nothing has been spent on materials yet, so there is nothing to lose on resale
     expect(
       facilityCashBack(aFacility({ yearsToBuildLeft: 4, yearsToBuild: 4 })),
     ).toBe(1000000);
+    [0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
+      expect(facilityCashBack(aFacility({ yearsToBuildLeft }))).toBe(1000000);
+    });
   });
 
-  it("takes the sell multiplier off a finished facility", () => {
-    expect(facilityCashBack(aFacility())).toBeCloseTo(
-      1000000 * (1 - GENERATOR_SELL_MULTIPLIER),
-      6,
-    );
-  });
-
-  it("pays back less the further construction has progressed", () => {
-    // 2.5% and 5% of a four year build
-    const early = facilityCashBack(aFacility({ yearsToBuildLeft: 3.9 }));
-    const later = facilityCashBack(aFacility({ yearsToBuildLeft: 3.8 }));
-    expect(early).toBeGreaterThan(later);
-    expect(later).toBeGreaterThan(facilityCashBack(aFacility()));
-  });
-
-  /**
-   * The taper is sqrt(percentBuilt * 10), capped at 1, so it reaches the full penalty at 10% built
-   * and everything past that refunds the same. Worth knowing before reading the "refund slightly
-   * more if construction isn't complete" comment as a smooth curve across the whole build.
-   */
-  it("charges the full penalty from 10% built onwards", () => {
-    const tenPercent = facilityCashBack(aFacility({ yearsToBuildLeft: 3.6 }));
-    expect(tenPercent).toBeCloseTo(facilityCashBack(aFacility()), 6);
-    expect(facilityCashBack(aFacility({ yearsToBuildLeft: 0.5 }))).toBeCloseTo(
-      facilityCashBack(aFacility()),
-      6,
-    );
+  it("depreciates linearly over the facility's own lifespan", () => {
+    const minute = (years: number) => years * DAYS_PER_YEAR * 24 * 60;
+    expect(facilityCashBack(aFacility())).toBe(1000000);
+    expect(facilityCashBack(aFacility(), minute(20))).toBeCloseTo(500000, 6);
+    expect(facilityCashBack(aFacility(), minute(40))).toBe(0);
+    expect(facilityCashBack(aFacility(), minute(60))).toBe(0);
   });
 
   it("nets out what is still owed on the loan", () => {
     const owed = 400000;
     expect(facilityCashBack(aFacility({ loanAmountLeft: owed }))).toBeCloseTo(
-      (1000000 - owed) * (1 - GENERATOR_SELL_MULTIPLIER),
+      1000000 - owed,
       6,
     );
-  });
-
-  it("never returns more than was spent", () => {
-    [0, 0.1, 1, 2, 3.5, 4].forEach((yearsToBuildLeft) => {
-      expect(
-        facilityCashBack(aFacility({ yearsToBuildLeft })),
-      ).toBeLessThanOrEqual(1000000);
-    });
-  });
-});
-
-describe("customersFromMarketingSpend", () => {
-  it("signs up nobody for nothing", () => {
-    expect(customersFromMarketingSpend(0)).toBe(0);
-  });
-
-  it("returns a whole number of customers", () => {
-    expect(Number.isInteger(customersFromMarketingSpend(1234567))).toBe(true);
-  });
-
-  it("wins more customers the more is spent", () => {
-    expect(customersFromMarketingSpend(1000000)).toBeGreaterThan(
-      customersFromMarketingSpend(100000),
-    );
-  });
-
-  it("costs more per customer as spend grows", () => {
-    // The acquisition cost rises with spend, so the last dollar buys less than the first
-    const costPer = (spend: number) =>
-      spend / customersFromMarketingSpend(spend);
-    expect(costPer(10000000)).toBeGreaterThan(costPer(100000));
   });
 });
 
@@ -203,6 +148,60 @@ describe("LCWH", () => {
     );
   });
 
+  it("includes compounding output degradation in a lifetime quote", () => {
+    const degrading = { ...generator, annualOutputDegradation: 0.005 };
+    const productiveYears = degradedLifetimeYears(25, 0.005);
+    const totalWh =
+      generator.peakW *
+      productiveYears *
+      HOURS_PER_YEAR_REAL *
+      generator.capacityFactor;
+
+    expect(LCWH(degrading, date, 0, SEED)).toBeCloseTo(
+      (generator.buildCost + generator.annualOperatingCost * 25) / totalWh,
+      12,
+    );
+    expect(LCWH(degrading, date, 0, SEED)).toBeGreaterThan(
+      LCWH(generator, date, 0, SEED),
+    );
+  });
+
+  it("quotes start maintenance at one start per day", () => {
+    const peaker = {
+      ...generator,
+      annualOperatingCost: 4926635.52,
+      costPerStart: 23100,
+    };
+    expect(estimatedAnnualOperatingCost(peaker)).toBeCloseTo(13358135.52, 2);
+
+    const totalWh =
+      peaker.peakW *
+      peaker.lifespanYears *
+      HOURS_PER_YEAR_REAL *
+      peaker.capacityFactor;
+    expect(LCWH(peaker, date, 0, SEED)).toBeCloseTo(
+      (peaker.buildCost + 13358135.52 * peaker.lifespanYears) / totalWh,
+      12,
+    );
+  });
+
+  it("quotes variable O&M at expected annual output", () => {
+    const oil = {
+      ...generator,
+      annualOperatingCost: 3085368.560061,
+      capacityFactor: 0.2,
+      variableOperatingCostPerMWh: 25.711404667176,
+    };
+    expect(estimatedAnnualOperatingCost(oil)).toBeCloseTo(7590006.65775, 5);
+
+    const totalWh =
+      oil.peakW * oil.lifespanYears * HOURS_PER_YEAR_REAL * oil.capacityFactor;
+    expect(LCWH(oil, date, 0, SEED)).toBeCloseTo(
+      (oil.buildCost + 7590006.65775 * oil.lifespanYears) / totalWh,
+      12,
+    );
+  });
+
   it("charges a carbon fee against a fuel's emissions", () => {
     const gas = {
       ...generator,
@@ -212,6 +211,22 @@ describe("LCWH", () => {
     expect(LCWH(gas, date, 0.1, SEED)).toBeGreaterThan(
       LCWH(gas, date, 0, SEED),
     );
+  });
+
+  it("integrates a known future carbon fee over the applicable operating years", () => {
+    const gas = {
+      ...generator,
+      fuel: "Natural Gas",
+      btuPerWh: 0.0035,
+      yearsToBuild: 2,
+    } as GeneratorShoppingType;
+    const noFee = LCWH(gas, date, 0, SEED);
+    const futureFee = LCWH(gas, date, 0, SEED, undefined, (yearsFromQuote) =>
+      yearsFromQuote >= 4 ? 0.1 : 0,
+    );
+    const fullFee = LCWH(gas, date, 0.1, SEED);
+    expect(futureFee).toBeGreaterThan(noFee);
+    expect(futureFee).toBeLessThan(fullFee);
   });
 
   /**
@@ -242,11 +257,8 @@ function aCleanCompany(
 }
 
 describe("getCreditPremium", () => {
-  it("lends at prime to a company with nothing wrong with it", () => {
+  it("uses prime as the floor for clean companies", () => {
     expect(getCreditPremium(aCleanCompany())).toEqual(1);
-  });
-
-  it("charges nothing extra for being better than the bar", () => {
     // Sitting on twice the cash asked for doesn't earn a discount - prime is the floor
     expect(
       getCreditPremium(
@@ -326,7 +338,6 @@ describe("getCreditInputs", () => {
       expensesOM: 0,
       expensesCarbonFee: 0,
       expensesInterest: 0,
-      expensesMarketing: 0,
       supplyWh: 1000,
     }) as never;
 
@@ -401,5 +412,31 @@ describe("facilityLifetime", () => {
     expect(lifetime.capacityFactor).toBe(0);
     expect(lifetime.costPerMWh).toBeUndefined();
     expect(lifetime.profit).toBeCloseTo(-4500, 10);
+  });
+});
+
+describe("facility aging", () => {
+  const minute = (years: number) => years * DAYS_PER_YEAR * 24 * 60;
+
+  it("compounds solar output loss to about ten percent after twenty years", () => {
+    const solar = aFacility({ annualOutputDegradation: 0.005 });
+    expect(facilityOutputFactor(solar, minute(20))).toBeCloseTo(
+      Math.pow(0.995, 20),
+      10,
+    );
+    expect(facilityOutputFactor(solar, minute(20))).toBeCloseTo(0.905, 3);
+  });
+
+  it("leaves technologies without an evidence-backed decline at nameplate", () => {
+    expect(facilityOutputFactor(aFacility(), minute(60))).toBe(1);
+  });
+
+  it("derives battery equivalent full cycles from discharged energy", () => {
+    const battery = aFacility({
+      peakWh: 4000000,
+      lifetimeWh: 10000000,
+    });
+    expect(facilityEquivalentCycles(battery)).toBeCloseTo(2.5, 10);
+    expect(facilityEquivalentCycles(aFacility())).toBeUndefined();
   });
 });

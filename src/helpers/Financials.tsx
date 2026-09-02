@@ -1,12 +1,9 @@
-import {
-  FUELS,
-  GENERATOR_SELL_MULTIPLIER,
-  HOURS_PER_YEAR_REAL,
-} from "../Constants";
+import { DAYS_PER_YEAR, FUELS, HOURS_PER_YEAR_REAL } from "../Constants";
 import {
   DateType,
   FacilityOperatingType,
   GeneratorShoppingType,
+  LocationType,
   MonthlyHistoryType,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
@@ -137,29 +134,111 @@ export function getCreditInputs(
   };
 }
 
-// TODO extrapolate future fuel prices over plant lifetime
+// Fuel prices stay at the current forecast value across the quoted lifetime.
 export function LCWH(
   g: GeneratorShoppingType,
   date: DateType,
   feePerKgCO2e: number,
   seed: number,
+  location?: LocationType,
+  feePerKgCO2eAtYear?: (yearsFromQuote: number) => number,
 ) {
   const fuel = FUELS[g.fuel] || {};
   const fuelCostPerWh =
-    ((getFuelPricesPerMBTU(date, seed)[g.fuel] || 0) * g.btuPerWh) / 1000000;
-  const carbonCostPerWh = (feePerKgCO2e * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
+    ((getFuelPricesPerMBTU(date, seed, location)[g.fuel] || 0) * g.btuPerWh) /
+    1000000;
+  let lifetimeFee = feePerKgCO2e;
+  if (feePerKgCO2eAtYear) {
+    let weightedFee = 0;
+    let weight = 0;
+    const retention = Math.max(0, 1 - (g.annualOutputDegradation || 0));
+    for (let year = 0; year < Math.ceil(g.lifespanYears); year++) {
+      const fraction = Math.min(1, g.lifespanYears - year);
+      const yearWeight = Math.pow(retention, year) * fraction;
+      weightedFee +=
+        feePerKgCO2eAtYear(g.yearsToBuild + year + fraction / 2) * yearWeight;
+      weight += yearWeight;
+    }
+    lifetimeFee = weight > 0 ? weightedFee / weight : feePerKgCO2e;
+  }
+  const carbonCostPerWh = (lifetimeFee * fuel.kgCO2ePerBtu || 0) * g.btuPerWh;
   // Zero when the capacity factor estimate is zero -- an intermittent generator sampled across
   // a window with no sun or no wind in it. The cost per Wh of a plant expected to produce nothing
   // is genuinely unbounded, so this returns Infinity rather than inventing a number; the money
   // formatters render that as a dash.
+  const productiveYears = degradedLifetimeYears(
+    g.lifespanYears,
+    g.annualOutputDegradation || 0,
+  );
   const totalWh =
-    g.peakW * g.lifespanYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
+    g.peakW * productiveYears * HOURS_PER_YEAR_REAL * g.capacityFactor;
   const costPerWh =
     (g.buildCost +
-      g.annualOperatingCost * g.lifespanYears +
+      estimatedAnnualOperatingCost(g) * g.lifespanYears +
       (fuelCostPerWh + carbonCostPerWh) * totalWh) /
     totalWh;
   return costPerWh;
+}
+
+// The build quote needs one legible operating pattern. A daily start matches a peaking turbine
+// that shuts down overnight, and turns EIA's per-start maintenance value into an annual estimate;
+// live play still charges only when the facility actually crosses from off to generating.
+export const ASSUMED_STARTS_PER_YEAR = 365;
+
+export function estimatedAnnualStartCost(
+  generator: Pick<GeneratorShoppingType, "costPerStart">,
+): number {
+  return (generator.costPerStart || 0) * ASSUMED_STARTS_PER_YEAR;
+}
+
+export function estimatedAnnualVariableOperatingCost(
+  generator: Pick<
+    GeneratorShoppingType,
+    "capacityFactor" | "peakW" | "variableOperatingCostPerMWh"
+  >,
+): number {
+  return (
+    (generator.variableOperatingCostPerMWh || 0) *
+    (generator.peakW / 1000000) *
+    HOURS_PER_YEAR_REAL *
+    generator.capacityFactor
+  );
+}
+
+export function estimatedAnnualOperatingCost(
+  generator: Pick<
+    GeneratorShoppingType,
+    | "annualOperatingCost"
+    | "capacityFactor"
+    | "costPerStart"
+    | "peakW"
+    | "variableOperatingCostPerMWh"
+  >,
+): number {
+  return (
+    generator.annualOperatingCost +
+    estimatedAnnualVariableOperatingCost(generator) +
+    estimatedAnnualStartCost(generator)
+  );
+}
+
+/**
+ * Nameplate-equivalent years delivered across a design life with compounding annual decline.
+ * Runtime degradation is continuous in operating age, so the lifetime quote integrates the same
+ * curve instead of approximating it with beginning- or end-of-year steps.
+ */
+export function degradedLifetimeYears(
+  lifespanYears: number,
+  annualOutputDegradation: number,
+): number {
+  if (annualOutputDegradation <= 0) {
+    return lifespanYears;
+  }
+  if (annualOutputDegradation >= 1) {
+    return 0;
+  }
+  const retention = 1 - annualOutputDegradation;
+  return (Math.pow(retention, lifespanYears) - 1) / Math.log(retention);
 }
 
 /**
@@ -184,10 +263,10 @@ export interface FacilityLifetimeType {
 export function facilityLifetime(
   f: FacilityOperatingType,
 ): FacilityLifetimeType {
-  const wh = f.lifetimeWh || 0;
-  const revenue = f.lifetimeRevenue || 0;
-  const expenses = f.lifetimeExpenses || 0;
-  const potentialWh = f.lifetimePotentialWh || 0;
+  const wh = f.lifetimeWh;
+  const revenue = f.lifetimeRevenue;
+  const expenses = f.lifetimeExpenses;
+  const potentialWh = f.lifetimePotentialWh;
   const mwh = wh / 1000000;
   return {
     wh,
@@ -200,19 +279,69 @@ export function facilityLifetime(
   };
 }
 
-// Returns how much cash the user recieves if they sell / cancel the facility
-export function facilityCashBack(g: FacilityOperatingType): number {
-  // Refund slightly more if construction isn't complete - after all, that money hasn't been spent yet
-  // But lose more upfront from material purchases: https://www.wolframalpha.com/input/?i=10*x+%5E+1%2F2+from+0+to+100
-  const percentBuilt = (g.yearsToBuild - g.yearsToBuildLeft) / g.yearsToBuild;
-  const lostFromSelling =
-    (g.buildCost - g.loanAmountLeft) *
-    GENERATOR_SELL_MULTIPLIER *
-    Math.min(1, Math.pow(percentBuilt * 10, 1 / 2));
-  return g.buildCost - lostFromSelling - g.loanAmountLeft;
+const MINUTES_PER_GAME_YEAR = DAYS_PER_YEAR * 24 * 60;
+
+/** The time a completed facility has spent operating, excluding its construction period. */
+export function facilityAgeYears(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  return g.minuteOperational === undefined
+    ? 0
+    : Math.max(
+        0,
+        (currentMinute - g.minuteOperational) / MINUTES_PER_GAME_YEAR,
+      );
 }
 
-// CAC $100->150, increasing as you spend more - https://woodlawnassociates.com/electrical-potential-solar-and-competitive-electricity/
-export function customersFromMarketingSpend(spend: number) {
-  return Math.floor(spend / (100 + spend / 1000000));
+/** Current output capability after permanent age-related degradation. */
+export function facilityOutputFactor(
+  g: FacilityOperatingType,
+  currentMinute: number,
+): number {
+  const annualDegradation = g.annualOutputDegradation || 0;
+  if (annualDegradation <= 0) {
+    return 1;
+  }
+  return Math.pow(
+    Math.max(0, 1 - annualDegradation),
+    facilityAgeYears(g, currentMinute),
+  );
+}
+
+/**
+ * Storage lifetimeWh already counts discharge only, which is the industry convention for an
+ * equivalent full cycle. Deriving the counter avoids a second running total that could drift out
+ * of sync.
+ */
+export function facilityEquivalentCycles(
+  g: FacilityOperatingType,
+): number | undefined {
+  return g.peakWh > 0 ? g.lifetimeWh / g.peakWh : undefined;
+}
+
+/** Nameplate-equivalent hours generated, using the already calendar-scaled lifetime energy. */
+export function facilityEquivalentOperatingHours(
+  g: FacilityOperatingType,
+): number | undefined {
+  return !g.peakWh && g.peakW > 0 ? g.lifetimeWh / g.peakW : undefined;
+}
+
+// Returns how much cash the user receives if they sell / cancel the facility. Construction
+// refunds committed equity; an operating asset depreciates linearly to zero over the
+// technology-specific life in Facilities.tsx. Any outstanding loan is settled on sale.
+export function facilityCashBack(
+  g: FacilityOperatingType,
+  currentMinute = g.minuteOperational ?? g.minuteCreated,
+): number {
+  if (g.yearsToBuildLeft === 0) {
+    const remainingLife = Math.max(
+      0,
+      1 - facilityAgeYears(g, currentMinute) / g.lifespanYears,
+    );
+    return g.buildCost * remainingLife - g.loanAmountLeft;
+  }
+  // Cancellation unwinds the committed purchase. For a financed build this returns only the
+  // down payment/equity because the outstanding loan is settled at the same time.
+  return g.buildCost - g.loanAmountLeft;
 }

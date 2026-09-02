@@ -1,27 +1,46 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Settings, { Props } from "./Settings";
+import { clearAppCache } from "../../helpers/Cache";
+
+jest.mock("../../helpers/Cache", () => ({
+  clearAppCache: jest.fn(async () => undefined),
+}));
+
+const mockedClearAppCache = clearAppCache as jest.MockedFunction<
+  typeof clearAppCache
+>;
 
 function renderSettings(overrides: Partial<Props> = {}) {
   const props: Props = {
-    settings: { units: "metric" },
+    settings: {
+      musicVolume: 1,
+      soundEffectsVolume: 1,
+      units: "metric",
+      theme: "system",
+    },
     loggedIn: false,
     onLogin: () => undefined,
     onLogout: () => undefined,
     onChangeName: () => undefined,
     onAudioChange: () => undefined,
+    onMusicVolumeChange: () => undefined,
+    onSoundEffectsVolumeChange: () => undefined,
     onUnitsChange: () => undefined,
+    onThemeChange: () => undefined,
     onExportSave: () => undefined,
     onImportSave: () => undefined,
     onBack: () => undefined,
     ...overrides,
   };
-  render(<Settings {...props} />);
+  return render(<Settings {...props} />);
 }
 
 function exportButton(): HTMLButtonElement {
-  return screen.getByText("Export").closest("button") as HTMLButtonElement;
+  return screen.getByRole("button", {
+    name: "Export save",
+  }) as HTMLButtonElement;
 }
 
 function fileInput(): HTMLInputElement {
@@ -29,6 +48,96 @@ function fileInput(): HTMLInputElement {
 }
 
 describe("Settings", () => {
+  it("groups controls into labeled, scannable sections", () => {
+    renderSettings();
+
+    ["Preferences", "Leaderboard", "Game data", "Keyboard shortcuts"].forEach(
+      (name) =>
+        expect(screen.getByRole("region", { name })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("switch", { name: "Sound" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Units" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Appearance" }),
+    ).toBeInTheDocument();
+  });
+
+  it("changes appearance and units with direct choices", async () => {
+    const onThemeChange = jest.fn();
+    const onUnitsChange = jest.fn();
+    renderSettings({ onThemeChange, onUnitsChange });
+
+    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
+    await userEvent.click(screen.getByRole("button", { name: "Imperial" }));
+
+    expect(onThemeChange).toHaveBeenCalledWith("dark");
+    expect(onUnitsChange).toHaveBeenCalledWith("imperial");
+  });
+
+  it("controls music and sound-effects volume independently", () => {
+    const onMusicVolumeChange = jest.fn();
+    const onSoundEffectsVolumeChange = jest.fn();
+    renderSettings({
+      settings: {
+        audioEnabled: true,
+        musicVolume: 0.7,
+        soundEffectsVolume: 0.4,
+        units: "metric",
+        theme: "system",
+      },
+      onMusicVolumeChange,
+      onSoundEffectsVolumeChange,
+    });
+
+    fireEvent.change(screen.getByRole("slider", { name: /music volume/i }), {
+      target: { value: 35 },
+    });
+    fireEvent.change(screen.getByRole("slider", { name: /effects volume/i }), {
+      target: { value: 80 },
+    });
+    expect(onMusicVolumeChange).toHaveBeenCalledWith(0.35);
+    expect(onSoundEffectsVolumeChange).toHaveBeenCalledWith(0.8);
+  });
+
+  it("only shows volume controls while audio is enabled", () => {
+    const view = renderSettings();
+
+    expect(screen.queryByRole("slider", { name: /music volume/i })).toBeNull();
+    expect(
+      screen.queryByRole("slider", { name: /effects volume/i }),
+    ).toBeNull();
+
+    view.unmount();
+    renderSettings({
+      settings: {
+        audioEnabled: true,
+        musicVolume: 1,
+        soundEffectsVolume: 1,
+        units: "metric",
+        theme: "system",
+      },
+    });
+
+    expect(screen.getByRole("slider", { name: /music volume/i })).toBeVisible();
+    expect(
+      screen.getByRole("slider", { name: /effects volume/i }),
+    ).toBeVisible();
+  });
+
+  it("keeps keyboard shortcuts available without letting them dominate the page", async () => {
+    renderSettings();
+
+    expect(
+      screen.queryByRole("table", { name: "Keyboard shortcuts" }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Keys for faster play/ }),
+    );
+    expect(
+      screen.getByRole("table", { name: "Keyboard shortcuts" }),
+    ).toBeVisible();
+  });
+
   it("names the saved game that Export would download", async () => {
     const onExportSave = jest.fn();
     renderSettings({ savedGame: "Rise of Renewables, 2035", onExportSave });
@@ -46,13 +155,13 @@ describe("Settings", () => {
     renderSettings();
     expect(exportButton().disabled).toBe(true);
     expect(
-      screen.getByText(/need a game in progress to export/),
+      screen.getByText(/Start a game to enable export/),
     ).toBeInTheDocument();
   });
 
   it("offers a way in when nobody is logged in", () => {
     renderSettings();
-    expect(screen.getByText("Log in")).toBeInTheDocument();
+    expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     expect(screen.queryByText("Log out")).not.toBeInTheDocument();
   });
 
@@ -60,8 +169,8 @@ describe("Settings", () => {
     const onChangeName = jest.fn();
     renderSettings({ loggedIn: true, displayName: "Ada", onChangeName });
 
-    expect(screen.getByText(/On the leaderboard as Ada/)).toBeInTheDocument();
-    await userEvent.click(screen.getByText("Change name"));
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Edit name"));
     expect(onChangeName).toHaveBeenCalled();
   });
 
@@ -70,9 +179,9 @@ describe("Settings", () => {
   it("prompts for a name when a logged-in player hasn't picked one", () => {
     renderSettings({ loggedIn: true });
     expect(
-      screen.getByText(/haven't picked a leaderboard name/),
+      screen.getByText(/Choose a name to appear with your scores/),
     ).toBeInTheDocument();
-    expect(screen.getByText("Pick a name")).toBeInTheDocument();
+    expect(screen.getByText("Choose a name")).toBeInTheDocument();
   });
 
   it("imports whichever file the player picks, saved game or not", async () => {
@@ -85,5 +194,57 @@ describe("Settings", () => {
 
     // Picking the same file again still counts, for the player who went and fixed a bad one
     expect(fileInput().value).toBe("");
+  });
+
+  it("does not show an install group when no install action is available", () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = jest.fn().mockReturnValue({
+      matches: true,
+      media: "(display-mode: standalone)",
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    });
+
+    renderSettings();
+
+    expect(
+      screen.queryByRole("region", { name: "Install Electrify" }),
+    ).not.toBeInTheDocument();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it("offers a subtle cache reset at the bottom", async () => {
+    renderSettings();
+
+    const button = screen.getByRole("button", { name: "Clear cached data" });
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("button", {
+        name: "Clear cached data",
+      }),
+    ).toBe(button);
+    await userEvent.click(button);
+
+    expect(mockedClearAppCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns focus to the control that opened Settings", () => {
+    jest.useFakeTimers();
+    const trigger = document.createElement("button");
+    trigger.dataset.settingsTrigger = "";
+    document.body.appendChild(trigger);
+    const onBack = jest.fn();
+    renderSettings({ onBack });
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    act(() => jest.advanceTimersByTime(350));
+
+    expect(onBack).toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+    jest.useRealTimers();
   });
 });

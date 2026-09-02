@@ -1,12 +1,13 @@
 import * as React from "react";
 import {
   Avatar,
-  Button,
+  Badge,
   Card,
+  CardActionArea,
   CardHeader,
   IconButton,
-  LinearProgress,
   List,
+  ListSubheader,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -14,7 +15,6 @@ import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
-import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -39,98 +39,96 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-interface TutorialListItemProps {
+function scenarioEndYear(scenario: ScenarioType): number {
+  return scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
+}
+
+interface MissionListItemProps {
+  s: ScenarioType;
   completed: boolean;
-  // The first tutorial the player hasn't done yet, called out so the sequence has an
-  // obvious entry point instead of six equal-looking rows
+  // The first mission the player hasn't done yet, called out so the single list has an
+  // obvious entry point instead of a dozen equal-looking rows
   next: boolean;
-  s: ScenarioType;
-  onTutorial: DispatchProps["onTutorial"];
-}
-
-function TutorialListItem(props: TutorialListItemProps): React.JSX.Element {
-  const { s, onTutorial, completed, next } = props;
-  return (
-    <Card className={`build-list-item${next ? " tutorialNext" : ""}`}>
-      <CardHeader
-        style={{ opacity: completed ? 0.6 : 1 }}
-        avatar={
-          completed ? (
-            <CheckCircleIcon
-              className="tutorialComplete"
-              color="primary"
-              titleAccess={`${s.name} completed`}
-            />
-          ) : (
-            <RadioButtonUncheckedIcon
-              className="tutorialIncomplete"
-              titleAccess={`${s.name} not yet completed`}
-            />
-          )
-        }
-        action={
-          <Button
-            size="small"
-            variant={completed ? "outlined" : "contained"}
-            color="primary"
-            onClick={() => onTutorial(s.id)}
-            autoFocus={next}
-          >
-            {completed ? "Replay" : "Play"}
-          </Button>
-        }
-        title={s.name}
-        subheader={next ? "Start here" : undefined}
-      />
-    </Card>
-  );
-}
-
-interface ScenarioListItemProps {
-  s: ScenarioType;
-  // The custom game row opens its own setup screen rather than the scenario details one, so the
-  // row doesn't get to assume what selecting it does
   onSelect: () => void;
 }
 
-function ScenarioListItem(props: ScenarioListItemProps): React.JSX.Element {
-  const { s, onSelect } = props;
+function displayName(s: ScenarioType): string {
+  return s.name.replace(/^Mission \d+:\s*/, "");
+}
+
+// One row for everything: tutorial missions, scenarios, and the custom game all share the
+// list now - the only differences are the action control and what the subheader shows
+function MissionListItem(props: MissionListItemProps): React.JSX.Element {
+  const { s, completed, next, onSelect } = props;
+  const isTutorial = !!s.tutorialSteps;
+  const name = displayName(s);
   const location = getScenarioLocation(s) || { name: "UNKNOWN" };
   const summary =
-    s.id === CUSTOM_SCENARIO_ID ? (
+    isTutorial || s.id === CUSTOM_SCENARIO_ID ? (
       s.summary
     ) : (
       <span>
         {s.summary}
         <br />
-        <i>
-          {location.name}, {s.startingYear}-
-          {s.startingYear + s.durationMonths / 12}
-        </i>
+        <span className="missionMeta">
+          {location.name} · {s.startingYear}–{scenarioEndYear(s)}
+        </span>
       </span>
     );
   return (
-    <Card className="build-list-item clickable-card" onClick={onSelect}>
-      <CardHeader
-        avatar={<Avatar src={`/images/${s.icon.toLowerCase()}.svg`} />}
-        title={s.name}
-        subheader={summary}
-        action={
-          <IconButton color="primary" onClick={onSelect} size="large">
-            <ArrowRightIcon />
-          </IconButton>
+    <Card
+      data-testid={`mission-row-${s.id}`}
+      className={`build-list-item missionItem${next ? " tutorialNext" : ""}`}
+    >
+      <CardActionArea
+        onClick={onSelect}
+        autoFocus={next}
+        aria-label={
+          isTutorial
+            ? `${completed ? "Review" : "Start"} ${name}`
+            : `View ${name} details`
         }
-      />
+      >
+        <CardHeader
+          avatar={
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              badgeContent={
+                completed ? (
+                  <CheckCircleIcon
+                    data-testid={`mission-complete-${s.id}`}
+                    className="tutorialComplete"
+                    color="primary"
+                    fontSize="small"
+                    titleAccess={`${s.name} completed`}
+                  />
+                ) : undefined
+              }
+            >
+              <Avatar
+                src={`/images/${s.icon.toLowerCase()}.svg`}
+                alt={`${name} icon`}
+              />
+            </Badge>
+          }
+          title={<span>{name}</span>}
+          subheader={<span>{summary}</span>}
+          action={!isTutorial && <ArrowRightIcon color="primary" aria-hidden />}
+        />
+      </CardActionArea>
     </Card>
   );
 }
 
 export default function NewGame(props: Props): React.JSX.Element {
   const ids = getPlayedScenarioIds();
-  const completedTutorials = TUTORIALS.filter(
-    (s) => ids.indexOf(s.id) !== -1,
-  ).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
+  const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
+    (a, b) =>
+      b.startingYear - a.startingYear ||
+      scenarioEndYear(b) - scenarioEndYear(a),
+  );
 
   return (
     <div id="listCard" className="flexContainer">
@@ -145,7 +143,9 @@ export default function NewGame(props: Props): React.JSX.Element {
           >
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Select a Scenario</Typography>
+          <Typography component="h1" variant="h6">
+            Choose a game
+          </Typography>
           {/* Otherwise the Manual is only reachable from the title screen and the in-game
               overflow menu, so players who stop partway through never find out it exists.
               Auto margin rather than absolute positioning, so it can't sit on top of the
@@ -153,7 +153,7 @@ export default function NewGame(props: Props): React.JSX.Element {
           <IconButton
             sx={{ marginLeft: "auto" }}
             onClick={props.onManual}
-            aria-label="manual"
+            aria-label="How to play"
             color="primary"
             size="large"
           >
@@ -161,50 +161,83 @@ export default function NewGame(props: Props): React.JSX.Element {
           </IconButton>
         </Toolbar>
       </div>
-      <List dense className="scrollable cardList">
-        <Typography variant="h5" sx={{ paddingLeft: 1, paddingTop: 1 }}>
-          Tutorials
-        </Typography>
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          sx={{ paddingLeft: 1, paddingBottom: 1 }}
+      <List
+        dense
+        className="scrollable cardList missionList"
+        aria-label="Available games"
+      >
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
         >
-          {completedTutorials} of {TUTORIALS.length} complete
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={(completedTutorials / TUTORIALS.length) * 100}
-          className="tutorialProgressBar"
-          aria-label={`Tutorials: ${completedTutorials} of ${TUTORIALS.length} complete`}
-        />
-        {TUTORIALS.map((s) => {
-          return (
-            <TutorialListItem
-              key={s.id}
-              onTutorial={props.onTutorial}
-              s={s}
-              completed={ids.indexOf(s.id) !== -1}
-              next={nextTutorial !== undefined && s.id === nextTutorial.id}
-            />
-          );
-        })}
-        <Typography variant="h5" sx={{ paddingLeft: 1, paddingTop: 1 }}>
-          Scenarios
-        </Typography>
-        {SCENARIOS.filter((s: ScenarioType) => !s.tutorialSteps).map((s) => {
-          return (
-            <ScenarioListItem
-              key={s.id}
-              onSelect={() => props.onDetails({ scenarioId: s.id })}
-              s={s}
-            />
-          );
-        })}
-        <ScenarioListItem
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Learn the basics
+          </Typography>
+        </ListSubheader>
+        {TUTORIALS.map((s) => (
+          <MissionListItem
+            key={s.id}
+            s={s}
+            completed={ids.indexOf(s.id) !== -1}
+            next={nextTutorial !== undefined && s.id === nextTutorial.id}
+            onSelect={() => props.onTutorial(s.id)}
+          />
+        ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Challenges
+          </Typography>
+        </ListSubheader>
+        {scenarios.map((s) => (
+          <MissionListItem
+            key={s.id}
+            s={s}
+            completed={ids.indexOf(s.id) !== -1}
+            next={false}
+            onSelect={() => props.onDetails({ scenarioId: s.id })}
+          />
+        ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            bgcolor: "transparent",
+            color: "text.primary",
+            fontWeight: 700,
+          }}
+        >
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            sx={{ fontWeight: 700 }}
+          >
+            Custom game
+          </Typography>
+        </ListSubheader>
+        <MissionListItem
           key={CUSTOM_SCENARIO_ID}
-          onSelect={props.onCustomGame}
           s={DEFAULT_CUSTOM_SCENARIO}
+          completed={false}
+          next={false}
+          onSelect={props.onCustomGame}
         />
       </List>
     </div>

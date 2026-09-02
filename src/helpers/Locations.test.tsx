@@ -73,6 +73,11 @@ describe("getScenarioLocation", () => {
     ).toBeUndefined();
     expect(getScenarioLocation(undefined)).toBeUndefined();
   });
+
+  it("accepts subdivision metadata as real location data", () => {
+    expect(isValidLocation({ ...ELSEWHERE, admin: "TX" })).toBe(true);
+    expect(isValidLocation({ ...ELSEWHERE, admin: 7 })).toBe(false);
+  });
 });
 
 describe("isValidLocationId", () => {
@@ -95,6 +100,8 @@ describe("isValidLocationId", () => {
 describe("isValidLocation", () => {
   it("accepts a well formed location", () => {
     expect(isValidLocation(ELSEWHERE)).toBe(true);
+    expect(isValidLocation({ ...ELSEWHERE, timeZone: undefined })).toBe(true);
+    expect(isValidLocation({ ...ELSEWHERE, offshore: true })).toBe(true);
   });
 
   it("rejects blobs that aren't one", () => {
@@ -105,5 +112,6 @@ describe("isValidLocation", () => {
     expect(isValidLocation({ ...ELSEWHERE, long: -181 })).toBe(false);
     expect(isValidLocation({ ...ELSEWHERE, lat: NaN })).toBe(false);
     expect(isValidLocation({ ...ELSEWHERE, timeZone: 5 })).toBe(false);
+    expect(isValidLocation({ ...ELSEWHERE, offshore: "yes" })).toBe(false);
   });
 });

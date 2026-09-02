@@ -6,10 +6,31 @@
  * stack trace after every call.
  */
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, ScenarioType } from "../Types";
+import { DifficultyType, GeneratorOperatingType, ScenarioType } from "../Types";
 import { formatReport } from "./Report";
 import { getSimLocation, simLocationIds } from "./SimData";
-import { runSimulation, SimOptionsType, StrategyType } from "./Simulator";
+import { TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+import { generateNewTimeline } from "../reducers/Game";
+import {
+  createGame,
+  runSimulation,
+  SimOptionsType,
+  StrategyType,
+} from "./Simulator";
+import { STANDARD_BALANCE_PLAYS } from "./BalancePlaybooks";
+
+export const STANDARD_BALANCE_SEEDS = Array.from(
+  { length: 20 },
+  (_, index) => index + 1,
+);
+const MATRIX_DIFFICULTIES: DifficultyType[] = [
+  "Intern",
+  "Employee",
+  "Manager",
+  "VP",
+  "CEO",
+];
 
 jest.setTimeout(600000);
 
@@ -53,13 +74,26 @@ function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
 }
 
 function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
+  const initialBuildName = process.env.SIM_BUILD;
+  const initialBuildMWh = envNumber("SIM_BUILD_MWH");
   return {
     difficulty: (process.env.SIM_DIFFICULTY as DifficultyType) || undefined,
     months: envNumber("SIM_MONTHS"),
     seed: envNumber("SIM_SEED"),
     dollarsPerkWh: envNumber("SIM_RATE"),
-    monthlyMarketingSpend: envNumber("SIM_MARKETING"),
     strategy: (process.env.SIM_STRATEGY as StrategyType) || undefined,
+    initialBuild: initialBuildName
+      ? {
+          name: initialBuildName,
+          ...(initialBuildMWh === undefined
+            ? { peakW: (envNumber("SIM_BUILD_MW") || 300) * 1000000 }
+            : { peakWh: initialBuildMWh * 1000000 }),
+          financed: process.env.SIM_FINANCE === "1",
+        }
+      : undefined,
+    sellFacilityId: envNumber("SIM_SELL_ID"),
+    sellAtMonth: envNumber("SIM_SELL_MONTH"),
+    storyEffectsEnabled: process.env.SIM_WITHOUT_STORIES !== "1",
   };
 }
 
@@ -84,9 +118,12 @@ function runSweep() {
     const demandWh = result.months.reduce((a, m) => a + m.demandWh, 0);
     const supplyWh = result.months.reduce((a, m) => a + m.supplyWh, 0);
     const cash = result.finalCash;
-    const outcome = result.wentBankrupt
-      ? `bankrupt @ month ${result.bankruptAtMonth}`
-      : "survived";
+    const outcome =
+      result.outcome === "bankrupt"
+        ? `bankrupt @ month ${result.bankruptAtMonth}`
+        : result.outcome === "fired"
+          ? `fired @ month ${result.firedAtMonth}`
+          : "completed";
     write(
       "  " +
         scenario.name.slice(0, 25).padEnd(26) +
@@ -114,6 +151,175 @@ function runSweep() {
   write("");
 }
 
+function matrixRecord(result: ReturnType<typeof runSimulation>) {
+  const demandWh = result.months.reduce(
+    (total, month) => total + month.demandWh,
+    0,
+  );
+  const supplyWh = result.months.reduce(
+    (total, month) => total + month.supplyWh,
+    0,
+  );
+  const generationMix = result.months.reduce<Record<string, number>>(
+    (totals, month) => {
+      Object.entries(month.deliveredWhByFuel).forEach(([fuel, wh]) => {
+        totals[fuel] = (totals[fuel] || 0) + (wh || 0);
+      });
+      return totals;
+    },
+    {},
+  );
+  return {
+    seed: result.options.seed,
+    outcome: result.outcome,
+    outcomeMonth:
+      result.bankruptAtMonth ?? result.firedAtMonth ?? result.months.length,
+    unservedShare:
+      demandWh > 0 ? Math.max(0, (demandWh - supplyWh) / demandWh) : 0,
+    endingCash: result.finalCash,
+    generationMix,
+    phaseKeys: result.storyOccurrences.map((event) => event.key),
+    selectedIds: result.storyOccurrences.flatMap((event) =>
+      Array.isArray(event.attributes.selectedFacilityIds)
+        ? (event.attributes.selectedFacilityIds as number[])
+        : [],
+    ),
+    resolvedEffects: result.storyOccurrences.map((event) => event.effects),
+  };
+}
+
+function runMatrix() {
+  const scenarios = SCENARIOS.filter((scenario: ScenarioType) =>
+    [100, 101, 102, 103, 104, 105].includes(scenario.id),
+  );
+  let failedGates = 0;
+  write("");
+  write(
+    "  SCENARIO                  DIFFICULTY BASELINE  STORY FAILURES  GATE",
+  );
+  write(
+    "  ------------------------- ---------- --------- --------------- --------------------",
+  );
+  scenarios.forEach((scenario) => {
+    MATRIX_DIFFICULTIES.forEach((difficulty) => {
+      const records = STANDARD_BALANCE_SEEDS.map((seed) => {
+        const common = {
+          ...STANDARD_BALANCE_PLAYS[scenario.id],
+          scenarioId: scenario.id,
+          difficulty,
+          seed,
+        };
+        return {
+          baseline: matrixRecord(
+            runSimulation({ ...common, storyEffectsEnabled: false }),
+          ),
+          story: matrixRecord(
+            runSimulation({ ...common, storyEffectsEnabled: true }),
+          ),
+        };
+      });
+      const otherwiseSuccessful = records.filter(
+        ({ baseline }) => baseline.outcome === "completed",
+      );
+      const storyFailures = otherwiseSuccessful.filter(
+        ({ story }) => story.outcome !== "completed",
+      ).length;
+      const enoughCoverage = otherwiseSuccessful.length >= 12;
+      const failureRate = enoughCoverage
+        ? storyFailures / otherwiseSuccessful.length
+        : null;
+      const passed = failureRate !== null && failureRate <= 0.25;
+      if (!passed) {
+        failedGates++;
+      }
+      write(
+        "  " +
+          scenario.name.slice(0, 25).padEnd(26) +
+          difficulty.padEnd(11) +
+          String(otherwiseSuccessful.length).padEnd(10) +
+          String(storyFailures).padEnd(16) +
+          (!enoughCoverage
+            ? "INSUFFICIENT COVERAGE"
+            : `${(100 * (failureRate || 0)).toFixed(1)}% ${passed ? "ok" : "FAILED"}`),
+      );
+      if (process.env.SIM_FULL === "1") {
+        write(JSON.stringify({ scenarioId: scenario.id, difficulty, records }));
+      }
+    });
+  });
+  write("");
+  write(
+    failedGates === 0
+      ? "  Story balance matrix passed every coverage and failure-rate gate."
+      : `  ${failedGates} story balance matrix gates need attention.`,
+  );
+  write("");
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+const BENCHMARK_FACILITY_COUNT = 10;
+const BENCHMARK_FORECAST_YEARS = 20;
+const BENCHMARK_STEP_MINUTES = 60;
+
+function benchmarkForecast(storyEffectsDisabled: boolean): number {
+  const samples: number[] = [];
+  for (let sample = 0; sample < 5; sample++) {
+    const state = createGame({
+      scenarioId: 103,
+      difficulty: "Manager",
+      seed: 7,
+    });
+    state.storyEffectsDisabled = storyEffectsDisabled;
+    const template = state.facilities[0] as GeneratorOperatingType;
+    state.facilities = Array.from(
+      { length: BENCHMARK_FACILITY_COUNT },
+      (_, index) => ({
+        ...template,
+        id: index + 1,
+        peakW: template.peakW / BENCHMARK_FACILITY_COUNT,
+        currentW: template.currentW / BENCHMARK_FACILITY_COUNT,
+      }),
+    );
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const started = performance.now();
+    generateNewTimeline(
+      state,
+      now.cash,
+      now.customers,
+      (TICKS_PER_YEAR * BENCHMARK_FORECAST_YEARS * TICK_MINUTES) /
+        BENCHMARK_STEP_MINUTES,
+      BENCHMARK_STEP_MINUTES,
+    );
+    const elapsed = performance.now() - started;
+    if (sample > 0) {
+      samples.push(elapsed);
+    }
+  }
+  return median(samples);
+}
+
+function runStoryBenchmark() {
+  const baselineMs = benchmarkForecast(true);
+  const storyMs = benchmarkForecast(false);
+  const regression = storyMs / baselineMs - 1;
+  write("");
+  write(
+    `  ${BENCHMARK_FACILITY_COUNT}-facility, 20-year hourly forecast without stories  ${baselineMs.toFixed(1)} ms`,
+  );
+  write(
+    `  ${BENCHMARK_FACILITY_COUNT}-facility, 20-year hourly forecast with stories     ${storyMs.toFixed(1)} ms`,
+  );
+  write(
+    `  Story resolution regression       ${(regression * 100).toFixed(1)}%`,
+  );
+  write("");
+  expect(regression).toBeLessThanOrEqual(0.15);
+}
+
 function runSingle() {
   const scenarioId = envNumber("SIM_SCENARIO") ?? 101;
   const base = SCENARIOS.find((s: ScenarioType) => s.id === scenarioId);
@@ -132,7 +338,11 @@ function runSingle() {
 }
 
 it("simulation", () => {
-  if (process.env.SIM_ALL === "1") {
+  if (process.env.SIM_STORY_BENCHMARK === "1") {
+    runStoryBenchmark();
+  } else if (process.env.SIM_MATRIX === "1") {
+    runMatrix();
+  } else if (process.env.SIM_ALL === "1") {
     runSweep();
   } else {
     runSingle();

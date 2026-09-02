@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VictoryDialog, { Props } from "./VictoryDialog";
 import { VictoryType } from "../../Types";
@@ -11,7 +11,11 @@ jest.mock("../../reducers/User", () => ({
 
 const mockShareText = jest.fn();
 jest.mock("../../helpers/Share", () => ({
-  buildShareText: () => "I scored 812 ...",
+  buildScoreShareContent: () => ({
+    title: "score",
+    text: "I scored 812 ...",
+    url: "https://electrifygame.com",
+  }),
   canShare: () => true,
   shareText: (...args: unknown[]) => mockShareText(...args),
 }));
@@ -34,6 +38,7 @@ function renderDialog(overrides: Partial<Props> = {}) {
     loggedIn: true,
     onClose: () => undefined,
     onQuit: () => undefined,
+    onRetry: () => undefined,
     onLogin: () => undefined,
     onShared: () => undefined,
     onShareFailed: () => undefined,
@@ -67,6 +72,67 @@ describe("VictoryDialog", () => {
       screen.getByText(/800 pts from electricity supplied/),
     ).toBeInTheDocument();
     expect(screen.getByText(/-18 pts from blackouts/)).toBeInTheDocument();
+    expect(screen.queryByText("What you accomplished")).not.toBeInTheDocument();
+  });
+
+  it("uses the scenario name instead of repeating a generic completion title", () => {
+    renderDialog({ victory: aVictory({ endTitle: "Mission complete!" }) });
+
+    expect(screen.getByText("Deregulation")).toBeInTheDocument();
+    expect(screen.getAllByText(/Mission complete/i)).toHaveLength(1);
+  });
+
+  it("shows how the fleet and company changed over the run", () => {
+    renderDialog({
+      victory: aVictory({
+        debrief: {
+          startingFleet: [
+            { fuel: "Coal", watts: 300000000 },
+            { fuel: "Natural Gas", watts: 200000000 },
+          ],
+          finalFleet: [
+            { fuel: "Sun", watts: 400000000 },
+            { fuel: "Natural Gas", watts: 200000000 },
+          ],
+          startingCash: 330000000,
+          finalCash: 510000000,
+          finalCustomers: 1200000,
+          reliability: 0.998,
+          unservedWh: 1000000000,
+          kgco2e: 2000000000,
+          scenarioMetrics: [
+            {
+              label: "Demand not met during Winter Storm Uri · Feb 2021",
+              value: "12GWh",
+              concept: "blackout",
+            },
+          ],
+          highlights: [
+            {
+              kind: "CONSTRUCTION",
+              label: "Jan 2028",
+              message: "Construction complete: Solar",
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(screen.getByText("The story of your grid")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /Coal 300MW, Natural Gas 200MW/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /Sun 400MW, Natural Gas 200MW/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("99.8%")).toBeInTheDocument();
+    expect(
+      screen.getByText("Demand not met during Winter Storm Uri · Feb 2021"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("12GWh")).toBeInTheDocument();
+    expect(
+      screen.getByText("Construction complete: Solar"),
+    ).toBeInTheDocument();
   });
 
   it("fills in the global rank once it resolves", async () => {
@@ -157,10 +223,29 @@ describe("VictoryDialog", () => {
     const onQuit = jest.fn();
     renderDialog({ onClose, onQuit });
 
-    await userEvent.click(screen.getByText("Keep playing"));
+    await userEvent.click(screen.getByText("Review grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Return to scenarios"));
+    await userEvent.click(screen.getByText("Choose game"));
     expect(onQuit).toHaveBeenCalled();
+  });
+
+  it("shows terminal scores without letting either run resume", async () => {
+    for (const [outcome, title] of [
+      ["bankrupt", "Bankrupt!"],
+      ["fired", "Fired!"],
+    ] as const) {
+      const onClose = jest.fn();
+      renderDialog({ victory: aVictory({ outcome }), onClose });
+
+      expect(screen.getByText("Run ended")).toBeInTheDocument();
+      expect(screen.getByText(title)).toBeInTheDocument();
+      expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
+      expect(screen.getByText(/Final score/)).toBeInTheDocument();
+      expect(screen.queryByText("Review grid")).not.toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      expect(onClose).not.toHaveBeenCalled();
+      cleanup();
+    }
   });
 
   it("uses the scenario's own ending when it has one", () => {

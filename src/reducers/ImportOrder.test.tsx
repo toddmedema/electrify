@@ -37,34 +37,4 @@ describe("module import order", () => {
   it("builds the store when it is loaded first", () => {
     expect(require("../Store").store.getState().card.name).toBe("MAIN_MENU");
   });
-
-  it("keeps the action types the game slice used to generate", () => {
-    const { start, loaded, quit } = require("./GameActions");
-    expect(start(3).type).toBe("game/start");
-    expect(loaded().type).toBe("game/loaded");
-    expect(quit().type).toBe("game/quit");
-  });
-
-  it("still exports those actions from the game reducer", () => {
-    const game = require("./Game");
-    expect(game.start(3).type).toBe("game/start");
-    expect(game.loaded().type).toBe("game/loaded");
-    expect(game.quit().type).toBe("game/quit");
-  });
-
-  it("routes start, loaded and quit through the game slice", () => {
-    const gameReducer = require("./Game").default;
-    const { start, loaded, quit } = require("./GameActions");
-    const started = gameReducer(undefined, start(103));
-    expect(started.scenarioId).toBe(103);
-    expect(gameReducer(started, loaded()).inGame).toBe(true);
-    expect(gameReducer(started, quit()).scenarioId).toBe(0);
-  });
-
-  it("still switches the card to LOADING on start and FACILITIES on loaded", () => {
-    const cardReducer = require("./Card").default;
-    const { start, loaded } = require("./GameActions");
-    expect(cardReducer(undefined, start(0)).name).toBe("LOADING");
-    expect(cardReducer(undefined, loaded()).name).toBe("FACILITIES");
-  });
 });

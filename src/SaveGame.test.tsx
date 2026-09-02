@@ -13,6 +13,7 @@ import {
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
+import { tickState } from "./reducers/Game";
 
 jest.setTimeout(60000);
 
@@ -45,6 +46,13 @@ describe("SaveGame", () => {
     expect(save!.game.facilities).toEqual(game.facilities);
     expect(save!.game.monthlyHistory).toEqual(game.monthlyHistory);
     expect(cash(save!.game)).toBe(cash(game));
+    expect(
+      save!.game.facilities.find((facility) => facility.name === "Oil")
+        ?.variableOperatingCostPerMWh,
+    ).toBe(
+      game.facilities.find((facility) => facility.name === "Oil")
+        ?.variableOperatingCostPerMWh,
+    );
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game
@@ -68,9 +76,130 @@ describe("SaveGame", () => {
     expect(readSave()).toBeNull();
   });
 
-  it("ignores a save from a different schema version", () => {
+  it("rejects a save from a different schema version", () => {
     expect(
       parseSave({ ...serializeSave(game), version: SAVE_VERSION + 1 }),
+    ).toBeNull();
+  });
+
+  it("rejects a save without current envelope metadata", () => {
+    const save = serializeSave(game);
+    expect(parseSave({ ...save, savedAt: undefined })).toBeNull();
+    expect(parseSave({ ...save, appVersion: undefined })).toBeNull();
+  });
+
+  it("rejects a current-version save without customer-market state", () => {
+    const save = serializeSave(game);
+    const withoutMarket = { ...save.game } as Partial<GameType>;
+    delete withoutMarket.customerMarketSize;
+    expect(parseSave({ ...save, game: withoutMarket })).toBeNull();
+  });
+
+  it("persists and validates scenario demand calibration state", () => {
+    const configured: GameType = {
+      ...game,
+      startingDemandScale: 7.5,
+      loadAdditions: [
+        {
+          id: "fixture",
+          label: "Fixture load",
+          startsYear: 2026,
+          startsMonth: 4,
+          peakW: 100_000_000,
+          loadFactor: 0.9,
+          demandType: "Data centers",
+        },
+      ],
+    };
+    expect(parseSave(serializeSave(configured))!.game).toMatchObject({
+      startingDemandScale: 7.5,
+      loadAdditions: configured.loadAdditions,
+    });
+
+    const save = serializeSave(configured);
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, startingDemandScale: undefined },
+      }),
+    ).toBeNull();
+    expect(
+      parseSave({
+        ...save,
+        game: {
+          ...save.game,
+          loadAdditions: [{ ...configured.loadAdditions[0], loadFactor: 1.1 }],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects history from beyond the save's elapsed time", () => {
+    const advanced = createGame(OPTIONS);
+    while (advanced.date.monthsElapsed < 1) {
+      tickState(advanced);
+    }
+    expect(advanced.monthlyHistory).toHaveLength(1);
+    const impossible = serializeSave({
+      ...advanced,
+      monthlyHistory: [...advanced.monthlyHistory, advanced.monthlyHistory[0]],
+    });
+    expect(parseSave(impossible)).toBeNull();
+  });
+
+  it("rejects a current-version save without current runtime state", () => {
+    const save = serializeSave(game);
+    for (const field of [
+      "eventLog",
+      "reportedEventKeys",
+      "eventLogReadThroughId",
+      "worldEvents",
+    ] as const) {
+      const incomplete = { ...save.game } as Partial<GameType>;
+      delete incomplete[field];
+      expect(parseSave({ ...save, game: incomplete })).toBeNull();
+    }
+  });
+
+  it("rejects current-version monthly history without story simulation facts", () => {
+    const save = serializeSave(game);
+    const month = { ...save.game.monthlyHistory[0] } as Partial<
+      GameType["monthlyHistory"][number]
+    >;
+    delete month.deliveredWhByFuel;
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, monthlyHistory: [month] },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a current-version save with incomplete facility totals", () => {
+    const save = serializeSave(game);
+    const facility = { ...save.game.facilities[0] } as Partial<
+      GameType["facilities"][number]
+    >;
+    delete facility.lifetimeRevenue;
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, facilities: [facility] },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a non-finite variable operating cost", () => {
+    const save = serializeSave(game);
+    const facility = {
+      ...save.game.facilities[0],
+      variableOperatingCostPerMWh: Number.POSITIVE_INFINITY,
+    };
+    expect(
+      parseSave({
+        ...save,
+        game: { ...save.game, facilities: [facility] },
+      }),
     ).toBeNull();
   });
 
@@ -120,9 +249,11 @@ describe("SaveGame", () => {
     // Off the globe, which the sun model has no answer for
     expect(withLocation({ ...save.game.location, lat: 400 })).toBeNull();
     expect(withLocation({ ...save.game.location, long: "west" })).toBeNull();
+    // Arbitrary coordinates legitimately have no IANA zone; their longitude supplies an offset.
     expect(
       withLocation({ ...save.game.location, timeZone: undefined }),
-    ).toBeNull();
+    ).not.toBeNull();
+    expect(withLocation({ ...save.game.location, timeZone: 5 })).toBeNull();
     // And the real one still round trips
     expect(parseSave(save)).not.toBeNull();
   });
@@ -212,6 +343,19 @@ describe("SaveGame", () => {
       store.set(quit);
       expect(readSave()!.game.date.minute).toBe(5000);
 
+      stop();
+    });
+
+    it("flushes player actions made while the clock stays paused", () => {
+      const store = fakeStore(quit);
+      const stop = startAutosave(store as never, () => true);
+      const running = playing(game, 2020, 0);
+
+      store.set(running);
+      store.set({ ...running, speed: "PAUSED" });
+      store.set(quit);
+
+      expect(readSave()!.game.speed).toBe("PAUSED");
       stop();
     });
 

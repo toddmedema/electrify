@@ -11,8 +11,8 @@ npm run sim -- --all
 ```
   SCENARIO                  MONTHS   OUTCOME              CASH      UNSERVED  INVARIANTS
   ------------------------- -------- -------------------- --------- --------- ----------
-  Carbon Fee                144      survived             $56M      0.3%      ok
-  The Shale Boom            240      survived             $3,099M   0.7%      ok
+  Carbon Fee                144      bankrupt @ month 54  $-1M      0.3%      ok
+  The Shale Boom            240      bankrupt @ month 104 $-1M      0.7%      ok
   Paradise                  144      bankrupt @ month 43  $-3M      0.1%      ok
   ...
   All scenarios hold every invariant.
@@ -25,8 +25,37 @@ npm run sim -- --scenario 103 --strategy keepUp
 ```
 
 which prints a month by month table (customers, demand, supplied, unserved, cash, net worth,
-profit, emissions), totals for the run, the fleet it finished with, and any invariant violations.
+profit, emissions), the number of recorded player actions, totals for the run, the fleet it
+finished with, and any invariant violations. Outcomes match the real game: completed, bankrupt,
+or fired after three consecutive months below 90% supplied.
 `npm run sim -- --help` lists the flags; `--list` shows the scenario ids.
+One explicit storage decision can be replayed with, for example,
+`--build Battery --build-mwh 800 --finance`; generator builds use `--build-mw`.
+Pass `--without-stories` to run the same playthrough as an authored-effects control.
+
+Story balance uses the checked-in seeds 1–20 across all six scored scenarios and five
+difficulties, running the same UI-legal playbooks as the CEO economics tests with authored effects
+disabled and enabled:
+
+```sh
+npm run sim -- --matrix
+```
+
+Each cell records outcome month, unserved share, ending cash, generation mix, phase keys,
+onset-selected facility IDs, and resolved effects (`--full` prints the records). A failure-rate
+gate is only calculated when at least 12 baseline seeds complete; otherwise the cell reports
+`INSUFFICIENT COVERAGE` instead of a misleading percentage. The story run may fail no more than
+25% of those otherwise-successful seeds.
+
+The forecast performance gate is independently reproducible:
+
+```sh
+npm run sim -- --benchmark-stories
+```
+
+It compares median warmed 20-year hourly Shale forecasts with scheduled story resolution disabled
+and enabled across a ten-facility fleet, a reasonable worst case for normal play. It fails above a
+15% regression.
 
 `--year` and `--location` play an authored scenario somewhere or somewhen else, which is the
 only way to exercise a start past the recorded weather from the command line:
@@ -57,7 +86,7 @@ code rather than a vibe.
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends
-of the difficulty range, marketing spend, and a run that builds on credit. It also pins down
+of the difficulty range, customer price competition, and a run that builds on credit. It also pins down
 determinism and a few economic identities (revenue really is rate times kilowatt hours, the carbon
 fee really is proportional to emissions).
 

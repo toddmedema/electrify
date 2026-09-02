@@ -47,7 +47,7 @@ jobs:
       # matches, that should fail the build rather than report success.
       - name: Tests
         if: '!cancelled()'
-        run: npm test -- --watchAll=false --coverage
+        run: npm run test:ci
 
       # The headless simulation asserts the economy's invariants across every
       # scenario. Simulation.test.tsx covers this too, but running the CLI keeps

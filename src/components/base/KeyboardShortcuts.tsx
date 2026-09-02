@@ -13,9 +13,20 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["Q"], description: "Facilities tab" },
-  { keys: ["W"], description: "Finances tab" },
-  { keys: ["E"], description: "Forecasts tab" },
+  { keys: ["W", "E"], description: "Insights tab" },
+  { keys: ["R"], description: "Events tab" },
+  { keys: ["G"], description: "Build a generator" },
+  { keys: ["S"], description: "Build storage" },
+  {
+    keys: ["shift", "1-9"],
+    description: "Pause / resume that facility in the fleet",
+  },
+  {
+    keys: ["[", "]"],
+    description: "Move the selected facility up / down the dispatch order",
+  },
   { keys: ["?"], description: "Open the manual" },
+  { keys: ["Esc"], description: "Close the current screen" },
 ];
 
 // The shortcuts render as a component rather than as plain markup, so the manual's search has
@@ -27,14 +38,15 @@ export const SHORTCUTS_SEARCH_TEXT = SHORTCUTS.map(
 export default function KeyboardShortcuts(): React.JSX.Element {
   return (
     <table className="shortcuts">
+      <caption className="srOnly">Keyboard shortcuts</caption>
       <tbody>
         {SHORTCUTS.map((shortcut: ShortcutType) => (
           <tr key={shortcut.description}>
-            <td>
+            <th scope="row">
               {shortcut.keys.map((key: string) => (
                 <kbd key={key}>{key}</kbd>
               ))}
-            </td>
+            </th>
             <td>{shortcut.description}</td>
           </tr>
         ))}

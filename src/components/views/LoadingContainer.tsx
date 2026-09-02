@@ -4,12 +4,29 @@ import { logEvent } from "../../Globals";
 import { initEconomy } from "../../data/Economy";
 import { initFuelPrices } from "../../data/FuelPrices";
 import { initWeather } from "../../data/Weather";
+import { getStartingCustomers } from "../../data/LocationProfiles";
 import { getScenarioLocation } from "../../helpers/Locations";
 import { getScenario } from "../../data/Scenarios";
+import { navigate } from "../../reducers/Card";
 import { initGame, loaded, delta } from "../../reducers/Game";
 import { isResumedGame } from "../../SaveGame";
-import { AppStateType, GameType } from "../../Types";
+import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
+
+export function restoreTutorialAfterLoading(
+  dispatch: AppDispatch,
+  tutorialSteps: TutorialStepType[],
+  tutorialStep: number,
+): void {
+  const destination = tutorialSteps[tutorialStep]?.card;
+  // loaded() always mounts Facilities first. Reapply the selected objective's authored pane after
+  // a capstone reset so Finances/Pricing retries do not strand their HUD on the fleet, and so
+  // future capstones can safely start anywhere.
+  if (destination) {
+    dispatch(navigate(destination));
+  }
+  dispatch(delta({ tutorialStep }));
+}
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -17,18 +34,30 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   };
 };
 
-let lastLoad = performance.now();
-const LOADING_DEBOUNCE_MS = 1000;
+let loadInProgress = false;
+let loadListeners: Array<{
+  onProgress: (message: string) => void;
+  onError: (message: string) => void;
+}> = [];
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
-    load: (game: GameType) => {
-      if (performance.now() - lastLoad < LOADING_DEBOUNCE_MS) {
-        // Compositor sometimes renders cards multiple times, no good for loading
+    load: async (
+      game: GameType,
+      onProgress: (message: string) => void,
+      onError: (message: string) => void,
+    ) => {
+      loadListeners.push({ onProgress, onError });
+      if (loadInProgress) {
+        // StrictMode and card transitions can mount the loading view twice. Both renders share
+        // this module, so only the first one starts the downloads.
         return;
       }
-
-      lastLoad = performance.now();
+      loadInProgress = true;
+      const reportProgress = (message: string) =>
+        loadListeners.forEach((listener) => listener.onProgress(message));
+      const reportError = (message: string) =>
+        loadListeners.forEach((listener) => listener.onError(message));
       // resume() has already restored the whole slice by the time a saved game reaches this
       // screen, so all that's left is re-reading the CSVs it couldn't carry
       const resumed = isResumedGame(game);
@@ -44,7 +73,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       }
       const scenario = getScenario(game.scenarioId, game.customScenario);
       if (!scenario) {
-        return alert("Unknown scenario ID " + game.scenarioId);
+        reportError(
+          "We couldn't find that mission. Return to the mission list and try another.",
+        );
+        loadInProgress = false;
+        loadListeners = [];
+        return;
       }
       // A resumed game keeps the location it was saved with, so the weather CSV that gets loaded
       // is the one its forecasts were built from. A replay is the same story: startReplay put
@@ -53,52 +87,74 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       const location =
         resumed || replaying ? game.location : getScenarioLocation(scenario);
       if (!location) {
-        return alert("Unknown location ID " + scenario.locationId);
+        reportError("We couldn't find the location data for this mission.");
+        loadInProgress = false;
+        loadListeners = [];
+        return;
       }
 
-      initWeather(location.id, (weatherFailure?: string) => {
-        if (weatherFailure) {
-          // Every city the picker offers has a file behind it, so this is a download that failed
-          // rather than a place that was never fetched -- and starting anyway would hand back a
-          // game where the weather never changes, which reads as the game being broken
-          return alert(weatherFailure);
-        }
-        // The two records below have no fallback at all: a game started without them throws on
-        // its first tick rather than playing oddly, so each one stops here the way weather does
-        initFuelPrices((fuelFailure?: string) => {
-          if (fuelFailure) {
-            return alert(fuelFailure);
-          }
-          initEconomy((economyFailure?: string) => {
-            if (economyFailure) {
-              return alert(economyFailure);
-            }
-            if (!resumed) {
-              // Otherwise, generate from scratch
-              // TODO different scenarios - for example, start with Natural Gas if year is 2000+, otherwise coal
-              dispatch(
-                initGame({
-                  facilities: scenario.facilities,
-                  cash: scenario.cash,
-                  customers: 1030000,
-                  location,
-                  // A replay has to run on the seed it was recorded with. Otherwise only the custom
-                  // game screen sets one; every authored scenario leaves it undefined and draws a
-                  // fresh seed
-                  seed: replaying ? game.seed : scenario.seed,
-                }),
-              );
-            }
-
-            dispatch(loaded());
-
-            // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
-            if (scenario.tutorialSteps && !resumed && !replaying) {
-              setTimeout(() => dispatch(delta({ tutorialStep: 0 })), 300);
-            }
-          });
+      const callbackLoad = (
+        start: (done: (failure?: string) => void) => void,
+      ) =>
+        new Promise<void>((resolve, reject) => {
+          start((failure?: string) =>
+            failure ? reject(new Error(failure)) : resolve(),
+          );
         });
-      });
+
+      reportProgress("Loading weather and market data…");
+      try {
+        await Promise.all([
+          callbackLoad((done) => initWeather(location, done)),
+          callbackLoad(initFuelPrices),
+          callbackLoad(initEconomy),
+        ]);
+        reportProgress("Starting your mission…");
+        if (!resumed) {
+          // A new game uses the scenario's authored opening fleet.
+          dispatch(
+            initGame({
+              facilities: scenario.facilities,
+              cash: scenario.cash,
+              customers:
+                scenario.startingCustomers || getStartingCustomers(location),
+              location,
+              // A replay has to run on the seed it was recorded with. Otherwise only the custom
+              // game screen sets one; every authored scenario leaves it undefined and draws a
+              // fresh seed
+              seed: replaying ? game.seed : scenario.seed,
+            }),
+          );
+        }
+
+        dispatch(loaded());
+
+        // Tutorials are never autosaved, so a resumed game shouldn't restart a walkthrough
+        if (scenario.tutorialSteps && !resumed && !replaying) {
+          // A capstone retry comes through the same clean scenario-start path with its authored
+          // step already selected. Preserve it; a normal tutorial still arrives with -1 and
+          // starts at the first objective after the card transition has mounted its controls.
+          const tutorialStep = game.tutorialStep >= 0 ? game.tutorialStep : 0;
+          setTimeout(
+            () =>
+              restoreTutorialAfterLoading(
+                dispatch,
+                scenario.tutorialSteps!,
+                tutorialStep,
+              ),
+            300,
+          );
+        }
+      } catch (error) {
+        reportError(
+          error instanceof Error
+            ? error.message
+            : "The game data couldn't be loaded. Check your connection and retry.",
+        );
+      } finally {
+        loadInProgress = false;
+        loadListeners = [];
+      }
     },
   };
 };

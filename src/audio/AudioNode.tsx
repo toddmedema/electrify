@@ -1,28 +1,27 @@
 import { MUSIC_FADE_SECONDS } from "../Constants";
 
-/**
- * Pre-standard Web Audio names this class still guards for. Browsers of the Safari 6 / Chrome 20
- * era exposed noteOn/noteOff rather than start/stop, and reported playback through
- * playbackState. None of them exist in a current browser, so every one of these is optional.
- */
-interface LegacyBufferSource extends AudioBufferSourceNode {
-  noteOn?: AudioBufferSourceNode["start"];
-  noteOff?: AudioBufferSourceNode["stop"];
-  playbackState?: number;
-  PLAYING_STATE?: number;
-}
-
 export class AudioNode {
   private context: AudioContext;
   private buffer: AudioBuffer;
+  private output: AudioDestinationNode | GainNode;
   private gain: GainNode | null;
-  private source: LegacyBufferSource | null;
+  private source: AudioBufferSourceNode | null;
 
-  constructor(audioContext: AudioContext, buffer: AudioBuffer) {
+  constructor(
+    audioContext: AudioContext,
+    buffer: AudioBuffer,
+    output: AudioDestinationNode | GainNode = audioContext.destination,
+  ) {
     this.buffer = buffer;
     this.context = audioContext;
+    this.output = output;
     this.gain = null;
     this.source = null;
+  }
+
+  /** Routes future playbacks through a shared bus, used for independent music volume. */
+  public setOutput(output: AudioDestinationNode | GainNode) {
+    this.output = output;
   }
 
   /**
@@ -45,16 +44,15 @@ export class AudioNode {
         ? offsetSeconds
         : 0;
     this.gain = this.context.createGain();
-    this.gain.connect(this.context.destination);
+    this.gain.connect(this.output);
     this.gain.gain.setValueAtTime(initialVolume, when);
     if (fadeInVolume) {
       this.fadeIn(fadeInVolume);
     }
-    const source: LegacyBufferSource = this.context.createBufferSource();
+    const source = this.context.createBufferSource();
     this.source = source;
     source.buffer = this.buffer;
     source.connect(this.gain);
-    source.start = source.start || source.noteOn; // polyfill for old browsers
     source.start(when, offset);
   }
 
@@ -79,11 +77,10 @@ export class AudioNode {
     gain.gain.linearRampToValueAtTime(0, this.context.currentTime + seconds);
     if (stop && this.source) {
       const source = this.source;
-      source.stop = source.stop || source.noteOff; // polyfill for old browsers
       try {
         source.stop(this.context.currentTime + seconds);
       } catch (_err) {
-        // polyfill for iOS
+        // An already-stopped single-use source may reject another stop request.
         gain.disconnect();
       }
     }
@@ -96,14 +93,9 @@ export class AudioNode {
     return this.gain.gain.value;
   }
 
-  // NOTE: playbackState and PLAYING_STATE are both undefined in any browser released this
-  // decade, so this comparison holds whenever a source exists -- meaning the answer is really
-  // "has playOnce been called", and a node never reports itself as finished. Preserved as-is
-  // because the music fading in ThemeManager is tuned around the current behaviour; fixing it
-  // means tracking completion off the source's ended event.
+  // ThemeManager uses this as "has playOnce been called"; it intentionally keeps treating a
+  // naturally ended source as active so later intensity changes preserve the established mix.
   public isPlaying(): boolean {
-    return Boolean(
-      this.source && this.source.playbackState === this.source.PLAYING_STATE,
-    );
+    return this.source !== null;
   }
 }

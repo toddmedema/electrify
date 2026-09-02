@@ -10,11 +10,12 @@ import {
 } from "./UPlotHelpers";
 import {
   formatMinuteAsMonthAxis,
+  formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
-import { demandColor, fuelColors, withAlpha } from "../../Theme";
+import { chartPalette, fuelColors, withAlpha } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -68,6 +69,7 @@ interface State {
   // Each fuel's own output at each x, ie before it is stacked, for the tooltip to report
   byFuel: number[][];
   demand: number[];
+  minutes: number[];
   domain: Props["domain"];
   maxY: number;
   startingYear: number;
@@ -122,17 +124,17 @@ function buildOptions(
       ...fuels.map((f) => ({
         fill:
           highlightFuel && f !== highlightFuel
-            ? withAlpha(fuelColors[f], MUTED_BAND_ALPHA)
-            : fuelColors[f],
+            ? withAlpha(fuelColors()[f], MUTED_BAND_ALPHA)
+            : fuelColors()[f],
         // A hairline of background between bands keeps them apart even where two
         // fuel colors are close, since seven series can't all be far apart
-        stroke: "#ffffff",
+        stroke: chartPalette().background,
         width: 0.5,
         points: { show: false },
       })),
       {
         // Drawn over the stack so the gap between the two reads as the shortfall
-        stroke: demandColor,
+        stroke: chartPalette().demand,
         width: 2,
         dash: [4, 2],
         points: { show: false },
@@ -145,7 +147,12 @@ function buildOptions(
 }
 
 function tooltip(idx: number, state: State): string {
+  const header = formatMinuteAsTooltipHeader(
+    state.minutes[idx],
+    state.startingYear,
+  );
   return [
+    header,
     ...state.fuels
       .map(
         (f: FuelNameType, i: number) =>
@@ -210,6 +217,7 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
       fuels,
       byFuel,
       demand,
+      minutes,
       domain,
       maxY,
       startingYear,
@@ -219,10 +227,15 @@ export default class ChartForecastSupplyByFuel extends React.PureComponent<
     return (
       <div id="chartForecastSupplyByFuel">
         <UPlotChart<State>
-          ariaLabel="Chart of forecasted electricity supply by fuel type"
+          ariaLabel="Chart of predicted electricity supply by fuel type"
+          formatSummaryValue={formatWatts}
           height={height}
           state={state}
           data={[minutes, ...stacked, demand]}
+          seriesLabels={[
+            ...fuels.map((fuel) => `${fuel} cumulative supply`),
+            "Demand",
+          ]}
           buildOptions={buildOptions(
             fuels,
             showXLabels !== false,

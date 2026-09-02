@@ -2,7 +2,12 @@ import * as React from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { produce } from "immer";
-import Finances, { getComparison, parseRange, projectMonths } from "./Finances";
+import Finances, {
+  formatCustomerChange,
+  getComparison,
+  parseRange,
+  projectMonths,
+} from "./Finances";
 import { createGame } from "../../testing/Simulator";
 import { tickState } from "../../reducers/Game";
 import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
@@ -22,6 +27,10 @@ jest.mock("../base/GameCard", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+}));
+jest.mock("../base/ManualLink", () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 /**
@@ -73,7 +82,7 @@ async function choose(select: HTMLElement, option: string) {
 // end of game machinery (dialogs, high scores) fires while the pane is under test
 function playMonths(months: number): GameType {
   let state = createGame({ scenarioId: 100 });
-  while (state.date.monthsEllapsed < months) {
+  while (state.date.monthsElapsed < months) {
     state = produce(state, (draft: GameType) => {
       tickState(draft);
     });
@@ -95,6 +104,30 @@ function renderFinances(
   );
 }
 
+describe("the customer forecast", () => {
+  it("shows customer growth as a delta and percent when compact totals would look equal", () => {
+    expect(formatCustomerChange(9900, 1000000)).toEqual("+9.9k (+1.0%)");
+  });
+
+  it("formats losses and omits an undefined percent with no existing customers", () => {
+    expect(formatCustomerChange(-9900, 1000000)).toEqual("-9.9k (-1.0%)");
+    expect(formatCustomerChange(9900, 0)).toEqual("+9.9k");
+  });
+
+  it("shows investor players the market benchmark and a rate control", () => {
+    renderFinances(createGame({ scenarioId: 101 }), "PAUSED");
+    expect(
+      screen.getByRole("slider", {
+        name: "The rate you charge for electricity generation",
+      }),
+    ).toBeInTheDocument();
+    const rateSummary = screen.getByText(/market \$/);
+    expect(rateSummary).toBeInTheDocument();
+    expect(rateSummary.textContent).not.toMatch(/market [^—]*\/kWh/);
+    cleanup();
+  });
+});
+
 describe("the Finances chart selectors", () => {
   // Two years in, so that the period select has past years to offer and each one covers a
   // different stretch of the history
@@ -102,12 +135,11 @@ describe("the Finances chart selectors", () => {
 
   beforeEach(() => localStorage.clear());
 
-  // Every speed, because the pane skips frames at FAST and used to skip the player's own clicks
-  // along with them: the dropdown redrew itself with the new label while the chart kept plotting
-  // the old metric, which looks exactly like a selector that does nothing
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
-    "replots when the metric changes at %s speed",
-    async (speed: SpeedType) => {
+  // PAUSED covers the unthrottled path and FAST covers the frame-skipping path that used to
+  // swallow the player's own clicks. SLOW and NORMAL exercise the same branches as FAST.
+  it("replots metric changes on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
       expect(plottedMetric()).toContain("Profit");
 
@@ -116,17 +148,18 @@ describe("the Finances chart selectors", () => {
 
       // The second change is the one the throttle used to swallow: the first update after mount
       // always got through, and everything after it waited on the game clock
-      await choose(metricSelect(), "Net Worth");
-      expect(plottedMetric()).toContain("Net Worth");
+      await choose(metricSelect(), "Net worth");
+      expect(plottedMetric()).toContain("Net worth");
 
       await choose(metricSelect(), "Demand");
       expect(plottedMetric()).toContain("Demand");
-    },
-  );
+      cleanup();
+    }
+  });
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
-    "keeps the metric dropdown showing what is plotted at %s speed",
-    async (speed: SpeedType) => {
+  it("keeps the dropdown in sync on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
 
       await choose(metricSelect(), "Revenue");
@@ -134,12 +167,13 @@ describe("the Finances chart selectors", () => {
 
       expect(metricSelect()).toHaveTextContent("Expenses");
       expect(plottedMetric()).toContain("Expenses");
-    },
-  );
+      cleanup();
+    }
+  });
 
-  it.each(["PAUSED", "SLOW", "NORMAL", "FAST"] as SpeedType[])(
-    "replots when the period changes at %s speed",
-    async (speed: SpeedType) => {
+  it("replots period changes on paused and throttled paths", async () => {
+    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
+      localStorage.clear();
       renderFinances(game, speed);
       const thisYear = summarised("Revenue");
 
@@ -153,17 +187,18 @@ describe("the Finances chart selectors", () => {
       await choose(periodSelect(), "Current year");
       expect(periodSelect()).toHaveTextContent("Current year");
       expect(summarised("Revenue")).toEqual(thisYear);
-    },
-  );
+      cleanup();
+    }
+  });
 
   it("remembers the metric across a remount, dropdown and chart together", async () => {
     const view = renderFinances(game, "PAUSED");
-    await choose(metricSelect(), "Net Worth");
+    await choose(metricSelect(), "Net worth");
     view.unmount();
 
     renderFinances(game, "PAUSED");
-    expect(metricSelect()).toHaveTextContent("Net Worth");
-    expect(plottedMetric()).toContain("Net Worth");
+    expect(metricSelect()).toHaveTextContent("Net worth");
+    expect(plottedMetric()).toContain("Net worth");
   });
 
   // A remount is what going off to build a facility and coming back amounts to, and the period
@@ -187,18 +222,6 @@ describe("the Finances chart selectors", () => {
     renderFinances(game, "PAUSED");
     expect(periodSelect()).toHaveTextContent("Current year");
   });
-
-  // The sentinels the dropdown used to store its two non-year options as. They aren't options
-  // any more, and a returning player has one of them sitting in storage
-  it.each(["-1", "0"])(
-    "falls back to the current year when storage holds the old %s sentinel",
-    (stored: string) => {
-      localStorage.setItem("financesChartYear", stored);
-
-      renderFinances(game, "PAUSED");
-      expect(periodSelect()).toHaveTextContent("Current year");
-    },
-  );
 
   it("plots further than the game has reached when a forward range is chosen", async () => {
     renderFinances(game, "PAUSED");

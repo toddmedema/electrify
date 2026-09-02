@@ -25,9 +25,7 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
     scenarioId: 101,
     difficulty: "Employee",
     seed: 12345,
-    startingYear: 2020,
     location: LOCATIONS.SF,
-    durationMinutes: 43200,
     actions: [
       { minute: 0, type: "delta", payload: { dollarsPerkWh: 0.12 } },
       { minute: 1440, type: "sellFacility", payload: 3 },
@@ -38,9 +36,9 @@ function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
 
 describe("recordedDelta", () => {
   it("keeps the fields the simulation reads", () => {
-    expect(
-      recordedDelta({ dollarsPerkWh: 0.11, monthlyMarketingSpend: 5000 }),
-    ).toEqual({ dollarsPerkWh: 0.11, monthlyMarketingSpend: 5000 });
+    expect(recordedDelta({ dollarsPerkWh: 0.11 })).toEqual({
+      dollarsPerkWh: 0.11,
+    });
   });
 
   it("ignores a delta that changes nothing about the run", () => {
@@ -48,6 +46,11 @@ describe("recordedDelta", () => {
     // scenario, the difficulty picked before the game began
     expect(recordedDelta({ tutorialStep: 3 })).toBeNull();
     expect(recordedDelta({ difficulty: "CEO" })).toBeNull();
+  });
+
+  it("rejects an invalid rate from an untrusted replay", () => {
+    expect(recordedDelta({ dollarsPerkWh: Number.NaN })).toBeNull();
+    expect(recordedDelta({ dollarsPerkWh: -0.01 })).toBeNull();
   });
 });
 
@@ -77,16 +80,61 @@ describe("recordReplayAction", () => {
     ).toBe(100);
   });
 
+  it("round-trips an Airborne Wind build action", () => {
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: {
+            facility: {
+              name: "Airborne Wind",
+              fuel: "Airborne Wind",
+              peakW: 1200000,
+            },
+            financed: true,
+          },
+        },
+      ],
+    });
+    expect(
+      decodeReplay(JSON.parse(JSON.stringify(encodeReplay(replay)))),
+    ).toEqual(replay);
+  });
+
+  it("round-trips an Oil build's variable O&M", () => {
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: {
+            facility: {
+              name: "Oil",
+              fuel: "Oil",
+              peakW: 100000000,
+              annualOperatingCost: 3085368.560061,
+              variableOperatingCostPerMWh: 25.711404667176,
+            },
+            financed: false,
+          },
+        },
+      ],
+    });
+    expect(
+      decodeReplay(JSON.parse(JSON.stringify(encodeReplay(replay)))),
+    ).toEqual(replay);
+  });
+
   it("merges deltas fired within one minute", () => {
     const game = aGame(60, []);
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.1 });
     recordReplayAction(game, "delta", { dollarsPerkWh: 0.2 });
-    recordReplayAction(game, "delta", { monthlyMarketingSpend: 100 });
     expect(game.replayLog).toEqual([
       {
         minute: 60,
         type: "delta",
-        payload: { dollarsPerkWh: 0.2, monthlyMarketingSpend: 100 },
+        payload: { dollarsPerkWh: 0.2 },
       },
     ]);
   });
@@ -145,7 +193,7 @@ describe("decodeReplay", () => {
     expect(decodeReplay({})).toBeNull();
   });
 
-  it("ignores a replay from a schema it doesn't understand", () => {
+  it("rejects a replay from a different schema", () => {
     expect(
       decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
     ).toBeNull();
@@ -157,8 +205,12 @@ describe("decodeReplay", () => {
     expect(decodeReplay(doc)).toBeNull();
   });
 
-  // A scenario id no longer says where a run was played, so a replay without a location has
-  // nowhere to be re-simulated -- which is the whole reason REPLAY_VERSION went to 2
+  it("rejects a replay without current envelope metadata", () => {
+    const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
+    delete doc.appVersion;
+    expect(decodeReplay(doc)).toBeNull();
+  });
+
   it("ignores a replay that doesn't say where it was played", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.location;

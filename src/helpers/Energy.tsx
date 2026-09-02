@@ -3,6 +3,13 @@ import { FacilityOperatingType, GeneratorOperatingType } from "../Types";
 
 const KPH_PER_MS = 3.6;
 
+// Shared turbine curve: cut in at 3m/s, reach rated output at 14m/s, and cut out above 25m/s.
+function powerCurve(windMS: number) {
+  return windMS < 3 || windMS > 25
+    ? 0
+    : Math.max(0, Math.min(1, (windMS - 3) / 11));
+}
+
 export function getWindOutputFactor(windKph: number) {
   // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
   // The 5 was labelled as the kph to m/s conversion, but it never was one: the CSVs this was
@@ -15,19 +22,65 @@ export function getWindOutputFactor(windKph: number) {
       ((windKph / KPH_PER_MS) * Math.pow(100 / 10, 0.34))) /
     5;
 
-  // Production output is sloped from 3-14m/s, capped on zero and peak at both ends, and cut off >25m/s - http://www.wind-power-program.com/turbine_characteristics.htm
-  const windOutputFactor =
-    turbineWindMS < 3 || turbineWindMS > 25
-      ? 0
-      : Math.max(0, Math.min(1, (turbineWindMS - 3) / 11));
-
-  return windOutputFactor;
+  return powerCurve(turbineWindMS);
 }
 
-// Since solar panel nameplate wattages are usually rated at peak output at equator noon, we use that as baseline
-// Solar panels slightly less efficient in warm weather, declining about 1% efficiency per 1C starting at 10C
-// TODO what about rain and snow, esp panels covered in snow? We should update irradianceWM2 based on weather when it's originally calculated...
-// but that still means we'd need to track some additional historic value of "even though it's not currently snowing, they're still covered in snow"
+// Wind at sea starts from a reading at the farm rather than a city station, and its vertical
+// gradient is much weaker than over human habitation. Hsu et al. measured a 0.11 +/- 0.03 power
+// law exponent over ocean; NREL uses the same 0.11 for US marine areas. Array wake, electrical
+// and availability losses then remove about 15% from the output of a large farm.
+// https://journals.ametsoc.org/view/journals/apme/33/6/1520-0450_1994_033_0757_dtplwp_2_0_co_2.xml
+const OFFSHORE_SHEAR_EXPONENT = 0.11;
+const OFFSHORE_HUB_M = 150;
+const OFFSHORE_ARRAY_LOSSES = 0.85;
+
+export function getOffshoreWindOutputFactor(windKph: number) {
+  const turbineWindMS =
+    (windKph / KPH_PER_MS) *
+    Math.pow(OFFSHORE_HUB_M / 10, OFFSHORE_SHEAR_EXPONENT);
+  return powerCurve(turbineWindMS) * OFFSHORE_ARRAY_LOSSES;
+}
+
+// Airborne Wind follows the fixed-wing, ground-generation reference design from Joshi,
+// von Terzi & Schmehl (2025): its published curve takes wind at 100m, cuts in at 6m/s,
+// reaches rated power at 11m/s and cuts out above 20m/s. The weather files currently carry
+// raw 10m wind, so the reference-height conversion happens explicitly before the legacy
+// OUTSKIRTS_WIND_MULTIPLIER can touch it.
+const AIRBORNE_SHEAR_EXPONENT = 0.2;
+const AIRBORNE_REFERENCE_HEIGHT_M = 100;
+const AIRBORNE_CUT_IN_MS = 6;
+const AIRBORNE_RATED_MS = 11;
+const AIRBORNE_CUT_OUT_MS = 20;
+// The linear reference curve yields 45.05% across the shipped 1980-2019 Lista record. This
+// single pumping-cycle/availability factor calibrates it to the project's 3,500 full-load-hour
+// target (39.95%, rounded to 40%) without flattening every location to the same capacity factor.
+const AIRBORNE_SYSTEM_AVAILABILITY = 0.888;
+
+export function getAirborneWindReferenceKph(wind10mKph: number): number {
+  return (
+    wind10mKph *
+    Math.pow(AIRBORNE_REFERENCE_HEIGHT_M / 10, AIRBORNE_SHEAR_EXPONENT)
+  );
+}
+
+export function getAirborneWindOutputFactor(wind100mKph: number): number {
+  const windMS = wind100mKph / KPH_PER_MS;
+  if (windMS < AIRBORNE_CUT_IN_MS || windMS > AIRBORNE_CUT_OUT_MS) {
+    return 0;
+  }
+  const curve = Math.max(
+    0,
+    Math.min(
+      1,
+      (windMS - AIRBORNE_CUT_IN_MS) / (AIRBORNE_RATED_MS - AIRBORNE_CUT_IN_MS),
+    ),
+  );
+  return curve * AIRBORNE_SYSTEM_AVAILABILITY;
+}
+
+// Solar nameplate wattages use peak irradiance as their baseline. Panel efficiency declines by
+// about 1% per degree above 10 C. Snow cover is not modeled because it would require persistent
+// accumulation state rather than only the current hour's weather.
 export function getSolarOutputFactor(
   irradianceWM2: number,
   temepratureC: number,
@@ -49,6 +102,30 @@ export function getWindCapacityFactor(windSpeedsKph: number[]) {
   );
 }
 
+export function getOffshoreWindCapacityFactor(windSpeedsKph: number[]) {
+  if (windSpeedsKph.length === 0) {
+    return 0;
+  }
+  return (
+    windSpeedsKph.reduce(
+      (total, windKph) => total + getOffshoreWindOutputFactor(windKph),
+      0,
+    ) / windSpeedsKph.length
+  );
+}
+
+export function getAirborneWindCapacityFactor(windSpeeds100mKph: number[]) {
+  if (windSpeeds100mKph.length === 0) {
+    return 0;
+  }
+  return (
+    windSpeeds100mKph.reduce(
+      (total, windKph) => total + getAirborneWindOutputFactor(windKph),
+      0,
+    ) / windSpeeds100mKph.length
+  );
+}
+
 // Takes in an array of irradiances and returns the average of all outputFactors
 // For simplicty, assumes a constant temperature across all readings
 export function getSolarCapacityFactor(irradiancesWM2: number[]) {
@@ -66,7 +143,7 @@ export function getSolarCapacityFactor(irradiancesWM2: number[]) {
 // Sun and Wind aren't dispatchable - they generate whatever the weather allows regardless of
 // where the player drags them - so a dispatch stack puts them on the bottom as must-run supply,
 // the same convention EIA and ISO generation stacks use.
-const MUST_RUN_FUELS = ["Sun", "Wind"];
+const MUST_RUN_FUELS = ["Sun", "Wind", "Offshore Wind", "Airborne Wind"];
 
 /**
  * The fuels present in a fleet, ordered the way a dispatch stack is drawn: must-run renewables

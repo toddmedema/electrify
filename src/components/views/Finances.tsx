@@ -14,21 +14,24 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import { MONTHS, TICKS_PER_MONTH } from "../../Constants";
+import { MONTHS, TICK_MINUTES, TICKS_PER_MONTH } from "../../Constants";
 import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   deriveExpandedSummary,
   EMPTY_HISTORY,
+  getDateFromMinute,
   getTimeFromTimeline,
   reduceHistories,
   summarizeHistory,
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
+import { facilityLifetime } from "../../helpers/Financials";
 import {
-  customersFromMarketingSpend,
-  facilityLifetime,
-} from "../../helpers/Financials";
+  customerMarketSizeAt,
+  getMarketRate,
+  projectCustomerChange,
+} from "../../helpers/Customers";
 import {
   formatMoneyConcise,
   formatMoneyStable,
@@ -53,6 +56,7 @@ import {
 } from "../../Types";
 import {
   formatLargeMassValue,
+  formatLargeMassValueConcise,
   largeMassUnit,
   massUnit,
   toDisplayMass,
@@ -60,6 +64,8 @@ import {
 import { UnitsContext } from "../base/UnitsContext";
 import ChartFinances from "../base/ChartFinances";
 import GameCard from "../base/GameCard";
+import MetricTiles, { MetricTileType } from "../base/MetricTiles";
+import { isDesktopScreen } from "../../Globals";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
 
 import numbro from "numbro";
@@ -72,8 +78,8 @@ interface ChartKeyMetadataType {
   nesting?: number; // default 0 / unnested
   /**
    * Which direction of the change column is good news, so the arrow can be coloured. Left
-   * unset for the metrics that are neither: marketing spend is a decision rather than a
-   * result, and inflation is weather. Those get an arrow with no colour on it.
+   * unset for metrics such as inflation that are neither good nor bad. Those get an arrow with no
+   * colour on it.
    */
   higherIsBetter?: boolean;
 }
@@ -91,7 +97,7 @@ function buildChartKeys(units: UnitSystemType): {
       formatTable: formatMoneyStable,
     },
     profitPerkWh: {
-      label: "Unit profit",
+      label: "Profit per kWh",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -105,7 +111,7 @@ function buildChartKeys(units: UnitSystemType): {
       formatTable: formatMoneyStable,
     },
     revenuePerkWh: {
-      label: "Unit revenue",
+      label: "Revenue per kWh",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -113,7 +119,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 1,
     },
     supplyWh: {
-      label: "Power sold",
+      label: "Electricity sold",
       higherIsBetter: true,
       format: (n: number) => `${formatWatts(n, 0)}h`,
       nesting: 1,
@@ -143,14 +149,8 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 1,
     },
     expensesOM: {
-      label: "Operations",
+      label: "Operations & maintenance",
       higherIsBetter: false,
-      format: formatMoneyConcise,
-      formatTable: formatMoneyStable,
-      nesting: 1,
-    },
-    expensesMarketing: {
-      label: "Marketing",
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
       nesting: 1,
@@ -178,12 +178,13 @@ function buildChartKeys(units: UnitSystemType): {
     kgco2e: {
       label: "CO2e emitted",
       higherIsBetter: false,
-      format: (n: number) => formatLargeMassValue(n, units),
+      format: (n: number) => formatLargeMassValueConcise(n, units),
+      formatTable: (n: number) => formatLargeMassValue(n, units),
       suffix: largeMassUnit(units),
       nesting: 2,
     },
     kgco2ePerMWh: {
-      label: "Emissions factor",
+      label: "Emissions per MWh",
       higherIsBetter: false,
       format: (n: number) =>
         numbro(toDisplayMass(n, units)).format({
@@ -194,7 +195,7 @@ function buildChartKeys(units: UnitSystemType): {
       nesting: 2,
     },
     netWorth: {
-      label: "Net Worth",
+      label: "Net worth",
       higherIsBetter: true,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -222,6 +223,23 @@ const CHART_KEYS_BY_SYSTEM: {
 
 // The metrics on offer, which no system changes - the stored choice is checked against these
 const CHART_KEY_NAMES = Object.keys(CHART_KEYS_BY_SYSTEM.metric);
+
+/**
+ * The metrics the small multiples draw, in the order they are laid out.
+ *
+ * Six rather than all eighteen: these are the ones a player steers on, and the rest are the
+ * breakdowns underneath them, which the table below already carries. Whatever is being plotted
+ * is added to the end if it is not already here, so a metric chosen from the dropdown on a
+ * narrow screen still has a tile to be un-selected from on a wide one.
+ */
+const SMALL_MULTIPLE_KEYS: DerivedHistoryKeysType[] = [
+  "profit",
+  "revenue",
+  "expenses",
+  "kgco2e",
+  "customers",
+  "cash",
+];
 
 const CHART_KEY_STORAGE_KEY = "financesChartKey";
 // Still says year, because a stored year is still one of the options and reading it back is
@@ -424,23 +442,30 @@ function DeltaCell(props: DeltaCellProps): React.JSX.Element {
   );
 }
 
-// -1:0 -> 0:$100k, each tick increments the front number - when it overflows, instead add a 0 (i.e. 1->2M, 9->10M, 10->20M)
-function getValueFromTick(tick: number) {
-  if (tick === -1) {
-    return 0;
-  }
-  const exponent = Math.floor(tick / 9) + 5;
-  const frontNumber = (tick % 9) + 1;
-  return Math.round(frontNumber * Math.pow(10, exponent));
-}
+// The rate slider runs $0 to $0.30/kWh, so its ticks are a fixed nickel apart
+const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate: number) => ({
+  value: rate,
+  label: formatMoneyConcise(rate),
+}));
 
-function getTickFromValue(v: number) {
-  if (v === 0) {
-    return -1;
-  }
-  const exponent = Math.floor(Math.log10(v)) - 5;
-  const frontNumber = +v.toString().charAt(0);
-  return Math.floor(frontNumber + exponent * 9 - 1);
+/**
+ * The useful part of the customer forecast is its change, not its resulting total. At large
+ * customer counts, formatting both totals compactly can turn `1m -> 1m` and hide the effect.
+ */
+export function formatCustomerChange(
+  change: number,
+  customers: number,
+): string {
+  const formattedChange = numbro(Math.abs(change)).format({
+    average: true,
+    mantissa: 1,
+    trimMantissa: true,
+  });
+  const percent =
+    customers > 0
+      ? ` (${change >= 0 ? "+" : "-"}${((Math.abs(change) / customers) * 100).toFixed(1)}%)`
+      : "";
+  return `${change >= 0 ? "+" : "-"}${formattedChange}${percent}`;
 }
 
 export default class Finances extends React.Component<Props, State> {
@@ -474,6 +499,17 @@ export default class Finances extends React.Component<Props, State> {
   // referentially stable, because that is what lets ChartFinances memoise its canvas.
   private projectionCache:
     { key: string; range: string; months: MonthlyHistoryType[] } | undefined;
+  // The tiles read the same months the chart does, one value per metric rather than one metric
+  // per month, and are rebuilt on the same terms: a month rolling over, or the range moving
+  private tileCache:
+    | {
+        chartKey: DerivedHistoryKeysType;
+        range: string;
+        historyLength: number;
+        projected: MonthlyHistoryType[];
+        tiles: MetricTileType[];
+      }
+    | undefined;
   private seriesCache:
     | {
         chartKey: DerivedHistoryKeysType;
@@ -484,8 +520,8 @@ export default class Finances extends React.Component<Props, State> {
       }
     | undefined;
 
-  // Rebuilding a twenty-year projection costs ~120ms, and the marketing and rate sliders change
-  // one of its inputs on every pointer move. Drawing from the previous projection while the
+  // Rebuilding a twenty-year projection costs ~120ms, and the rate slider changes one of its
+  // inputs on every pointer move. Drawing from the previous projection while the
   // player is still dragging keeps the slider smooth, and the trailing timer below makes sure
   // the chart catches up with wherever they let go.
   private static readonly PROJECTION_THROTTLE_MS = 250;
@@ -567,9 +603,8 @@ export default class Finances extends React.Component<Props, State> {
 
     const key = [
       this.state.range,
-      date.monthsEllapsed,
+      date.monthsElapsed,
       game.monthlyHistory.length,
-      game.monthlyMarketingSpend,
       game.dollarsPerkWh,
       game.facilities.map((f) => `${f.id}${f.paused ? "p" : ""}`).join(","),
     ].join("|");
@@ -662,6 +697,57 @@ export default class Finances extends React.Component<Props, State> {
     return series;
   }
 
+  /**
+   * One tile per headline metric: its label, its latest value and the same span of months the
+   * chart is drawing. Built from the derived months once rather than per metric, since deriving
+   * a month is the expensive half and every tile wants the same twelve.
+   */
+  private getTiles(
+    monthlyHistory: MonthlyHistoryType[],
+    projected: MonthlyHistoryType[],
+    chartKeys: { [index: string]: ChartKeyMetadataType },
+  ): MetricTileType[] {
+    const { chartKey, range } = this.state;
+    const historyLength = this.props.game.monthlyHistory.length;
+    const cached = this.tileCache;
+    if (
+      cached &&
+      cached.chartKey === chartKey &&
+      cached.range === range &&
+      cached.historyLength === historyLength &&
+      cached.projected === projected
+    ) {
+      return cached.tiles;
+    }
+
+    // game.monthlyHistory is newest first; the tiles read left to right through time
+    const months = [...monthlyHistory]
+      .reverse()
+      .concat(projected)
+      .map(deriveExpandedSummary);
+    // Whatever is plotted always has a tile, even the breakdowns that aren't headline metrics
+    const keys = SMALL_MULTIPLE_KEYS.includes(chartKey)
+      ? SMALL_MULTIPLE_KEYS
+      : [...SMALL_MULTIPLE_KEYS, chartKey];
+    const tiles = keys.map((key: DerivedHistoryKeysType) => {
+      const values = months.map((m: DerivedHistoryType) => m[key]);
+      const metadata = chartKeys[key];
+      const latest = metadata.format(values[values.length - 1] || 0);
+      return {
+        metricKey: key,
+        label: metadata.label,
+        // A number with no unit on it is a different number: "380K" of CO2e could be anything
+        value: metadata.suffix
+          ? `${latest}${metadata.suffix.startsWith("/") ? "" : " "}${metadata.suffix}`
+          : String(latest),
+        values,
+      };
+    });
+
+    this.tileCache = { chartKey, range, historyLength, projected, tiles };
+    return tiles;
+  }
+
   public render() {
     const { game, onDelta, selectedFacilityId } = this.props;
     const chartKeys = CHART_KEYS_BY_SYSTEM[this.context as UnitSystemType];
@@ -676,6 +762,46 @@ export default class Finances extends React.Component<Props, State> {
 
     const scenario =
       getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
+    const marketRate = getMarketRate(
+      scenario.dollarsPerkWh,
+      date,
+      startingYear,
+      game.seed,
+    );
+    const customerChange = projectCustomerChange({
+      customers: now.customers,
+      customerRate: now.customerRate || game.customerRate || game.dollarsPerkWh,
+      currentRate: game.dollarsPerkWh,
+      marketRateAt: (tick: number) =>
+        getMarketRate(
+          scenario.dollarsPerkWh,
+          getDateFromMinute(date.minute + tick * TICK_MINUTES, startingYear),
+          startingYear,
+          game.seed,
+        ),
+      marketSizeAt: (tick: number) =>
+        customerMarketSizeAt(
+          game.customerMarketSize || now.customers * 2,
+          date.minute + tick * TICK_MINUTES,
+        ),
+      ownership: scenario.ownership,
+    });
+    const investorRateMax = Math.max(
+      0.05,
+      Math.ceil(marketRate * 200) / 100,
+      game.dollarsPerkWh,
+    );
+    const investorRateMarks = [
+      { value: 0, label: "$0" },
+      {
+        value: marketRate,
+        label: `${formatMoneyConcise(marketRate)} market`,
+      },
+      { value: investorRateMax, label: formatMoneyConcise(investorRateMax) },
+    ];
+    // Six sparklines need width the phone layout does not have, and the dropdown they replace is
+    // the right control at that size -- see MetricTiles
+    const smallMultiples = isDesktopScreen();
     const years = getPlayedYears(game);
 
     // A forward range still draws every month on the record behind its projection, so that the
@@ -722,13 +848,51 @@ export default class Finances extends React.Component<Props, State> {
     const selectedLifetime =
       selectedFacility && facilityLifetime(selectedFacility);
     const fleetWh = game.facilities.reduce(
-      (sum: number, f: FacilityOperatingType) => sum + (f.lifetimeWh || 0),
+      (sum: number, f: FacilityOperatingType) => sum + f.lifetimeWh,
       0,
     );
 
     return (
-      <GameCard className="finances" title="Finances" id="financesPane">
+      <GameCard
+        className="finances"
+        title={smallMultiples ? undefined : "Finances"}
+        id="financesPane"
+      >
         <div className="scrollable">
+          {/* On a wide screen the tiles below already say what's plotted and pick a different
+              one, so the range is the only thing left to choose -- it moves up here with the
+              title instead of sharing a row with the sliders (see Facilities, whose build
+              buttons live in the same spot) */}
+          {smallMultiples && (
+            <Toolbar className="paneHeader">
+              <Typography variant="h6">Finances</Typography>
+              <Select
+                id="plotRange"
+                value={this.state.range}
+                onChange={(e: SelectChangeEvent<string>) =>
+                  this.setRange(e.target.value)
+                }
+                className="headerControl"
+              >
+                <MenuItem value={ALL_TIME}>All time</MenuItem>
+                <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
+                {FUTURE_YEARS.map((y: number) => {
+                  return (
+                    <MenuItem value={futureRange(y)} key={futureRange(y)}>
+                      Next {y} {y === 1 ? "year" : "years"}
+                    </MenuItem>
+                  );
+                })}
+                {years.map((y: number) => {
+                  return (
+                    <MenuItem value={String(y)} key={y}>
+                      {y}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </Toolbar>
+          )}
           {selectedFacility && selectedLifetime && (
             // The other half of clicking a row in the fleet list: the stack in Forecasts
             // says which power is this facility's, and this says which money is
@@ -756,72 +920,55 @@ export default class Finances extends React.Component<Props, State> {
           )}
           <br />
           <Toolbar>
-            {scenario.ownership === "Investor" && (
-              <Typography
-                className="flex-newline"
-                variant="body2"
-                color="textSecondary"
-              >
-                Marketing:&nbsp;
-                <Typography color="primary" component="strong">
-                  {formatMoneyConcise(game.monthlyMarketingSpend)}
-                </Typography>
-                /mo&nbsp; (+
-                {numbro(
-                  customersFromMarketingSpend(game.monthlyMarketingSpend),
-                ).format({ average: true })}{" "}
-                customers)
-              </Typography>
-            )}
-            {scenario.ownership === "Investor" && (
-              <Slider
-                id="marketingSlider"
-                disabled={!!game.replayPlayback}
-                value={getTickFromValue(game.monthlyMarketingSpend)}
-                aria-labelledby="marketing monthly budget"
-                valueLabelDisplay="off"
-                min={-1}
-                step={1}
-                max={getTickFromValue(
-                  Math.max(now.cash / 12, game.monthlyMarketingSpend),
-                )}
-                onChange={(_e: Event, newTick: number | number[]) =>
-                  onDelta({
-                    monthlyMarketingSpend: getValueFromTick(
-                      Array.isArray(newTick) ? newTick[0] : newTick,
-                    ),
-                  })
-                }
+            <Typography
+              className="flex-newline"
+              variant="body2"
+              color="textSecondary"
+            >
+              Electricity Rate
+              <ManualLink
+                entry={MANUAL_ENTRY.RATES}
+                label="electricity rates"
               />
-            )}
-            {scenario.ownership === "Public" && (
-              <Typography
-                className="flex-newline"
-                variant="body2"
-                color="textSecondary"
-              >
-                Electricity Rate
-                <ManualLink
-                  entry={MANUAL_ENTRY.RATES}
-                  label="electricity rates"
-                />
-                :&nbsp;
-                <Typography color="primary" component="strong">
-                  {formatMoneyConcise(game.dollarsPerkWh)}
-                </Typography>
-                /kWh
+              :&nbsp;
+              <Typography color="primary" component="strong">
+                {formatMoneyConcise(game.dollarsPerkWh)}
               </Typography>
-            )}
-            {scenario.ownership === "Public" && (
+              /kWh
+              {scenario.ownership === "Investor" && (
+                <>
+                  &nbsp;&mdash;&nbsp;market {formatMoneyConcise(marketRate)}
+                  &nbsp;&mdash;&nbsp;
+                  {numbro(now.customers).format({ average: true })} customers,
+                  projected&nbsp;
+                  <Typography color="primary" component="strong">
+                    {formatCustomerChange(customerChange, now.customers)}
+                  </Typography>
+                  &nbsp;next month
+                </>
+              )}
+            </Typography>
+            <div className="budgetSlider flex-newline">
               <Slider
                 id="rateSlider"
                 disabled={!!game.replayPlayback}
                 value={game.dollarsPerkWh}
-                aria-labelledby="The rate you charge for electricity generation"
-                valueLabelDisplay="off"
+                aria-label="The rate you charge for electricity generation"
+                valueLabelDisplay="auto"
+                valueLabelFormat={(rate: number) =>
+                  `${formatMoneyConcise(rate)}/kWh`
+                }
+                getAriaValueText={(rate: number) =>
+                  `${formatMoneyConcise(rate)} per kilowatt hour`
+                }
+                marks={
+                  scenario.ownership === "Investor"
+                    ? investorRateMarks
+                    : RATE_MARKS
+                }
                 min={0}
-                step={0.01}
-                max={0.3}
+                step={scenario.ownership === "Investor" ? 0.001 : 0.01}
+                max={scenario.ownership === "Investor" ? investorRateMax : 0.3}
                 onChange={(_e: Event, newTick: number | number[]) =>
                   onDelta({
                     dollarsPerkWh: Array.isArray(newTick)
@@ -830,68 +977,77 @@ export default class Finances extends React.Component<Props, State> {
                   })
                 }
               />
+            </div>
+            {/* On a wide screen this whole row goes away: the range moved up into the pane
+                header above, and the tiles below are the metric picker, so there is nothing
+                left here that isn't said somewhere else */}
+            {!smallMultiples && (
+              <>
+                <div className="flex-newline"></div>
+                <Typography variant="h6" style={{ flexGrow: 0 }}>
+                  Plotting{" "}
+                </Typography>
+                {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
+                <Select
+                  id="plotMetric"
+                  value={chartKey}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    this.setChartKey(e.target.value as DerivedHistoryKeysType)
+                  }
+                >
+                  {CHART_KEY_NAMES.map((key: string) => {
+                    const k = chartKeys[key];
+                    let label = k.label;
+                    if (chartKey !== key && chartKeys[key].nesting) {
+                      // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
+                      label =
+                        new Array((chartKeys[key].nesting || 0) + 1).join(
+                          " -",
+                        ) +
+                        " " +
+                        label;
+                    }
+                    return (
+                      <MenuItem
+                        className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
+                        value={key}
+                        key={key}
+                      >
+                        {label}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+                <Typography variant="h6" style={{ flexGrow: 0 }}>
+                  {" "}
+                  for{" "}
+                </Typography>
+                <Select
+                  id="plotRange"
+                  value={this.state.range}
+                  onChange={(e: SelectChangeEvent<string>) =>
+                    this.setRange(e.target.value)
+                  }
+                >
+                  <MenuItem value={ALL_TIME}>All time</MenuItem>
+                  <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
+                  {FUTURE_YEARS.map((y: number) => {
+                    return (
+                      <MenuItem value={futureRange(y)} key={futureRange(y)}>
+                        Next {y} {y === 1 ? "year" : "years"}
+                      </MenuItem>
+                    );
+                  })}
+                  {years.map((y: number) => {
+                    return (
+                      <MenuItem value={String(y)} key={y}>
+                        {y}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </>
             )}
-            <div className="flex-newline"></div>
-            <Typography variant="h6" style={{ flexGrow: 0 }}>
-              Plotting{" "}
-            </Typography>
-            {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
-            <Select
-              id="plotMetric"
-              value={chartKey}
-              onChange={(e: SelectChangeEvent<string>) =>
-                this.setChartKey(e.target.value as DerivedHistoryKeysType)
-              }
-            >
-              {CHART_KEY_NAMES.map((key: string) => {
-                const k = chartKeys[key];
-                let label = k.label;
-                if (chartKey !== key && chartKeys[key].nesting) {
-                  // https://stackoverflow.com/questions/14343844/create-a-string-of-variable-length-filled-with-a-repeated-character
-                  label =
-                    new Array((chartKeys[key].nesting || 0) + 1).join(" -") +
-                    " " +
-                    label;
-                }
-                return (
-                  <MenuItem
-                    className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
-                    value={key}
-                    key={key}
-                  >
-                    {label}
-                  </MenuItem>
-                );
-              })}
-            </Select>
-            <Typography variant="h6" style={{ flexGrow: 0 }}>
-              {" "}
-              for{" "}
-            </Typography>
-            <Select
-              id="plotRange"
-              value={this.state.range}
-              onChange={(e: SelectChangeEvent<string>) =>
-                this.setRange(e.target.value)
-              }
-            >
-              <MenuItem value={ALL_TIME}>All time</MenuItem>
-              <MenuItem value={CURRENT_YEAR}>Current year</MenuItem>
-              {FUTURE_YEARS.map((y: number) => {
-                return (
-                  <MenuItem value={futureRange(y)} key={futureRange(y)}>
-                    Next {y} {y === 1 ? "year" : "years"}
-                  </MenuItem>
-                );
-              })}
-              {years.map((y: number) => {
-                return (
-                  <MenuItem value={String(y)} key={y}>
-                    {y}
-                  </MenuItem>
-                );
-              })}
-            </Select>
           </Toolbar>
           {monthly.length > 0 ? (
             <ChartFinances
@@ -907,6 +1063,16 @@ export default class Finances extends React.Component<Props, State> {
             />
           ) : (
             <span />
+          )}
+          {smallMultiples && monthly.length > 0 && (
+            <MetricTiles
+              id="plotMetric"
+              tiles={this.getTiles(monthlyHistory, projectedMonths, chartKeys)}
+              selectedKey={chartKey}
+              onSelect={(key: string) =>
+                this.setChartKey(key as DerivedHistoryKeysType)
+              }
+            />
           )}
           <div
             className={`expandable ${!expanded && "notExpanded"}`}

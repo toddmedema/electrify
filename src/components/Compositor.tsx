@@ -4,19 +4,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Snackbar,
-  Typography,
+  SnackbarContent,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import * as React from "react";
-import { GlobalHotKeys } from "react-hotkeys";
-import {
-  ACTIONS,
-  EVENTS,
-  Joyride,
-  type EventData,
-  type Step,
-  type TooltipRenderProps,
-} from "react-joyride";
+import { GlobalHotKeys, configure } from "react-hotkeys";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import { CARD_TRANSITION_ANIMATION_MS, NAV_CARDS } from "../Constants";
 import {
@@ -24,51 +18,194 @@ import {
   CardType,
   SettingsType,
   TransitionClassType,
+  TutorialStepChangeType,
   TutorialStepType,
   UIType,
+  isGatedStep,
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import DesktopPanes from "./base/DesktopPanes";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
+import InstallAppButton from "./base/InstallAppButton";
+import TutorialHud from "./base/TutorialHud";
+import EventLogContainer from "./views/EventLogContainer";
+import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
 import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
 import BuildStorageContainer from "./views/BuildStorageContainer";
 import CustomGameContainer from "./views/CustomGameContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
-import FinancesContainer from "./views/FinancesContainer";
-import ForecastsContainer from "./views/ForecastsContainer";
+import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
 import SettingsContainer from "./views/SettingsContainer";
-import { navigate } from "../reducers/Card";
-import { setSpeed } from "../reducers/Game";
-import { isDesktopScreen } from "../Globals";
+import { navigate, navigateBack } from "../reducers/Card";
+import {
+  reprioritizeFacility,
+  setSpeed,
+  togglePauseFacility,
+} from "../reducers/Game";
+import { snackbarOpen } from "../reducers/UI";
+import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
 
-// All three of these cards are shown at once side by side above the desktop breakpoint (see
-// isDesktopScreen / $desktop_breakpoint), so they share one stable transition key there --
-// switching among them shouldn't slide/remount the pane group, since nothing visibly changes
+// The in-game cards share one stable transition key above the desktop breakpoint. Facilities
+// and Insights stay mounted while Events replaces Insights, or joins it on an ultrawide screen.
 const DESKTOP_PANES_KEY = "DESKTOP_PANES";
 
+// And the same again for the two-column layout below it, where Facilities is pinned and the nav
+// swaps what is beside it -- the pinned column would otherwise slide off with the card transition
+const TABLET_PANES_KEY = "TABLET_PANES";
+
+// How many facilities the number row can reach. Nine because that is how many number keys
+// there are; a longer fleet is still reachable by mouse, and by the row actions
+const FACILITY_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+// Shifted, because the bare number row is the speed control and has been for far longer than
+// the fleet has had shortcuts of its own
+const facilitySlotKey = (slot: number) => `shift+${slot}`;
+
+// react-hotkeys' default ignoreEventsCondition treats every <input> as a text field and drops
+// the keydown entirely -- but the capacity sliders on the build screens and the rate slider in
+// Finances are MUI Sliders, which render as a bare <input type="range">. Just
+// clicking one leaves it focused, and from then on every shortcut silently did nothing until
+// the player happened to click something else -- the "some element is pulling focus" bug.
+// These types don't take character input, so there's nothing for a shortcut key to clobber.
+// Escape is exempted outright too, so it can always back out of a screen even if focus never
+// left an actual text field.
+const NON_TEXT_INPUT_TYPES = new Set([
+  "range",
+  "checkbox",
+  "radio",
+  "button",
+  "color",
+  "submit",
+  "reset",
+  "image",
+  "file",
+]);
+configure({
+  ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      return false;
+    }
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName?.toLowerCase();
+    if (!tagName) {
+      return false;
+    }
+    if (
+      tagName === "input" &&
+      NON_TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)
+    ) {
+      return false;
+    }
+    return (
+      tagName === "input" ||
+      tagName === "select" ||
+      tagName === "textarea" ||
+      !!target?.isContentEditable
+    );
+  },
+});
+
 // Keep in sync with SHORTCUTS in base/KeyboardShortcuts, which is what the Manual and Settings
-// both list. react-hotkeys ignores key events from inputs, so `?` still types into a text field
-const keyMap = {
+// both list -- exported so a test can hold the two against each other rather than a comment
+// asking politely. react-hotkeys ignores key events from inputs, so `?` still types into a
+// text field
+export const keyMap = {
   PAUSED: ["`", "space", "0"],
   SLOW: "1",
   NORMAL: "2",
   FAST: "3",
   FACILITIES: "q",
-  FINANCES: "w",
-  FORECASTS: "e",
+  INSIGHTS: ["w", "e"],
+  EVENTS: "r",
+  BUILD_GENERATOR: "g",
+  BUILD_STORAGE: "s",
+  PRIORITIZE_EARLIER: "[",
+  PRIORITIZE_LATER: "]",
   MANUAL: ["?", "shift+/"],
+  ESCAPE: "esc",
+  ...Object.fromEntries(
+    FACILITY_SLOTS.map((slot: number) => [
+      `TOGGLE_FACILITY_${slot}`,
+      facilitySlotKey(slot),
+    ]),
+  ),
 };
 
+/**
+ * Whether the keys that act on the game should do anything right now.
+ *
+ * The hotkeys are global, so they fire over the main menu and the manual too -- and a replay is
+ * somebody else's run, which the viewer does not get to reorder.
+ */
+function canPlay(): boolean {
+  const state = store.getState();
+  return (
+    state.game.inGame &&
+    !state.game.replayPlayback &&
+    isNavCard(state.card.name)
+  );
+}
+
+// Pausing from the keyboard offers the same undo the row's pause button does: the fleet is a
+// list of similar-looking rows, and a mistyped number is the likeliest way to reach one
+function togglePauseSlot(slot: number) {
+  if (!canPlay()) {
+    return;
+  }
+  const facility = store.getState().game.facilities[slot - 1];
+  if (!facility || facility.yearsToBuildLeft > 0) {
+    return;
+  }
+  const wasPaused = facility.paused;
+  store.dispatch(togglePauseFacility(facility.id));
+  store.dispatch(
+    snackbarOpen({
+      message: `${wasPaused ? "Resumed" : "Paused"} ${facility.name}`,
+      actionLabel: "Undo",
+      action: () => store.dispatch(togglePauseFacility(facility.id)),
+      open: true,
+      timeout: 6000,
+    }),
+  );
+}
+
+// Dispatch order is a core mechanic, and until now the only ways to change it were a drag and a
+// pair of buttons that appear on hover. These move the open row, which is the one the other two
+// panes are already reporting on
+function reprioritizeSelected(delta: number) {
+  if (!canPlay()) {
+    return;
+  }
+  const { game, ui } = store.getState();
+  const spotInList = game.facilities.findIndex(
+    (f) => f.id === ui.selectedFacilityId,
+  );
+  const destination = spotInList + delta;
+  if (
+    spotInList < 0 ||
+    destination < 0 ||
+    destination >= game.facilities.length
+  ) {
+    return;
+  }
+  store.dispatch(reprioritizeFacility({ spotInList, delta }));
+}
+
 const shortcutHandlers = {
-  PAUSED: () => {
+  // Space is one of this handler's own keys, and the browser's default action for it is to
+  // scroll the page -- which fires alongside the pause because react-hotkeys doesn't call
+  // preventDefault for you. Only this binding needs it: the other two (`` ` `` and `0`) have no
+  // native behaviour of their own
+  PAUSED: (e?: KeyboardEvent) => {
+    e?.preventDefault();
     store.dispatch(setSpeed("PAUSED"));
   },
   SLOW: () => {
@@ -83,59 +220,45 @@ const shortcutHandlers = {
   FACILITIES: () => {
     store.dispatch(navigate("FACILITIES"));
   },
-  FINANCES: () => {
-    store.dispatch(navigate("FINANCES"));
+  INSIGHTS: () => {
+    store.dispatch(navigate("INSIGHTS"));
   },
-  FORECASTS: () => {
-    store.dispatch(navigate("FORECASTS"));
+  EVENTS: () => {
+    store.dispatch(navigate("EVENTS"));
   },
+  BUILD_GENERATOR: () => {
+    if (canPlay()) {
+      store.dispatch(
+        navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
+      );
+    }
+  },
+  BUILD_STORAGE: () => {
+    if (canPlay()) {
+      store.dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
+    }
+  },
+  PRIORITIZE_EARLIER: () => reprioritizeSelected(-1),
+  PRIORITIZE_LATER: () => reprioritizeSelected(1),
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
+  // Every screen that isn't one of the three panes (Build Generator/Storage, Manual, Settings)
+  // is reached by a "back"/"close" control rather than tab navigation, and none of them
+  // responded to Escape -- this gives all of them one, without hardcoding which cards count
+  ESCAPE: () => {
+    const { card, game } = store.getState();
+    if (game.inGame && !isNavCard(card.name)) {
+      store.dispatch(navigateBack());
+    }
+  },
+  ...Object.fromEntries(
+    FACILITY_SLOTS.map((slot: number) => [
+      `TOGGLE_FACILITY_${slot}`,
+      () => togglePauseSlot(slot),
+    ]),
+  ),
 };
-
-function Tooltip(props: TooltipRenderProps): React.JSX.Element {
-  const {
-    index,
-    size,
-    step,
-    backProps,
-    primaryProps,
-    tooltipProps,
-    isLastStep,
-  } = props;
-  const isString = typeof step.content === "string";
-  // tooltipProps carries role="alertdialog" + aria-modal, which require an accessible name;
-  // without one screen readers announce an anonymous dialog
-  return (
-    <div id="tutorial-tooltip" aria-label="Tutorial" {...tooltipProps}>
-      {step.title && (
-        <Typography variant="h6" gutterBottom>
-          {step.title}
-        </Typography>
-      )}
-      {isString ? (
-        <Typography variant="body1">{step.content}</Typography>
-      ) : (
-        step.content
-      )}
-      <div className="tutorialFooter">
-        {/* Joyride's own showProgress only applies to its built-in tooltip */}
-        <span className="tutorialProgress">
-          Step {index + 1} of {size}
-        </span>
-        {index > 0 && (
-          <Button {...backProps} color="primary">
-            Back
-          </Button>
-        )}
-        <Button {...primaryProps} variant="contained" color="primary">
-          {isLastStep ? "Play" : "Next"}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export interface StateProps {
   card: CardType;
@@ -147,15 +270,9 @@ export interface StateProps {
   tutorialSteps?: TutorialStepType[];
 }
 
-// A walkthrough moving between two steps. Both ends are named because Back and Next need
-// telling apart: a step's onNext only applies to leaving it forwards
-export interface TutorialStepChangeType {
-  fromStep: number;
-  toStep: number;
-  tutorialSteps: TutorialStepType[] | undefined;
-  scenarioId: number;
-  currentCard: CardNameType;
-}
+// Moved to Types so the tutorial gate middleware can share it without a component import;
+// re-exported here for existing consumers
+export type { TutorialStepChangeType } from "../Types";
 
 export interface DispatchProps {
   closeDialog: () => void;
@@ -170,11 +287,22 @@ export function isNavCard(name: CardNameType) {
   return NAV_CARDS.indexOf(name) !== -1;
 }
 
+const SNACKBAR_SWIPE_DISTANCE = 56;
+
+export function shouldDismissSnackbarSwipe(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): boolean {
+  return (
+    Math.abs(end.x - start.x) >= SNACKBAR_SWIPE_DISTANCE ||
+    end.y - start.y >= SNACKBAR_SWIPE_DISTANCE
+  );
+}
+
 export default class Compositor extends React.Component<Props, {}> {
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
-  private stepsCache:
-    | { source: TutorialStepType[]; desktop: boolean; resolved: Step[] }
-    | undefined;
+  private snackbarContentRef = React.createRef<HTMLDivElement>();
+  private snackbarDrag?: { x: number; y: number; pointerId: number };
 
   // react-transition-group falls back to ReactDOM.findDOMNode when no nodeRef is given, and
   // React 19 removed findDOMNode outright. TransitionGroup holds the exiting and the entering
@@ -189,24 +317,6 @@ export default class Compositor extends React.Component<Props, {}> {
       this.nodeRefs.set(key, ref);
     }
     return ref;
-  }
-
-  // Applies each step's desktop override when the panes are side by side, and drops the key
-  // either way so Joyride only ever sees a plain step. The result is cached because Joyride
-  // reloads its steps whenever the array isn't identical, which loses the current step -- but
-  // it still recomputes when handleResize carries the layout across the breakpoint
-  private stepsForViewport(steps: TutorialStepType[]): Step[] {
-    const desktop = isDesktopScreen();
-    const cache = this.stepsCache;
-    if (cache && cache.source === steps && cache.desktop === desktop) {
-      return cache.resolved;
-    }
-    const resolved = steps.map((step) => {
-      const { desktop: override, ...rest } = step;
-      return (desktop && override ? { ...rest, ...override } : rest) as Step;
-    });
-    this.stepsCache = { source: steps, desktop, resolved };
-    return resolved;
   }
 
   // isDesktopScreen() is read straight from the DOM rather than from state, so a resize needs
@@ -226,31 +336,14 @@ export default class Compositor extends React.Component<Props, {}> {
     clearTimeout(this.resizeTimeout);
   }
 
-  public handleJoyrideCallback = (data: EventData) => {
-    const { action, index, type } = data;
-    // Esc: leave the walkthrough without crediting it as done, so it's still offered on the
-    // scenario list. Has to come first, since closing also reports STEP_AFTER
-    if (action === ACTIONS.CLOSE) {
-      this.props.onTutorialEnd(this.props.tutorialSteps);
-      return;
-    }
-    const advancingEvents: string[] = [
-      EVENTS.STEP_AFTER,
-      EVENTS.TARGET_NOT_FOUND,
-    ];
-    // Quitting tears the walkthrough's targets out of the DOM, and Joyride reports that as
-    // TARGET_NOT_FOUND on the way out. Advancing on it navigated the just-reset game back onto
-    // the step's card, which then rendered nothing because the game was over - a blank screen
-    // where the main menu should be. tutorialStep is only >= 0 while a walkthrough is live
-    if (advancingEvents.includes(type) && this.props.tutorialStep >= 0) {
-      this.props.onTutorialStep({
-        fromStep: index,
-        toStep: index + (action === ACTIONS.PREV ? -1 : 1),
-        tutorialSteps: this.props.tutorialSteps,
-        scenarioId: this.props.scenarioId,
-        currentCard: this.props.card.name,
-      });
-    }
+  public moveTutorial = (toStep: number) => {
+    this.props.onTutorialStep({
+      fromStep: this.props.tutorialStep,
+      toStep,
+      tutorialSteps: this.props.tutorialSteps,
+      scenarioId: this.props.scenarioId,
+      currentCard: this.props.card.name,
+    });
   };
 
   public snackbarActionClicked(e: React.MouseEvent<HTMLElement>) {
@@ -259,19 +352,80 @@ export default class Compositor extends React.Component<Props, {}> {
     }
   }
 
+  private resetSnackbarDrag = () => {
+    this.snackbarDrag = undefined;
+    if (this.snackbarContentRef.current) {
+      this.snackbarContentRef.current.style.transform = "";
+    }
+  };
+
+  private snackbarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+    this.snackbarDrag = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  private snackbarPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = this.snackbarDrag;
+    if (!start || start.pointerId !== event.pointerId) {
+      return;
+    }
+    const x = event.clientX - start.x;
+    const y = Math.max(0, event.clientY - start.y);
+    event.currentTarget.style.transform =
+      Math.abs(x) > y ? `translateX(${x}px)` : `translateY(${y}px)`;
+  };
+
+  private snackbarPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = this.snackbarDrag;
+    if (
+      start &&
+      start.pointerId === event.pointerId &&
+      shouldDismissSnackbarSwipe(start, { x: event.clientX, y: event.clientY })
+    ) {
+      this.props.closeSnackbar();
+    }
+    this.resetSnackbarDrag();
+  };
+
   private renderCard(): React.JSX.Element {
-    // Wide enough to show the fleet, P&L and forecast at once instead of tabbing between them.
-    // Cash, the date, the speed controls and the year's progress are the game's state rather
-    // than any one pane's, so they span all three columns instead of living in the first
-    if (isDesktopScreen() && isNavCard(this.props.card.name)) {
+    const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
+    // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
+    // instead of splitting the width between separate Finance and Forecast chart columns.
+    if (isPanes && isDesktopScreen()) {
       return (
         <div className="desktop-layout flexContainer">
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            <FinancesContainer />
-            <ForecastsContainer />
+            <InsightsContainer />
+            <EventLogContainer />
           </DesktopPanes>
+        </div>
+      );
+    }
+    // Laptops and landscape tablets keep the fleet pinned beside Insights or Events.
+    if (isPanes) {
+      return (
+        <div className="pane-layout flexContainer">
+          <GameAppBarContainer />
+          <DesktopPanes>
+            <FacilitiesContainer />
+            {this.props.card.name === "EVENTS" ? (
+              <EventLogContainer />
+            ) : (
+              <InsightsContainer />
+            )}
+          </DesktopPanes>
+          {/* The panes supply no nav of their own in this layout, and it is still what
+              switches the second column */}
+          <NavigationContainer />
         </div>
       );
     }
@@ -280,10 +434,10 @@ export default class Compositor extends React.Component<Props, {}> {
         return <BuildGeneratorsContainer />;
       case "BUILD_STORAGE":
         return <BuildStorageContainer />;
-      case "FINANCES":
-        return <FinancesContainer />;
-      case "FORECASTS":
-        return <ForecastsContainer />;
+      case "INSIGHTS":
+        return <InsightsContainer />;
+      case "EVENTS":
+        return <EventLogContainer />;
       case "FACILITIES":
         return <FacilitiesContainer />;
       case "SETTINGS":
@@ -330,11 +484,27 @@ export default class Compositor extends React.Component<Props, {}> {
   public render() {
     const { tutorialStep, ui, closeDialog, tutorialSteps, closeSnackbar } =
       this.props;
+    const currentTutorialStep =
+      tutorialSteps && tutorialStep >= 0 && tutorialStep < tutorialSteps.length
+        ? tutorialSteps[tutorialStep]
+        : undefined;
+    const canGoBack = !!(
+      currentTutorialStep &&
+      tutorialStep > 0 &&
+      !isGatedStep(currentTutorialStep) &&
+      !isGatedStep(tutorialSteps![tutorialStep - 1])
+    );
 
-    const transitionKey =
-      isDesktopScreen() && isNavCard(this.props.card.name)
+    // The pane layouts don't slide between their own cards: on desktop nothing about the screen
+    // changes, and on two columns only the second one does -- sliding the pinned fleet off the
+    // side with it would be a lie about what just happened
+    const transitionKey = !isNavCard(this.props.card.name)
+      ? this.props.card.name
+      : isDesktopScreen()
         ? DESKTOP_PANES_KEY
-        : this.props.card.name;
+        : isPaneLayout()
+          ? TABLET_PANES_KEY
+          : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
@@ -343,6 +513,7 @@ export default class Compositor extends React.Component<Props, {}> {
       <div className="app_container">
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
+          className="cardTransitions"
           childFactory={(child) =>
             // @types/react 19 defaults ReactElement's props to unknown rather than any,
             // so the element has to be named before cloneElement will accept classNames
@@ -361,40 +532,25 @@ export default class Compositor extends React.Component<Props, {}> {
               exit: CARD_TRANSITION_ANIMATION_MS,
             }}
           >
-            <div className="base_main" ref={transitionNodeRef}>
+            <main className="base_main" ref={transitionNodeRef}>
               {this.renderCard()}
-            </div>
+            </main>
           </CSSTransition>
         </TransitionGroup>
-        {tutorialSteps && (
-          <Joyride
-            // Swapping in the desktop targets hands Joyride a different steps array, which it
-            // reloads mid-tour and ends up showing no tooltip behind a blocking overlay.
-            // Remounting instead resumes cleanly, since it starts from the stepIndex prop
-            key={isDesktopScreen() ? "desktop" : "compact"}
-            onEvent={this.handleJoyrideCallback}
-            continuous={true}
-            run={tutorialStep >= 0 && tutorialStep < tutorialSteps.length}
-            tooltipComponent={Tooltip}
-            stepIndex={tutorialStep}
-            steps={this.stepsForViewport(tutorialSteps)}
-            // v3 folded the old top-level styles.options, and the standalone
-            // disableOverlayClose prop, into this single options prop
-            options={{
-              beaconSize: 48,
-              overlayColor: "rgba(0, 0, 0, 0.1)",
-              // Joyride traps Tab inside the tooltip, so Esc is the way back out for
-              // keyboard users -- WCAG 2.1.2. Overlay clicks still don't close, since
-              // those are far too easy to trigger by accident mid-walkthrough
-              overlayClickAction: false,
-              // v3 scrolls each target into view and waits for a scroll:end that never
-              // arrives for targets inside the non-scrolling card panes, which hangs the
-              // tour on step 4 of the generators walkthrough. Every target is already in
-              // view, so there is nothing to scroll to
-              skipScroll: true,
-            }}
-          />
-        )}
+        {tutorialSteps &&
+          currentTutorialStep &&
+          this.props.card.name !== "LOADING" && (
+            <TutorialHud
+              desktop={isDesktopScreen()}
+              step={currentTutorialStep}
+              stepIndex={tutorialStep}
+              totalSteps={tutorialSteps.length}
+              canGoBack={canGoBack}
+              onBack={() => this.moveTutorial(tutorialStep - 1)}
+              onNext={() => this.moveTutorial(tutorialStep + 1)}
+              onExit={() => this.props.onTutorialEnd(tutorialSteps)}
+            />
+          )}
         <Dialog
           open={ui.dialog.open}
           // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A
@@ -411,6 +567,9 @@ export default class Compositor extends React.Component<Props, {}> {
           <DialogTitle>{ui.dialog.title}</DialogTitle>
           <DialogContent>{ui.dialog.message}</DialogContent>
           <DialogActions>
+            {ui.dialog.title.startsWith("🎉") && (
+              <InstallAppButton label="Install for later" afterMilestone />
+            )}
             {ui.dialog.secondaryAction && (
               <Button color="primary" onClick={ui.dialog.secondaryAction}>
                 {ui.dialog.secondaryLabel || "Close"}
@@ -433,29 +592,45 @@ export default class Compositor extends React.Component<Props, {}> {
           </DialogActions>
         </Dialog>
         <Snackbar
-          className="snackbar"
+          className={`snackbar ${isNavCard(this.props.card.name) ? "snackbar-above-nav" : ""}`}
           // Bottom left is the MUI default, which on a wide screen leaves the toast hanging
           // off the side of the centered app frame
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={ui.snackbar.open}
-          message={<span>{ui.snackbar.message}</span>}
           autoHideDuration={ui.snackbar.timeout}
           onClose={closeSnackbar}
-          action={
-            ui.snackbar.actionLabel
-              ? [
+        >
+          <SnackbarContent
+            ref={this.snackbarContentRef}
+            className="snackbarContent"
+            message={<span>{ui.snackbar.message}</span>}
+            onPointerDown={this.snackbarPointerDown}
+            onPointerMove={this.snackbarPointerMove}
+            onPointerUp={this.snackbarPointerUp}
+            onPointerCancel={this.resetSnackbarDrag}
+            action={
+              <>
+                {ui.snackbar.actionLabel && (
                   <Button
-                    key={1}
                     onClick={(e: React.MouseEvent<HTMLElement>) =>
                       this.snackbarActionClicked(e)
                     }
                   >
                     {ui.snackbar.actionLabel}
-                  </Button>,
-                ]
-              : []
-          }
-        />
+                  </Button>
+                )}
+                <IconButton
+                  className="snackbarClose"
+                  aria-label="Dismiss notification"
+                  size="small"
+                  onClick={closeSnackbar}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </>
+            }
+          />
+        </Snackbar>
         {/* Connected, so they still update when shouldComponentUpdate blocks this component --
             neither is driven by the current card, and both can open over any of them */}
         <VictoryDialogContainer />

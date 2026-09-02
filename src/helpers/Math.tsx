@@ -41,6 +41,9 @@ export const RANDOM_STREAM = {
   fuelPrices: 2, // normalAt only
   economy: 3, // randomAt only
   weatherShape: 4, // randomAt only -- which recorded day a forecast borrows its shape from
+  worldEvents: 5, // randomAt only -- discrete occurrences and each occurrence's attributes
+  // normalAt only -- separate so adding offshore wind cannot shift any existing weather field
+  weatherOffshore: 6,
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
@@ -110,6 +113,14 @@ export function normalAt(seed: number, stream: number, index: number): number {
 // silently truncated and no longer describes the run it is stored alongside. Mint them here.
 export function newSeed(): number {
   return Math.floor(Math.random() * 2 ** 32);
+}
+
+/** Rounds a finite measurement without tying its precision to a particular display unit. */
+export function roundToSignificantDigits(
+  value: number,
+  digits: number,
+): number {
+  return Number(value.toPrecision(digits));
 }
 
 // https://stackoverflow.com/questions/5306680/move-an-array-element-from-one-array-position-to-another

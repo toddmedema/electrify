@@ -1,6 +1,5 @@
 import * as React from "react";
 import {
-  Autocomplete,
   Button,
   Card,
   CardHeader,
@@ -12,6 +11,7 @@ import {
   MenuItem,
   Select,
   SelectChangeEvent,
+  Slider,
   Table,
   TableBody,
   TableCell,
@@ -27,15 +27,23 @@ import CasinoIcon from "@mui/icons-material/Casino";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
+import LocationPicker from "../base/LocationPicker";
 import VictoryConditions from "../base/VictoryConditions";
-import { DIFFICULTIES } from "../../Constants";
+import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
 import { CityType, getCities, initCities } from "../../data/Cities";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
+import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
+import { getStartingCustomers } from "../../data/LocationProfiles";
+import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
-import { formatWattHours, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatWattHours,
+  formatWatts,
+} from "../../helpers/Format";
 import { formatPricePerLargeMass, largeMassUnit } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import { newSeed } from "../../helpers/Math";
@@ -43,6 +51,7 @@ import {
   DifficultyType,
   FacilityShoppingType,
   GameType,
+  ScenarioFacilityType,
   ScenarioType,
 } from "../../Types";
 
@@ -74,32 +83,32 @@ const STARTING_YEARS = Array.from(
   (_v: unknown, i: number) => WEATHER_STARTING_YEAR + i * STARTING_YEAR_STEP,
 );
 const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
-// The era the rates and fees above are written in: cents per kilowatt hour a player recognises,
-// against the fuel prices the data ends on.
-const RATE_BASE_YEAR = 2020;
+// The era the cash, rates and fees below are written in: amounts a player recognises, against the
+// fuel prices the data ends on.
+const MONEY_BASE_YEAR = 2020;
 
 /**
- * A rate or a fee re-quoted into the money of the year the game starts in.
+ * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
  *
  * Fuel is the one price the game reads at face value for the year it is in - build costs and O&M
  * are anchored on whatever year a game starts, so they always open at what the tables say. A 2080
  * game therefore opens against sixty years of escalated fuel, and offering it a literal seven
  * cents a kilowatt hour is offering a game that is bankrupt inside a quarter.
  *
- * Only forwards. A game starting before RATE_BASE_YEAR is played against real recorded prices
+ * Only forwards. A game starting before MONEY_BASE_YEAR is played against real recorded prices
  * rather than a projection, so there is no escalation to undo, and deflating those rates would
  * change every historical scenario's balance for no reason.
  */
 function inEraMoney(base: number, startingYear: number): number {
   const factor =
-    getFuelEscalation(Math.max(startingYear, RATE_BASE_YEAR)) /
-    getFuelEscalation(RATE_BASE_YEAR);
+    getFuelEscalation(Math.max(startingYear, MONEY_BASE_YEAR)) /
+    getFuelEscalation(MONEY_BASE_YEAR);
   // Two significant figures, so the offered numbers stay round enough to choose between
   return Number((base * factor).toPrecision(2));
 }
 
 // The option nearest a value, used to keep the player's position in a list when the era under it
-// moves, and to migrate a custom game stored before these became era-aware.
+// moves.
 function nearestIndex(options: number[], value: number): number {
   let best = 0;
   options.forEach((option: number, i: number) => {
@@ -110,32 +119,6 @@ function nearestIndex(options: number[], value: number): number {
   return best;
 }
 
-/**
- * A stored custom game with its cash, rate and fee snapped onto the options this screen
- * offers - the rate and fee against its own starting year.
- *
- * Only ever changes a game saved before those became era-aware. Doing it on the way in rather
- * than on the way out is what keeps the screen honest: showing the nearest option while the
- * scenario still held the old number would start a game at a rate the player was never shown.
- * There is no recovering what they originally meant -- fifty dollars a ton is a rounding error in
- * 2090 money -- so the nearest option is the best that can be done, once.
- */
-function inEraScenario(scenario: ScenarioType): ScenarioType {
-  const rates = RATES_PER_KWH.map((r: number) =>
-    inEraMoney(r, scenario.startingYear),
-  );
-  const fees = FEES_PER_TON.map((f: number) =>
-    inEraMoney(f, scenario.startingYear),
-  );
-  return {
-    ...scenario,
-    // Cash is quoted the same in every era, so this only catches a game stored against an
-    // amount the picker no longer offers - which would otherwise render the field blank
-    cash: STARTING_CASH[nearestIndex(STARTING_CASH, scenario.cash)],
-    dollarsPerkWh: rates[nearestIndex(rates, scenario.dollarsPerkWh)],
-    feePerKgCO2e: fees[nearestIndex(fees, scenario.feePerKgCO2e * 1000)] / 1000,
-  };
-}
 const STARTING_CASH = [100000000, 200000000, 500000000, 1000000000];
 const RATES_PER_KWH = [0.05, 0.07, 0.1, 0.15];
 const FEES_PER_TON = [0, 20, 50, 100];
@@ -162,10 +145,12 @@ function technologiesFor(
   // Only the fields those two read; a full game state doesn't exist yet at setup time
   const state = {
     date: getDateFromMinute(0, scenario.startingYear),
+    startingYear: scenario.startingYear,
     difficulty,
     feePerKgCO2e: scenario.feePerKgCO2e,
     seed: 0,
     facilities: [],
+    location: getScenarioLocation(scenario),
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
   return [
@@ -199,12 +184,35 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
     : formatWatts(facility.peakW || 0);
 }
 
+/**
+ * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
+ * The default 500 MW plant for one million customers covers the opening demand plus the game's
+ * 5% reserve margin; scaling every starting generator together preserves that coverage and the
+ * player's chosen generation mix. Storage is energy capacity rather than firm generation, so it
+ * stays at the size the player selected.
+ */
+function facilitiesForStartingCustomers(
+  scenario: ScenarioType,
+  startingCustomers: number,
+): ScenarioFacilityType[] {
+  const previousCustomers =
+    scenario.startingCustomers ||
+    getStartingCustomers(getScenarioLocation(scenario));
+  if (previousCustomers <= 0 || previousCustomers === startingCustomers) {
+    return scenario.facilities;
+  }
+  const scale = startingCustomers / previousCustomers;
+  return scenario.facilities.map((facility: ScenarioFacilityType) =>
+    facility.peakW && !facility.peakWh
+      ? { ...facility, peakW: Math.round(facility.peakW * scale) }
+      : facility,
+  );
+}
+
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
-  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
-    inEraScenario(props.scenario),
-  );
+  const [scenario, setScenario] = React.useState<ScenarioType>(props.scenario);
   const [victoryDialogOpen, setVictoryDialogOpen] = React.useState(false);
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
@@ -218,10 +226,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const sizes = (adding?.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W).filter(
     (size) => !adding || size <= adding.maxSize,
   );
-  // What a kilowatt hour may be charged at, and what a ton of CO2e may be feed, in the money of
-  // the year the game starts in. Both move with the starting year, which is why changing that
-  // year has to re-quote whatever was already chosen rather than leaving a 2020 rate on a 2080
-  // game -- see changeStartingYear below.
+  // What the utility starts with, what a kilowatt hour may be charged at, and what a ton of CO2e
+  // may be feed, in the money of the year the game starts in. All move with the starting year,
+  // which is why changing that year has to re-quote whatever was already chosen rather than
+  // leaving a 2020 amount on a 2080 game -- see changeStartingYear below.
+  const cashOptions = React.useMemo(
+    () =>
+      STARTING_CASH.map((cash: number) =>
+        inEraMoney(cash, scenario.startingYear),
+      ),
+    [scenario.startingYear],
+  );
   const rateOptions = React.useMemo(
     () =>
       RATES_PER_KWH.map((r: number) => inEraMoney(r, scenario.startingYear)),
@@ -235,11 +250,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // Every place that can be picked: the six in the bundle to begin with, and every city with
   // downloaded weather once the index arrives, which is a download rather than a rebuild
   const [cities, setCities] = React.useState<CityType[]>(getCities);
+  const [citiesLoading, setCitiesLoading] = React.useState(true);
   React.useEffect(() => {
     let live = true;
     initCities().then((loaded: CityType[]) => {
       if (live) {
         setCities(loaded);
+        setCitiesLoading(false);
       }
     });
     return () => {
@@ -252,6 +269,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // one of its options renders blank and drops the choice on the next edit. Listed last, under
   // its own heading, so it doesn't shuffle the rest of the list around.
   const current = getScenarioLocation(scenario);
+  React.useEffect(() => {
+    if (current) {
+      void prefetchScenarioData(current);
+    }
+  }, [current]);
   const selectableLocations = React.useMemo(
     () =>
       current && !cities.some((c: CityType) => c.id === current.id)
@@ -265,13 +287,40 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   // Rolling the year back past a technology's invention would otherwise leave a facility in the
   // list that quietly disappears once the game loads
+  const claimedSites: Array<{ name: string }> = [];
   const unavailable = scenario.facilities.filter(
-    (f: Partial<FacilityShoppingType>) =>
-      !technologies.some((t) => t.name === facilityName(f)),
+    (f: Partial<FacilityShoppingType>) => {
+      const name = facilityName(f);
+      if (!technologies.some((t) => t.name === name)) {
+        return true;
+      }
+      const sitesRemaining = getViableLocationsRemaining(
+        location,
+        claimedSites,
+        name,
+      );
+      claimedSites.push({ name });
+      return sitesRemaining === 0;
+    },
   );
 
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
+  };
+
+  const changeStartingCustomers = (
+    startingCustomers: number,
+    delta: Partial<ScenarioType> = {},
+  ) => {
+    setScenario((currentScenario: ScenarioType) => ({
+      ...currentScenario,
+      ...delta,
+      startingCustomers,
+      facilities: facilitiesForStartingCustomers(
+        currentScenario,
+        startingCustomers,
+      ),
+    }));
   };
 
   /**
@@ -282,10 +331,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
    * 2080 and leaving seven cents behind would silently hand back a game that cannot be won.
    */
   const changeStartingYear = (startingYear: number) => {
+    const cash = nearestIndex(cashOptions, scenario.cash);
     const rate = nearestIndex(rateOptions, scenario.dollarsPerkWh);
     const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
     change({
       startingYear,
+      cash: inEraMoney(STARTING_CASH[cash], startingYear),
       dollarsPerkWh: inEraMoney(RATES_PER_KWH[rate], startingYear),
       feePerKgCO2e: inEraMoney(FEES_PER_TON[fee], startingYear) / 1000,
     });
@@ -322,54 +373,58 @@ export default function CustomGame(props: Props): React.JSX.Element {
           >
             <ArrowBackIosIcon />
           </IconButton>
-          <Typography variant="h6">Custom Game Setup</Typography>
+          <Typography variant="h6">Custom setup</Typography>
         </Toolbar>
       </div>
 
       <div className="scrollable">
+        <LocationPicker
+          locations={selectableLocations}
+          value={location}
+          loading={citiesLoading}
+          onChange={(picked: CityType) => {
+            changeStartingCustomers(getStartingCustomers(picked), {
+              locationId: picked.id,
+              location: picked,
+            });
+          }}
+        />
         <Table size="small" id="gameSetupTable">
           <TableBody>
             <TableRow>
-              <TableCell>Location</TableCell>
+              <TableCell>Customers</TableCell>
               <TableCell>
-                {/* The scenario carries the whole location rather than just its id, so a custom
-                    game stays playable even if the catalogue it was picked from changes
-                    underneath it - and so it can hold somewhere the catalogue never listed.
-                    Typed rather than scrolled: a few hundred cities is well past what a menu of
-                    them is any use for. */}
-                <Autocomplete
-                  id="location"
-                  options={selectableLocations}
-                  groupBy={(l: CityType) => l.region}
-                  getOptionLabel={(l: CityType) => l.name}
-                  isOptionEqualToValue={(a: CityType, b: CityType) =>
-                    a.id === b.id
+                <Slider
+                  aria-label="Starting customers"
+                  min={100000}
+                  max={5000000}
+                  step={50000}
+                  value={
+                    scenario.startingCustomers ||
+                    getStartingCustomers(getScenarioLocation(scenario))
                   }
-                  value={location}
-                  onChange={(_e: unknown, picked: CityType | null) => {
-                    if (picked) {
-                      change({ locationId: picked.id, location: picked });
-                    }
-                  }}
-                  disableClearable
-                  autoHighlight
-                  openOnFocus
-                  sx={{ minWidth: 200 }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      variant="standard"
-                      placeholder="Search cities"
-                    />
-                  )}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value: number) => value.toLocaleString()}
+                  onChange={(_event: Event, value: number | number[]) =>
+                    changeStartingCustomers(
+                      Array.isArray(value) ? value[0] : value,
+                    )
+                  }
                 />
+                <Typography variant="caption" color="textSecondary">
+                  {(
+                    scenario.startingCustomers ||
+                    getStartingCustomers(getScenarioLocation(scenario))
+                  ).toLocaleString()}
+                </Typography>
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Starting year</TableCell>
+              <TableCell>Start year</TableCell>
               <TableCell>
                 <Select
                   id="startingYear"
+                  inputProps={{ "aria-label": "Starting year" }}
                   value={scenario.startingYear}
                   onChange={(e: SelectChangeEvent<number>) =>
                     changeStartingYear(Number(e.target.value))
@@ -390,6 +445,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="duration"
+                  inputProps={{ "aria-label": "Duration" }}
                   value={scenario.durationMonths}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ durationMonths: Number(e.target.value) })
@@ -420,6 +476,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="ownership"
+                  inputProps={{ "aria-label": "Ownership" }}
                   value={scenario.ownership}
                   onChange={(e: SelectChangeEvent<ScenarioType["ownership"]>) =>
                     change({
@@ -427,25 +484,26 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     })
                   }
                 >
-                  <MenuItem value="Investor">Investor-Owned</MenuItem>
-                  <MenuItem value="Public">Public-Owned</MenuItem>
+                  <MenuItem value="Investor">Investor-owned utility</MenuItem>
+                  <MenuItem value="Public">Publicly owned utility</MenuItem>
                 </Select>
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>Starting cash</TableCell>
+              <TableCell>Cash</TableCell>
               <TableCell>
                 <Select
                   id="cash"
+                  inputProps={{ "aria-label": "Starting cash" }}
                   value={scenario.cash}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ cash: Number(e.target.value) })
                   }
                 >
-                  {STARTING_CASH.map((c: number) => {
+                  {cashOptions.map((c: number) => {
                     return (
                       <MenuItem value={c} key={c}>
-                        ${c / 1000000}M
+                        {formatMoneyConcise(c)}
                       </MenuItem>
                     );
                   })}
@@ -457,6 +515,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="dollarsPerkWh"
+                  inputProps={{ "aria-label": "Electricity rate" }}
                   value={scenario.dollarsPerkWh}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ dollarsPerkWh: Number(e.target.value) })
@@ -487,6 +546,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <TableCell>
                 <Select
                   id="feePerKgCO2e"
+                  inputProps={{ "aria-label": "Carbon fee" }}
                   value={scenario.feePerKgCO2e}
                   onChange={(e: SelectChangeEvent<number>) =>
                     change({ feePerKgCO2e: Number(e.target.value) })
@@ -511,6 +571,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     on the scenario details screen */}
                 <Select
                   id="difficulty"
+                  inputProps={{ "aria-label": "Difficulty" }}
                   value={game.difficulty}
                   onChange={(e: SelectChangeEvent<DifficultyType>) =>
                     onDelta({ difficulty: e.target.value as DifficultyType })
@@ -523,7 +584,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                           title={DIFFICULTIES[d].description}
                           placement="right"
                         >
-                          <span>{d}</span>
+                          <span>{DIFFICULTY_LABELS[d as DifficultyType]}</span>
                         </Tooltip>
                       </MenuItem>
                     );
@@ -540,6 +601,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   id="seed"
                   variant="standard"
                   placeholder="Random"
+                  slotProps={{ htmlInput: { "aria-label": "Seed" } }}
                   value={scenario.seed === undefined ? "" : scenario.seed}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const digits = e.target.value.replace(/[^0-9]/g, "");
@@ -562,13 +624,14 @@ export default function CustomGame(props: Props): React.JSX.Element {
         </Table>
 
         <Typography variant="h6" sx={{ paddingLeft: 1, paddingTop: 1 }}>
-          Starting facilities
+          Facilities
         </Typography>
         {unavailable.length > 0 && (
           <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>
-            {unavailable.map(facilityName).join(", ")} can't be built in{" "}
-            {scenario.startingYear} - remove{" "}
-            {unavailable.length === 1 ? "it" : "them"} or pick a later year.
+            {unavailable.map(facilityName).join(", ")} can't be built with this
+            location and year, or exceeds the number of suitable build sites.
+            Remove {unavailable.length === 1 ? "it" : "them"} or change the
+            setup.
           </Typography>
         )}
 
@@ -595,9 +658,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
           },
         )}
 
-        <div style={{ padding: "8px", textAlign: "center" }}>
+        <div className="customFacilityPicker">
           <Select
             id="addFacilityName"
+            inputProps={{ "aria-label": "Facility type" }}
             displayEmpty
             value={adding ? adding.name : ""}
             onChange={(e: SelectChangeEvent<string>) => {
@@ -627,9 +691,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
               );
             })}
           </Select>
-          &nbsp;
           <Select
             id="addFacilitySize"
+            inputProps={{ "aria-label": "Facility size" }}
             value={sizes.indexOf(addSize) === -1 ? sizes[0] : addSize}
             disabled={!adding}
             onChange={(e: SelectChangeEvent<number>) =>
@@ -662,7 +726,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
             color="primary"
             disabled={unavailable.length > 0}
             onClick={() => onStart(scenario)}
-            autoFocus
           >
             Play
           </Button>
@@ -688,6 +751,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
           <VictoryConditions
             ownership={scenario.ownership}
             dollarsPerkWh={scenario.dollarsPerkWh}
+            minimumCustomerRetention={scenario.minimumCustomerRetention}
+            reliabilityObjective={scenario.reliabilityObjective}
           />
         </DialogContent>
         <DialogActions>
@@ -704,9 +769,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
       <Dialog open={feeDialogOpen} onClose={() => setFeeDialogOpen(false)}>
         <DialogTitle>Carbon fee</DialogTitle>
         <DialogContent>
-          A fee placed on pollution to cover its damage to society. Charged by
-          the amount of greenhouse gas emitted, measured in{" "}
-          {largeMassUnit(units)} of CO2 equivalent.
+          A carbon fee charges for greenhouse gas emissions. The game measures
+          them in {largeMassUnit(units)} of carbon dioxide equivalent (CO2e), a
+          common unit for comparing different greenhouse gases.
         </DialogContent>
         <DialogActions>
           <Button

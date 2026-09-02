@@ -58,6 +58,26 @@ export function isValidLocation(value: unknown): value is LocationType {
     typeof location.long === "number" &&
     Number.isFinite(location.long) &&
     Math.abs(location.long) <= 180 &&
-    typeof location.timeZone === "string"
+    (location.timeZone === undefined ||
+      typeof location.timeZone === "string") &&
+    (location.admin === undefined || typeof location.admin === "string") &&
+    (location.region === undefined || typeof location.region === "string") &&
+    (location.country === undefined || typeof location.country === "string") &&
+    (location.elevation === undefined ||
+      (typeof location.elevation === "number" &&
+        Number.isFinite(location.elevation))) &&
+    (location.watershedId === undefined ||
+      isValidLocationId(location.watershedId)) &&
+    (location.watershedName === undefined ||
+      typeof location.watershedName === "string") &&
+    (location.offshore === undefined ||
+      typeof location.offshore === "boolean") &&
+    (location.resources === undefined ||
+      (typeof location.resources === "object" &&
+        location.resources !== null &&
+        (location.resources.geothermal === undefined ||
+          typeof location.resources.geothermal === "boolean") &&
+        (location.resources.hydro === undefined ||
+          typeof location.resources.hydro === "boolean")))
   );
 }

@@ -34,11 +34,14 @@ import ChartForecastSupplyByFuel, {
   forecastFuels,
 } from "../base/ChartForecastSupplyByFuel";
 import ChartForecastWeather from "../base/ChartForecastWeather";
+import ChartForecastRenewableCapacityFactor from "../base/ChartForecastRenewableCapacityFactor";
 import ChartForecastStorage from "../base/ChartForecastStorage";
+import ChartForecastWater from "../base/ChartForecastWater";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { TICK_MINUTES } from "../../Constants";
-import { fuelColors, fuelDashArrays } from "../../Theme";
+import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
+import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 
 const FORECAST_YEARS_KEY = "forecastYears";
 const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
@@ -86,11 +89,14 @@ export default class Forecasts extends React.Component<Props, State> {
   public shouldComponentUpdate(nextProps: Props, nextState: State) {
     // Because forecasts are computationally intense and long term, only update when the
     // month or state changes -- plus when the player selects a facility, which is a direct
-    // request to re-highlight the stack and would otherwise wait for a month rollover
+    // request to re-highlight the stack and would otherwise wait for a month rollover, or moves
+    // the rate slider, which drives both customer growth and revenue and would otherwise sit
+    // frozen until the next month rolled over
     return (
       this.props.game.date.monthNumber !== nextProps.game.date.monthNumber ||
       this.props.selectedFacilityId !== nextProps.selectedFacilityId ||
-      this.state.years !== nextState.years
+      this.state.years !== nextState.years ||
+      this.props.game.dollarsPerkWh !== nextProps.game.dollarsPerkWh
     );
   }
 
@@ -103,14 +109,20 @@ export default class Forecasts extends React.Component<Props, State> {
     }
 
     // Generate the forecast
+    const projectionStepMinutes = years >= 10 ? 60 : TICK_MINUTES;
+    const tickScale = projectionStepMinutes / TICK_MINUTES;
     const forecastedTimeline = generateNewTimeline(
       game,
       now.cash,
       now.customers,
-      TICKS_PER_YEAR * years,
+      (TICKS_PER_YEAR * years) / tickScale,
+      projectionStepMinutes,
     );
 
     let hasStorage = false;
+    const hasHydro = game.facilities.some(
+      (facility) => facility.fuel === "Hydro",
+    );
     for (let i = 0; i < forecastedTimeline.length; i++) {
       if (forecastedTimeline[i].storedWh > 0) {
         hasStorage = true;
@@ -202,14 +214,12 @@ export default class Forecasts extends React.Component<Props, State> {
       game.startingYear,
     );
 
-    // Downsample the data to 6 per day @ 1 year, less at longer, to make it more vague / forecast-y
-    const sampledForecastedTimeline = forecastedTimeline.filter(
-      (t: TickPresentFutureType) => t.minute % (240 * years) < TICK_MINUTES,
-    );
-    // Make sure it gets the first + last entries for a full chart
-    sampledForecastedTimeline.unshift(forecastedTimeline[0]);
-    sampledForecastedTimeline.push(
-      forecastedTimeline[forecastedTimeline.length - 1],
+    // Keep regular samples plus one significant fuel-mix change between them. That preserves
+    // short events without making every chart draw the full projection.
+    const sampledForecastedTimeline = sampleForecastTimeline(
+      forecastedTimeline,
+      240 * years,
+      projectionStepMinutes,
     );
 
     // Derived here rather than inside the chart, since the legend beside the chart's title has
@@ -230,26 +240,31 @@ export default class Forecasts extends React.Component<Props, State> {
         : undefined;
 
     return (
-      <GameCard className="Forecasts" title="Forecasts" id="forecastsPane">
+      <GameCard className="Forecasts" id="forecastsPane">
         <div className="scrollable">
+          {/* The pane's own header rather than GameCard's plain one, so the horizon picker --
+              which governs every chart in the stack below, not just the first -- sits with the
+              title instead of floating inside "Supply & Demand" (see Facilities, whose build
+              buttons live here the same way) */}
+          <Toolbar className="paneHeader">
+            <Typography variant="h6">Forecasts</Typography>
+            <Select
+              id="forecastYears"
+              value={years}
+              onChange={(e: SelectChangeEvent<number>) =>
+                this.setYears(e.target.value as number)
+              }
+              className="headerControl"
+            >
+              {FORECAST_YEARS_OPTIONS.map((y: number) => (
+                <MenuItem value={y} key={y}>
+                  {y} year{y > 1 ? "s" : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </Toolbar>
           <Toolbar>
-            <Typography variant="h6">
-              Supply & Demand
-              <Select
-                id="forecastYears"
-                value={years}
-                onChange={(e: SelectChangeEvent<number>) =>
-                  this.setYears(e.target.value as number)
-                }
-                sx={{ float: "right" }}
-              >
-                {FORECAST_YEARS_OPTIONS.map((y: number) => (
-                  <MenuItem value={y} key={y}>
-                    {y} year{y > 1 ? "s" : ""}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Typography>
+            <Typography variant="h6">Supply & Demand</Typography>
           </Toolbar>
           <ChartForecastSupplyDemand
             height={140}
@@ -265,7 +280,9 @@ export default class Forecasts extends React.Component<Props, State> {
             <Table size="small">
               <TableBody>
                 <TableRow className="bold">
-                  <TableCell colSpan={2}>Blackouts forecasted</TableCell>
+                  <TableCell colSpan={2}>
+                    Predicted electricity shortfalls
+                  </TableCell>
                   <TableCell align="right">
                     ~{formatWattHours(blackoutTotalWh)}
                   </TableCell>
@@ -306,7 +323,7 @@ export default class Forecasts extends React.Component<Props, State> {
               items={[
                 ...[...fuels].reverse().map((f) => ({
                   name: f,
-                  color: fuelColors[f],
+                  color: fuelColors()[f],
                   muted: !!highlightFuel && f !== highlightFuel,
                 })),
                 { name: "Demand", color: "", rule: true },
@@ -346,7 +363,7 @@ export default class Forecasts extends React.Component<Props, State> {
               inline
               items={PRICED_FUELS.map((f) => ({
                 name: f,
-                color: fuelColors[f],
+                color: fuelColors()[f],
                 dash: fuelDashArrays[f],
               }))}
             />
@@ -360,9 +377,53 @@ export default class Forecasts extends React.Component<Props, State> {
             showXLabels={false}
             syncKey={FORECAST_SYNC_KEY}
           />
+          {hasHydro && (
+            <div>
+              <Toolbar className="forecastSection">
+                <Typography variant="h6">
+                  Water in {game.location.watershedName || game.location.name}
+                </Typography>
+                <ChartLegend
+                  inline
+                  items={[
+                    {
+                      name: "Precipitation",
+                      color: chartPalette().precipitation,
+                    },
+                    { name: "Snowpack", color: chartPalette().snowpack },
+                    { name: "Reservoir", color: chartPalette().reservoir },
+                  ]}
+                />
+              </Toolbar>
+              <ChartForecastWater
+                height={140}
+                timeline={sampledForecastedTimeline}
+                domain={{ x: [rangeMin, rangeMax] }}
+                startingYear={game.startingYear}
+                multiyear={years > 1}
+                showXLabels={false}
+                syncKey={FORECAST_SYNC_KEY}
+              />
+            </div>
+          )}
           <Toolbar className="forecastSection">
             <Typography variant="h6">
-              Weather in {game.location.name}
+              Renewable potential in {game.location.name}
+            </Typography>
+          </Toolbar>
+          <ChartForecastRenewableCapacityFactor
+            game={game}
+            height={140}
+            timeline={forecastedTimeline}
+            domain={{ x: [rangeMin, rangeMax] }}
+            startingYear={game.startingYear}
+            multiyear={years > 1}
+            showXLabels={false}
+            syncKey={FORECAST_SYNC_KEY}
+          />
+          <Toolbar className="forecastSection">
+            <Typography variant="h6">
+              Temperature in {game.location.name}
             </Typography>
           </Toolbar>
           {/* Last, so it's the one that draws the month names the whole stack is read against */}

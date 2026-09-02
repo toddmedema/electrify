@@ -1,26 +1,29 @@
 # Electrify
 
-A mobile-friendly web game that teaches about the electricity markets in the style of a Tycoon game. Hosted at https://electrifygame.com
+A mobile-friendly tycoon game about electricity markets. Play it at
+[electrifygame.com](https://electrifygame.com).
 
-## Getting Started
+## Getting started
 
 ### Setup
 
-Requires NodeJS v21+. Check your version with `node -v`.
+Requires Node.js 24. Check your version with `node --version`.
 
-We recommend using [NVM](https://github.com/creationix/nvm) to install Node to make it easier to swap between and upgrade Node versions.
+Using a version manager such as [nvm](https://github.com/nvm-sh/nvm) makes it easier to switch
+between Node versions.
 
-Windows: must be run within a Unix-like shell (such as Git Bash).
+Development commands work in standard Windows, macOS, and Linux shells. The deployment script
+requires a POSIX-compatible shell such as Git Bash.
 
 With Node.js installed, run the following from the root of the repository:
 
 ```sh
-npm install
+npm ci
 ```
 
 To use the online high score capabilities, you will need to contact an admin to get a Firebase api key.
 
-### Development Workflow: Serve & watch
+### Serve and watch
 
 ```sh
 npm start
@@ -34,7 +37,7 @@ This runs the app at [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-This runs the unit tests defined in files with the `.test.tsx` extension.
+This starts Jest in watch mode. Test files use the `.test.ts` or `.test.tsx` suffix.
 
 ### Check everything
 
@@ -44,14 +47,16 @@ npm run check
 
 Types, lint, formatting and tests, which is what CI runs on every pull request. Individually:
 
-| | |
-|---|---|
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run lint` | ESLint, with warnings treated as errors |
-| `npm run format` | Rewrite files with prettier |
-| `npm run format:check` | Report unformatted files without changing them |
+| Command                | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `npm run typecheck`    | `tsc --noEmit`                                            |
+| `npm run lint`         | ESLint for app and data scripts; warnings are errors      |
+| `npm run format`       | Rewrite app and script files with Prettier                |
+| `npm run format:check` | Report unformatted app or script files                    |
+| `npm run test:ci`      | Run Jest once with the same coverage checks used by CI    |
+| `npm run sim -- --all` | Run every scenario through the headless invariant checker |
 
-`npm test -- --coverage` reports coverage. `src/helpers` and `src/reducers` have floors set in
+`npm run test:ci` reports coverage. `src/helpers` and `src/reducers` have floors set in
 `package.json` just under where they stand today, so a change that guts them fails rather than
 landing quietly; raise the floors as coverage grows.
 
@@ -67,7 +72,7 @@ recorded revenue and expenses, storage can't invent electricity, and so on). Use
 check a change to the simulation in seconds rather than by playing through the UI.
 
 `npm run sim -- --scenario 103` reports one scenario month by month, and `npm run sim -- --help`
-lists the flags. See [src/testing/README.md](src/testing/README.md) for what it checks and how it
+lists the flags. See [the simulation guide](src/testing/README.md) for what it checks and how it
 works.
 
 ### Add a city to play in
@@ -110,9 +115,9 @@ in save games and replays, so it can never be changed afterwards; everything els
 
 ### Release checklist
 
-To release, you'll need to install and authenticate the `aws cli`.
+To release, install and authenticate the AWS CLI.
 
-Before deploying to production, run `./deploy.sh` and have it deploy to beta. Then check that:
+Before deploying to production, run `npm run deploy` and have it deploy to beta. Then check that:
 
 - basic functionality works (app loads, game starts, music plays)
 
@@ -120,4 +125,6 @@ Once functionality is verified, you can deploy prod with the same script.
 
 ### Troubleshooting
 
-If you're trying to debug the Redux store, it's wired up to use the Dev Tool extension for advanced state debugging: https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd
+The app supports the [Redux DevTools browser
+extension](https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd)
+for inspecting application state.

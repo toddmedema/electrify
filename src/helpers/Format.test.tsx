@@ -9,49 +9,22 @@ import {
 } from "./Format";
 
 describe("formatWatts", () => {
-  it("should correctly format numbers in the tens", () => {
-    const result = formatWatts(10);
-    expect(result).toEqual("10W");
+  it("chooses the appropriate SI unit", () => {
+    [
+      [10, "10W"],
+      [1500, "1.5kW"],
+      [1500000, "1.5MW"],
+      [1500000000, "1.5GW"],
+      [1500000000000, "1.5TW"],
+    ].forEach(([watts, formatted]) => {
+      expect(formatWatts(watts as number)).toEqual(formatted);
+    });
   });
 
-  it("should correctly format numbers in the thousands", () => {
-    const result = formatWatts(1500);
-    expect(result).toEqual("1.5kW");
-  });
-
-  it("should correctly format numbers in the millions", () => {
-    const result = formatWatts(1500000);
-    expect(result).toEqual("1.5MW");
-  });
-
-  it("should correctly format numbers in the billions", () => {
-    const result = formatWatts(1500000000);
-    expect(result).toEqual("1.5GW");
-  });
-
-  it("should correctly format numbers in the trillions", () => {
-    const result = formatWatts(1500000000000);
-    expect(result).toEqual("1.5TW");
-  });
-
-  it("should correctly handle the mantissa parameter when 0", () => {
-    const result = formatWatts(1001, 0);
-    expect(result).toEqual("1kW");
-  });
-
-  it("should correctly handle the mantissa parameter when 2", () => {
-    const result = formatWatts(1521, 0);
-    expect(result).toEqual("1.5kW");
-  });
-
-  it("should correctly handle the mantissa parameter when 3", () => {
-    const result = formatWatts(1521, 3);
-    expect(result).toEqual("1.52kW");
-  });
-
-  it("should correctly handle the mantissa parameter when 4", () => {
-    const result = formatWatts(1521, 4);
-    expect(result).toEqual("1.521kW");
+  it("honours the requested precision", () => {
+    expect(formatWatts(1001, 0)).toEqual("1kW");
+    expect(formatWatts(1521, 3)).toEqual("1.52kW");
+    expect(formatWatts(1521, 4)).toEqual("1.521kW");
   });
 });
 
@@ -119,6 +92,14 @@ describe("money formatting of values that are not numbers", () => {
   it("still formats ordinary amounts", () => {
     expect(formatMoneyConcise(1500000)).toEqual("$1.5M");
     expect(formatMoneyStable(1500000)).toEqual("$1.50M");
+  });
+
+  it("does not promote an amount before it reaches the next tier", () => {
+    expect(formatMoneyConcise(700000000)).toEqual("$700M");
+    expect(formatMoneyStable(700000000)).toEqual("$700M");
+    expect(formatMoneyConcise(999000000)).toEqual("$999M");
+    expect(formatMoneyConcise(999999999)).toEqual("$999M");
+    expect(formatMoneyConcise(1000000000)).toEqual("$1B");
   });
 
   it("shows a dash rather than a word for a value it cannot express", () => {

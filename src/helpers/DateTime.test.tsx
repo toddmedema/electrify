@@ -9,26 +9,28 @@ import {
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "./DateTime";
-import { LOCATIONS, TICK_MINUTES, TICKS_PER_MONTH } from "../Constants";
-import { DateType, MonthlyHistoryType, TickPresentFutureType } from "../Types";
+import {
+  GAME_TO_REAL_YEARS,
+  LOCATIONS,
+  TICK_MINUTES,
+  TICKS_PER_HOUR,
+  TICKS_PER_MONTH,
+} from "../Constants";
+import {
+  DateType,
+  LocationType,
+  MonthlyHistoryType,
+  TickPresentFutureType,
+} from "../Types";
 import { SCENARIOS } from "../data/Scenarios";
 import { generateNewTimeline } from "../reducers/Game";
 import { createGame } from "../testing/Simulator";
 
 describe("formatMinuteOfDayChartAxis", () => {
-  it("should render midnight as 12am", () => {
+  it("formats a day in twelve-hour time", () => {
     expect(formatMinuteOfDayChartAxis(0)).toEqual("12am");
-  });
-
-  it("should render noon as 12pm", () => {
     expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12pm");
-  });
-
-  it("should render the evening peak in 12 hour time", () => {
     expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7pm");
-  });
-
-  it("should ignore whole days, since the axis only shows a clock", () => {
     expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6am");
   });
 });
@@ -102,6 +104,40 @@ describe("getSunriseSunset", () => {
     // location's own zone
     expect(typeof machineOffsetMinutes).toEqual("number");
   });
+
+  it("derives local time from longitude when an arbitrary point has no timezone", () => {
+    const arbitrary = {
+      id: "arbitrary",
+      name: "30 degrees east",
+      lat: 0,
+      long: 30,
+    } as LocationType;
+    const { sunrise, sunset } = getSunriseSunset(january, arbitrary);
+    expect(sunrise).toBeGreaterThan(5 * 60);
+    expect(sunrise).toBeLessThan(7 * 60);
+    expect(sunset).toBeGreaterThan(17 * 60);
+    expect(sunset).toBeLessThan(19 * 60);
+  });
+
+  it("models polar day and night instead of inventing a 6am to 6pm day", () => {
+    const tromso = {
+      id: "tromso",
+      name: "Tromsø, Norway",
+      lat: 69.6492,
+      long: 18.9553,
+      timeZone: "Europe/Oslo",
+    } as LocationType;
+    expect(getSunriseSunset(january, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 0,
+      daylight: "polar-night",
+    });
+    expect(getSunriseSunset(july, tromso)).toEqual({
+      sunrise: 0,
+      sunset: 1440,
+      daylight: "polar-day",
+    });
+  });
 });
 
 // The two summarize helpers walk arrays that are ordered opposite ways, and reduceHistories keeps
@@ -114,8 +150,9 @@ describe("summarizeTimeline", () => {
       (cash: number, i: number) =>
         ({
           minute: i * TICK_MINUTES,
-          supplyW: 0,
-          demandW: 0,
+          supplyW: 100 + i * 50,
+          demandW: 200 + i * 100,
+          supplyByFuel: { Coal: 60 + i * 10, Wind: 40 + i * 40 },
           cash,
           customers: 1000 + i,
           netWorth: cash * 2,
@@ -124,7 +161,6 @@ describe("summarizeTimeline", () => {
           expensesOM: 0,
           expensesCarbonFee: 0,
           expensesInterest: 0,
-          expensesMarketing: 0,
           kgco2e: 0,
           interestRate: 0.04 + i / 1000,
           inflationRate: 0.02,
@@ -132,22 +168,21 @@ describe("summarizeTimeline", () => {
     );
   }
 
-  it("reports the balances the period ended on, not the ones it opened with", () => {
+  it("reports ending balances and rates while totalling flows", () => {
     const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.cash).toEqual(300);
     expect(summary.netWorth).toEqual(600);
     expect(summary.customers).toEqual(1002);
-  });
-
-  it("reports the rate in force at the end of the period", () => {
-    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.interestRate).toBeCloseTo(0.042, 10);
-  });
-
-  it("still totals the flows across every tick", () => {
-    const summary = summarizeTimeline(ticks([100, 200, 300]), 2020);
     expect(summary.revenue).toEqual(30);
     expect(summary.expensesFuel).toEqual(3);
+    expect(summary.peakDemandW).toEqual(400);
+    expect(summary.deliveredWhByFuel.Coal).toBeCloseTo(
+      ((60 + 70 + 80) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS,
+    );
+    expect(summary.deliveredWhByFuel.Wind).toBeCloseTo(
+      ((40 + 80 + 120) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS,
+    );
   });
 
   it("ends on the last tick the filter kept, not the last one in the array", () => {
@@ -159,6 +194,32 @@ describe("summarizeTimeline", () => {
     expect(summary.cash).toEqual(300);
     expect(summary.revenue).toEqual(30);
   });
+
+  it("does not attribute curtailed oversupply as delivered fuel energy", () => {
+    const oversupplied = ticks([100]);
+    oversupplied[0].supplyW = 200;
+    oversupplied[0].demandW = 100;
+    oversupplied[0].supplyByFuel = { Coal: 120, Wind: 80 };
+    const summary = summarizeTimeline(oversupplied, 2020);
+    expect(
+      Object.values(summary.deliveredWhByFuel).reduce<number>(
+        (total, delivered) => total + (delivered || 0),
+        0,
+      ),
+    ).toBeCloseTo(summary.supplyWh);
+  });
+
+  it("integrates hourly forecast points across their full duration", () => {
+    const hourly = ticks([100, 200]);
+    hourly[1].minute = 60;
+
+    const summary = summarizeTimeline(hourly, 2020);
+
+    expect(summary.demandWh).toBeCloseTo(
+      ((200 + 300) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS * 4,
+    );
+    expect(summary.revenue).toBe(20);
+  });
 });
 
 describe("summarizeHistory", () => {
@@ -168,6 +229,8 @@ describe("summarizeHistory", () => {
       (cash: number) =>
         ({
           ...EMPTY_HISTORY,
+          deliveredWhByFuel: { Coal: cash },
+          peakDemandW: cash * 10,
           cash,
           netWorth: cash * 2,
           revenue: 10,
@@ -175,15 +238,14 @@ describe("summarizeHistory", () => {
     );
   }
 
-  it("reports the balances of the most recent month", () => {
+  it("reports the latest balances while totalling monthly flows", () => {
     // Newest first, so 300 is the newest month and 100 the oldest
     const summary = summarizeHistory(months([300, 200, 100]));
     expect(summary.cash).toEqual(300);
     expect(summary.netWorth).toEqual(600);
-  });
-
-  it("still totals the flows across every month", () => {
-    expect(summarizeHistory(months([300, 200, 100])).revenue).toEqual(30);
+    expect(summary.revenue).toEqual(30);
+    expect(summary.deliveredWhByFuel.Coal).toEqual(600);
+    expect(summary.peakDemandW).toEqual(3000);
   });
 });
 

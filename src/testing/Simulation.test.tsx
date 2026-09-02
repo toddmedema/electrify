@@ -1,19 +1,30 @@
-import { SCENARIOS } from "../data/Scenarios";
+import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GameType, ScenarioType } from "../Types";
-import { createGame, runSimulation, SimResultType } from "./Simulator";
+import {
+  createGame,
+  createGameFromReplay,
+  runSimulation,
+  SimResultType,
+} from "./Simulator";
+import {
+  INTERN_ONE_BUILD_PLAYS,
+  STANDARD_BALANCE_PLAYS,
+} from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
-import { TICKS_PER_MONTH } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
+import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
+import { getDateFromMinute, getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
+import { serializeReplay } from "../Replay";
+import { getAirborneWindOutputFactor } from "../helpers/Energy";
 
 jest.setTimeout(120000);
 
 // Ticks a state forwards without the simulator around it, for tests that care about where the
 // game ends up rather than about how it played
 function runMonths(state: GameType, months: number) {
-  const until = state.date.monthsEllapsed + months;
-  while (state.date.monthsEllapsed < until) {
+  const until = state.date.monthsElapsed + months;
+  while (state.date.monthsElapsed < until) {
     tickState(state);
   }
 }
@@ -81,13 +92,11 @@ describe("simulation invariants", () => {
     });
   });
 
-  it("holds while spending on marketing", () => {
-    expectNoViolations(
-      runSimulation({
-        scenarioId: 101,
-        months: MONTHS,
-        monthlyMarketingSpend: 5000000,
-      }),
+  it("holds while gaining and losing customers through price competition", () => {
+    [0.01, 0.2].forEach((dollarsPerkWh) =>
+      expectNoViolations(
+        runSimulation({ scenarioId: 101, months: MONTHS, dollarsPerkWh }),
+      ),
     );
   });
 
@@ -172,7 +181,582 @@ describe("simulation determinism", () => {
   });
 });
 
+describe("researched public-utility scenarios", () => {
+  const manassas = SCENARIOS.find((scenario) => scenario.id === 106)!;
+
+  it("calibrates Manassas against its authored weather", () => {
+    const result = runSimulation({ scenarioId: 106, months: 12 });
+    expect(result.months).toHaveLength(12);
+    const firstYear = result.months.slice(-12);
+    const annualDemandWh = firstYear.reduce(
+      (total, month) => total + month.demandWh,
+      0,
+    );
+    const peakDemandW = Math.max(
+      ...firstYear.map((month) => month.peakDemandW),
+    );
+
+    expect(annualDemandWh).toBeGreaterThanOrEqual(394_000_000e3);
+    expect(annualDemandWh).toBeLessThanOrEqual(455_000_000e3);
+    expect(peakDemandW).toBeGreaterThanOrEqual(70_000_000);
+    expect(peakDemandW).toBeLessThanOrEqual(80_000_000);
+    const state = createGame({ scenarioId: 106 });
+    expect(
+      state.facilities.find((facility) => facility.fuel === "Natural Gas")
+        ?.name,
+    ).toBe("Natural Gas");
+    expect(
+      state.timeline.every((tick) => tick.demandByType["Data centers"] === 0),
+    ).toBe(true);
+    const restored = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(state))),
+    )!.game;
+    expect(restored.startingDemandScale).toBe(7.5);
+    expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
+    const replayed = createGameFromReplay(serializeReplay(state)!);
+    expect(replayed.startingDemandScale).toBe(7.5);
+    expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
+    expect(replayed.timeline).toEqual(state.timeline);
+  });
+
+  it("records only completed Manassas months across new game, save and replay", () => {
+    const fresh = createGame({ scenarioId: 106 });
+    expect(fresh.monthlyHistory).toEqual([]);
+    runMonths(fresh, 1);
+    expect(fresh.monthlyHistory).toHaveLength(1);
+    expect(fresh.monthlyHistory[0]).toMatchObject({ year: 2020, month: 1 });
+
+    const uninterrupted = createGame({ scenarioId: 106 });
+    runMonths(uninterrupted, 73);
+    const boundary = createGame({ scenarioId: 106 });
+    runMonths(boundary, 71); // December 2025, immediately before the authored load arrives
+    const restored = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(boundary))),
+    )!.game;
+    runMonths(restored, 2);
+    expect(restored.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
+
+    const replayed = createGameFromReplay(serializeReplay(boundary)!);
+    runMonths(replayed, 73);
+    expect(replayed.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
+
+    const full = runSimulation({
+      scenarioId: 106,
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 50_000_000,
+        financed: true,
+      },
+    });
+    expect(full.months).toHaveLength(192);
+    expect(full.months[0]).toMatchObject({ year: 2020, month: 1 });
+    expect(full.months[191]).toMatchObject({ year: 2035, month: 12 });
+    expect(
+      new Set(full.months.map((month) => `${month.year}-${month.month}`)).size,
+    ).toBe(192);
+  });
+
+  it("defaults demand calibration to one and applies it to the whole forecast", () => {
+    const base: ScenarioType = {
+      id: CUSTOM_SCENARIO_ID,
+      name: "Demand calibration fixture",
+      icon: "natural gas",
+      locationId: "SF",
+      location: LOCATIONS.SF,
+      ownership: "Public",
+      startingYear: 2019,
+      startingCustomers: 10_000,
+      cash: 1_000_000,
+      dollarsPerkWh: 0.1,
+      durationMonths: 1,
+      feePerKgCO2e: 0,
+      facilities: [],
+    };
+    const defaultScale = createGame({ scenarioId: base.id, scenario: base });
+    const explicitOne = createGame({
+      scenarioId: base.id,
+      scenario: { ...base, startingDemandScale: 1 },
+    });
+    const doubled = createGame({
+      scenarioId: base.id,
+      scenario: { ...base, startingDemandScale: 2 },
+    });
+
+    expect(defaultScale.startingDemandScale).toBe(1);
+    expect(defaultScale.timeline.map((tick) => tick.demandW)).toEqual(
+      explicitOne.timeline.map((tick) => tick.demandW),
+    );
+    doubled.timeline.forEach((tick, index) => {
+      expect(tick.demandW).toBeCloseTo(
+        defaultScale.timeline[index].demandW * 2,
+      );
+    });
+  });
+
+  it("calibrates Austin's first full modeled year to FY2017 energy and peak", () => {
+    const result = runSimulation({ scenarioId: 107, months: 12 });
+    // The simulator records an opening forecast row before its first rollover; the trailing twelve
+    // rows are the first complete January-December operating year.
+    const firstYear = result.months.slice(-12);
+    const annualDemandWh = firstYear.reduce(
+      (total, month) => total + month.demandWh,
+      0,
+    );
+    const peakDemandW = Math.max(
+      ...firstYear.map((month) => month.peakDemandW),
+    );
+    expect(annualDemandWh).toBeGreaterThanOrEqual(13_010_291e6 * 0.9);
+    expect(annualDemandWh).toBeLessThanOrEqual(13_010_291e6 * 1.1);
+    expect(peakDemandW).toBeGreaterThanOrEqual(2_654_000_000 * 0.9);
+    expect(peakDemandW).toBeLessThanOrEqual(2_654_000_000 * 1.1);
+  });
+
+  it("reproduces Uri once across forecast, save and replay, then expires every effect", () => {
+    const event = createGame({ scenarioId: 107 });
+    const control = createGame({
+      scenarioId: 107,
+      storyEffectsEnabled: false,
+    });
+    runMonths(event, 49);
+    runMonths(control, 49);
+
+    expect(event.date).toMatchObject({ year: 2021, monthNumber: 2 });
+    expect(
+      event.worldEvents.active.map((occurrence) => occurrence.key),
+    ).toEqual(["story:107:texas-deep-freeze:uri"]);
+    const minimumTemperatureC = Math.min(
+      ...event.timeline.map((tick) => tick.temperatureC),
+    );
+    expect(minimumTemperatureC).toBeGreaterThanOrEqual(-16.5);
+    expect(minimumTemperatureC).toBeLessThanOrEqual(-12.5);
+    expect(
+      Math.min(...event.timeline.map((tick) => tick.supplyW - tick.demandW)),
+    ).toBeLessThan(100_000_000);
+
+    event.timeline
+      .map((tick, index) => ({
+        actual: tick.supplyByFuel.Wind || 0,
+        expected: control.timeline[index].supplyByFuel.Wind || 0,
+      }))
+      .filter(({ expected }) => expected > 0)
+      .forEach(({ actual, expected }) => {
+        expect(actual).toBeCloseTo(expected * 0.44, -2);
+      });
+    event.timeline.forEach((tick, index) => {
+      expect(tick["Natural Gas"]).toBeCloseTo(
+        control.timeline[index]["Natural Gas"]! * 2.8,
+      );
+    });
+
+    const restored = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(event))),
+    )!.game;
+    expect(restored.startingDemandScale).toBe(event.startingDemandScale);
+    expect(restored.loadAdditions).toEqual(event.loadAdditions);
+    expect(restored.worldEvents).toEqual(event.worldEvents);
+
+    const replay = serializeReplay(event)!;
+    const replayed = createGameFromReplay(replay);
+    runMonths(replayed, 49);
+    expect(replayed.timeline).toEqual(event.timeline);
+    expect(replayed.worldEvents).toEqual(event.worldEvents);
+
+    runMonths(event, 1);
+    runMonths(control, 1);
+    expect(event.date).toMatchObject({ year: 2021, monthNumber: 3 });
+    expect(
+      event.worldEvents.active.map((occurrence) => occurrence.key),
+    ).toEqual(["story:107:texas-deep-freeze:thaw"]);
+    expect(
+      event.worldEvents.occurrences.map((occurrence) => occurrence.key),
+    ).toEqual([
+      "story:107:texas-deep-freeze:uri",
+      "story:107:texas-deep-freeze:thaw",
+    ]);
+    event.timeline.forEach((tick, index) => {
+      // Different February dispatch changes cumulative emissions slightly; the 20°C event offset
+      // itself is gone, leaving only that normal climate-forcing consequence.
+      expect(
+        Math.abs(tick.temperatureC - control.timeline[index].temperatureC),
+      ).toBeLessThan(0.1);
+      expect(tick["Natural Gas"]).toBe(control.timeline[index]["Natural Gas"]);
+    });
+  });
+
+  it.each(["Intern", "Employee"] as DifficultyType[])(
+    "blackouts during the eclipse when the player takes no action on %s",
+    (difficulty) => {
+      const eclipse = createGame({ scenarioId: 109, difficulty });
+      const control = createGame({
+        scenarioId: 109,
+        difficulty,
+        storyEffectsEnabled: false,
+      });
+      runMonths(eclipse, 32);
+      runMonths(control, 32);
+
+      expect(eclipse.date).toMatchObject({ year: 2035, monthNumber: 9 });
+      expect(eclipse.replayLog).toHaveLength(0);
+      const eclipseTickIndexes = eclipse.timeline
+        .map((tick, index) => ({
+          index,
+          minuteOfDay: getDateFromMinute(tick.minute, eclipse.startingYear)
+            .minuteOfDay,
+        }))
+        .filter(
+          ({ minuteOfDay }) =>
+            minuteOfDay >= 8 * 60 + 30 && minuteOfDay <= 11 * 60 + 30,
+        )
+        .map(({ index }) => index);
+
+      expect(eclipseTickIndexes).not.toHaveLength(0);
+      expect(
+        Math.min(
+          ...eclipseTickIndexes.map(
+            (index) =>
+              eclipse.timeline[index].supplyW - eclipse.timeline[index].demandW,
+          ),
+        ),
+      ).toBeLessThan(0);
+      expect(
+        Math.min(
+          ...eclipseTickIndexes.map(
+            (index) =>
+              control.timeline[index].supplyW - control.timeline[index].demandW,
+          ),
+        ),
+      ).toBeGreaterThanOrEqual(0);
+    },
+  );
+
+  const difficulties: DifficultyType[] = [
+    "Intern",
+    "Employee",
+    "Manager",
+    "VP",
+    "CEO",
+  ];
+  it.each(difficulties)(
+    "completes Data Center Boom on %s with capacity planned before the arrival",
+    (difficulty) => {
+      const result = runSimulation({
+        scenarioId: 106,
+        difficulty,
+        initialBuild: {
+          name: "Natural Gas",
+          peakW: 50_000_000,
+          financed: true,
+        },
+      });
+      expectNoViolations(result);
+      expect(result.outcome).toBe("completed");
+    },
+  );
+
+  it.each(difficulties)(
+    "rejects passive customer attrition as a Data Center Boom win on %s",
+    (difficulty) => {
+      const result = runSimulation({ scenarioId: 106, difficulty });
+      expectNoViolations(result);
+      expect(result.outcome).toBe("fired");
+      expect(result.months[result.months.length - 1].customers).toBeLessThan(
+        manassas.startingCustomers! * manassas.minimumCustomerRetention!,
+      );
+    },
+  );
+
+  it.each(difficulties)(
+    "rejects an unattended Texas Deep Freeze run on %s",
+    (difficulty) => {
+      const result = runSimulation({ scenarioId: 107, difficulty });
+      expectNoViolations(result);
+      expect(result.outcome).toBe("fired");
+      const uri = result.months.find(
+        (month) => month.year === 2021 && month.month === 2,
+      )!;
+      expect(uri.supplyWh).toBeLessThan(uri.demandWh);
+    },
+  );
+
+  it.each(difficulties)(
+    "keeps Texas Deep Freeze winnable with planned firm capacity on %s",
+    (difficulty) => {
+      const result = runSimulation({
+        scenarioId: 107,
+        difficulty,
+        initialBuild: {
+          name: "Natural Gas",
+          peakW: 1_000_000_000,
+          financed: true,
+        },
+      });
+      expectNoViolations(result);
+      expect(result.outcome).toBe("completed");
+      expect(result.actionCount).toBeGreaterThan(0);
+    },
+  );
+
+  it("supports materially different Manager strategies for Data Center Boom", () => {
+    const leanPlan = runSimulation({
+      scenarioId: 106,
+      difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 40_000_000,
+        financed: true,
+      },
+    });
+    const reservePlan = runSimulation({
+      scenarioId: 106,
+      difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 50_000_000,
+        financed: true,
+      },
+    });
+    expect(leanPlan.outcome).toBe("completed");
+    expect(reservePlan.outcome).toBe("completed");
+    expect(leanPlan.builds[0].buildCost).not.toBe(
+      reservePlan.builds[0].buildCost,
+    );
+  });
+
+  it("supports materially different Manager strategies for Texas Deep Freeze", () => {
+    const gasPlan = runSimulation({
+      scenarioId: 107,
+      difficulty: "Manager",
+      initialBuild: {
+        name: "Natural Gas",
+        peakW: 1_000_000_000,
+        financed: true,
+      },
+    });
+    const oilPlan = runSimulation({
+      scenarioId: 107,
+      difficulty: "Manager",
+      initialBuild: { name: "Oil", peakW: 500_000_000, financed: true },
+    });
+    expect(gasPlan.outcome).toBe("completed");
+    expect(oilPlan.outcome).toBe("completed");
+    expect(gasPlan.builds[0].name).toBe("Natural Gas");
+    expect(oilPlan.builds[0].name).toBe("Oil");
+  });
+});
+
+describe("hydro dispatch", () => {
+  const scenario: ScenarioType = {
+    id: 9999,
+    name: "Hydro test basin",
+    icon: "hydro",
+    locationId: "SF",
+    location: LOCATIONS.SF,
+    ownership: "Public",
+    startingYear: 2002,
+    cash: 500_000_000,
+    startingCustomers: 250_000,
+    feePerKgCO2e: 0,
+    dollarsPerkWh: 0.1,
+    durationMonths: 24,
+    facilities: [{ fuel: "Hydro", peakW: 150_000_000 }],
+  };
+
+  function hydroGame() {
+    return createGame({ scenarioId: scenario.id, scenario });
+  }
+
+  it("holds the water-balance invariants across wet and dry seasons", () => {
+    expectNoViolations(
+      runSimulation({ scenarioId: scenario.id, scenario, months: 24 }),
+    );
+  });
+
+  it("turns water-rights flow into must-run power above the dead pool", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.hydroMandatedReleaseW).toBeGreaterThan(0);
+    expect(now.supplyByFuel.Hydro).toBeGreaterThanOrEqual(
+      now.hydroMandatedReleaseW,
+    );
+    expect(hydro.reservoirWh).toBeLessThan(hydro.reservoirCapacityWh!);
+  });
+
+  it("stops producing below minimum power pool while required releases continue", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.reservoirWh = hydro.reservoirCapacityWh! * 0.05;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
+  });
+
+  it("keeps paused reservoirs visible while required releases bypass the turbine", () => {
+    const state = hydroGame();
+    const hydro = state.facilities.find((f) => f.fuel === "Hydro")!;
+    hydro.paused = true;
+    const before = hydro.reservoirWh!;
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.supplyByFuel.Hydro || 0).toBe(0);
+    expect(now.hydroReservoirWh).toBe(hydro.reservoirWh);
+    expect(now.hydroReservoirCapacityWh).toBe(hydro.reservoirCapacityWh);
+    expect(hydro.reservoirWh).not.toBe(before);
+    expect(hydro.hydroLastBypassWh).toBeGreaterThan(0);
+  });
+});
+
+describe("airborne wind dispatch", () => {
+  const location = {
+    id: "Lista",
+    name: "Lista, Norway",
+    lat: 58.109,
+    long: 6.567,
+    timeZone: "Europe/Oslo",
+    region: "Europe",
+    country: "Norway",
+  };
+  const scenario: ScenarioType = {
+    id: CUSTOM_SCENARIO_ID,
+    name: "Airborne Wind test",
+    icon: "wind",
+    locationId: "Lista",
+    location,
+    ownership: "Public",
+    startingYear: 2030,
+    cash: 100000000,
+    startingCustomers: 10000,
+    feePerKgCO2e: 0,
+    dollarsPerkWh: 0.1,
+    durationMonths: 12,
+    facilities: [{ fuel: "Airborne Wind", peakW: 1000000 }],
+  };
+
+  it("uses the Airborne Wind curve as intermittent must-run supply", () => {
+    const state = createGame({ scenarioId: scenario.id, scenario });
+    const productive = state.timeline.find(
+      (tick) => (tick.supplyByFuel["Airborne Wind"] || 0) > 0,
+    );
+    expect(productive).toBeDefined();
+    expect(productive!.supplyByFuel["Airborne Wind"]).toBeCloseTo(
+      1000000 * getAirborneWindOutputFactor(productive!.windAirborneKph),
+      -2,
+    );
+    expect(productive!.supplyByFuel["Airborne Wind"]).toBeGreaterThan(0);
+  });
+
+  it("round-trips its facility and reference wind through a save", () => {
+    const state = createGame({ scenarioId: scenario.id, scenario });
+    const parsed = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(state))),
+    )!.game;
+    expect(parsed.facilities[0].fuel).toBe("Airborne Wind");
+    expect(parsed.timeline[0].windAirborneKph).toBe(
+      state.timeline[0].windAirborneKph,
+    );
+  });
+});
+
 describe("simulation economics", () => {
+  SCENARIOS.filter(
+    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
+  ).forEach((scenario) => {
+    it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
+      const passive = runSimulation({
+        scenarioId: scenario.id,
+        difficulty: "Intern",
+      });
+      expectNoViolations(passive);
+      expect(passive.actionCount).toBe(0);
+      expect(passive.outcome).not.toBe("completed");
+
+      const active = runSimulation({
+        scenarioId: scenario.id,
+        difficulty: "Intern",
+        ...INTERN_ONE_BUILD_PLAYS[scenario.id],
+      });
+      expectNoViolations(active);
+      expect(active.actionCount).toBe(1);
+      expect(active.builds).toHaveLength(1);
+      expect(active.outcome).toBe("completed");
+    });
+  });
+
+  SCENARIOS.filter((scenario) => [108, 109, 110].includes(scenario.id)).forEach(
+    (scenario) => {
+      it(`requires player input but accepts one build on Intern in "${scenario.name}"`, () => {
+        const passive = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+        });
+        expectNoViolations(passive);
+        expect(passive.actionCount).toBe(0);
+        expect(passive.outcome).not.toBe("completed");
+
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "Intern",
+          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect(active.actionCount).toBe(1);
+        expect(active.builds).toHaveLength(1);
+        expect(active.outcome).toBe("completed");
+      });
+    },
+  );
+
+  SCENARIOS.filter(
+    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
+  ).forEach((scenario) => {
+    it(`rejects passive play and accepts a multi-action plan in "${scenario.name}" on CEO`, () => {
+      const passive = runSimulation({
+        scenarioId: scenario.id,
+        difficulty: "CEO",
+      });
+      expectNoViolations(passive);
+      expect(passive.actionCount).toBe(0);
+      expect(passive.outcome).not.toBe("completed");
+
+      const play = STANDARD_BALANCE_PLAYS[scenario.id];
+      const active = runSimulation({
+        scenarioId: scenario.id,
+        difficulty: "CEO",
+        ...play,
+      });
+      expectNoViolations(active);
+      expect(active.actionCount).toBeGreaterThanOrEqual(3);
+      expect(active.outcome).toBe("completed");
+    });
+  });
+
+  it("makes a replacement build necessary at the End of an Era compliance deadline", () => {
+    const shortcut = runSimulation({
+      scenarioId: 102,
+      difficulty: "CEO",
+      dollarsPerkWh: 0.15,
+      sellFacilityId: 1,
+      sellAtMonth: 39,
+    });
+    expectNoViolations(shortcut);
+    expect(shortcut.actionCount).toBe(2);
+    expect(shortcut.outcome).not.toBe("completed");
+  });
+
+  it("makes storm hardening necessary on Hurricane Season CEO", () => {
+    const shortcut = runSimulation({
+      scenarioId: 104,
+      difficulty: "CEO",
+      dollarsPerkWh: 0.08,
+    });
+    expectNoViolations(shortcut);
+    expect(shortcut.actionCount).toBe(1);
+    expect(shortcut.outcome).not.toBe("completed");
+  });
+
   it("bills every customer it supplies at the going rate", () => {
     const result = runSimulation({
       scenarioId: 101,
@@ -209,6 +793,23 @@ describe("simulation economics", () => {
     const revenue = (r: SimResultType) =>
       r.months.reduce((a, m) => a + m.revenue, 0);
     expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
+  });
+
+  it("moves investor customers toward a cheaper utility and away from a dearer one", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 101, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.05)).toBeGreaterThan(customersAt(0.07));
+    expect(customersAt(0.07)).toBeGreaterThan(customersAt(0.1));
+  });
+
+  it("keeps public customer growth independent of the rate", () => {
+    const customersAt = (dollarsPerkWh: number) =>
+      runSimulation({ scenarioId: 104, months: 12, dollarsPerkWh }).months.at(
+        -1,
+      )!.customers;
+    expect(customersAt(0.02)).toBe(customersAt(0.2));
   });
 
   /**

@@ -2,6 +2,7 @@ import * as React from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { chartScale } from "./UPlotHelpers";
+import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 
 /**
  * The React shell every chart in the game sits in.
@@ -33,6 +34,8 @@ export interface UPlotChartProps<S> {
   /** Everything the option callbacks and plugins need, recomputed every render */
   state: S;
   data: uPlot.AlignedData;
+  /** Optional unstacked values for the accessible summary when the canvas needs cumulative data. */
+  summaryData?: uPlot.AlignedData;
   /** Called once per plot. Width and height are filled in by this component. */
   buildOptions: (ctx: BuildContext<S>) => uPlot.Options;
   /** Change to force a rebuild, eg when the number of series changes */
@@ -45,6 +48,10 @@ export interface UPlotChartProps<S> {
    * with the pointer -- five tooltips at once would cover the data they are about.
    */
   syncKey?: string;
+  /** Human names for each y-series, used by the keyboard/screen-reader summary below. */
+  seriesLabels?: string[];
+  /** Formats summary values with the same compact units the visible chart uses. */
+  formatSummaryValue?: (value: number, seriesIndex: number) => string;
 }
 
 const TOOLTIP_OFFSET = 8;
@@ -109,6 +116,54 @@ export default function UPlotChart<S>(
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
+  const number = React.useMemo(
+    () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
+    [],
+  );
+  const formatSummaryValue =
+    props.formatSummaryValue || ((value: number) => number.format(value));
+  const seriesSummary = (props.summaryData || data)
+    .slice(1)
+    .map((series, index) => {
+      // Charts can carry thousands of points and desktop renders several together. Derive the
+      // accessible summary in one pass instead of allocating a filtered copy and spreading it
+      // into Math.min/Math.max for every series.
+      let first = 0;
+      let latest = 0;
+      let minimum = Number.POSITIVE_INFINITY;
+      let maximum = Number.NEGATIVE_INFINITY;
+      let found = false;
+      for (let i = 0; i < series.length; i++) {
+        const value = series[i];
+        if (typeof value !== "number" || !isFinite(value)) {
+          continue;
+        }
+        if (!found) {
+          first = value;
+          found = true;
+        }
+        latest = value;
+        minimum = Math.min(minimum, value);
+        maximum = Math.max(maximum, value);
+      }
+      if (!found) {
+        minimum = 0;
+        maximum = 0;
+      }
+      return {
+        label: props.seriesLabels?.[index] || `Series ${index + 1}`,
+        latest: formatSummaryValue(latest, index),
+        minimum: formatSummaryValue(minimum, index),
+        maximum: formatSummaryValue(maximum, index),
+        trend: latest > first ? "up" : latest < first ? "down" : "flat",
+      };
+    });
+  const accessibleLabel = `${ariaLabel}. ${seriesSummary
+    .map(
+      (series) =>
+        `${series.label}: latest ${series.latest}, range ${series.minimum} to ${series.maximum}, trend ${series.trend}`,
+    )
+    .join(". ")}`;
 
   // Refs rather than deps: the plot is built once, and everything it calls back into wants the
   // newest render's values, not the ones that happened to be current when it was built.
@@ -121,9 +176,25 @@ export default function UPlotChart<S>(
   const tooltipRef = React.useRef(props.tooltip);
   tooltipRef.current = props.tooltip;
 
+  // A plot's options are built once and then only fed data, so the colours in them are the
+  // ones that were in force when it was built. Switching palette therefore has to rebuild --
+  // which is what this version does, by changing below alongside width and structure
+  const themeVersion = React.useSyncExternalStore(
+    subscribeThemeMode,
+    getThemeVersion,
+    getThemeVersion,
+  );
+
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
-    const measure = () => setWidth(root.clientWidth);
+    const measure = () => {
+      // Floor fractional flex widths so uPlot's explicit canvas width can never
+      // round a pixel wider than the pane that owns it.
+      const nextWidth = Math.floor(root.getBoundingClientRect().width);
+      setWidth((currentWidth) =>
+        currentWidth === nextWidth ? currentWidth : nextWidth,
+      );
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
@@ -169,9 +240,9 @@ export default function UPlotChart<S>(
       plotRef.current = null;
       drawnRef.current = null;
     };
-    // Data changes go through setData below; only size and shape rebuild
+    // Data changes go through setData below; only size, shape and palette rebuild
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height, structureKey]);
+  }, [width, height, structureKey, themeVersion]);
 
   React.useLayoutEffect(() => {
     if (plotRef.current && drawnRef.current !== data) {
@@ -180,5 +251,45 @@ export default function UPlotChart<S>(
     }
   });
 
-  return <div id={id} ref={rootRef} role="img" aria-label={ariaLabel} />;
+  return (
+    <div className="accessibleChart">
+      <div
+        id={id}
+        ref={rootRef}
+        role="img"
+        aria-label={accessibleLabel}
+        style={{
+          width: "100%",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+        }}
+      />
+      <details className="chartDataSummary">
+        <summary>View chart summary</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Series</th>
+              <th>Latest</th>
+              <th>Minimum</th>
+              <th>Maximum</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {seriesSummary.map((series) => (
+              <tr key={series.label}>
+                <th>{series.label}</th>
+                <td>{series.latest}</td>
+                <td>{series.minimum}</td>
+                <td>{series.maximum}</td>
+                <td>{series.trend}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  );
 }

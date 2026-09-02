@@ -28,10 +28,8 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// Bump on any breaking schema change. Mismatched replays are ignored rather than migrated.
-// 2 added `location`: a v1 replay names only a scenario, and a scenario no longer pins down
-// where it is played, so there is no safe way to migrate one.
-export const REPLAY_VERSION = 2;
+// Initial public schema. Increment this when a post-release change becomes incompatible.
+export const REPLAY_VERSION = 1;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -52,10 +50,7 @@ export const MAX_REPLAY_BYTES = 800000;
 // Only the fields of a `delta` that change how the simulation runs. Everything else the action
 // carries -- the tutorial step, the custom scenario, the difficulty picked before the game began
 // -- either doesn't affect the sim or is already in the replay header.
-export const RECORDED_DELTA_KEYS = [
-  "dollarsPerkWh",
-  "monthlyMarketingSpend",
-] as const;
+export const RECORDED_DELTA_KEYS = ["dollarsPerkWh"] as const;
 
 export type RecordedDeltaType = Partial<
   Pick<GameType, (typeof RECORDED_DELTA_KEYS)[number]>
@@ -76,22 +71,17 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
 export function recordedDelta(
   payload: Partial<GameType>,
 ): RecordedDeltaType | null {
-  const recorded: RecordedDeltaType = {};
-  let any = false;
-  RECORDED_DELTA_KEYS.forEach((key) => {
-    if (payload[key] !== undefined) {
-      recorded[key] = payload[key];
-      any = true;
-    }
-  });
-  return any ? recorded : null;
+  const rate = payload.dollarsPerkWh;
+  return typeof rate === "number" && Number.isFinite(rate) && rate >= 0
+    ? { dollarsPerkWh: rate }
+    : null;
 }
 
 /**
  * Appends an action to the run's log, if the run is being recorded at all.
  *
- * Consecutive deltas within the same game minute are merged rather than appended: the rate and
- * marketing sliders fire an action per pixel dragged, and since nothing reads either value until
+ * Consecutive deltas within the same game minute are merged rather than appended: the rate slider
+ * fires an action per pixel dragged, and since nothing reads the intermediate values until
  * the next tick, only the one the player let go on ever mattered. Merging is exact, and it's the
  * difference between a few dozen entries and a few thousand.
  */
@@ -141,9 +131,7 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     seed: game.seed,
-    startingYear: game.startingYear,
     location: cloneDeep(game.location),
-    durationMinutes: game.date.minute,
     actions: cloneDeep(game.replayLog),
   };
 }
@@ -221,6 +209,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
+    typeof doc.appVersion !== "string" ||
     typeof doc.difficulty !== "string" ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
@@ -234,18 +223,11 @@ export function decodeReplay(raw: unknown): ReplayType | null {
   }
   return {
     version: REPLAY_VERSION,
-    appVersion: typeof doc.appVersion === "string" ? doc.appVersion : "unknown",
+    appVersion: doc.appVersion,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
-    // Diagnostic only (see ReplayType), so a document without one is still a replay
-    startingYear: isFiniteNumber(doc.startingYear)
-      ? doc.startingYear
-      : undefined,
     location: doc.location,
-    durationMinutes: isFiniteNumber(doc.durationMinutes)
-      ? doc.durationMinutes
-      : 0,
     actions,
   };
 }
