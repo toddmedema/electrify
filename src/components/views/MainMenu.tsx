@@ -84,9 +84,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           >
             {startLabel}
           </Button>
-          {!props.hasSavedGame && !props.uid && (
-            <Typography variant="caption">Free · no sign-up needed</Typography>
-          )}
         </Stack>
         <Stack
           component="nav"
@@ -113,9 +110,21 @@ const MainMenu = (props: Props): React.JSX.Element => {
             Settings
           </Button>
           {!props.uid && (
-            <Button variant="text" color="primary" onClick={login}>
-              Sign in
-            </Button>
+            <Stack
+              role="group"
+              aria-label="Sign-in options"
+              spacing={0}
+              sx={{ alignItems: "center" }}
+            >
+              <Button variant="text" color="primary" onClick={login}>
+                Sign in
+              </Button>
+              {!props.hasSavedGame && (
+                <Typography variant="caption">
+                  Free · no sign-up needed
+                </Typography>
+              )}
+            </Stack>
           )}
         </Stack>
         <Stack

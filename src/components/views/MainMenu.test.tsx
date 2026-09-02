@@ -39,7 +39,15 @@ describe("MainMenu", () => {
 
   it("only advertises account-free play before sign-in", () => {
     const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
-    expect(screen.getByText("Free · no sign-up needed")).toBeInTheDocument();
+    const signInOptions = screen.getByRole("group", {
+      name: "Sign-in options",
+    });
+    expect(
+      within(signInOptions).getByRole("button", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(
+      within(signInOptions).getByText("Free · no sign-up needed"),
+    ).toBeInTheDocument();
 
     rerender(<MainMenu {...props({ uid: "player" })} />);
     expect(
