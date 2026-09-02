@@ -95,9 +95,11 @@ npm run fetch-weather -- Tokyo Nairobi Reykjavik
 
 The data is ERA5 reanalysis from the [Open-Meteo archive
 API](https://open-meteo.com/en/docs/historical-weather-api), which is free and needs no key but
-rate limits to roughly ten cities an hour and twenty a day. The script paces itself against that,
-writes each city out as it finishes and skips whatever is already on disk - so filling in the rest
-of the catalogue is a matter of running it again tomorrow rather than leaving it running.
+rate limits by location-day. A 1980-2025 city costs 552 location-days, or 1,104 when its offshore
+point is fetched too, which works out to roughly nine onshore cities or four offshore cities an
+hour. The script paces itself against that, writes each city out as it finishes and skips whatever
+is already on disk - so filling in the rest of the catalogue is a matter of running it again
+tomorrow rather than leaving it running.
 
 To extend every existing file after another calendar year has completed, run:
 

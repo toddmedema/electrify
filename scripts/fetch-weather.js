@@ -11,8 +11,9 @@
  * ones that are.
  *
  * Rate limits are the binding constraint, not bandwidth. Open-Meteo's free tier allows roughly
- * 600 location-days a minute, 5,000 an hour and 10,000 a day, and one city costs 480 - so a run
- * fetches about ten cities an hour and twenty a day before the API starts refusing. Everything
+ * 600 location-days a minute, 5,000 an hour and 10,000 a day. A 1980-2025 city costs 552
+ * location-days, or 1,104 when its offshore point is fetched too, so a run gets through roughly
+ * nine onshore cities or four offshore cities an hour before the API starts refusing. Everything
  * here is built around that: cities are written out as each small batch finishes, an already
  * written city is skipped, and a run that gets cut off by the daily limit stops cleanly and
  * leaves the rest for the next one. Filling all of scripts/cities.json takes a couple of weeks
@@ -748,9 +749,13 @@ async function main() {
   }
 
   const perCity = (ENDING_YEAR - STARTING_YEAR + 1) * MONTHS_PER_YEAR;
+  const locationDays = wanted.reduce(
+    (total, city) => total + perCity * (city.offshore ? 2 : 1),
+    0,
+  );
   log(
-    `Fetching ${wanted.length} cities, ${perCity} location-days each. ` +
-      `The free tier allows about ten cities an hour.`,
+    `Fetching ${wanted.length} cities (${locationDays} location-days; ` +
+      `${perCity} per onshore city, ${perCity * 2} with offshore wind).`,
   );
 
   const fetched = {};
