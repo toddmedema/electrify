@@ -1326,7 +1326,7 @@ export default class Insights extends React.Component<Props, State> {
                     </>
                   ) : (
                     <>
-                      Forecast electricity shortfall: ~
+                      Forecasted shortfall: ~
                       {formatWattHours(projection.blackoutTotalWh)} of demand
                       not met · largest shortage{" "}
                       {formatWatts(projection.largestBlackout.peakW)}
@@ -1803,18 +1803,21 @@ export default class Insights extends React.Component<Props, State> {
                   </IconButton>
                 </Tooltip>
               </div>
-              <Button
-                id="insightsLayersButton"
-                className="insightsLayerControls"
-                startIcon={<LayersIcon />}
-                onClick={() =>
-                  this.setState({ layersOpen: !this.state.layersOpen })
-                }
-                aria-expanded={this.state.layersOpen}
-                aria-controls="insightsLayerPanel"
-              >
-                Layers ({visible.length})
-              </Button>
+              <Tooltip title={`Choose layers (${visible.length} shown)`}>
+                <IconButton
+                  id="insightsLayersButton"
+                  className="insightsLayerControls"
+                  size="small"
+                  onClick={() =>
+                    this.setState({ layersOpen: !this.state.layersOpen })
+                  }
+                  aria-label={`Layers (${visible.length} shown)`}
+                  aria-expanded={this.state.layersOpen}
+                  aria-controls="insightsLayerPanel"
+                >
+                  <LayersIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </div>
             <Menu
               id="insightsPresetActionsMenu"
@@ -1826,7 +1829,7 @@ export default class Insights extends React.Component<Props, State> {
                 disabled={customLimitReached || !this.state.layers.length}
                 onClick={() => this.openPresetDialog("saveAs")}
               >
-                Save as new preset…
+                Save as new preset
               </MenuItem>
               {selectedCustom && (
                 <MenuItem onClick={() => this.openPresetDialog("rename")}>
@@ -1841,7 +1844,7 @@ export default class Insights extends React.Component<Props, State> {
               {selectedDefault &&
                 this.state.presetLibrary.defaults[selectedDefault] && (
                   <MenuItem onClick={() => this.openPresetDialog("restore")}>
-                    Restore original preset…
+                    Restore original preset
                   </MenuItem>
                 )}
             </Menu>

@@ -55,7 +55,7 @@ describe("MainMenu", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("places account actions between resources and discovery actions", () => {
+  it("places account actions below the sound and discovery actions", () => {
     render(
       <MainMenu
         {...props({
@@ -74,11 +74,11 @@ describe("MainMenu", () => {
       name: "Discovery actions",
     });
     expect(
-      resources.compareDocumentPosition(account) &
+      resources.compareDocumentPosition(discovery) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      account.compareDocumentPosition(discovery) &
+      discovery.compareDocumentPosition(account) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(within(account).getByText("Free · no sign-up needed")).toBeVisible();

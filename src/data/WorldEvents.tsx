@@ -65,11 +65,11 @@ export interface StoryPhaseDefinitionType {
   /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
   scheduleAddress?: string;
   scheduleOffsetMonths?: number | ((context: StoryContextType) => number);
-  /** Short, future-tense copy for the Events tab. Live logs continue to use `describe`. */
+  /** Events-tab copy; live logs use `describe`. Return null to omit warning-only phases. */
   preview?: (
     context: StoryContextType,
     random: StoryRandomType,
-  ) => StoryPhasePreviewType;
+  ) => StoryPhasePreviewType | null;
   describe: (
     context: StoryContextType,
     random: StoryRandomType,
@@ -168,6 +168,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "regional-glut-warning",
       schedule: { atMonth: 12 },
+      preview: () => null,
       describe: () => ({
         title: "Cheaper gas forecast",
         message:
@@ -201,6 +202,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "freeze-warning",
       schedule: { atMonth: 95 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const { freezeGasOutput } = SHALE_BOOM_BALANCE[difficulty];
         return {
@@ -436,6 +438,7 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
     {
       id: "published-ratchet",
       schedule: { atMonth: 12 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const feePerTon = CARBON_FEE_BALANCE[difficulty];
         return {
@@ -515,6 +518,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
     {
       id: "visitor-warning",
       schedule: { atMonth: 21 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Visitor surge forecast",
         message: `Visitors are expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
@@ -545,6 +549,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
     {
       id: "cargo-warning",
       schedule: { atMonth: 101 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Fuel delivery warning",
         message: `A late fuel shipment could raise oil prices ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% this fall, so prepare local generation or stored energy before September.`,
@@ -662,6 +667,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
     {
       id: "manufacturing-warning",
       schedule: { atMonth: 72 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
@@ -704,6 +710,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
     {
       id: "clean-tech-load-warning",
       schedule: { atMonth: 114 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Factory growth forecast",
         message: `New factories are expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
@@ -775,6 +782,7 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
     {
       id: "outlook",
       schedule: { atMonth: 96 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const balance = HURRICANE_BALANCE[difficulty];
         return {
@@ -896,6 +904,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
     {
       id: "aging-warning",
       schedule: { atMonth: 48 },
+      preview: () => null,
       describe: ({ snapshot, difficulty }) => {
         const selected = snapshot.facilities.filter(
           (facility) => facility.fuel === "Coal" && facility.ageYears + 2 >= 30,
@@ -951,6 +960,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
     {
       id: "compliance-warning",
       schedule: { atMonth: 130 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "New coal rules announced",
         message: `Operating costs for old and new coal plants will rise ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
@@ -1181,6 +1191,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
     {
       id: "seasonal-warning",
       schedule: { atMonth: 24 },
+      preview: () => null,
       describe: () => ({
         title: "A hot, dry summer ahead",
         message:
@@ -1250,10 +1261,7 @@ const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
     {
       id: "advance-warning",
       schedule: { atMonth: 24 },
-      preview: () => ({
-        title: "Eclipse planning ahead",
-        message: "Grid planners will begin preparing for a total eclipse.",
-      }),
+      preview: () => null,
       describe: () => ({
         title: "Eclipse preparations begin",
         message:
@@ -1304,6 +1312,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
     {
       id: "contingency-review",
       schedule: { atMonth: 24 },
+      preview: () => null,
       describe: () => ({
         title: "Backup-power review",
         message:
@@ -1760,10 +1769,10 @@ export function upcomingStoryPhases(
     .flatMap((arc) =>
       arc.phases
         .filter((phase) => phase.forecastable !== false)
-        .map((phase) => {
+        .flatMap((phase) => {
           const resolved = resolveStoryPhase(arc, phase, context);
           if (!phase.preview) {
-            return resolved;
+            return [resolved];
           }
           const random = (attribute: string) =>
             randomAt(
@@ -1772,11 +1781,15 @@ export function upcomingStoryPhases(
               storyHash(`${resolved.key}|${attribute}`),
             );
           const preview = phase.preview(context, random);
-          return {
-            ...resolved,
-            title: preview.title,
-            message: preview.message,
-          };
+          return preview
+            ? [
+                {
+                  ...resolved,
+                  title: preview.title,
+                  message: preview.message,
+                },
+              ]
+            : [];
         }),
     )
     .filter(
