@@ -19,6 +19,11 @@ files are large, so broad rewrites create expensive review diffs.
 - When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
   finished interface and embed them in the pull request description. Choose views that clearly
   show the change, including both desktop and mobile layouts when responsive behavior is relevant.
+- Keep review screenshots in a temporary location and upload them with GitHub CLI 2.99 or newer
+  using `gh pr create --attach`, `gh pr edit --attach`, or `gh pr comment --attach`. Do not commit
+  screenshots that exist only to illustrate a pull request; GitHub-hosted attachments keep them
+  out of the repository and its Git LFS history. Remove the temporary files after a successful
+  upload.
 - Review screenshots before uploading them: exclude sensitive or user-specific data, transient
   errors, debug UI, and unrelated windows or overlays. Non-UI changes do not need screenshots.
 - If the current environment cannot capture or upload images, say so in the pull request
