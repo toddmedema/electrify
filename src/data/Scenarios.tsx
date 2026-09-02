@@ -127,22 +127,7 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <TutorialPrompt
-            concepts={["play"]}
-            text="Tap 1× to start time."
-            action={["play"]}
-          />
-        ),
-      },
-      {
-        card: "FACILITIES",
-        target: "#chartSupplyDemand",
-        advanceOn: (s: AppStateType) => s.game.date.minute >= 1440,
-        content: (
-          <TutorialPrompt
-            concepts={["weather", "time"]}
-            text="Watch one full day go by."
-          />
+          <TutorialPrompt concepts={["play"]} text="Tap 1× to start time." />
         ),
       },
       {
@@ -194,7 +179,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["build", "generator"]}
             text="Open the generator shop."
-            action={["generator"]}
           />
         ),
       },
@@ -216,7 +200,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["buy", "generator"]}
             text="Choose a generator and decide whether to pay with cash or a loan."
-            action={["buy"]}
           />
         ),
       },
@@ -235,11 +218,7 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <TutorialPrompt
-            concepts={["play"]}
-            text="Tap 1× to run the year."
-            action={["play"]}
-          />
+          <TutorialPrompt concepts={["play"]} text="Tap 1× to run the year." />
         ),
       },
       {
@@ -292,7 +271,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["build", "storage"]}
             text="Store spare power for when you need it - open the storage shop."
-            action={["storage"]}
           />
         ),
       },
@@ -304,7 +282,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["buy", "storage"]}
             text="Choose a storage system and decide whether to pay with cash or a loan."
-            action={["buy"]}
           />
         ),
       },
@@ -326,7 +303,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["reorder"]}
             text="Drag facilities to change their dispatch order. Generators higher in the list run first; storage charges when they make more electricity than customers need."
-            action={["reorder"]}
           />
         ),
       },
@@ -335,11 +311,7 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <TutorialPrompt
-            concepts={["play"]}
-            text="Tap 1× to run it."
-            action={["play"]}
-          />
+          <TutorialPrompt concepts={["play"]} text="Tap 1× to run it." />
         ),
       },
       {
@@ -443,7 +415,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["play", "money"]}
             text="Tap 1× to run a month and watch the numbers."
-            action={["play"]}
           />
         ),
       },
@@ -517,7 +488,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["rate", "customers"]}
             text="Lower the rate below the market price so more customers choose your utility."
-            action={["rate"]}
           />
         ),
       },
@@ -536,11 +506,7 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
         content: (
-          <TutorialPrompt
-            concepts={["play"]}
-            text="Tap 1× to run the year."
-            action={["play"]}
-          />
+          <TutorialPrompt concepts={["play"]} text="Tap 1× to run the year." />
         ),
       },
       {
@@ -592,7 +558,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["pause", "generator"]}
             text="Pause your only plant and watch how the supply forecast changes."
-            action={["pause"]}
           />
         ),
       },
@@ -615,7 +580,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["play", "blackout"]}
             text="Tap 1× and let the predicted blackout begin."
-            action={["play"]}
           />
         ),
       },
@@ -647,7 +611,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["play", "generator"]}
             text="Turn it back on."
-            action={["play"]}
           />
         ),
       },
@@ -679,7 +642,6 @@ export const SCENARIOS = [
           <TutorialPrompt
             concepts={["play"]}
             text="Tap 1× to run the year. The Manual has the deep dives."
-            action={["play"]}
           />
         ),
       },

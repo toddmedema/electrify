@@ -1130,10 +1130,6 @@ $pane_header_height: 40px;
 
   .tutorialHudContent .tutorialPrompt {
     grid-template-columns: minmax(0, 1fr);
-
-    .tutorialPromptAction {
-      grid-column: auto;
-    }
   }
 }
 
@@ -1798,8 +1794,7 @@ html[data-theme="dark"] .uplot {
     border-radius: 0;
   }
 
-  // Icon-led step content: symbols on top, one confirming line of text, and for gated
-  // steps a "do this" chip naming the deed in the same symbols
+  // Icon-led step content: symbols on top and one confirming line of text
   .tutorialPrompt {
     text-align: center;
 
@@ -1813,16 +1808,6 @@ html[data-theme="dark"] .uplot {
 
     .tutorialPromptArrow {
       opacity: 0.5;
-    }
-
-    .tutorialPromptAction {
-      display: inline-flex;
-      align-items: center;
-      gap: size(tiny);
-      margin-top: size(small);
-      padding: size(tiny) size(small);
-      border: 1px solid var(--border-strong);
-      border-radius: 100px;
     }
   }
 
@@ -2788,12 +2773,6 @@ html[data-theme="dark"] .uplot {
   backdrop-filter: blur(10px);
 }
 
-.tutorialHud-collapsed {
-  width: 100%;
-  max-height: none;
-  overflow: hidden;
-}
-
 .tutorialHudHeader {
   display: flex;
   min-width: 0;
@@ -2821,33 +2800,6 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-.tutorialHudToggle {
-  flex: 0 0 auto;
-}
-
-.tutorialHudProgressRing {
-  position: relative;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  place-items: center;
-}
-
-.tutorialHudProgressRing > * {
-  grid-area: 1 / 1;
-}
-
-.tutorialHudProgressIcon {
-  display: grid;
-  place-items: center;
-
-  .conceptIcon {
-    width: 20px;
-    height: 20px;
-  }
-}
-
 .tutorialHudContent {
   min-width: 0;
   margin-top: 6px;
@@ -2864,11 +2816,6 @@ html[data-theme="dark"] .uplot {
     min-height: 32px;
     margin-bottom: 0;
     padding: 4px 8px;
-  }
-
-  .tutorialPromptAction {
-    grid-column: 1 / -1;
-    margin-top: 2px;
   }
 }
 
@@ -2893,52 +2840,41 @@ html[data-theme="dark"] .uplot {
   flex: 1 1 auto;
 }
 
-.tutorialHudGate {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: $interactive_blue;
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.tutorialHudScreenReader {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  clip-path: inset(50%) !important;
-  white-space: nowrap !important;
-}
-
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
-// surrounding choices. Capstones never receive this class.
+// surrounding choices. If the player has not acted after ten seconds, a short pulse repeats every
+// ten seconds. Capstones never receive either class.
 .tutorialTarget {
-  outline: 3px solid var(--interactive-blue) !important;
+  outline: 2px solid var(--interactive-blue) !important;
   outline-offset: 3px;
-  animation: tutorialTargetPulse 1.6s ease-in-out infinite;
+}
+
+.tutorialTargetReminder {
+  animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
 
 @keyframes tutorialTargetPulse {
   0%,
+  16%,
   100% {
     box-shadow: 0 0 0 0 var(--interactive-tint);
   }
-  50% {
+  8% {
     box-shadow: 0 0 0 7px transparent;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTarget {
+  .tutorialTargetReminder {
     animation: none;
+  }
+
+  .tutorialTarget {
+    outline-width: 3px !important;
   }
 }
 
 @media screen and (min-width: 700px) {
-  .tutorialHud-expanded {
+  .tutorialHud {
     display: grid;
     grid-template-areas:
       "header content footer"
