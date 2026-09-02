@@ -249,6 +249,8 @@ export interface ReplayPlaybackType {
 export interface LocalStoragePlayedType {
   scenarioId: number;
   date: string; // Stringified new Date()
+  // Missing from older saves, where the presence of this record means one completed play.
+  timesPlayed?: number;
 }
 
 export interface DateType {
@@ -561,6 +563,9 @@ export interface TutorialStepChangeType {
 export type ScenarioBriefingToneType =
   "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
 
+export type ScenarioThemeType =
+  "Extreme weather" | "Energy transition" | "Rapid growth";
+
 /**
  * The authored promise of a scenario, kept beside its simulation setup so the mission list and
  * briefing screen tell the same story. Each scenario's dedicated icon supplies the visual tone.
@@ -583,6 +588,10 @@ export interface ScenarioType {
   location?: LocationType;
   summary?: string;
   briefing?: ScenarioBriefingType;
+  // Player-facing browse categories. A challenge may appear in more than one theme.
+  themes?: ScenarioThemeType[];
+  // Lower numbers appear first in the compact recommendations; omitted challenges follow.
+  recommendationOrder?: number;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves

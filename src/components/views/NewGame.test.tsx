@@ -28,14 +28,57 @@ function recordPlayed(...scenarioIds: number[]) {
   );
 }
 
+function challengeRows(): HTMLElement[] {
+  return within(screen.getByTestId("challenge-list")).getAllByTestId(
+    /^mission-row-/,
+  );
+}
+
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
 
-  it("shows training in its authored order and scenarios by latest timeframe", () => {
+  it("starts with one next lesson and three varied challenge recommendations", () => {
     render(<NewGame {...props()} />);
 
-    const rows = screen.getAllByTestId(/^mission-row-/);
-    expect(rows).toHaveLength(SCENARIOS.length + 1);
+    expect(
+      screen.getByTestId(`tutorial-spotlight-${TUTORIALS[0].id}`),
+    ).toHaveTextContent("Continue learning · 0 of 6 complete");
+    expect(screen.queryByTestId(`mission-row-${TUTORIALS[0].id}`)).toBeNull();
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Carbon Fee"),
+    ]);
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
+    expect(screen.getByRole("button", { name: "View all 6" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(
+      screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`),
+    ).toHaveTextContent("Custom Game");
+  });
+
+  it("expands tutorials in authored order and shows all challenges by latest timeframe", () => {
+    render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    const tutorialCatalog = screen.getByRole("group", {
+      name: "All tutorials",
+    });
+    const tutorialRows =
+      within(tutorialCatalog).getAllByTestId(/^mission-row-/);
+    TUTORIALS.forEach((tutorial, index) =>
+      expect(tutorialRows[index]).toHaveTextContent(
+        tutorial.name.replace(/^Mission \d+:\s*/, ""),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     const scenariosNewestFirst = SCENARIOS.filter(
       (scenario) => !scenario.tutorialSteps,
     ).sort(
@@ -46,30 +89,91 @@ describe("NewGame", () => {
           1 -
           (a.startingYear + Math.ceil(a.durationMonths / 12) - 1),
     );
-    [...TUTORIALS, ...scenariosNewestFirst].forEach((scenario, index) =>
-      expect(rows[index]).toHaveTextContent(
-        scenario.name.replace(/^Mission \d+:\s*/, ""),
-      ),
+    const rows = challengeRows();
+    expect(rows).toHaveLength(scenariosNewestFirst.length);
+    scenariosNewestFirst.forEach((scenario, index) =>
+      expect(rows[index]).toHaveTextContent(scenario.name),
     );
-    const scenarioYears = scenariosNewestFirst.map(
-      (scenario) => scenario.startingYear,
-    );
-    expect(scenarioYears).toEqual([...scenarioYears].sort((a, b) => b - a));
-    expect(
-      scenariosNewestFirst
-        .filter((scenario) => scenario.startingYear === 2020)
-        .map((scenario) => scenario.name),
-    ).toEqual(["Data Center Boom", "Carbon Fee"]);
-    expect(rows[rows.length - 1]).toHaveTextContent("Custom Game");
-    expect(screen.getByText("Learn the basics")).toBeInTheDocument();
-    expect(screen.getByText("Challenges")).toBeInTheDocument();
-    expect(screen.getByText("Custom game")).toBeInTheDocument();
-    expect(
-      screen.getByRole("list", { name: "Available games" }),
-    ).toContainElement(rows[0]);
   });
 
-  it("uses each scenario's dedicated icon", () => {
+  it("filters the full challenge catalog by player-facing themes", () => {
+    render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Extreme weather" }));
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Heatwave + Drought"),
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Hurricane Season"),
+    ]);
+    expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
+      "Extreme weather",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Energy transition" }));
+    expect(screen.getByTestId("mission-row-105")).toHaveTextContent("Paradise");
+    expect(screen.queryByTestId("mission-row-104")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "For you" }));
+    expect(challengeRows()).toHaveLength(3);
+    expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
+  });
+
+  it("moves completed recommendations behind unplayed challenges", () => {
+    recordPlayed(107);
+    render(<NewGame {...props()} />);
+
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Carbon Fee"),
+      expect.stringContaining("Solar Eclipse"),
+    ]);
+  });
+
+  it("fills fewer than three unplayed recommendations with the most-played challenge", () => {
+    const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+    const unplayedNames = new Set(["Deep Freeze", "Data Center Boom"]);
+    const playedIds = challenges
+      .filter((scenario) => !unplayedNames.has(scenario.name))
+      .map((scenario) => scenario.id);
+    const paradiseId = challenges.find(
+      (scenario) => scenario.name === "Paradise",
+    )!.id;
+    recordPlayed(...playedIds, paradiseId, paradiseId, paradiseId);
+
+    render(<NewGame {...props()} />);
+
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Paradise"),
+    ]);
+  });
+
+  it("recommends the most-played challenges after every challenge has been played", () => {
+    const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+    const dataCenterId = challenges.find(
+      (scenario) => scenario.name === "Data Center Boom",
+    )!.id;
+    const deepFreezeId = challenges.find(
+      (scenario) => scenario.name === "Deep Freeze",
+    )!.id;
+    recordPlayed(
+      ...challenges.map((scenario) => scenario.id),
+      dataCenterId,
+      dataCenterId,
+      deepFreezeId,
+    );
+
+    render(<NewGame {...props()} />);
+
+    expect(challengeRows().map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Data Center Boom"),
+      expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("Carbon Fee"),
+    ]);
+  });
+
+  it("uses each recommended scenario's dedicated icon", () => {
     render(<NewGame {...props()} />);
     expect(
       screen.getByRole("img", { name: "Carbon Fee icon" }),
@@ -82,7 +186,7 @@ describe("NewGame", () => {
     ).toHaveAttribute("src", "/images/texas deep freeze.svg");
   });
 
-  it("shows the inclusive final calendar year for each scenario", () => {
+  it("shows the inclusive final calendar year for recommendations", () => {
     render(<NewGame {...props()} />);
 
     expect(screen.getByTestId("mission-row-107")).toHaveTextContent(
@@ -93,62 +197,66 @@ describe("NewGame", () => {
     );
   });
 
-  it("highlights the first incomplete tutorial without replacing its subtitle", () => {
+  it("turns the first incomplete tutorial into an explicit continuation", () => {
     recordPlayed(TUTORIALS[0].id);
     render(<NewGame {...props()} />);
 
-    const next = screen.getByTestId(`mission-row-${TUTORIALS[1].id}`);
-    expect(TUTORIALS[1].summary).toBeDefined();
+    const next = screen.getByTestId(`tutorial-spotlight-${TUTORIALS[1].id}`);
+    expect(next).toHaveTextContent("Continue learning · 1 of 6 complete");
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
-    expect(next).not.toHaveTextContent("Start here");
-    expect(next).not.toHaveTextContent("Recommended next");
-    expect(next).toHaveTextContent(
-      TUTORIALS[1].name.replace(/^Mission \d+:\s*/, ""),
-    );
-    expect(next).toHaveClass("tutorialNext");
     expect(within(next).getByRole("button")).toHaveAccessibleName(
       `Start ${TUTORIALS[1].name.replace(/^Mission \d+:\s*/, "")}`,
     );
   });
 
-  it("shows completion badges for tutorials and regular missions", () => {
+  it("shows a completion summary when every tutorial is finished", () => {
+    recordPlayed(...TUTORIALS.map((tutorial) => tutorial.id));
+    render(<NewGame {...props()} />);
+
+    expect(screen.getByText("Tutorials complete")).toBeInTheDocument();
+    expect(screen.queryByTestId(/^tutorial-spotlight-/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    expect(
+      within(
+        screen.getByRole("group", { name: "All tutorials" }),
+      ).getAllByTestId(/^mission-complete-/),
+    ).toHaveLength(TUTORIALS.length);
+  });
+
+  it("shows completion badges in the expanded catalogs", () => {
     const regular = SCENARIOS.find(
       (scenario: ScenarioType) => !scenario.tutorialSteps,
     ) as ScenarioType;
     recordPlayed(TUTORIALS[0].id, regular.id);
     render(<NewGame {...props()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     expect(
       screen.getByTestId(`mission-complete-${TUTORIALS[0].id}`),
     ).toBeInTheDocument();
     expect(
       screen.getByTestId(`mission-complete-${regular.id}`),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Completed")).toBeNull();
   });
 
-  it("starts tutorials directly and opens details for regular missions", () => {
+  it("starts the recommended tutorial and opens challenge and custom details", () => {
     const onTutorial = jest.fn();
     const onDetails = jest.fn();
     const onCustomGame = jest.fn();
-    const regular = SCENARIOS.find(
-      (scenario: ScenarioType) => !scenario.tutorialSteps,
-    ) as ScenarioType;
     render(<NewGame {...props({ onTutorial, onDetails, onCustomGame })} />);
 
     fireEvent.click(
-      within(screen.getByTestId(`mission-row-${TUTORIALS[0].id}`)).getByRole(
-        "button",
-      ),
+      within(
+        screen.getByTestId(`tutorial-spotlight-${TUTORIALS[0].id}`),
+      ).getByRole("button"),
     );
     expect(onTutorial).toHaveBeenCalledWith(TUTORIALS[0].id);
 
     fireEvent.click(
-      within(screen.getByTestId(`mission-row-${regular.id}`)).getByRole(
-        "button",
-      ),
+      within(screen.getByTestId("mission-row-107")).getByRole("button"),
     );
-    expect(onDetails).toHaveBeenCalledWith({ scenarioId: regular.id });
+    expect(onDetails).toHaveBeenCalledWith({ scenarioId: 107 });
 
     fireEvent.click(
       within(screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`)).getByRole(

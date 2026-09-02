@@ -135,6 +135,23 @@ describe("authored scenario briefings", () => {
       },
     );
   });
+
+  it("gives every challenge at least one player-facing browse theme", () => {
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => expect(scenario.themes?.length).toBeGreaterThan(0),
+    );
+  });
+
+  it("uses the three player-facing challenge themes", () => {
+    const themes = new Set(
+      SCENARIOS.filter((scenario) => !scenario.tutorialSteps).flatMap(
+        (scenario) => scenario.themes ?? [],
+      ),
+    );
+    expect(themes).toEqual(
+      new Set(["Extreme weather", "Energy transition", "Rapid growth"]),
+    );
+  });
 });
 
 describe("authored starting fleets", () => {

@@ -1407,23 +1407,6 @@ html[data-theme="dark"] .uplot {
   margin-bottom: 100%;
 }
 
-// Completion state of each tutorial in the scenario list
-.tutorialIncomplete {
-  color: var(--font-color-disabled);
-}
-
-// How far through the 101-106 sequence the player is
-.tutorialProgressBar {
-  margin: 0 16px 12px 8px;
-  height: 4px !important;
-  border-radius: 2px;
-}
-
-// The next tutorial to play, so the sequence has one obvious entry point
-.tutorialNext {
-  border-left: 4px solid var(--interactive-blue);
-}
-
 .scenarioDossier {
   display: flex;
   flex-direction: column;
@@ -2361,6 +2344,140 @@ html[data-theme="dark"] .uplot {
         padding-top: 12px;
       }
     }
+
+    .missionSectionHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: transparent;
+      color: $font_color_primary;
+
+      .MuiButton-root {
+        flex: 0 0 auto;
+        margin-right: -8px;
+        text-transform: none;
+      }
+    }
+  }
+
+  .tutorialSpotlight {
+    margin: 0 12px 8px;
+    border: 1px solid $interactive_blue;
+    border-radius: 10px;
+    background: var(--bg-raised);
+    box-shadow: none;
+
+    .MuiCardHeader-root {
+      padding: 12px 14px 8px;
+    }
+
+    .MuiCardHeader-action {
+      align-self: center;
+      margin: 0 0 0 12px;
+    }
+  }
+
+  .tutorialSpotlightEyebrow,
+  .tutorialSpotlightTitle {
+    display: block;
+  }
+
+  .tutorialSpotlightEyebrow {
+    margin-bottom: 2px;
+    color: $interactive_blue;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+  }
+
+  .tutorialSpotlightTitle {
+    color: $font_color_primary;
+    font-weight: 700;
+  }
+
+  .tutorialSpotlightAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: $interactive_blue;
+    color: $bg_primary;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .tutorialSpotlightProgress {
+    height: 4px !important;
+    margin: 0 14px 12px;
+    border-radius: 2px;
+  }
+
+  .tutorialCompleteSummary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 12px 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-tile);
+    border-radius: 10px;
+    background: var(--bg-raised);
+
+    & > span {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .tutorialCatalog {
+    padding-top: 4px;
+  }
+
+  .challengeFilters {
+    display: flex !important;
+    gap: 6px;
+    width: calc(100% - 24px);
+    margin: 0 12px 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+
+    .MuiToggleButton-root {
+      flex: 0 0 auto;
+      padding: 5px 10px;
+      border: 1px solid var(--border-tile) !important;
+      border-radius: 999px !important;
+      font-size: 0.75rem;
+      text-transform: none;
+
+      &.Mui-selected {
+        border-color: $interactive_blue !important;
+        color: $interactive_blue;
+        font-weight: 700;
+      }
+    }
+  }
+
+  @media (max-width: 520px) {
+    .tutorialSpotlight {
+      .MuiCardHeader-root {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .MuiCardHeader-content {
+        min-width: 0;
+      }
+
+      .MuiCardHeader-action {
+        grid-row: 2;
+        grid-column: 2;
+        justify-self: start;
+        margin: 8px 0 0 !important;
+      }
+    }
   }
 
   .build-list-item.missionItem {
@@ -2392,6 +2509,23 @@ html[data-theme="dark"] .uplot {
       display: block;
       margin-top: 2px;
       color: $font_color_faded;
+    }
+
+    .missionThemes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .missionThemeTag {
+      height: 20px;
+      color: $font_color_faded;
+      font-size: 0.68rem;
+
+      .MuiChip-label {
+        padding: 0 7px;
+      }
     }
   }
 
