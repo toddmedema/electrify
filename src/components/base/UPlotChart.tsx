@@ -55,6 +55,10 @@ export interface UPlotChartProps<S> {
 }
 
 const TOOLTIP_OFFSET = 8;
+// During a live pane or window resize, changing this state rebuilds the complete plot so axes,
+// fonts and decorations can be rescaled. Do that once after the gesture instead of once per
+// pointer move; uPlot can resize its existing canvas cheaply in the meantime.
+const RESIZE_SETTLE_MS = 120;
 
 function tooltipPlugin<S>(
   getState: () => S,
@@ -116,6 +120,9 @@ export default function UPlotChart<S>(
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
   const [width, setWidth] = React.useState(0);
+  const measuredWidthRef = React.useRef(0);
+  const heightRef = React.useRef(height);
+  heightRef.current = height;
   const number = React.useMemo(
     () => new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }),
     [],
@@ -187,18 +194,64 @@ export default function UPlotChart<S>(
 
   React.useLayoutEffect(() => {
     const root = rootRef.current!;
+    let resizeFrame: number | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let nextWidth = 0;
+
+    const resizeExistingPlot = () => {
+      resizeFrame = undefined;
+      const plot = plotRef.current;
+      if (!plot || nextWidth <= 0) {
+        return;
+      }
+      plot.setSize({
+        width: nextWidth,
+        height: Math.max(
+          1,
+          Math.round((heightRef.current || 300) * chartScale(nextWidth)),
+        ),
+      });
+    };
+
     const measure = () => {
       // Floor fractional flex widths so uPlot's explicit canvas width can never
       // round a pixel wider than the pane that owns it.
-      const nextWidth = Math.floor(root.getBoundingClientRect().width);
-      setWidth((currentWidth) =>
-        currentWidth === nextWidth ? currentWidth : nextWidth,
+      nextWidth = Math.floor(root.getBoundingClientRect().width);
+      if (nextWidth <= 0 || nextWidth === measuredWidthRef.current) {
+        return;
+      }
+      measuredWidthRef.current = nextWidth;
+
+      // There is no canvas to resize on first layout, so build it immediately. Once it exists,
+      // coalesce ResizeObserver bursts into one cheap setSize per animation frame and reserve
+      // the full options rebuild for the end of the resize gesture.
+      if (!plotRef.current) {
+        setWidth(nextWidth);
+        return;
+      }
+      if (resizeFrame === undefined) {
+        resizeFrame = requestAnimationFrame(resizeExistingPlot);
+      }
+      if (settleTimer) {
+        clearTimeout(settleTimer);
+      }
+      settleTimer = setTimeout(
+        () => setWidth(measuredWidthRef.current),
+        RESIZE_SETTLE_MS,
       );
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (resizeFrame !== undefined) {
+        cancelAnimationFrame(resizeFrame);
+      }
+      if (settleTimer) {
+        clearTimeout(settleTimer);
+      }
+    };
   }, []);
 
   React.useLayoutEffect(() => {
