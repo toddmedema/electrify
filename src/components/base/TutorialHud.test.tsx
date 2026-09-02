@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { TutorialStepType } from "../../Types";
@@ -55,35 +55,12 @@ describe("TutorialHud", () => {
     expect(hudProps.onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps collapsed state across objective changes and expands on focus", async () => {
-    const user = userEvent.setup();
-    const hudProps = props();
-    const { rerender } = render(<TutorialHud {...hudProps} />);
+  it("keeps the compact objective visible without collapse controls", () => {
+    render(<TutorialHud {...props()} />);
 
-    await user.click(
-      screen.getByRole("button", { name: "Collapse objective" }),
-    );
-    expect(
-      screen.getByRole("button", { name: "Expand objective" }),
-    ).toHaveAttribute("aria-expanded", "false");
-
-    rerender(
-      <TutorialHud
-        {...hudProps}
-        step={objective({
-          content: (
-            <TutorialPrompt concepts={["money"]} text="Protect your cash." />
-          ),
-        })}
-        stepIndex={1}
-      />,
-    );
-    const expand = screen.getByRole("button", { name: "Expand objective" });
-    fireEvent.focus(expand);
-    expect(
-      screen.getByRole("button", { name: "Collapse objective" }),
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Protect your cash.")).toBeInTheDocument();
+    expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Collapse objective")).toBeNull();
+    expect(screen.queryByLabelText("Expand objective")).toBeNull();
   });
 
   it("reveals help only when requested and has no redundant Next for gates", async () => {
@@ -101,7 +78,7 @@ describe("TutorialHud", () => {
 
     expect(screen.queryByText("Look at the reserve readout.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.getByText("Complete objective")).toBeInTheDocument();
+    expect(screen.queryByText("Complete objective")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Hint" }));
     expect(screen.getByRole("note")).toHaveTextContent(
@@ -110,7 +87,8 @@ describe("TutorialHud", () => {
     expect(screen.getByRole("button", { name: "Hide hint" })).toHaveFocus();
   });
 
-  it("outlines guided targets but never points out a capstone answer", () => {
+  it("delays target reminders and never points out a capstone answer", () => {
+    jest.useFakeTimers();
     const target = document.createElement("button");
     target.id = "tutorial-target";
     document.body.appendChild(target);
@@ -118,6 +96,12 @@ describe("TutorialHud", () => {
     const hudProps = props();
     const { rerender, unmount } = render(<TutorialHud {...hudProps} />);
     expect(target).toHaveClass("tutorialTarget");
+    expect(target).not.toHaveClass("tutorialTargetReminder");
+
+    act(() => jest.advanceTimersByTime(9_999));
+    expect(target).not.toHaveClass("tutorialTargetReminder");
+    act(() => jest.advanceTimersByTime(1));
+    expect(target).toHaveClass("tutorialTargetReminder");
 
     rerender(
       <TutorialHud
@@ -138,5 +122,6 @@ describe("TutorialHud", () => {
 
     unmount();
     target.remove();
+    jest.useRealTimers();
   });
 });

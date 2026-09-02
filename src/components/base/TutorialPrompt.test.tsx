@@ -3,22 +3,17 @@ import { render, screen } from "@testing-library/react";
 import TutorialPrompt from "./TutorialPrompt";
 
 describe("TutorialPrompt", () => {
-  it("names the required action for a gated step", () => {
+  it("keeps the instruction to one concise line", () => {
     render(
       <TutorialPrompt
         concepts={["build", "generator"]}
         text="Open the generator shop."
-        action={["build", "generator"]}
       />,
     );
 
-    expect(screen.getByText("Do this to continue:")).toBeInTheDocument();
-    expect(screen.getByText("build then generator")).toBeInTheDocument();
-    expect(
-      screen.getByRole("status", {
-        name: "Required action: build then generator",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Open the generator shop.")).toBeInTheDocument();
+    expect(screen.queryByText("Do this to continue:")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("gives the concept sequence an accessible summary", () => {

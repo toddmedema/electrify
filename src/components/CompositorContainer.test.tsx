@@ -270,9 +270,9 @@ describe("walkthrough steps", () => {
   });
 
   it("uses the same symbols as the generator and storage buttons it highlights", () => {
-    const actionOf = (step: TutorialStepType) =>
-      React.isValidElement<{ action?: string[] }>(step.content)
-        ? step.content.props.action
+    const conceptsOf = (step: TutorialStepType) =>
+      React.isValidElement<{ concepts?: string[] }>(step.content)
+        ? step.content.props.concepts
         : undefined;
     const generatorStep = walkthrough("Mission 2: Generators").find(
       (step) => step.target === ".button-buildGenerator",
@@ -281,8 +281,8 @@ describe("walkthrough steps", () => {
       (step) => step.target === ".button-buildStorage",
     )!;
 
-    expect(actionOf(generatorStep)).toEqual(["generator"]);
-    expect(actionOf(storageStep)).toEqual(["storage"]);
+    expect(conceptsOf(generatorStep)).toEqual(["build", "generator"]);
+    expect(conceptsOf(storageStep)).toEqual(["build", "storage"]);
   });
 
   it("declares the card every tutorial target lives on", () => {
