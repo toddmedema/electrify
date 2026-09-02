@@ -674,6 +674,8 @@ export const SCENARIOS = [
     icon: "carbon fee",
     locationId: "SF",
     summary: "Pollution now costs money. Can you replace your aging plants?",
+    themes: ["Energy transition"],
+    recommendationOrder: 3,
     briefing: {
       tone: "transition",
       fantasy: "Modernize an aging grid as pollution gets more expensive.",
@@ -697,6 +699,7 @@ export const SCENARIOS = [
     icon: "the shale boom",
     locationId: "PIT",
     summary: "Local gas is suddenly cheap—but the boom may not last.",
+    themes: ["Rapid growth"],
     briefing: {
       tone: "boom",
       fantasy: "Turn a cheap-gas boom into lasting success.",
@@ -717,6 +720,7 @@ export const SCENARIOS = [
     icon: "paradise",
     locationId: "HNL",
     summary: "Power an island where every shipment and outage matters.",
+    themes: ["Island grids"],
     briefing: {
       tone: "island",
       fantasy: "Keep an island paradise bright without outside backup.",
@@ -741,6 +745,7 @@ export const SCENARIOS = [
     icon: "rise of renewables",
     locationId: "SF",
     summary: "New clean technologies are arriving fast. Choose when to invest.",
+    themes: ["Energy transition"],
     briefing: {
       tone: "innovation",
       fantasy: "Build the next generation of clean power.",
@@ -765,6 +770,7 @@ export const SCENARIOS = [
     icon: "hurricane season",
     locationId: "SJU",
     summary: "Prepare an island grid for storms and costly fuel.",
+    themes: ["Extreme weather", "Island grids", "Sudden disruption"],
     briefing: {
       tone: "storm",
       fantasy: "Protect an island grid through years of fierce storms.",
@@ -790,6 +796,7 @@ export const SCENARIOS = [
     icon: "the end of an era",
     locationId: "PIT",
     summary: "Your coal company must adapt to a changing power market.",
+    themes: ["Energy transition"],
     briefing: {
       tone: "legacy",
       fantasy: "Decide what comes after a century of coal.",
@@ -825,6 +832,8 @@ export const SCENARIOS = [
       timeZone: "America/New_York",
     },
     summary: "Prepare for data-center growth without pricing out residents.",
+    themes: ["Rapid growth"],
+    recommendationOrder: 2,
     briefing: {
       tone: "boom",
       fantasy: "Guide a small city grid through explosive growth.",
@@ -883,6 +892,8 @@ export const SCENARIOS = [
       timeZone: "America/Chicago",
     },
     summary: "Prepare Austin's grid for a historic winter emergency.",
+    themes: ["Extreme weather", "Sudden disruption"],
+    recommendationOrder: 1,
     briefing: {
       tone: "storm",
       fantasy: "Keep Austin powered through a brutal winter storm.",
@@ -938,6 +949,7 @@ export const SCENARIOS = [
       resources: { hydro: true },
     },
     summary: "Keep Spain powered through a worsening heatwave and drought.",
+    themes: ["Extreme weather", "Sudden disruption"],
     briefing: {
       tone: "storm",
       fantasy:
@@ -996,6 +1008,7 @@ export const SCENARIOS = [
       resources: { hydro: true },
     },
     summary: "Prepare China's solar-heavy grid for a total eclipse.",
+    themes: ["Energy transition", "Sudden disruption"],
     briefing: {
       tone: "innovation",
       fantasy:
@@ -1059,6 +1072,7 @@ export const SCENARIOS = [
       resources: { hydro: false },
     },
     summary: "Cover an unexpected nuclear shutdown in France.",
+    themes: ["Sudden disruption"],
     briefing: {
       tone: "legacy",
       fantasy:

@@ -135,6 +135,12 @@ describe("authored scenario briefings", () => {
       },
     );
   });
+
+  it("gives every challenge at least one player-facing browse theme", () => {
+    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
+      (scenario) => expect(scenario.themes?.length).toBeGreaterThan(0),
+    );
+  });
 });
 
 describe("authored starting fleets", () => {

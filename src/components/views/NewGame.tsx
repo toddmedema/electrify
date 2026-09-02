@@ -2,18 +2,24 @@ import * as React from "react";
 import {
   Avatar,
   Badge,
+  Button,
   Card,
   CardActionArea,
   CardHeader,
   IconButton,
+  LinearProgress,
   List,
   ListSubheader,
   Toolbar,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
 import { getPlayedScenarioIds } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
@@ -23,7 +29,7 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "../../data/Scenarios";
-import { GameType, ScenarioType } from "../../Types";
+import { GameType, ScenarioThemeType, ScenarioType } from "../../Types";
 
 export interface StateProps {
   game: GameType;
@@ -39,6 +45,16 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
+type ChallengeFilterType = "All" | ScenarioThemeType;
+
+const CHALLENGE_THEMES: ScenarioThemeType[] = [
+  "Extreme weather",
+  "Energy transition",
+  "Rapid growth",
+  "Island grids",
+  "Sudden disruption",
+];
+
 function scenarioEndYear(scenario: ScenarioType): number {
   return scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1;
 }
@@ -46,9 +62,6 @@ function scenarioEndYear(scenario: ScenarioType): number {
 interface MissionListItemProps {
   s: ScenarioType;
   completed: boolean;
-  // The first mission the player hasn't done yet, called out so the single list has an
-  // obvious entry point instead of a dozen equal-looking rows
-  next: boolean;
   onSelect: () => void;
 }
 
@@ -56,10 +69,28 @@ function displayName(s: ScenarioType): string {
   return s.name.replace(/^Mission \d+:\s*/, "");
 }
 
+interface MissionSectionHeaderProps {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}
+
+function MissionSectionHeader(
+  props: MissionSectionHeaderProps,
+): React.JSX.Element {
+  return (
+    <ListSubheader disableSticky className="missionSectionHeader">
+      <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 700 }}>
+        {props.children}
+      </Typography>
+      {props.action}
+    </ListSubheader>
+  );
+}
+
 // One row for everything: tutorial missions, scenarios, and the custom game all share the
 // list now - the only differences are the action control and what the subheader shows
 function MissionListItem(props: MissionListItemProps): React.JSX.Element {
-  const { s, completed, next, onSelect } = props;
+  const { s, completed, onSelect } = props;
   const isTutorial = !!s.tutorialSteps;
   const name = displayName(s);
   const location = getScenarioLocation(s) || { name: "UNKNOWN" };
@@ -78,11 +109,10 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   return (
     <Card
       data-testid={`mission-row-${s.id}`}
-      className={`build-list-item missionItem${next ? " tutorialNext" : ""}`}
+      className="build-list-item missionItem"
     >
       <CardActionArea
         onClick={onSelect}
-        autoFocus={next}
         aria-label={
           isTutorial
             ? `${completed ? "Review" : "Start"} ${name}`
@@ -121,14 +151,85 @@ function MissionListItem(props: MissionListItemProps): React.JSX.Element {
   );
 }
 
+interface TutorialSpotlightProps {
+  completedTutorials: number;
+  onSelect: () => void;
+  tutorial: ScenarioType;
+}
+
+function TutorialSpotlight(props: TutorialSpotlightProps): React.JSX.Element {
+  const { completedTutorials, onSelect, tutorial } = props;
+  const name = displayName(tutorial);
+  return (
+    <Card
+      data-testid={`tutorial-spotlight-${tutorial.id}`}
+      className="tutorialSpotlight"
+    >
+      <CardActionArea onClick={onSelect} autoFocus aria-label={`Start ${name}`}>
+        <CardHeader
+          avatar={
+            <Avatar
+              src={`/images/${tutorial.icon.toLowerCase()}.svg`}
+              alt={`${name} icon`}
+            />
+          }
+          title={
+            <span>
+              <span className="tutorialSpotlightEyebrow">
+                Continue learning · {completedTutorials} of {TUTORIALS.length}{" "}
+                complete
+              </span>
+              <span className="tutorialSpotlightTitle">{name}</span>
+            </span>
+          }
+          subheader={tutorial.summary}
+          action={
+            <span className="tutorialSpotlightAction" aria-hidden>
+              Start lesson <ArrowRightIcon fontSize="small" />
+            </span>
+          }
+        />
+        <LinearProgress
+          variant="determinate"
+          value={(completedTutorials / TUTORIALS.length) * 100}
+          className="tutorialSpotlightProgress"
+          aria-label={`Tutorials: ${completedTutorials} of ${TUTORIALS.length} complete`}
+        />
+      </CardActionArea>
+    </Card>
+  );
+}
+
 export default function NewGame(props: Props): React.JSX.Element {
+  const [showAllTutorials, setShowAllTutorials] = React.useState(false);
+  const [showAllChallenges, setShowAllChallenges] = React.useState(false);
+  const [challengeFilter, setChallengeFilter] =
+    React.useState<ChallengeFilterType>("All");
   const ids = getPlayedScenarioIds();
+  const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
   const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
   const scenarios = SCENARIOS.filter((s) => !s.tutorialSteps).sort(
     (a, b) =>
       b.startingYear - a.startingYear ||
       scenarioEndYear(b) - scenarioEndYear(a),
   );
+  const recommendationRank = (scenario: ScenarioType): number => {
+    return scenario.recommendationOrder ?? Number.MAX_SAFE_INTEGER;
+  };
+  const recommendedScenarios = [...scenarios]
+    .sort(
+      (a, b) =>
+        Number(ids.includes(a.id)) - Number(ids.includes(b.id)) ||
+        recommendationRank(a) - recommendationRank(b),
+    )
+    .slice(0, 3);
+  const visibleScenarios = showAllChallenges
+    ? scenarios.filter(
+        (scenario) =>
+          challengeFilter === "All" ||
+          scenario.themes?.includes(challengeFilter),
+      )
+    : recommendedScenarios;
 
   return (
     <div id="listCard" className="flexContainer">
@@ -166,77 +267,125 @@ export default function NewGame(props: Props): React.JSX.Element {
         className="scrollable cardList missionList"
         aria-label="Available games"
       >
-        <ListSubheader
-          disableSticky
-          sx={{
-            bgcolor: "transparent",
-            color: "text.primary",
-            fontWeight: 700,
-          }}
+        <MissionSectionHeader
+          action={
+            <Button
+              size="small"
+              onClick={() => setShowAllTutorials(!showAllTutorials)}
+              aria-expanded={showAllTutorials}
+              aria-controls="tutorial-catalog"
+              endIcon={
+                showAllTutorials ? <ExpandLessIcon /> : <ExpandMoreIcon />
+              }
+            >
+              {showAllTutorials
+                ? "Hide lessons"
+                : `View all ${TUTORIALS.length}`}
+            </Button>
+          }
         >
-          <Typography
-            component="h2"
-            variant="subtitle2"
-            sx={{ fontWeight: 700 }}
-          >
-            Learn the basics
-          </Typography>
-        </ListSubheader>
-        {TUTORIALS.map((s) => (
-          <MissionListItem
-            key={s.id}
-            s={s}
-            completed={ids.indexOf(s.id) !== -1}
-            next={nextTutorial !== undefined && s.id === nextTutorial.id}
-            onSelect={() => props.onTutorial(s.id)}
+          Learn the basics
+        </MissionSectionHeader>
+        {nextTutorial ? (
+          <TutorialSpotlight
+            tutorial={nextTutorial}
+            completedTutorials={completedTutorials}
+            onSelect={() => props.onTutorial(nextTutorial.id)}
           />
-        ))}
-        <ListSubheader
-          disableSticky
-          sx={{
-            bgcolor: "transparent",
-            color: "text.primary",
-            fontWeight: 700,
-          }}
-        >
-          <Typography
-            component="h2"
-            variant="subtitle2"
-            sx={{ fontWeight: 700 }}
+        ) : (
+          <div className="tutorialCompleteSummary">
+            <CheckCircleIcon color="primary" />
+            <span>
+              <strong>Tutorials complete</strong>
+              <Typography
+                component="span"
+                variant="body2"
+                color="textSecondary"
+              >
+                You can replay any lesson whenever you want.
+              </Typography>
+            </span>
+          </div>
+        )}
+        {showAllTutorials && (
+          <div
+            id="tutorial-catalog"
+            className="tutorialCatalog"
+            role="group"
+            aria-label="All tutorials"
           >
-            Challenges
-          </Typography>
-        </ListSubheader>
-        {scenarios.map((s) => (
-          <MissionListItem
-            key={s.id}
-            s={s}
-            completed={ids.indexOf(s.id) !== -1}
-            next={false}
-            onSelect={() => props.onDetails({ scenarioId: s.id })}
-          />
-        ))}
-        <ListSubheader
-          disableSticky
-          sx={{
-            bgcolor: "transparent",
-            color: "text.primary",
-            fontWeight: 700,
-          }}
+            {TUTORIALS.map((s) => (
+              <MissionListItem
+                key={s.id}
+                s={s}
+                completed={ids.indexOf(s.id) !== -1}
+                onSelect={() => props.onTutorial(s.id)}
+              />
+            ))}
+          </div>
+        )}
+        <MissionSectionHeader
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                setShowAllChallenges(!showAllChallenges);
+                setChallengeFilter("All");
+              }}
+              aria-expanded={showAllChallenges}
+              aria-controls="challenge-catalog"
+              endIcon={
+                showAllChallenges ? <ExpandLessIcon /> : <ExpandMoreIcon />
+              }
+            >
+              {showAllChallenges
+                ? "Show recommendations"
+                : `View all ${scenarios.length}`}
+            </Button>
+          }
         >
-          <Typography
-            component="h2"
-            variant="subtitle2"
-            sx={{ fontWeight: 700 }}
+          Challenges
+        </MissionSectionHeader>
+        {showAllChallenges ? (
+          <ToggleButtonGroup
+            className="challengeFilters"
+            value={challengeFilter}
+            exclusive
+            onChange={(
+              _event: React.MouseEvent<HTMLElement>,
+              value: ChallengeFilterType | null,
+            ) => value && setChallengeFilter(value)}
+            aria-label="Filter challenges by theme"
+            size="small"
           >
-            Custom game
+            {(["All", ...CHALLENGE_THEMES] as ChallengeFilterType[]).map(
+              (theme) => (
+                <ToggleButton key={theme} value={theme} aria-label={theme}>
+                  {theme}
+                </ToggleButton>
+              ),
+            )}
+          </ToggleButtonGroup>
+        ) : (
+          <Typography className="challengeBrowseCaption" variant="body2">
+            Recommended for you
           </Typography>
-        </ListSubheader>
+        )}
+        <div id="challenge-catalog" data-testid="challenge-list">
+          {visibleScenarios.map((s) => (
+            <MissionListItem
+              key={s.id}
+              s={s}
+              completed={ids.indexOf(s.id) !== -1}
+              onSelect={() => props.onDetails({ scenarioId: s.id })}
+            />
+          ))}
+        </div>
+        <MissionSectionHeader>Custom game</MissionSectionHeader>
         <MissionListItem
           key={CUSTOM_SCENARIO_ID}
           s={DEFAULT_CUSTOM_SCENARIO}
           completed={false}
-          next={false}
           onSelect={props.onCustomGame}
         />
       </List>
