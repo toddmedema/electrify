@@ -139,6 +139,7 @@
     }
   },
   "overrides": {
+    "serialize-javascript": "^7.0.3",
     "@svgr/plugin-svgo": {
       "svgo": "^2.8.3"
     },
