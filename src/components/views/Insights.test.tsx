@@ -307,16 +307,21 @@ describe("Insights layers", () => {
     const region = screen.getByRole("region", {
       name: "Upcoming scenario events",
     });
-    expect(region).toHaveTextContent("1 in this range");
+    expect(region).toHaveTextContent("Upcoming");
+    expect(region).toHaveTextContent("Jul 2023");
+    expect(region).not.toHaveTextContent("Higher pollution fee begins");
     const event = within(region).getByRole("button", {
       name: "Expected Jul 2023: Higher pollution fee begins",
     });
     expect(event).toHaveAttribute("aria-expanded", "false");
     await user.click(event);
     expect(event).toHaveAttribute("aria-expanded", "true");
-    expect(region).toHaveTextContent(
+    expect(screen.getByRole("dialog")).toHaveTextContent(
       "Polluting plants become more expensive to run.",
     );
+    await user.keyboard("{Escape}");
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(region).not.toHaveTextContent("Outside range");
   });
 

@@ -39,7 +39,8 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
   });
-  await expect(eventRail).toContainText("1 in this range");
+  await expect(eventRail).toContainText("Upcoming");
+  await expect(eventRail).not.toContainText("Higher pollution fee begins");
   const eventButton = eventRail.getByRole("button", {
     name: /Higher pollution fee begins/,
   });
@@ -47,7 +48,9 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   await expect(eventButton).toHaveAttribute("aria-expanded", "false");
   await eventButton.click();
   await expect(eventButton).toHaveAttribute("aria-expanded", "true");
-  await expect(eventRail).toContainText("Polluting plants now pay");
+  await expect(page.getByRole("dialog")).toContainText(
+    "Polluting plants now pay",
+  );
 
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),
@@ -61,6 +64,9 @@ test("upcoming scenario events stay usable across insight viewports", async ({
       "overflow-x",
       "auto",
     );
+    const railBox = await eventRail.boundingBox();
+    expect(railBox).not.toBeNull();
+    expect(railBox!.height).toBeLessThanOrEqual(52);
   }
 
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
