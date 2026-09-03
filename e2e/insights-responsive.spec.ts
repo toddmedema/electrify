@@ -96,7 +96,7 @@ test("insights header controls stay aligned in one compact row", async ({
   }
 });
 
-test("touch-sized facility build buttons stay above the chart", async ({
+test("compact facility build buttons stay above the chart", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile-"));
@@ -123,8 +123,14 @@ test("touch-sized facility build buttons stay above the chart", async ({
   expect(chartBox).not.toBeNull();
   expect(buttonBoxes.every(Boolean)).toBe(true);
   buttonBoxes.forEach((box) => {
-    expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y);
+    expect(box!.height).toBeLessThanOrEqual(32);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y + 0.5);
   });
+  if (testInfo.project.name === "mobile-390px") {
+    expect(
+      (await facilities.locator(".paneHeader").boundingBox())!.height,
+    ).toBeLessThanOrEqual(41); // 40px content plus the divider
+  }
 });
 
 test("main-menu account actions follow the sound action", async ({
