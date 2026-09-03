@@ -163,6 +163,10 @@ export type StoryActionTargetType =
 export interface NavigateActionType {
   name: CardNameType;
   dontRemember?: boolean;
+  // Most cards use the app's anonymous hash entry. Public routes can supply a meaningful URL,
+  // while a popstate restoration must not write another browser-history entry.
+  url?: string;
+  skipBrowserHistory?: boolean;
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
   storyTarget?: StoryActionTargetType;

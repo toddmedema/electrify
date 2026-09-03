@@ -1,15 +1,20 @@
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
 import { navigate, navigateBack } from "./reducers/Card";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
-import { firebaseAppAuth, getDevicePlatform } from "./Globals";
+import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
 import { delta as gameDelta } from "./reducers/Game";
+import {
+  scenarioDetailsUrl,
+  scenarioFromSearch,
+  scenarioListUrl,
+} from "./ScenarioUrl";
 import { startAutosave } from "./SaveGame";
 import { store, useAppSelector } from "./Store";
 import {
@@ -134,6 +139,7 @@ function OfflineNotice(): React.JSX.Element | null {
 }
 
 export default function App() {
+  const scenarioRouteInitialized = useRef(false);
   /**
    * All of this used to run in the component body. A function component's body runs on every
    * render, and index.tsx mounts App inside React.StrictMode, which deliberately invokes it twice
@@ -145,21 +151,36 @@ export default function App() {
   useEffect(() => {
     setupStorage(document);
 
-    // Shared score links land on the relevant challenge instead of dropping a new player at an
-    // unexplained title screen. Tutorial ids still use the guided mission list.
-    const sharedScenarioId = Number(
-      new URLSearchParams(window.location.search).get("scenario"),
-    );
-    const sharedScenario = SCENARIOS.find(
-      (scenario) => scenario.id === sharedScenarioId && !scenario.tutorialSteps,
-    );
-    if (sharedScenario) {
-      store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
-      store.dispatch(navigate("NEW_GAME_DETAILS"));
+    // A direct challenge link needs a real catalog entry behind it, so both the visible Back
+    // button and the browser Back button stay in the app instead of returning to the referring
+    // site. The ref makes this safe under StrictMode's development effect replay.
+    if (!scenarioRouteInitialized.current) {
+      scenarioRouteInitialized.current = true;
+      const sharedScenario = scenarioFromSearch(window.location.search);
+      if (sharedScenario) {
+        const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(navigate({ name: "NEW_GAME_DETAILS", url: detailsUrl }));
+      }
     }
 
     const onPopState = (e: PopStateEvent) => {
-      store.dispatch(navigateBack());
+      const sharedScenario = scenarioFromSearch(window.location.search);
+      if (sharedScenario) {
+        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(
+          navigate({
+            name: "NEW_GAME_DETAILS",
+            skipBrowserHistory: true,
+          }),
+        );
+      } else {
+        store.dispatch(navigateBack());
+      }
       e.preventDefault();
     };
     window.addEventListener("popstate", onPopState);
