@@ -280,6 +280,26 @@ describe("The Shale Boom pilot arc", () => {
       "story:103:shale-boom:freeze-recovery",
       "story:103:shale-boom:normalization",
     ]);
+    expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
+      {
+        title: "Gas prices will fall",
+        message: "Natural gas prices will drop 25% through Feb 2016.",
+      },
+      {
+        title: "Winter freeze will hit",
+        message:
+          "Gas costs will spike and gas plants will be limited to 70% output for three months.",
+      },
+      {
+        title: "Gas output will recover",
+        message:
+          "Plant limits will lift and lower boom-era prices will resume.",
+      },
+      {
+        title: "Gas boom will end",
+        message: "Natural gas prices will return to normal.",
+      },
+    ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
   });
 

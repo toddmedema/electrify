@@ -205,6 +205,14 @@ $sizemap: (
   @return null;
 }
 
+// Interface chrome follows a fixed 4px rhythm. The legacy size() scale remains useful for
+// responsive illustration and chart spacing, but vmin-based gutters made otherwise identical
+// cards drift between 4px and 8px as a phone rotated or changed size.
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+
 // ===============================================
 // Base/General Styles
 // ===============================================
@@ -497,6 +505,11 @@ $topbar_height: 56px;
   padding-right: max(16px, env(safe-area-inset-right)) !important;
 }
 
+#topbar .constructionTitleBar.MuiToolbar-root {
+  padding-left: max($space-2, env(safe-area-inset-left)) !important;
+  padding-right: max($space-2, env(safe-area-inset-right)) !important;
+}
+
 .constructionHeader {
   flex: 0 0 auto;
   background: var(--bg-primary);
@@ -504,37 +517,45 @@ $topbar_height: 56px;
 
 .constructionTitle {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   min-width: 0;
-  gap: 12px;
+  gap: $space-3;
 
   .iconLabel {
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 }
 
 .constructionCash {
   flex: 0 0 auto;
+  margin-left: auto;
   font-size: 0.875rem;
   white-space: nowrap;
+}
+
+.constructionTitleBar #close-button {
+  flex: 0 0 auto;
 }
 
 .constructionControls {
   display: grid;
   grid-template-columns: max-content minmax(80px, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: $space-2;
   min-height: 50px;
-  padding: 0 max(8px, env(safe-area-inset-right)) 0
-    max(8px, env(safe-area-inset-left));
+  padding: 0 max($space-2, env(safe-area-inset-right)) 0
+    max($space-2, env(safe-area-inset-left));
   border-bottom: $border_accent;
 }
 
 .constructionCapacity {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: $space-1;
   white-space: nowrap;
 }
 
@@ -557,15 +578,15 @@ $topbar_height: 56px;
 
 @media screen and (min-width: 600px) {
   .constructionControls {
-    gap: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+    gap: $space-4;
+    padding-left: max($space-4, env(safe-area-inset-left));
+    padding-right: max($space-4, env(safe-area-inset-right));
   }
 }
 
 @media screen and (max-width: 359px) {
   .constructionTitle {
-    gap: 6px;
+    gap: $space-1;
     font-size: 1.05rem !important;
   }
 
@@ -574,9 +595,9 @@ $topbar_height: 56px;
   }
 
   .constructionControls {
-    gap: 4px;
-    padding-left: max(4px, env(safe-area-inset-left));
-    padding-right: max(4px, env(safe-area-inset-right));
+    gap: $space-1;
+    padding-left: max($space-2, env(safe-area-inset-left));
+    padding-right: max($space-2, env(safe-area-inset-right));
   }
 
   .constructionCapacity {
@@ -800,6 +821,33 @@ $pane_header_height: 40px;
   }
 }
 
+// Keep the compact pane-header height on phones while preventing the global coarse-pointer
+// target size from making these two labeled controls spill into the chart below.
+@media (pointer: coarse) {
+  .facilities .paneHeader {
+    .button-buildGenerator,
+    .button-buildStorage {
+      height: 32px;
+      min-height: 32px !important;
+    }
+  }
+}
+
+@media (pointer: coarse) and (max-width: 359px) {
+  .facilities .paneHeader {
+    flex-flow: row nowrap !important;
+    gap: 4px;
+    padding-right: 8px;
+    padding-left: 8px;
+
+    > h6 {
+      min-width: 0;
+      font-size: 1.125rem;
+      white-space: nowrap;
+    }
+  }
+}
+
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
 // the flex equivalent of .manual-search, for headers with a dropdown instead of a search box
 .headerControl {
@@ -919,6 +967,14 @@ $pane_header_height: 40px;
   }
 }
 
+.insightsPresetSaveMenuItem {
+  display: none !important;
+
+  > svg {
+    margin-right: 12px;
+  }
+}
+
 .insightsLayerPanel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -992,7 +1048,9 @@ $pane_header_height: 40px;
 
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
-    min-height: 52px !important;
+    // Toolbar min-height is content height; the 8px padding is added around it. Match the
+    // 36px controls instead of accidentally adding another 16px of empty height.
+    min-height: 36px !important;
     padding: 8px !important;
   }
 
@@ -1002,7 +1060,7 @@ $pane_header_height: 40px;
 
   .insightsHeaderControls {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr) 36px;
+    grid-template-columns: minmax(128px, 1fr) minmax(88px, 1fr) 36px;
     width: 100%;
     gap: 4px;
     margin-left: 0;
@@ -1020,12 +1078,26 @@ $pane_header_height: 40px;
         width: 100%;
         min-width: 0;
       }
+
+      .insightsPresetSave {
+        display: none;
+      }
     }
 
     .insightsLayerControls {
       width: 36px;
       height: 36px;
     }
+  }
+
+  .insightsPresetSaveMenuItem {
+    display: flex !important;
+  }
+
+  // The custom state already uses the same "Save as new preset" action above. Keep one clear
+  // save action in the compact mobile menu instead of repeating it on adjacent rows.
+  .insightsPresetSaveMenuItem + .insightsPresetSaveAsMenuItem {
+    display: none;
   }
 
   .insightsPresetEdited,
@@ -1049,6 +1121,47 @@ $pane_header_height: 40px;
 
     .MuiButton-root {
       min-height: 44px;
+    }
+  }
+
+  // Keep the planning controls on an explicit four-pixel vertical rhythm. Flex wrapping made
+  // the title and description share a row only at a few in-between widths, and left their
+  // horizontal edges out of step with the track headings below.
+  .insightsLevers {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+    padding: 4px 16px 8px;
+
+    > .MuiButton-root {
+      justify-self: start;
+      padding-left: 0;
+
+      .MuiButton-startIcon {
+        margin-left: 0;
+      }
+    }
+
+    .budgetSlider {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+    }
+  }
+
+  @media screen and (max-width: 359px) {
+    .base_main .MuiToolbar-root.insightsTrackHeader {
+      flex-flow: row nowrap !important;
+      padding-right: 8px;
+      padding-left: 8px;
+
+      > h6 {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 1.125rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
   }
 }
@@ -1235,6 +1348,8 @@ $pane_header_height: 40px;
       .MuiStack-root {
         display: flex;
         flex-wrap: wrap;
+        gap: $space-2;
+        align-items: flex-start;
         justify-content: flex-end;
       }
     }
@@ -1661,83 +1776,18 @@ html[data-theme="dark"] .uplot {
 
 .victoryDebrief {
   display: grid;
-  gap: 10px;
-  margin: 10px 0 14px;
-  padding: 12px;
-  border: 1px solid var(--border-tile);
-  border-radius: 10px;
-  background: var(--bg-raised);
-
-  & > h3 {
-    font-weight: 800;
-  }
-}
-
-.victoryFleetComparison {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px 16px;
+  margin: 16px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.victoryFleetMix h4 {
-  font-weight: 800;
-  line-height: 1.3;
-}
-
-.victoryFleetBar {
-  display: flex;
-  height: 18px;
-  overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 9px;
-  background: var(--bg-sunken);
-
-  span {
-    min-width: 3px;
-  }
-
-  .empty {
-    width: 100%;
-    background: var(--border-tile);
-  }
-}
-
-.victoryFleetLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  margin-top: 4px;
-  color: $font_color_faded;
-  font-size: 0.72rem;
-
-  span {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  i {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-}
-
-.victoryDebriefStats {
+.victoryMetric {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-
-  & > div {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 2px 6px;
-    padding: 7px;
-    border: 1px solid var(--border-subtle);
-    border-radius: 7px;
-    background: var(--bg-primary);
-  }
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 7px;
 
   .conceptIcon {
     grid-row: 1 / span 2;
@@ -1748,54 +1798,42 @@ html[data-theme="dark"] .uplot {
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
+
+  > span {
+    color: $font_color_faded;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
 }
 
-.victoryHighlights {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.victoryScore,
+.victoryScoreBreakdown,
+.victoryStanding {
+  text-align: center;
+}
 
-  li {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: start;
-    gap: 7px;
-  }
+.victoryScore {
+  margin: 8px 0 0 !important;
+}
 
-  li span span {
-    display: block;
-  }
+.victoryScoreBreakdown {
+  margin-top: 2px !important;
+}
+
+.victoryStanding {
+  margin-top: 12px !important;
 }
 
 @media (max-width: 520px) {
   .victoryDebrief {
-    padding: 10px;
-  }
-
-  .victoryFleetComparison {
-    grid-template-columns: 1fr;
-  }
-
-  .victoryDebriefStats {
-    grid-template-columns: 1fr;
-
-    & > div {
-      min-height: 48px;
-      padding: 8px 10px;
-    }
+    gap: 8px 12px;
   }
 
   .victoryDialogActions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
+    justify-content: center;
 
     & > .MuiButton-root {
-      width: 100%;
       min-height: 40px;
-      margin: 0;
     }
   }
 }
@@ -1835,15 +1873,15 @@ html[data-theme="dark"] .uplot {
   .conceptLegend {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: size(small);
-    margin-top: size(base);
+    gap: $space-2;
+    margin-top: $space-4;
   }
 
   .conceptLegendItem {
     display: flex;
     align-items: center;
-    gap: size(small);
-    padding: size(small);
+    gap: $space-2;
+    padding: $space-2;
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     background: var(--bg-raised);
@@ -1857,17 +1895,17 @@ html[data-theme="dark"] .uplot {
   }
 
   .MuiCard-root {
-    margin: 0 size(small) size(base) size(small);
+    margin: 0 $space-2 $space-2;
     border-radius: 0;
     position: relative;
 
     .MuiCardHeader-root {
       align-items: flex-start;
-      padding: size(base);
+      padding: $space-4;
     }
 
     .MuiCardHeader-avatar {
-      margin-right: size(base);
+      margin-right: $space-3;
     }
 
     .MuiCardHeader-action {
@@ -1877,14 +1915,14 @@ html[data-theme="dark"] .uplot {
       text-align: right;
 
       p.MuiTypography-colorTextSecondary {
-        margin-top: size(small);
+        margin-top: $space-1;
       }
     }
   }
 
   .expand-details.MuiButton-root {
     width: calc(100% - 32px);
-    margin: 0 16px size(small);
+    margin: 0 $space-4 $space-2;
     border-top: 1px solid var(--border-subtle);
     border-radius: 0;
   }
@@ -1939,7 +1977,7 @@ html[data-theme="dark"] .uplot {
 
       .gameSubtitle {
         max-width: 380px;
-        margin: 0 auto 20px;
+        margin: 0 auto $space-4;
         color: $font_color_faded;
         font-size: 1.05rem;
         line-height: 1.5;
@@ -1947,7 +1985,7 @@ html[data-theme="dark"] .uplot {
 
       .mainActions {
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: $space-2;
 
         .MuiButton-root {
           width: min(100%, 260px);
@@ -1961,7 +1999,7 @@ html[data-theme="dark"] .uplot {
 
       .accountActions {
         align-items: center;
-        margin-top: 6px;
+        margin-top: $space-2;
 
         .MuiTypography-caption {
           font-size: 0.8125rem;
@@ -1970,7 +2008,7 @@ html[data-theme="dark"] .uplot {
       }
 
       .discoveryActions {
-        margin-top: 14px;
+        margin-top: $space-4;
       }
 
       button {
@@ -2036,7 +2074,7 @@ html[data-theme="dark"] .uplot {
 
   #manual {
     figure {
-      margin: size(base) 0;
+      margin: $space-4 0;
     }
 
     img {
@@ -2050,11 +2088,11 @@ html[data-theme="dark"] .uplot {
     figcaption {
       font-size: 0.75rem;
       opacity: 0.7;
-      margin-top: size(small);
+      margin-top: $space-1;
     }
 
     .manual-empty {
-      padding: size(base) size(base) size(base) size(base);
+      padding: $space-4;
       text-align: center;
     }
 
@@ -2077,7 +2115,7 @@ html[data-theme="dark"] .uplot {
   // Manual entries are Accordions rather than clickable Cards, which is what gets them
   // keyboard focus, aria-expanded and a real heading for free
   .manual-entry {
-    margin: 0 size(small) size(base) size(small);
+    margin: 0 $space-2 $space-2;
 
     // MUI zeroes the radius on a square Accordion but keeps the before-pseudo divider that
     // stacked accordions use; these are separate cards, so it isn't wanted
@@ -2086,7 +2124,7 @@ html[data-theme="dark"] .uplot {
     }
 
     .MuiAccordionSummary-root {
-      padding: 0 size(base);
+      padding: 0 $space-4;
 
       &:hover {
         background: var(--bg-raised);
@@ -2101,7 +2139,7 @@ html[data-theme="dark"] .uplot {
     }
 
     .MuiAccordionDetails-root {
-      padding: 0 size(base) size(base) size(base);
+      padding: 0 $space-4 $space-4;
     }
   }
 
@@ -2811,14 +2849,14 @@ html[data-theme="dark"] .uplot {
   // and the only column they share is when they happened
   .eventLogList {
     display: grid;
-    gap: size(small);
+    gap: $space-2;
     margin: 0;
-    padding: 0 size(small) size(small);
+    padding: 0 $space-2 $space-2;
     list-style: none;
   }
 
   .eventLogSection {
-    padding-top: size(small);
+    padding-top: $space-2;
   }
 
   .eventLogSectionHeader {
@@ -2826,7 +2864,7 @@ html[data-theme="dark"] .uplot {
     grid-template-columns: 1fr auto;
     gap: 1px;
     align-items: center;
-    padding: 0 size(base) size(small);
+    padding: 0 $space-4 $space-2;
   }
 
   .eventHistoryFilterButton {
@@ -2916,7 +2954,7 @@ html[data-theme="dark"] .uplot {
   // column would take a third of it to say something the eye only occasionally asks for
   .eventLogWhen {
     grid-column: 2;
-    margin-top: size(tiny);
+    margin-top: $space-1;
     font-size: 0.75rem;
   }
 
@@ -2931,7 +2969,7 @@ html[data-theme="dark"] .uplot {
 
   .eventLogEmpty {
     display: block;
-    padding: size(base);
+    padding: $space-4;
   }
 
   // The change column, and the facility figures that use the same two colours
@@ -3110,6 +3148,8 @@ html[data-theme="dark"] .uplot {
       .MuiStack-root {
         display: flex;
         flex-wrap: wrap;
+        gap: $space-2;
+        align-items: flex-start;
         justify-content: flex-end;
       }
     }

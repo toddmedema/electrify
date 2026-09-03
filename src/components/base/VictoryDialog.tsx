@@ -5,8 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  Skeleton,
+  IconButton,
   Stack,
   Typography,
 } from "@mui/material";
@@ -14,25 +13,15 @@ import ShareIcon from "@mui/icons-material/Share";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import numbro from "numbro";
-import {
-  GameEventKindType,
-  VictoryDebriefType,
-  VictoryFleetCapacityType,
-  VictoryType,
-} from "../../Types";
+import { VictoryDebriefType, VictoryType } from "../../Types";
 import { fetchGlobalRank } from "../../reducers/User";
 import {
   buildScoreShareContent,
   canShare,
   shareText,
 } from "../../helpers/Share";
-import ConceptIcon, { ConceptNameType } from "./ConceptIcon";
-import { fuelColors } from "../../Theme";
-import {
-  formatMoneyConcise,
-  formatWattHours,
-  formatWatts,
-} from "../../helpers/Format";
+import ConceptIcon from "./ConceptIcon";
+import { formatMoneyConcise } from "../../helpers/Format";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
 
@@ -46,15 +35,6 @@ export const SCORE_LABELS: { [key: string]: string } = {
   rate: "electric rates",
   emissions: "emissions",
   blackouts: "blackouts",
-};
-
-const SCORE_CONCEPTS: { [key: string]: ConceptNameType | undefined } = {
-  supply: "supply",
-  netWorth: "money",
-  customers: "customers",
-  rate: "money",
-  emissions: "danger",
-  blackouts: "blackout",
 };
 
 export interface StateProps {
@@ -78,60 +58,6 @@ export function formatScore(score: number): string {
   return numbro(score).format({ thousandSeparated: true, mantissa: 0 });
 }
 
-const EVENT_CONCEPTS: Record<GameEventKindType, ConceptNameType> = {
-  BLACKOUT: "blackout",
-  BLACKOUT_OVER: "supply",
-  CONSTRUCTION: "construction",
-  BUILD: "build",
-  SELL: "money",
-  LOAN: "finances",
-  FUEL_PRICE: "fuel",
-  FUEL_CROSSOVER: "fuel",
-  WORLD_EVENT: "forecast",
-};
-
-function FleetMix(props: {
-  title: string;
-  fleet: VictoryFleetCapacityType[];
-}): React.JSX.Element {
-  const total = props.fleet.reduce((sum, item) => sum + item.watts, 0);
-  const label =
-    props.fleet.length > 0
-      ? props.fleet
-          .map((item) => `${item.fuel} ${formatWatts(item.watts)}`)
-          .join(", ")
-      : "No operational generation";
-  const colors = fuelColors();
-  return (
-    <div className="victoryFleetMix">
-      <Typography variant="overline" component="h4">
-        {props.title}
-      </Typography>
-      <div className="victoryFleetBar" role="img" aria-label={label}>
-        {props.fleet.map((item) => (
-          <span
-            key={item.fuel}
-            style={{
-              flexGrow: item.watts,
-              backgroundColor: colors[item.fuel],
-            }}
-          />
-        ))}
-        {total === 0 && <span className="empty" />}
-      </div>
-      <div className="victoryFleetLegend">
-        {props.fleet.map((item) => (
-          <span key={item.fuel}>
-            <i style={{ backgroundColor: colors[item.fuel] }} />
-            {item.fuel} {formatWatts(item.watts)}
-          </span>
-        ))}
-        {props.fleet.length === 0 && <span>No operational generation</span>}
-      </div>
-    </div>
-  );
-}
-
 function RunDebrief({
   debrief,
 }: {
@@ -141,92 +67,38 @@ function RunDebrief({
   const reliability = `${(debrief.reliability * 100).toFixed(
     debrief.reliability >= 0.999 ? 2 : 1,
   )}%`;
+  const metrics = [
+    { concept: "supply" as const, label: "served", value: reliability },
+    {
+      concept: "money" as const,
+      label: "cash",
+      value: formatMoneyConcise(debrief.finalCash),
+    },
+    {
+      concept: "customers" as const,
+      label: "customers",
+      value: numbro(debrief.finalCustomers).format({ average: true }),
+    },
+    {
+      concept: "danger" as const,
+      label: "emissions",
+      value: formatLargeMass(debrief.kgco2e, units),
+    },
+    ...(debrief.scenarioMetrics || []).map((metric) => ({
+      concept: metric.concept,
+      label: metric.label,
+      value: metric.value,
+    })),
+  ];
   return (
-    <section className="victoryDebrief" aria-labelledby="debrief-title">
-      <Typography id="debrief-title" variant="h6" component="h3">
-        The story of your grid
-      </Typography>
-      <div className="victoryFleetComparison">
-        <FleetMix
-          title="Then · starting capacity"
-          fleet={debrief.startingFleet}
-        />
-        <FleetMix
-          title="Now · operational capacity"
-          fleet={debrief.finalFleet}
-        />
-      </div>
-      <div className="victoryDebriefStats">
-        <div>
-          <ConceptIcon concept="supply" fontSize="small" />
-          <Typography variant="caption">Demand served</Typography>
-          <strong>{reliability}</strong>
+    <section className="victoryDebrief" aria-label="Mission results">
+      {metrics.map((metric) => (
+        <div key={metric.label} className="victoryMetric">
+          <ConceptIcon concept={metric.concept} fontSize="small" />
+          <strong>{metric.value}</strong>
+          <span>{metric.label}</span>
         </div>
-        <div>
-          <ConceptIcon concept="money" fontSize="small" />
-          <Typography variant="caption">Cash</Typography>
-          <strong>
-            {formatMoneyConcise(debrief.startingCash)} →{" "}
-            {formatMoneyConcise(debrief.finalCash)}
-          </strong>
-        </div>
-        <div>
-          <ConceptIcon concept="customers" fontSize="small" />
-          <Typography variant="caption">Customers</Typography>
-          <strong>
-            {numbro(debrief.finalCustomers).format({ average: true })}
-          </strong>
-        </div>
-        <div>
-          <ConceptIcon concept="danger" fontSize="small" />
-          <Typography variant="caption">Emissions</Typography>
-          <strong>{formatLargeMass(debrief.kgco2e, units)}</strong>
-        </div>
-        {debrief.unservedWh > 0 && (
-          <div>
-            <ConceptIcon concept="blackout" fontSize="small" />
-            <Typography variant="caption">Customer demand not met</Typography>
-            <strong>{formatWattHours(debrief.unservedWh)}</strong>
-          </div>
-        )}
-        {debrief.scenarioMetrics?.map((metric) => (
-          <div key={metric.label}>
-            <ConceptIcon concept={metric.concept} fontSize="small" />
-            <Typography variant="caption">{metric.label}</Typography>
-            <strong>{metric.value}</strong>
-          </div>
-        ))}
-      </div>
-      {debrief.highlights.length > 0 && (
-        <>
-          <Divider />
-          <Typography variant="overline" component="h4">
-            Turning points
-          </Typography>
-          <ol className="victoryHighlights">
-            {debrief.highlights.map((event, index) => (
-              <li key={`${event.label}-${index}`}>
-                <ConceptIcon
-                  concept={EVENT_CONCEPTS[event.kind]}
-                  fontSize="small"
-                />
-                <span>
-                  <Typography variant="body2" component="span">
-                    {event.message}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="textSecondary"
-                    component="span"
-                  >
-                    {event.label}
-                  </Typography>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
+      ))}
     </section>
   );
 }
@@ -284,16 +156,17 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
   const failed = victory.outcome === "bankrupt" || victory.outcome === "fired";
   const isPersonalBest =
     previousBest === undefined || victory.score > previousBest;
-  let displayTitle =
-    endTitle ||
-    (victory.outcome === "bankrupt"
-      ? "Bankrupt!"
-      : victory.outcome === "fired"
-        ? "Fired!"
-        : `You've retired!`);
-  if (!failed && endTitle && /^mission complete!?$/i.test(endTitle.trim())) {
-    displayTitle = victory.scenarioName;
-  }
+  const displayTitle = failed
+    ? endTitle || (victory.outcome === "bankrupt" ? "Bankrupt!" : "Fired!")
+    : !endTitle || /^mission complete!?$/i.test(endTitle.trim())
+      ? "Mission complete"
+      : endTitle;
+  const breakdownSummary = Object.keys(breakdown)
+    .map(
+      (category) =>
+        `${formatScore(breakdown[category])} ${SCORE_LABELS[category] || category}`,
+    )
+    .join(" · ");
 
   const onShare = () => {
     const content = buildScoreShareContent({
@@ -339,23 +212,16 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           {failed ? (
             <ReportProblemOutlinedIcon
               color="error"
-              sx={{ fontSize: 52 }}
+              sx={{ fontSize: 44 }}
               aria-hidden
             />
           ) : (
             <EmojiEventsIcon
               color="warning"
-              sx={{ fontSize: 52 }}
+              sx={{ fontSize: 44 }}
               aria-hidden
             />
           )}
-          <Typography
-            variant="overline"
-            color={failed ? "error.main" : "warning.main"}
-            sx={{ fontWeight: 800, letterSpacing: "0.14em" }}
-          >
-            {failed ? "Run ended" : "Mission complete"}
-          </Typography>
           <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>
             {displayTitle}
           </Typography>
@@ -367,58 +233,49 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
             {endMessage}
           </Typography>
         )}
-        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
-        {victory.debrief && <Divider sx={{ my: 1.5 }} />}
-        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-          Final score: <strong>{formatScore(victory.score)}</strong>
+        <Typography
+          className="victoryScore"
+          variant="h4"
+          component="p"
+          aria-label={`Final score ${formatScore(victory.score)} points`}
+        >
+          <strong>{formatScore(victory.score)}</strong> points
         </Typography>
-        <div style={{ margin: "8px 0" }}>
-          {Object.keys(breakdown).map((category: string) => {
-            const concept = SCORE_CONCEPTS[category];
-            return (
-              <div key={category} className="scoreBreakdownRow">
-                {concept && <ConceptIcon concept={concept} fontSize="small" />}
-                {breakdown[category]} pts from{" "}
-                {SCORE_LABELS[category] || category}
-              </div>
-            );
-          })}
-        </div>
+        <Typography
+          className="victoryScoreBreakdown"
+          variant="body2"
+          color="textSecondary"
+        >
+          {breakdownSummary}
+        </Typography>
+        {victory.debrief && <RunDebrief debrief={victory.debrief} />}
         {ranked && loggedIn && (
-          <Typography variant="body1" style={{ marginTop: 12 }}>
+          <Typography
+            className="victoryStanding"
+            variant="body2"
+            color="textSecondary"
+          >
             {isPersonalBest ? (
-              <strong>
-                New personal best
-                {previousBest !== undefined
-                  ? ` - was ${formatScore(previousBest)}`
-                  : ""}
-              </strong>
+              <span>New personal best</span>
             ) : (
-              <span>Your best: {formatScore(previousBest as number)}</span>
+              <span>Personal best {formatScore(previousBest as number)}</span>
             )}
-          </Typography>
-        )}
-        {ranked && !rankFailed && (
-          <Typography variant="body1" component="div">
-            {rank === undefined ? (
-              <Skeleton width={200} aria-label="Working out your rank" />
-            ) : (
-              <span>
-                <strong>#{formatScore(rank)}</strong> on the global leaderboard
-              </span>
+            {!rankFailed && rank !== undefined && (
+              <span> · #{formatScore(rank)} globally</span>
             )}
           </Typography>
         )}
         {ranked && !loggedIn && (
-          <Typography variant="body2" color="textSecondary" component="div">
-            <Button
-              color="primary"
-              onClick={onLogin}
-              style={{ paddingLeft: 0 }}
-            >
+          <Typography
+            className="victoryStanding"
+            variant="body2"
+            color="textSecondary"
+            component="div"
+          >
+            <Button color="primary" onClick={onLogin} size="small">
               Log in
             </Button>
-            to put this score on the board under your name
+            to join the leaderboard
           </Typography>
         )}
       </DialogContent>
@@ -433,9 +290,13 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
         }}
       >
         {canShare() && (
-          <Button color="primary" onClick={onShare} startIcon={<ShareIcon />}>
-            Share
-          </Button>
+          <IconButton
+            color="primary"
+            onClick={onShare}
+            aria-label="Share score"
+          >
+            <ShareIcon />
+          </IconButton>
         )}
         {!failed && (
           <Button color="primary" onClick={onClose}>
