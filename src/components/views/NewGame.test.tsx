@@ -120,6 +120,43 @@ describe("NewGame", () => {
     expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
   });
 
+  it("sorts challenges by play history, timeframe, and duration", () => {
+    const wildfire = SCENARIOS.find(
+      (scenario) => scenario.name === "Wildfire Emergency",
+    )!;
+    recordPlayed(wildfire.id);
+    render(<NewGame {...props()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
+    fireEvent.click(screen.getByRole("button", { name: "Newest first" }));
+    expect(screen.getByRole("menu", { name: "Sort challenges" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Unplayed first" }));
+    expect(challengeRows().at(-1)).toHaveTextContent("Wildfire Emergency");
+
+    fireEvent.click(screen.getByRole("button", { name: "Unplayed first" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Newest first" }));
+    expect(challengeRows()[0]).toHaveTextContent("Sudden Nuclear Shutdown");
+
+    fireEvent.click(screen.getByRole("button", { name: "Newest first" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Shortest first" }));
+    const shortestDuration = Math.min(
+      ...SCENARIOS.filter((scenario) => !scenario.tutorialSteps).map(
+        (scenario) => scenario.durationMonths,
+      ),
+    );
+    const firstScenarioId = Number(
+      challengeRows()[0].dataset.testid!.replace("mission-row-", ""),
+    );
+    expect(
+      SCENARIOS.find((scenario) => scenario.id === firstScenarioId),
+    ).toMatchObject({ durationMonths: shortestDuration });
+
+    fireEvent.click(screen.getByRole("button", { name: "Shortest first" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Oldest first" }));
+    expect(challengeRows()[0]).toHaveTextContent("The End of an Era");
+  });
+
   it("moves completed recommendations behind unplayed challenges", () => {
     recordPlayed(107);
     render(<NewGame {...props()} />);

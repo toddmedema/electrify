@@ -70,4 +70,12 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
   await expect(page.getByLabel("Deep Freeze themes")).toContainText(
     "Extreme weather",
   );
+
+  const sortButton = page.getByRole("button", { name: "Newest first" });
+  await expect(sortButton).toBeVisible();
+  await sortButton.click();
+  await page.getByRole("menuitem", { name: "Shortest first" }).click();
+  await expect(
+    page.getByRole("button", { name: "Shortest first" }),
+  ).toBeVisible();
 });

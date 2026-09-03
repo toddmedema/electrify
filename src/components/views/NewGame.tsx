@@ -11,6 +11,8 @@ import {
   LinearProgress,
   List,
   ListSubheader,
+  Menu,
+  MenuItem,
   Toolbar,
   ToggleButton,
   ToggleButtonGroup,
@@ -22,6 +24,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutlineOutlined";
+import SortIcon from "@mui/icons-material/Sort";
 import { getScenarioPlayCounts } from "../../LocalStorage";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -47,11 +50,24 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 type ChallengeFilterType = "For you" | "All challenges" | ScenarioThemeType;
+type ChallengeSortType =
+  "RECOMMENDED" | "UNPLAYED" | "NEWEST" | "SHORTEST" | "OLDEST";
 
 const CHALLENGE_THEMES: ScenarioThemeType[] = [
   "Extreme weather",
   "Energy transition",
   "Rapid growth",
+];
+
+const CHALLENGE_SORTS: Array<{
+  value: ChallengeSortType;
+  label: string;
+}> = [
+  { value: "RECOMMENDED", label: "Recommended" },
+  { value: "UNPLAYED", label: "Unplayed first" },
+  { value: "NEWEST", label: "Newest first" },
+  { value: "SHORTEST", label: "Shortest first" },
+  { value: "OLDEST", label: "Oldest first" },
 ];
 
 function scenarioEndYear(scenario: ScenarioType): number {
@@ -218,6 +234,10 @@ export default function NewGame(props: Props): React.JSX.Element {
   const [showAllTutorials, setShowAllTutorials] = React.useState(false);
   const [challengeFilter, setChallengeFilter] =
     React.useState<ChallengeFilterType>("For you");
+  const [challengeSort, setChallengeSort] =
+    React.useState<ChallengeSortType | null>(null);
+  const [challengeSortAnchor, setChallengeSortAnchor] =
+    React.useState<HTMLElement | null>(null);
   const playCounts = getScenarioPlayCounts();
   const ids = Object.keys(playCounts).map(Number);
   const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
@@ -241,7 +261,7 @@ export default function NewGame(props: Props): React.JSX.Element {
       );
     })
     .slice(0, 3);
-  const visibleScenarios =
+  const filteredScenarios =
     challengeFilter === "For you"
       ? recommendedScenarios
       : challengeFilter === "All challenges"
@@ -249,6 +269,50 @@ export default function NewGame(props: Props): React.JSX.Element {
         : scenarios.filter((scenario) =>
             scenario.themes?.includes(challengeFilter),
           );
+  const effectiveChallengeSort =
+    challengeSort ?? (challengeFilter === "For you" ? "RECOMMENDED" : "NEWEST");
+  const visibleScenarios = [...filteredScenarios].sort((a, b) => {
+    const aPlays = playCounts[a.id] ?? 0;
+    const bPlays = playCounts[b.id] ?? 0;
+    const recommended =
+      Number(aPlays > 0) - Number(bPlays > 0) ||
+      (aPlays > 0 && bPlays > 0 ? bPlays - aPlays : 0) ||
+      recommendationRank(a) - recommendationRank(b) ||
+      a.name.localeCompare(b.name);
+    if (effectiveChallengeSort === "RECOMMENDED") {
+      return recommended;
+    }
+    if (effectiveChallengeSort === "UNPLAYED") {
+      return (
+        Number((playCounts[a.id] ?? 0) > 0) -
+          Number((playCounts[b.id] ?? 0) > 0) ||
+        b.startingYear - a.startingYear ||
+        recommended
+      );
+    }
+    if (effectiveChallengeSort === "SHORTEST") {
+      return (
+        a.durationMonths - b.durationMonths ||
+        b.startingYear - a.startingYear ||
+        recommended
+      );
+    }
+    if (effectiveChallengeSort === "OLDEST") {
+      return (
+        a.startingYear - b.startingYear ||
+        scenarioEndYear(a) - scenarioEndYear(b) ||
+        recommended
+      );
+    }
+    return (
+      b.startingYear - a.startingYear ||
+      scenarioEndYear(b) - scenarioEndYear(a) ||
+      recommended
+    );
+  });
+  const challengeSortLabel = CHALLENGE_SORTS.find(
+    (sort) => sort.value === effectiveChallengeSort,
+  )!.label;
 
   return (
     <div id="listCard" className="flexContainer">
@@ -343,7 +407,45 @@ export default function NewGame(props: Props): React.JSX.Element {
             ))}
           </div>
         )}
-        <MissionSectionHeader>Challenges</MissionSectionHeader>
+        <MissionSectionHeader
+          action={
+            <Button
+              size="small"
+              startIcon={<SortIcon />}
+              endIcon={<ExpandMoreIcon />}
+              onClick={(event) => setChallengeSortAnchor(event.currentTarget)}
+              aria-haspopup="menu"
+              aria-controls={
+                challengeSortAnchor ? "challenge-sort-menu" : undefined
+              }
+              aria-expanded={!!challengeSortAnchor}
+            >
+              {challengeSortLabel}
+            </Button>
+          }
+        >
+          Challenges
+        </MissionSectionHeader>
+        <Menu
+          id="challenge-sort-menu"
+          anchorEl={challengeSortAnchor}
+          open={!!challengeSortAnchor}
+          onClose={() => setChallengeSortAnchor(null)}
+          slotProps={{ list: { "aria-label": "Sort challenges" } }}
+        >
+          {CHALLENGE_SORTS.map((sort) => (
+            <MenuItem
+              key={sort.value}
+              selected={sort.value === effectiveChallengeSort}
+              onClick={() => {
+                setChallengeSort(sort.value);
+                setChallengeSortAnchor(null);
+              }}
+            >
+              {sort.label}
+            </MenuItem>
+          ))}
+        </Menu>
         <ToggleButtonGroup
           className="challengeFilters"
           value={challengeFilter}
