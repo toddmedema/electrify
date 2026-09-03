@@ -374,7 +374,7 @@ export default function NewGame(props: Props): React.JSX.Element {
               s={s}
               completed={ids.indexOf(s.id) !== -1}
               onSelect={() => props.onDetails({ scenarioId: s.id })}
-              showThemes={challengeFilter !== "For you"}
+              showThemes={challengeFilter === "All challenges"}
             />
           ))}
         </div>

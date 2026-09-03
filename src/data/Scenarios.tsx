@@ -1090,7 +1090,6 @@ export const SCENARIOS = [
         fuel: "Natural Gas",
         peakW: 24240000,
         initialAgeYears: 18,
-        label: "Harbor Gas Portfolio",
       },
       { fuel: "Sun", peakW: 17000000, initialAgeYears: 6 },
       { fuel: "Uranium", peakW: 12120000, initialAgeYears: 30 },

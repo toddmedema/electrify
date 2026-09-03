@@ -422,9 +422,6 @@ export default class NewGameDetails extends React.Component<Props, State> {
               </div>
               <div className="scenarioStartControls">
                 <div className="difficultyPicker">
-                  <Typography variant="caption" component="div">
-                    Difficulty
-                  </Typography>
                   <ToggleButtonGroup
                     exclusive
                     value={game.difficulty}
