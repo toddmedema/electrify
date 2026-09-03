@@ -51,6 +51,10 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   await expect(page.getByRole("dialog")).toContainText(
     "Polluting plants now pay",
   );
+  await eventButton.click();
+  await expect(eventButton).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await eventButton.click();
 
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),

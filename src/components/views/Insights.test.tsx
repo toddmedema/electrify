@@ -319,6 +319,10 @@ describe("Insights layers", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent(
       "Polluting plants become more expensive to run.",
     );
+    await user.click(event);
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(event);
     await user.keyboard("{Escape}");
     expect(event).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("dialog")).toBeNull();
