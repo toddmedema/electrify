@@ -62,24 +62,49 @@ files are large, so broad rewrites create expensive review diffs.
 - Reducer changes should have a reducer/helper test and should run `npm run sim -- --all`. UI flow,
   responsive layout, or tutorial changes may also need a Playwright spec.
 
+## Interface design
+
+- Organize each screen around the player's next decision. Give it one clearly dominant action;
+  keep navigation, account actions, and secondary controls quieter than the game state and choice
+  in front of the player.
+- Follow the established 4 px spacing rhythm, building common gaps and padding from 4, 8, 12, and
+  16 px. Keep interactive controls at least 40 px high on desktop and 44 px on coarse-pointer
+  devices.
+- Preserve the palette's semantic roles. Electric blue means interaction, red means a shortage or
+  harmful state, amber means warning, and green means favorable change. Use the cool neutral
+  surfaces for structure instead of introducing decorative colors.
+- Design light and dark modes as separate contrast systems rather than mechanically inverting
+  colors. Use the shared theme and CSS tokens, and verify text, controls, charts, and SVGs in both
+  palettes.
+- Make dense information readable through hierarchy: clear headings, direct labels, restrained
+  dividers, and small tonal steps between page, panel, card, selected, and chart surfaces. Prefer
+  these tools to heavy shadows, ornamental decoration, or unnecessary nested cards.
+- Reflow by priority instead of shrinking the desktop composition. On phones, show one primary
+  pane, abbreviate or collapse secondary controls, allow appropriate rails to scroll, and stack
+  actions before they crowd or overflow. Keep charts and critical status legible.
+- Never make color or an icon the only carrier of meaning. Pair symbols and state colors with text;
+  distinguish chart series with direct labels, patterns, or line styles as well as color.
+
 ## Icon design
 
 - Match the existing scenario and facility icon system: use a `0 0 500 500` SVG view box, a bold
-  circular silhouette where appropriate, flat fills, black outlines, and no text, gradients,
-  filters, or decorative detail that disappears at small sizes.
+  circular boundary where appropriate, flat fills, black outlines, and a small palette drawn from
+  nearby icons. Do not use text, gradients, filters, or a one-off illustration style.
+- Communicate one concept with a strong silhouette and the fewest useful shapes and anchor points.
+  Build on clean circles, straight segments, and simple curves; remove incidental detail rather
+  than relying on the full-size artwork to carry it.
 - Use the shared stroke hierarchy exactly: `40` for the outer boundary, `20` for primary interior
-  shapes, and `10` for secondary detail. Do not introduce in-between stroke widths to compensate
-  for imprecise geometry.
-- Prefer the fewest shapes and anchor points that communicate the concept. Build on clean circles,
-  straight segments, and simple curves; keep repeated elements equal in size and spacing.
+  shapes, and `10` for secondary detail. Do not treat intermediate widths found in legacy icons as
+  precedent or use them to compensate for imprecise geometry.
 - Align geometry to deliberate centers, baselines, and axes. Use whole-number coordinates, mirror
-  symmetric elements from a shared axis, and account for stroke extents so forms do not crowd or
-  clip the 500 px canvas.
-- Preserve legibility at the icon's actual UI size. Review both the full-size SVG and a rasterized
-  small-size preview, checking silhouette, contrast, optical centering, and separation between
-  overlapping forms before choosing an option.
-- Include concise SVG `<title>` and `<desc>` elements for scenario icons. Reuse the established
-  palette and visual language from nearby icons instead of adding a one-off illustration style.
+  symmetric elements from a shared axis, keep repeated elements equal in size and spacing, and
+  account for stroke extents so forms do not crowd or clip the canvas.
+- Design for the icon's actual 40-48 px UI size. Review the full-size SVG and rasterized small-size
+  previews on both light and dark backgrounds, checking silhouette, contrast, optical centering,
+  negative-space separation, and whether fine details merge or disappear.
+- Include concise SVG `<title>` and `<desc>` elements for scenario icons. Keep visible text labels
+  beside icons in the interface so first-time players and assistive-technology users do not have to
+  infer meaning from the artwork.
 
 ## Guardrails
 
