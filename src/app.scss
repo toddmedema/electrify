@@ -812,6 +812,21 @@ $pane_header_height: 40px;
   }
 }
 
+@media (pointer: coarse) and (max-width: 359px) {
+  .facilities .paneHeader {
+    flex-flow: row nowrap !important;
+    gap: 4px;
+    padding-right: 8px;
+    padding-left: 8px;
+
+    > h6 {
+      min-width: 0;
+      font-size: 1.125rem;
+      white-space: nowrap;
+    }
+  }
+}
+
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
 // the flex equivalent of .manual-search, for headers with a dropdown instead of a search box
 .headerControl {
@@ -1012,7 +1027,9 @@ $pane_header_height: 40px;
 
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
-    min-height: 52px !important;
+    // Toolbar min-height is content height; the 8px padding is added around it. Match the
+    // 36px controls instead of accidentally adding another 16px of empty height.
+    min-height: 36px !important;
     padding: 8px !important;
   }
 
@@ -1083,6 +1100,47 @@ $pane_header_height: 40px;
 
     .MuiButton-root {
       min-height: 44px;
+    }
+  }
+
+  // Keep the planning controls on an explicit four-pixel vertical rhythm. Flex wrapping made
+  // the title and description share a row only at a few in-between widths, and left their
+  // horizontal edges out of step with the track headings below.
+  .insightsLevers {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+    padding: 4px 16px 8px;
+
+    > .MuiButton-root {
+      justify-self: start;
+      padding-left: 0;
+
+      .MuiButton-startIcon {
+        margin-left: 0;
+      }
+    }
+
+    .budgetSlider {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+    }
+  }
+
+  @media screen and (max-width: 359px) {
+    .base_main .MuiToolbar-root.insightsTrackHeader {
+      flex-flow: row nowrap !important;
+      padding-right: 8px;
+      padding-left: 8px;
+
+      > h6 {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 1.125rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
   }
 }
