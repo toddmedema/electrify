@@ -90,6 +90,7 @@ export interface UpcomingStoryEventType {
 export interface StateProps {
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
+  ongoing?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
@@ -100,7 +101,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
-  const { events, onOpen, onSelect, upcoming = [] } = props;
+  const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
   const [historyFilter, setHistoryFilter] =
     React.useState<EventHistoryFilterType>("ALL");
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(
@@ -121,6 +122,65 @@ export default function EventLog(props: Props): React.JSX.Element {
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
+        {ongoing.length > 0 && (
+          <section
+            className="eventLogSection ongoingEvents"
+            aria-labelledby="ongoingEventsTitle"
+          >
+            <header className="eventLogSectionHeader">
+              <Typography id="ongoingEventsTitle" variant="subtitle2">
+                Ongoing events
+              </Typography>
+            </header>
+            <ul className="eventLogList">
+              {ongoing.map((event) => (
+                <li
+                  className={`eventLogItem ongoing importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                  key={event.key}
+                  onClick={() => onSelect(event.actionTarget)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                    if (
+                      event.actionTarget &&
+                      (e.key === "Enter" || e.key === " ")
+                    ) {
+                      e.preventDefault();
+                      onSelect(event.actionTarget);
+                    }
+                  }}
+                  role={event.actionTarget ? "button" : undefined}
+                  tabIndex={event.actionTarget ? 0 : undefined}
+                >
+                  <span className="eventLogIcon">
+                    <ConceptIcon
+                      concept={event.concept || "forecast"}
+                      fontSize="small"
+                    />
+                  </span>
+                  <span>
+                    {event.title && <strong>{event.title}</strong>}
+                    <span className="eventLogCopy">
+                      <Typography
+                        variant="body2"
+                        component="span"
+                        sx={{ display: "block" }}
+                      >
+                        {event.message}
+                      </Typography>
+                    </span>
+                  </span>
+                  <Typography
+                    className="eventLogWhen"
+                    variant="body2"
+                    color="textSecondary"
+                    component="span"
+                  >
+                    {event.label}
+                  </Typography>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {upcoming.length > 0 && (
           <section
             className="eventLogSection upcomingEvents"

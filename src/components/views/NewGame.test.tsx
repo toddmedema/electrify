@@ -102,6 +102,7 @@ describe("NewGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Extreme weather" }));
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Heatwave + Drought"),
+      expect.stringContaining("Wildfire Emergency"),
       expect.stringContaining("Deep Freeze"),
       expect.stringContaining("Hurricane Season"),
     ]);

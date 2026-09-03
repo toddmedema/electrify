@@ -53,6 +53,9 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     page.getByRole("button", { name: "View Heatwave + Drought details" }),
   ).toBeVisible();
   await expect(
+    page.getByRole("button", { name: "View Wildfire Emergency details" }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("button", { name: "View Deep Freeze details" }),
   ).toBeVisible();
   await expect(

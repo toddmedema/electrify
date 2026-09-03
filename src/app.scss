@@ -2881,6 +2881,17 @@ html[data-theme="dark"] .uplot {
     width: 24px;
   }
 
+  // Active scenario effects stay pinned above the historical feed for their whole duration, so
+  // a player can always answer "what is changing the grid right now?" after dismissing the alert.
+  .ongoingEvents {
+    border-bottom: 1px solid var(--border-strong);
+    background: var(--blackout-tint);
+
+    .eventLogIcon {
+      color: $blackout_red;
+    }
+  }
+
   // Forecasts are grouped on a sunken surface and deliberately stay neutral: a future critical
   // event should not look like a red, active emergency before it has happened.
   .upcomingEvents {
