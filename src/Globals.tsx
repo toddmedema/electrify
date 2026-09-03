@@ -58,7 +58,7 @@ interface HistoryApi {
 const refs = {
   db: null as Firestore | null,
   history:
-    typeof window.history !== "undefined"
+    typeof window !== "undefined" && typeof window.history !== "undefined"
       ? (window.history as HistoryApi)
       : { pushState: () => undefined },
   localStorage: null as Storage | null,

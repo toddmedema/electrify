@@ -12,8 +12,6 @@ import {
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
   SHALE_BOOM_BALANCE,
-  solarEclipseOutputMultiplier,
-  SOLAR_ECLIPSE_MINIMUM_OUTPUT,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
@@ -288,7 +286,7 @@ describe("The Shale Boom pilot arc", () => {
   it("authors every scenario with deterministic story events and no custom game", () => {
     expect(
       [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 109, 110]);
+    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 110]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
 
@@ -439,21 +437,6 @@ describe("generation and storage reliability scenarios", () => {
     );
   });
 
-  it("models the eclipse as a known intraday fall and recovery", () => {
-    const effects = resolveStoryAtDate(context(32, 109)).effects;
-    expect(effects.solarEclipse).toMatchObject({
-      startsMinuteOfDay: 510,
-      totalityMinuteOfDay: 600,
-      endsMinuteOfDay: 690,
-      minimumOutputMultiplier: SOLAR_ECLIPSE_MINIMUM_OUTPUT.Manager,
-    });
-    expect(solarEclipseOutputMultiplier(effects, 510)).toBe(1);
-    expect(solarEclipseOutputMultiplier(effects, 555)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 600)).toBe(0.08);
-    expect(solarEclipseOutputMultiplier(effects, 645)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 690)).toBe(1);
-  });
-
   it("keeps the seeded nuclear trip hidden and targets a paused unit at onset", () => {
     const snapshot: StorySnapshotType = {
       ...EMPTY_SNAPSHOT,
@@ -491,25 +474,6 @@ describe("generation and storage reliability scenarios", () => {
     expect(trip.attributes.selectedFacilityNames).toEqual([
       "Grand Nuclear Unit",
     ]);
-  });
-
-  it("previews the actual eclipse but not its separate warning phase", () => {
-    const upcoming = upcomingStoryPhases(context(0, 109));
-    const warning = upcoming.find((phase) =>
-      phase.key.endsWith(":advance-warning"),
-    );
-    const eclipse = upcoming.find((phase) => phase.key.endsWith(":eclipse"))!;
-
-    expect(warning).toBeUndefined();
-    expect(eclipse).toMatchObject({
-      title: "Total solar eclipse",
-      message: "A total eclipse will briefly reduce solar generation.",
-    });
-    expect(eclipse.message).not.toMatch(/underway|08:30|10:00|11:30/i);
-
-    const live = resolveStoryAtDate(context(32, 109)).occurrences[0];
-    expect(live.title).toBe("The eclipse is underway");
-    expect(live.message).toMatch(/08:30.*10:00.*11:30/i);
   });
 });
 

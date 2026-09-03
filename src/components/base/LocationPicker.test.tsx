@@ -86,6 +86,33 @@ it("selects the same city from the map and searchable list", async () => {
   expect(onChange).toHaveBeenLastCalledWith(cities[0]);
 });
 
+it("keeps a marker click out of the pan gesture after zooming", async () => {
+  const user = userEvent.setup();
+  const onChange = jest.fn();
+  render(
+    <LocationPicker locations={cities} value={cities[0]} onChange={onChange} />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Zoom in" }));
+  const map = screen.getByRole("group", { name: "Playable locations map" });
+  const setPointerCapture = jest.fn();
+  Object.defineProperty(map, "setPointerCapture", {
+    configurable: true,
+    value: setPointerCapture,
+  });
+  const east = screen.getByRole("button", { name: /Select East City/ });
+
+  firePointer(east, "pointerdown", {
+    pointerId: 1,
+    button: 0,
+    clientX: 300,
+    clientY: 150,
+  });
+  expect(setPointerCapture).not.toHaveBeenCalled();
+  await user.click(east);
+  expect(onChange).toHaveBeenCalledWith(cities[1]);
+});
+
 it("captures wheel gestures inside the map", () => {
   render(
     <LocationPicker

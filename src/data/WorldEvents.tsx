@@ -1176,14 +1176,6 @@ export const HEATWAVE_DROUGHT_BALANCE: Record<
   },
 };
 
-export const SOLAR_ECLIPSE_MINIMUM_OUTPUT: Record<DifficultyType, number> = {
-  Intern: 0.15,
-  Employee: 0.12,
-  Manager: 0.08,
-  VP: 0.05,
-  CEO: 0.02,
-};
-
 const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   id: "heatwave-drought",
   scenarioId: 108,
@@ -1254,57 +1246,6 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   ],
 };
 
-const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
-  id: "solar-eclipse",
-  scenarioId: 109,
-  phases: [
-    {
-      id: "advance-warning",
-      schedule: { atMonth: 24 },
-      preview: () => null,
-      describe: () => ({
-        title: "Eclipse preparations begin",
-        message:
-          "China's September 2035 total eclipse will sharply reduce morning solar output, so check both storage discharge power (MW) and duration (MWh).",
-        concept: "forecast",
-        kind: "WORLD_EVENT",
-        importance: "NOTABLE",
-        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
-      }),
-    },
-    {
-      id: "eclipse",
-      schedule: { atMonth: 32 },
-      durationMonths: 1,
-      preview: () => ({
-        title: "Total solar eclipse",
-        message: "A total eclipse will briefly reduce solar generation.",
-      }),
-      describe: ({ difficulty }) => {
-        const minimumOutputMultiplier =
-          SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty];
-        return {
-          title: "The eclipse is underway",
-          message: `Solar output falls from normal at 08:30 to ${Math.round(minimumOutputMultiplier * 100)}% at 10:00 before recovering by 11:30, so storage and on-demand generators must cover the shortage.`,
-          concept: "storage",
-          kind: "WORLD_EVENT",
-          importance: "CRITICAL",
-          actionTarget: { card: "FACILITIES", view: "FLEET" },
-          effects: {
-            solarEclipse: {
-              startsMinuteOfDay: 8 * 60 + 30,
-              totalityMinuteOfDay: 10 * 60,
-              endsMinuteOfDay: 11 * 60 + 30,
-              minimumOutputMultiplier,
-            },
-          },
-          turningPointPriority: 110,
-        };
-      },
-    },
-  ],
-};
-
 const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   id: "nuclear-trip",
   scenarioId: 110,
@@ -1367,7 +1308,6 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   PARADISE_ARC,
   TEXAS_DEEP_FREEZE_ARC,
   HEATWAVE_DROUGHT_ARC,
-  SOLAR_ECLIPSE_ARC,
   NUCLEAR_TRIP_ARC,
 ];
 
@@ -1474,12 +1414,6 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       ),
     );
   });
-  descending(
-    "Solar eclipse minimum output",
-    DIFFICULTY_ORDER.map(
-      (difficulty) => SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty],
-    ),
-  );
   ascending(
     "Hurricane affected capacity",
     DIFFICULTY_ORDER.map(
@@ -1599,12 +1533,6 @@ export function combineStoryEffects(
       combined.hydroRunoffMultiplier =
         (combined.hydroRunoffMultiplier ?? 1) *
         (effects.hydroRunoffMultiplier ?? 1);
-    }
-    if (effects.solarEclipse !== undefined) {
-      if (combined.solarEclipse !== undefined) {
-        throw new Error("Overlapping solar-eclipse effects");
-      }
-      combined.solarEclipse = effects.solarEclipse;
     }
     const fuelPriceMultipliers = multiplyEffects(
       combined.fuelPriceMultipliers,
@@ -1800,37 +1728,6 @@ export function upcomingStoryPhases(
     .sort(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
-}
-
-/** Piecewise-linear loss and recovery across a known eclipse window. */
-export function solarEclipseOutputMultiplier(
-  effects: WorldEventEffectsType,
-  minuteOfDay: number,
-): number {
-  const eclipse = effects.solarEclipse;
-  if (
-    !eclipse ||
-    minuteOfDay <= eclipse.startsMinuteOfDay ||
-    minuteOfDay >= eclipse.endsMinuteOfDay
-  ) {
-    return 1;
-  }
-  if (minuteOfDay === eclipse.totalityMinuteOfDay) {
-    return eclipse.minimumOutputMultiplier;
-  }
-  if (minuteOfDay <= eclipse.totalityMinuteOfDay) {
-    const progress =
-      (minuteOfDay - eclipse.startsMinuteOfDay) /
-      (eclipse.totalityMinuteOfDay - eclipse.startsMinuteOfDay);
-    return 1 - progress * (1 - eclipse.minimumOutputMultiplier);
-  }
-  const recovery =
-    (minuteOfDay - eclipse.totalityMinuteOfDay) /
-    (eclipse.endsMinuteOfDay - eclipse.totalityMinuteOfDay);
-  return (
-    eclipse.minimumOutputMultiplier +
-    recovery * (1 - eclipse.minimumOutputMultiplier)
-  );
 }
 
 export function activeWorldEventEffects(

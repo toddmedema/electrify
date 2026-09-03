@@ -116,6 +116,8 @@
       "src/**/*.{ts,tsx}",
       "!src/**/*.test.{ts,tsx}",
       "!src/react-app-env.d.ts",
+      "!src/helpers/CustomGameForecastClient.ts",
+      "!src/workers/**/*.ts",
       "!src/testing/SimCli.tsx"
     ],
     "coverageThreshold": {

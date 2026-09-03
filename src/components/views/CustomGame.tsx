@@ -24,9 +24,11 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
 import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
@@ -37,6 +39,12 @@ import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
+import {
+  CustomGameForecastRequest,
+  CustomGameForecastResponse,
+  YearOneOutlook,
+} from "../../helpers/CustomGameForecast";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -86,6 +94,13 @@ const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
 // The era the cash, rates and fees below are written in: amounts a player recognises, against the
 // fuel prices the data ends on.
 const MONEY_BASE_YEAR = 2020;
+const FORECAST_DEBOUNCE_MS = 250;
+
+type OutlookState =
+  | { status: "loading" }
+  | { status: "invalid" }
+  | { status: "error" }
+  | { status: "ready"; outlook: YearOneOutlook };
 
 /**
  * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
@@ -184,6 +199,15 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
     : formatWatts(facility.peakW || 0);
 }
 
+function demandServedLabel(outlook: YearOneOutlook): string {
+  if (outlook.worstShortfallW === 0) {
+    return "100%";
+  }
+  // Never round a real deficit up to the covered state's 100%.
+  const percent = Math.min(99.9, outlook.demandServed * 100);
+  return `${percent >= 99 ? percent.toFixed(1) : Math.round(percent)}%`;
+}
+
 /**
  * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
  * The default 500 MW plant for one million customers covers the opening demand plus the game's
@@ -217,6 +241,42 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
   const [addSize, setAddSize] = React.useState(GENERATOR_SIZES_W[2]);
+  const previewSeed = React.useRef(scenario.seed ?? newSeed());
+  const forecastRequestId = React.useRef(0);
+  const forecastWorker = React.useRef<Worker>();
+  const [outlook, setOutlook] = React.useState<OutlookState>({
+    status: "loading",
+  });
+  const ensureForecastWorker = React.useCallback(() => {
+    if (forecastWorker.current) {
+      return forecastWorker.current;
+    }
+    const worker = createCustomGameForecastWorker();
+    forecastWorker.current = worker;
+    worker.onmessage = (event: MessageEvent<CustomGameForecastResponse>) => {
+      if (event.data.requestId !== forecastRequestId.current) {
+        return;
+      }
+      if ("outlook" in event.data) {
+        setOutlook({ status: "ready", outlook: event.data.outlook });
+      } else {
+        setOutlook({ status: "error" });
+      }
+    };
+    worker.onerror = (event: ErrorEvent) => {
+      // The outlook is optional. Handle a worker failure without making the setup unusable.
+      event.preventDefault();
+      setOutlook({ status: "error" });
+    };
+    return worker;
+  }, []);
+  React.useEffect(() => {
+    return () => {
+      const worker = forecastWorker.current;
+      forecastWorker.current = undefined;
+      worker?.terminate();
+    };
+  }, []);
 
   const technologies = React.useMemo(
     () => technologiesFor(scenario, game.difficulty),
@@ -304,6 +364,38 @@ export default function CustomGame(props: Props): React.JSX.Element {
     },
   );
 
+  React.useEffect(() => {
+    const requestId = ++forecastRequestId.current;
+    if (unavailable.length > 0) {
+      setOutlook({ status: "invalid" });
+      return;
+    }
+    const location = getScenarioLocation(scenario);
+    if (!location) {
+      setOutlook({ status: "error" });
+      return;
+    }
+
+    setOutlook({ status: "loading" });
+    const timer = window.setTimeout(() => {
+      const request: CustomGameForecastRequest = {
+        requestId,
+        scenario: {
+          ...scenario,
+          locationId: location.id,
+          location,
+        },
+        difficulty: game.difficulty,
+        seed: scenario.seed ?? previewSeed.current,
+      };
+      ensureForecastWorker().postMessage(request);
+    }, FORECAST_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [ensureForecastWorker, game.difficulty, scenario, unavailable.length]);
+
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
   };
@@ -389,343 +481,468 @@ export default function CustomGame(props: Props): React.JSX.Element {
             });
           }}
         />
-        <Table size="small" id="gameSetupTable">
-          <TableBody>
-            <TableRow>
-              <TableCell>Customers</TableCell>
-              <TableCell>
-                <Slider
-                  aria-label="Starting customers"
-                  min={100000}
-                  max={5000000}
-                  step={50000}
-                  value={
-                    scenario.startingCustomers ||
-                    getStartingCustomers(getScenarioLocation(scenario))
-                  }
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value: number) => value.toLocaleString()}
-                  onChange={(_event: Event, value: number | number[]) =>
-                    changeStartingCustomers(
-                      Array.isArray(value) ? value[0] : value,
-                    )
-                  }
-                />
-                <Typography variant="caption" color="textSecondary">
-                  {(
-                    scenario.startingCustomers ||
-                    getStartingCustomers(getScenarioLocation(scenario))
-                  ).toLocaleString()}
-                </Typography>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Start year</TableCell>
-              <TableCell>
-                <Select
-                  id="startingYear"
-                  inputProps={{ "aria-label": "Starting year" }}
-                  value={scenario.startingYear}
-                  onChange={(e: SelectChangeEvent<number>) =>
-                    changeStartingYear(Number(e.target.value))
-                  }
-                >
-                  {STARTING_YEARS.map((y: number) => {
-                    return (
-                      <MenuItem value={y} key={y}>
-                        {y}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Duration</TableCell>
-              <TableCell>
-                <Select
-                  id="duration"
-                  inputProps={{ "aria-label": "Duration" }}
-                  value={scenario.durationMonths}
-                  onChange={(e: SelectChangeEvent<number>) =>
-                    change({ durationMonths: Number(e.target.value) })
-                  }
-                >
-                  {DURATION_YEARS.map((y: number) => {
-                    return (
-                      <MenuItem value={y * 12} key={y}>
-                        {y} {y === 1 ? "year" : "years"}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>
-                Ownership&nbsp;
-                <IconButton
-                  onClick={() => setVictoryDialogOpen(true)}
-                  aria-label="Victory conditions"
-                  color="primary"
-                  size="small"
-                >
-                  <InfoIcon />
-                </IconButton>
-              </TableCell>
-              <TableCell>
-                <Select
-                  id="ownership"
-                  inputProps={{ "aria-label": "Ownership" }}
-                  value={scenario.ownership}
-                  onChange={(e: SelectChangeEvent<ScenarioType["ownership"]>) =>
-                    change({
-                      ownership: e.target.value as ScenarioType["ownership"],
-                    })
-                  }
-                >
-                  <MenuItem value="Investor">Investor-owned utility</MenuItem>
-                  <MenuItem value="Public">Publicly owned utility</MenuItem>
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Cash</TableCell>
-              <TableCell>
-                <Select
-                  id="cash"
-                  inputProps={{ "aria-label": "Starting cash" }}
-                  value={scenario.cash}
-                  onChange={(e: SelectChangeEvent<number>) =>
-                    change({ cash: Number(e.target.value) })
-                  }
-                >
-                  {cashOptions.map((c: number) => {
-                    return (
-                      <MenuItem value={c} key={c}>
-                        {formatMoneyConcise(c)}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Electricity rate</TableCell>
-              <TableCell>
-                <Select
-                  id="dollarsPerkWh"
-                  inputProps={{ "aria-label": "Electricity rate" }}
-                  value={scenario.dollarsPerkWh}
-                  onChange={(e: SelectChangeEvent<number>) =>
-                    change({ dollarsPerkWh: Number(e.target.value) })
-                  }
-                >
-                  {rateOptions.map((r: number) => {
-                    return (
-                      <MenuItem value={r} key={r}>
-                        ${r.toFixed(2)}/kWh
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>
-                Carbon fee&nbsp;
-                <IconButton
-                  onClick={() => setFeeDialogOpen(true)}
-                  aria-label="What is a carbon fee?"
-                  color="primary"
-                  size="small"
-                >
-                  <InfoIcon />
-                </IconButton>
-              </TableCell>
-              <TableCell>
-                <Select
-                  id="feePerKgCO2e"
-                  inputProps={{ "aria-label": "Carbon fee" }}
-                  value={scenario.feePerKgCO2e}
-                  onChange={(e: SelectChangeEvent<number>) =>
-                    change({ feePerKgCO2e: Number(e.target.value) })
-                  }
-                >
-                  {feeOptions.map((f: number) => {
-                    return (
-                      <MenuItem value={f / 1000} key={f}>
-                        {/* The options are set per tonne, and the value stays per kilogram
-                            whichever way it is quoted - only the label moves */}
-                        {formatPricePerLargeMass(f / 1000, units)}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Difficulty</TableCell>
-              <TableCell>
-                {/* Difficulty lives on the game rather than the scenario, the same way it does
-                    on the scenario details screen */}
-                <Select
-                  id="difficulty"
-                  inputProps={{ "aria-label": "Difficulty" }}
-                  value={game.difficulty}
-                  onChange={(e: SelectChangeEvent<DifficultyType>) =>
-                    onDelta({ difficulty: e.target.value as DifficultyType })
-                  }
-                >
-                  {Object.keys(DIFFICULTIES).map((d: string) => {
-                    return (
-                      <MenuItem value={d} key={d}>
-                        <Tooltip
-                          title={DIFFICULTIES[d].description}
-                          placement="right"
-                        >
-                          <span>{DIFFICULTY_LABELS[d as DifficultyType]}</span>
-                        </Tooltip>
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Seed</TableCell>
-              <TableCell>
-                {/* Everything random in a run - weather, fuel prices - comes from the seed, so
-                    the same seed and settings replay the same game */}
-                <TextField
-                  id="seed"
-                  variant="standard"
-                  placeholder="Random"
-                  slotProps={{ htmlInput: { "aria-label": "Seed" } }}
-                  value={scenario.seed === undefined ? "" : scenario.seed}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const digits = e.target.value.replace(/[^0-9]/g, "");
-                    change({
-                      seed: digits === "" ? undefined : Number(digits),
-                    });
-                  }}
-                />
-                <IconButton
-                  onClick={() => change({ seed: newSeed() })}
-                  aria-label="Random seed"
-                  color="primary"
-                  size="small"
-                >
-                  <CasinoIcon />
-                </IconButton>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-
-        <Typography variant="h6" sx={{ paddingLeft: 1, paddingTop: 1 }}>
-          Facilities
-        </Typography>
-        {unavailable.length > 0 && (
-          <Typography variant="body2" color="error" sx={{ paddingLeft: 1 }}>
-            {unavailable.map(facilityName).join(", ")} can't be built with this
-            location and year, or exceeds the number of suitable build sites.
-            Remove {unavailable.length === 1 ? "it" : "them"} or change the
-            setup.
-          </Typography>
-        )}
-
-        {scenario.facilities.map(
-          (f: Partial<FacilityShoppingType>, i: number) => {
-            return (
-              <Card className="build-list-item" key={`${facilityName(f)}${i}`}>
-                <CardHeader
-                  title={facilityName(f)}
-                  subheader={facilitySize(f)}
-                  action={
-                    <IconButton
-                      onClick={() => removeFacility(i)}
-                      aria-label={`Remove ${facilityName(f)}`}
-                      color="primary"
-                      size="large"
+        <div className="customSetupColumns">
+          <section
+            className="customSetupSettings"
+            aria-labelledby="custom-setup-settings-heading"
+          >
+            <Typography
+              id="custom-setup-settings-heading"
+              variant="h6"
+              component="h2"
+              className="customSetupSectionHeading"
+            >
+              Game setup
+            </Typography>
+            <Table size="small" id="gameSetupTable">
+              <TableBody>
+                <TableRow>
+                  <TableCell>Customers</TableCell>
+                  <TableCell>
+                    <Slider
+                      aria-label="Starting customers"
+                      min={100000}
+                      max={5000000}
+                      step={50000}
+                      value={
+                        scenario.startingCustomers ||
+                        getStartingCustomers(getScenarioLocation(scenario))
+                      }
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value: number) =>
+                        value.toLocaleString()
+                      }
+                      onChange={(_event: Event, value: number | number[]) =>
+                        changeStartingCustomers(
+                          Array.isArray(value) ? value[0] : value,
+                        )
+                      }
+                    />
+                    <Typography variant="caption" color="textSecondary">
+                      {(
+                        scenario.startingCustomers ||
+                        getStartingCustomers(getScenarioLocation(scenario))
+                      ).toLocaleString()}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Start year</TableCell>
+                  <TableCell>
+                    <Select
+                      id="startingYear"
+                      inputProps={{ "aria-label": "Starting year" }}
+                      value={scenario.startingYear}
+                      onChange={(e: SelectChangeEvent<number>) =>
+                        changeStartingYear(Number(e.target.value))
+                      }
                     >
-                      <DeleteIcon />
+                      {STARTING_YEARS.map((y: number) => {
+                        return (
+                          <MenuItem value={y} key={y}>
+                            {y}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Duration</TableCell>
+                  <TableCell>
+                    <Select
+                      id="duration"
+                      inputProps={{ "aria-label": "Duration" }}
+                      value={scenario.durationMonths}
+                      onChange={(e: SelectChangeEvent<number>) =>
+                        change({ durationMonths: Number(e.target.value) })
+                      }
+                    >
+                      {DURATION_YEARS.map((y: number) => {
+                        return (
+                          <MenuItem value={y * 12} key={y}>
+                            {y} {y === 1 ? "year" : "years"}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    Ownership&nbsp;
+                    <IconButton
+                      onClick={() => setVictoryDialogOpen(true)}
+                      aria-label="Victory conditions"
+                      color="primary"
+                      size="small"
+                    >
+                      <InfoIcon />
                     </IconButton>
-                  }
-                />
-              </Card>
-            );
-          },
-        )}
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      id="ownership"
+                      inputProps={{ "aria-label": "Ownership" }}
+                      value={scenario.ownership}
+                      onChange={(
+                        e: SelectChangeEvent<ScenarioType["ownership"]>,
+                      ) =>
+                        change({
+                          ownership: e.target
+                            .value as ScenarioType["ownership"],
+                        })
+                      }
+                    >
+                      <MenuItem value="Investor">
+                        Investor-owned utility
+                      </MenuItem>
+                      <MenuItem value="Public">Publicly owned utility</MenuItem>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Cash</TableCell>
+                  <TableCell>
+                    <Select
+                      id="cash"
+                      inputProps={{ "aria-label": "Starting cash" }}
+                      value={scenario.cash}
+                      onChange={(e: SelectChangeEvent<number>) =>
+                        change({ cash: Number(e.target.value) })
+                      }
+                    >
+                      {cashOptions.map((c: number) => {
+                        return (
+                          <MenuItem value={c} key={c}>
+                            {formatMoneyConcise(c)}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Electricity rate</TableCell>
+                  <TableCell>
+                    <Select
+                      id="dollarsPerkWh"
+                      inputProps={{ "aria-label": "Electricity rate" }}
+                      value={scenario.dollarsPerkWh}
+                      onChange={(e: SelectChangeEvent<number>) =>
+                        change({ dollarsPerkWh: Number(e.target.value) })
+                      }
+                    >
+                      {rateOptions.map((r: number) => {
+                        return (
+                          <MenuItem value={r} key={r}>
+                            ${r.toFixed(2)}/kWh
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    Carbon fee&nbsp;
+                    <IconButton
+                      onClick={() => setFeeDialogOpen(true)}
+                      aria-label="What is a carbon fee?"
+                      color="primary"
+                      size="small"
+                    >
+                      <InfoIcon />
+                    </IconButton>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      id="feePerKgCO2e"
+                      inputProps={{ "aria-label": "Carbon fee" }}
+                      value={scenario.feePerKgCO2e}
+                      onChange={(e: SelectChangeEvent<number>) =>
+                        change({ feePerKgCO2e: Number(e.target.value) })
+                      }
+                    >
+                      {feeOptions.map((f: number) => {
+                        return (
+                          <MenuItem value={f / 1000} key={f}>
+                            {/* The options are set per tonne, and the value stays per kilogram
+                            whichever way it is quoted - only the label moves */}
+                            {formatPricePerLargeMass(f / 1000, units)}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Difficulty</TableCell>
+                  <TableCell>
+                    {/* Difficulty lives on the game rather than the scenario, the same way it does
+                    on the scenario details screen */}
+                    <Select
+                      id="difficulty"
+                      inputProps={{ "aria-label": "Difficulty" }}
+                      value={game.difficulty}
+                      onChange={(e: SelectChangeEvent<DifficultyType>) =>
+                        onDelta({
+                          difficulty: e.target.value as DifficultyType,
+                        })
+                      }
+                    >
+                      {Object.keys(DIFFICULTIES).map((d: string) => {
+                        return (
+                          <MenuItem value={d} key={d}>
+                            <Tooltip
+                              title={DIFFICULTIES[d].description}
+                              placement="right"
+                            >
+                              <span>
+                                {DIFFICULTY_LABELS[d as DifficultyType]}
+                              </span>
+                            </Tooltip>
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Seed</TableCell>
+                  <TableCell>
+                    {/* Everything random in a run - weather, fuel prices - comes from the seed, so
+                    the same seed and settings replay the same game */}
+                    <TextField
+                      id="seed"
+                      variant="standard"
+                      placeholder="Random"
+                      slotProps={{ htmlInput: { "aria-label": "Seed" } }}
+                      value={scenario.seed === undefined ? "" : scenario.seed}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const digits = e.target.value.replace(/[^0-9]/g, "");
+                        change({
+                          seed: digits === "" ? undefined : Number(digits),
+                        });
+                      }}
+                    />
+                    <IconButton
+                      onClick={() => change({ seed: newSeed() })}
+                      aria-label="Random seed"
+                      color="primary"
+                      size="small"
+                    >
+                      <CasinoIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </section>
 
-        <div className="customFacilityPicker">
-          <Select
-            id="addFacilityName"
-            inputProps={{ "aria-label": "Facility type" }}
-            displayEmpty
-            value={adding ? adding.name : ""}
-            onChange={(e: SelectChangeEvent<string>) => {
-              const next = technologies.find((t) => t.name === e.target.value);
-              setAddName(e.target.value);
-              // Sizes differ between generators and storage, so carrying the old one over would
-              // offer a watt-hour capacity for a generator. Opens on a middling plant rather
-              // than the biggest one the year allows, which is a lot to hand someone by default
-              if (next) {
-                const options = (
-                  next.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W
-                ).filter((s) => s <= next.maxSize);
-                setAddSize(
-                  options[Math.min(next.storage ? 1 : 2, options.length - 1)],
+          <section
+            className="customSetupFacilities"
+            aria-labelledby="custom-setup-facilities-heading"
+          >
+            <Typography
+              id="custom-setup-facilities-heading"
+              variant="h6"
+              component="h2"
+              className="customSetupSectionHeading"
+            >
+              Facilities
+            </Typography>
+            {unavailable.length > 0 && (
+              <Typography variant="body2" color="error">
+                {unavailable.map(facilityName).join(", ")} can't be built with
+                this location and year, or exceeds the number of suitable build
+                sites. Remove {unavailable.length === 1 ? "it" : "them"} or
+                change the setup.
+              </Typography>
+            )}
+
+            <section
+              className={`customSetupOutlook customSetupOutlook-${outlook.status}${
+                outlook.status === "ready"
+                  ? outlook.outlook.worstShortfallW > 0
+                    ? " customSetupOutlook-deficit"
+                    : " customSetupOutlook-covered"
+                  : ""
+              }`}
+              aria-labelledby="custom-setup-outlook-heading"
+              aria-busy={outlook.status === "loading"}
+            >
+              <Typography
+                id="custom-setup-outlook-heading"
+                variant="subtitle2"
+                component="h3"
+              >
+                Year 1 outlook
+              </Typography>
+              <div role="status" aria-live="polite" aria-atomic="true">
+                {outlook.status === "loading" && (
+                  <Typography variant="body2">
+                    Calculating Year 1 outlook…
+                  </Typography>
+                )}
+                {outlook.status === "invalid" && (
+                  <Typography variant="body2">
+                    Fix the facility issue to calculate an outlook.
+                  </Typography>
+                )}
+                {outlook.status === "error" && (
+                  <Typography variant="body2">
+                    Year 1 outlook unavailable.
+                  </Typography>
+                )}
+                {outlook.status === "ready" && (
+                  <>
+                    <div className="customSetupOutlookState">
+                      {outlook.outlook.worstShortfallW > 0 ? (
+                        <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                      ) : (
+                        <CheckCircleOutlineIcon
+                          fontSize="small"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <strong>
+                        {outlook.outlook.worstShortfallW > 0
+                          ? "Deficit forecast"
+                          : "Demand covered"}
+                      </strong>
+                    </div>
+                    <div className="customSetupOutlookMetrics">
+                      <div>
+                        <strong>{demandServedLabel(outlook.outlook)}</strong>
+                        <span>annual demand served</span>
+                      </div>
+                      <div>
+                        <strong>
+                          {outlook.outlook.worstShortfallW > 0
+                            ? `Up to ${formatWatts(outlook.outlook.worstShortfallW)} short`
+                            : "No forecast shortfall"}
+                        </strong>
+                      </div>
+                    </div>
+                    <Typography
+                      variant="caption"
+                      className="customSetupOutlookAssumption"
+                    >
+                      Assumes this fleet and rate stay unchanged.
+                    </Typography>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {scenario.facilities.map(
+              (f: Partial<FacilityShoppingType>, i: number) => {
+                return (
+                  <Card
+                    className="build-list-item"
+                    key={`${facilityName(f)}${i}`}
+                  >
+                    <CardHeader
+                      title={facilityName(f)}
+                      subheader={facilitySize(f)}
+                      action={
+                        <IconButton
+                          onClick={() => removeFacility(i)}
+                          aria-label={`Remove ${facilityName(f)}`}
+                          color="primary"
+                          size="large"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      }
+                    />
+                  </Card>
                 );
-              }
-            }}
-          >
-            <MenuItem value="" disabled>
-              Add a facility
-            </MenuItem>
-            {technologies.map((t: TechnologyType) => {
-              return (
-                <MenuItem value={t.name} key={t.name}>
-                  {t.name}
+              },
+            )}
+
+            <div className="customFacilityPicker">
+              <Select
+                id="addFacilityName"
+                inputProps={{ "aria-label": "Facility type" }}
+                displayEmpty
+                value={adding ? adding.name : ""}
+                onChange={(e: SelectChangeEvent<string>) => {
+                  const next = technologies.find(
+                    (t) => t.name === e.target.value,
+                  );
+                  setAddName(e.target.value);
+                  // Sizes differ between generators and storage, so carrying the old one over would
+                  // offer a watt-hour capacity for a generator. Opens on a middling plant rather
+                  // than the biggest one the year allows, which is a lot to hand someone by default
+                  if (next) {
+                    const options = (
+                      next.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W
+                    ).filter((s) => s <= next.maxSize);
+                    setAddSize(
+                      options[
+                        Math.min(next.storage ? 1 : 2, options.length - 1)
+                      ],
+                    );
+                  }
+                }}
+              >
+                <MenuItem value="" disabled>
+                  Add a facility
                 </MenuItem>
-              );
-            })}
-          </Select>
-          <Select
-            id="addFacilitySize"
-            inputProps={{ "aria-label": "Facility size" }}
-            value={sizes.indexOf(addSize) === -1 ? sizes[0] : addSize}
-            disabled={!adding}
-            onChange={(e: SelectChangeEvent<number>) =>
-              setAddSize(Number(e.target.value))
-            }
-          >
-            {sizes.map((size: number) => {
-              return (
-                <MenuItem value={size} key={size}>
-                  {adding?.storage ? formatWattHours(size) : formatWatts(size)}
-                </MenuItem>
-              );
-            })}
-          </Select>
-          <IconButton
-            onClick={addFacility}
-            aria-label="Add facility"
-            color="primary"
-            disabled={!adding}
-            size="large"
-          >
-            <AddIcon />
-          </IconButton>
+                {technologies.map((t: TechnologyType) => {
+                  return (
+                    <MenuItem value={t.name} key={t.name}>
+                      {t.name}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+              <Select
+                id="addFacilitySize"
+                inputProps={{ "aria-label": "Facility size" }}
+                value={sizes.indexOf(addSize) === -1 ? sizes[0] : addSize}
+                disabled={!adding}
+                onChange={(e: SelectChangeEvent<number>) =>
+                  setAddSize(Number(e.target.value))
+                }
+              >
+                {sizes.map((size: number) => {
+                  return (
+                    <MenuItem value={size} key={size}>
+                      {adding?.storage
+                        ? formatWattHours(size)
+                        : formatWatts(size)}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+              <IconButton
+                onClick={addFacility}
+                aria-label="Add facility"
+                color="primary"
+                disabled={!adding}
+                size="large"
+              >
+                <AddIcon />
+              </IconButton>
+            </div>
+          </section>
         </div>
 
-        <div style={{ textAlign: "center", padding: "12px" }}>
+        <div className="customSetupActions">
           <Button
             size="large"
             variant="contained"
             color="primary"
             disabled={unavailable.length > 0}
-            onClick={() => onStart(scenario)}
+            onClick={() =>
+              onStart({
+                ...scenario,
+                seed: scenario.seed ?? previewSeed.current,
+              })
+            }
           >
             Play
           </Button>
