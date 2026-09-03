@@ -149,6 +149,7 @@
       "long": -75.1652,
       "timeZone": "America/New_York",
       "elevation": 32,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -305,6 +306,7 @@
       "long": -71.0589,
       "timeZone": "America/New_York",
       "elevation": 9,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -383,6 +385,7 @@
       "long": -76.6122,
       "timeZone": "America/New_York",
       "elevation": 29,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -669,6 +672,7 @@
       "long": -63.5752,
       "timeZone": "America/Halifax",
       "elevation": 26,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1091,6 +1095,7 @@
       "long": -43.1729,
       "timeZone": "America/Sao_Paulo",
       "elevation": 12,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1127,6 +1132,7 @@
       "long": -38.5267,
       "timeZone": "America/Fortaleza",
       "elevation": 21,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1151,6 +1157,7 @@
       "long": -51.2177,
       "timeZone": "America/Sao_Paulo",
       "elevation": 15,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1224,6 +1231,7 @@
       "long": -2.2426,
       "timeZone": "Europe/London",
       "elevation": 52,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1236,6 +1244,7 @@
       "long": -3.1883,
       "timeZone": "Europe/London",
       "elevation": 69,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1248,6 +1257,7 @@
       "long": -6.2603,
       "timeZone": "Europe/Dublin",
       "elevation": 11,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1260,6 +1270,7 @@
       "long": 2.3522,
       "timeZone": "Europe/Paris",
       "elevation": 36,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1272,6 +1283,7 @@
       "long": 5.3698,
       "timeZone": "Europe/Paris",
       "elevation": 6,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1308,6 +1320,7 @@
       "long": 2.1734,
       "timeZone": "Europe/Madrid",
       "elevation": 28,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1320,6 +1333,7 @@
       "long": -5.9845,
       "timeZone": "Europe/Madrid",
       "elevation": 18,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1332,6 +1346,7 @@
       "long": -9.1393,
       "timeZone": "Europe/Lisbon",
       "elevation": 66,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1344,6 +1359,7 @@
       "long": -8.6291,
       "timeZone": "Europe/Lisbon",
       "elevation": 88,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1356,6 +1372,7 @@
       "long": 12.4964,
       "timeZone": "Europe/Rome",
       "elevation": 58,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
@@ -1380,6 +1397,7 @@
       "long": 14.2681,
       "timeZone": "Europe/Rome",
       "elevation": 19,
+      "offshore": true,
       "startingYear": 1980,
       "endingYear": 2025
     },
