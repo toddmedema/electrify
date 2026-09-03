@@ -94,6 +94,9 @@ describe("NewGame", () => {
     scenariosNewestFirst.forEach((scenario, index) =>
       expect(rows[index]).toHaveTextContent(scenario.name),
     );
+    expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
+      "Extreme weather",
+    );
   });
 
   it("filters the full challenge catalog by player-facing themes", () => {
@@ -106,9 +109,7 @@ describe("NewGame", () => {
       expect.stringContaining("Deep Freeze"),
       expect.stringContaining("Hurricane Season"),
     ]);
-    expect(screen.getByLabelText("Deep Freeze themes")).toHaveTextContent(
-      "Extreme weather",
-    );
+    expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Energy transition" }));
     expect(screen.getByTestId("mission-row-105")).toHaveTextContent("Paradise");

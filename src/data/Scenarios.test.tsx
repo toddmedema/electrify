@@ -372,6 +372,11 @@ describe("authored starting fleets", () => {
         0,
       ),
     ).toBe(80_810_000);
+    expect(wildfire.facilities[0]).toEqual({
+      fuel: "Natural Gas",
+      peakW: 24_240_000,
+      initialAgeYears: 18,
+    });
   });
 
   it("makes every plant in the aging coal fleet at least 20 years old", () => {

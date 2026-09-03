@@ -512,7 +512,7 @@ describe("California wildfire emergency", () => {
       facilities: [
         {
           id: 10,
-          name: "Harbor Gas Portfolio",
+          name: "Natural Gas",
           fuel: "Natural Gas" as const,
           ageYears: 18,
           peakW: 60,
