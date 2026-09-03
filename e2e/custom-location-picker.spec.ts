@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Locator, Page, test } from "@playwright/test";
 
 async function openCustomSetup(page: Page) {
   await page.addInitScript(() => {
@@ -20,6 +20,28 @@ async function openCustomSetup(page: Page) {
   ).toBeVisible();
 }
 
+async function activateFocusedNeighbor(
+  page: Page,
+  search: Locator,
+  previousLabel: string,
+  previousSelection: string,
+  key: " " | "Enter",
+) {
+  const focusedMarker = page.locator(":focus");
+  await expect(focusedMarker).not.toHaveAttribute("aria-label", previousLabel);
+  const focusedCluster = await focusedMarker.evaluate((element) =>
+    element.classList.contains("cluster"),
+  );
+  await focusedMarker.press(key);
+  if (focusedCluster) {
+    await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+    await expect(search).toHaveValue(previousSelection);
+  } else {
+    await expect(focusedMarker).toHaveAttribute("aria-pressed", "true");
+    await expect(search).not.toHaveValue(previousSelection);
+  }
+}
+
 test("world map location picker works with pointer, touch, search, and keyboard", async ({
   page,
 }, testInfo) => {
@@ -34,14 +56,14 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await expect(map).toBeVisible();
   await expect(selectedSanFrancisco).toHaveAttribute("aria-pressed", "true");
 
-  const alternateMarker = map
-    .locator(".worldMapMarker.marker:not(.selected)")
+  const pointerTarget = map
+    .locator(".worldMapMarker:not(.cluster)[aria-pressed='false']")
     .first();
-  const alternateMarkerLabel = await alternateMarker.getAttribute("aria-label");
-  expect(alternateMarkerLabel).not.toBeNull();
-  await alternateMarker.click();
+  const pointerTargetLabel = await pointerTarget.getAttribute("aria-label");
+  expect(pointerTargetLabel).not.toBeNull();
+  await pointerTarget.click();
   await expect(
-    page.getByRole("button", { name: alternateMarkerLabel! }),
+    page.getByRole("button", { name: pointerTargetLabel! }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(search).not.toHaveValue("San Francisco, CA");
   await search.fill("San Francisco");
@@ -63,11 +85,13 @@ test("world map location picker works with pointer, touch, search, and keyboard"
 
   await selectedSanFrancisco.focus();
   await selectedSanFrancisco.press("ArrowLeft");
-  const focusedLabel = await page.evaluate(
-    () => document.activeElement?.getAttribute("aria-label") || "",
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    startingSelection,
+    "Enter",
   );
-  expect(focusedLabel).not.toBe("Select San Francisco, CA, United States");
-
   await expect(page.locator(".locationPickerCount")).toHaveText(
     /\d+ playable locations/,
   );
@@ -212,40 +236,33 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   const sanFrancisco = page.getByRole("button", {
     name: "Select San Francisco, CA, United States",
   });
-
   await expect(page.locator(".locationPickerCount")).toHaveText(
     /\d{3} playable locations/,
   );
   await sanFrancisco.focus();
   await sanFrancisco.press("ArrowLeft");
-  await expect(page.locator(":focus")).toHaveClass(/worldMapMarker/);
-  const spaceMarker = map
-    .locator(".worldMapMarker.marker:not(.selected)")
-    .first();
-  const spaceMarkerLabel = await spaceMarker.getAttribute("aria-label");
-  expect(spaceMarkerLabel).not.toBeNull();
-  await spaceMarker.focus();
-  await spaceMarker.press(" ");
-  await expect(
-    page.getByRole("button", { name: spaceMarkerLabel! }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(search).not.toHaveValue("San Francisco, CA");
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    "San Francisco, CA",
+    " ",
+  );
 
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await page.getByRole("button", { name: "Show world" }).click();
-  const enterMarker = map
-    .locator(".worldMapMarker.marker:not(.selected)")
-    .first();
-  const enterMarkerLabel = await enterMarker.getAttribute("aria-label");
-  expect(enterMarkerLabel).not.toBeNull();
-  await enterMarker.focus();
-  await enterMarker.press("Enter");
-  await expect(
-    page.getByRole("button", { name: enterMarkerLabel! }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(search).not.toHaveValue("San Francisco, CA");
+  await sanFrancisco.focus();
+  await sanFrancisco.press("ArrowLeft");
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    "San Francisco, CA",
+    "Enter",
+  );
 
+  await page.getByRole("button", { name: "Show world" }).click();
   const cluster = map.locator(".worldMapMarker.cluster").first();
   await cluster.focus();
   await cluster.press("Enter");

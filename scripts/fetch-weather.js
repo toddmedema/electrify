@@ -11,8 +11,9 @@
  * ones that are.
  *
  * Rate limits are the binding constraint, not bandwidth. Open-Meteo's free tier allows roughly
- * 600 location-days a minute, 5,000 an hour and 10,000 a day, and one city costs 480 - so a run
- * fetches about ten cities an hour and twenty a day before the API starts refusing. Everything
+ * 600 location-days a minute, 5,000 an hour and 10,000 a day. A 1980-2025 city costs 552
+ * location-days, or 1,104 when its offshore point is fetched too, so a run gets through roughly
+ * nine onshore cities or four offshore cities an hour before the API starts refusing. Everything
  * here is built around that: cities are written out as each small batch finishes, an already
  * written city is skipped, and a run that gets cut off by the daily limit stops cleanly and
  * leaves the rest for the next one. Filling all of scripts/cities.json takes a couple of weeks
@@ -200,6 +201,10 @@ function writeIndex(fetched, endingYears = {}) {
       header.length === HEADER_BYTES && header.toString("ascii", 0, 4) === MAGIC
         ? header.readUInt16LE(8) + header.readUInt16LE(10) - 1
         : undefined;
+    const fileHasOffshore =
+      header.length === HEADER_BYTES &&
+      header.readUInt8(4) >= 2 &&
+      (header.readUInt8(15) & FLAG_OFFSHORE_WIND) !== 0;
     cities[city.id] = {
       id: city.id,
       name: displayName(city),
@@ -210,7 +215,7 @@ function writeIndex(fetched, endingYears = {}) {
       long: city.long,
       timeZone: entry.timeZone,
       elevation: entry.elevation,
-      ...(city.offshore ? { offshore: true } : {}),
+      ...(fileHasOffshore ? { offshore: true } : {}),
       ...(city.weatherSource ? { source: city.weatherSource } : {}),
       startingYear: STARTING_YEAR,
       endingYear:
@@ -278,17 +283,27 @@ class DailyLimitReached extends Error {}
 /**
  * One day of hourly readings for a batch of locations, retried through the API's refusals.
  *
- * timezone=auto is what makes the hours local ones: the game reads row 18 as six in the evening
- * where the player is, and compares it against a sunset it works out from the same zone.
+ * Onshore requests resolve the city's timezone. Offshore requests reuse it so row 18 still means
+ * six in the evening for the player even when the sampling point crosses a timezone boundary.
+ * Selecting sea cells explicitly also prevents the API's default land preference from quietly
+ * substituting a coastal land cell for an offshore coordinate.
  */
-async function fetchDay(batch, year, month) {
+async function fetchDay(batch, year, month, timeZones = null) {
   const date = `${year}-${String(month).padStart(2, "0")}-${SAMPLE_DAY}`;
+  const offshore = batch.every((point) => point.offshore);
+  if (!offshore && batch.some((point) => point.offshore)) {
+    throw new Error("Onshore and offshore points must be fetched separately");
+  }
+  const hourly = offshore
+    ? "wind_speed_10m"
+    : "temperature_2m,wind_speed_10m,cloud_cover,precipitation";
+  const timeZone = encodeURIComponent(timeZones?.join(",") || "auto");
   const url =
     `${API}?latitude=${batch.map((c) => c.lat).join(",")}` +
     `&longitude=${batch.map((c) => c.long).join(",")}` +
     `&start_date=${date}&end_date=${date}` +
-    `&hourly=temperature_2m,wind_speed_10m,cloud_cover,precipitation` +
-    `&wind_speed_unit=kmh&timezone=auto`;
+    `&hourly=${hourly}&wind_speed_unit=kmh&timezone=${timeZone}` +
+    `&models=era5&cell_selection=${offshore ? "sea" : "land"}`;
 
   for (let attempt = 0; ; attempt++) {
     const wait = budgetWaitMs();
@@ -434,12 +449,13 @@ async function fetchBatch(
   batch,
   firstYear = STARTING_YEAR,
   lastYear = ENDING_YEAR,
+  offshoreOnly = false,
 ) {
   const rows = new Map(batch.map((city) => [city.id, []]));
   const meta = new Map();
-  const points = batch.flatMap((city) => [
-    { city, id: city.id, lat: city.lat, long: city.long, offshore: false },
-    ...(city.offshore
+  const indexedCities = offshoreOnly ? readIndex().cities : {};
+  const points = batch.flatMap((city) =>
+    offshoreOnly
       ? [
           {
             city,
@@ -449,72 +465,129 @@ async function fetchBatch(
             offshore: true,
           },
         ]
-      : []),
-  ]);
+      : [
+          {
+            city,
+            id: city.id,
+            lat: city.lat,
+            long: city.long,
+            offshore: false,
+          },
+          ...(city.offshore
+            ? [
+                {
+                  city,
+                  id: `${city.id} offshore`,
+                  lat: city.offshore.lat,
+                  long: city.offshore.long,
+                  offshore: true,
+                },
+              ]
+            : []),
+        ],
+  );
+
+  const pointGroups = [
+    points.filter((point) => !point.offshore),
+    points.filter((point) => point.offshore),
+  ].filter((group) => group.length > 0);
 
   for (let year = firstYear; year <= lastYear; year++) {
     for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
       const daily = new Map();
-      for (let at = 0; at < points.length; at += LOCATIONS_PER_REQUEST) {
-        const slice = points.slice(at, at + LOCATIONS_PER_REQUEST);
-        const results = await fetchDay(slice, year, month);
-        if (results.length !== slice.length) {
-          throw new Error(
-            `Asked for ${slice.length} locations and got ${results.length} back`,
-          );
-        }
-        slice.forEach((point, index) => {
-          const result = results[index];
-          const date = `${year}-${month}`;
-          if (point.offshore) {
-            const windOffshore = readField(
+      for (const group of pointGroups) {
+        for (let at = 0; at < group.length; at += LOCATIONS_PER_REQUEST) {
+          const slice = group.slice(at, at + LOCATIONS_PER_REQUEST);
+          const timeZones = slice[0].offshore
+            ? slice.map((point) => {
+                const timeZone =
+                  meta.get(point.city.id)?.timeZone ||
+                  indexedCities[point.city.id]?.timeZone;
+                if (!timeZone) {
+                  throw new Error(
+                    `${point.city.id}: no city timezone for offshore weather`,
+                  );
+                }
+                return timeZone;
+              })
+            : null;
+          const results = await fetchDay(slice, year, month, timeZones);
+          if (results.length !== slice.length) {
+            throw new Error(
+              `Asked for ${slice.length} locations and got ${results.length} back`,
+            );
+          }
+          slice.forEach((point, index) => {
+            const result = results[index];
+            const date = `${year}-${month}`;
+            if (point.offshore) {
+              const windOffshore = readField(
+                result.hourly,
+                "wind_speed_10m",
+                point.id,
+                date,
+              );
+              daily.set(point.city.id, {
+                ...daily.get(point.city.id),
+                windOffshore,
+              });
+              return;
+            }
+            const temp = readField(
+              result.hourly,
+              "temperature_2m",
+              point.id,
+              date,
+            );
+            const wind = readField(
               result.hourly,
               "wind_speed_10m",
               point.id,
               date,
             );
+            const cloud = readField(
+              result.hourly,
+              "cloud_cover",
+              point.id,
+              date,
+            );
+            const precip = readField(
+              result.hourly,
+              "precipitation",
+              point.id,
+              date,
+            );
             daily.set(point.city.id, {
               ...daily.get(point.city.id),
-              windOffshore,
+              temp,
+              wind,
+              cloud,
+              precip,
             });
-            return;
-          }
-          const temp = readField(
-            result.hourly,
-            "temperature_2m",
-            point.id,
-            date,
-          );
-          const wind = readField(
-            result.hourly,
-            "wind_speed_10m",
-            point.id,
-            date,
-          );
-          const cloud = readField(result.hourly, "cloud_cover", point.id, date);
-          const precip = readField(
-            result.hourly,
-            "precipitation",
-            point.id,
-            date,
-          );
-          daily.set(point.city.id, {
-            ...daily.get(point.city.id),
-            temp,
-            wind,
-            cloud,
-            precip,
+            if (!meta.has(point.city.id)) {
+              meta.set(point.city.id, {
+                timeZone: result.timezone,
+                elevation: result.elevation,
+              });
+            }
           });
-          if (!meta.has(point.city.id)) {
-            meta.set(point.city.id, {
-              timeZone: result.timezone,
-              elevation: result.elevation,
-            });
-          }
-        });
+        }
       }
       batch.forEach((city) => {
         const reading = daily.get(city.id);
+        if (offshoreOnly) {
+          if (!reading?.windOffshore) {
+            throw new Error(
+              `${city.id} ${year}-${month}: incomplete offshore weather response`,
+            );
+          }
+          for (let hour = 0; hour < HOURS_PER_DAY; hour++) {
+            rows.get(city.id).push({
+              windOffshoreKph: reading.windOffshore[hour],
+            });
+          }
+          return;
+        }
         if (
           !reading ||
           !reading.temp ||
@@ -542,7 +615,7 @@ async function fetchBatch(
   return { rows, meta };
 }
 
-function readPackedWeather(city) {
+function readPackedWeather(city, expectedOffshore = Boolean(city.offshore)) {
   const file = fs.readFileSync(binaryPath(city.id));
   if (file.length < HEADER_BYTES || file.toString("ascii", 0, 4) !== MAGIC) {
     throw new Error(`${city.id}: existing file is not ${MAGIC} weather data`);
@@ -567,7 +640,7 @@ function readPackedWeather(city) {
     file.readUInt8(12) !== TEMP_SCALE ||
     file.readUInt8(13) !== WIND_SCALE ||
     file.readUInt8(14) !== PRECIP_SCALE ||
-    Boolean(city.offshore) !== offshore
+    expectedOffshore !== offshore
   ) {
     throw new Error(
       `${city.id}: existing weather layout is incompatible with this updater`,
@@ -585,6 +658,40 @@ function readPackedWeather(city) {
     bytesPerRow,
     endingYear: startingYear + yearCount - 1,
   };
+}
+
+/**
+ * Adds an offshore byte to each row of an existing onshore-only file without changing any of its
+ * established readings. This is both cheaper than refetching the city and keeps seeded historical
+ * simulations byte-for-byte stable when offshore wind is enabled for a shipped location later.
+ */
+function addOffshoreWeather(entry, offshoreRows) {
+  const rowCount = (entry.file.length - HEADER_BYTES) / BASE_BYTES_PER_ROW;
+  if (
+    entry.bytesPerRow !== BASE_BYTES_PER_ROW ||
+    offshoreRows.length !== rowCount ||
+    !offshoreRows.every((row) => Number.isFinite(row.windOffshoreKph))
+  ) {
+    throw new Error("Offshore weather does not match the existing file");
+  }
+
+  const upgraded = Buffer.alloc(
+    HEADER_BYTES + rowCount * OFFSHORE_BYTES_PER_ROW,
+  );
+  entry.file.copy(upgraded, 0, 0, HEADER_BYTES);
+  upgraded.writeUInt8(VERSION, 4);
+  upgraded.writeUInt8(OFFSHORE_BYTES_PER_ROW, 7);
+  upgraded.writeUInt8(FLAG_OFFSHORE_WIND, 15);
+  offshoreRows.forEach((row, index) => {
+    const oldAt = HEADER_BYTES + index * BASE_BYTES_PER_ROW;
+    const newAt = HEADER_BYTES + index * OFFSHORE_BYTES_PER_ROW;
+    entry.file.copy(upgraded, newAt, oldAt, oldAt + BASE_BYTES_PER_ROW);
+    upgraded.writeUInt8(
+      clamp(Math.round(row.windOffshoreKph * WIND_SCALE), 0, 255),
+      newAt + BASE_BYTES_PER_ROW,
+    );
+  });
+  return upgraded;
 }
 
 function extendPackedWeather(entry, newRows, endingYear) {
@@ -678,6 +785,40 @@ async function updateExisting(catalogue) {
   log(`\nUpdated ${done} cities through ${options.through}`);
 }
 
+async function upgradeOffshoreWeather(entries) {
+  if (entries.length === 0) {
+    return 0;
+  }
+  log(
+    `Upgrading ${entries.length} existing cities with offshore wind ` +
+      `(${entries.length * (ENDING_YEAR - STARTING_YEAR + 1) * MONTHS_PER_YEAR} location-days).`,
+  );
+  let done = 0;
+  for (let at = 0; at < entries.length; at += CITIES_PER_BATCH) {
+    const batch = entries.slice(at, at + CITIES_PER_BATCH);
+    const cities = batch.map((entry) => entry.city);
+    log(`\n${cities.map((city) => `${city.id} offshore`).join(", ")}`);
+    const { rows } = await fetchBatch(cities, STARTING_YEAR, ENDING_YEAR, true);
+    batch.forEach((entry) => {
+      const cityRows = rows.get(entry.city.id);
+      fs.writeFileSync(
+        binaryPath(entry.city.id),
+        addOffshoreWeather(entry, cityRows),
+      );
+      const meanWind =
+        cityRows.reduce((total, row) => total + row.windOffshoreKph, 0) /
+        cityRows.length;
+      log(
+        `  ${entry.city.id}: added ${cityRows.length} offshore rows, ` +
+          `${meanWind.toFixed(1)}kph mean wind`,
+      );
+    });
+    done += batch.length;
+    writeIndex({});
+  }
+  return done;
+}
+
 /**
  * A quick look at what came back, printed per city, because a silently wrong location is the
  * failure that would survive every check here: coordinates a degree out still return a perfectly
@@ -747,17 +888,41 @@ async function main() {
     return;
   }
 
+  const offshoreUpgrades = [];
+  if (!options.force) {
+    wanted.forEach((city) => {
+      if (!city.offshore || !fs.existsSync(binaryPath(city.id))) {
+        return;
+      }
+      try {
+        offshoreUpgrades.push({
+          city,
+          ...readPackedWeather(city, false),
+        });
+      } catch (_e) {
+        // A malformed or otherwise incompatible file follows the normal full-refetch path.
+      }
+    });
+  }
+  const upgradeIds = new Set(offshoreUpgrades.map((entry) => entry.city.id));
+  const fullFetches = wanted.filter((city) => !upgradeIds.has(city.id));
+
   const perCity = (ENDING_YEAR - STARTING_YEAR + 1) * MONTHS_PER_YEAR;
+  const locationDays = fullFetches.reduce(
+    (total, city) => total + perCity * (city.offshore ? 2 : 1),
+    offshoreUpgrades.length * perCity,
+  );
   log(
-    `Fetching ${wanted.length} cities, ${perCity} location-days each. ` +
-      `The free tier allows about ten cities an hour.`,
+    `Fetching ${wanted.length} cities (${locationDays} location-days; ` +
+      `${perCity} per onshore city, ${perCity * 2} with offshore wind).`,
   );
 
   const fetched = {};
   let done = 0;
   try {
-    for (let at = 0; at < wanted.length; at += CITIES_PER_BATCH) {
-      const batch = wanted.slice(at, at + CITIES_PER_BATCH);
+    done += await upgradeOffshoreWeather(offshoreUpgrades);
+    for (let at = 0; at < fullFetches.length; at += CITIES_PER_BATCH) {
+      const batch = fullFetches.slice(at, at + CITIES_PER_BATCH);
       log(`\n${batch.map((c) => c.id).join(", ")}`);
       const { rows, meta } = await fetchBatch(batch);
       for (const city of batch) {

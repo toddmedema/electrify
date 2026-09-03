@@ -1,4 +1,4 @@
-import { produce } from "immer";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { getPlayedScenarioIds } from "../LocalStorage";
