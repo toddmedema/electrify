@@ -1266,6 +1266,164 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export interface CaliforniaWildfireBalanceType {
+  disconnectedDemand: number;
+  targetCapacityShare: number;
+  outputMultiplier: number;
+  restorationCostPerMonth: number;
+}
+
+export const CALIFORNIA_WILDFIRE_BALANCE: Record<
+  DifficultyType,
+  CaliforniaWildfireBalanceType
+> = {
+  Intern: {
+    disconnectedDemand: 0.02,
+    targetCapacityShare: 0.3,
+    outputMultiplier: 0.65,
+    restorationCostPerMonth: 1000000,
+  },
+  Employee: {
+    disconnectedDemand: 0.04,
+    targetCapacityShare: 0.4,
+    outputMultiplier: 0.55,
+    restorationCostPerMonth: 1500000,
+  },
+  Manager: {
+    disconnectedDemand: 0.06,
+    targetCapacityShare: 0.5,
+    outputMultiplier: 0.45,
+    restorationCostPerMonth: 2000000,
+  },
+  VP: {
+    disconnectedDemand: 0.08,
+    targetCapacityShare: 0.6,
+    outputMultiplier: 0.35,
+    restorationCostPerMonth: 2750000,
+  },
+  CEO: {
+    disconnectedDemand: 0.1,
+    targetCapacityShare: 0.7,
+    outputMultiplier: 0.25,
+    restorationCostPerMonth: 3500000,
+  },
+};
+
+const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
+  id: "california-wildfire-2025",
+  scenarioId: 111,
+  phases: [
+    {
+      id: "red-flag-warning",
+      schedule: { atMonth: 11 },
+      preview: () => null,
+      describe: () => ({
+        title: "Red-flag warning",
+        message:
+          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so prepare backup power for possible safety shutoffs.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: FLEET_TARGET,
+      }),
+    },
+    {
+      id: "firestorm",
+      schedule: { atMonth: 12 },
+      durationMonths: 2,
+      preview: () => ({
+        title: "January wildfire emergency",
+        message:
+          "Extreme fire weather may force two months of safety shutoffs, lost sales, constrained generation, and restoration work.",
+      }),
+      describe: (context, random) => {
+        const balance = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
+        const candidates = context.snapshot.facilities
+          .filter((facility) => facility.operational && !!facility.fuel)
+          .map((facility) => ({
+            ...facility,
+            score: random(`facility|${facility.id}`),
+          }))
+          .sort((a, b) => a.score - b.score || a.id - b.id);
+        const totalPeakW = candidates.reduce(
+          (total, facility) => total + facility.peakW,
+          0,
+        );
+        const targetPeakW = totalPeakW * balance.targetCapacityShare;
+        const selected: typeof candidates = [];
+        let selectedPeakW = 0;
+        for (const candidate of candidates) {
+          if (selectedPeakW >= targetPeakW) {
+            break;
+          }
+          selected.push(candidate);
+          selectedPeakW += candidate.peakW;
+        }
+        const outputMultipliers = Object.fromEntries(
+          selected.map((facility) => [
+            String(facility.id),
+            balance.outputMultiplier,
+          ]),
+        );
+        const selectedNames = selected.map((facility) => facility.name);
+        const affectedFacilities = selectedNames.length
+          ? selectedNames.join(", ")
+          : "No operating generators";
+        return {
+          title: "Wildfire emergency",
+          message: `${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${(balance.restorationCostPerMonth / 1000000).toFixed(1)}M per month through February.`,
+          concept: "danger",
+          kind: "WORLD_EVENT",
+          importance: "CRITICAL",
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            disconnectedDemand: balance.disconnectedDemand,
+            targetCapacityShare: balance.targetCapacityShare,
+            selectedCapacityShare: share(selectedPeakW, totalPeakW),
+            selectedFacilityIds: selected.map((facility) => facility.id),
+            selectedFacilityNames: selectedNames,
+            outputMultiplier: balance.outputMultiplier,
+            restorationCostPerMonth: balance.restorationCostPerMonth,
+          },
+          effects: {
+            demandMultiplier: 1 - balance.disconnectedDemand,
+            facilityOutputMultipliersById: outputMultipliers,
+            operatingExpensePerMonth: balance.restorationCostPerMonth,
+          },
+          turningPointPriority: 120,
+        };
+      },
+    },
+    {
+      id: "restoration-complete",
+      schedule: { atMonth: 14 },
+      preview: () => null,
+      describe: (context) => {
+        const period = context.periodSnapshots?.[2];
+        const demandWh = period?.demandWh || context.snapshot.demandWh12m;
+        const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
+        const reliability = reliabilityOf(demandWh, unservedWh);
+        const onset = context.occurrences?.find(
+          (event) =>
+            event.key === "story:111:california-wildfire-2025:firestorm",
+        );
+        const selectedNames = (onset?.attributes.selectedFacilityNames ||
+          []) as string[];
+        return {
+          title: "Wildfire restoration complete",
+          message: `Safety shutoffs are lifted, ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal, and the grid met ${percent(reliability)} of connected demand during the emergency.`,
+          concept: "supply",
+          kind: "WORLD_EVENT",
+          importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { demandWh, unservedWh, reliability },
+          turningPointPriority: 110,
+        };
+      },
+    },
+  ],
+};
+
 const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   id: "nuclear-trip",
   scenarioId: 110,
@@ -1329,6 +1487,7 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   TEXAS_DEEP_FREEZE_ARC,
   HEATWAVE_DROUGHT_ARC,
   NUCLEAR_TRIP_ARC,
+  CALIFORNIA_WILDFIRE_ARC,
 ];
 
 /** Content-level difficulty scaling is centralized and mechanically checkable. */
@@ -1474,6 +1633,33 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
     ),
   );
+  ascending(
+    "California wildfire disconnected demand",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].disconnectedDemand,
+    ),
+  );
+  ascending(
+    "California wildfire affected capacity",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].targetCapacityShare,
+    ),
+  );
+  descending(
+    "California wildfire output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => CALIFORNIA_WILDFIRE_BALANCE[difficulty].outputMultiplier,
+    ),
+  );
+  ascending(
+    "California wildfire restoration cost",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
+    ),
+  );
   return problems;
 }
 
@@ -1574,6 +1760,14 @@ export function combineStoryEffects(
     );
     if (operatingCostMultipliersByFuel !== undefined) {
       combined.operatingCostMultipliersByFuel = operatingCostMultipliersByFuel;
+    }
+    if (
+      combined.operatingExpensePerMonth !== undefined ||
+      effects.operatingExpensePerMonth !== undefined
+    ) {
+      combined.operatingExpensePerMonth =
+        (combined.operatingExpensePerMonth || 0) +
+        (effects.operatingExpensePerMonth || 0);
     }
     const facilityOutputMultipliersByFuel = multiplyEffects(
       combined.facilityOutputMultipliersByFuel,

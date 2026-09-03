@@ -62,6 +62,25 @@ files are large, so broad rewrites create expensive review diffs.
 - Reducer changes should have a reducer/helper test and should run `npm run sim -- --all`. UI flow,
   responsive layout, or tutorial changes may also need a Playwright spec.
 
+## Icon design
+
+- Match the existing scenario and facility icon system: use a `0 0 500 500` SVG view box, a bold
+  circular silhouette where appropriate, flat fills, black outlines, and no text, gradients,
+  filters, or decorative detail that disappears at small sizes.
+- Use the shared stroke hierarchy exactly: `40` for the outer boundary, `20` for primary interior
+  shapes, and `10` for secondary detail. Do not introduce in-between stroke widths to compensate
+  for imprecise geometry.
+- Prefer the fewest shapes and anchor points that communicate the concept. Build on clean circles,
+  straight segments, and simple curves; keep repeated elements equal in size and spacing.
+- Align geometry to deliberate centers, baselines, and axes. Use whole-number coordinates, mirror
+  symmetric elements from a shared axis, and account for stroke extents so forms do not crowd or
+  clip the 500 px canvas.
+- Preserve legibility at the icon's actual UI size. Review both the full-size SVG and a rasterized
+  small-size preview, checking silhouette, contrast, optical centering, and separation between
+  overlapping forms before choosing an option.
+- Include concise SVG `<title>` and `<desc>` elements for scenario icons. Reuse the established
+  palette and visual language from nearby icons instead of adding a one-off illustration style.
+
 ## Guardrails
 
 - Keep seeded simulation paths deterministic. Use the seed helpers in `src/helpers/Math.tsx`, not

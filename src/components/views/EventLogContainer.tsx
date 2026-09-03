@@ -31,6 +31,7 @@ export function navigationForStoryTarget(
 let upcomingCache:
   { key: string; events: UpcomingStoryEventType[] } | undefined;
 const NO_UPCOMING: UpcomingStoryEventType[] = [];
+const NO_ONGOING: UpcomingStoryEventType[] = [];
 
 function selectUpcoming(state: AppStateType): UpcomingStoryEventType[] {
   const game = state.game;
@@ -108,9 +109,41 @@ function selectUpcoming(state: AppStateType): UpcomingStoryEventType[] {
   return events;
 }
 
+export function selectOngoing(state: AppStateType): UpcomingStoryEventType[] {
+  const game = state.game;
+  const ongoing = game.worldEvents.active
+    .filter(
+      (event) =>
+        event.endsMinute > game.date.minute && event.message !== undefined,
+    )
+    .map((event) => {
+      const through = getDateFromMinute(
+        event.endsMinute - 1,
+        game.startingYear,
+      );
+      return {
+        key: event.key,
+        label: `Through ${through.month} ${through.year}`,
+        title: event.title,
+        message: event.message!,
+        concept: event.concept,
+        importance: event.importance,
+        actionTarget: event.actionTarget,
+      };
+    });
+  return ongoing.length > 0 ? ongoing : NO_ONGOING;
+}
+
 const mapStateToProps = (state: AppStateType): StateProps => {
+  const ongoing = selectOngoing(state);
+  const ongoingKeys = new Set(ongoing.map((event) => event.key));
   return {
-    events: state.game.eventLog,
+    // An active story belongs in the status section; its original log row returns to history as
+    // soon as the effect expires.
+    events: state.game.eventLog.filter(
+      (event) => !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
+    ),
+    ongoing,
     upcoming: selectUpcoming(state),
   };
 };

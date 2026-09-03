@@ -2,6 +2,7 @@ import { LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { StorySnapshotType } from "../Types";
 import {
+  CALIFORNIA_WILDFIRE_BALANCE,
   combineStoryEffects,
   CARBON_FEE_BALANCE,
   END_OF_ERA_BALANCE,
@@ -169,6 +170,7 @@ describe("story effect composition", () => {
             temperatureOffsetC: -4,
             fuelPriceMultipliers: { "Natural Gas": 0.75 },
             carbonFeePerKgCO2e: 0.1,
+            operatingExpensePerMonth: 1000,
           },
         },
         {
@@ -177,6 +179,7 @@ describe("story effect composition", () => {
             temperatureOffsetC: 2,
             fuelPriceMultipliers: { "Natural Gas": 1.8 },
             carbonFeePerKgCO2e: 0.1,
+            operatingExpensePerMonth: 2500,
           },
         },
       ]),
@@ -185,6 +188,7 @@ describe("story effect composition", () => {
       temperatureOffsetC: -2,
       fuelPriceMultipliers: { "Natural Gas": 1.35 },
       carbonFeePerKgCO2e: 0.1,
+      operatingExpensePerMonth: 3500,
     });
   });
 
@@ -306,7 +310,7 @@ describe("The Shale Boom pilot arc", () => {
   it("authors every scenario with deterministic story events and no custom game", () => {
     expect(
       [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 110]);
+    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 110, 111]);
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
   });
 
@@ -325,6 +329,8 @@ describe("The Shale Boom pilot arc", () => {
       "seasonal-warning",
       "advance-warning",
       "contingency-review",
+      "red-flag-warning",
+      "restoration-complete",
     ]);
 
     STORY_ARC_DEFINITIONS.forEach((arc) => {
@@ -494,6 +500,102 @@ describe("generation and storage reliability scenarios", () => {
     expect(trip.attributes.selectedFacilityNames).toEqual([
       "Grand Nuclear Unit",
     ]);
+  });
+});
+
+describe("California wildfire emergency", () => {
+  const wildfireContext = (month: number) => ({
+    ...context(month, 111, 2468),
+    location: LOCATIONS.LA,
+    snapshot: {
+      ...EMPTY_SNAPSHOT,
+      facilities: [
+        {
+          id: 10,
+          name: "Harbor Gas Portfolio",
+          fuel: "Natural Gas" as const,
+          ageYears: 18,
+          peakW: 60,
+          operational: true,
+        },
+        {
+          id: 11,
+          name: "Solar Portfolio",
+          fuel: "Sun" as const,
+          ageYears: 6,
+          peakW: 40,
+          operational: true,
+        },
+        {
+          id: 12,
+          name: "Battery",
+          ageYears: 4,
+          peakW: 100,
+          operational: true,
+        },
+      ],
+    },
+  });
+
+  it("applies the fixed January 2025 emergency only to scenario 111", () => {
+    const january = resolveStoryAtDate(wildfireContext(12));
+    const february = resolveStoryAtDate(wildfireContext(13));
+
+    expect(january.occurrences[0]).toMatchObject({
+      key: "story:111:california-wildfire-2025:firestorm",
+      title: "Wildfire emergency",
+      importance: "CRITICAL",
+      effects: { demandMultiplier: 0.94 },
+    });
+    expect(january.effects.facilityOutputMultipliersById).toBeDefined();
+    expect(january.effects.operatingExpensePerMonth).toBe(2_000_000);
+    expect(february.effects).toEqual(january.effects);
+    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
+    expect(
+      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 999 })
+        .occurrences,
+    ).toEqual([]);
+    expect(
+      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 0 }).occurrences,
+    ).toEqual([]);
+  });
+
+  it("previews one emergency and reports the recorded restoration result", () => {
+    const upcoming = upcomingStoryPhases(wildfireContext(0));
+    expect(upcoming.map((phase) => phase.key)).toEqual([
+      "story:111:california-wildfire-2025:firestorm",
+    ]);
+    expect(upcoming[0].message).toMatch(/safety shutoffs/i);
+
+    const onset = resolveStoryAtDate(wildfireContext(12)).occurrences[0];
+    const restoration = resolveStoryAtDate({
+      ...wildfireContext(14),
+      periodSnapshots: {
+        2: {
+          deliveredWhByFuel: {},
+          demandWh: 100,
+          unservedWh: 1,
+          netIncome: -10,
+          peakDemandW: 10,
+        },
+      },
+      occurrences: [onset],
+    }).occurrences[0];
+    expect(restoration).toMatchObject({
+      key: "story:111:california-wildfire-2025:restoration-complete",
+      attributes: { reliability: 0.99 },
+    });
+    expect(restoration.message).toMatch(/met 99% of connected demand/i);
+  });
+
+  it("checks in the Manager balance values", () => {
+    expect(CALIFORNIA_WILDFIRE_BALANCE.Manager).toEqual({
+      disconnectedDemand: 0.06,
+      targetCapacityShare: 0.5,
+      outputMultiplier: 0.45,
+      restorationCostPerMonth: 2_000_000,
+    });
+    expect(validateStoryDifficultyMonotonicity()).toEqual([]);
   });
 });
 

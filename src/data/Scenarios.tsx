@@ -1048,6 +1048,61 @@ export const SCENARIOS = [
     endMessage:
       "The sudden shutdown tested the backup capacity your normal plan rarely needed.",
   },
+  {
+    id: 111, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "Wildfire Emergency",
+    icon: "wildfire emergency",
+    locationId: "LA",
+    summary: "Prepare Los Angeles for the January 2025 firestorm.",
+    themes: ["Extreme weather"],
+    briefing: {
+      tone: "storm",
+      fantasy:
+        "Guide Los Angeles through extreme fire weather and a long restoration effort.",
+      objective:
+        "Keep all connected customers supplied during the January and February 2025 wildfire emergency.",
+      threat:
+        "Safety shutoffs will cut sales, constrain part of the fleet, and raise restoration costs.",
+    },
+    ownership: "Public",
+    startingYear: 2024,
+    durationMonths: 36,
+    // A 1%-scale model of LADWP's roughly 1.6 million electric customers and 20,749 GWh of
+    // FY2023-24 retail sales. The demand scale reconciles the account-based load model to that
+    // annual energy total. https://www.ladwp.com/who-we-are/power-system
+    startingCustomers: 16000,
+    startingDemandScale: 3.55,
+    dollarsPerkWh: 0.17,
+    cash: 50000000,
+    feePerKgCO2e: 50 / 1000,
+    reliabilityObjective: {
+      year: 2025,
+      month: 1,
+      durationMonths: 2,
+      minimumDemandServed: 1,
+      label: "January and February 2025 wildfire emergency",
+    },
+    // One percent of LADWP's 8,081 MW net dependable capacity, grouped into six readable
+    // resources using its 2024 power-content mix as the portfolio anchor.
+    // https://www.ladwp.com/who-we-are/power-system/power-content-label
+    facilities: [
+      {
+        fuel: "Natural Gas",
+        peakW: 24240000,
+        initialAgeYears: 18,
+        label: "Harbor Gas Portfolio",
+      },
+      { fuel: "Sun", peakW: 17000000, initialAgeYears: 6 },
+      { fuel: "Uranium", peakW: 12120000, initialAgeYears: 30 },
+      { fuel: "Wind", peakW: 10500000, initialAgeYears: 8 },
+      { fuel: "Coal", peakW: 8890000, initialAgeYears: 35 },
+      { fuel: "Geothermal", peakW: 8060000, initialAgeYears: 20 },
+      { name: "Battery", peakWh: 20000000, initialAgeYears: 4 },
+    ],
+    endTitle: "After the firestorm",
+    endMessage:
+      "The emergency tested whether backup power and financial reserves could carry Los Angeles through shutoffs and restoration.",
+  },
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them

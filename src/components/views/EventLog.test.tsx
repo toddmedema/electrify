@@ -61,6 +61,47 @@ describe("EventLog", () => {
     expect(screen.queryByText("Critical")).not.toBeInTheDocument();
   });
 
+  it("pins an ongoing emergency above upcoming events and history", () => {
+    render(
+      <EventLog
+        events={[
+          {
+            id: 1,
+            kind: "BUILD",
+            label: "Dec 2024",
+            message: "Battery project completed.",
+          },
+        ]}
+        ongoing={[
+          {
+            key: "story:111:california-wildfire-2025:firestorm",
+            label: "Through Feb 2025",
+            title: "Wildfire emergency",
+            message: "Safety shutoffs and restoration work remain active.",
+            concept: "danger",
+            importance: "CRITICAL",
+            actionTarget: { card: "FACILITIES", view: "FLEET" },
+          },
+        ]}
+        upcoming={[
+          {
+            key: "next",
+            label: "Expected Mar 2025",
+            message: "Restoration review.",
+          },
+        ]}
+        onOpen={jest.fn()}
+        onSelect={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Ongoing events")).toBeVisible();
+    expect(screen.getByText("Wildfire emergency")).toBeVisible();
+    expect(screen.getByText("Through Feb 2025")).toBeVisible();
+    expect(screen.getByText("Upcoming events")).toBeVisible();
+    expect(screen.getByText("Event history")).toBeVisible();
+  });
+
   it("keeps upcoming and past events in labeled sections", () => {
     render(
       <EventLog

@@ -700,6 +700,8 @@ export interface WorldEventEffectsType {
   carbonFeePerKgCO2e?: number;
   buildCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   operatingCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  /** Fixed company-wide operating expense charged once per active story month. */
+  operatingExpensePerMonth?: number;
   facilityOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   facilityOutputMultipliersById?: Record<string, number>;
 }
@@ -744,6 +746,13 @@ export interface ActiveWorldEventType {
   effects: WorldEventEffectsType;
   /** False for surprises that must not appear in the event list or forward forecasts. */
   forecastable?: boolean;
+  // Presentation travels with a persisted occurrence so the Events pane can continue to explain
+  // an ongoing effect after a save/load without re-resolving authored content.
+  title?: string;
+  message?: string;
+  concept?: ConceptNameType;
+  importance?: GameEventImportanceType;
+  actionTarget?: StoryActionTargetType;
 }
 
 export interface WorldEventStateType {

@@ -504,6 +504,7 @@ const storyEffectsCache = new Map<string, WorldEventEffectsType>();
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
     state.scenarioId === 104 ||
+    state.scenarioId === 111 ||
     (state.scenarioId === 102 &&
       date.monthsElapsed >= 72 &&
       date.monthsElapsed < 96);
@@ -2206,7 +2207,10 @@ function updateSupplyFacilitiesFinances(
 
   // Facilities expenses
   let kgco2e = 0;
-  let expensesOM = 0;
+  // Some authored emergencies carry company-level response costs that do not belong to a single
+  // plant, such as field crews and rebuilding damaged distribution equipment.
+  let expensesOM =
+    (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;

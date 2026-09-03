@@ -8,6 +8,7 @@ import {
 } from "./Scenarios";
 import { AppStateType, ScenarioType } from "../Types";
 import { render, screen } from "@testing-library/react";
+import { getScenarioLocation } from "../helpers/Locations";
 
 describe("getScenario", () => {
   it("finds an authored scenario by id", () => {
@@ -290,6 +291,7 @@ describe("authored starting fleets", () => {
       ["Deep Freeze", "Natural Gas"],
       ["Heatwave + Drought", "Hydro"],
       ["Sudden Nuclear Shutdown", "Uranium"],
+      ["Wildfire Emergency", "Natural Gas"],
     ]);
   });
 
@@ -332,15 +334,44 @@ describe("authored starting fleets", () => {
 
   it("keeps locations in scenario metadata rather than scenario names", () => {
     expect(
-      [107, 108, 110].map((id) => ({
+      [107, 108, 110, 111].map((id) => ({
         name: getScenario(id)!.name,
-        location: getScenario(id)!.location?.name,
+        location: getScenarioLocation(getScenario(id))?.name,
       })),
     ).toEqual([
       { name: "Deep Freeze", location: "Austin, TX" },
       { name: "Heatwave + Drought", location: "Madrid, Spain" },
       { name: "Sudden Nuclear Shutdown", location: "Paris, France" },
+      { name: "Wildfire Emergency", location: "Los Angeles, CA" },
     ]);
+  });
+
+  it("authors a Los Angeles-only January 2025 wildfire challenge", () => {
+    const wildfire = getScenario(111)!;
+
+    expect(wildfire).toMatchObject({
+      name: "Wildfire Emergency",
+      icon: "wildfire emergency",
+      locationId: "LA",
+      startingYear: 2024,
+      durationMonths: 36,
+      startingCustomers: 16_000,
+      reliabilityObjective: {
+        year: 2025,
+        month: 1,
+        durationMonths: 2,
+        minimumDemandServed: 1,
+      },
+    });
+    expect(wildfire.briefing?.threat).toMatch(
+      /safety shutoffs.*sales.*restoration costs/i,
+    );
+    expect(
+      wildfire.facilities.reduce(
+        (total, facility) => total + (facility.peakW || 0),
+        0,
+      ),
+    ).toBe(80_810_000);
   });
 
   it("makes every plant in the aging coal fleet at least 20 years old", () => {
