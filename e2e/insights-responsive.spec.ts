@@ -57,15 +57,17 @@ test("insights header controls stay aligned in one compact row", async ({
   const controls = [
     page.locator(".insightsRange"),
     page.locator(".insightsPreset"),
-    page.getByRole("button", { name: "Save" }),
     page.getByRole("button", { name: "Preset actions" }),
     page.getByRole("button", { name: /^Layers \(/ }),
   ];
+  if (!testInfo.project.name.startsWith("mobile-")) {
+    controls.splice(2, 0, page.getByRole("button", { name: "Save" }));
+  }
   const boxes = await Promise.all(
     controls.map((control) => control.boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
-  expect(boxes.map((box) => box!.height)).toEqual([36, 36, 36, 36, 36]);
+  expect(boxes.every((box) => box!.height >= 36)).toBe(true);
   expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
 
   const headerOverflow = await page
@@ -78,12 +80,51 @@ test("insights header controls stay aligned in one compact row", async ({
   const presetName = page.locator(".insightsPresetName");
   await expect(presetName).toHaveCSS("text-overflow", "ellipsis");
   if (testInfo.project.name === "mobile-320px") {
+    await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
+    await expect(page.locator(".insightsRange")).toContainText(
+      "Next 12 months",
+    );
+    await page.getByRole("button", { name: "Preset actions" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Save preset changes" }),
+    ).toBeVisible();
     expect(
       await presetName.evaluate(
         (element) => element.scrollWidth > element.clientWidth,
       ),
     ).toBe(true);
   }
+});
+
+test("touch-sized facility build buttons stay above the chart", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("mobile-"));
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .click();
+
+  const facilities = page.locator(".facilities");
+  if (!(await facilities.isVisible())) {
+    await page.getByRole("button", { name: "Facilities", exact: true }).click();
+  }
+  const buildButtons = [
+    page.getByRole("button", { name: "Generator" }),
+    page.getByRole("button", { name: "Storage" }),
+  ];
+  const chart = page.locator("#chartSupplyDemand");
+  await expect(chart).toBeVisible();
+  const chartBox = await chart.boundingBox();
+  const buttonBoxes = await Promise.all(
+    buildButtons.map((button) => button.boundingBox()),
+  );
+  expect(chartBox).not.toBeNull();
+  expect(buttonBoxes.every(Boolean)).toBe(true);
+  buttonBoxes.forEach((box) => {
+    expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y);
+  });
 });
 
 test("main-menu account actions follow the sound action", async ({

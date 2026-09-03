@@ -183,6 +183,10 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "regional-glut",
       schedule: { atMonth: 48 },
       durationMonths: 74,
+      preview: ({ difficulty }) => ({
+        title: "Gas prices will fall",
+        message: `Natural gas prices will drop ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% through Feb 2016.`,
+      }),
       describe: ({ difficulty }) => {
         const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
         return {
@@ -219,6 +223,13 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "freeze",
       schedule: { atMonth: 96 },
       durationMonths: 3,
+      preview: ({ difficulty }) => {
+        const balance = SHALE_BOOM_BALANCE[difficulty];
+        return {
+          title: "Winter freeze will hit",
+          message: `Gas costs will spike and gas plants will be limited to ${Math.round(balance.freezeGasOutput * 100)}% output for three months.`,
+        };
+      },
       describe: ({ difficulty }) => {
         const balance = SHALE_BOOM_BALANCE[difficulty];
         const effectiveMultiplier =
@@ -249,6 +260,10 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "normalization",
       schedule: { atMonth: 122 },
+      preview: () => ({
+        title: "Gas boom will end",
+        message: "Natural gas prices will return to normal.",
+      }),
       describe: ({ snapshot }) => {
         const gasShare = share(
           snapshot.deliveredWhByFuel12m["Natural Gas"] || 0,
@@ -276,6 +291,11 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "freeze-recovery",
       schedule: { atMonth: 99 },
+      preview: () => ({
+        title: "Gas output will recover",
+        message:
+          "Plant limits will lift and lower boom-era prices will resume.",
+      }),
       describe: ({ difficulty }) => ({
         title: "Winter freeze ends",
         message: `Gas output is fully restored, and prices return to the ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% reduction caused by the shale gas boom.`,

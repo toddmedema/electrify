@@ -67,22 +67,19 @@ describe("VictoryDialog", () => {
    */
   it("shows the breakdown before any of the async data lands", () => {
     renderDialog();
-    expect(screen.getByText(/812/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/800 pts from electricity supplied/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/-18 pts from blackouts/)).toBeInTheDocument();
-    expect(screen.queryByText("What you accomplished")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Final score 812 points")).toBeInTheDocument();
+    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
+    expect(screen.getByText(/-18 blackouts/)).toBeInTheDocument();
   });
 
-  it("uses the scenario name instead of repeating a generic completion title", () => {
+  it("shows one generic completion title", () => {
     renderDialog({ victory: aVictory({ endTitle: "Mission complete!" }) });
 
-    expect(screen.getByText("Deregulation")).toBeInTheDocument();
     expect(screen.getAllByText(/Mission complete/i)).toHaveLength(1);
+    expect(screen.queryByText("Deregulation")).not.toBeInTheDocument();
   });
 
-  it("shows how the fleet and company changed over the run", () => {
+  it("summarizes mission results without replaying the run", () => {
     renderDialog({
       victory: aVictory({
         debrief: {
@@ -118,30 +115,23 @@ describe("VictoryDialog", () => {
       }),
     });
 
-    expect(screen.getByText("The story of your grid")).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: /Coal 300MW, Natural Gas 200MW/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: /Sun 400MW, Natural Gas 200MW/ }),
-    ).toBeInTheDocument();
+      screen.getByRole("region", { name: "Mission results" }),
+    ).toBeVisible();
     expect(screen.getByText("99.8%")).toBeInTheDocument();
+    expect(screen.getByText("$510M")).toBeInTheDocument();
+    expect(screen.queryByText("$330M")).not.toBeInTheDocument();
     expect(
       screen.getByText("Demand not met during Winter Storm Uri · Feb 2021"),
     ).toBeInTheDocument();
     expect(screen.getByText("12GWh")).toBeInTheDocument();
-    expect(
-      screen.getByText("Construction complete: Solar"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Construction complete: Solar")).toBeNull();
   });
 
   it("fills in the global rank once it resolves", async () => {
     mockFetchGlobalRank.mockResolvedValue(4);
     renderDialog();
-    expect(
-      await screen.findByText(/on the global leaderboard/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("#4")).toBeInTheDocument();
+    expect(await screen.findByText(/#4 globally/)).toBeInTheDocument();
     expect(mockFetchGlobalRank).toHaveBeenCalledWith(101, 812);
   });
 
@@ -153,14 +143,9 @@ describe("VictoryDialog", () => {
     renderDialog();
 
     await waitFor(() =>
-      expect(
-        screen.queryByLabelText("Working out your rank"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByText(/globally/)).not.toBeInTheDocument(),
     );
-    expect(
-      screen.getByText(/800 pts from electricity supplied/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/global leaderboard/)).not.toBeInTheDocument();
+    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
     warn.mockRestore();
   });
 
@@ -169,12 +154,11 @@ describe("VictoryDialog", () => {
   it("celebrates a personal best against the previous one", () => {
     renderDialog({ victory: aVictory({ previousBest: 640 }) });
     expect(screen.getByText(/New personal best/)).toBeInTheDocument();
-    expect(screen.getByText(/was 640/)).toBeInTheDocument();
   });
 
   it("reports the best that still stands when the run didn't beat it", () => {
     renderDialog({ victory: aVictory({ score: 500, previousBest: 640 }) });
-    expect(screen.getByText(/Your best: 640/)).toBeInTheDocument();
+    expect(screen.getByText(/Personal best 640/)).toBeInTheDocument();
     expect(screen.queryByText(/New personal best/)).not.toBeInTheDocument();
   });
 
@@ -183,7 +167,7 @@ describe("VictoryDialog", () => {
   it("offers a login rather than a personal best when logged out", () => {
     renderDialog({ loggedIn: false });
     expect(screen.queryByText(/personal best/)).not.toBeInTheDocument();
-    expect(screen.getByText(/under your name/)).toBeInTheDocument();
+    expect(screen.getByText(/join the leaderboard/)).toBeInTheDocument();
   });
 
   // A custom game shares its scenario id with every other custom game, and a replay is someone
@@ -200,7 +184,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("clipboard");
     renderDialog({ onShared });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByRole("button", { name: "Share score" }));
     await waitFor(() => expect(onShared).toHaveBeenCalled());
     expect(onShared.mock.calls[0][1]).toBe("clipboard");
   });
@@ -212,7 +196,7 @@ describe("VictoryDialog", () => {
     mockShareText.mockResolvedValue("cancelled");
     renderDialog({ onShared, onShareFailed });
 
-    await userEvent.click(screen.getByText("Share"));
+    await userEvent.click(screen.getByRole("button", { name: "Share score" }));
     await waitFor(() => expect(mockShareText).toHaveBeenCalled());
     expect(onShared).not.toHaveBeenCalled();
     expect(onShareFailed).not.toHaveBeenCalled();
@@ -237,10 +221,11 @@ describe("VictoryDialog", () => {
       const onClose = jest.fn();
       renderDialog({ victory: aVictory({ outcome }), onClose });
 
-      expect(screen.getByText("Run ended")).toBeInTheDocument();
       expect(screen.getByText(title)).toBeInTheDocument();
       expect(screen.queryByText("How you scored")).not.toBeInTheDocument();
-      expect(screen.getByText(/Final score/)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Final score 812 points"),
+      ).toBeInTheDocument();
       expect(screen.queryByText("Review grid")).not.toBeInTheDocument();
       await userEvent.keyboard("{Escape}");
       expect(onClose).not.toHaveBeenCalled();
@@ -257,9 +242,7 @@ describe("VictoryDialog", () => {
     });
     expect(screen.getByText("The lights stayed on")).toBeInTheDocument();
     expect(screen.getByText("Your city never noticed.")).toBeInTheDocument();
-    // The breakdown is still there: the override replaces the flavour text, not the score
-    expect(
-      screen.getByText(/800 pts from electricity supplied/),
-    ).toBeInTheDocument();
+    // The compact breakdown remains: the override replaces the flavour text, not the score.
+    expect(screen.getByText(/800 electricity supplied/)).toBeInTheDocument();
   });
 });

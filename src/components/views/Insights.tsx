@@ -1831,6 +1831,25 @@ export default class Insights extends React.Component<Props, State> {
               onClose={() => this.setState({ presetMenuAnchor: null })}
             >
               <MenuItem
+                className="insightsPresetSaveMenuItem"
+                disabled={
+                  !this.state.layers.length ||
+                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
+                  (this.state.preset === "custom" && customLimitReached)
+                }
+                onClick={() => {
+                  this.setState({ presetMenuAnchor: null }, () =>
+                    this.savePresetChanges(),
+                  );
+                }}
+              >
+                <SaveIcon fontSize="small" />
+                {this.state.preset === "custom"
+                  ? "Save as new preset"
+                  : "Save preset changes"}
+              </MenuItem>
+              <MenuItem
+                className="insightsPresetSaveAsMenuItem"
                 disabled={customLimitReached || !this.state.layers.length}
                 onClick={() => this.openPresetDialog("saveAs")}
               >
