@@ -205,6 +205,14 @@ $sizemap: (
   @return null;
 }
 
+// Interface chrome follows a fixed 4px rhythm. The legacy size() scale remains useful for
+// responsive illustration and chart spacing, but vmin-based gutters made otherwise identical
+// cards drift between 4px and 8px as a phone rotated or changed size.
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+
 // ===============================================
 // Base/General Styles
 // ===============================================
@@ -497,6 +505,11 @@ $topbar_height: 56px;
   padding-right: max(16px, env(safe-area-inset-right)) !important;
 }
 
+#topbar .constructionTitleBar.MuiToolbar-root {
+  padding-left: max($space-2, env(safe-area-inset-left)) !important;
+  padding-right: max($space-2, env(safe-area-inset-right)) !important;
+}
+
 .constructionHeader {
   flex: 0 0 auto;
   background: var(--bg-primary);
@@ -504,37 +517,45 @@ $topbar_height: 56px;
 
 .constructionTitle {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   min-width: 0;
-  gap: 12px;
+  gap: $space-3;
 
   .iconLabel {
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 }
 
 .constructionCash {
   flex: 0 0 auto;
+  margin-left: auto;
   font-size: 0.875rem;
   white-space: nowrap;
+}
+
+.constructionTitleBar #close-button {
+  flex: 0 0 auto;
 }
 
 .constructionControls {
   display: grid;
   grid-template-columns: max-content minmax(80px, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: $space-2;
   min-height: 50px;
-  padding: 0 max(8px, env(safe-area-inset-right)) 0
-    max(8px, env(safe-area-inset-left));
+  padding: 0 max($space-2, env(safe-area-inset-right)) 0
+    max($space-2, env(safe-area-inset-left));
   border-bottom: $border_accent;
 }
 
 .constructionCapacity {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: $space-1;
   white-space: nowrap;
 }
 
@@ -557,15 +578,15 @@ $topbar_height: 56px;
 
 @media screen and (min-width: 600px) {
   .constructionControls {
-    gap: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+    gap: $space-4;
+    padding-left: max($space-4, env(safe-area-inset-left));
+    padding-right: max($space-4, env(safe-area-inset-right));
   }
 }
 
 @media screen and (max-width: 359px) {
   .constructionTitle {
-    gap: 6px;
+    gap: $space-1;
     font-size: 1.05rem !important;
   }
 
@@ -574,9 +595,9 @@ $topbar_height: 56px;
   }
 
   .constructionControls {
-    gap: 4px;
-    padding-left: max(4px, env(safe-area-inset-left));
-    padding-right: max(4px, env(safe-area-inset-right));
+    gap: $space-1;
+    padding-left: max($space-2, env(safe-area-inset-left));
+    padding-right: max($space-2, env(safe-area-inset-right));
   }
 
   .constructionCapacity {
@@ -1327,6 +1348,8 @@ $pane_header_height: 40px;
       .MuiStack-root {
         display: flex;
         flex-wrap: wrap;
+        gap: $space-2;
+        align-items: flex-start;
         justify-content: flex-end;
       }
     }
@@ -1850,15 +1873,15 @@ html[data-theme="dark"] .uplot {
   .conceptLegend {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: size(small);
-    margin-top: size(base);
+    gap: $space-2;
+    margin-top: $space-4;
   }
 
   .conceptLegendItem {
     display: flex;
     align-items: center;
-    gap: size(small);
-    padding: size(small);
+    gap: $space-2;
+    padding: $space-2;
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     background: var(--bg-raised);
@@ -1872,17 +1895,17 @@ html[data-theme="dark"] .uplot {
   }
 
   .MuiCard-root {
-    margin: 0 size(small) size(base) size(small);
+    margin: 0 $space-2 $space-2;
     border-radius: 0;
     position: relative;
 
     .MuiCardHeader-root {
       align-items: flex-start;
-      padding: size(base);
+      padding: $space-4;
     }
 
     .MuiCardHeader-avatar {
-      margin-right: size(base);
+      margin-right: $space-3;
     }
 
     .MuiCardHeader-action {
@@ -1892,14 +1915,14 @@ html[data-theme="dark"] .uplot {
       text-align: right;
 
       p.MuiTypography-colorTextSecondary {
-        margin-top: size(small);
+        margin-top: $space-1;
       }
     }
   }
 
   .expand-details.MuiButton-root {
     width: calc(100% - 32px);
-    margin: 0 16px size(small);
+    margin: 0 $space-4 $space-2;
     border-top: 1px solid var(--border-subtle);
     border-radius: 0;
   }
@@ -1954,7 +1977,7 @@ html[data-theme="dark"] .uplot {
 
       .gameSubtitle {
         max-width: 380px;
-        margin: 0 auto 20px;
+        margin: 0 auto $space-4;
         color: $font_color_faded;
         font-size: 1.05rem;
         line-height: 1.5;
@@ -1962,7 +1985,7 @@ html[data-theme="dark"] .uplot {
 
       .mainActions {
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: $space-2;
 
         .MuiButton-root {
           width: min(100%, 260px);
@@ -1976,7 +1999,7 @@ html[data-theme="dark"] .uplot {
 
       .accountActions {
         align-items: center;
-        margin-top: 6px;
+        margin-top: $space-2;
 
         .MuiTypography-caption {
           font-size: 0.8125rem;
@@ -1985,7 +2008,7 @@ html[data-theme="dark"] .uplot {
       }
 
       .discoveryActions {
-        margin-top: 14px;
+        margin-top: $space-4;
       }
 
       button {
@@ -2051,7 +2074,7 @@ html[data-theme="dark"] .uplot {
 
   #manual {
     figure {
-      margin: size(base) 0;
+      margin: $space-4 0;
     }
 
     img {
@@ -2065,11 +2088,11 @@ html[data-theme="dark"] .uplot {
     figcaption {
       font-size: 0.75rem;
       opacity: 0.7;
-      margin-top: size(small);
+      margin-top: $space-1;
     }
 
     .manual-empty {
-      padding: size(base) size(base) size(base) size(base);
+      padding: $space-4;
       text-align: center;
     }
 
@@ -2092,7 +2115,7 @@ html[data-theme="dark"] .uplot {
   // Manual entries are Accordions rather than clickable Cards, which is what gets them
   // keyboard focus, aria-expanded and a real heading for free
   .manual-entry {
-    margin: 0 size(small) size(base) size(small);
+    margin: 0 $space-2 $space-2;
 
     // MUI zeroes the radius on a square Accordion but keeps the before-pseudo divider that
     // stacked accordions use; these are separate cards, so it isn't wanted
@@ -2101,7 +2124,7 @@ html[data-theme="dark"] .uplot {
     }
 
     .MuiAccordionSummary-root {
-      padding: 0 size(base);
+      padding: 0 $space-4;
 
       &:hover {
         background: var(--bg-raised);
@@ -2116,7 +2139,7 @@ html[data-theme="dark"] .uplot {
     }
 
     .MuiAccordionDetails-root {
-      padding: 0 size(base) size(base) size(base);
+      padding: 0 $space-4 $space-4;
     }
   }
 
@@ -2826,14 +2849,14 @@ html[data-theme="dark"] .uplot {
   // and the only column they share is when they happened
   .eventLogList {
     display: grid;
-    gap: size(small);
+    gap: $space-2;
     margin: 0;
-    padding: 0 size(small) size(small);
+    padding: 0 $space-2 $space-2;
     list-style: none;
   }
 
   .eventLogSection {
-    padding-top: size(small);
+    padding-top: $space-2;
   }
 
   .eventLogSectionHeader {
@@ -2841,7 +2864,7 @@ html[data-theme="dark"] .uplot {
     grid-template-columns: 1fr auto;
     gap: 1px;
     align-items: center;
-    padding: 0 size(base) size(small);
+    padding: 0 $space-4 $space-2;
   }
 
   .eventHistoryFilterButton {
@@ -2931,7 +2954,7 @@ html[data-theme="dark"] .uplot {
   // column would take a third of it to say something the eye only occasionally asks for
   .eventLogWhen {
     grid-column: 2;
-    margin-top: size(tiny);
+    margin-top: $space-1;
     font-size: 0.75rem;
   }
 
@@ -2946,7 +2969,7 @@ html[data-theme="dark"] .uplot {
 
   .eventLogEmpty {
     display: block;
-    padding: size(base);
+    padding: $space-4;
   }
 
   // The change column, and the facility figures that use the same two colours
@@ -3125,6 +3148,8 @@ html[data-theme="dark"] .uplot {
       .MuiStack-root {
         display: flex;
         flex-wrap: wrap;
+        gap: $space-2;
+        align-items: flex-start;
         justify-content: flex-end;
       }
     }
