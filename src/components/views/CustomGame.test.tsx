@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { RESERVE_MARGIN } from "../../Constants";
 import {
   CUSTOM_SCENARIO_ID,
@@ -8,12 +8,39 @@ import {
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { LOCATIONS } from "../../Constants";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
 import { createGame } from "../../testing/Simulator";
 import CustomGame from "./CustomGame";
 
 jest.mock("../../helpers/OfflineData", () => ({
   prefetchScenarioData: jest.fn(() => Promise.resolve()),
 }));
+jest.mock("../../helpers/CustomGameForecastClient", () => ({
+  createCustomGameForecastWorker: jest.fn(),
+}));
+
+const mockCreateForecastWorker =
+  createCustomGameForecastWorker as jest.MockedFunction<
+    typeof createCustomGameForecastWorker
+  >;
+
+function forecastWorkerStub(): Worker {
+  return {
+    onmessage: null,
+    onerror: null,
+    postMessage: jest.fn(),
+    terminate: jest.fn(),
+  } as unknown as Worker;
+}
+
+beforeEach(() => {
+  mockCreateForecastWorker.mockReturnValue(forecastWorkerStub());
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+  mockCreateForecastWorker.mockReset();
+});
 
 it("opens after economic data is loaded and names every setup control", () => {
   // createGame loads the economy, matching the path that used to make this screen crash after
@@ -56,6 +83,130 @@ it("opens after economic data is loaded and names every setup control", () => {
   expect(
     screen.queryByText("Same seed, same weather and fuel prices."),
   ).not.toBeInTheDocument();
+});
+
+it("shows an accessible Year 1 outlook and starts with its preview seed", () => {
+  jest.useFakeTimers();
+  const onStart = jest.fn();
+  const worker = forecastWorkerStub();
+  mockCreateForecastWorker.mockReturnValue(worker);
+
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: undefined }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  expect(
+    screen.getByRole("region", { name: "Year 1 outlook" }),
+  ).toHaveAttribute("aria-busy", "true");
+  act(() => jest.advanceTimersByTime(250));
+  const request = (worker.postMessage as jest.Mock).mock.calls[0][0];
+  act(() => {
+    worker.onmessage?.({
+      data: {
+        requestId: request.requestId,
+        outlook: { demandServed: 0.974, worstShortfallW: 180_000_000 },
+      },
+    } as MessageEvent);
+  });
+
+  expect(screen.getByText("Deficit forecast")).toBeInTheDocument();
+  expect(screen.getByText("97%")).toBeInTheDocument();
+  expect(screen.getByText("Up to 180MW short")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({ seed: request.seed }),
+  );
+});
+
+it("keeps Play available when the optional outlook fails", () => {
+  jest.useFakeTimers();
+  const worker = forecastWorkerStub();
+  mockCreateForecastWorker.mockReturnValue(worker);
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+
+  act(() => jest.advanceTimersByTime(250));
+  act(() =>
+    worker.onerror?.({ preventDefault: jest.fn() } as unknown as ErrorEvent),
+  );
+
+  expect(screen.getByText("Year 1 outlook unavailable.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Play" })).toBeEnabled();
+});
+
+it("ignores an older forecast result after the setup changes", () => {
+  jest.useFakeTimers();
+  const worker = forecastWorkerStub();
+  mockCreateForecastWorker.mockReturnValue(worker);
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+
+  act(() => jest.advanceTimersByTime(250));
+  const firstRequest = (worker.postMessage as jest.Mock).mock.calls[0][0];
+  fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
+    target: { value: 2_000_000 },
+  });
+  act(() => jest.advanceTimersByTime(250));
+  const secondRequest = (worker.postMessage as jest.Mock).mock.calls[1][0];
+  act(() => {
+    worker.onmessage?.({
+      data: {
+        requestId: secondRequest.requestId,
+        outlook: { demandServed: 1, worstShortfallW: 0 },
+      },
+    } as MessageEvent);
+    worker.onmessage?.({
+      data: {
+        requestId: firstRequest.requestId,
+        outlook: { demandServed: 0.5, worstShortfallW: 50_000_000 },
+      },
+    } as MessageEvent);
+  });
+
+  expect(screen.getByText("Demand covered")).toBeInTheDocument();
+  expect(screen.queryByText("Deficit forecast")).not.toBeInTheDocument();
+});
+
+it("does not forecast a facility that is unavailable in the selected year", () => {
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        startingYear: 1980,
+        facilities: [{ name: "Solar", peakW: 500_000_000 }],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText("Fix the facility issue to calculate an outlook."),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+  expect(mockCreateForecastWorker).not.toHaveBeenCalled();
 });
 
 it("re-quotes starting cash when the starting year changes", () => {

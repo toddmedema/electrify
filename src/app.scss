@@ -2129,6 +2129,70 @@ html[data-theme="dark"] .uplot {
     padding: 8px;
   }
 
+  .customSetupOutlook {
+    min-height: 126px;
+    margin: 0 8px 12px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-raised);
+
+    h3 {
+      margin-bottom: 8px;
+    }
+  }
+
+  .customSetupOutlookState {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .customSetupOutlook-deficit .customSetupOutlookState {
+    color: var(--delta-bad);
+  }
+
+  .customSetupOutlook-covered .customSetupOutlookState {
+    color: $interactive_blue;
+  }
+
+  .customSetupOutlookMetrics {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 12px;
+
+    > div {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    strong {
+      font-size: 1rem;
+    }
+
+    span {
+      color: $font_color_faded;
+      font-size: 0.75rem;
+      line-height: 1.3;
+    }
+  }
+
+  .customSetupOutlookAssumption {
+    display: block;
+    margin-top: 8px;
+    color: $font_color_faded;
+    line-height: 1.3;
+  }
+
+  @media screen and (max-width: 340px) {
+    .customSetupOutlookMetrics {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .customSetupActions {
     padding: 12px;
     text-align: center;

@@ -43,3 +43,15 @@ jest.mock("firebase/analytics", () => ({
   getAnalytics: () => ({}),
   logEvent: () => undefined,
 }));
+
+// Webpack recognizes import.meta.url as the entry point for a code-split Web Worker, while Jest's
+// CommonJS parser intentionally does not. Component tests replace this browser-only constructor
+// with their own workers when they exercise the protocol; everything else gets an inert stub.
+jest.mock("./helpers/CustomGameForecastClient", () => ({
+  createCustomGameForecastWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));

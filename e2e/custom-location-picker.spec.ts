@@ -145,10 +145,17 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
 
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
+  const outlook = page.getByRole("region", { name: "Year 1 outlook" });
   const settingsBox = await settings.boundingBox();
   const facilitiesBox = await facilities.boundingBox();
+  const outlookBox = await outlook.boundingBox();
   expect(settingsBox).not.toBeNull();
   expect(facilitiesBox).not.toBeNull();
+  expect(outlookBox).not.toBeNull();
+  expect(outlookBox!.x).toBeGreaterThanOrEqual(facilitiesBox!.x);
+  expect(outlookBox!.x + outlookBox!.width).toBeLessThanOrEqual(
+    facilitiesBox!.x + facilitiesBox!.width,
+  );
 
   if (testInfo.project.name.startsWith("desktop")) {
     expect(Math.abs(settingsBox!.y - facilitiesBox!.y)).toBeLessThanOrEqual(1);
@@ -165,6 +172,34 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
       Math.max(0, element.scrollWidth - element.clientWidth),
     );
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("Year 1 outlook recalculates from the selected facilities", async ({
+  page,
+}) => {
+  await openCustomSetup(page);
+
+  const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+  await expect(outlook).toContainText(/Demand covered|Deficit forecast/, {
+    timeout: 20000,
+  });
+
+  await page
+    .getByRole("button", { name: "Remove Natural Gas", exact: true })
+    .click();
+  await expect(outlook).toContainText("Calculating Year 1 outlook…");
+  await expect(outlook).toContainText("0%", { timeout: 20000 });
+  await expect(outlook).toContainText("Deficit forecast");
+
+  await page.getByRole("combobox", { name: "Facility type" }).click();
+  await page.getByRole("option", { name: "Natural Gas" }).click();
+  await page.getByRole("combobox", { name: "Facility size" }).click();
+  await page.getByRole("option", { name: "2GW" }).click();
+  await page.getByRole("button", { name: "Add facility" }).click();
+  await expect(outlook).toContainText("Calculating Year 1 outlook…");
+  await expect(outlook).toContainText("Demand covered", { timeout: 20000 });
+  await expect(outlook).toContainText("100%");
+  await expect(outlook).toContainText("No forecast shortfall");
 });
 
 test("keyboard navigation retains one map stop and honors activation and zoom bounds", async ({

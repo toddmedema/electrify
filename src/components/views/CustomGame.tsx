@@ -24,9 +24,11 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import LocationPicker from "../base/LocationPicker";
 import VictoryConditions from "../base/VictoryConditions";
 import { DIFFICULTIES, DIFFICULTY_LABELS } from "../../Constants";
@@ -37,6 +39,12 @@ import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
+import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
+import {
+  CustomGameForecastRequest,
+  CustomGameForecastResponse,
+  YearOneOutlook,
+} from "../../helpers/CustomGameForecast";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
@@ -86,6 +94,13 @@ const DURATION_YEARS = [1, 5, 10, 20, 40, 60, 100];
 // The era the cash, rates and fees below are written in: amounts a player recognises, against the
 // fuel prices the data ends on.
 const MONEY_BASE_YEAR = 2020;
+const FORECAST_DEBOUNCE_MS = 250;
+
+type OutlookState =
+  | { status: "loading" }
+  | { status: "invalid" }
+  | { status: "error" }
+  | { status: "ready"; outlook: YearOneOutlook };
 
 /**
  * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
@@ -184,6 +199,15 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
     : formatWatts(facility.peakW || 0);
 }
 
+function demandServedLabel(outlook: YearOneOutlook): string {
+  if (outlook.worstShortfallW === 0) {
+    return "100%";
+  }
+  // Never round a real deficit up to the covered state's 100%.
+  const percent = Math.min(99.9, outlook.demandServed * 100);
+  return `${percent >= 99 ? percent.toFixed(1) : Math.round(percent)}%`;
+}
+
 /**
  * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
  * The default 500 MW plant for one million customers covers the opening demand plus the game's
@@ -217,6 +241,42 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
   const [addSize, setAddSize] = React.useState(GENERATOR_SIZES_W[2]);
+  const previewSeed = React.useRef(scenario.seed ?? newSeed());
+  const forecastRequestId = React.useRef(0);
+  const forecastWorker = React.useRef<Worker>();
+  const [outlook, setOutlook] = React.useState<OutlookState>({
+    status: "loading",
+  });
+  const ensureForecastWorker = React.useCallback(() => {
+    if (forecastWorker.current) {
+      return forecastWorker.current;
+    }
+    const worker = createCustomGameForecastWorker();
+    forecastWorker.current = worker;
+    worker.onmessage = (event: MessageEvent<CustomGameForecastResponse>) => {
+      if (event.data.requestId !== forecastRequestId.current) {
+        return;
+      }
+      if ("outlook" in event.data) {
+        setOutlook({ status: "ready", outlook: event.data.outlook });
+      } else {
+        setOutlook({ status: "error" });
+      }
+    };
+    worker.onerror = (event: ErrorEvent) => {
+      // The outlook is optional. Handle a worker failure without making the setup unusable.
+      event.preventDefault();
+      setOutlook({ status: "error" });
+    };
+    return worker;
+  }, []);
+  React.useEffect(() => {
+    return () => {
+      const worker = forecastWorker.current;
+      forecastWorker.current = undefined;
+      worker?.terminate();
+    };
+  }, []);
 
   const technologies = React.useMemo(
     () => technologiesFor(scenario, game.difficulty),
@@ -303,6 +363,38 @@ export default function CustomGame(props: Props): React.JSX.Element {
       return sitesRemaining === 0;
     },
   );
+
+  React.useEffect(() => {
+    const requestId = ++forecastRequestId.current;
+    if (unavailable.length > 0) {
+      setOutlook({ status: "invalid" });
+      return;
+    }
+    const location = getScenarioLocation(scenario);
+    if (!location) {
+      setOutlook({ status: "error" });
+      return;
+    }
+
+    setOutlook({ status: "loading" });
+    const timer = window.setTimeout(() => {
+      const request: CustomGameForecastRequest = {
+        requestId,
+        scenario: {
+          ...scenario,
+          locationId: location.id,
+          location,
+        },
+        difficulty: game.difficulty,
+        seed: scenario.seed ?? previewSeed.current,
+      };
+      ensureForecastWorker().postMessage(request);
+    }, FORECAST_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [ensureForecastWorker, game.difficulty, scenario, unavailable.length]);
 
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
@@ -669,6 +761,81 @@ export default function CustomGame(props: Props): React.JSX.Element {
               </Typography>
             )}
 
+            <section
+              className={`customSetupOutlook customSetupOutlook-${outlook.status}${
+                outlook.status === "ready"
+                  ? outlook.outlook.worstShortfallW > 0
+                    ? " customSetupOutlook-deficit"
+                    : " customSetupOutlook-covered"
+                  : ""
+              }`}
+              aria-labelledby="custom-setup-outlook-heading"
+              aria-busy={outlook.status === "loading"}
+            >
+              <Typography
+                id="custom-setup-outlook-heading"
+                variant="subtitle2"
+                component="h3"
+              >
+                Year 1 outlook
+              </Typography>
+              <div role="status" aria-live="polite" aria-atomic="true">
+                {outlook.status === "loading" && (
+                  <Typography variant="body2">
+                    Calculating Year 1 outlook…
+                  </Typography>
+                )}
+                {outlook.status === "invalid" && (
+                  <Typography variant="body2">
+                    Fix the facility issue to calculate an outlook.
+                  </Typography>
+                )}
+                {outlook.status === "error" && (
+                  <Typography variant="body2">
+                    Year 1 outlook unavailable.
+                  </Typography>
+                )}
+                {outlook.status === "ready" && (
+                  <>
+                    <div className="customSetupOutlookState">
+                      {outlook.outlook.worstShortfallW > 0 ? (
+                        <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                      ) : (
+                        <CheckCircleOutlineIcon
+                          fontSize="small"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <strong>
+                        {outlook.outlook.worstShortfallW > 0
+                          ? "Deficit forecast"
+                          : "Demand covered"}
+                      </strong>
+                    </div>
+                    <div className="customSetupOutlookMetrics">
+                      <div>
+                        <strong>{demandServedLabel(outlook.outlook)}</strong>
+                        <span>annual demand served</span>
+                      </div>
+                      <div>
+                        <strong>
+                          {outlook.outlook.worstShortfallW > 0
+                            ? `Up to ${formatWatts(outlook.outlook.worstShortfallW)} short`
+                            : "No forecast shortfall"}
+                        </strong>
+                      </div>
+                    </div>
+                    <Typography
+                      variant="caption"
+                      className="customSetupOutlookAssumption"
+                    >
+                      Assumes this fleet and rate stay unchanged.
+                    </Typography>
+                  </>
+                )}
+              </div>
+            </section>
+
             {scenario.facilities.map(
               (f: Partial<FacilityShoppingType>, i: number) => {
                 return (
@@ -770,7 +937,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
             variant="contained"
             color="primary"
             disabled={unavailable.length > 0}
-            onClick={() => onStart(scenario)}
+            onClick={() =>
+              onStart({
+                ...scenario,
+                seed: scenario.seed ?? previewSeed.current,
+              })
+            }
           >
             Play
           </Button>
