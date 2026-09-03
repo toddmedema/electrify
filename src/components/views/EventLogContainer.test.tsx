@@ -2,6 +2,7 @@ import { navigationForStoryTarget, selectOngoing } from "./EventLogContainer";
 import { createGame } from "../../testing/Simulator";
 import { AppStateType } from "../../Types";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { selectUpcomingStoryEvents } from "./StoryEventSelectors";
 
 describe("story action targets", () => {
   it("routes a generator target to the quote screen and preserves its fuel", () => {
@@ -59,5 +60,30 @@ describe("ongoing story events", () => {
         label: "Through Feb 2025",
       }),
     ]);
+  });
+});
+
+describe("upcoming story events", () => {
+  it("preserves graph timing while excluding unpreviewed announcements", () => {
+    const game = createGame({ scenarioId: 100 });
+    const upcoming = selectUpcomingStoryEvents({ game } as AppStateType);
+
+    expect(upcoming).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "story:100:carbon-fee-ratchet:ratchet-onset",
+          startsMinute: 48 * MINUTES_PER_MONTH,
+          label: `Expected Jan ${game.startingYear + 4}`,
+        }),
+      ]),
+    );
+    expect(
+      upcoming.some((event) => event.key.endsWith(":published-ratchet")),
+    ).toBe(false);
+    expect(upcoming.map((event) => event.startsMinute)).toEqual(
+      [...upcoming]
+        .map((event) => event.startsMinute)
+        .sort((a, b) => (a || 0) - (b || 0)),
+    );
   });
 });

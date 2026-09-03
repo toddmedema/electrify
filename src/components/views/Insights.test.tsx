@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EMPTY_HISTORY } from "../../helpers/DateTime";
+import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
 import Insights, {
@@ -11,6 +11,7 @@ import Insights, {
   presetForLayers,
   withRequiredLayers,
 } from "./Insights";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 jest.mock("../base/GameCard", () => ({
   __esModule: true,
@@ -127,12 +128,17 @@ const user = userEvent.setup({ delay: null });
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);
 
-function renderInsights(scenarioId = 100, suppliedGame?: GameType) {
+function renderInsights(
+  scenarioId = 100,
+  suppliedGame?: GameType,
+  upcomingEvents?: UpcomingStoryEventType[],
+) {
   return render(
     <Insights
       game={suppliedGame || createGame({ scenarioId })}
       selectedFacilityId={null}
       facilityDragActive={false}
+      upcomingEvents={upcomingEvents}
       onDelta={() => undefined}
     />,
   );
@@ -275,6 +281,61 @@ describe("Insights layers", () => {
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
     expect(levers).not.toHaveTextContent(/market/i);
+  });
+
+  it("shows in-range scenario events and reveals their forecast details", async () => {
+    localStorage.setItem("insightsRange", "next1");
+    renderInsights(100, undefined, [
+      {
+        key: "fee-onset",
+        startsMinute: 6 * MINUTES_PER_MONTH,
+        endsMinute: 7 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2023",
+        title: "Higher pollution fee begins",
+        message: "Polluting plants become more expensive to run.",
+      },
+      {
+        key: "later-event",
+        startsMinute: 18 * MINUTES_PER_MONTH,
+        endsMinute: 19 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2024",
+        title: "Outside range",
+        message: "This should not be shown.",
+      },
+    ]);
+
+    const region = screen.getByRole("region", {
+      name: "Upcoming scenario events",
+    });
+    expect(region).toHaveTextContent("1 in this range");
+    const event = within(region).getByRole("button", {
+      name: "Expected Jul 2023: Higher pollution fee begins",
+    });
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    await user.click(event);
+    expect(event).toHaveAttribute("aria-expanded", "true");
+    expect(region).toHaveTextContent(
+      "Polluting plants become more expensive to run.",
+    );
+    expect(region).not.toHaveTextContent("Outside range");
+  });
+
+  it("does not show forecast event annotations in historical views", async () => {
+    localStorage.setItem("insightsRange", "all");
+    renderInsights(100, gameWithHistory(), [
+      {
+        key: "future",
+        startsMinute: 48 * MINUTES_PER_MONTH,
+        endsMinute: 49 * MINUTES_PER_MONTH,
+        label: "Expected Jan 2027",
+        title: "Future event",
+        message: "Forecast only.",
+      },
+    ]);
+
+    expect(
+      screen.queryByRole("region", { name: "Upcoming scenario events" }),
+    ).toBeNull();
   });
 
   it("offers one rolling 12-month range instead of separate calendar years", async () => {

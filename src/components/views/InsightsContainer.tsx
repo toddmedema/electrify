@@ -7,6 +7,7 @@ import Insights, {
   InsightLayerId,
   StateProps,
 } from "./Insights";
+import { selectUpcomingStoryEvents } from "./StoryEventSelectors";
 
 const STORY_INSIGHT_LAYERS: Record<string, InsightLayerId> = {
   FINANCES: "financeDetails",
@@ -18,6 +19,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
   game: state.game,
   selectedFacilityId: state.ui.selectedFacilityId,
   facilityDragActive: state.ui.facilityDragActive,
+  upcomingEvents: selectUpcomingStoryEvents(state),
   focusLayer:
     state.card.storyTarget?.card === "INSIGHTS" && state.card.storyTarget.layer
       ? STORY_INSIGHT_LAYERS[state.card.storyTarget.layer]

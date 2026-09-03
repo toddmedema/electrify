@@ -1011,6 +1011,109 @@ $pane_header_height: 40px;
   border-bottom: $border_accent;
 }
 
+.insightEventRail {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 960px;
+  padding: 10px 16px 12px;
+  margin: 0 auto;
+  border-bottom: $border_accent;
+  background: var(--bg-raised);
+}
+
+.insightEventRailHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: $interactive_blue;
+
+  .MuiTypography-caption {
+    margin-left: auto;
+  }
+}
+
+.insightEventList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.insightEventChip {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid var(--border-selected);
+  border-radius: 8px;
+  background: var(--chart-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible,
+  &.active {
+    border-color: $interactive_blue;
+    background: var(--interactive-tint);
+    outline: none;
+  }
+
+  &:focus-visible {
+    box-shadow:
+      0 0 0 2px var(--chart-surface),
+      0 0 0 4px $interactive_blue;
+  }
+}
+
+.insightEventNumber {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $interactive_blue;
+  border-radius: 50%;
+  color: $interactive_blue;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.insightEventChipCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.2;
+
+  strong {
+    max-width: 190px;
+    overflow: hidden;
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.insightEventDate {
+  color: $font_color_faded;
+  font-size: 0.68rem;
+}
+
+.insightEventDetails {
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-left: 3px solid $interactive_blue;
+  border-radius: 0 6px 6px 0;
+  background: var(--interactive-tint);
+}
+
 .insightsTracks {
   width: 100%;
   max-width: 960px;
@@ -1122,6 +1225,35 @@ $pane_header_height: 40px;
     .MuiButton-root {
       min-height: 44px;
     }
+  }
+
+  .insightEventRail {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .insightEventRailHeader,
+  .insightEventDetails {
+    margin-right: 16px;
+    margin-left: 16px;
+  }
+
+  .insightEventList {
+    flex-wrap: nowrap;
+    padding: 2px 16px 6px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 16px;
+    scroll-snap-type: x proximity;
+
+    > li {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+    }
+  }
+
+  .insightEventChip {
+    min-height: 44px;
   }
 
   // Keep the planning controls on an explicit four-pixel vertical rhythm. Flex wrapping made

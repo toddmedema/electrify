@@ -13,12 +13,12 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import GameCard from "../base/GameCard";
 import {
   ConceptNameType,
-  GameEventImportanceType,
   GameEventKindType,
   GameEventType,
   StoryActionTargetType,
 } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -76,16 +76,6 @@ const EVENT_HISTORY_FILTERS: {
     kinds: ["FUEL_PRICE", "FUEL_CROSSOVER", "LOAN"],
   },
 ];
-
-export interface UpcomingStoryEventType {
-  key: string;
-  label: string;
-  title?: string;
-  message: string;
-  concept?: ConceptNameType;
-  importance?: GameEventImportanceType;
-  actionTarget?: StoryActionTargetType;
-}
 
 export interface StateProps {
   events: GameEventType[];

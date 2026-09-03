@@ -14,6 +14,7 @@ jest.mock("uplot", () => {
 
 jest.mock("./UPlotHelpers", () => ({
   chartScale: (width: number) => Math.min(width / 350, 1.4),
+  eventMarkersPlugin: () => ({ hooks: {} }),
 }));
 
 describe("UPlotChart resizing", () => {

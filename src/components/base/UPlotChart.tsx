@@ -1,8 +1,9 @@
 import * as React from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
-import { chartScale } from "./UPlotHelpers";
+import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
+import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
 
 /**
  * The React shell every chart in the game sits in.
@@ -116,6 +117,7 @@ export default function UPlotChart<S>(
   props: UPlotChartProps<S>,
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
+  const annotations = React.useContext(ChartAnnotationsContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
@@ -182,6 +184,8 @@ export default function UPlotChart<S>(
   buildRef.current = props.buildOptions;
   const tooltipRef = React.useRef(props.tooltip);
   tooltipRef.current = props.tooltip;
+  const annotationsRef = React.useRef(annotations);
+  annotationsRef.current = annotations;
 
   // A plot's options are built once and then only fed data, so the colours in them are the
   // ones that were in force when it was built. Switching palette therefore has to rebuild --
@@ -280,6 +284,10 @@ export default function UPlotChart<S>(
           : built.cursor,
         plugins: [
           ...(built.plugins || []),
+          eventMarkersPlugin(
+            () => annotationsRef.current.events,
+            () => annotationsRef.current.activeEventKey,
+          ),
           tooltipPlugin(getState, () => tooltipRef.current, !!syncKey),
         ],
       },
@@ -303,6 +311,10 @@ export default function UPlotChart<S>(
       drawnRef.current = data;
     }
   });
+
+  React.useLayoutEffect(() => {
+    plotRef.current?.redraw();
+  }, [annotations]);
 
   return (
     <div className="accessibleChart">
