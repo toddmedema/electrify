@@ -24,19 +24,24 @@ interface ChartMockProps {
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
+  domain?: [number, number] | { x: [number, number] };
 }
+
+const domainValue = (domain?: ChartMockProps["domain"]) =>
+  JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
 
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
-  default: ({ id, syncKey, timeline }: ChartMockProps) => (
+  default: ({ id, syncKey, timeline, domain }: ChartMockProps) => (
     <div
       role="img"
       id={id}
       data-testid={id}
       data-sync-key={syncKey}
       data-points={timeline?.length}
+      data-domain={domainValue(domain)}
     />
   ),
 }));
@@ -70,7 +75,7 @@ jest.mock("../base/ChartForecastSupplyByFuel", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline }: ChartMockProps) => {
+  default: ({ syncKey, timeline, domain }: ChartMockProps) => {
     mockSupplyDemandPaints++;
     return (
       <div
@@ -79,6 +84,7 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
         data-testid="supply-demand-chart"
         data-sync-key={syncKey}
         data-points={timeline?.length}
+        data-domain={domainValue(domain)}
       />
     );
   },
@@ -272,7 +278,39 @@ describe("Insights layers", () => {
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/Rate .*\/kWh/);
-    expect(levers.textContent).not.toMatch(/market [^·]*\/kWh/);
+    expect(
+      within(levers).getByText(/market \$/, {
+        selector: ".insightsRateSummaryDesktop",
+      }).textContent,
+    ).not.toMatch(/market [^·]*\/kWh/);
+    expect(within(levers).getByText("Market")).toBeInTheDocument();
+    expect(within(levers).getByText("Customers / mo")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hide rate slider" }),
+    ).toHaveAccessibleDescription(/projected customers .* next month/i);
+  });
+
+  it("keeps the compact rate metrics visible when the slider is collapsed", async () => {
+    renderInsights();
+
+    const toggle = screen.getByRole("button", { name: "Hide rate slider" });
+    const sliderControl = screen.getByTestId("rate-slider-control");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(sliderControl).not.toHaveClass("insightsRateSliderCollapsed");
+    expect(screen.getByRole("slider")).toBeVisible();
+
+    await user.click(toggle);
+
+    expect(
+      screen.getByRole("button", { name: "Show rate slider" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(sliderControl).toHaveClass("insightsRateSliderCollapsed");
+    expect(screen.getByRole("slider")).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("region", { name: "Planning controls" }),
+      ).getByText("Customers / mo"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the customer growth rate visible for public utilities", () => {
@@ -281,6 +319,12 @@ describe("Insights layers", () => {
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
     expect(levers).not.toHaveTextContent(/market/i);
+    expect(
+      within(levers).getByText("Customer growth / yr"),
+    ).toBeInTheDocument();
+    expect(
+      within(levers).getByText("+1.5%", { selector: "strong" }),
+    ).toBeVisible();
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {
@@ -323,6 +367,11 @@ describe("Insights layers", () => {
     expect(event).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("dialog")).toBeNull();
     await user.click(event);
+    await user.click(screen.getByRole("button", { name: "Zoom to event" }));
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([5.9 * MINUTES_PER_MONTH, 7.1 * MINUTES_PER_MONTH]),
+    );
     await user.keyboard("{Escape}");
     expect(event).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -351,7 +400,7 @@ describe("Insights layers", () => {
     localStorage.setItem("insightsRange", "current");
     renderInsights();
 
-    const range = screen.getByRole("combobox", { name: "Insight range" });
+    const range = screen.getByRole("combobox", { name: "Time horizon" });
     expect(range).toHaveTextContent("Next 12 months");
     await user.click(range);
 
@@ -359,6 +408,31 @@ describe("Insights layers", () => {
     expect(options.getByText("Next 12 months")).toBeVisible();
     expect(options.queryByText("Current year")).toBeNull();
     expect(options.queryByText("Next year")).toBeNull();
+  });
+
+  it("zooms and pans every insight chart on one shared time viewport", async () => {
+    renderInsights();
+
+    const supply = screen.getByTestId("supply-demand-chart");
+    const cash = screen.getByTestId("chartInsightsCashPlot");
+    const full = JSON.parse(supply.getAttribute("data-domain") || "[]");
+    expect(cash).toHaveAttribute("data-domain", JSON.stringify(full));
+    expect(screen.getByRole("button", { name: "Pan earlier" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Zoom out" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
+    expect(zoomed[1] - zoomed[0]).toBeCloseTo((full[1] - full[0]) / 2);
+    expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
+    expect(screen.getByRole("button", { name: "Pan earlier" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pan later" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Pan later" }));
+    expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
+    await user.click(
+      screen.getByRole("button", { name: "Fit 1-year horizon" }),
+    );
+    expect(supply).toHaveAttribute("data-domain", JSON.stringify(full));
   });
 
   it.each([
@@ -571,7 +645,7 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
-    await user.click(screen.getByRole("combobox", { name: "Insight range" }));
+    await user.click(screen.getByRole("combobox", { name: "Time horizon" }));
     const ranges = within(await screen.findByRole("listbox"));
     expect(ranges.getByText(String(game.startingYear))).toBeVisible();
     await user.click(ranges.getByText("All recorded"));
@@ -599,7 +673,7 @@ describe("Insights layers", () => {
     );
     expect(screen.getByText(/Energy not served:/)).toBeVisible();
 
-    await user.click(screen.getByRole("combobox", { name: "Insight range" }));
+    await user.click(screen.getByRole("combobox", { name: "Time horizon" }));
     await user.click(
       within(await screen.findByRole("listbox")).getByText(
         String(game.startingYear),

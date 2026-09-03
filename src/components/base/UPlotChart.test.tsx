@@ -1,6 +1,7 @@
 import { act, render } from "@testing-library/react";
 import uPlot from "uplot";
 import UPlotChart from "./UPlotChart";
+import { ChartViewportContext } from "./ChartViewportContext";
 
 jest.mock("uplot", () => {
   const MockUPlot = jest.fn();
@@ -8,6 +9,8 @@ jest.mock("uplot", () => {
   MockUPlot.prototype.cursor = {};
   MockUPlot.prototype.setData = jest.fn();
   MockUPlot.prototype.setSize = jest.fn();
+  MockUPlot.prototype.setScale = jest.fn();
+  MockUPlot.prototype.redraw = jest.fn();
   MockUPlot.prototype.destroy = jest.fn();
   return { __esModule: true, default: MockUPlot };
 });
@@ -20,7 +23,12 @@ jest.mock("./UPlotHelpers", () => ({
 describe("UPlotChart resizing", () => {
   const uPlotPrototype = (
     uPlot as unknown as {
-      prototype: { setSize: jest.Mock; destroy: jest.Mock };
+      prototype: {
+        over: HTMLDivElement;
+        setSize: jest.Mock;
+        setScale: jest.Mock;
+        destroy: jest.Mock;
+      };
     }
   ).prototype;
   let width = 400;
@@ -104,5 +112,140 @@ describe("UPlotChart resizing", () => {
     act(() => jest.advanceTimersByTime(1));
     expect(uPlotPrototype.destroy).toHaveBeenCalledTimes(1);
     expect(uPlot).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies a shared viewport and reserves Ctrl-wheel for anchored zoom", () => {
+    const onRangeChange = jest.fn();
+    render(
+      <ChartViewportContext.Provider
+        value={{
+          bounds: [0, 100],
+          range: [0, 100],
+          minSpan: 10,
+          onRangeChange,
+          onReset: jest.fn(),
+        }}
+      >
+        <UPlotChart
+          ariaLabel="Interactive chart"
+          state={{}}
+          data={[
+            [0, 100],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+      </ChartViewportContext.Provider>,
+    );
+
+    expect(uPlotPrototype.setScale).toHaveBeenCalledWith("x", {
+      min: 0,
+      max: 100,
+    });
+    const ordinaryWheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 100,
+    });
+    uPlotPrototype.over.dispatchEvent(ordinaryWheel);
+    expect(ordinaryWheel.defaultPrevented).toBe(false);
+
+    const zoomWheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      clientX: 200,
+      deltaY: -120,
+    });
+    act(() => {
+      uPlotPrototype.over.dispatchEvent(zoomWheel);
+      jest.advanceTimersByTime(200);
+    });
+    expect(zoomWheel.defaultPrevented).toBe(true);
+    expect(onRangeChange).toHaveBeenCalled();
+    const zoomed = onRangeChange.mock.calls.at(-1)?.[0];
+    expect(zoomed[1] - zoomed[0]).toBeLessThan(100);
+  });
+
+  it("pans with a pointer drag and zooms with a touch pinch", () => {
+    const onRangeChange = jest.fn();
+    const pointer = (type: string, values: Record<string, string | number>) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, values);
+      uPlotPrototype.over.dispatchEvent(event);
+    };
+    render(
+      <ChartViewportContext.Provider
+        value={{
+          bounds: [0, 100],
+          range: [25, 75],
+          minSpan: 10,
+          onRangeChange,
+          onReset: jest.fn(),
+        }}
+      >
+        <UPlotChart
+          ariaLabel="Gesture chart"
+          state={{}}
+          data={[
+            [0, 100],
+            [2, 3],
+          ]}
+          buildOptions={() => ({ width: 0, height: 0, series: [{}, {}] })}
+        />
+      </ChartViewportContext.Provider>,
+    );
+
+    pointer("pointerdown", {
+      pointerId: 1,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+      clientY: 10,
+    });
+    pointer("pointermove", {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 80,
+      clientY: 10,
+    });
+    pointer("pointerup", {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 80,
+      clientY: 10,
+    });
+    expect(onRangeChange).toHaveBeenCalled();
+    expect(onRangeChange.mock.calls.at(-1)?.[0]).toEqual([50, 100]);
+
+    onRangeChange.mockClear();
+    pointer("pointerdown", {
+      pointerId: 2,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+      clientY: 10,
+    });
+    pointer("pointerdown", {
+      pointerId: 3,
+      pointerType: "touch",
+      button: 0,
+      clientX: 200,
+      clientY: 10,
+    });
+    pointer("pointermove", {
+      pointerId: 3,
+      pointerType: "touch",
+      clientX: 250,
+      clientY: 10,
+    });
+    pointer("pointerup", {
+      pointerId: 3,
+      pointerType: "touch",
+      clientX: 250,
+      clientY: 10,
+    });
+    const pinched = onRangeChange.mock.calls.at(-1)?.[0];
+    expect(pinched[1] - pinched[0]).toBeLessThan(50);
   });
 });

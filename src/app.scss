@@ -1006,9 +1006,90 @@ $pane_header_height: 40px;
   }
 }
 
+.insightsRateMetrics,
+.insightsRateMarkMobile {
+  display: none;
+}
+
+.insightsRateSliderCollapsed {
+  display: none;
+}
+
 .insightsHistoryNotice {
   padding: 8px 16px;
   border-bottom: $border_accent;
+}
+
+.insightsViewportToolbar {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 960px;
+  height: 52px;
+  min-height: 52px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 4px 16px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-bottom: $border_accent;
+  background: var(--bg-raised);
+}
+
+.insightsHorizon {
+  width: 152px;
+  height: 40px;
+  min-width: 0;
+  flex: 0 0 152px;
+}
+
+.insightsHorizonValue {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightsHorizonCompact {
+  display: none;
+}
+
+.insightsViewportButtons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+
+  .insightsViewportButton,
+  .MuiIconButton-root {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+  }
+
+  .MuiIconButton-root {
+    color: $interactive_blue;
+  }
+}
+
+.insightsViewportText {
+  min-width: 0;
+  flex: 1 1 auto;
+
+  .MuiTypography-root {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.insights .u-over {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .insightEventRail {
@@ -1102,6 +1183,11 @@ $pane_header_height: 40px;
     display: block;
     margin: 1px 0 6px;
   }
+
+  .MuiButton-root {
+    min-height: 36px;
+    margin-top: 10px;
+  }
 }
 
 .insightEventPopover {
@@ -1157,7 +1243,7 @@ $pane_header_height: 40px;
 
   .insightsHeaderControls {
     display: grid;
-    grid-template-columns: minmax(128px, 1fr) minmax(88px, 1fr) 36px;
+    grid-template-columns: minmax(0, 1fr) 36px;
     width: 100%;
     gap: 4px;
     margin-left: 0;
@@ -1227,6 +1313,43 @@ $pane_header_height: 40px;
     padding: 3px 0 3px 16px;
   }
 
+  .insightsViewportToolbar {
+    height: 52px;
+    min-height: 52px;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .insightsHorizon {
+    width: 80px;
+    height: 44px;
+    flex-basis: 80px;
+  }
+
+  .insightsHorizonLong {
+    display: none;
+  }
+
+  .insightsHorizonCompact {
+    display: inline;
+  }
+
+  .insightsViewportButtons {
+    flex-basis: 220px;
+    gap: 0;
+
+    .insightsViewportButton,
+    .MuiIconButton-root {
+      width: 44px;
+      height: 44px;
+      flex-basis: 44px;
+    }
+  }
+
+  .insightsViewportText {
+    display: none;
+  }
+
   .insightEventList {
     padding-right: 16px;
     scroll-padding-inline: 16px;
@@ -1243,28 +1366,101 @@ $pane_header_height: 40px;
     padding-right: 9px;
   }
 
-  // Keep the planning controls on an explicit four-pixel vertical rhythm. Flex wrapping made
-  // the title and description share a row only at a few in-between widths, and left their
-  // horizontal edges out of step with the track headings below.
   .insightsLevers {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    row-gap: 4px;
-    padding: 4px 16px 8px;
+    gap: 0;
+    padding: 4px 12px 12px;
 
-    > .MuiButton-root {
-      justify-self: start;
-      padding-left: 0;
+    > .insightsRateToggle {
+      display: none;
+    }
 
-      .MuiButton-startIcon {
-        margin-left: 0;
+    .insightsRateToggleLabel,
+    .insightsRateSummaryDesktop {
+      display: none;
+    }
+
+    .insightsRateMetrics {
+      display: grid;
+      min-width: 0;
+      height: 44px;
+      grid-column: 1;
+      grid-template-columns: minmax(68px, 0.8fr) minmax(60px, 0.75fr) minmax(
+          112px,
+          1.25fr
+        );
+      gap: 4px;
+      align-items: stretch;
+
+      &.insightsRateMetricsPublic {
+        grid-template-columns: 72px minmax(0, 1fr);
       }
+    }
+
+    .insightsRateMetric {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      justify-content: center;
+      padding-left: 4px;
+      border-left: 1px solid var(--border-subtle);
+    }
+
+    .insightsRateMetric:first-child {
+      padding-left: 0;
+      border-left: 0;
+    }
+
+    .insightsRateMetricGrowth {
+      grid-column: 2;
+    }
+
+    .insightsRateMetricLabel,
+    .insightsRateMetricValue {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .insightsRateMetricLabel {
+      color: var(--text-secondary);
+      font-size: 0.6rem;
+      line-height: 1.15;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .insightsRateMetricValue {
+      font-size: 0.78rem;
+      line-height: 1.35;
     }
 
     .budgetSlider {
       box-sizing: border-box;
       width: 100%;
+      min-height: 48px;
       min-width: 0;
+      grid-column: 1;
+      padding: 0 20px;
+
+      .MuiSlider-root {
+        margin-bottom: 0;
+      }
+    }
+
+    .insightsRateSliderCollapsed {
+      display: block;
+    }
+
+    .insightsRateMarkDesktop {
+      display: none;
+    }
+
+    .insightsRateMarkMobile {
+      display: inline;
+      font-size: 0.65rem;
+      white-space: nowrap;
     }
   }
 

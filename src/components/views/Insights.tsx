@@ -26,11 +26,16 @@ import {
 } from "@mui/material";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import LayersIcon from "@mui/icons-material/Layers";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import TuneIcon from "@mui/icons-material/Tune";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
   GAME_TO_REAL_YEARS,
   ORGANIC_GROWTH_MAX_ANNUAL,
@@ -110,6 +115,15 @@ import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
+import {
+  ChartViewportContext,
+  ChartViewportRange,
+  clampChartViewport,
+  eventChartViewport,
+  panChartViewport,
+  rangesEqual,
+  zoomChartViewport,
+} from "../base/ChartViewportContext";
 
 export type InsightRange =
   "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
@@ -254,9 +268,30 @@ const HISTORICAL_LAYER_IDS = new Set<InsightLayerId>([
 ]);
 const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
 
+function formatRateCompact(rate: number): string {
+  return `${Number((rate * 100).toFixed(1))}¢`;
+}
+
+function rateMarkLabel(
+  rate: number,
+  desktopLabel = formatMoneyConcise(rate),
+  mobileLabel = "",
+) {
+  return (
+    <>
+      <span className="insightsRateMarkDesktop">{desktopLabel}</span>
+      <span className="insightsRateMarkMobile">{mobileLabel}</span>
+    </>
+  );
+}
+
 const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate) => ({
   value: rate,
-  label: formatMoneyConcise(rate),
+  label: rateMarkLabel(
+    rate,
+    formatMoneyConcise(rate),
+    [0, 0.15, 0.3].includes(rate) ? formatRateCompact(rate) : "",
+  ),
 }));
 
 interface BlackoutEdges {
@@ -276,6 +311,7 @@ interface ProjectionView {
   hasHydro: boolean;
   financePast: MonthlyHistoryType[];
   financeProjected: MonthlyHistoryType[];
+  projectionStepMinutes: number;
 }
 
 export interface StateProps {
@@ -305,6 +341,89 @@ interface State {
   layersOpen: boolean;
   leversOpen: boolean;
   activeEventKey?: string;
+  viewport?: ChartViewportRange;
+  viewportAnnouncement: string;
+}
+
+const VIEWPORT_ZOOM_FACTOR = 0.5;
+const VIEWPORT_PAN_FRACTION = 0.25;
+
+function viewportLabel(
+  range: ChartViewportRange,
+  bounds: ChartViewportRange,
+  startingYear: number,
+): string {
+  if (rangesEqual(range, bounds)) {
+    return "Full selected range";
+  }
+  const start = getDateFromMinute(range[0], startingYear);
+  const end = getDateFromMinute(range[1], startingYear);
+  const left = `${start.month} ${start.year}`;
+  const right = `${end.month} ${end.year}`;
+  return left === right ? left : `${left} – ${right}`;
+}
+
+function horizonLabels(range: InsightRange): {
+  compact: string;
+  full: string;
+  description: string;
+} {
+  if (range === "all") {
+    return {
+      compact: "All",
+      full: "All recorded",
+      description: "recorded history",
+    };
+  }
+  const year = historicalYear(range);
+  if (year !== null) {
+    return {
+      compact: String(year),
+      full: String(year),
+      description: String(year),
+    };
+  }
+  const years = rangeYears(range) || 1;
+  return {
+    compact: `${years}y`,
+    full: years === 1 ? "Next 12 months" : `Next ${years} years`,
+    description: `${years}-year horizon`,
+  };
+}
+
+function viewportAnnouncement(
+  range: ChartViewportRange,
+  bounds: ChartViewportRange,
+  startingYear: number,
+  horizon: InsightRange,
+): string {
+  const description = horizonLabels(horizon).description;
+  return rangesEqual(range, bounds)
+    ? `Showing the full ${description}`
+    : `Showing ${viewportLabel(range, bounds, startingYear)} within the ${description}`;
+}
+
+function timelineWithin(
+  timeline: TickPresentFutureType[],
+  range: ChartViewportRange,
+): TickPresentFutureType[] {
+  if (timeline.length <= 2) return timeline;
+  let first = 0;
+  let last = timeline.length;
+  while (first < last) {
+    const middle = Math.floor((first + last) / 2);
+    if (timeline[middle].minute < range[0]) first = middle + 1;
+    else last = middle;
+  }
+  const from = Math.max(0, first - 1);
+  first = from;
+  last = timeline.length;
+  while (first < last) {
+    const middle = Math.floor((first + last) / 2);
+    if (timeline[middle].minute <= range[1]) first = middle + 1;
+    else last = middle;
+  }
+  return timeline.slice(from, Math.min(timeline.length, first + 1));
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -549,6 +668,8 @@ function financeSeries(
   key: DerivedHistoryKeysType,
   past: MonthlyHistoryType[],
   projected: MonthlyHistoryType[],
+  domain?: ChartViewportRange,
+  startingYear?: number,
 ) {
   const point = (month: MonthlyHistoryType, isProjected: boolean) => {
     const summary = deriveExpandedSummary(month);
@@ -559,10 +680,21 @@ function financeSeries(
       projected: isProjected,
     };
   };
-  return [
+  const points = [
     ...[...past].reverse().map((month) => point(month, false)),
     ...projected.map((month) => point(month, true)),
   ];
+  if (!domain || startingYear === undefined || points.length <= 2)
+    return points;
+  const minutes = points.map(
+    (value) => (value.month - startingYear * 12 - 1) * MINUTES_PER_MONTH,
+  );
+  const firstInside = minutes.findIndex((minute) => minute >= domain[0]);
+  const first =
+    firstInside < 0 ? points.length - 1 : Math.max(0, firstInside - 1);
+  const firstAfter = minutes.findIndex((minute) => minute > domain[1]);
+  const end = firstAfter < 0 ? points.length : firstAfter + 1;
+  return points.slice(first, Math.max(first + 1, Math.min(points.length, end)));
 }
 
 function facilitySignature(game: GameType): string {
@@ -609,6 +741,8 @@ export default class Insights extends React.Component<Props, State> {
       layersOpen: false,
       leversOpen: true,
       activeEventKey: undefined,
+      viewport: undefined,
+      viewportAnnouncement: "",
     };
   }
 
@@ -648,7 +782,11 @@ export default class Insights extends React.Component<Props, State> {
 
   private setRange(range: InsightRange) {
     setStorageKeyValue(RANGE_KEY, range);
-    this.setState({ range });
+    this.setState({
+      range,
+      viewport: undefined,
+      viewportAnnouncement: `Showing the full ${horizonLabels(range).description}`,
+    });
   }
 
   private setLayers(
@@ -942,6 +1080,7 @@ export default class Insights extends React.Component<Props, State> {
       hasHydro: false,
       financePast,
       financeProjected: [],
+      projectionStepMinutes: MINUTES_PER_MONTH,
     };
   }
 
@@ -1058,6 +1197,7 @@ export default class Insights extends React.Component<Props, State> {
       hasHydro: game.facilities.some((facility) => facility.fuel === "Hydro"),
       financePast: [],
       financeProjected: [currentMonth, ...projectedMonths],
+      projectionStepMinutes,
     };
     this.projectionCache = { key, projection };
     return projection;
@@ -1112,33 +1252,58 @@ export default class Insights extends React.Component<Props, State> {
     const marks =
       scenario.ownership === "Investor"
         ? [
-            { value: 0, label: "$0" },
+            { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
             {
               value: marketRate,
-              label: `${formatMoneyConcise(marketRate)} market`,
+              label: rateMarkLabel(
+                marketRate,
+                `${formatMoneyConcise(marketRate)} market`,
+                `market ${formatRateCompact(marketRate)}`,
+              ),
             },
-            { value: max, label: formatMoneyConcise(max) },
+            {
+              value: max,
+              label: rateMarkLabel(
+                max,
+                formatMoneyConcise(max),
+                formatRateCompact(max),
+              ),
+            },
           ]
         : RATE_MARKS;
+    const formattedCustomerChange = formatCustomerChange(
+      customerChange,
+      now.customers,
+    );
+    const rateSummary =
+      scenario.ownership === "Investor"
+        ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
+        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year.`;
     return (
       <section className="insightsLevers" aria-label="Planning controls">
         <Button
+          className="insightsRateToggle"
           startIcon={<TuneIcon />}
           onClick={() => this.setState({ leversOpen: !this.state.leversOpen })}
           aria-expanded={this.state.leversOpen}
+          aria-controls="rateSliderControl"
+          aria-label={`${this.state.leversOpen ? "Hide" : "Show"} rate slider`}
+          aria-describedby="insightsRateSummary"
         >
-          Rate controls
+          <span className="insightsRateToggleLabel">Rate controls</span>
         </Button>
-        <Typography variant="body2" color="textSecondary">
+        <Typography
+          className="insightsRateSummaryDesktop"
+          variant="body2"
+          color="textSecondary"
+          aria-hidden="true"
+        >
           Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
           {scenario.ownership === "Investor" && (
             <>
               {" "}
               · market {formatMoneyConcise(marketRate)} · projected customers{" "}
-              <strong>
-                {formatCustomerChange(customerChange, now.customers)}
-              </strong>{" "}
-              next month
+              <strong>{formattedCustomerChange}</strong> next month
             </>
           )}
           {scenario.ownership === "Public" && (
@@ -1151,32 +1316,80 @@ export default class Insights extends React.Component<Props, State> {
             </>
           )}
         </Typography>
-        {this.state.leversOpen && (
-          <div className="budgetSlider flex-newline">
-            <Slider
-              // Keep the thumb local while it is moving. Dispatching every pointer step makes
-              // the entire workbench reconcile and regenerate its long-range projection before
-              // the browser can paint the next thumb position. The committed rate remounts this
-              // uncontrolled slider through its key, so external changes still stay in sync.
-              key={game.dollarsPerkWh}
-              id="rateSlider"
-              disabled={!!game.replayPlayback}
-              defaultValue={game.dollarsPerkWh}
-              aria-label="The rate you charge for electricity generation"
-              valueLabelDisplay="auto"
-              valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
-              marks={marks}
-              min={0}
-              step={scenario.ownership === "Investor" ? 0.001 : 0.01}
-              max={max}
-              onChangeCommitted={(_event, value) =>
-                onDelta({
-                  dollarsPerkWh: Array.isArray(value) ? value[0] : value,
-                })
-              }
-            />
-          </div>
-        )}
+        <div
+          className={`insightsRateMetrics ${
+            scenario.ownership === "Public" ? "insightsRateMetricsPublic" : ""
+          }`}
+          aria-hidden="true"
+        >
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Rate</span>
+            <strong className="insightsRateMetricValue">
+              {formatRateCompact(game.dollarsPerkWh)}/kWh
+            </strong>
+          </span>
+          {scenario.ownership === "Investor" ? (
+            <>
+              <span className="insightsRateMetric">
+                <span className="insightsRateMetricLabel">Market</span>
+                <span className="insightsRateMetricValue">
+                  {formatRateCompact(marketRate)}
+                </span>
+              </span>
+              <span className="insightsRateMetric">
+                <span className="insightsRateMetricLabel">Customers / mo</span>
+                <strong className="insightsRateMetricValue">
+                  {formattedCustomerChange}
+                </strong>
+              </span>
+            </>
+          ) : (
+            <span className="insightsRateMetric insightsRateMetricGrowth">
+              <span className="insightsRateMetricLabel">
+                Customer growth / yr
+              </span>
+              <strong className="insightsRateMetricValue">
+                +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%
+              </strong>
+            </span>
+          )}
+        </div>
+        <span id="insightsRateSummary" className="srOnly">
+          {rateSummary}
+        </span>
+        <div
+          className={`budgetSlider flex-newline ${
+            this.state.leversOpen ? "" : "insightsRateSliderCollapsed"
+          }`}
+          id="rateSliderControl"
+          data-testid="rate-slider-control"
+        >
+          <Slider
+            // Keep the thumb local while it is moving. Dispatching every pointer step makes
+            // the entire workbench reconcile and regenerate its long-range projection before
+            // the browser can paint the next thumb position. The committed rate remounts this
+            // uncontrolled slider through its key, so external changes still stay in sync.
+            key={game.dollarsPerkWh}
+            id="rateSlider"
+            disabled={!!game.replayPlayback}
+            defaultValue={game.dollarsPerkWh}
+            aria-label="The rate you charge for electricity generation"
+            valueLabelDisplay="auto"
+            valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
+            getAriaValueText={(rate) =>
+              `${formatMoneyConcise(rate)} per kilowatt hour`
+            }
+            marks={marks}
+            min={0}
+            step={scenario.ownership === "Investor" ? 0.001 : 0.01}
+            max={max}
+            onChangeCommitted={(_event, value) =>
+              onDelta({
+                dollarsPerkWh: Array.isArray(value) ? value[0] : value,
+              })
+            }
+          />
+        </div>
       </section>
     );
   }
@@ -1273,6 +1486,165 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  private setViewport(
+    bounds: ChartViewportRange,
+    minSpan: number,
+    next: ChartViewportRange,
+    announce = true,
+  ) {
+    const clamped = clampChartViewport(bounds, next, minSpan);
+    this.setState({
+      viewport: rangesEqual(clamped, bounds) ? undefined : clamped,
+      viewportAnnouncement: announce
+        ? viewportAnnouncement(
+            clamped,
+            bounds,
+            this.props.game.startingYear,
+            this.state.range,
+          )
+        : this.state.viewportAnnouncement,
+    });
+  }
+
+  private renderViewportControls(
+    bounds: ChartViewportRange,
+    range: ChartViewportRange,
+    minSpan: number,
+    years: number[],
+  ) {
+    const full = rangesEqual(bounds, range);
+    const span = range[1] - range[0];
+    const setRange = (next: ChartViewportRange) =>
+      this.setViewport(bounds, minSpan, next);
+    const iconButton = (
+      label: string,
+      icon: React.ReactNode,
+      disabled: boolean,
+      onClick: () => void,
+    ) => (
+      <Tooltip title={label}>
+        <span className="insightsViewportButton">
+          <IconButton
+            size="small"
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+          >
+            {icon}
+          </IconButton>
+        </span>
+      </Tooltip>
+    );
+    return (
+      <section
+        className="insightsViewportToolbar"
+        aria-label="Chart time navigation"
+        aria-describedby="insightsViewportHint"
+      >
+        <Select
+          id="insightsRange"
+          value={this.state.range}
+          onChange={(event: SelectChangeEvent<InsightRange>) =>
+            this.setRange(event.target.value as InsightRange)
+          }
+          className="insightsHorizon"
+          aria-label="Time horizon"
+          renderValue={(value) => {
+            const labels = horizonLabels(value as InsightRange);
+            return (
+              <span className="insightsHorizonValue">
+                <span className="srOnly">{labels.full}</span>
+                <span className="insightsHorizonLong" aria-hidden="true">
+                  {labels.full}
+                </span>
+                <span className="insightsHorizonCompact" aria-hidden="true">
+                  {labels.compact}
+                </span>
+              </span>
+            );
+          }}
+        >
+          <MenuItem value="next1">Next 12 months</MenuItem>
+          <MenuItem value="next5">Next 5 years</MenuItem>
+          <MenuItem value="next10">Next 10 years</MenuItem>
+          <MenuItem value="next20">Next 20 years</MenuItem>
+          {!!this.props.game.monthlyHistory.length && (
+            <MenuItem value="all">All recorded</MenuItem>
+          )}
+          {years.map((year) => (
+            <MenuItem value={historyRange(year)} key={year}>
+              {year}
+            </MenuItem>
+          ))}
+        </Select>
+        <div className="insightsViewportButtons">
+          {iconButton(
+            "Pan earlier",
+            <ChevronLeftIcon />,
+            full || range[0] <= bounds[0],
+            () =>
+              setRange(
+                panChartViewport(
+                  bounds,
+                  range,
+                  minSpan,
+                  -span * VIEWPORT_PAN_FRACTION,
+                ),
+              ),
+          )}
+          {iconButton("Zoom out", <ZoomOutIcon />, full, () =>
+            setRange(
+              zoomChartViewport(
+                bounds,
+                range,
+                minSpan,
+                1 / VIEWPORT_ZOOM_FACTOR,
+              ),
+            ),
+          )}
+          {iconButton(
+            `Fit ${horizonLabels(this.state.range).description}`,
+            <FitScreenIcon />,
+            full,
+            () => setRange(bounds),
+          )}
+          {iconButton("Zoom in", <ZoomInIcon />, span <= minSpan, () =>
+            setRange(
+              zoomChartViewport(bounds, range, minSpan, VIEWPORT_ZOOM_FACTOR),
+            ),
+          )}
+          {iconButton(
+            "Pan later",
+            <ChevronRightIcon />,
+            full || range[1] >= bounds[1],
+            () =>
+              setRange(
+                panChartViewport(
+                  bounds,
+                  range,
+                  minSpan,
+                  span * VIEWPORT_PAN_FRACTION,
+                ),
+              ),
+          )}
+        </div>
+        <div className="insightsViewportText">
+          <Typography variant="body2">
+            {viewportLabel(range, bounds, this.props.game.startingYear)} ·
+            Ctrl-scroll or drag
+          </Typography>
+        </div>
+        <span id="insightsViewportHint" className="srOnly">
+          Pinch or use the zoom controls to zoom. Swipe, drag, or use the pan
+          controls to move through time.
+        </span>
+        <span className="srOnly" aria-live="polite">
+          {this.state.viewportAnnouncement}
+        </span>
+      </section>
+    );
+  }
+
   private renderTrack(
     id: InsightLayerId,
     index: number,
@@ -1307,6 +1679,8 @@ export default class Insights extends React.Component<Props, State> {
             finance.key,
             projection.financePast,
             projection.financeProjected,
+            projection.domain.x,
+            game.startingYear,
           )}
           title={finance.label}
           format={finance.format}
@@ -1653,6 +2027,56 @@ export default class Insights extends React.Component<Props, State> {
       return <span />;
     }
     const projection = this.getProjection(now);
+    const viewportBounds = projection.domain.x;
+    const minViewportSpan = Math.min(
+      viewportBounds[1] - viewportBounds[0],
+      MINUTES_PER_MONTH,
+    );
+    const viewportRange = this.state.viewport
+      ? clampChartViewport(viewportBounds, this.state.viewport, minViewportSpan)
+      : viewportBounds;
+    const viewportTimeline = rangesEqual(viewportRange, viewportBounds)
+      ? projection.timeline
+      : timelineWithin(projection.timeline, viewportRange);
+    const viewportSampleInterval = Math.max(
+      projection.projectionStepMinutes,
+      Math.ceil(
+        (viewportRange[1] - viewportRange[0]) /
+          1600 /
+          projection.projectionStepMinutes,
+      ) * projection.projectionStepMinutes,
+    );
+    const viewportProjection: ProjectionView = rangesEqual(
+      viewportRange,
+      viewportBounds,
+    )
+      ? projection
+      : {
+          ...projection,
+          domain: { ...projection.domain, x: viewportRange },
+          timeline: viewportTimeline,
+          sampled: projection.historical
+            ? viewportTimeline
+            : sampleForecastTimeline(
+                viewportTimeline,
+                viewportSampleInterval,
+                projection.projectionStepMinutes,
+              ),
+        };
+    const viewportContext = {
+      bounds: viewportBounds,
+      range: viewportRange,
+      minSpan: minViewportSpan,
+      onRangeChange: (range: ChartViewportRange, announce = false) =>
+        this.setViewport(viewportBounds, minViewportSpan, range, announce),
+      onReset: (announce = false) =>
+        this.setViewport(
+          viewportBounds,
+          minViewportSpan,
+          viewportBounds,
+          announce,
+        ),
+    };
     const years = playedHistoryYears(game);
     const visible = this.state.layers.filter((id) => {
       const definition = INSIGHT_LAYERS.find((layer) => layer.id === id);
@@ -1696,28 +2120,6 @@ export default class Insights extends React.Component<Props, State> {
           <Toolbar className="paneHeader insightsHeader">
             <Typography variant="h6">Insights</Typography>
             <div className="insightsHeaderControls">
-              <Select
-                id="insightsRange"
-                value={this.state.range}
-                onChange={(event: SelectChangeEvent<InsightRange>) =>
-                  this.setRange(event.target.value as InsightRange)
-                }
-                className="headerControl insightsRange"
-                aria-label="Insight range"
-              >
-                <MenuItem value="next1">Next 12 months</MenuItem>
-                <MenuItem value="next5">Next 5 years</MenuItem>
-                <MenuItem value="next10">Next 10 years</MenuItem>
-                <MenuItem value="next20">Next 20 years</MenuItem>
-                {!!game.monthlyHistory.length && (
-                  <MenuItem value="all">All recorded</MenuItem>
-                )}
-                {years.map((year) => (
-                  <MenuItem value={historyRange(year)} key={year}>
-                    {year}
-                  </MenuItem>
-                ))}
-              </Select>
               <div
                 className="insightsPresetControls"
                 role="group"
@@ -1904,6 +2306,12 @@ export default class Insights extends React.Component<Props, State> {
           ) : (
             this.renderLevers(now)
           )}
+          {this.renderViewportControls(
+            viewportBounds,
+            viewportRange,
+            minViewportSpan,
+            years,
+          )}
           {!!upcomingEvents.length && (
             <InsightEventRail
               events={upcomingEvents}
@@ -1911,20 +2319,34 @@ export default class Insights extends React.Component<Props, State> {
               onActiveChange={(activeEventKey) =>
                 this.setState({ activeEventKey })
               }
+              onZoom={(event) =>
+                this.setViewport(
+                  viewportBounds,
+                  minViewportSpan,
+                  eventChartViewport(
+                    viewportBounds,
+                    event.startsMinute!,
+                    event.endsMinute,
+                    minViewportSpan,
+                  ),
+                )
+              }
             />
           )}
-          <ChartAnnotationsContext.Provider value={annotations}>
-            <div className="insightsTracks">
-              {visible.map((id, index) =>
-                this.renderTrack(id, index, visible, projection),
-              )}
-              {!visible.length && (
-                <Typography className="insightsEmpty" color="textSecondary">
-                  Choose Layers to build this view.
-                </Typography>
-              )}
-            </div>
-          </ChartAnnotationsContext.Provider>
+          <ChartViewportContext.Provider value={viewportContext}>
+            <ChartAnnotationsContext.Provider value={annotations}>
+              <div className="insightsTracks">
+                {visible.map((id, index) =>
+                  this.renderTrack(id, index, visible, viewportProjection),
+                )}
+                {!visible.length && (
+                  <Typography className="insightsEmpty" color="textSecondary">
+                    Choose Layers to build this view.
+                  </Typography>
+                )}
+              </div>
+            </ChartAnnotationsContext.Provider>
+          </ChartViewportContext.Provider>
         </div>
         {this.renderPresetDialogs()}
       </GameCard>
