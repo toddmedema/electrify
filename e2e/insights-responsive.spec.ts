@@ -1,3 +1,4 @@
+import path from "path";
 import { expect, test, type Page } from "@playwright/test";
 
 const REVIEW_VIEWPORTS = new Set([
@@ -13,6 +14,72 @@ const dismissTutorial = async (page: Page) => {
   await exit.click();
   await expect(exit).not.toBeVisible();
 };
+
+test("upcoming scenario events stay usable across insight viewports", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !new Set(["desktop-chromium", "mobile-390px", "mobile-320px"]).has(
+      testInfo.project.name,
+    ),
+  );
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem("insightsRange", "next5");
+  });
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game" }).click();
+
+  const insights = page.locator(".insights:visible");
+  if (!(await insights.isVisible())) {
+    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  }
+  await expect(insights).toBeVisible();
+
+  const eventRail = insights.getByRole("region", {
+    name: "Upcoming scenario events",
+  });
+  await expect(eventRail).toContainText("Upcoming");
+  await expect(eventRail).not.toContainText("Higher pollution fee begins");
+  const eventButton = eventRail.getByRole("button", {
+    name: /Higher pollution fee begins/,
+  });
+  await expect(eventButton).toBeVisible();
+  await expect(eventButton).toHaveAttribute("aria-expanded", "false");
+  await eventButton.click();
+  await expect(eventButton).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("dialog")).toContainText(
+    "Polluting plants now pay",
+  );
+
+  const pageOverflow = await insights.evaluate((element) =>
+    Math.max(0, element.scrollWidth - element.clientWidth),
+  );
+  expect(pageOverflow).toBeLessThanOrEqual(1);
+  if (testInfo.project.name.startsWith("mobile-")) {
+    const eventBox = await eventButton.boundingBox();
+    expect(eventBox).not.toBeNull();
+    expect(eventBox!.height).toBeGreaterThanOrEqual(44);
+    await expect(eventRail.locator(".insightEventList")).toHaveCSS(
+      "overflow-x",
+      "auto",
+    );
+    const railBox = await eventRail.boundingBox();
+    expect(railBox).not.toBeNull();
+    expect(railBox!.height).toBeLessThanOrEqual(52);
+  }
+
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir) {
+    await page.screenshot({
+      path: path.join(
+        reviewDir,
+        `upcoming-events-${testInfo.project.name}.png`,
+      ),
+      fullPage: true,
+    });
+  }
+});
 
 test("insights header controls stay aligned in one compact row", async ({
   page,

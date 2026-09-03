@@ -1011,6 +1011,103 @@ $pane_header_height: 40px;
   border-bottom: $border_accent;
 }
 
+.insightEventRail {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 960px;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px;
+  margin: 0 auto;
+  border-bottom: $border_accent;
+}
+
+.insightEventRailLabel {
+  flex: 0 0 auto;
+  color: $font_color_faded;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.insightEventList {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.insightEventChip {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible,
+  &.active {
+    border-color: var(--border-selected);
+    background: var(--interactive-tint);
+    outline: none;
+  }
+
+  &:focus-visible {
+    box-shadow:
+      0 0 0 2px var(--chart-surface),
+      0 0 0 4px $interactive_blue;
+  }
+}
+
+.insightEventNumber {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: $interactive_blue;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.insightEventDate {
+  color: $font_color_faded;
+  font-size: 0.74rem;
+}
+
+.insightEventDetails {
+  width: min(300px, calc(100vw - 32px));
+  padding: 10px 12px;
+
+  .MuiTypography-caption {
+    display: block;
+    margin: 1px 0 6px;
+  }
+}
+
+.insightEventPopover {
+  z-index: 1300;
+}
+
 .insightsTracks {
   width: 100%;
   max-width: 960px;
@@ -1122,6 +1219,28 @@ $pane_header_height: 40px;
     .MuiButton-root {
       min-height: 44px;
     }
+  }
+
+  .insightEventRail {
+    min-height: 52px;
+    gap: 6px;
+    padding: 3px 0 3px 16px;
+  }
+
+  .insightEventList {
+    padding-right: 16px;
+    scroll-padding-inline: 16px;
+    scroll-snap-type: x proximity;
+
+    > li {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+    }
+  }
+
+  .insightEventChip {
+    min-height: 44px;
+    padding-right: 9px;
   }
 
   // Keep the planning controls on an explicit four-pixel vertical rhythm. Flex wrapping made

@@ -107,6 +107,9 @@ import GameCard from "../base/GameCard";
 import { UnitsContext } from "../base/UnitsContext";
 import { formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
+import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
+import InsightEventRail from "../base/InsightEventRail";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 export type InsightRange =
   "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
@@ -280,6 +283,7 @@ export interface StateProps {
   selectedFacilityId: number | null;
   facilityDragActive: boolean;
   focusLayer?: InsightLayerId;
+  upcomingEvents?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
@@ -300,6 +304,7 @@ interface State {
   presetNameError: string;
   layersOpen: boolean;
   leversOpen: boolean;
+  activeEventKey?: string;
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -603,6 +608,7 @@ export default class Insights extends React.Component<Props, State> {
       presetNameError: "",
       layersOpen: false,
       leversOpen: true,
+      activeEventKey: undefined,
     };
   }
 
@@ -625,6 +631,7 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.focusLayer !== this.props.focusLayer ||
+      nextProps.upcomingEvents !== this.props.upcomingEvents ||
       facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
     );
   }
@@ -1666,6 +1673,22 @@ export default class Insights extends React.Component<Props, State> {
       !!selectedDefault &&
       !!this.state.presetLibrary.defaults[selectedDefault] &&
       !this.state.presetDirty;
+    const upcomingEvents = projection.historical
+      ? []
+      : (this.props.upcomingEvents || []).filter(
+          (event) =>
+            event.startsMinute !== undefined &&
+            event.startsMinute >= projection.domain.x[0] &&
+            event.startsMinute <= projection.domain.x[1],
+        );
+    const annotations = {
+      events: upcomingEvents.map((event, index) => ({
+        key: event.key,
+        x: event.startsMinute!,
+        number: index + 1,
+      })),
+      activeEventKey: this.state.activeEventKey,
+    };
 
     return (
       <GameCard className="insights" id="insightsPane">
@@ -1881,16 +1904,27 @@ export default class Insights extends React.Component<Props, State> {
           ) : (
             this.renderLevers(now)
           )}
-          <div className="insightsTracks">
-            {visible.map((id, index) =>
-              this.renderTrack(id, index, visible, projection),
-            )}
-            {!visible.length && (
-              <Typography className="insightsEmpty" color="textSecondary">
-                Choose Layers to build this view.
-              </Typography>
-            )}
-          </div>
+          {!!upcomingEvents.length && (
+            <InsightEventRail
+              events={upcomingEvents}
+              activeKey={this.state.activeEventKey}
+              onActiveChange={(activeEventKey) =>
+                this.setState({ activeEventKey })
+              }
+            />
+          )}
+          <ChartAnnotationsContext.Provider value={annotations}>
+            <div className="insightsTracks">
+              {visible.map((id, index) =>
+                this.renderTrack(id, index, visible, projection),
+              )}
+              {!visible.length && (
+                <Typography className="insightsEmpty" color="textSecondary">
+                  Choose Layers to build this view.
+                </Typography>
+              )}
+            </div>
+          </ChartAnnotationsContext.Provider>
         </div>
         {this.renderPresetDialogs()}
       </GameCard>
