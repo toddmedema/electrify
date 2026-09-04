@@ -7,6 +7,7 @@ import {
   TickPresentFutureType,
 } from "../../Types";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -72,11 +73,13 @@ function buildOptions(showXLabels: boolean) {
         },
         values: (_u, splits) => {
           const state = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return splits.map((minute) =>
             formatMinuteAsMonthAxis(
               minute,
               state.startingYear,
               state.multiyear,
+              yearOnly,
             ),
           );
         },

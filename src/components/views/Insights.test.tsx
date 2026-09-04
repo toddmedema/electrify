@@ -152,7 +152,13 @@ function renderInsights(
 
 function gameWithHistory(): GameType {
   const game = createGame({ scenarioId: 100 });
-  game.date.year = game.startingYear + 2;
+  game.date = {
+    ...game.date,
+    minute: 24 * MINUTES_PER_MONTH,
+    monthsElapsed: 24,
+    monthNumber: 1,
+    year: game.startingYear + 2,
+  };
   game.monthlyHistory = [
     {
       ...EMPTY_HISTORY,
@@ -378,7 +384,7 @@ describe("Insights layers", () => {
     expect(region).not.toHaveTextContent("Outside range");
   });
 
-  it("does not show forecast event annotations in historical views", async () => {
+  it("ignores the removed stored horizon and shows only events in the viewport", () => {
     localStorage.setItem("insightsRange", "all");
     renderInsights(100, gameWithHistory(), [
       {
@@ -396,18 +402,14 @@ describe("Insights layers", () => {
     ).toBeNull();
   });
 
-  it("offers one rolling 12-month range instead of separate calendar years", async () => {
+  it("replaces preset horizons with a displayed 12-month date range", () => {
     localStorage.setItem("insightsRange", "current");
     renderInsights();
 
-    const range = screen.getByRole("combobox", { name: "Time horizon" });
-    expect(range).toHaveTextContent("Next 12 months");
-    await user.click(range);
-
-    const options = within(await screen.findByRole("listbox"));
-    expect(options.getByText("Next 12 months")).toBeVisible();
-    expect(options.queryByText("Current year")).toBeNull();
-    expect(options.queryByText("Next year")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
+    expect(
+      screen.getByLabelText("Displayed date range: 2020–21"),
+    ).toBeVisible();
   });
 
   it("zooms and pans every insight chart on one shared time viewport", async () => {
@@ -415,39 +417,100 @@ describe("Insights layers", () => {
 
     const supply = screen.getByTestId("supply-demand-chart");
     const cash = screen.getByTestId("chartInsightsCashPlot");
-    const full = JSON.parse(supply.getAttribute("data-domain") || "[]");
-    expect(cash).toHaveAttribute("data-domain", JSON.stringify(full));
+    const initial = JSON.parse(supply.getAttribute("data-domain") || "[]");
+    expect(cash).toHaveAttribute("data-domain", JSON.stringify(initial));
     expect(screen.getByRole("button", { name: "Pan earlier" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Zoom out" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Zoom out" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Zoom in" }));
     const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
-    expect(zoomed[1] - zoomed[0]).toBeCloseTo((full[1] - full[0]) / 2);
+    expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
+    expect(
+      screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Pan earlier" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Pan later" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Pan later" }));
     expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
-    await user.click(
-      screen.getByRole("button", { name: "Fit 1-year horizon" }),
+    await user.click(screen.getByRole("button", { name: "Fit full timeline" }));
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
     );
-    expect(supply).toHaveAttribute("data-domain", JSON.stringify(full));
+    expect(
+      screen.getByLabelText("Displayed date range: 2020–40"),
+    ).toBeVisible();
   });
 
-  it.each([
-    ["next10", "2880"],
-    ["next20", "5760"],
-  ])("uses hourly points for the %s forecast", (range, expectedPoints) => {
-    localStorage.setItem("insightsRange", range);
+  it("uses hourly points for the continuous forecast", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["weather"]));
     renderInsights();
 
-    expect(screen.getByRole("img")).toHaveAttribute(
-      "data-points",
-      expectedPoints,
-    );
     expect(screen.getByRole("img")).toHaveAttribute("data-step", "60");
+  });
+
+  it("advances the end while keeping a scenario-start viewport anchored", () => {
+    const game = createGame({ scenarioId: 100 });
+    const view = renderInsights(100, game);
+    const supply = screen.getByTestId("supply-demand-chart");
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+    );
+
+    const nextGame = {
+      ...game,
+      date: {
+        ...game.date,
+        minute: game.date.minute + MINUTES_PER_MONTH,
+        monthsElapsed: game.date.monthsElapsed + 1,
+      },
+    };
+    view.rerender(
+      <Insights
+        game={nextGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+      />,
+    );
+
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 13 * MINUTES_PER_MONTH]),
+    );
+  });
+
+  it("slides both ends of an unanchored viewport as the game advances", async () => {
+    const game = createGame({ scenarioId: 100 });
+    const view = renderInsights(100, game);
+    const supply = screen.getByTestId("supply-demand-chart");
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    const before = JSON.parse(supply.getAttribute("data-domain") || "[]");
+
+    const nextGame = {
+      ...game,
+      date: {
+        ...game.date,
+        minute: game.date.minute + MINUTES_PER_MONTH,
+        monthsElapsed: game.date.monthsElapsed + 1,
+      },
+    };
+    view.rerender(
+      <Insights
+        game={nextGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+      />,
+    );
+    const after = JSON.parse(supply.getAttribute("data-domain") || "[]");
+
+    expect(after).toEqual(
+      before.map((minute: number) => minute + MINUTES_PER_MONTH),
+    );
   });
 
   it("keeps tutorial targets visible without duplicating stored layers", () => {
@@ -637,7 +700,7 @@ describe("Insights layers", () => {
     ).toHaveAttribute("data-sync-key", "insights");
   });
 
-  it("charts recorded monthly data and disables forecast-only layers", async () => {
+  it("combines recorded monthly data with the continuous forecast", async () => {
     localStorage.setItem(
       "insightsLayers",
       JSON.stringify(["supplyDemand", "profit", "fuelPrices"]),
@@ -645,49 +708,31 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
-    await user.click(screen.getByRole("combobox", { name: "Time horizon" }));
-    const ranges = within(await screen.findByRole("listbox"));
-    expect(ranges.getByText(String(game.startingYear))).toBeVisible();
-    await user.click(ranges.getByText("All recorded"));
+    await user.click(screen.getByRole("button", { name: "Fit full timeline" }));
 
     expect(
-      screen.queryByRole("region", { name: "Planning controls" }),
-    ).toBeNull();
-    expect(
-      screen.getByText(
-        "Monthly records · forecast-only layers are unavailable",
-      ),
+      screen.getByRole("region", { name: "Planning controls" }),
     ).toBeVisible();
     expect(
       screen.getByText("Supply & Demand", { selector: "h6" }),
     ).toBeVisible();
     expect(screen.getByText("Profit", { selector: "h6" })).toBeVisible();
-    expect(screen.queryByText("Fuel Prices", { selector: "h6" })).toBeNull();
-    expect(screen.getByTestId("chartInsightsProfitPlot")).toHaveAttribute(
-      "data-points",
-      "3",
-    );
-    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
-      "data-points",
-      "3",
-    );
-    expect(screen.getByText(/Energy not served:/)).toBeVisible();
-
-    await user.click(screen.getByRole("combobox", { name: "Time horizon" }));
-    await user.click(
-      within(await screen.findByRole("listbox")).getByText(
-        String(game.startingYear),
+    expect(screen.getByText("Fuel Prices", { selector: "h6" })).toBeVisible();
+    expect(
+      Number(
+        screen
+          .getByTestId("chartInsightsProfitPlot")
+          .getAttribute("data-points"),
       ),
-    );
-    expect(screen.getByTestId("chartInsightsProfitPlot")).toHaveAttribute(
-      "data-points",
-      "2",
-    );
+    ).toBeGreaterThan(240);
+    expect(
+      Number(
+        screen.getByTestId("supply-demand-chart").getAttribute("data-points"),
+      ),
+    ).toBeGreaterThan(3);
 
     await user.click(screen.getByRole("button", { name: /Layers/ }));
-    expect(
-      screen.getByRole("checkbox", { name: "Fuel Prices" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Fuel Prices" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Profit" })).toBeEnabled();
   });
 

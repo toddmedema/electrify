@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import { HOURS_PER_YEAR_REAL } from "../../Constants";
 import { GENERATORS } from "../../data/Facilities";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -169,12 +170,14 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         },
         values: (_u, splits) => {
           const state = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return state.showXLabels
             ? splits.map((minute) =>
                 formatMinuteAsMonthAxis(
                   minute,
                   state.startingYear,
                   state.multiyear,
+                  yearOnly,
                 ),
               )
             : splits.map(() => "");

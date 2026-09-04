@@ -25,7 +25,6 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   );
   await page.addInitScript(() => {
     window.localStorage.clear();
-    window.localStorage.setItem("insightsRange", "next5");
   });
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game" }).click();
@@ -35,6 +34,8 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     await page.getByRole("button", { name: "Insights", exact: true }).click();
   }
   await expect(insights).toBeVisible();
+  await insights.getByRole("button", { name: "Zoom out" }).click();
+  await insights.getByRole("button", { name: "Zoom out" }).click();
 
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
@@ -94,14 +95,10 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     name: "Chart time navigation",
   });
   await expect(viewportToolbar).toContainText(/20\d{2}/);
-  const horizon = viewportToolbar.getByRole("combobox", {
-    name: "Time horizon",
-  });
-  await expect(insights.locator(".insightsHeader .insightsRange")).toHaveCount(
-    0,
-  );
-  const viewportButtons = viewportToolbar.getByRole("button");
-  const viewportControls = [horizon, ...(await viewportButtons.all())];
+  await expect(
+    viewportToolbar.getByRole("combobox", { name: "Time horizon" }),
+  ).toHaveCount(0);
+  const viewportControls = await viewportToolbar.getByRole("button").all();
   const viewportControlBoxes = await Promise.all(
     viewportControls.map((control) => control.boundingBox()),
   );
@@ -119,7 +116,7 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     Math.max(0, element.scrollWidth - element.clientWidth),
   );
   expect(toolbarOverflow).toBeLessThanOrEqual(1);
-  const viewportButtonBoxes = viewportControlBoxes.slice(1);
+  const viewportButtonBoxes = viewportControlBoxes;
   expect(
     viewportButtonBoxes.every((box) =>
       testInfo.project.name.startsWith("mobile-")
@@ -128,17 +125,13 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     ),
   ).toBe(true);
   if (testInfo.project.name.startsWith("mobile-")) {
-    expect(viewportControlBoxes[0]!.width).toBeCloseTo(80, 0);
-    viewportButtonBoxes.forEach((box) => expect(box!.width).toBeCloseTo(44, 0));
-  } else {
-    const longHorizonLabel = horizon.locator(".insightsHorizonLong");
-    await expect(longHorizonLabel).toContainText("Next 5 years");
-    expect(
-      await longHorizonLabel.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(0);
+    viewportControlBoxes.forEach((box) =>
+      expect(box!.width).toBeCloseTo(44, 0),
+    );
   }
+  await expect(
+    viewportToolbar.locator(".insightsViewportDate"),
+  ).toBeVisible();
 
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),
@@ -220,6 +213,19 @@ test("insights header controls stay aligned in one compact row", async ({
   }
   await expect(insights).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+
+  const [supplyPlot, cashPlot] = await Promise.all([
+    insights
+      .locator('.insightsTrack[data-layer="supplyDemand"] .u-over')
+      .boundingBox(),
+    insights.locator('.insightsTrack[data-layer="cash"] .u-over').boundingBox(),
+  ]);
+  expect(supplyPlot).not.toBeNull();
+  expect(cashPlot).not.toBeNull();
+  expect(supplyPlot!.x + supplyPlot!.width).toBeCloseTo(
+    cashPlot!.x + cashPlot!.width,
+    0,
+  );
 
   const controls = [
     page.locator(".insightsPreset"),
@@ -317,6 +323,17 @@ test("insights header controls stay aligned in one compact row", async ({
 
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
   if (reviewDir) {
+    const notification = page.getByRole("button", {
+      name: "Dismiss notification",
+    });
+    if (await notification.count()) {
+      await notification.click({ timeout: 2_000 }).catch(() => undefined);
+    }
+    await page
+      .getByText(/^Walkthrough closed/)
+      .waitFor({ state: "hidden", timeout: 10_000 })
+      .catch(() => undefined);
+    await page.waitForTimeout(500);
     await page.screenshot({
       path: path.join(
         reviewDir,
@@ -330,14 +347,25 @@ test("insights header controls stay aligned in one compact row", async ({
   await expect(presetName).toHaveCSS("text-overflow", "ellipsis");
   if (testInfo.project.name === "mobile-320px") {
     await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
-    const horizon = page.getByRole("combobox", { name: "Time horizon" });
-    await expect(horizon.locator(".insightsHorizonCompact")).toHaveText("1y");
-    await horizon.click();
-    await page.getByRole("option", { name: "Next 5 years" }).click();
-    await expect(horizon.locator(".insightsHorizonCompact")).toHaveText("5y");
+    const dateRange = page.getByLabel(/Displayed date range:/);
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: 2019–20",
+    );
+    await expect(dateRange).toHaveCSS("font-size", "14px");
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: Apr–Oct 2019",
+    );
+    expect(
+      await dateRange.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
     await expect(
-      page.getByRole("button", { name: "Fit 5-year horizon" }),
-    ).toBeDisabled();
+      page.getByRole("combobox", { name: "Time horizon" }),
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "Preset actions" }).click();
     await expect(
       page.getByRole("menuitem", { name: "Save preset changes" }),

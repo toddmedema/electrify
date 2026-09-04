@@ -1037,23 +1037,13 @@ $pane_header_height: 40px;
   background: var(--bg-raised);
 }
 
-.insightsHorizon {
-  width: 152px;
-  height: 40px;
+.insightsViewportDate {
   min-width: 0;
-  flex: 0 0 152px;
-}
-
-.insightsHorizonValue {
-  display: block;
-  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.insightsHorizonCompact {
-  display: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .insightsViewportButtons {
@@ -1070,17 +1060,6 @@ $pane_header_height: 40px;
 
   .MuiIconButton-root {
     color: $interactive_blue;
-  }
-}
-
-.insightsViewportText {
-  min-width: 0;
-  flex: 1 1 auto;
-
-  .MuiTypography-root {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 
@@ -1317,21 +1296,13 @@ $pane_header_height: 40px;
     height: 52px;
     min-height: 52px;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 4px;
   }
 
-  .insightsHorizon {
-    width: 80px;
-    height: 44px;
-    flex-basis: 80px;
-  }
-
-  .insightsHorizonLong {
-    display: none;
-  }
-
-  .insightsHorizonCompact {
-    display: inline;
+  .insightsViewportDate {
+    flex: 1 1 auto;
+    font-size: 0.875rem;
+    white-space: nowrap;
   }
 
   .insightsViewportButtons {
@@ -1344,10 +1315,6 @@ $pane_header_height: 40px;
       height: 44px;
       flex-basis: 44px;
     }
-  }
-
-  .insightsViewportText {
-    display: none;
   }
 
   .insightEventList {
@@ -1748,6 +1715,11 @@ $pane_header_height: 40px;
 
 // The canvas is transparent, so one quiet surface behind it frames the axes and plot together.
 // Inset shadow behaves like a border without changing uPlot's measured width.
+.accessibleChart {
+  width: 100%;
+  min-width: 0;
+}
+
 html[data-theme="dark"] .uplot {
   overflow: hidden;
   border-radius: 8px;
