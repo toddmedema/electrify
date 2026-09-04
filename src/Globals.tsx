@@ -53,6 +53,8 @@ export function logout(): Promise<void> {
 // non-browser hosts) gets a no-op.
 interface HistoryApi {
   pushState: History["pushState"];
+  replaceState: History["replaceState"];
+  back: History["back"];
 }
 
 const refs = {
@@ -60,7 +62,11 @@ const refs = {
   history:
     typeof window !== "undefined" && typeof window.history !== "undefined"
       ? (window.history as HistoryApi)
-      : { pushState: () => undefined },
+      : {
+          pushState: () => undefined,
+          replaceState: () => undefined,
+          back: () => undefined,
+        },
   localStorage: null as Storage | null,
   audioContext: null as AudioContext | null,
 };

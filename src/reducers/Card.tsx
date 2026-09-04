@@ -32,7 +32,9 @@ export const cardSlice = createSlice({
         return state;
       }
       logEvent("card_view", { card: a.name });
-      getHistoryApi().pushState(null, "", "#");
+      if (!a.skipBrowserHistory) {
+        getHistoryApi().pushState(null, "", a.url || "#");
+      }
       // TODO better implementation for don't remember, right now it still makes an entry!
       return {
         ...state,
