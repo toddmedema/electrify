@@ -4,6 +4,13 @@ import "uplot/dist/uPlot.min.css";
 import { chartScale, eventMarkersPlugin } from "./UPlotHelpers";
 import { getThemeVersion, subscribeThemeMode } from "../../Theme";
 import { ChartAnnotationsContext } from "./ChartAnnotationsContext";
+import {
+  ChartViewportContext,
+  ChartViewportRange,
+  panChartViewport,
+  rangesEqual,
+  zoomChartViewport,
+} from "./ChartViewportContext";
 
 /**
  * The React shell every chart in the game sits in.
@@ -118,6 +125,7 @@ export default function UPlotChart<S>(
 ): React.JSX.Element {
   const { ariaLabel, id, height, state, data, structureKey, syncKey } = props;
   const annotations = React.useContext(ChartAnnotationsContext);
+  const viewport = React.useContext(ChartViewportContext);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const plotRef = React.useRef<uPlot | null>(null);
   const drawnRef = React.useRef<uPlot.AlignedData | null>(null);
@@ -186,6 +194,9 @@ export default function UPlotChart<S>(
   tooltipRef.current = props.tooltip;
   const annotationsRef = React.useRef(annotations);
   annotationsRef.current = annotations;
+  const viewportRef = React.useRef(viewport);
+  viewportRef.current = viewport;
+  const viewportEnabled = !!viewport;
 
   // A plot's options are built once and then only fed data, so the colours in them are the
   // ones that were in force when it was built. Switching palette therefore has to rebuild --
@@ -313,6 +324,206 @@ export default function UPlotChart<S>(
   });
 
   React.useLayoutEffect(() => {
+    if (plotRef.current && viewport) {
+      plotRef.current.setScale("x", {
+        min: viewport.range[0],
+        max: viewport.range[1],
+      });
+    }
+  }, [viewport, width]);
+
+  React.useLayoutEffect(() => {
+    const plot = plotRef.current;
+    const currentViewport = viewportRef.current;
+    if (!plot || !currentViewport) {
+      return;
+    }
+    const over = plot.over;
+    over.style.touchAction = "pan-y";
+    let liveRange = currentViewport.range;
+    let frame: number | undefined;
+    let pending: ChartViewportRange | undefined;
+    let wheelTimer: ReturnType<typeof setTimeout> | undefined;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let drag:
+      | { id: number; x: number; y: number; active: boolean; touch: boolean }
+      | undefined;
+    let pinchDistance: number | undefined;
+
+    const schedule = (range: ChartViewportRange) => {
+      liveRange = range;
+      pending = range;
+      if (frame === undefined) {
+        frame = requestAnimationFrame(() => {
+          frame = undefined;
+          if (pending) {
+            viewportRef.current?.onRangeChange(pending);
+            pending = undefined;
+          }
+        });
+      }
+    };
+    const commit = () => {
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame);
+        frame = undefined;
+      }
+      if (pending) {
+        liveRange = pending;
+        pending = undefined;
+      }
+      viewportRef.current?.onRangeChange(liveRange, true);
+    };
+    const point = (clientX: number) => {
+      const rect = over.getBoundingClientRect();
+      return Math.min(
+        1,
+        Math.max(0, (clientX - rect.left) / Math.max(1, rect.width)),
+      );
+    };
+    const onWheel = (event: WheelEvent) => {
+      const value = viewportRef.current;
+      if (!value) return;
+      if (!wheelTimer) liveRange = value.range;
+      const horizontal =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey;
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        const factor = Math.exp(Math.max(-1, Math.min(1, event.deltaY / 240)));
+        schedule(
+          zoomChartViewport(
+            value.bounds,
+            liveRange,
+            value.minSpan,
+            factor,
+            point(event.clientX),
+          ),
+        );
+      } else if (horizontal && !rangesEqual(value.bounds, liveRange)) {
+        event.preventDefault();
+        const delta = event.shiftKey ? event.deltaY : event.deltaX;
+        schedule(
+          panChartViewport(
+            value.bounds,
+            liveRange,
+            value.minSpan,
+            (delta / Math.max(1, over.clientWidth)) *
+              (liveRange[1] - liveRange[0]),
+          ),
+        );
+      } else {
+        return;
+      }
+      if (wheelTimer) clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => {
+        wheelTimer = undefined;
+        commit();
+      }, 160);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      if (viewportRef.current) liveRange = viewportRef.current.range;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+        drag = undefined;
+        pointers.forEach((_pointer, id) => over.setPointerCapture?.(id));
+        event.preventDefault();
+        return;
+      }
+      drag = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        active: event.pointerType !== "touch",
+        touch: event.pointerType === "touch",
+      };
+      if (!drag.touch) over.setPointerCapture?.(event.pointerId);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (pointers.has(event.pointerId)) {
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      const value = viewportRef.current;
+      if (!value) return;
+      if (pinchDistance !== undefined && pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (distance > 0) {
+          event.preventDefault();
+          schedule(
+            zoomChartViewport(
+              value.bounds,
+              liveRange,
+              value.minSpan,
+              pinchDistance / distance,
+              point((a.x + b.x) / 2),
+            ),
+          );
+          pinchDistance = distance;
+        }
+        return;
+      }
+      if (!drag || drag.id !== event.pointerId) return;
+      const deltaX = event.clientX - drag.x;
+      const deltaY = event.clientY - drag.y;
+      if (!drag.active) {
+        if (Math.abs(deltaY) >= Math.abs(deltaX) || Math.abs(deltaX) < 8) {
+          return;
+        }
+        drag.active = true;
+        over.setPointerCapture?.(event.pointerId);
+      }
+      if (rangesEqual(value.bounds, liveRange)) return;
+      event.preventDefault();
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      schedule(
+        panChartViewport(
+          value.bounds,
+          liveRange,
+          value.minSpan,
+          (-deltaX / Math.max(1, over.clientWidth)) *
+            (liveRange[1] - liveRange[0]),
+        ),
+      );
+    };
+    const onPointerEnd = (event: PointerEvent) => {
+      const interacted = pinchDistance !== undefined || !!drag?.active;
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinchDistance = undefined;
+      if (drag?.id === event.pointerId) drag = undefined;
+      if (over.hasPointerCapture?.(event.pointerId)) {
+        over.releasePointerCapture(event.pointerId);
+      }
+      if (interacted) commit();
+    };
+    const onDoubleClick = (event: MouseEvent) => {
+      event.preventDefault();
+      viewportRef.current?.onReset(true);
+    };
+
+    over.addEventListener("wheel", onWheel, { passive: false });
+    over.addEventListener("pointerdown", onPointerDown);
+    over.addEventListener("pointermove", onPointerMove);
+    over.addEventListener("pointerup", onPointerEnd);
+    over.addEventListener("pointercancel", onPointerEnd);
+    over.addEventListener("dblclick", onDoubleClick);
+    return () => {
+      over.style.touchAction = "";
+      over.removeEventListener("wheel", onWheel);
+      over.removeEventListener("pointerdown", onPointerDown);
+      over.removeEventListener("pointermove", onPointerMove);
+      over.removeEventListener("pointerup", onPointerEnd);
+      over.removeEventListener("pointercancel", onPointerEnd);
+      over.removeEventListener("dblclick", onDoubleClick);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      if (wheelTimer) clearTimeout(wheelTimer);
+    };
+  }, [width, viewportEnabled]);
+
+  React.useLayoutEffect(() => {
     plotRef.current?.redraw();
   }, [annotations]);
 
@@ -323,6 +534,8 @@ export default function UPlotChart<S>(
         ref={rootRef}
         role="img"
         aria-label={accessibleLabel}
+        data-viewport-min={viewport?.range[0]}
+        data-viewport-max={viewport?.range[1]}
         style={{
           width: "100%",
           minWidth: 0,

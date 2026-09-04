@@ -1,15 +1,22 @@
 import * as React from "react";
-import { ClickAwayListener, Paper, Popper, Typography } from "@mui/material";
+import {
+  Button,
+  ClickAwayListener,
+  Paper,
+  Popper,
+  Typography,
+} from "@mui/material";
 import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
 
 interface Props {
   events: UpcomingStoryEventType[];
   activeKey?: string;
   onActiveChange: (key?: string) => void;
+  onZoom: (event: UpcomingStoryEventType) => void;
 }
 
 export default function InsightEventRail(props: Props): React.JSX.Element {
-  const { events, activeKey, onActiveChange } = props;
+  const { events, activeKey, onActiveChange, onZoom } = props;
   const selected = events.find((event) => event.key === activeKey);
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
 
@@ -94,6 +101,13 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                   {selected.label}
                 </Typography>
                 <Typography variant="body2">{selected.message}</Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onZoom(selected)}
+                >
+                  Zoom to event
+                </Button>
               </div>
             </Paper>
           </ClickAwayListener>

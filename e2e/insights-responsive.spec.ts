@@ -56,6 +56,90 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await eventButton.click();
 
+  const charts = insights.locator(".accessibleChart [role=img]");
+  const fullMin = Number(
+    await charts.first().getAttribute("data-viewport-min"),
+  );
+  const fullMax = Number(
+    await charts.first().getAttribute("data-viewport-max"),
+  );
+  await page.getByRole("button", { name: "Zoom to event" }).click();
+  await expect
+    .poll(async () => {
+      const min = Number(
+        await charts.first().getAttribute("data-viewport-min"),
+      );
+      const max = Number(
+        await charts.first().getAttribute("data-viewport-max"),
+      );
+      return max - min;
+    })
+    .toBeLessThan(fullMax - fullMin);
+  const zoomedMin = Number(
+    await charts.first().getAttribute("data-viewport-min"),
+  );
+  const zoomedMax = Number(
+    await charts.first().getAttribute("data-viewport-max"),
+  );
+  expect(zoomedMax - zoomedMin).toBeLessThan(fullMax - fullMin);
+  const chartRanges = await charts.evaluateAll((elements) =>
+    elements.map((element) => [
+      element.getAttribute("data-viewport-min"),
+      element.getAttribute("data-viewport-max"),
+    ]),
+  );
+  expect(new Set(chartRanges.map((range) => range.join(":"))).size).toBe(1);
+
+  const viewportToolbar = insights.getByRole("region", {
+    name: "Chart time navigation",
+  });
+  await expect(viewportToolbar).toContainText(/20\d{2}/);
+  const horizon = viewportToolbar.getByRole("combobox", {
+    name: "Time horizon",
+  });
+  await expect(insights.locator(".insightsHeader .insightsRange")).toHaveCount(
+    0,
+  );
+  const viewportButtons = viewportToolbar.getByRole("button");
+  const viewportControls = [horizon, ...(await viewportButtons.all())];
+  const viewportControlBoxes = await Promise.all(
+    viewportControls.map((control) => control.boundingBox()),
+  );
+  expect(viewportControlBoxes.every(Boolean)).toBe(true);
+  const viewportControlCenters = viewportControlBoxes.map(
+    (box) => box!.y + box!.height / 2,
+  );
+  expect(
+    Math.max(...viewportControlCenters) - Math.min(...viewportControlCenters),
+  ).toBeLessThanOrEqual(1);
+  const toolbarBox = await viewportToolbar.boundingBox();
+  expect(toolbarBox).not.toBeNull();
+  expect(toolbarBox!.height).toBeLessThanOrEqual(53);
+  const toolbarOverflow = await viewportToolbar.evaluate((element) =>
+    Math.max(0, element.scrollWidth - element.clientWidth),
+  );
+  expect(toolbarOverflow).toBeLessThanOrEqual(1);
+  const viewportButtonBoxes = viewportControlBoxes.slice(1);
+  expect(
+    viewportButtonBoxes.every((box) =>
+      testInfo.project.name.startsWith("mobile-")
+        ? box!.height >= 44
+        : box!.height >= 40,
+    ),
+  ).toBe(true);
+  if (testInfo.project.name.startsWith("mobile-")) {
+    expect(viewportControlBoxes[0]!.width).toBeCloseTo(80, 0);
+    viewportButtonBoxes.forEach((box) => expect(box!.width).toBeCloseTo(44, 0));
+  } else {
+    const longHorizonLabel = horizon.locator(".insightsHorizonLong");
+    await expect(longHorizonLabel).toContainText("Next 5 years");
+    expect(
+      await longHorizonLabel.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+  }
+
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),
   );
@@ -75,6 +159,8 @@ test("upcoming scenario events stay usable across insight viewports", async ({
 
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
   if (reviewDir) {
+    await eventButton.click();
+    await viewportToolbar.scrollIntoViewIfNeeded();
     await page.screenshot({
       path: path.join(
         reviewDir,
@@ -136,13 +222,12 @@ test("insights header controls stay aligned in one compact row", async ({
   await page.evaluate(() => document.fonts.ready);
 
   const controls = [
-    page.locator(".insightsRange"),
     page.locator(".insightsPreset"),
     page.getByRole("button", { name: "Preset actions" }),
     page.getByRole("button", { name: /^Layers \(/ }),
   ];
   if (!testInfo.project.name.startsWith("mobile-")) {
-    controls.splice(2, 0, page.getByRole("button", { name: "Save" }));
+    controls.splice(1, 0, page.getByRole("button", { name: "Save" }));
   }
   const boxes = await Promise.all(
     controls.map((control) => control.boundingBox()),
@@ -166,34 +251,52 @@ test("insights header controls stay aligned in one compact row", async ({
 
     const levers = page.locator(".insightsLevers");
     await expect(levers).toHaveCSS("display", "grid");
-    await expect(levers).toHaveCSS("row-gap", "4px");
-    const [rateButton, rateSummary, rateSlider, trackTitle] = await Promise.all(
-      [
-        levers.getByRole("button", { name: "Rate controls" }).boundingBox(),
-        levers.locator(":scope > .MuiTypography-root").boundingBox(),
-        levers.locator(".budgetSlider").boundingBox(),
-        page
-          .locator('.insightsTrack[data-layer="supplyDemand"] h6')
-          .boundingBox(),
-      ],
-    );
-    expect(rateButton).not.toBeNull();
-    expect(rateSummary).not.toBeNull();
+    await expect(levers).toHaveCSS("row-gap", "0px");
+    const rateToggle = levers.locator(".insightsRateToggle");
+    const rateMetrics = levers.locator(".insightsRateMetrics");
+    await expect(rateToggle).not.toBeVisible();
+    const [leversBox, metricsBox, rateSlider, trackTitle] = await Promise.all([
+      levers.boundingBox(),
+      rateMetrics.boundingBox(),
+      levers.locator(".budgetSlider").boundingBox(),
+      page
+        .locator('.insightsTrack[data-layer="supplyDemand"] h6')
+        .boundingBox(),
+    ]);
+    expect(leversBox).not.toBeNull();
+    expect(metricsBox).not.toBeNull();
     expect(rateSlider).not.toBeNull();
     expect(trackTitle).not.toBeNull();
-    expect(rateSummary!.y - (rateButton!.y + rateButton!.height)).toBeCloseTo(
-      4,
-      1,
+    expect(leversBox!.height).toBeLessThanOrEqual(110);
+    expect(metricsBox!.height).toBeGreaterThanOrEqual(44);
+    expect(metricsBox!.x - leversBox!.x).toBeCloseTo(12, 1);
+    expect(
+      await levers.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+    expect(
+      await rateMetrics.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+    await expect(rateMetrics).toContainText(/RATE/i);
+    await expect(rateMetrics).toContainText(/MARKET/i);
+    await expect(rateMetrics).toContainText(/CUSTOMERS \/ MO/i);
+    await expect(rateMetrics).toContainText(/\+.*\(\+.*%\)/);
+    const visibleRateMarks = levers.locator(".insightsRateMarkMobile:visible");
+    await expect(visibleRateMarks).toHaveCount(3);
+    await expect(visibleRateMarks.nth(1)).toContainText(/market/i);
+    const markBoxes = await Promise.all(
+      (await visibleRateMarks.all()).map((mark) => mark.boundingBox()),
     );
-    expect(rateSlider!.y - (rateSummary!.y + rateSummary!.height)).toBeCloseTo(
-      4,
-      1,
+    expect(markBoxes.every(Boolean)).toBe(true);
+    const marksBottom = Math.max(
+      ...markBoxes.map((box) => box!.y + box!.height),
     );
-    expect(rateSummary!.x).toBeCloseTo(trackTitle!.x, 1);
-    expect(rateSlider!.x).toBeCloseTo(trackTitle!.x, 1);
-    expect(rateSlider!.x + rateSlider!.width).toBeLessThanOrEqual(
-      (page.viewportSize()?.width || 0) - trackTitle!.x + 0.5,
-    );
+    expect(
+      leversBox!.y + leversBox!.height - marksBottom,
+    ).toBeGreaterThanOrEqual(4);
 
     if (testInfo.project.name === "mobile-320px") {
       const trackHeader = page.locator(
@@ -212,13 +315,29 @@ test("insights header controls stay aligned in one compact row", async ({
     }
   }
 
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir) {
+    await page.screenshot({
+      path: path.join(
+        reviewDir,
+        `compact-rate-controls-${testInfo.project.name}.png`,
+      ),
+      fullPage: true,
+    });
+  }
+
   const presetName = page.locator(".insightsPresetName");
   await expect(presetName).toHaveCSS("text-overflow", "ellipsis");
   if (testInfo.project.name === "mobile-320px") {
     await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
-    await expect(page.locator(".insightsRange")).toContainText(
-      "Next 12 months",
-    );
+    const horizon = page.getByRole("combobox", { name: "Time horizon" });
+    await expect(horizon.locator(".insightsHorizonCompact")).toHaveText("1y");
+    await horizon.click();
+    await page.getByRole("option", { name: "Next 5 years" }).click();
+    await expect(horizon.locator(".insightsHorizonCompact")).toHaveText("5y");
+    await expect(
+      page.getByRole("button", { name: "Fit 5-year horizon" }),
+    ).toBeDisabled();
     await page.getByRole("button", { name: "Preset actions" }).click();
     await expect(
       page.getByRole("menuitem", { name: "Save preset changes" }),
