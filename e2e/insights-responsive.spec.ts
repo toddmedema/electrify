@@ -128,14 +128,10 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     viewportControlBoxes.forEach((box) =>
       expect(box!.width).toBeCloseTo(44, 0),
     );
-    await expect(
-      viewportToolbar.locator(".insightsViewportDateCompact"),
-    ).toBeVisible();
-  } else {
-    await expect(
-      viewportToolbar.locator(".insightsViewportDateLong"),
-    ).toBeVisible();
   }
+  await expect(
+    viewportToolbar.locator(".insightsViewportDate"),
+  ).toBeVisible();
 
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),
@@ -351,9 +347,22 @@ test("insights header controls stay aligned in one compact row", async ({
   await expect(presetName).toHaveCSS("text-overflow", "ellipsis");
   if (testInfo.project.name === "mobile-320px") {
     await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
-    await expect(page.getByLabel(/Displayed date range:/)).toContainText(
-      /20\d{2}/,
+    const dateRange = page.getByLabel(/Displayed date range:/);
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: 2019–20",
     );
+    await expect(dateRange).toHaveCSS("font-size", "14px");
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await expect(dateRange).toHaveAttribute(
+      "aria-label",
+      "Displayed date range: Apr–Oct 2019",
+    );
+    expect(
+      await dateRange.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
     await expect(
       page.getByRole("combobox", { name: "Time horizon" }),
     ).toHaveCount(0);

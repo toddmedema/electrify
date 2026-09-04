@@ -408,7 +408,7 @@ describe("Insights layers", () => {
 
     expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
     expect(
-      screen.getByLabelText("Displayed date range: Jan 2020 – Jan 2021"),
+      screen.getByLabelText("Displayed date range: 2020–21"),
     ).toBeVisible();
   });
 
@@ -426,6 +426,9 @@ describe("Insights layers", () => {
     const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
+    expect(
+      screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Pan earlier" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Pan later" })).toBeEnabled();
 
@@ -436,6 +439,9 @@ describe("Insights layers", () => {
       "data-domain",
       JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
     );
+    expect(
+      screen.getByLabelText("Displayed date range: 2020–40"),
+    ).toBeVisible();
   });
 
   it("uses hourly points for the continuous forecast", () => {

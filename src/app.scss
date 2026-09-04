@@ -1046,10 +1046,6 @@ $pane_header_height: 40px;
   font-variant-numeric: tabular-nums;
 }
 
-.insightsViewportDateCompact {
-  display: none;
-}
-
 .insightsViewportButtons {
   display: flex;
   flex: 0 0 auto;
@@ -1300,28 +1296,13 @@ $pane_header_height: 40px;
     height: 52px;
     min-height: 52px;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 4px;
   }
 
   .insightsViewportDate {
-    flex: 1 1 80px;
-    font-size: 0.72rem;
-    line-height: 1.2;
-    white-space: normal;
-  }
-
-  .insightsViewportDateLong {
-    display: none;
-  }
-
-  .insightsViewportDateCompact {
-    display: flex;
-    flex-direction: column;
-
-    // Preserve the range relationship when the dates wrap onto separate lines.
-    span + span::before {
-      content: "– ";
-    }
+    flex: 1 1 auto;
+    font-size: 0.875rem;
+    white-space: nowrap;
   }
 
   .insightsViewportButtons {

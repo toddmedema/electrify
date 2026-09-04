@@ -350,9 +350,14 @@ function viewportLabel(
 ): string {
   const start = getDateFromMinute(range[0], startingYear);
   const end = getDateFromMinute(range[1], startingYear);
-  const left = `${start.month} ${start.year}`;
-  const right = `${end.month} ${end.year}`;
-  return left === right ? left : `${left} – ${right}`;
+  if (start.year !== end.year) {
+    const sameCentury =
+      Math.floor(start.year / 100) === Math.floor(end.year / 100);
+    const endYear = sameCentury ? String(end.year).slice(-2) : end.year;
+    return `${start.year}–${endYear}`;
+  }
+  if (start.month === end.month) return `${start.month} ${start.year}`;
+  return `${start.month}–${end.month} ${start.year}`;
 }
 
 function viewportAnnouncement(
@@ -1387,7 +1392,6 @@ export default class Insights extends React.Component<Props, State> {
     const full = rangesEqual(bounds, range);
     const span = range[1] - range[0];
     const rangeLabel = viewportLabel(range, this.props.game.startingYear);
-    const [startLabel, endLabel] = rangeLabel.split(" – ");
     const setRange = (next: ChartViewportRange) =>
       this.setViewport(bounds, minSpan, next);
     const iconButton = (
@@ -1420,13 +1424,7 @@ export default class Insights extends React.Component<Props, State> {
           variant="body2"
           aria-label={`Displayed date range: ${rangeLabel}`}
         >
-          <span className="insightsViewportDateLong" aria-hidden="true">
-            {rangeLabel}
-          </span>
-          <span className="insightsViewportDateCompact" aria-hidden="true">
-            <span>{startLabel}</span>
-            {endLabel && <span>{endLabel}</span>}
-          </span>
+          {rangeLabel}
         </Typography>
         <div className="insightsViewportButtons">
           {iconButton(
