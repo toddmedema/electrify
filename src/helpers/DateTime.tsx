@@ -247,8 +247,19 @@ export function getTimeFromTimeline(
   return timeline[deltaTicks];
 }
 
-export function formatMonthChartAxis(t: number, multiyear: boolean) {
+export function axisTicksAreYearly(splits: number[], unit: number): boolean {
+  return splits.length > 1 && Math.abs(splits[1] - splits[0]) >= 12 * unit;
+}
+
+export function formatMonthChartAxis(
+  t: number,
+  multiyear: boolean,
+  yearOnly = false,
+) {
   t--;
+  if (yearOnly) {
+    return String(Math.floor(t / 12));
+  }
   if (multiyear) {
     return (
       (t % 12) +
@@ -270,10 +281,16 @@ export function formatMinuteAsMonthAxis(
   minute: number,
   startingYear: number,
   multiyear: boolean,
+  yearOnly = false,
 ): string {
   return formatMonthChartAxis(
-    getDateFromMinute(minute, startingYear).monthsElapsed + 12 * startingYear,
+    // formatMonthChartAxis accepts the one-based month index used by finance
+    // records, while a game minute resolves to a zero-based elapsed month.
+    getDateFromMinute(minute, startingYear).monthsElapsed +
+      12 * startingYear +
+      1,
     multiyear,
+    yearOnly,
   );
 }
 

@@ -1,5 +1,8 @@
 import {
+  axisTicksAreYearly,
   EMPTY_HISTORY,
+  formatMinuteAsMonthAxis,
+  formatMonthChartAxis,
   formatMinuteOfDayChartAxis,
   getDateFromMinute,
   getHourTicks,
@@ -32,6 +35,25 @@ describe("formatMinuteOfDayChartAxis", () => {
     expect(formatMinuteOfDayChartAxis(12 * 60)).toEqual("12pm");
     expect(formatMinuteOfDayChartAxis(19 * 60)).toEqual("7pm");
     expect(formatMinuteOfDayChartAxis(5 * 1440 + 6 * 60)).toEqual("6am");
+  });
+});
+
+describe("month chart axes", () => {
+  it("uses bare years once adjacent ticks are at least a year apart", () => {
+    const yearly = [2025 * 12 + 1, 2026 * 12 + 1, 2027 * 12 + 1];
+
+    expect(axisTicksAreYearly(yearly, 1)).toBe(true);
+    expect(formatMonthChartAxis(yearly[0], true, true)).toBe("2025");
+  });
+
+  it("keeps the month when tick spacing is less than a year", () => {
+    expect(axisTicksAreYearly([1, 7, 13], 1)).toBe(false);
+    expect(formatMonthChartAxis(2025 * 12 + 1, true)).toBe("1/25");
+  });
+
+  it("converts minute-based axes to the formatter's one-based month index", () => {
+    expect(formatMinuteAsMonthAxis(0, 2019, true, true)).toBe("2019");
+    expect(formatMinuteAsMonthAxis(0, 2019, true)).toBe("1/19");
   });
 });
 

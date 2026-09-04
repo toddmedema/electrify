@@ -13,6 +13,7 @@ import {
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -76,8 +77,9 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         },
         values: (_u, splits) => {
           const s = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
           );
         },
       }),

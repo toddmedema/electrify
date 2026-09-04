@@ -9,6 +9,7 @@ import {
   yAxis,
 } from "./UPlotHelpers";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -109,8 +110,9 @@ function buildOptions(
         },
         values: (_u, splits) => {
           const s = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
           );
         },
       }),

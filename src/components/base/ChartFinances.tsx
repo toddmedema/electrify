@@ -3,6 +3,7 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import { padRange, stepTicks, titlePlugin, xAxis, yAxis } from "./UPlotHelpers";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMonthChartAxis,
   MINUTES_PER_MONTH,
@@ -89,10 +90,20 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         },
         values: (_u, splits) => {
           const s = getState();
+          const minuteScale = s.startingYear !== undefined;
+          const yearOnly = axisTicksAreYearly(
+            splits,
+            minuteScale ? MINUTES_PER_MONTH : 1,
+          );
           return splits.map((t) =>
-            s.startingYear === undefined
-              ? formatMonthChartAxis(t, s.multiyear)
-              : formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+            !minuteScale
+              ? formatMonthChartAxis(t, s.multiyear, yearOnly)
+              : formatMinuteAsMonthAxis(
+                  t,
+                  s.startingYear!,
+                  s.multiyear,
+                  yearOnly,
+                ),
           );
         },
       }),
