@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -23,12 +24,7 @@ export interface Props {
   onClose: () => void;
 }
 
-/**
- * The same rundown the scenario-select screen shows -- timeframe, location and victory
- * conditions -- reachable from the in-game menu, for whenever a player forgets what they signed
- * up for partway through a run. The score is figured from monthlyHistory, which only rolls up at
- * each month's end, so it reads as "through last month" rather than this exact instant.
- */
+/** An in-game reminder of the mission and its score through completed months. */
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
   const scenario = getScenario(game.scenarioId, game.customScenario);
@@ -41,59 +37,266 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
     history.length > 0
       ? computeScoreBreakdown(scenario, summarizeHistory(history))
       : null;
+  const facts = [
+    {
+      label: "Timeframe",
+      value: `${scenario.startingYear}–${scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}`,
+    },
+    ...(location ? [{ label: "Location", value: location.name }] : []),
+    { label: "Difficulty", value: game.difficulty },
+    { label: "Ownership", value: `${scenario.ownership}-owned` },
+  ];
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
       aria-labelledby="scenario-details-title"
+      fullWidth
+      maxWidth="md"
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: 840,
+            backgroundImage: "none",
+            "@media (max-width: 599px)": {
+              m: 0,
+              width: "100%",
+              maxWidth: "100%",
+              height: "100dvh",
+              maxHeight: "100dvh",
+              borderRadius: 0,
+            },
+          },
+        },
+      }}
     >
-      <DialogTitle>
-        <span id="scenario-details-title">{scenario.name}</span>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 1,
+          p: { xs: 2, sm: 3 },
+        }}
+      >
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            sx={{ lineHeight: 1.5 }}
+          >
+            Scenario details
+          </Typography>
+          <DialogTitle
+            id="scenario-details-title"
+            sx={{
+              "&&": { p: 0 },
+              mt: 0.5,
+              fontSize: { xs: 24, sm: 28 },
+              fontWeight: 700,
+              lineHeight: 1.2,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {scenario.name}
+          </DialogTitle>
+        </Box>
         <IconButton
-          aria-label="close"
+          aria-label="Close scenario details"
           onClick={onClose}
-          className="top-right"
-          size="large"
+          sx={{
+            width: 40,
+            height: 40,
+            "@media (pointer: coarse)": { width: 44, height: 44 },
+          }}
         >
           <CloseIcon />
         </IconButton>
-      </DialogTitle>
-      <DialogContent>
-        <p>
-          Timeframe: {scenario.startingYear} to{" "}
-          {scenario.startingYear + Math.ceil(scenario.durationMonths / 12) - 1}
-        </p>
-        {location && <p>Location: {location.name}</p>}
-        <p>Difficulty: {game.difficulty}</p>
-        <Typography variant="h6" gutterBottom>
-          Victory Conditions: {scenario.ownership}-Owned
-        </Typography>
-        <VictoryConditions
-          ownership={scenario.ownership}
-          dollarsPerkWh={scenario.dollarsPerkWh}
-          minimumCustomerRetention={scenario.minimumCustomerRetention}
-          reliabilityObjective={scenario.reliabilityObjective}
-        />
-        {breakdown && (
-          <>
-            <Typography variant="h6" gutterBottom>
-              Current score: {formatScore(totalScore(breakdown))}
+      </Box>
+      <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
+        <Box
+          component="dl"
+          sx={{
+            m: 0,
+            mb: 3,
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "repeat(2, minmax(0, 1fr))",
+              sm: "repeat(4, minmax(0, 1fr))",
+            },
+            gap: 2,
+          }}
+        >
+          {facts.map(({ label, value }) => (
+            <Box key={label} sx={{ minWidth: 0 }}>
+              <Typography component="dt" variant="body2" color="text.secondary">
+                {label}
+              </Typography>
+              <Typography
+                component="dd"
+                variant="body2"
+                sx={{
+                  m: 0,
+                  mt: 0.5,
+                  fontWeight: 600,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {value}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "minmax(0, 1fr)",
+              sm: "minmax(0, 1.2fr) minmax(0, 1fr)",
+            },
+            gap: 3,
+            alignItems: "start",
+          }}
+        >
+          <Box component="section" aria-labelledby="scenario-rules-title">
+            <Typography
+              id="scenario-rules-title"
+              variant="h6"
+              component="h3"
+              sx={{ fontWeight: 700 }}
+            >
+              Victory conditions
             </Typography>
-            <div style={{ margin: "8px 0" }}>
-              {Object.keys(breakdown).map((category: string) => (
-                <div key={category}>
-                  {breakdown[category]} pts from{" "}
-                  {SCORE_LABELS[category] || category}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+            <Box
+              sx={{
+                typography: "body2",
+                "& p": {
+                  my: 0,
+                  py: 1.5,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                },
+                "& p:last-child": { borderBottom: 0, pb: 0 },
+              }}
+            >
+              <VictoryConditions
+                ownership={scenario.ownership}
+                dollarsPerkWh={scenario.dollarsPerkWh}
+                minimumCustomerRetention={scenario.minimumCustomerRetention}
+                reliabilityObjective={scenario.reliabilityObjective}
+              />
+            </Box>
+          </Box>
+          <Box
+            component="section"
+            aria-labelledby="scenario-score-title"
+            sx={{
+              p: 2,
+              bgcolor: "var(--bg-raised)",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <Typography
+              id="scenario-score-title"
+              variant="h6"
+              component="h3"
+              sx={{ fontWeight: 700 }}
+            >
+              Current score
+            </Typography>
+            {breakdown ? (
+              <>
+                <Typography
+                  component="p"
+                  sx={{ mt: 1, mb: 0.5, fontVariantNumeric: "tabular-nums" }}
+                >
+                  <Box
+                    component="strong"
+                    sx={{ fontSize: 36, lineHeight: 1.2 }}
+                  >
+                    {formatScore(totalScore(breakdown))}
+                  </Box>{" "}
+                  <Box component="span" sx={{ color: "text.secondary" }}>
+                    points
+                  </Box>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Through last month · updates monthly
+                </Typography>
+                <Box component="dl" sx={{ m: 0, mt: 2 }}>
+                  {Object.entries(breakdown).map(([category, score]) => (
+                    <Box
+                      key={category}
+                      sx={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        py: 1,
+                        borderTop: "1px solid",
+                        borderColor: "divider",
+                        typography: "body2",
+                      }}
+                    >
+                      <Box
+                        component="dt"
+                        sx={{
+                          "&::first-letter": { textTransform: "uppercase" },
+                        }}
+                      >
+                        {SCORE_LABELS[category] || category}
+                      </Box>
+                      <Box
+                        component="dd"
+                        sx={{
+                          m: 0,
+                          flexShrink: 0,
+                          fontWeight: 600,
+                          fontVariantNumeric: "tabular-nums",
+                          color:
+                            score < 0
+                              ? "var(--delta-bad)"
+                              : score > 0
+                                ? "var(--delta-good)"
+                                : "text.secondary",
+                        }}
+                      >
+                        {score > 0 ? "+" : ""}
+                        {formatScore(score)}
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Your score will appear after the first month. Use the victory
+                conditions to plan your opening moves.
+              </Typography>
+            )}
+          </Box>
+        </Box>
       </DialogContent>
-      <DialogActions>
-        <Button color="primary" variant="contained" onClick={onClose}>
-          Close
+      <DialogActions
+        sx={{
+          p: 2,
+          px: { sm: 3 },
+          pb: "max(16px, env(safe-area-inset-bottom))",
+        }}
+      >
+        <Button
+          color="primary"
+          variant="contained"
+          onClick={onClose}
+          sx={{
+            minHeight: 40,
+            width: { xs: "100%", sm: "auto" },
+            "@media (pointer: coarse)": { minHeight: 44 },
+          }}
+        >
+          Back to game
         </Button>
       </DialogActions>
     </Dialog>
