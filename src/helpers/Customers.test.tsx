@@ -1,14 +1,49 @@
 import {
   CUSTOMER_RATE_MEMORY_MONTHS,
+  getMarketRate,
   customerMarketSizeAt,
   customerSwitchingRate,
   nextCustomerCount,
   projectCustomerChange,
   updateCustomerRate,
 } from "./Customers";
-import { TICKS_PER_MONTH } from "../Constants";
+import { TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
+import { initEconomyFromCsv } from "../data/Economy";
 
 describe("customer price competition", () => {
+  it("preserves a small utility's growth across a whole year", () => {
+    let customers = 100;
+    for (let tick = 0; tick < TICKS_PER_YEAR; tick++) {
+      customers = nextCustomerCount({
+        customers,
+        customerRate: 0.1,
+        marketRate: 0.1,
+        marketSize: 200,
+        ownership: "Public",
+      });
+    }
+    expect(customers).toBeCloseTo(100 * Math.exp(0.015), 2);
+  });
+
+  it("compounds the market benchmark with inflation every year", () => {
+    initEconomyFromCsv(
+      "month,year,prime,inflation\n" +
+        [2020, 2021, 2022]
+          .flatMap((year) =>
+            Array.from(
+              { length: 12 },
+              (_, month) => `${month + 1},${year},4,0.12`,
+            ),
+          )
+          .join("\n"),
+    );
+    for (let year = 2020; year <= 2022; year++) {
+      expect(getMarketRate(0.1, { year, monthNumber: 1 }, 2020, 1)).toBeCloseTo(
+        0.1 * Math.pow(1.01, (year - 2020) * 12),
+        10,
+      );
+    }
+  });
   it("gains customers below market, holds share at market, and loses above it", () => {
     const base = {
       customers: 1_000_000,

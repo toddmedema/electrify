@@ -207,6 +207,32 @@ describe("summarizeTimeline", () => {
     );
   });
 
+  it("records chart averages without mutating ticks, including nonlinear wind output", () => {
+    const timeline = ticks([100, 200]);
+    timeline.forEach((tick, index) => {
+      tick.demandByType = {
+        Residential: 100 + index * 100,
+        Commercial: 0,
+        Industrial: 0,
+        Transportation: 0,
+        "Data centers": 100,
+      };
+      tick.windKph = index * 100;
+      tick.windAirborneKph = 0;
+      tick.solarIrradianceWM2 = 0;
+      tick.storedWh = index * 1000;
+    });
+    const original = JSON.stringify(timeline);
+    const average = summarizeTimeline(timeline, 2020).chartAverage!;
+    expect(average.demandByType.Residential).toBe(150);
+    expect(average.demandByType["Data centers"]).toBe(100);
+    expect(average.supplyByFuel.Coal).toBe(65);
+    expect(average.storedWh).toBe(500);
+    expect(average.windKph).toBe(50);
+    expect(average.renewableCapacityFactors!.Wind).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(timeline)).toBe(original);
+  });
+
   it("ends on the last tick the filter kept, not the last one in the array", () => {
     const summary = summarizeTimeline(
       ticks([100, 200, 300, 400]),

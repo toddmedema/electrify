@@ -16,6 +16,7 @@ import { getScenarioLocation } from "../../helpers/Locations";
 import { summarizeHistory } from "../../helpers/DateTime";
 import { computeScoreBreakdown, totalScore } from "../../helpers/Scoring";
 import VictoryConditions from "./VictoryConditions";
+import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore, SCORE_LABELS } from "./VictoryDialog";
 
 export interface Props {
@@ -167,6 +168,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             >
               Victory conditions
             </Typography>
+            {scenario.id === 3 && <CustomerGrowthChallenge />}
             <Box
               sx={{
                 typography: "body2",
@@ -182,6 +184,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               <VictoryConditions
                 ownership={scenario.ownership}
                 dollarsPerkWh={scenario.dollarsPerkWh}
+                startingCustomers={scenario.startingCustomers}
                 minimumCustomerRetention={scenario.minimumCustomerRetention}
                 reliabilityObjective={scenario.reliabilityObjective}
               />

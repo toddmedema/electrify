@@ -1,3 +1,4 @@
+import { generateNewTimeline } from "../../reducers/Game";
 import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -51,6 +52,25 @@ describe("ChartForecastRenewableCapacityFactor", () => {
     );
 
     expect(names).toEqual(expect.arrayContaining(["Wind", "Solar", "Hydro"]));
+  });
+
+  it("forecasts hydro resources in Los Angeles without a built hydro plant", () => {
+    const game = createGame({ scenarioId: 111 });
+    expect(game.facilities.some((facility) => facility.fuel === "Hydro")).toBe(
+      false,
+    );
+    const timeline = generateNewTimeline(
+      game,
+      game.timeline[0].cash,
+      game.timeline[0].customers,
+      (12 * MINUTES_PER_MONTH) / 60,
+      60,
+    );
+    const points = monthlyRenewableCapacityFactors(
+      timeline,
+      availableWeatherRenewables(game, timeline),
+    );
+    expect(points.some((point) => point.factors.Hydro > 0.005)).toBe(true);
   });
 
   it("exposes each available series as a percentage", () => {

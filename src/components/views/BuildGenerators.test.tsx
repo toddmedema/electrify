@@ -36,7 +36,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.getByText(/typical output/)).toBeInTheDocument();
+  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
   );
@@ -209,7 +209,7 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   );
 
   expect(screen.getByText("Natural Gas")).toBeInTheDocument();
-  expect(screen.getByText(/typical output/)).toBeInTheDocument();
+  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
   expect(screen.getByText(/largest forecast shortage/)).toBeInTheDocument();
   expect(screen.getByText("Build cost")).toBeInTheDocument();
   expect(screen.getByText("Build time")).toBeInTheDocument();

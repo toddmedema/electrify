@@ -968,6 +968,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
           <VictoryConditions
             ownership={scenario.ownership}
             dollarsPerkWh={scenario.dollarsPerkWh}
+            startingCustomers={scenario.startingCustomers}
             minimumCustomerRetention={scenario.minimumCustomerRetention}
             reliabilityObjective={scenario.reliabilityObjective}
           />

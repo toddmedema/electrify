@@ -1,4 +1,5 @@
 import * as React from "react";
+import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
 import TutorialPrompt from "../components/base/TutorialPrompt";
 import { AppStateType, ScenarioType } from "../Types";
@@ -511,12 +512,7 @@ export const SCENARIOS = [
       },
       {
         card: "INSIGHTS",
-        content: (
-          <TutorialPrompt
-            concepts={["rate", "customers", "money"]}
-            text="Your turn: grow customers by at least 5% in six months while staying profitable and reliable."
-          />
-        ),
+        content: <CustomerGrowthChallenge />,
         hint: "A modest discount below the market rate attracts customers. Check the financial forecast too: a rate that is too low can grow sales while losing money.",
         capstone: {
           success: pricingCapstoneSucceeded,

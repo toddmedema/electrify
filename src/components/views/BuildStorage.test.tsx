@@ -121,7 +121,9 @@ it("submits a storage purchase only once on a double-click", () => {
   );
 
   // Pumped Hydro is the first shopping card, so its price is the first purchase button.
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   const takeLoan = screen.getByRole("button", { name: "Take loan" });
   fireEvent.click(takeLoan);
   fireEvent.click(takeLoan);
@@ -138,7 +140,9 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     />,
   );
 
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
@@ -165,7 +169,9 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   expect(
     screen.getByRole("button", { name: "Show financing terms" }),
   ).toHaveAttribute("aria-expanded", "false");
