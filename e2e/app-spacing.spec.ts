@@ -70,15 +70,11 @@ test("phone surfaces share stable gutters and compact chrome", async ({
   expect(firstBuildCard!.x).toBeCloseTo(8, 0);
   expect(firstBuildCard!.width).toBeCloseTo(page.viewportSize()!.width - 16, 0);
 
-  const buildAction = page
-    .locator(".cardList > .build-list-item .MuiCardHeader-action")
-    .first();
-  const buyButton = await buildAction.getByRole("button").boundingBox();
-  const buildTiming = await buildAction.locator("p").boundingBox();
-  expect(buyButton).not.toBeNull();
-  expect(buildTiming).not.toBeNull();
-  expect(
-    buildTiming!.x - (buyButton!.x + buyButton!.width),
-  ).toBeGreaterThanOrEqual(7);
+  const card = page.locator(".cardList > .buildOption").first();
+  await expect(
+    card.getByRole("button", { name: /Review purchase of/ }),
+  ).toBeVisible();
+  await expect(card.locator(".buildOptionMetrics")).toContainText("Build time");
+  await expectNoHorizontalOverflow(card);
   await expectNoHorizontalOverflow(page.locator("#topbar"));
 });

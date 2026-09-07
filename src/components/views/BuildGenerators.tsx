@@ -58,6 +58,7 @@ import {
   getBuildAvailability,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
+import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 
 interface GeneratorBuildItemProps {
@@ -153,7 +154,7 @@ export function GeneratorBuildItem(
   };
 
   return (
-    <Card className="build-list-item">
+    <Card className="build-list-item buildOption">
       <CardHeader
         avatar={
           <Avatar
@@ -163,21 +164,6 @@ export function GeneratorBuildItem(
         }
         action={
           <Stack direction="row" spacing={0.5}>
-            {props.onCompare && canBuild && (
-              <Button
-                size="small"
-                variant={props.compared ? "contained" : "outlined"}
-                aria-pressed={props.compared}
-                aria-label={`Compare ${generator.name}`}
-                disabled={props.compareDisabled && !props.compared}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onCompare?.();
-                }}
-              >
-                Compare
-              </Button>
-            )}
             <Button
               className="buy-button"
               size="small"
@@ -193,79 +179,81 @@ export function GeneratorBuildItem(
           </Stack>
         }
         title={generator.name}
-        subheader={
-          <span
-            className={
-              buildable && financingGap === 0
-                ? "generatorBuildSubtitle"
-                : undefined
-            }
-          >
-            {buildSubtitle}
-          </span>
-        }
       />
-      <Box className="generatorDecisionLead">
-        <Stack
-          direction="row"
-          spacing={0.75}
-          useFlexGap
-          sx={{ flexWrap: "wrap" }}
+      {!canBuild && (
+        <Typography
+          component="div"
+          className="buildOptionWarning"
+          color="textSecondary"
         >
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${formatWatts(typicalOutputW)} typical output`}
-          />
-          {gapCoverage !== undefined && (
-            <Chip
-              size="small"
-              color={gapCoverage >= 100 ? "success" : "default"}
-              label={`~${gapCoverage}% of largest forecast shortage`}
-            />
-          )}
-        </Stack>
-      </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
-          gap: 1,
-          px: 2,
-          pb: 1.5,
-        }}
-      >
-        <GeneratorMetric
+          {buildSubtitle}
+        </Typography>
+      )}
+      <Box className="buildOptionMetrics">
+        <BuildMetric
+          label="Typical output"
+          value={formatWatts(typicalOutputW)}
+        />
+        <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
         />
-        <GeneratorMetric
+        <BuildMetric
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
         {props.secondaryMetric === "lcWh" && (
-          <GeneratorMetric
+          <BuildMetric
             label="Lifetime cost / MWh"
             value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
           />
         )}
       </Box>
-      <Button
-        color="primary"
-        className="expand-details"
-        size="small"
-        aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
-        aria-expanded={expanded}
-        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-        onClick={(event) => {
-          event.stopPropagation();
-          toggleExpand();
-        }}
-      >
-        {expanded ? "Hide details" : "Show details"}
-      </Button>
+      {gapCoverage !== undefined && (
+        <Typography className="buildOptionContext" variant="caption">
+          ~{gapCoverage}% of largest forecast shortage (average output)
+        </Typography>
+      )}
+      <Box className="buildOptionFooter">
+        <Button
+          color="primary"
+          className="expand-details"
+          size="small"
+          aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
+          aria-expanded={expanded}
+          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleExpand();
+          }}
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </Button>
 
+        {props.onCompare && canBuild && (
+          <Button
+            size="small"
+            variant={props.compared ? "contained" : "outlined"}
+            aria-pressed={props.compared}
+            aria-label={`Compare ${generator.name}`}
+            disabled={props.compareDisabled && !props.compared}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onCompare?.();
+            }}
+          >
+            Compare
+          </Button>
+        )}
+      </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {generator.description}
+        </Typography>
         {(props.advantages || []).length > 0 && (
           <Box sx={{ px: 2, pb: 1 }}>
             <Stack
@@ -587,31 +575,6 @@ export function GeneratorBuildItem(
         </DialogActions>
       </Dialog>
     </Card>
-  );
-}
-
-function GeneratorMetric(props: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <Box
-      sx={{
-        minWidth: 0,
-        p: 1,
-        border: 1,
-        borderColor: "divider",
-        borderRadius: 1,
-        bgcolor: "action.hover",
-      }}
-    >
-      <Typography variant="caption" color="textSecondary" component="div">
-        {props.label}
-      </Typography>
-      <Typography variant="body2" component="div" sx={{ fontWeight: 600 }}>
-        {props.value}
-      </Typography>
-    </Box>
   );
 }
 

@@ -1553,19 +1553,6 @@ $pane_header_height: 40px;
   background: var(--bg-primary);
 }
 
-.generatorDecisionLead {
-  display: grid;
-  gap: 4px;
-  padding: 0 16px 12px;
-}
-
-.generatorBuildSubtitle {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .generatorComparison {
   padding: 8px 16px 10px;
   border-bottom: 1px solid var(--border-selected);
@@ -3776,5 +3763,71 @@ $sizemap: (
   }
   100% {
     background-color: transparent;
+  }
+}
+
+// Shared purchase rows: keep the decision and touch targets compact without clipping copy.
+.build-list-item.buildOption {
+  .MuiCardHeader-root {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+    .MuiCardHeader-avatar {
+      margin: 0;
+    }
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+    .MuiCardHeader-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .MuiCardHeader-action {
+      width: auto;
+      margin: 0 !important;
+      align-self: center;
+      flex-shrink: 0;
+    }
+  }
+  .MuiButton-root {
+    min-height: 40px;
+  }
+  .buildOptionMetrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 12px 8px;
+  }
+  .buildOptionMetric {
+    min-width: 0;
+  }
+  .buildOptionContext {
+    display: block;
+    padding: 0 12px 8px;
+  }
+  .buildOptionWarning,
+  .buildOptionDescription {
+    padding: 0 12px 8px;
+  }
+  .buildOptionFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 12px;
+    padding: 4px 0;
+    border-top: 1px solid var(--border-subtle);
+    .expand-details.MuiButton-root {
+      width: auto;
+      margin: 0;
+      border: 0;
+      border-radius: 4px;
+    }
+  }
+}
+@media (pointer: coarse) {
+  .build-list-item.buildOption .MuiButton-root {
+    min-height: 44px;
   }
 }
