@@ -1,5 +1,11 @@
 import { getPosition, getTimes } from "suncalc";
 import {
+  getWindCapacityFactor,
+  getOffshoreWindCapacityFactor,
+  getAirborneWindCapacityFactor,
+  getSolarCapacityFactor,
+} from "./Energy";
+import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
   GAME_TO_REAL_YEARS,
@@ -112,6 +118,57 @@ function accumulateTick(
   tickScale: number,
 ) {
   const date = getMonthYearFromMinute(t.minute, startingYear);
+  const weight = summary.chartTickWeight || 0;
+  const share = tickScale / (weight + tickScale);
+  const factors = {
+    Wind: getWindCapacityFactor([t.windKph]),
+    "Offshore Wind": getOffshoreWindCapacityFactor(
+      t.windOffshoreKph === undefined ? [] : [t.windOffshoreKph],
+    ),
+    "Airborne Wind": getAirborneWindCapacityFactor([t.windAirborneKph]),
+    Solar: getSolarCapacityFactor([t.solarIrradianceWM2]),
+  };
+  // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
+  const sample = Object.fromEntries(Object.entries(t)) as TickPresentFutureType;
+  sample.renewableCapacityFactors = factors;
+  if (!summary.chartAverage) {
+    summary.chartAverage = {
+      ...sample,
+      demandByType: { ...t.demandByType },
+      supplyByFuel: { ...t.supplyByFuel },
+    } as TickPresentFutureType;
+  } else {
+    // Average levels, including fuel prices and weather. Financial totals live above this
+    // chart-only record. Clone nested maps so summarizing never mutates simulation ticks.
+    const average = summary.chartAverage;
+    for (const key of Object.keys(sample) as (keyof TickPresentFutureType)[]) {
+      const value = sample[key];
+      if (typeof value === "number") {
+        Object.assign(average, {
+          [key]:
+            Number(average[key] ?? value) +
+            (value - Number(average[key] ?? value)) * share,
+        });
+      }
+    }
+    for (const key of [
+      "demandByType",
+      "supplyByFuel",
+      "renewableCapacityFactors",
+    ] as const) {
+      const previous = average[key] as Record<string, number>;
+      const current = (sample[key] || {}) as Record<string, number>;
+      for (const name of new Set([
+        ...Object.keys(previous),
+        ...Object.keys(current),
+      ])) {
+        previous[name] =
+          (previous[name] || 0) +
+          ((current[name] || 0) - (previous[name] || 0)) * share;
+      }
+    }
+  }
+  summary.chartTickWeight = weight + tickScale;
   // Integrate instantaneous electricity (watts) to watt hours
   // Only electricity isn't multiplied by this during tick calculations (financials are)
   summary.supplyWh +=

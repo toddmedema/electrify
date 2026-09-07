@@ -1,4 +1,4 @@
-import { getTimeFromTimeline } from "./helpers/DateTime";
+import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
 import {
   clearSave,
   clearSaveFor,
@@ -53,6 +53,27 @@ describe("SaveGame", () => {
       game.facilities.find((facility) => facility.name === "Oil")
         ?.variableOperatingCostPerMWh,
     );
+  });
+
+  it("round trips every monthly chart layer and rejects corrupt chart values", () => {
+    const recorded = {
+      ...game,
+      date: { ...game.date, minute: 1440 },
+      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
+    };
+    const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
+    const restored = parseSave(raw);
+    expect(restored?.game.monthlyHistory[0].chartAverage).toEqual(
+      recorded.monthlyHistory[0].chartAverage,
+    );
+    raw.game.monthlyHistory[0].chartAverage.demandByType.Residential = "bad";
+    expect(parseSave(raw)).toBeNull();
+  });
+
+  it("upgrades older saves without inventing missing chart history", () => {
+    const restored = parseSave({ ...serializeSave(game), version: 1 });
+    expect(restored?.version).toBe(SAVE_VERSION);
+    expect(restored?.game).toEqual(game);
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game

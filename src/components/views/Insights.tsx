@@ -1005,14 +1005,24 @@ export default class Insights extends React.Component<Props, State> {
     const historicalSupplyDemand = [...game.monthlyHistory]
       .reverse()
       .map((month) => {
-        // Monthly history retains supply and demand but not the other forecast layers. Keep it
-        // on the supply/demand chart and let forecast-only charts begin at the current month.
         const tick = { ...now } as TickPresentFutureType;
         tick.minute = monthMinute(month, game.startingYear);
         tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
         tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
         return tick;
       });
+    const historicalCharts = [...game.monthlyHistory]
+      .reverse()
+      .flatMap((month) =>
+        month.chartAverage
+          ? [
+              {
+                ...month.chartAverage,
+                minute: monthMinute(month, game.startingYear),
+              } as TickPresentFutureType,
+            ]
+          : [],
+      );
     let domainMin = Number.POSITIVE_INFINITY;
     let domainMax = 0;
     for (const tick of [...historicalSupplyDemand, ...timeline]) {
@@ -1077,15 +1087,19 @@ export default class Insights extends React.Component<Props, State> {
       game.startingYear,
     ).slice(1, 1 + monthsAhead);
     const projection: ProjectionView = {
-      timeline,
-      sampled,
+      timeline: [...historicalCharts, ...timeline],
+      sampled: [...historicalCharts, ...sampled],
       supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
       domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
       blackouts,
       blackoutTotalWh,
       largestBlackout,
-      hasStorage: timeline.some((tick) => tick.storedWh > 0),
-      hasHydro: game.facilities.some((facility) => facility.fuel === "Hydro"),
+      hasStorage: [...historicalCharts, ...timeline].some(
+        (tick) => tick.storedWh > 0,
+      ),
+      hasHydro:
+        game.facilities.some((facility) => facility.fuel === "Hydro") ||
+        historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
       financePast: game.monthlyHistory,
       financeProjected: [currentMonth, ...projectedMonths],
       projectionStepMinutes,
@@ -1166,7 +1180,7 @@ export default class Insights extends React.Component<Props, State> {
     const rateSummary =
       scenario.ownership === "Investor"
         ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year.`;
+        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market benchmark ${formatMoneyConcise(marketRate)}; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year. Public utility customers do not switch based on rates.`;
     return (
       <section className="insightsLevers" aria-label="Planning controls">
         <Button
@@ -1197,7 +1211,8 @@ export default class Insights extends React.Component<Props, State> {
           {scenario.ownership === "Public" && (
             <>
               {" "}
-              · customer growth{" "}
+              · market benchmark {formatMoneyConcise(marketRate)} · customer
+              growth{" "}
               <strong>
                 +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
               </strong>
@@ -1216,14 +1231,14 @@ export default class Insights extends React.Component<Props, State> {
               {formatRateCompact(game.dollarsPerkWh)}/kWh
             </strong>
           </span>
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Market</span>
+            <span className="insightsRateMetricValue">
+              {formatRateCompact(marketRate)}
+            </span>
+          </span>
           {scenario.ownership === "Investor" ? (
             <>
-              <span className="insightsRateMetric">
-                <span className="insightsRateMetricLabel">Market</span>
-                <span className="insightsRateMetricValue">
-                  {formatRateCompact(marketRate)}
-                </span>
-              </span>
               <span className="insightsRateMetric">
                 <span className="insightsRateMetricLabel">Customers / mo</span>
                 <strong className="insightsRateMetricValue">
@@ -2153,6 +2168,14 @@ export default class Insights extends React.Component<Props, State> {
           </Toolbar>
           {this.renderLayerPanel(projection)}
           {this.renderLevers(now)}
+          {game.monthlyHistory.length > 0 && (
+            <Typography variant="caption" color="textSecondary" sx={{ px: 2 }}>
+              Past charts show monthly averages; financial charts show monthly
+              totals or ending balances.
+              {game.monthlyHistory.some((month) => !month.chartAverage) &&
+                " Older saves have only financial and supply/demand history until new months are recorded."}
+            </Typography>
+          )}
           {this.renderViewportControls(
             viewportBounds,
             viewportRange,

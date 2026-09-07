@@ -6,6 +6,7 @@ import { useUnits } from "./UnitsContext";
 export interface Props {
   ownership: ScenarioType["ownership"];
   dollarsPerkWh: number;
+  startingCustomers?: number;
   minimumCustomerRetention?: number;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
 }
@@ -52,6 +53,8 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
         <p>
           Required: retain at least {Math.round(minimumCustomerRetention * 100)}
           % of starting customers
+          {props.startingCustomers !== undefined &&
+            ` (at least ${Math.ceil(props.startingCustomers * minimumCustomerRetention).toLocaleString("en-US")} customers, from ${props.startingCustomers.toLocaleString("en-US")} at the start)`}
         </p>
       )}
       <p>

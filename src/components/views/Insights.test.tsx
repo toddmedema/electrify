@@ -324,7 +324,7 @@ describe("Insights layers", () => {
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
-    expect(levers).not.toHaveTextContent(/market/i);
+    expect(levers).toHaveTextContent(/market benchmark/i);
     expect(
       within(levers).getByText("Customer growth / yr"),
     ).toBeInTheDocument();

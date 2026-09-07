@@ -289,8 +289,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     minute: number;
     supplyW: number; // Watts
     demandW: number; // Watts
-    // Components sum to demandW. Kept on forecast ticks so Insights can explain what is driving
-    // load without bloating the long-lived monthly history in saves.
+    // Components sum to demandW; monthly chart averages preserve the breakdown in saves.
     demandByType: DemandByTypeType;
     solarIrradianceWM2: number;
     windKph: number;
@@ -311,6 +310,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;
+    renewableCapacityFactors?: Record<string, number>;
   };
 
 export type DerivedHistoryKeysType = Exclude<
@@ -333,6 +333,9 @@ export interface DerivedHistoryType extends MonthlyHistoryType {
 
 // Basically, downsample per-tick information so that I can store it for the entire game, which could go 100+ years
 export interface MonthlyHistoryType extends HistoryForecastShared {
+  // Compact monthly averages for all non-financial Insights layers.
+  chartAverage?: TickPresentFutureType;
+  chartTickWeight?: number;
   year: number;
   month: number;
   supplyWh: number; // total
