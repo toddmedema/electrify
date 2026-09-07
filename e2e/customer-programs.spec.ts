@@ -32,6 +32,8 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog.getByRole("radio", { name: /^Small/ })).toBeChecked();
     await expect(apply).toBeEnabled({ timeout: 30000 });
     await expect(dialog).toContainText("Peak demand:");
+    await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
+    await expect(dialog.getByText(/^Change in utility cash/)).toBeVisible();
     await expect(dialog).toContainText("Charges start Feb 2020");
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
@@ -56,6 +58,9 @@ for (const theme of ["light", "dark"]) {
     await dialog
       .getByRole("button", { name: "Rooftop solar rebates · Off" })
       .click();
+    await dialog.getByRole("radio", { name: /^Off/ }).check();
+    await expect(dialog).toContainText("Funding stops Feb 2020");
+    await expect(dialog).not.toContainText("Charges start");
     await dialog.getByRole("radio", { name: /^Large/ }).check();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog).toContainText("Small starts Feb 2020");

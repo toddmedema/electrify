@@ -180,7 +180,9 @@ function Decision({
               {current!.adoption >= 1
                 ? "Fully adopted"
                 : current!.adoption > 0
-                  ? "Building up"
+                  ? current!.tier === "Off"
+                    ? "Installed upgrades retained"
+                    : "Building up"
                   : "No funded upgrades yet"}{" "}
               · {Math.round(current!.adoption * 100)}% of eligible potential
               installed
@@ -203,6 +205,10 @@ function Decision({
             </RadioGroup>
             <Typography variant="body2">
               Off stops new spending; installed upgrades remain.
+            </Typography>
+            <Typography variant="body2">
+              Small installs upgrades at a lower cost per upgrade. Large
+              installs them faster, at a higher cost per upgrade.
             </Typography>
             <Typography variant="body2">
               Rebates cost money and reduce electricity sales.
@@ -247,12 +253,29 @@ function Decision({
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
                       </Typography>
+                      <Typography>
+                        Electricity supplied:{" "}
+                        {formatWattHours(result.before.supplyWh)} →{" "}
+                        {formatWattHours(result.after.supplyWh)} in{" "}
+                        {labelMonth(game, month)}
+                      </Typography>
+                      <Typography>
+                        Change in utility cash from now through{" "}
+                        {labelMonth(game, month)}:{" "}
+                        {formatMoneyConcise(result.cashChange)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Includes program spending, less electricity sold, and
+                        actual dispatch costs.
+                      </Typography>
                       {(formatWatts(peakBefore) === formatWatts(peakAfter) ||
                         Math.abs(peakAfter - peakBefore) <
                           peakBefore * 0.001) && (
                         <Typography variant="body2">
-                          Little change yet. Adoption builds gradually; daylight
-                          savings may leave the evening peak unchanged.
+                          Little change in peak demand.{" "}
+                          {selected === "solar"
+                            ? "Daylight savings may leave the evening peak unchanged."
+                            : "Efficiency savings build gradually as upgrades are installed."}
                         </Typography>
                       )}
                     </Box>
@@ -263,15 +286,6 @@ function Decision({
                         inflation. Spending pays only for new upgrades and stops
                         at full adoption. Installed upgrades persist for this
                         run.
-                      </Typography>
-                      <Typography variant="body2">
-                        Electricity supplied in {labelMonth(game, month)}:{" "}
-                        {formatWattHours(result.before.supplyWh)} →{" "}
-                        {formatWattHours(result.after.supplyWh)}. Change in
-                        utility cash from now through {labelMonth(game, month)}:{" "}
-                        {formatMoneyConcise(result.cashChange)}. Includes
-                        program spending, less electricity sold, and actual
-                        dispatch costs.
                       </Typography>
                       <Typography variant="body2">
                         Estimates hold weather, fuel prices, fleet, rate and
@@ -319,9 +333,11 @@ function Decision({
       <DialogActions
         sx={{ p: 2, flexWrap: "wrap", gap: 1, "& button": { minHeight: 44 } }}
       >
-        {selected && effective < end && (
+        {selected && !unchanged && effective < end && (
           <Typography variant="body2" sx={{ width: "100%" }}>
-            Charges start {labelMonth(game, effective)} · until changed
+            {tier === "Off"
+              ? `Funding stops ${labelMonth(game, effective)}`
+              : `Charges start ${labelMonth(game, effective)} · until changed`}
           </Typography>
         )}
         <Button onClick={() => (selected ? setSelected(undefined) : onClose())}>
