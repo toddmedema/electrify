@@ -85,6 +85,32 @@ describe("transmission actions", () => {
     expect(after.netWorth).toBe(netWorthBefore);
   });
 
+  it("turns construction principal payments into project equity", () => {
+    const state = buildNorthernIntertie();
+    const line = state.transmission!.lines[0];
+    line.yearsToBuildLeft = 0.5;
+    state.facilities = [];
+    const opening = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    state.timeline = generateNewTimeline(
+      state,
+      opening.cash,
+      opening.customers,
+      3,
+    );
+    const debtBefore = line.loanAmountLeft;
+
+    tickState(state);
+
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const principalPaid = debtBefore - line.loanAmountLeft;
+    expect(line.yearsToBuildLeft).toBeGreaterThan(0);
+    expect(principalPaid).toBeGreaterThan(0);
+    expect(now.netWorth - now.cash).toBeCloseTo(
+      180000000 - debtBefore + principalPaid,
+      5,
+    );
+  });
+
   it("commissions an intertie, imports a shortage, and books its full cash costs", () => {
     const state = buildNorthernIntertie();
     const line = state.transmission!.lines[0];

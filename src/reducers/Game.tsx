@@ -2759,7 +2759,10 @@ function supplyForecastPass(
           newState.facilities,
           t.cash,
           t.minute,
-          newState.transmission?.lines,
+          // Just like currentCash, the live transmission balance already represents this tick.
+          // The cloned line has made one forecast payment, so using it here would grant project
+          // equity before the matching principal has actually left cash.
+          state.transmission?.lines,
         );
       }
     }
@@ -3029,10 +3032,11 @@ function getNetWorth(
     }
   });
   transmissionLines.forEach((line) => {
-    netWorth +=
-      line.yearsToBuildLeft > 0
-        ? line.buildCost * DOWNPAYMENT_PERCENT
-        : line.buildCost - line.loanAmountLeft;
+    // The project is worth what has been paid for it at every construction stage. At purchase,
+    // cost less the new loan is exactly the down payment, keeping net worth neutral. Each later
+    // principal payment then moves value from cash into project equity instead of disappearing
+    // from the balance sheet before the line opens.
+    netWorth += line.buildCost - line.loanAmountLeft;
   });
   return netWorth;
 }
