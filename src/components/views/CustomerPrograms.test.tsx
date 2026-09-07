@@ -65,7 +65,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   act(() => {
     old.onmessage!({ data: { result } });
   });
-  const apply = screen.getByRole("button", { name: "Apply next month" });
+  const apply = screen.getByRole("button", { name: "Start next month" });
   expect(apply).toBeDisabled();
   act(() => {
     jest.advanceTimersByTime(250);
@@ -167,8 +167,15 @@ test("stopped funding describes retained upgrades without announcing another cha
     "5%",
   );
   expect(screen.queryByText(/Building up/)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Funding stops/)).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Stop next month" }),
+  ).toBeDisabled();
   fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
-  expect(screen.getByText(/Charges start Feb 2020/)).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Start next month" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Charges start|Funding stops/),
+  ).not.toBeInTheDocument();
   view.unmount();
 });

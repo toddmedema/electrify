@@ -333,13 +333,6 @@ function Decision({
       <DialogActions
         sx={{ p: 2, flexWrap: "wrap", gap: 1, "& button": { minHeight: 44 } }}
       >
-        {selected && !unchanged && effective < end && (
-          <Typography variant="body2" sx={{ width: "100%" }}>
-            {tier === "Off"
-              ? `Funding stops ${labelMonth(game, effective)}`
-              : `Charges start ${labelMonth(game, effective)} · until changed`}
-          </Typography>
-        )}
         <Button onClick={() => (selected ? setSelected(undefined) : onClose())}>
           {selected ? "Cancel" : "Close"}
         </Button>
@@ -356,7 +349,7 @@ function Decision({
               setSelected(undefined);
             }}
           >
-            Apply next month
+            {tier === "Off" ? "Stop next month" : "Start next month"}
           </Button>
         )}
       </DialogActions>

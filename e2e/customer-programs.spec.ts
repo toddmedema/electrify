@@ -25,8 +25,10 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText(
       "does not directly cover an evening peak",
     );
-    const apply = dialog.getByRole("button", { name: "Apply next month" });
-    await expect(apply).toBeDisabled();
+    const apply = dialog.getByRole("button", { name: "Start next month" });
+    await expect(
+      dialog.getByRole("button", { name: "Stop next month" }),
+    ).toBeDisabled();
     await dialog.getByRole("radio", { name: /^Off/ }).focus();
     await page.keyboard.press("ArrowDown");
     await expect(dialog.getByRole("radio", { name: /^Small/ })).toBeChecked();
@@ -34,7 +36,7 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText("Peak demand:");
     await expect(dialog.getByText(/^Electricity supplied:/)).toBeVisible();
     await expect(dialog.getByText(/^Change in utility cash/)).toBeVisible();
-    await expect(dialog).toContainText("Charges start Feb 2020");
+    await expect(dialog).not.toContainText("Charges start");
     await page.keyboard.press("g");
     await expect(dialog).toBeVisible();
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -59,7 +61,10 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Rooftop solar rebates · Off" })
       .click();
     await dialog.getByRole("radio", { name: /^Off/ }).check();
-    await expect(dialog).toContainText("Funding stops Feb 2020");
+    await expect(
+      dialog.getByRole("button", { name: "Stop next month" }),
+    ).toBeVisible();
+    await expect(dialog).not.toContainText("Funding stops");
     await expect(dialog).not.toContainText("Charges start");
     await dialog.getByRole("radio", { name: /^Large/ }).check();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
