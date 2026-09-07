@@ -248,6 +248,18 @@ test("insights header controls stay aligned in one compact row", async ({
     );
   expect(headerOverflow).toBeLessThanOrEqual(1);
 
+  if (testInfo.project.name === "desktop-chromium") {
+    const [group, layerButton] = await Promise.all([
+      page.locator(".insightsPresetControls").boundingBox(),
+      page.locator("#insightsLayersButton").boundingBox(),
+    ]);
+    expect(layerButton!.x - group!.x - group!.width).toBeCloseTo(8, 0);
+    await expect(page.locator(".insightsHeaderControls")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
+  }
+
   if (testInfo.project.name.startsWith("mobile-")) {
     const header = await page.locator(".insightsHeader").boundingBox();
     expect(header).not.toBeNull();

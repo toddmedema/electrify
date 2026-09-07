@@ -30,7 +30,7 @@ import {
 
 // Version 2 changes authored starting fleets and their facility IDs, so older action streams can
 // no longer reproduce the run they recorded.
-export const REPLAY_VERSION = 2;
+export const REPLAY_VERSION = 3;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

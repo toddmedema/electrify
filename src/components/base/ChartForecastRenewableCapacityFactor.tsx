@@ -88,6 +88,18 @@ function capacityFactor(
   technology: GeneratorShoppingType,
   ticks: TickPresentFutureType[],
 ): number {
+  if (
+    ticks.every(
+      (tick) => tick.renewableCapacityFactors?.[technology.name] !== undefined,
+    )
+  ) {
+    return (
+      ticks.reduce(
+        (sum, tick) => sum + tick.renewableCapacityFactors![technology.name],
+        0,
+      ) / ticks.length
+    );
+  }
   switch (technology.name) {
     case "Wind":
       return getWindCapacityFactor(ticks.map((tick) => tick.windKph));

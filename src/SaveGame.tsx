@@ -26,7 +26,7 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Initial public schema. Increment this when a post-release change becomes incompatible.
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface SaveGameType {
   version: number;
@@ -61,7 +61,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   const save = raw as Partial<SaveGameType>;
   if (
-    save.version !== SAVE_VERSION ||
+    (save.version !== SAVE_VERSION && save.version !== 1) ||
     typeof save.savedAt !== "string" ||
     typeof save.appVersion !== "string"
   ) {
@@ -171,6 +171,30 @@ export function parseSave(raw: unknown): SaveGameType | null {
         return true;
       }
       const record = month as Partial<GameType["monthlyHistory"][number]>;
+      const chart = record.chartAverage;
+      if (
+        chart !== undefined &&
+        (typeof chart !== "object" ||
+          chart === null ||
+          !chart.demandByType ||
+          !chart.supplyByFuel ||
+          !chart.renewableCapacityFactors ||
+          Object.values(chart).some((value) =>
+            typeof value === "number"
+              ? !Number.isFinite(value)
+              : typeof value !== "object" ||
+                value === null ||
+                Object.values(value).some(
+                  (entry) =>
+                    typeof entry !== "number" || !Number.isFinite(entry),
+                ),
+          ) ||
+          typeof record.chartTickWeight !== "number" ||
+          !Number.isFinite(record.chartTickWeight) ||
+          record.chartTickWeight <= 0)
+      ) {
+        return true;
+      }
       return (
         typeof record.deliveredWhByFuel !== "object" ||
         record.deliveredWhByFuel === null ||
@@ -203,7 +227,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
-  return save as SaveGameType;
+  // Version 1 saves remain playable. New months collect chart history; older months have only
+  // their original financial and supply/demand records. Replays use a separate strict version.
+  return { ...save, version: SAVE_VERSION } as SaveGameType;
 }
 
 export function readSave(): SaveGameType | null {
