@@ -62,6 +62,16 @@ import {
   getWindOutputFactor,
 } from "../helpers/Energy";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
+import {
+  adjacentMarketForCorridor,
+  corridorsForLocation,
+  emptyTransmissionState,
+} from "../data/AdjacentMarkets";
+import {
+  adjacentMarketPricePerMWh,
+  clearTransmissionMarket,
+  transmissionRatingW,
+} from "../helpers/Transmission";
 import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
 import {
   combineStoryEffects,
@@ -149,6 +159,8 @@ import {
   TickPresentFutureType,
   FuelProductionType,
   ReplayActionType,
+  TradingPolicyType,
+  TransmissionLineOperatingType,
   VictoryType,
   WorldEventEffectsType,
 } from "../Types";
@@ -161,6 +173,11 @@ interface BuildFacilityAction {
 interface ReprioritizeFacilityAction {
   spotInList: number;
   delta: number;
+}
+
+interface BuildTransmissionLineAction {
+  corridorId: string;
+  financed: boolean;
 }
 
 interface NewGameAction {
@@ -654,6 +671,7 @@ const initialGame: GameType = {
   reportedEventKeys: [],
   eventLogReadThroughId: 0,
   worldEvents: { active: [], occurrences: [], checkedKeys: [] },
+  transmission: emptyTransmissionState(),
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -742,6 +760,7 @@ export const gameSlice = createSlice({
       state.eventLogReadThroughId = 0;
       state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
+      state.transmission = emptyTransmissionState();
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
@@ -897,6 +916,19 @@ export const gameSlice = createSlice({
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
       applyBuildFacility(state, action.payload);
       recordReplayAction(state, "buildFacility", action.payload);
+    },
+    buildTransmissionLine: (
+      state,
+      action: PayloadAction<BuildTransmissionLineAction>,
+    ) => {
+      if (applyBuildTransmissionLine(state, action.payload)) {
+        recordReplayAction(state, "buildTransmissionLine", action.payload);
+      }
+    },
+    setTradingPolicy: (state, action: PayloadAction<TradingPolicyType>) => {
+      if (applyTradingPolicy(state, action.payload)) {
+        recordReplayAction(state, "setTradingPolicy", action.payload);
+      }
     },
     sellFacility: (state, action: PayloadAction<number>) => {
       applySellFacility(state, action.payload);
@@ -1074,9 +1106,11 @@ export const {
   delta,
   initGame,
   buildFacility,
+  buildTransmissionLine,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
+  setTradingPolicy,
   setSpeed,
   markEventsRead,
 } = gameSlice.actions;
@@ -1188,6 +1222,82 @@ function applyReprioritizeFacility(
   state.timeline = reforecastSupply(state);
 }
 
+const TRADING_POLICIES: readonly TradingPolicyType[] = [
+  "BALANCED",
+  "RELIABILITY_FIRST",
+  "SURPLUS_ONLY",
+  "CLOSED",
+];
+
+function applyTradingPolicy(state: GameType, policy: unknown): boolean {
+  if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
+  state.transmission ??= emptyTransmissionState();
+  if (state.transmission.tradingPolicy === policy) return false;
+  state.transmission.tradingPolicy = policy as TradingPolicyType;
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+function applyBuildTransmissionLine(
+  state: GameType,
+  payload: Partial<BuildTransmissionLineAction>,
+): boolean {
+  if (typeof payload.corridorId !== "string") return false;
+  const corridor = corridorsForLocation(state.location).find(
+    ({ id }) => id === payload.corridorId,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  state.transmission ??= emptyTransmissionState();
+  if (
+    !corridor ||
+    !now ||
+    state.transmission.lines.some(
+      ({ corridorId }) => corridorId === corridor.id,
+    )
+  ) {
+    return false;
+  }
+  const financed = !!payload.financed;
+  const amountDue = financed
+    ? corridor.buildCost * DOWNPAYMENT_PERCENT
+    : corridor.buildCost;
+  if (now.cash < amountDue) return false;
+  now.cash -= amountDue;
+  const loanAmount = financed ? corridor.buildCost - amountDue : 0;
+  const line: TransmissionLineOperatingType = {
+    id:
+      state.transmission.lines.reduce(
+        (largest, item) => Math.max(largest, item.id),
+        0,
+      ) + 1,
+    corridorId: corridor.id,
+    name: corridor.name,
+    capacityW: corridor.capacityW,
+    buildCost: corridor.buildCost,
+    annualOperatingCost: corridor.annualOperatingCost,
+    yearsToBuildLeft: corridor.yearsToBuild,
+    minuteCreated: state.date.minute,
+    financed,
+    loanAmountLeft: loanAmount,
+    loanMonthlyPayment: financed
+      ? getMonthlyPayment(loanAmount, state.interestRate, LOAN_MONTHS)
+      : 0,
+    interestRate: financed ? state.interestRate : 0,
+  };
+  state.transmission.lines.push(line);
+  logGameEvent(
+    state,
+    "BUILD",
+    `Started ${corridor.name}: ${formatWatts(corridor.capacityW)} to ${adjacentMarketForCorridor(corridor.id)?.name}`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 /**
  * Replays one recorded action. The payload came off the network, so anything shaped wrong is
  * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
@@ -1250,6 +1360,14 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       }
       break;
     }
+    case "buildTransmissionLine": {
+      const build = payload as Partial<BuildTransmissionLineAction>;
+      applyBuildTransmissionLine(state, build);
+      break;
+    }
+    case "setTradingPolicy":
+      applyTradingPolicy(state, payload);
+      break;
     case "sellFacility":
       if (typeof payload === "number") {
         applySellFacility(state, payload);
@@ -2036,6 +2154,18 @@ function updateSupplyFacilitiesFinances(
     }
   });
 
+  const transmission = state.transmission ?? emptyTransmissionState();
+  transmission.lines.forEach((line) => {
+    if (line.yearsToBuildLeft <= 0) return;
+    line.yearsToBuildLeft = Math.max(
+      0,
+      line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
+    );
+    if (line.yearsToBuildLeft === 0 && !simulated) {
+      logGameEvent(state, "CONSTRUCTION", `Intertie open: ${line.name}`);
+    }
+  });
+
   const windOutputFactor = getWindOutputFactor(now.windKph);
   const offshoreWindOutputFactor = getOffshoreWindOutputFactor(
     now.windOffshoreKph || 0,
@@ -2306,6 +2436,46 @@ function updateSupplyFacilitiesFinances(
       }
     }
   });
+  const operatingLines = transmission.lines.filter(
+    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+  );
+  let transmissionCapacity = 0;
+  let weightedMarketPrice = 0;
+  let marketImportLimitW = 0;
+  let marketExportLimitW = 0;
+  for (const line of operatingLines) {
+    const rating = transmissionRatingW(line, now);
+    const market = adjacentMarketForCorridor(line.corridorId);
+    const price = adjacentMarketPricePerMWh(
+      line.corridorId,
+      state.seed,
+      now.minute,
+      now,
+    );
+    transmissionCapacity += rating;
+    weightedMarketPrice += rating * price;
+    marketImportLimitW += Math.min(rating, market?.availableSupplyW || 0);
+    marketExportLimitW += Math.min(rating, market?.availableDemandW || 0);
+  }
+  const marketPricePerMWh =
+    transmissionCapacity > 0 ? weightedMarketPrice / transmissionCapacity : 0;
+  // Exports use only energy above demand plus the reserve margin. Trading can earn money, but it
+  // must never create a local shortage or sell the reliability buffer the dispatch stack built.
+  const clearing = clearTransmissionMarket({
+    localSupplyW: supply,
+    demandW: now.demandW,
+    capacityW: transmissionCapacity,
+    importLimitW: marketImportLimitW,
+    exportLimitW: marketExportLimitW,
+    reserveMargin: RESERVE_MARGIN,
+    policy: transmission.tradingPolicy,
+  });
+  const { importedW, exportedW } = clearing;
+  supply = clearing.localAvailableSupplyW;
+  now.importedW = importedW;
+  now.exportedW = exportedW;
+  now.transmissionCapacityW = transmissionCapacity;
+  now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
@@ -2320,7 +2490,12 @@ function updateSupplyFacilitiesFinances(
     (Math.min(now.supplyW, now.demandW) / ticksPerHour) * GAME_TO_REAL_YEARS;
   // Scale the representative simulated day to the real month it stands for.
   const demandWh = (now.demandW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const revenue = (supplyWh / 1000) * state.dollarsPerkWh;
+  const customerRevenue = (supplyWh / 1000) * state.dollarsPerkWh;
+  const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
+  const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
+  const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
+  const revenueExports = (exportedWh / 1000000) * marketPricePerMWh;
+  const revenue = customerRevenue + revenueExports;
 
   // Facilities expenses
   let kgco2e = 0;
@@ -2337,7 +2512,7 @@ function updateSupplyFacilitiesFinances(
   // What one facility earns is its share of what the company actually sold, so the row can say
   // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
   // served total is exactly what expresses
-  const revenuePerSuppliedW = supply > 0 ? revenue / supply : 0;
+  const revenuePerSuppliedW = supply > 0 ? customerRevenue / supply : 0;
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
@@ -2436,6 +2611,24 @@ function updateSupplyFacilitiesFinances(
       }
     }
   });
+  let transmissionPrincipalRepayment = 0;
+  operatingLines.forEach((line) => {
+    expensesOM += line.annualOperatingCost / ticksPerYear;
+  });
+  transmission.lines.forEach((line) => {
+    if (line.loanAmountLeft <= 0) return;
+    const paymentInterest = getPaymentInterest(
+      line.loanAmountLeft,
+      line.interestRate,
+    );
+    const paymentPrincipal = Math.min(
+      (line.loanMonthlyPayment - paymentInterest) / ticksPerMonth,
+      line.loanAmountLeft,
+    );
+    expensesInterest += paymentInterest / ticksPerMonth;
+    transmissionPrincipalRepayment += paymentPrincipal;
+    line.loanAmountLeft -= paymentPrincipal;
+  });
   const expensesCarbonFee = effectiveCarbonFee(tickDate, state) * kgco2e;
 
   // Customers
@@ -2469,15 +2662,24 @@ function updateSupplyFacilitiesFinances(
   now.cash = Math.round(
     prev.cash +
       revenue -
+      expensesImports -
       expensesOM -
       expensesFuel -
       expensesCarbonFee -
       expensesInterest -
       (now.expensesPolicy || 0) -
-      principalRepayment,
+      principalRepayment -
+      transmissionPrincipalRepayment,
   );
-  now.netWorth = getNetWorth(facilities, now.cash, now.minute);
+  now.netWorth = getNetWorth(
+    facilities,
+    now.cash,
+    now.minute,
+    transmission.lines,
+  );
   now.revenue = revenue;
+  now.revenueExports = revenueExports;
+  now.expensesImports = expensesImports;
   now.expensesOM = expensesOM;
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
@@ -2507,7 +2709,11 @@ function supplyForecastPass(
   // spread shares the same facility objects, which let a forecast leave the real fleet sitting at
   // its end-of-horizon state -- resuming a paused nuclear plant snapped straight to full output
   // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
-  const newState = { ...state, facilities: cloneDeep(state.facilities) };
+  const newState = {
+    ...state,
+    facilities: cloneDeep(state.facilities),
+    transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),
+  };
   if (withoutMinimumStableOutput) {
     newState.facilities.forEach((facility) => {
       if (!facility.peakWh) {
@@ -2543,7 +2749,12 @@ function supplyForecastPass(
         if (currentCustomers !== undefined) {
           t.customers = currentCustomers;
         }
-        t.netWorth = getNetWorth(newState.facilities, t.cash, t.minute);
+        t.netWorth = getNetWorth(
+          newState.facilities,
+          t.cash,
+          t.minute,
+          newState.transmission?.lines,
+        );
       }
     }
     prev = t;
@@ -2603,6 +2814,9 @@ export function generateNewTimeline(
   const state = {
     ...readOnlyState,
     facilities: cloneDeep(readOnlyState.facilities),
+    transmission: cloneDeep(
+      readOnlyState.transmission ?? emptyTransmissionState(),
+    ),
     // Story checkpoints only need the trailing year, and scheduled forecast effects resolve from
     // the same immutable facts as live play. Keeping twelve entries is cheap and avoids a second
     // forecast-only narrative state.
@@ -2614,7 +2828,12 @@ export function generateNewTimeline(
   );
   // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
   // was the same number recomputed for every one of up to a year's worth of ticks
-  const netWorth = getNetWorth(state.facilities, cash, state.date.minute);
+  const netWorth = getNetWorth(
+    state.facilities,
+    cash,
+    state.date.minute,
+    state.transmission?.lines,
+  );
   const currentCustomerRate =
     getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
       ?.customerRate || readOnlyState.customerRate;
@@ -2644,6 +2863,12 @@ export function generateNewTimeline(
       expensesCarbonFee: 0,
       expensesInterest: 0,
       expensesPolicy: 0,
+      expensesImports: 0,
+      revenueExports: 0,
+      importedW: 0,
+      exportedW: 0,
+      transmissionCapacityW: 0,
+      marketPricePerMWh: 0,
       kgco2e: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
       interestRate: 0,
@@ -2787,6 +3012,7 @@ function getNetWorth(
   facilities: FacilityOperatingType[],
   cash: number,
   currentMinute: number,
+  transmissionLines: readonly TransmissionLineOperatingType[] = [],
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
@@ -2795,6 +3021,12 @@ function getNetWorth(
     } else {
       netWorth += facilityCashBack(g, currentMinute);
     }
+  });
+  transmissionLines.forEach((line) => {
+    netWorth +=
+      (line.yearsToBuildLeft > 0
+        ? line.buildCost * DOWNPAYMENT_PERCENT
+        : line.buildCost) - line.loanAmountLeft;
   });
   return netWorth;
 }

@@ -229,6 +229,7 @@ describe("Insights layers", () => {
     ]);
     expect(INSIGHT_PRESETS.reliability.layers).toEqual([
       "supplyDemand",
+      "powerExchange",
       "supplyByFuel",
       "storage",
       "weather",

@@ -31,8 +31,8 @@ import {
 
 // Version 2 changes authored starting fleets and their facility IDs, so older action streams can
 // no longer reproduce the run they recorded.
-// Version 4 adds customer program actions; older clients must reject these streams.
-export const REPLAY_VERSION = 4;
+// Version 4 adds customer program actions; version 5 adds transmission builds and trading policy.
+export const REPLAY_VERSION = 5;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -66,6 +66,8 @@ const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
   "sellFacility",
   "togglePauseFacility",
   "reprioritizeFacility",
+  "buildTransmissionLine",
+  "setTradingPolicy",
   "delta",
 ];
 
@@ -187,6 +189,21 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       !validPolicyChange(action.payload)
     )
       return null;
+    if (
+      action.type === "buildTransmissionLine" &&
+      (typeof action.payload !== "object" ||
+        action.payload === null ||
+        typeof (action.payload as { corridorId?: unknown }).corridorId !==
+          "string")
+    )
+      return null;
+    if (
+      action.type === "setTradingPolicy" &&
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        action.payload as string,
+      )
+    )
+      return null;
     actions.push({
       minute: action.minute,
       type: action.type as ReplayActionNameType,
@@ -213,7 +230,11 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (doc.version !== REPLAY_VERSION && doc.version !== 3) {
+  if (
+    doc.version !== REPLAY_VERSION &&
+    doc.version !== 4 &&
+    doc.version !== 3
+  ) {
     return null;
   }
   if (
@@ -233,6 +254,11 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     (doc.version === 3 &&
       actions.some(
         (a) => a.type === "schedulePolicy" || a.type === "cancelPolicy",
+      )) ||
+    (doc.version !== REPLAY_VERSION &&
+      actions.some(
+        (a) =>
+          a.type === "buildTransmissionLine" || a.type === "setTradingPolicy",
       ))
   ) {
     return null;

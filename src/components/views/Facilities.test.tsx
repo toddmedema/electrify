@@ -55,6 +55,8 @@ function renderFacilities(
       selectedFacilityId={selectedFacilityId}
       onGeneratorBuild={() => undefined}
       onStorageBuild={() => undefined}
+      onTransmissionBuild={() => undefined}
+      onTradingPolicy={() => undefined}
       onSell={handlers.onSell}
       onTogglePause={() => undefined}
       onPause={handlers.onPause}
@@ -272,6 +274,8 @@ describe("the fleet list", () => {
       selectedFacilityId: null,
       onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
+      onTransmissionBuild: () => undefined,
+      onTradingPolicy: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
       onPause: () => undefined,
@@ -338,5 +342,18 @@ describe("the fleet list", () => {
         screen.queryByLabelText(`Move ${f.name} earlier in the dispatch order`),
       ).toBeNull();
     });
+  });
+});
+
+describe("the interties view", () => {
+  it("explains and offers California connection projects", async () => {
+    const game = playedGame(0);
+    renderFacilities(game, null);
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+    expect(
+      screen.getByText("Share power with nearby grids"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
+    expect(screen.getByLabelText("Trading rule")).toBeInTheDocument();
   });
 });

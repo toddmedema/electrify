@@ -6,6 +6,8 @@ import {
   setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
+  buildTransmissionLine,
+  setTradingPolicy,
 } from "../../reducers/Game";
 import {
   selectFacility,
@@ -76,6 +78,12 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onStorageBuild: () => {
       dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
+    },
+    onTransmissionBuild: (corridorId, financed) => {
+      dispatch(buildTransmissionLine({ corridorId, financed }));
+    },
+    onTradingPolicy: (policy) => {
+      dispatch(setTradingPolicy(policy));
     },
   };
 };

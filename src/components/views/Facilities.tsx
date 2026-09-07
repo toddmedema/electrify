@@ -14,6 +14,8 @@ import {
   ListItemAvatar,
   ListItemText,
   Toolbar,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -53,6 +55,8 @@ import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
+import TransmissionPanel from "./TransmissionPanel";
+import { TradingPolicyType } from "../../Types";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
@@ -516,13 +520,19 @@ export interface DispatchProps {
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
+  onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props, {}> {
+export default class Facilities extends React.Component<
+  Props,
+  { view: "PLANTS" | "INTERTIES" }
+> {
   constructor(props: Props) {
     super(props);
+    this.state = { view: "PLANTS" };
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
@@ -584,6 +594,8 @@ export default class Facilities extends React.Component<Props, {}> {
       onReprioritize,
       onSelect,
       onStorageBuild,
+      onTransmissionBuild,
+      onTradingPolicy,
       selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
@@ -602,7 +614,7 @@ export default class Facilities extends React.Component<Props, {}> {
             other panes' headers and the build buttons stay put as the fleet scrolls */}
         <Toolbar className="paneHeader">
           <Typography variant="h6">Facilities</Typography>
-          {!readOnly && (
+          {!readOnly && this.state.view === "PLANTS" && (
             <>
               <Button
                 size="small"
@@ -627,59 +639,79 @@ export default class Facilities extends React.Component<Props, {}> {
             </>
           )}
         </Toolbar>
-        <ChartSupplyDemand
-          height={180}
-          timeline={game.timeline}
-          currentMinute={game.date.minute}
-          location={game.location}
-          legend={game.speed === "PAUSED"}
-          startingYear={game.startingYear}
-        />
-        <List dense className="scrollable">
-          <DragDropContext
-            onBeforeDragStart={this.onBeforeDragStart}
-            onDragEnd={this.onDragEnd}
-          >
-            <Droppable droppableId="droppable">
-              {(provided) => (
-                <div {...provided.droppableProps} ref={provided.innerRef}>
-                  {game.facilities.map(
-                    (g: FacilityOperatingType, i: number) => (
-                      <FacilityListItem
-                        facility={g}
-                        game={game}
-                        key={g.id}
-                        onSell={onSell}
-                        onTogglePause={onTogglePause}
-                        onPause={onPause}
-                        onReprioritize={onReprioritize}
-                        onSelect={onSelect}
-                        selected={selectedFacilityId === g.id}
-                        storyOutputMultiplier={storyOutputMultiplierForFacility(
-                          g,
-                          storyEffects,
-                        )}
-                        spotInList={i}
-                        listLength={facilitiesCount}
-                        readOnly={readOnly}
-                      />
-                    ),
+        <Tabs
+          value={this.state.view}
+          onChange={(_event, view) => this.setState({ view })}
+          aria-label="Facility type"
+          className="facilityTabs"
+          variant="fullWidth"
+        >
+          <Tab value="PLANTS" label="Plants" />
+          <Tab value="INTERTIES" label="Interties" />
+        </Tabs>
+        {this.state.view === "PLANTS" ? (
+          <>
+            <ChartSupplyDemand
+              height={180}
+              timeline={game.timeline}
+              currentMinute={game.date.minute}
+              location={game.location}
+              legend={game.speed === "PAUSED"}
+              startingYear={game.startingYear}
+            />
+            <List dense className="scrollable">
+              <DragDropContext
+                onBeforeDragStart={this.onBeforeDragStart}
+                onDragEnd={this.onDragEnd}
+              >
+                <Droppable droppableId="droppable">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                      {game.facilities.map(
+                        (g: FacilityOperatingType, i: number) => (
+                          <FacilityListItem
+                            facility={g}
+                            game={game}
+                            key={g.id}
+                            onSell={onSell}
+                            onTogglePause={onTogglePause}
+                            onPause={onPause}
+                            onReprioritize={onReprioritize}
+                            onSelect={onSelect}
+                            selected={selectedFacilityId === g.id}
+                            storyOutputMultiplier={storyOutputMultiplierForFacility(
+                              g,
+                              storyEffects,
+                            )}
+                            spotInList={i}
+                            listLength={facilitiesCount}
+                            readOnly={readOnly}
+                          />
+                        ),
+                      )}
+                      {provided.placeholder}
+                    </div>
                   )}
-                  {provided.placeholder}
-                </div>
+                </Droppable>
+              </DragDropContext>
+              {facilitiesCount < 2 && !readOnly && (
+                <Typography
+                  color="textSecondary"
+                  variant="body2"
+                  style={{ textAlign: "center", marginTop: "12px" }}
+                >
+                  (click "Generator" or "Storage" to build more)
+                </Typography>
               )}
-            </Droppable>
-          </DragDropContext>
-          {facilitiesCount < 2 && !readOnly && (
-            <Typography
-              color="textSecondary"
-              variant="body2"
-              style={{ textAlign: "center", marginTop: "12px" }}
-            >
-              (click "Generator" or "Storage" to build more)
-            </Typography>
-          )}
-        </List>
+            </List>
+          </>
+        ) : (
+          <TransmissionPanel
+            game={game}
+            onBuild={onTransmissionBuild}
+            onPolicy={onTradingPolicy}
+          />
+        )}
       </GameCard>
     );
   }

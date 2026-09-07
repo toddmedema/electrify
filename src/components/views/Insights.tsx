@@ -124,9 +124,11 @@ import {
   rangesEqual,
   zoomChartViewport,
 } from "../base/ChartViewportContext";
+import PowerExchangeSummary from "../base/PowerExchangeSummary";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
   | "storage"
@@ -149,11 +151,17 @@ export interface InsightLayerDefinition {
   id: InsightLayerId;
   label: string;
   group: LayerGroup;
-  availability?: "storage" | "hydro";
+  availability?: "storage" | "hydro" | "transmission";
 }
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  {
+    id: "powerExchange",
+    label: "Power exchange",
+    group: "Grid",
+    availability: "transmission",
+  },
   {
     id: "demandByType",
     label: "Demand by use",
@@ -222,7 +230,14 @@ export const INSIGHT_PRESETS: Record<
   },
   reliability: {
     label: "Reliability",
-    layers: ["supplyDemand", "supplyByFuel", "storage", "weather", "water"],
+    layers: [
+      "supplyDemand",
+      "powerExchange",
+      "supplyByFuel",
+      "storage",
+      "weather",
+      "water",
+    ],
   },
   profitability: {
     label: "Profitability",
@@ -636,7 +651,7 @@ function financeSeries(
 }
 
 function facilitySignature(game: GameType): string {
-  return game.facilities
+  const facilities = game.facilities
     .map((facility) =>
       [
         facility.id,
@@ -646,6 +661,10 @@ function facilitySignature(game: GameType): string {
       ].join(":"),
     )
     .join("|");
+  const transmission = (game.transmission?.lines || [])
+    .map((line) => [line.id, line.corridorId, line.yearsToBuildLeft].join(":"))
+    .join("|");
+  return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
 }
 
 export default class Insights extends React.Component<Props, State> {
@@ -1119,7 +1138,9 @@ export default class Insights extends React.Component<Props, State> {
     return (
       !layer.availability ||
       (layer.availability === "storage" && projection.hasStorage) ||
-      (layer.availability === "hydro" && projection.hasHydro)
+      (layer.availability === "hydro" && projection.hasHydro) ||
+      (layer.availability === "transmission" &&
+        !!this.props.game.transmission?.lines.length)
     );
   }
 
@@ -1609,6 +1630,14 @@ export default class Insights extends React.Component<Props, State> {
                 </Typography>
               )}
             </>
+          );
+          break;
+        case "powerExchange":
+          body = (
+            <PowerExchangeSummary
+              game={game}
+              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
+            />
           );
           break;
         case "demandByType": {

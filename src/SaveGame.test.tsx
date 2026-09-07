@@ -77,6 +77,16 @@ describe("SaveGame", () => {
     expect(restored?.game).toEqual({ ...game, policies: emptyPolicies() });
   });
 
+  it("keeps legacy saves disconnected from adjacent markets", () => {
+    const legacy = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete legacy.game.transmission;
+    const restored = parseSave({ ...legacy, version: 2 });
+    expect(restored?.game.transmission).toEqual({
+      tradingPolicy: "BALANCED",
+      lines: [],
+    });
+  });
+
   // The memo must never alias the live game slice, or a Continue button would describe a game
   // that has kept playing since it was saved
   it("reads back through storage rather than handing back the live object", () => {

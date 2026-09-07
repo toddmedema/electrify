@@ -9,6 +9,10 @@ import {
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
 import { GameType } from "./Types";
+import {
+  emptyTransmissionState,
+  TRANSMISSION_CORRIDORS,
+} from "./data/AdjacentMarkets";
 import type { AppStore } from "./Store";
 
 /**
@@ -240,6 +244,37 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
+  const transmission = game.transmission;
+  if (
+    transmission !== undefined &&
+    (typeof transmission !== "object" ||
+      transmission === null ||
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        transmission.tradingPolicy,
+      ) ||
+      !Array.isArray(transmission.lines) ||
+      transmission.lines.some(
+        (line) =>
+          typeof line !== "object" ||
+          line === null ||
+          !TRANSMISSION_CORRIDORS.some(({ id }) => id === line.corridorId) ||
+          [
+            line.id,
+            line.capacityW,
+            line.buildCost,
+            line.annualOperatingCost,
+            line.yearsToBuildLeft,
+            line.minuteCreated,
+            line.loanAmountLeft,
+            line.loanMonthlyPayment,
+            line.interestRate,
+          ].some(
+            (value) => typeof value !== "number" || !Number.isFinite(value),
+          ) ||
+          typeof line.financed !== "boolean",
+      ))
+  )
+    return null;
   if (
     [...game.timeline, ...game.monthlyHistory].some(
       (t) =>
@@ -254,13 +289,22 @@ export function parseSave(raw: unknown): SaveGameType | null {
     policies:
       game.policies ??
       emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
+    transmission: game.transmission ?? emptyTransmissionState(),
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
+      importedW: t.importedW ?? 0,
+      exportedW: t.exportedW ?? 0,
+      transmissionCapacityW: t.transmissionCapacityW ?? 0,
+      marketPricePerMWh: t.marketPricePerMWh ?? 0,
     })),
     monthlyHistory: game.monthlyHistory.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
     })),
   };
   // Version 1 saves remain playable. New months collect chart history; older months have only
