@@ -10,6 +10,12 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(
+      page
+        .locator("#facilitiesPane:visible")
+        .or(page.getByRole("button", { name: "Facilities", exact: true }))
+        .first(),
+    ).toBeVisible();
     if (!(await page.locator("#facilitiesPane").isVisible())) {
       await page
         .getByRole("button", { name: "Facilities", exact: true })
@@ -91,6 +97,12 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(
+      page
+        .locator("#facilitiesPane:visible")
+        .or(page.getByRole("button", { name: "Facilities", exact: true }))
+        .first(),
+    ).toBeVisible();
     if (!(await page.locator("#facilitiesPane").isVisible())) {
       await page
         .getByRole("button", { name: "Facilities", exact: true })
