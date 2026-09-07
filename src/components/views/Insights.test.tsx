@@ -3,7 +3,9 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
-import { GameType } from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
+import gameReducer from "../../reducers/Game";
+import { schedulePolicy, cancelPolicy } from "../../reducers/GameActions";
 import Insights, {
   INSIGHT_LAYERS,
   INSIGHT_PRESETS,
@@ -31,6 +33,68 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+
+it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    props: typeof props;
+    getProjection: (now: TickPresentFutureType) => {
+      timeline: TickPresentFutureType[];
+    };
+  };
+  const before = internals.getProjection(game.timeline[0]);
+  const change = {
+    id: "efficiency" as const,
+    tier: "Large" as const,
+    month: 1,
+  };
+  const project = (nextGame: GameType) => {
+    const nextProps = { ...props, game: nextGame };
+    expect(insights.shouldComponentUpdate(nextProps, insights.state)).toBe(
+      true,
+    );
+    internals.props = nextProps;
+    return internals.getProjection(nextGame.timeline[0]);
+  };
+  const scheduledGame = gameReducer(game, schedulePolicy(change));
+  const scheduled = project(scheduledGame);
+  const replacedGame = gameReducer(
+    scheduledGame,
+    schedulePolicy({ ...change, tier: "Small" }),
+  );
+  const replaced = project(replacedGame);
+  const cancelled = project(
+    gameReducer(replacedGame, cancelPolicy({ ...change, tier: "Small" })),
+  );
+  const future = (projection: typeof before) =>
+    projection.timeline.find((tick) => tick.minute >= 3 * MINUTES_PER_MONTH)!;
+  expect(future(scheduled).demandW).toBeLessThan(future(replaced).demandW);
+  expect(future(replaced).demandW).toBeLessThan(future(before).demandW);
+  expect(future(scheduled).expensesPolicy).toBeGreaterThan(
+    future(replaced).expensesPolicy!,
+  );
+  expect(future(replaced).expensesPolicy).toBeGreaterThan(0);
+  expect(cancelled.timeline).toEqual(before.timeline);
+  expect(
+    insights.shouldComponentUpdate(
+      {
+        ...internals.props,
+        game: {
+          ...internals.props.game,
+          policies: JSON.parse(JSON.stringify(internals.props.game.policies)),
+        },
+      },
+      insights.state,
+    ),
+  ).toBe(false);
+});
 
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,

@@ -635,6 +635,27 @@ function financeSeries(
   return points.slice(first, Math.max(first + 1, Math.min(points.length, end)));
 }
 
+function policySignature(game: GameType): string {
+  const policies = game.policies;
+  if (!policies) return "";
+  return JSON.stringify([
+    policies.month,
+    ...Object.keys(policies.programs)
+      .sort()
+      .map((id) => {
+        const program = policies.programs[id as keyof typeof policies.programs];
+        return [
+          id,
+          program.tier,
+          program.adoption,
+          program.spending,
+          program.pending?.tier,
+          program.pending?.month,
+        ];
+      }),
+  ]);
+}
+
 function facilitySignature(game: GameType): string {
   return game.facilities
     .map((facility) =>
@@ -703,6 +724,7 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.focusLayer !== this.props.focusLayer ||
       nextProps.upcomingEvents !== this.props.upcomingEvents ||
+      policySignature(nextProps.game) !== policySignature(this.props.game) ||
       facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
     );
   }
@@ -997,6 +1019,7 @@ export default class Insights extends React.Component<Props, State> {
       game.dollarsPerkWh,
       game.feePerKgCO2e,
       facilitySignature(game),
+      policySignature(game),
     ].join("|");
     if (this.projectionCache?.key === key) {
       return this.projectionCache.projection;
