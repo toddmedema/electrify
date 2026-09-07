@@ -37,7 +37,9 @@ for (const theme of ["light", "dark"] as const) {
     );
     await back.click();
     await expect(dialog).not.toBeVisible();
-    await page.getByRole("button", { name: "Events", exact: true }).click();
+    // Wide desktops already show the event pane beside the grid.
+    const events = page.getByRole("button", { name: "Events", exact: true });
+    if (await events.isVisible()) await events.click();
     await page
       .locator("#appbar:visible")
       .getByRole("button", { name: "fast speed", exact: true })
