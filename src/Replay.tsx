@@ -1,3 +1,4 @@
+import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
 import { isValidLocation } from "./helpers/Locations";
@@ -30,7 +31,8 @@ import {
 
 // Version 2 changes authored starting fleets and their facility IDs, so older action streams can
 // no longer reproduce the run they recorded.
-export const REPLAY_VERSION = 3;
+// Version 4 adds customer program actions; older clients must reject these streams.
+export const REPLAY_VERSION = 4;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -58,6 +60,8 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "schedulePolicy",
+  "cancelPolicy",
   "buildFacility",
   "sellFacility",
   "togglePauseFacility",
@@ -178,6 +182,11 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     ) {
       return null;
     }
+    if (
+      (action.type === "schedulePolicy" || action.type === "cancelPolicy") &&
+      !validPolicyChange(action.payload)
+    )
+      return null;
     actions.push({
       minute: action.minute,
       type: action.type as ReplayActionNameType,
@@ -204,7 +213,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (doc.version !== REPLAY_VERSION) {
+  if (doc.version !== REPLAY_VERSION && doc.version !== 3) {
     return null;
   }
   if (
@@ -219,7 +228,13 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const actions = parseActions(doc.actions);
-  if (!actions) {
+  if (
+    !actions ||
+    (doc.version === 3 &&
+      actions.some(
+        (a) => a.type === "schedulePolicy" || a.type === "cancelPolicy",
+      ))
+  ) {
     return null;
   }
   return {

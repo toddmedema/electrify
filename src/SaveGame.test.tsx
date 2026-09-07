@@ -14,6 +14,7 @@ import {
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
 import { tickState } from "./reducers/Game";
+import { emptyPolicies } from "./helpers/Policies";
 
 jest.setTimeout(60000);
 
@@ -73,7 +74,7 @@ describe("SaveGame", () => {
   it("upgrades older saves without inventing missing chart history", () => {
     const restored = parseSave({ ...serializeSave(game), version: 1 });
     expect(restored?.version).toBe(SAVE_VERSION);
-    expect(restored?.game).toEqual(game);
+    expect(restored?.game).toEqual({ ...game, policies: emptyPolicies() });
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game
@@ -83,7 +84,10 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save!.game).not.toBe(game);
-    expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
+    expect(save!.game).toEqual({
+      ...JSON.parse(JSON.stringify(game)),
+      policies: emptyPolicies(),
+    });
   });
 
   it("reports no save when nothing has been written", () => {

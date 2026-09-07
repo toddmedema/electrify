@@ -62,7 +62,7 @@ export function selectUpcomingStoryEvents(
         month.expensesFuel,
         month.expensesOM,
         month.expensesCarbonFee,
-        month.expensesInterest,
+        month.expensesInterest + (month.expensesPolicy || 0),
         month.peakDemandW,
         Object.entries(month.deliveredWhByFuel)
           .sort(([a], [b]) => a.localeCompare(b))

@@ -45,6 +45,7 @@ export type ManualGroupType = (typeof MANUAL_GROUPS)[number];
 // them here rather than passing raw strings means renaming an entry breaks the build instead of
 // silently breaking the link.
 export const MANUAL_ENTRY = {
+  CUSTOMER_PROGRAMS: "Customer programs",
   HOW_TO_PLAY: "How to Play",
   BASELOAD_VS_PEAKER: "Baseload vs Peaker",
   BLACKOUTS: "Blackouts",
@@ -137,6 +138,25 @@ export function manualEntryText(node: React.ReactNode): string {
 }
 
 export const MANUAL_ENTRIES: ManualEntryType[] = [
+  {
+    title: "Customer programs",
+    group: "Gameplay",
+    keywords: "efficiency rooftop solar rebates funding adoption demand",
+    entry: (
+      <p>
+        In Insights, Customer programs lets you fund efficiency or rooftop solar
+        rebates. Choose Off, Small, or Large and compare estimated utility
+        demand before applying next month. Funding persists until changed.
+        Charges pay only for new upgrades, up to the monthly budget, and stop at
+        full adoption. Off stops new adoption and spending; installed upgrades
+        stay for the rest of the run. Efficiency reduces residential and
+        commercial use. Solar offsets their remaining daylight load, with
+        surplus curtailed and no export payment. It does not directly cover an
+        evening peak. Lower demand also means less electricity sold, so compare
+        cash as well as peak demand.
+      </p>
+    ),
+  },
   {
     title: MANUAL_ENTRY.HOW_TO_PLAY,
     group: "Gameplay",

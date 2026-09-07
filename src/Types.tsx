@@ -207,6 +207,8 @@ export interface ScoreType {
 // The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
 // prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
 export type ReplayActionNameType =
+  | "schedulePolicy"
+  | "cancelPolicy"
   | "buildFacility"
   | "sellFacility"
   | "togglePauseFacility"
@@ -350,6 +352,7 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
 }
 
 interface HistoryForecastShared {
+  expensesPolicy?: number; // Monthly funded upgrades; absent in legacy histories.
   cash: number;
   customers: number;
   netWorth: number;
@@ -772,7 +775,26 @@ export interface WorldEventStateType {
   checkedKeys: string[];
 }
 
+export type PolicyId = "efficiency" | "solar";
+export type PolicyTier = "Off" | "Small" | "Large";
+export interface PolicyProgramType {
+  tier: PolicyTier;
+  adoption: number; // Fraction of the authored potential installed; persists within the run.
+  spending: number; // Actual funded upgrades this month, in nominal dollars.
+  pending?: { tier: PolicyTier; month: number };
+}
+export interface PoliciesType {
+  month: number; // Last processed elapsed month; prevents duplicate enrollment and charges.
+  programs: Record<PolicyId, PolicyProgramType>;
+}
+export interface PolicyChangeType {
+  id: PolicyId;
+  tier: PolicyTier;
+  month: number;
+}
 export interface GameType {
+  policies?: PoliciesType;
+  policyPause?: { token: string; speed: SpeedType };
   seed: number;
   difficulty: DifficultyType;
   scenarioId: number;

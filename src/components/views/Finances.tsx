@@ -155,6 +155,13 @@ export function buildChartKeys(units: UnitSystemType): {
       formatTable: formatMoneyStable,
       nesting: 1,
     },
+    expensesPolicy: {
+      label: "Customer programs",
+      higherIsBetter: false,
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
     expensesInterest: {
       label: "Loan interest",
       higherIsBetter: false,

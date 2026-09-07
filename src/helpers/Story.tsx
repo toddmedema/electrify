@@ -24,7 +24,8 @@ export function buildStoryPeriodSnapshot(
     summary.expensesFuel +
     summary.expensesOM +
     summary.expensesCarbonFee +
-    summary.expensesInterest;
+    summary.expensesInterest +
+    (summary.expensesPolicy || 0);
   return {
     deliveredWhByFuel: { ...summary.deliveredWhByFuel },
     demandWh: summary.demandWh,
@@ -74,7 +75,8 @@ export function buildStorySnapshot(
     prior12Months.expensesFuel +
     prior12Months.expensesOM +
     prior12Months.expensesCarbonFee +
-    prior12Months.expensesInterest;
+    prior12Months.expensesInterest +
+    (prior12Months.expensesPolicy || 0);
   return {
     deliveredWhByFuel12m: { ...prior12Months.deliveredWhByFuel },
     demandWh12m: prior12Months.demandWh,

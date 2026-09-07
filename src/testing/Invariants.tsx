@@ -153,6 +153,31 @@ export function checkTick(
       collector.add("tick value is finite", when, `${field} = ${now[field]}`);
     }
   });
+  if (
+    !Number.isFinite(now.expensesPolicy ?? 0) ||
+    (now.expensesPolicy ?? 0) < 0
+  ) {
+    collector.add(
+      "policy spending is finite and non-negative",
+      when,
+      `${now.expensesPolicy}`,
+    );
+  }
+  if (state.policies) {
+    Object.values(state.policies.programs).forEach((program) => {
+      if (
+        program.adoption < 0 ||
+        program.adoption > 1 ||
+        !Number.isFinite(program.adoption)
+      ) {
+        collector.add(
+          "policy adoption is bounded",
+          when,
+          `${program.adoption}`,
+        );
+      }
+    });
+  }
 
   NON_NEGATIVE_TICK_FIELDS.forEach((field) => {
     const value = now[field];
@@ -202,7 +227,8 @@ export function checkTick(
       now.expensesFuel +
       now.expensesOM +
       now.expensesCarbonFee +
-      now.expensesInterest;
+      now.expensesInterest +
+      (now.expensesPolicy || 0);
     const maxPrincipal = state.facilities.reduce(
       (acc: number, f: FacilityOperatingType) =>
         acc +
