@@ -258,6 +258,47 @@ describe("Insights layers", () => {
     expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
   });
 
+  it("groups demand with customers and places rates last in economics", () => {
+    expect(
+      INSIGHT_LAYERS.find((layer) => layer.id === "demandByType")?.group,
+    ).toBe("Customers");
+    expect(
+      INSIGHT_LAYERS.filter((layer) => layer.group === "Economics").at(-1)?.id,
+    ).toBe("inflationInterest");
+  });
+
+  it("shows expanded finance rows and both rate graphs", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["financeDetails", "inflationInterest"]),
+    );
+    const game = createGame({ scenarioId: 100 });
+    renderInsights(100, game);
+    for (const label of [
+      "Fuel",
+      "Operations & maintenance",
+      "Loan interest",
+      "Carbon fees",
+      "Profit per kWh",
+      "Net worth",
+      "Current interest rate",
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    const interestRow = screen.getByRole("row", {
+      name: /Current interest rate/,
+    });
+    expect(interestRow).toHaveTextContent(
+      (game.timeline[0].interestRate * 100).toFixed(2) + "%",
+    );
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinflationRate"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinterestRate"),
+    ).toBeInTheDocument();
+  });
+
   it("starts new players on the five-chart overview in priority order", () => {
     renderInsights();
 
@@ -378,6 +419,7 @@ describe("Insights layers", () => {
       "data-domain",
       JSON.stringify([5.9 * MINUTES_PER_MONTH, 7.1 * MINUTES_PER_MONTH]),
     );
+    expect(screen.queryByRole("dialog")).toBeNull();
     await user.keyboard("{Escape}");
     expect(event).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("dialog")).toBeNull();
