@@ -22,7 +22,8 @@ const latestMonthProfit = (state: AppStateType) => {
         month.expensesFuel -
         month.expensesOM -
         month.expensesCarbonFee -
-        month.expensesInterest
+        month.expensesInterest -
+        (month.expensesPolicy || 0)
     : undefined;
 };
 

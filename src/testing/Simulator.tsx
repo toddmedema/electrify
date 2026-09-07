@@ -2,6 +2,8 @@
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
 // the reducer directly. Importing Store creates and registers it.
 import cloneDeep from "lodash.clonedeep";
+import { schedulePolicy } from "../reducers/GameActions";
+import type { PolicyId, PolicyTier } from "../Types";
 import "../Store";
 import gameReducer, {
   buildFacility,
@@ -67,6 +69,7 @@ function scenarioLocation(scenario: ScenarioType): LocationType {
 }
 
 export interface SimOptionsType {
+  initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   // A scenario that isn't in SCENARIOS - a custom game, or one being tried out. Its id wins over
   // scenarioId, the same way the real game treats the one on the slice
@@ -83,6 +86,7 @@ export interface SimOptionsType {
 }
 
 export interface ResolvedSimOptionsType {
+  initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   difficulty: DifficultyType;
   months: number;
@@ -224,6 +228,12 @@ function setUpGame(
     state = gameReducer(state, sellFacility(options.sellFacilityId));
   }
   // Redux Toolkit freezes reducer output in development; the tick loop mutates state in place
+  Object.entries(options.initialPrograms || {}).forEach(([id, tier]) => {
+    state = gameReducer(
+      state,
+      schedulePolicy({ id: id as PolicyId, tier, month: 1 }),
+    );
+  });
   return cloneDeep(state);
 }
 
@@ -305,6 +315,7 @@ function resolveOptions(
   options: SimOptionsType,
 ): ResolvedSimOptionsType {
   return {
+    initialPrograms: options.initialPrograms,
     scenarioId: scenario.id,
     difficulty: options.difficulty || "Employee",
     months: options.months || scenario.durationMonths || 12 * 20,

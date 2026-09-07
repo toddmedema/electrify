@@ -1,3 +1,4 @@
+import { emptyPolicies, validPolicies } from "./helpers/Policies";
 import packageJson from "../package.json";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
@@ -26,7 +27,9 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Initial public schema. Increment this when a post-release change becomes incompatible.
-export const SAVE_VERSION = 2;
+// Version 3 includes persistent customer programs. Accept and normalize v1/v2 saves;
+// older clients must not resume an active program as though its upgrades did not exist.
+export const SAVE_VERSION = 3;
 
 export interface SaveGameType {
   version: number;
@@ -61,7 +64,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   const save = raw as Partial<SaveGameType>;
   if (
-    (save.version !== SAVE_VERSION && save.version !== 1) ||
+    (save.version !== SAVE_VERSION &&
+      save.version !== 1 &&
+      save.version !== 2) ||
     typeof save.savedAt !== "string" ||
     typeof save.appVersion !== "string"
   ) {
@@ -227,9 +232,40 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  if (
+    game.policies !== undefined &&
+    !validPolicies(
+      game.policies,
+      Math.floor(game.date.minute / MINUTES_PER_MONTH),
+    )
+  )
+    return null;
+  if (
+    [...game.timeline, ...game.monthlyHistory].some(
+      (t) =>
+        t.expensesPolicy !== undefined &&
+        (!Number.isFinite(t.expensesPolicy) || t.expensesPolicy < 0),
+    )
+  )
+    return null;
+  const normalized = {
+    ...game,
+    policyPause: undefined,
+    policies:
+      game.policies ??
+      emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
+    timeline: game.timeline.map((t) => ({
+      ...t,
+      expensesPolicy: t.expensesPolicy ?? 0,
+    })),
+    monthlyHistory: game.monthlyHistory.map((t) => ({
+      ...t,
+      expensesPolicy: t.expensesPolicy ?? 0,
+    })),
+  };
   // Version 1 saves remain playable. New months collect chart history; older months have only
   // their original financial and supply/demand records. Replays use a separate strict version.
-  return { ...save, version: SAVE_VERSION } as SaveGameType;
+  return { ...save, game: normalized, version: SAVE_VERSION } as SaveGameType;
 }
 
 export function readSave(): SaveGameType | null {

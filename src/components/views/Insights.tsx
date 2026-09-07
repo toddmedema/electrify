@@ -1,4 +1,5 @@
 import * as React from "react";
+import CustomerPrograms from "./CustomerPrograms";
 import {
   Button,
   Checkbox,
@@ -1200,6 +1201,10 @@ export default class Insights extends React.Component<Props, State> {
         >
           <span className="insightsRateToggleLabel">Rate controls</span>
         </Button>
+        <CustomerPrograms
+          game={game}
+          onViewDemand={() => this.setLayers(["demandByType"])}
+        />
         <Typography
           className="insightsRateSummaryDesktop"
           variant="body2"

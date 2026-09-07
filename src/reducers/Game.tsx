@@ -1,4 +1,18 @@
 import { getViableLocationCount } from "../data/FacilitySites";
+import {
+  advancePolicies,
+  applyPolicyDemand,
+  emptyPolicies,
+  policyAvailable,
+  validPolicyChange,
+} from "../helpers/Policies";
+import { POLICIES, POLICY_IDS } from "../data/Policies";
+import {
+  schedulePolicy,
+  cancelPolicy,
+  openPolicyDecision,
+  closePolicyDecision,
+} from "./GameActions";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
@@ -705,13 +719,20 @@ export const gameSlice = createSlice({
       // Assigned onto the draft rather than spread into a new object, which is equivalent for a
       // partial merge and is what lets the recorder below append to the draft's own log. Immer
       // rejects a reducer that both mutates its draft and returns a replacement for it
-      Object.assign(state, action.payload);
+      const {
+        policies: _policies,
+        policyPause: _policyPause,
+        ...payload
+      } = action.payload;
+      Object.assign(state, payload);
       const recorded = recordedDelta(action.payload);
       if (recorded) {
         recordReplayAction(state, "delta", recorded);
       }
     },
     initGame: (state, action: PayloadAction<NewGameAction>) => {
+      delete state.policies;
+      delete state.policyPause;
       const a = action.payload;
       previouslyInBlackout = false;
       blackoutUnservedWh = 0;
@@ -893,6 +914,7 @@ export const gameSlice = createSlice({
       recordReplayAction(state, "reprioritizeFacility", action.payload);
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
       // instructions frozen until the player actually closes the card.
       if (
@@ -994,12 +1016,14 @@ export const gameSlice = createSlice({
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        speedBeforeBlockingCard = state.speed;
+        speedBeforeBlockingCard = state.policyPause?.speed ?? state.speed;
+        delete state.policyPause;
         state.speed = "PAUSED";
       }
     });
     builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
     builder.addCase(dialogOpen, (state) => {
+      delete state.policyPause;
       speedBeforeDialog = state.speed;
       state.speed = "PAUSED";
     });
@@ -1007,9 +1031,34 @@ export const gameSlice = createSlice({
       state.speed = speedBeforeDialog;
       ensureTicking(state);
     });
+    builder.addCase(schedulePolicy, (state, action) => {
+      if (
+        !state.replayPlayback &&
+        applyPolicyEdit(state, action.payload, false)
+      )
+        recordReplayAction(state, "schedulePolicy", action.payload);
+    });
+    builder.addCase(cancelPolicy, (state, action) => {
+      if (!state.replayPlayback && applyPolicyEdit(state, action.payload, true))
+        recordReplayAction(state, "cancelPolicy", action.payload);
+    });
+    builder.addCase(openPolicyDecision, (state, action) => {
+      if (!state.policyPause) {
+        state.policyPause = { token: action.payload, speed: state.speed };
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(closePolicyDecision, (state, action) => {
+      if (state.policyPause?.token === action.payload) {
+        if (state.speed === "PAUSED") state.speed = state.policyPause.speed;
+        delete state.policyPause;
+        ensureTicking(state);
+      }
+    });
     // The score screen stops the clock the same way any other dialog does - "Keep playing"
     // resumes at whatever speed the run was going when it ended
     builder.addCase(victoryOpen, (state) => {
+      delete state.policyPause;
       speedBeforeDialog = state.speed;
       state.speed = "PAUSED";
     });
@@ -1144,9 +1193,53 @@ function applyReprioritizeFacility(
  * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
  * wrong is a disappointment, one that throws takes the whole game down with it.
  */
+function applyPolicyEdit(
+  state: GameType,
+  payload: unknown,
+  cancel: boolean,
+): boolean {
+  const scenario = getScenario(state.scenarioId, state.customScenario);
+  if (
+    !validPolicyChange(payload) ||
+    !policyAvailable(state) ||
+    !scenario ||
+    !state.timeline.length ||
+    state.date.monthsElapsed !==
+      Math.floor(state.date.minute / MINUTES_PER_MONTH) ||
+    payload.month !== state.date.monthsElapsed + 1 ||
+    payload.month >= scenario.durationMonths
+  )
+    return false;
+  const existing = state.policies?.programs[payload.id];
+  if (cancel) {
+    if (
+      !existing?.pending ||
+      existing.pending.month !== payload.month ||
+      existing.pending.tier !== payload.tier
+    )
+      return false;
+    delete existing.pending;
+  } else {
+    if (payload.tier === (existing?.pending?.tier ?? existing?.tier ?? "Off"))
+      return false;
+    state.policies ??= emptyPolicies(state.date.monthsElapsed);
+    const program = state.policies.programs[payload.id];
+    if (payload.tier === program.tier) delete program.pending;
+    else program.pending = { tier: payload.tier, month: payload.month };
+  }
+  // Accepted changes start next month; the current month's demand and customer balance
+  // already happened. Long-range callers project the new pending state independently.
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 function applyReplayAction(state: GameType, entry: ReplayActionType) {
   const payload = entry.payload;
   switch (entry.type) {
+    case "schedulePolicy":
+    case "cancelPolicy":
+      applyPolicyEdit(state, payload, entry.type === "cancelPolicy");
+      break;
     case "buildFacility": {
       const build = payload as Partial<BuildFacilityAction>;
       if (typeof build?.facility === "object" && build.facility !== null) {
@@ -1345,6 +1438,17 @@ export function tickState(state: GameType) {
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
       const storyPriceFuels = updateWorldEvents(state);
+      const activatedPrograms = advancePolicies(
+        state,
+        state.date.monthsElapsed,
+      );
+      activatedPrograms.forEach((id) =>
+        logGameEvent(
+          state,
+          "WORLD_EVENT",
+          `${POLICIES[id].name}: ${state.policies!.programs[id].tier} funding starts this month.`,
+        ),
+      );
       state.timeline = generateNewTimeline(state, cash, customers);
       logFuelPriceMoves(state, storyPriceFuels);
       logFuelCrossovers(state);
@@ -1720,6 +1824,7 @@ function getDemandW(
     game.location,
     game.loadAdditions,
   );
+  applyPolicyDemand(game, now);
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
     0,
@@ -1821,11 +1926,21 @@ function reforecastDemand(
   state: GameType,
   tickScale = 1,
 ): TickPresentFutureType[] {
+  const projection = { ...state, policies: cloneDeep(state.policies) };
   let prev = state.timeline[0];
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      t.demandW = getDemandW(date, state, prev, t, tickScale);
+      advancePolicies(projection, date.monthsElapsed);
+      t = { ...t };
+      t.expensesPolicy =
+        (POLICY_IDS.reduce(
+          (sum, id) => sum + (projection.policies?.programs[id].spending || 0),
+          0,
+        ) *
+          tickScale) /
+        TICKS_PER_MONTH;
+      t.demandW = getDemandW(date, projection, prev, t, tickScale);
       prev = t;
       return t;
     }
@@ -2358,6 +2473,7 @@ function updateSupplyFacilitiesFinances(
       expensesFuel -
       expensesCarbonFee -
       expensesInterest -
+      (now.expensesPolicy || 0) -
       principalRepayment,
   );
   now.netWorth = getNetWorth(facilities, now.cash, now.minute);
@@ -2527,6 +2643,7 @@ export function generateNewTimeline(
       expensesOM: 0,
       expensesCarbonFee: 0,
       expensesInterest: 0,
+      expensesPolicy: 0,
       kgco2e: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
       interestRate: 0,
