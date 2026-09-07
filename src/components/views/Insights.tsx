@@ -109,7 +109,7 @@ import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
 import { UnitsContext } from "../base/UnitsContext";
-import { formatCustomerChange } from "./Finances";
+import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
@@ -139,7 +139,8 @@ export type InsightLayerId =
   | "cash"
   | "customers"
   | "emissions"
-  | "financeDetails";
+  | "financeDetails"
+  | "inflationInterest";
 
 type LayerGroup = "Grid" | "Customers" | "Economics" | "Environment";
 
@@ -155,7 +156,7 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   {
     id: "demandByType",
     label: "Demand by use",
-    group: "Grid",
+    group: "Customers",
   },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
@@ -171,6 +172,11 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
+  {
+    id: "inflationInterest",
+    label: "Inflation & interest rate",
+    group: "Economics",
+  },
   {
     id: "emissions",
     label: "Emissions (CO2e)",
@@ -1347,22 +1353,26 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {[
-              ["Profit", formatMoneyConcise(summary.profit)],
-              ["Revenue", formatMoneyConcise(summary.revenue)],
-              ["Expenses", formatMoneyConcise(summary.expenses)],
-              ["Cash", formatMoneyConcise(summary.cash)],
-              ["Customers", new Intl.NumberFormat().format(summary.customers)],
-              [
-                "CO2e emitted",
-                `${formatLargeMassValueConcise(summary.kgco2e, units)} ${largeMassUnit(units)}`,
-              ],
-            ].map(([label, value]) => (
-              <TableRow key={label}>
-                <TableCell>{label}</TableCell>
-                <TableCell align="right">{value}</TableCell>
-              </TableRow>
-            ))}
+            {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
+              const value =
+                key === "interestRate"
+                  ? getTimeFromTimeline(game.date.minute, game.timeline)!
+                      .interestRate
+                  : summary[key as DerivedHistoryKeysType];
+              return (
+                <TableRow key={key}>
+                  <TableCell sx={{ pl: 2 + (metadata.nesting || 0) * 2 }}>
+                    {key === "interestRate"
+                      ? "Current interest rate"
+                      : metadata.label}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(metadata.formatTable || metadata.format)(value)}
+                    {metadata.suffix ? " " + metadata.suffix : ""}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </>
@@ -1531,6 +1541,33 @@ export default class Insights extends React.Component<Props, State> {
       );
     } else {
       switch (id) {
+        case "inflationInterest":
+          body = (
+            <>
+              {(["inflationRate", "interestRate"] as const).map((key) => (
+                <ChartFinances
+                  key={key}
+                  id={chartId + key}
+                  height={140}
+                  timeline={financeSeries(
+                    key,
+                    projection.financePast,
+                    projection.financeProjected,
+                    projection.domain.x,
+                    game.startingYear,
+                  )}
+                  title={
+                    key === "inflationRate" ? "Inflation" : "Interest rate"
+                  }
+                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  startingYear={game.startingYear}
+                  domain={projection.domain.x}
+                  syncKey={SYNC_KEY}
+                />
+              ))}
+            </>
+          );
+          break;
         case "supplyDemand":
           body = (
             <>

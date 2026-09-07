@@ -1,3 +1,4 @@
+import { getViableLocationCount } from "../data/FacilitySites";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
@@ -1748,9 +1749,10 @@ function reforecastWeatherAndPrices(
   state: GameType,
   cumulativeMegatons: number,
 ): TickPresentFutureType[] {
-  const hasHydro = state.facilities.some(
-    (facility) => facility.fuel === "Hydro",
-  );
+  // Resource forecasts are also shown before the player builds a hydro plant.
+  const hasHydro =
+    (getViableLocationCount(state.location, "Hydro") || 0) > 0 ||
+    state.facilities.some((facility) => facility.fuel === "Hydro");
   const watershedId = state.location.watershedId || state.location.id;
   const hydrologyByMonth = new Map<
     string,
