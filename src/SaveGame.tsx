@@ -8,7 +8,7 @@ import {
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { GameType } from "./Types";
+import { GameType, TransmissionLineOperatingType } from "./Types";
 import {
   emptyTransmissionState,
   TRANSMISSION_CORRIDORS,
@@ -47,6 +47,51 @@ export interface SaveGameType {
 // clearing invalidate it rather than filling it in, so what's cached is always what's in storage
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
+
+function validTransmissionLine(
+  raw: unknown,
+): raw is TransmissionLineOperatingType {
+  if (typeof raw !== "object" || raw === null) return false;
+  const line = raw as Partial<TransmissionLineOperatingType>;
+  const corridor = TRANSMISSION_CORRIDORS.find(
+    ({ id }) => id === line.corridorId,
+  );
+  if (!corridor) return false;
+  const nonNegative = [
+    line.capacityW,
+    line.buildCost,
+    line.annualOperatingCost,
+    line.yearsToBuildLeft,
+    line.minuteCreated,
+    line.loanAmountLeft,
+    line.loanMonthlyPayment,
+    line.interestRate,
+  ];
+  return (
+    typeof line.name === "string" &&
+    line.name.length > 0 &&
+    Number.isInteger(line.id) &&
+    line.id! > 0 &&
+    nonNegative.every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    ) &&
+    line.capacityW === corridor.capacityW &&
+    line.buildCost === corridor.buildCost &&
+    line.annualOperatingCost === corridor.annualOperatingCost &&
+    line.yearsToBuildLeft! <= corridor.yearsToBuild &&
+    Number.isInteger(line.minuteCreated) &&
+    line.interestRate! <= 1 &&
+    line.loanAmountLeft! <= corridor.buildCost &&
+    line.loanMonthlyPayment! <= corridor.buildCost &&
+    typeof line.financed === "boolean" &&
+    (line.financed
+      ? line.loanMonthlyPayment! > 0
+      : line.loanAmountLeft === 0 &&
+        line.loanMonthlyPayment === 0 &&
+        line.interestRate === 0)
+  );
+}
 
 export function serializeSave(game: GameType): SaveGameType {
   return {
@@ -253,26 +298,11 @@ export function parseSave(raw: unknown): SaveGameType | null {
         transmission.tradingPolicy,
       ) ||
       !Array.isArray(transmission.lines) ||
-      transmission.lines.some(
-        (line) =>
-          typeof line !== "object" ||
-          line === null ||
-          !TRANSMISSION_CORRIDORS.some(({ id }) => id === line.corridorId) ||
-          [
-            line.id,
-            line.capacityW,
-            line.buildCost,
-            line.annualOperatingCost,
-            line.yearsToBuildLeft,
-            line.minuteCreated,
-            line.loanAmountLeft,
-            line.loanMonthlyPayment,
-            line.interestRate,
-          ].some(
-            (value) => typeof value !== "number" || !Number.isFinite(value),
-          ) ||
-          typeof line.financed !== "boolean",
-      ))
+      transmission.lines.some((line) => !validTransmissionLine(line)) ||
+      new Set(transmission.lines.map(({ id }) => id)).size !==
+        transmission.lines.length ||
+      new Set(transmission.lines.map(({ corridorId }) => corridorId)).size !==
+        transmission.lines.length)
   )
     return null;
   if (

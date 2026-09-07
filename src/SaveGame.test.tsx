@@ -13,7 +13,7 @@ import {
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
-import { tickState } from "./reducers/Game";
+import gameReducer, { buildTransmissionLine, tickState } from "./reducers/Game";
 import { emptyPolicies } from "./helpers/Policies";
 
 jest.setTimeout(60000);
@@ -85,6 +85,45 @@ describe("SaveGame", () => {
       tradingPolicy: "BALANCED",
       lines: [],
     });
+  });
+
+  it("rejects corrupt or impossible intertie financial state", () => {
+    const california = createGame({ scenarioId: 100, seed: 61 });
+    const built = gameReducer(
+      california,
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: true,
+      }),
+    );
+    const save = JSON.parse(JSON.stringify(serializeSave(built)));
+    expect(parseSave(save)).not.toBeNull();
+
+    for (const field of [
+      "capacityW",
+      "buildCost",
+      "annualOperatingCost",
+      "yearsToBuildLeft",
+      "minuteCreated",
+      "loanAmountLeft",
+      "loanMonthlyPayment",
+      "interestRate",
+    ]) {
+      const corrupt = JSON.parse(JSON.stringify(save));
+      corrupt.game.transmission.lines[0][field] = -1;
+      expect(parseSave(corrupt)).toBeNull();
+    }
+
+    const wrongCapacity = JSON.parse(JSON.stringify(save));
+    wrongCapacity.game.transmission.lines[0].capacityW = 1;
+    expect(parseSave(wrongCapacity)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(save));
+    duplicate.game.transmission.lines.push({
+      ...duplicate.game.transmission.lines[0],
+      id: 2,
+    });
+    expect(parseSave(duplicate)).toBeNull();
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game

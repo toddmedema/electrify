@@ -1,4 +1,5 @@
 import * as React from "react";
+import cloneDeep from "lodash.clonedeep";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
@@ -12,6 +13,7 @@ import Insights, {
   withRequiredLayers,
 } from "./Insights";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
+import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 
 jest.mock("../base/GameCard", () => ({
   __esModule: true,
@@ -804,5 +806,40 @@ describe("Insights layers", () => {
       <Insights {...props} game={nextGame} facilityDragActive={false} />,
     );
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
+  });
+
+  it("refreshes a visible power exchange on every simulation tick", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    const props: React.ComponentProps<typeof Insights> = {
+      game,
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const ref = React.createRef<Insights>();
+    render(<Insights {...props} ref={ref} />);
+
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            date: { ...game.date, minute: game.date.minute + 600 },
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 });

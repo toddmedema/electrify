@@ -1551,7 +1551,13 @@ export function tickState(state: GameType) {
       // against it. Once a month, not once a tick: a lender looks at a year of results, and a
       // rate that moved every tick would be unplannable.
       state.creditPremium = getCreditPremium(
-        getCreditInputs(history, cash, now.netWorth, state.facilities),
+        getCreditInputs(
+          history,
+          cash,
+          now.netWorth,
+          state.facilities,
+          state.transmission?.lines,
+        ),
       );
       state.interestRate =
         getPrimeRate(state.date, state.seed) * state.creditPremium;
@@ -3024,9 +3030,9 @@ function getNetWorth(
   });
   transmissionLines.forEach((line) => {
     netWorth +=
-      (line.yearsToBuildLeft > 0
+      line.yearsToBuildLeft > 0
         ? line.buildCost * DOWNPAYMENT_PERCENT
-        : line.buildCost) - line.loanAmountLeft;
+        : line.buildCost - line.loanAmountLeft;
   });
   return netWorth;
 }

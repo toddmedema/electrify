@@ -354,6 +354,13 @@ describe("the interties view", () => {
       screen.getByText("Share power with nearby grids"),
     ).toBeInTheDocument();
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
-    expect(screen.getByLabelText("Trading rule")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Trading rule")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: "Approve intertie" }),
+    ).not.toHaveLength(0);
+    expect(screen.getAllByText("Total cost")).toHaveLength(2);
+    expect(
+      screen.getByText(/Pay \$36M now · finance \$144M/),
+    ).toBeInTheDocument();
   });
 });

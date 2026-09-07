@@ -19,13 +19,35 @@ test("California players can build and understand an intertie", async ({
     facilities.getByRole("heading", { name: "Share power with nearby grids" }),
   ).toBeVisible();
   await expect(facilities.getByText("Pacific Northwest")).toBeVisible();
+  await expect(facilities.getByLabel("Trading rule")).toHaveCount(0);
+  await expect(facilities.getByText("Total cost").first()).toBeVisible();
+  await expect(
+    facilities.getByText("Pay $36M now · finance $144M").first(),
+  ).toBeVisible();
+  if (testInfo.project.name === "mobile-320px") {
+    const firstBuild = facilities
+      .getByRole("button", { name: "Approve intertie" })
+      .first();
+    const box = await firstBuild.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(512);
+  }
+
+  await facilities
+    .getByRole("button", { name: "Approve intertie" })
+    .first()
+    .click();
+  await expect(facilities.getByText("Your interties")).toBeVisible();
+  await expect(facilities.getByText("Building")).toBeVisible();
   await expect(facilities.getByLabel("Trading rule")).toContainText(
     "Buy for shortages, sell extra",
   );
-
-  await facilities.getByRole("button", { name: /Build/ }).first().click();
-  await expect(facilities.getByText("Your interties")).toBeVisible();
-  await expect(facilities.getByText("Building")).toBeVisible();
+  await expect(
+    page.getByText("Intertie approved — power can flow in 1 year."),
+  ).toBeVisible();
+  await expect(facilities.getByText("Northern intertie upgrade")).toHaveCount(
+    1,
+  );
   expect(
     await facilities.evaluate((element) =>
       Math.max(0, element.scrollWidth - element.clientWidth),

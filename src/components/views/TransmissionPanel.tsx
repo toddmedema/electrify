@@ -44,6 +44,10 @@ export default function TransmissionPanel({
   const corridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readOnly = !!game.replayPlayback;
+  const unbuiltCorridors = corridors.filter(
+    (corridor) =>
+      !state.lines.some(({ corridorId }) => corridorId === corridor.id),
+  );
 
   if (!corridors.length) {
     return (
@@ -70,30 +74,11 @@ export default function TransmissionPanel({
         <div>
           <Typography variant="h6">Share power with nearby grids</Typography>
           <Typography variant="body2" color="textSecondary">
-            An intertie is a large power line between regions. It can import
-            energy during a shortage or sell energy you can safely spare.
+            An intertie links regional grids. Buy power during shortages or sell
+            safe surplus.
           </Typography>
         </div>
       </section>
-
-      <FormControl fullWidth size="small" className="tradingPolicy">
-        <InputLabel id="trading-policy-label">Trading rule</InputLabel>
-        <Select
-          labelId="trading-policy-label"
-          label="Trading rule"
-          value={state.tradingPolicy}
-          disabled={readOnly}
-          onChange={(event) =>
-            onPolicy(event.target.value as TradingPolicyType)
-          }
-        >
-          {Object.entries(POLICY_LABELS).map(([value, label]) => (
-            <MenuItem key={value} value={value}>
-              {label}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
 
       {!!state.lines.length && (
         <section aria-labelledby="your-interties-title">
@@ -120,7 +105,7 @@ export default function TransmissionPanel({
                     primary={line.name}
                     secondary={
                       building
-                        ? `${line.yearsToBuildLeft.toFixed(1)} years until power can flow`
+                        ? `${line.yearsToBuildLeft.toFixed(1)} ${line.yearsToBuildLeft <= 1 ? "year" : "years"} until power can flow`
                         : `${formatWatts(rating)} available now · ${market?.name}`
                     }
                   />
@@ -136,71 +121,98 @@ export default function TransmissionPanel({
         </section>
       )}
 
-      <section aria-labelledby="intertie-projects-title">
-        <Typography id="intertie-projects-title" variant="subtitle2">
-          Connection projects
-        </Typography>
-        <div className="transmissionProjects">
-          {corridors.map((corridor) => {
-            const market = adjacentMarketForCorridor(corridor.id);
-            const built = state.lines.some(
-              ({ corridorId }) => corridorId === corridor.id,
-            );
-            const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
-            return (
-              <article className="transmissionProject" key={corridor.id}>
-                <div className="transmissionProjectHeading">
-                  <div>
-                    <Typography variant="subtitle1">{market?.name}</Typography>
+      {!!state.lines.length && (
+        <FormControl fullWidth size="small" className="tradingPolicy">
+          <InputLabel id="trading-policy-label">Trading rule</InputLabel>
+          <Select
+            labelId="trading-policy-label"
+            label="Trading rule"
+            value={state.tradingPolicy}
+            disabled={readOnly}
+            onChange={(event) =>
+              onPolicy(event.target.value as TradingPolicyType)
+            }
+          >
+            {Object.entries(POLICY_LABELS).map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+
+      {!!unbuiltCorridors.length && (
+        <section aria-labelledby="intertie-projects-title">
+          <Typography id="intertie-projects-title" variant="subtitle2">
+            Connection projects
+          </Typography>
+          <div className="transmissionProjects">
+            {unbuiltCorridors.map((corridor) => {
+              const market = adjacentMarketForCorridor(corridor.id);
+              const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
+              const financed = corridor.buildCost - downpayment;
+              return (
+                <article className="transmissionProject" key={corridor.id}>
+                  <div className="transmissionProjectHeading">
+                    <div>
+                      <Typography variant="subtitle1">
+                        {market?.name}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {corridor.name}
+                      </Typography>
+                    </div>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={
+                        corridor.routeType === "EXISTING"
+                          ? "Existing route"
+                          : "New route"
+                      }
+                    />
+                  </div>
+                  <Typography variant="body2">{market?.description}</Typography>
+                  <dl className="transmissionMetrics">
+                    <div>
+                      <dt>Capacity</dt>
+                      <dd>{formatWatts(corridor.capacityW)}</dd>
+                    </div>
+                    <div>
+                      <dt>Build time</dt>
+                      <dd>
+                        {corridor.yearsToBuild} year
+                        {corridor.yearsToBuild === 1 ? "" : "s"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Total cost</dt>
+                      <dd>{formatMoneyConcise(corridor.buildCost)}</dd>
+                    </div>
+                  </dl>
+                  {!readOnly && (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disabled={!now || now.cash < downpayment}
+                      onClick={() => onBuild(corridor.id, true)}
+                    >
+                      Approve intertie
+                    </Button>
+                  )}
+                  {!readOnly && (
                     <Typography variant="caption" color="textSecondary">
-                      {corridor.name}
+                      Pay {formatMoneyConcise(downpayment)} now · finance{" "}
+                      {formatMoneyConcise(financed)}
                     </Typography>
-                  </div>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={
-                      corridor.routeType === "EXISTING"
-                        ? "Existing route"
-                        : "New route"
-                    }
-                  />
-                </div>
-                <Typography variant="body2">{market?.description}</Typography>
-                <dl className="transmissionMetrics">
-                  <div>
-                    <dt>Capacity</dt>
-                    <dd>{formatWatts(corridor.capacityW)}</dd>
-                  </div>
-                  <div>
-                    <dt>Build time</dt>
-                    <dd>
-                      {corridor.yearsToBuild} year
-                      {corridor.yearsToBuild === 1 ? "" : "s"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Cost</dt>
-                    <dd>{formatMoneyConcise(corridor.buildCost)}</dd>
-                  </div>
-                </dl>
-                {!readOnly && (
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disabled={built || !now || now.cash < downpayment}
-                    onClick={() => onBuild(corridor.id, true)}
-                  >
-                    {built
-                      ? "Project started"
-                      : `Build · ${formatMoneyConcise(downpayment)} down`}
-                  </Button>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </section>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -717,6 +717,8 @@ export default class Insights extends React.Component<Props, State> {
       nextState !== this.state ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
+      (this.state.layers.includes("powerExchange") &&
+        nextProps.game.date.minute !== this.props.game.date.minute) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -1140,7 +1142,9 @@ export default class Insights extends React.Component<Props, State> {
       (layer.availability === "storage" && projection.hasStorage) ||
       (layer.availability === "hydro" && projection.hasHydro) ||
       (layer.availability === "transmission" &&
-        !!this.props.game.transmission?.lines.length)
+        !!this.props.game.transmission?.lines.some(
+          ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+        ))
     );
   }
 
