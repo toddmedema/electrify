@@ -20,6 +20,7 @@ import {
   TableContainer,
   TableRow,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
@@ -82,6 +83,7 @@ export function GeneratorBuildItem(
 ): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
+  const wideLayout = useMediaQuery("(min-width:600px)");
   const fuel = FUELS[generator.fuel] || {};
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
@@ -153,6 +155,22 @@ export function GeneratorBuildItem(
     toggleOpen(e);
   };
 
+  const compareAction = props.onCompare && canBuild && (
+    <Button
+      size="small"
+      variant={props.compared ? "contained" : "outlined"}
+      aria-pressed={props.compared}
+      aria-label={`Compare ${generator.name}`}
+      disabled={props.compareDisabled && !props.compared}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onCompare?.();
+      }}
+    >
+      Compare
+    </Button>
+  );
+
   return (
     <Card className="build-list-item buildOption">
       <CardHeader
@@ -164,6 +182,7 @@ export function GeneratorBuildItem(
         }
         action={
           <Stack direction="row" spacing={0.5}>
+            {wideLayout && compareAction}
             <Button
               className="buy-button"
               size="small"
@@ -230,21 +249,7 @@ export function GeneratorBuildItem(
           {expanded ? "Hide details" : "Show details"}
         </Button>
 
-        {props.onCompare && canBuild && (
-          <Button
-            size="small"
-            variant={props.compared ? "contained" : "outlined"}
-            aria-pressed={props.compared}
-            aria-label={`Compare ${generator.name}`}
-            disabled={props.compareDisabled && !props.compared}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onCompare?.();
-            }}
-          >
-            Compare
-          </Button>
-        )}
+        {!wideLayout && compareAction}
       </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Typography

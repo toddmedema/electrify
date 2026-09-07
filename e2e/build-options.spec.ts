@@ -46,6 +46,18 @@ for (const theme of ["light", "dark"] as const) {
         testInfo.project.use.hasTouch ? 44 : 40,
       );
       expect((await header.boundingBox())!.height).toBeLessThan(90);
+      if (kind === "Generator") {
+        const compare = (await first
+          .getByRole("button", { name: /^Compare/ })
+          .boundingBox())!;
+        const reviewBox = (await review.boundingBox())!;
+        if (page.viewportSize()!.width >= 600) {
+          expect(compare.y).toBeCloseTo(reviewBox.y, 0);
+          expect(reviewBox.x - (compare.x + compare.width)).toBeCloseTo(4, 0);
+        } else {
+          expect(compare.y).toBeGreaterThan(reviewBox.y + reviewBox.height);
+        }
+      }
       await page.screenshot({
         path: testInfo.outputPath(`${kind}-${theme}.png`),
       });
