@@ -187,6 +187,8 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                 startingCustomers={scenario.startingCustomers}
                 minimumCustomerRetention={scenario.minimumCustomerRetention}
                 reliabilityObjective={scenario.reliabilityObjective}
+                difficulty={game.difficulty}
+                meaningfulDecisionCount={game.meaningfulDecisions.length}
               />
             </Box>
           </Box>

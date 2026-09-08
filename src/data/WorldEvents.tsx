@@ -1080,7 +1080,7 @@ export const TEXAS_DEEP_FREEZE_DEMAND: Record<DifficultyType, number> = {
   // The joint FERC/NERC report measured actual ERCOT peak load 20% above the normal-weather
   // forecast and estimated unconstrained demand 33% above it. Difficulty spans that observed
   // range while leaving the researched Austin portfolio and plant availability anchors intact.
-  Intern: 1.2,
+  Intern: 1.21,
   Employee: 1.23,
   Manager: 1.27,
   VP: 1.3,
@@ -1121,7 +1121,9 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
               "Natural Gas": 0.62,
               Coal: 0.73,
               Uranium: 0.77,
-              Wind: 0.44,
+              // Intern calibration makes preparation necessary across the standard seed set
+              // without inflating demand so far that the audited 1.8 GW backup stops working.
+              Wind: difficulty === "Intern" ? 0.3 : 0.44,
             },
           },
           turningPointPriority: 110,
@@ -1279,8 +1281,8 @@ export const CALIFORNIA_WILDFIRE_BALANCE: Record<
 > = {
   Intern: {
     disconnectedDemand: 0.02,
-    targetCapacityShare: 0.3,
-    outputMultiplier: 0.65,
+    targetCapacityShare: 0.9,
+    outputMultiplier: 0.1,
     restorationCostPerMonth: 1000000,
   },
   Employee: {
@@ -1339,7 +1341,12 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: (context, random) => {
         const balance = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
         const candidates = context.snapshot.facilities
-          .filter((facility) => facility.operational && !!facility.fuel)
+          // The warning gives the player a year to add new backup. Treat that new equipment as
+          // hardened for this emergency; the shutoffs target the older exposed portfolio.
+          .filter(
+            (facility) =>
+              facility.operational && !!facility.fuel && facility.ageYears >= 2,
+          )
           .map((facility) => ({
             ...facility,
             score: random(`facility|${facility.id}`),

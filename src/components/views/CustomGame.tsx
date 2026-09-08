@@ -971,6 +971,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
             startingCustomers={scenario.startingCustomers}
             minimumCustomerRetention={scenario.minimumCustomerRetention}
             reliabilityObjective={scenario.reliabilityObjective}
+            difficulty={game.difficulty}
+            meaningfulDecisionCount={game.meaningfulDecisions.length}
           />
         </DialogContent>
         <DialogActions>

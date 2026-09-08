@@ -13,7 +13,11 @@ import {
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
-import gameReducer, { buildTransmissionLine, tickState } from "./reducers/Game";
+import gameReducer, {
+  buildTransmissionLine,
+  delta,
+  tickState,
+} from "./reducers/Game";
 import { emptyPolicies } from "./helpers/Policies";
 
 jest.setTimeout(60000);
@@ -85,6 +89,43 @@ describe("SaveGame", () => {
       tradingPolicy: "BALANCED",
       lines: [],
     });
+  });
+
+  it("normalizes old decision progress and round-trips validated progress", () => {
+    const legacy = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete legacy.game.meaningfulDecisions;
+    expect(parseSave(legacy)?.game.meaningfulDecisions).toEqual([]);
+
+    const played = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    expect(parseSave(serializeSave(played))?.game.meaningfulDecisions).toEqual(
+      played.meaningfulDecisions,
+    );
+  });
+
+  it("rejects malformed, duplicate, and future decision progress", () => {
+    const valid = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    const corrupt = JSON.parse(JSON.stringify(serializeSave(valid)));
+    corrupt.game.meaningfulDecisions[0].month =
+      corrupt.game.date.monthsElapsed + 1;
+    corrupt.game.meaningfulDecisions[0].key = `${corrupt.game.meaningfulDecisions[0].lever}@${corrupt.game.meaningfulDecisions[0].month}`;
+    expect(parseSave(corrupt)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(serializeSave(valid)));
+    duplicate.game.meaningfulDecisions.push({
+      ...duplicate.game.meaningfulDecisions[0],
+    });
+    expect(parseSave(duplicate)).toBeNull();
+
+    const noOp = JSON.parse(JSON.stringify(serializeSave(valid)));
+    noOp.game.meaningfulDecisions[0].after =
+      noOp.game.meaningfulDecisions[0].before;
+    expect(parseSave(noOp)).toBeNull();
   });
 
   it("does not invent transmission when an older tutorial is restored", () => {

@@ -55,6 +55,10 @@ import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
 import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
 import {
+  CEO_MEANINGFUL_DECISIONS_REQUIRED,
+  recordMeaningfulDecision,
+} from "../helpers/MeaningfulDecisions";
+import {
   getAirborneWindOutputFactor,
   getAirborneWindReferenceKph,
   getOffshoreWindOutputFactor,
@@ -141,6 +145,7 @@ import { clearSaveFor } from "../SaveGame";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   DateType,
+  DifficultyType,
   FacilityOperatingType,
   FacilityShoppingType,
   FuelPricesType,
@@ -673,6 +678,7 @@ const initialGame: GameType = {
   eventLogReadThroughId: 0,
   worldEvents: { active: [], occurrences: [], checkedKeys: [] },
   transmission: emptyTransmissionState(),
+  meaningfulDecisions: [],
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -743,9 +749,16 @@ export const gameSlice = createSlice({
         policyPause: _policyPause,
         ...payload
       } = action.payload;
-      Object.assign(state, payload);
       const recorded = recordedDelta(action.payload);
-      if (recorded) {
+      const rateBefore = state.dollarsPerkWh;
+      Object.assign(state, payload);
+      if (recorded && recorded.dollarsPerkWh !== rateBefore) {
+        recordMeaningfulDecision(state, {
+          lever: "rate",
+          kind: "rate",
+          before: String(rateBefore),
+          after: String(recorded.dollarsPerkWh),
+        });
         recordReplayAction(state, "delta", recorded);
       }
     },
@@ -761,6 +774,7 @@ export const gameSlice = createSlice({
       state.eventLogReadThroughId = 0;
       state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
+      state.meaningfulDecisions = [];
       state.transmission = undefined;
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
@@ -918,8 +932,9 @@ export const gameSlice = createSlice({
       applyPendingReplayActions(state);
     },
     buildFacility: (state, action: PayloadAction<BuildFacilityAction>) => {
-      applyBuildFacility(state, action.payload);
-      recordReplayAction(state, "buildFacility", action.payload);
+      if (applyBuildFacility(state, action.payload)) {
+        recordReplayAction(state, "buildFacility", action.payload);
+      }
     },
     buildTransmissionLine: (
       state,
@@ -935,19 +950,22 @@ export const gameSlice = createSlice({
       }
     },
     sellFacility: (state, action: PayloadAction<number>) => {
-      applySellFacility(state, action.payload);
-      recordReplayAction(state, "sellFacility", action.payload);
+      if (applySellFacility(state, action.payload)) {
+        recordReplayAction(state, "sellFacility", action.payload);
+      }
     },
     togglePauseFacility: (state, action: PayloadAction<number>) => {
-      applyTogglePauseFacility(state, action.payload);
-      recordReplayAction(state, "togglePauseFacility", action.payload);
+      if (applyTogglePauseFacility(state, action.payload)) {
+        recordReplayAction(state, "togglePauseFacility", action.payload);
+      }
     },
     reprioritizeFacility: (
       state,
       action: PayloadAction<ReprioritizeFacilityAction>,
     ) => {
-      applyReprioritizeFacility(state, action.payload);
-      recordReplayAction(state, "reprioritizeFacility", action.payload);
+      if (applyReprioritizeFacility(state, action.payload)) {
+        recordReplayAction(state, "reprioritizeFacility", action.payload);
+      }
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
       delete state.policyPause;
@@ -1145,7 +1163,10 @@ function matchesFacilitySearch(
   );
 }
 
-function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
+function applyBuildFacility(
+  state: GameType,
+  payload: BuildFacilityAction,
+): boolean {
   const built = payload.facility;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const amountDue = payload.financed
@@ -1154,7 +1175,7 @@ function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   // The dialog's quote can be stale by the time an action lands (or a replay/import can be
   // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
   if (!now || now.cash < amountDue) {
-    return;
+    return false;
   }
   const viableLocationsRemaining = getViableLocationsRemaining(
     state.location,
@@ -1164,29 +1185,39 @@ function applyBuildFacility(state: GameType, payload: BuildFacilityAction) {
   // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
   // a stale dialog or replay action from claiming one more site after the last one was used.
   if (viableLocationsRemaining !== undefined && viableLocationsRemaining <= 0) {
-    return;
+    return false;
   }
+  const existingIds = new Set(state.facilities.map(({ id }) => id));
   logGameEvent(state, "BUILD", buildStartedMessage(built), {
     importance: "NOTABLE",
     actionTarget: { card: "FACILITIES", view: "FLEET" },
   });
   state = buildFacilityHelper(state, built, payload.financed);
+  const added = state.facilities.find(({ id }) => !existingIds.has(id));
+  if (!added) return false;
+  recordMeaningfulDecision(state, {
+    lever: `facility:${added.id}`,
+    kind: "asset",
+    before: "absent",
+    after: `${added.name}:${added.peakWh ?? added.peakW}:${payload.financed ? "financed" : "cash"}`,
+  });
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
   // assigned to the parameter is discarded and the forecast would never reach state
   state.timeline = reforecastSupply(state);
+  return true;
 }
 
-function applySellFacility(state: GameType, id: number) {
+function applySellFacility(state: GameType, id: number): boolean {
   const sold = state.facilities.find((g: FacilityOperatingType) => g.id === id);
-  if (sold) {
-    logGameEvent(
-      state,
-      sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
-      sold.yearsToBuildLeft > 0
-        ? `Cancelled construction of ${sold.name}`
-        : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
-    );
-  }
+  if (!sold) return false;
+  logGameEvent(
+    state,
+    sold.yearsToBuildLeft > 0 ? "BUILD" : "SELL",
+    sold.yearsToBuildLeft > 0
+      ? `Cancelled construction of ${sold.name}`
+      : `Sold ${sold.name}, ${sold.peakWh ? formatWattHours(sold.peakWh) : formatWatts(sold.peakW)} for ${formatMoneyConcise(facilityCashBack(sold, state.date.minute))}`,
+  );
+  const ownedState = `${sold.name}:${sold.peakWh ?? sold.peakW}:${sold.financed ? "financed" : "cash"}`;
   // in one loop, refund cash from selling + remove from list
   state.facilities = state.facilities.filter(
     (g: GeneratorOperatingType | StorageOperatingType) => {
@@ -1200,30 +1231,60 @@ function applySellFacility(state: GameType, id: number) {
       return true;
     },
   );
+  recordMeaningfulDecision(state, {
+    lever: `facility:${id}`,
+    kind: "sale",
+    before: ownedState,
+    after: "absent",
+  });
   state.timeline = reforecastSupply(state);
+  return true;
 }
 
-function applyTogglePauseFacility(state: GameType, id: number) {
-  state.facilities.forEach(
-    (g: GeneratorOperatingType | StorageOperatingType) => {
-      if (g.id === id) {
-        g.paused = !g.paused;
-      }
-    },
-  );
+function applyTogglePauseFacility(state: GameType, id: number): boolean {
+  const facility = state.facilities.find((item) => item.id === id);
+  if (!facility) return false;
+  const before = facility.paused ? "paused" : "operating";
+  facility.paused = !facility.paused;
+  recordMeaningfulDecision(state, {
+    lever: `operation:${id}`,
+    kind: "operation",
+    before,
+    after: facility.paused ? "paused" : "operating",
+  });
   state.timeline = reforecastSupply(state);
+  return true;
 }
 
 function applyReprioritizeFacility(
   state: GameType,
   payload: ReprioritizeFacilityAction,
-) {
+): boolean {
+  const destination = payload.spotInList + payload.delta;
+  if (
+    !Number.isInteger(payload.spotInList) ||
+    !Number.isInteger(payload.delta) ||
+    payload.delta === 0 ||
+    payload.spotInList < 0 ||
+    payload.spotInList >= state.facilities.length ||
+    destination < 0 ||
+    destination >= state.facilities.length
+  )
+    return false;
+  const movedId = state.facilities[payload.spotInList].id;
   arrayMove(
     state.facilities,
     payload.spotInList,
     payload.spotInList + payload.delta,
   );
+  recordMeaningfulDecision(state, {
+    lever: `dispatch:${movedId}`,
+    kind: "dispatch",
+    before: String(payload.spotInList),
+    after: String(destination),
+  });
   state.timeline = reforecastSupply(state);
+  return true;
 }
 
 const TRADING_POLICIES: readonly TradingPolicyType[] = [
@@ -1237,7 +1298,14 @@ function applyTradingPolicy(state: GameType, policy: unknown): boolean {
   if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
   if (!state.transmission) return false;
   if (state.transmission.tradingPolicy === policy) return false;
+  const before = state.transmission.tradingPolicy;
   state.transmission.tradingPolicy = policy as TradingPolicyType;
+  recordMeaningfulDecision(state, {
+    lever: "trading",
+    kind: "trading",
+    before,
+    after: policy as TradingPolicyType,
+  });
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -1289,6 +1357,12 @@ function applyBuildTransmissionLine(
     interestRate: financed ? state.interestRate : 0,
   };
   state.transmission.lines.push(line);
+  recordMeaningfulDecision(state, {
+    lever: `intertie:${line.id}`,
+    kind: "asset",
+    before: "absent",
+    after: `${line.corridorId}:${financed ? "financed" : "cash"}`,
+  });
   logGameEvent(
     state,
     "BUILD",
@@ -1325,6 +1399,7 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
+  const before = existing?.pending?.tier ?? existing?.tier ?? "Off";
   if (cancel) {
     if (
       !existing?.pending ||
@@ -1341,6 +1416,16 @@ function applyPolicyEdit(
     if (payload.tier === program.tier) delete program.pending;
     else program.pending = { tier: payload.tier, month: payload.month };
   }
+  const after = cancel
+    ? (existing?.tier ?? "Off")
+    : (state.policies!.programs[payload.id].pending?.tier ??
+      state.policies!.programs[payload.id].tier);
+  recordMeaningfulDecision(state, {
+    lever: `policy:${payload.id}`,
+    kind: "policy",
+    before,
+    after,
+  });
   // Accepted changes start next month; the current month's demand and customer balance
   // already happened. Long-range callers project the new pending state independently.
   state.timeline = reforecastSupply(state, true);
@@ -1391,8 +1476,18 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     }
     case "delta": {
       const recorded = recordedDelta((payload || {}) as Partial<GameType>);
-      if (recorded) {
+      if (
+        recorded?.dollarsPerkWh !== undefined &&
+        recorded.dollarsPerkWh !== state.dollarsPerkWh
+      ) {
+        const before = state.dollarsPerkWh;
         Object.assign(state, recorded);
+        recordMeaningfulDecision(state, {
+          lever: "rate",
+          kind: "rate",
+          before: String(before),
+          after: String(recorded.dollarsPerkWh),
+        });
       }
       break;
     }
@@ -1697,7 +1792,12 @@ export function tickState(state: GameType) {
       const chronicBlackouts = hasChronicBlackouts(history);
       const objectiveFailure =
         state.date.monthsElapsed === (scenario.durationMonths || 12 * 20)
-          ? scenarioObjectiveFailure(scenario, history)
+          ? scenarioObjectiveFailure(
+              scenario,
+              history,
+              state.difficulty,
+              state.meaningfulDecisions.length,
+            )
           : undefined;
       const failure =
         now.cash < 0
@@ -1844,6 +1944,8 @@ export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
 export function scenarioObjectiveFailure(
   scenario: ScenarioType,
   history: MonthlyHistoryType[],
+  difficulty?: DifficultyType,
+  meaningfulDecisions = 0,
 ): string | undefined {
   const reliabilityObjective = scenario.reliabilityObjective;
   if (reliabilityObjective) {
@@ -1875,6 +1977,13 @@ export function scenarioObjectiveFailure(
     if (retained < scenario.minimumCustomerRetention) {
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
     }
+  }
+  if (
+    !scenario.tutorialSteps &&
+    difficulty === "CEO" &&
+    meaningfulDecisions < CEO_MEANINGFUL_DECISIONS_REQUIRED
+  ) {
+    return `You made ${meaningfulDecisions} of ${CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions; CEO difficulty requires choices that change the grid or its economics.`;
   }
   return undefined;
 }

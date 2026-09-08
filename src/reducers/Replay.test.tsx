@@ -100,6 +100,35 @@ describe("recording a run", () => {
       "togglePauseFacility",
       "sellFacility",
     ]);
+    expect(played.meaningfulDecisions).toHaveLength(6);
+    expect(new Set(played.meaningfulDecisions.map(({ key }) => key)).size).toBe(
+      6,
+    );
+  });
+
+  it("counts only accepted settled changes, not rejected targets or same-month churn", () => {
+    let state = createGame(OPTIONS);
+    const startingRate = state.dollarsPerkWh;
+
+    state = dispatch(state, delta({ dollarsPerkWh: startingRate + 0.001 }));
+    state = dispatch(state, delta({ dollarsPerkWh: startingRate + 0.002 }));
+    expect(state.meaningfulDecisions).toHaveLength(1);
+    expect(state.meaningfulDecisions[0]).toMatchObject({
+      lever: "rate",
+      before: String(startingRate),
+      after: String(startingRate + 0.002),
+    });
+
+    state = dispatch(state, delta({ dollarsPerkWh: startingRate }));
+    expect(state.meaningfulDecisions).toHaveLength(0);
+
+    state = dispatch(state, sellFacility(999999));
+    state = dispatch(state, togglePauseFacility(999999));
+    state = dispatch(
+      state,
+      reprioritizeFacility({ spotInList: 999999, delta: 1 }),
+    );
+    expect(state.meaningfulDecisions).toHaveLength(0);
   });
 
   it("merges the deltas fired within one minute into the value that stuck", () => {
@@ -176,6 +205,7 @@ describe("watching a replay", () => {
     expect(watched.date.minute).toBe(played.date.minute);
     expect(watched.monthlyHistory).toEqual(played.monthlyHistory);
     expect(watched.facilities).toEqual(played.facilities);
+    expect(watched.meaningfulDecisions).toEqual(played.meaningfulDecisions);
   });
 
   it("applies each action at the minute it was taken", () => {

@@ -9,9 +9,26 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     ),
   );
   test.setTimeout(60000);
-  await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/?scenario=112");
-  await page.getByRole("button", { name: "Start game" }).click();
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [0, 1, 2, 4, 3, 5].map((scenarioId) => ({
+          scenarioId,
+          date: "2026-09-08",
+        })),
+      }),
+    );
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Start playing", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Choose a game" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Start Interties" }).click();
 
   await expect(page.getByLabel("Objective 1 of 10")).toBeVisible();
   await expect(page.locator("#intertiesTab")).toBeVisible();

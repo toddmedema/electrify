@@ -1,7 +1,8 @@
 import * as React from "react";
-import { ScenarioType } from "../../Types";
+import { DifficultyType, ScenarioType } from "../../Types";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import { CEO_MEANINGFUL_DECISIONS_REQUIRED } from "../../helpers/MeaningfulDecisions";
 
 export interface Props {
   ownership: ScenarioType["ownership"];
@@ -9,6 +10,8 @@ export interface Props {
   startingCustomers?: number;
   minimumCustomerRetention?: number;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
+  difficulty?: DifficultyType;
+  meaningfulDecisionCount?: number;
 }
 
 /**
@@ -26,9 +29,19 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   } = props;
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
+  const ceoProgress =
+    props.difficulty === "CEO" ? (
+      <p data-testid="ceo-decision-progress">
+        Required: make {CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions
+        that change the grid or its economics. Progress:{" "}
+        {props.meaningfulDecisionCount ?? 0} of{" "}
+        {CEO_MEANINGFUL_DECISIONS_REQUIRED}.
+      </p>
+    ) : null;
   if (ownership === "Investor") {
     return (
       <div>
+        {ceoProgress}
         <p>Earn 40 points per $1 billion of net worth at the end.</p>
         <p>Earn 2 points per 100,000 customers at the end.</p>
         <p>Earn 1 point per terawatt-hour (TWh) of electricity supplied.</p>
@@ -39,6 +52,7 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   }
   return (
     <div>
+      {ceoProgress}
       {reliabilityObjective !== undefined && (
         <p>
           Required: serve at least{" "}

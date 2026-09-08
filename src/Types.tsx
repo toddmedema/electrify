@@ -275,6 +275,19 @@ export interface ReplayActionType {
   payload: unknown;
 }
 
+export type MeaningfulDecisionKindType =
+  "asset" | "sale" | "rate" | "policy" | "operation" | "dispatch" | "trading";
+
+/** One accepted player decision after same-month no-ops and reversals are coalesced. */
+export interface MeaningfulDecisionType {
+  key: string;
+  lever: string;
+  month: number;
+  kind: MeaningfulDecisionKindType;
+  before: string;
+  after: string;
+}
+
 export interface ReplayType {
   version: number;
   appVersion: string; // For bug reports
@@ -900,6 +913,9 @@ export interface GameType {
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
   // scenarios and their normalized saves carry an explicit empty state.
   transmission?: TransmissionStateType;
+  // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
+  // same accepted state changes; saves persist and validate it so progress survives a reload.
+  meaningfulDecisions: MeaningfulDecisionType[];
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
   // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the

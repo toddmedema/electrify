@@ -490,6 +490,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 startingCustomers={scenario.startingCustomers}
                 minimumCustomerRetention={scenario.minimumCustomerRetention}
                 reliabilityObjective={scenario.reliabilityObjective}
+                difficulty={game.difficulty}
+                meaningfulDecisionCount={0}
               />
             </DialogContent>
             <DialogActions>

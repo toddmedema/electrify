@@ -54,3 +54,34 @@ test("California players can build and understand an intertie", async ({
     ),
   ).toBeLessThanOrEqual(1);
 });
+
+test("island grids do not offer interties or power exchange", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !new Set(["desktop-chromium", "mobile-320px"]).has(testInfo.project.name),
+  );
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/?scenario=105");
+  await page.getByRole("button", { name: "Start game" }).click();
+
+  const facilities = page.locator(".facilities:visible");
+  if (!(await facilities.isVisible())) {
+    await page.getByRole("button", { name: "Facilities", exact: true }).click();
+  }
+  await expect(facilities.getByRole("tab", { name: "Interties" })).toHaveCount(
+    0,
+  );
+
+  const insights = page.locator(".insights:visible");
+  if (!(await insights.isVisible())) {
+    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  }
+  await insights.getByRole("button", { name: /Layers \(/ }).click();
+  await expect(
+    insights.getByRole("checkbox", { name: "Power exchange" }),
+  ).toHaveCount(0);
+  await expect(
+    insights.getByRole("heading", { name: "Power exchange" }),
+  ).toHaveCount(0);
+});

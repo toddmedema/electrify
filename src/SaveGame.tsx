@@ -9,6 +9,7 @@ import {
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
 import { GameType, TransmissionLineOperatingType } from "./Types";
+import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
 import {
   emptyTransmissionState,
   intertiesEnabledForScenario,
@@ -273,6 +274,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
+  if (
+    game.meaningfulDecisions !== undefined &&
+    !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth)
+  )
+    return null;
   const worldEvents = game.worldEvents as
     Partial<GameType["worldEvents"]> | undefined;
   if (
@@ -341,6 +348,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission: transmissionEnabled
       ? (game.transmission ?? emptyTransmissionState())
       : undefined,
+    meaningfulDecisions: game.meaningfulDecisions ?? [],
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
