@@ -8,7 +8,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
       testInfo.project.name,
     ),
   );
-  test.setTimeout(60000);
+  test.setTimeout(90000);
   await page.addInitScript(() => {
     window.localStorage.clear();
     window.localStorage.setItem(
@@ -60,11 +60,13 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await expect(page.getByLabel("Objective 7 of 10")).toBeVisible();
 
-  await page.getByRole("button", { name: "normal speed" }).click();
+  await page.getByRole("button", { name: "fast speed" }).click();
   await expect(page.getByText(/Trading · Importing/)).toBeVisible({
     timeout: 10000,
   });
-  await expect(page.locator(".gameStatus")).toContainText("Feb 2020", {
+  // Wait for a full importing month to settle into history; seeing live flow alone must not
+  // satisfy the observation gate.
+  await expect(page.locator(".gameStatus")).toContainText("Mar 2020", {
     timeout: 20000,
   });
   await page.getByRole("button", { name: "pause" }).click();
@@ -109,7 +111,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await facilities.getByLabel("Trading rule").click();
   await page.getByRole("option", { name: "No trading" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.locator(".gameStatus")).toContainText("Mar 2020", {
+  await expect(page.locator(".gameStatus")).toContainText("Apr 2020", {
     timeout: 15000,
   });
   await page.getByRole("button", { name: "pause" }).click();

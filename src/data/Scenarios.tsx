@@ -82,11 +82,9 @@ const tutorialSawImports = (state: AppStateType) =>
   );
 
 const tutorialSawSafeExport = (state: AppStateType) =>
-  state.game.monthlyHistory.some(
-    (month) =>
-      (month.chartAverage?.exportedW || 0) > 0 &&
-      (month.minimumSupplyMarginW ?? -1) >= 0,
-  );
+  !!state.game.monthlyHistory[0] &&
+  (state.game.monthlyHistory[0].chartAverage?.exportedW || 0) > 0 &&
+  (state.game.monthlyHistory[0].minimumSupplyMarginW ?? -1) >= 0;
 
 const intertiesCapstoneSucceeded = (state: AppStateType) =>
   state.game.date.monthsElapsed >= 14 &&
