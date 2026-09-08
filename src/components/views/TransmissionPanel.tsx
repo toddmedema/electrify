@@ -64,10 +64,7 @@ export default function TransmissionPanel({
   return (
     <div className="transmissionPanel scrollable">
       <section className="transmissionIntro">
-        <img
-          src="/images/transmission-option-2.svg"
-          alt="Two grids exchanging power"
-        />
+        <img src="/images/transmission.svg" alt="Two grids exchanging power" />
         <div>
           <Typography variant="h6">Share power with nearby grids</Typography>
           <Typography variant="body2" color="textSecondary">
@@ -100,7 +97,7 @@ export default function TransmissionPanel({
                   <ListItemAvatar>
                     <img
                       className="transmissionListIcon"
-                      src="/images/transmission-option-2.svg"
+                      src="/images/transmission.svg"
                       alt=""
                     />
                   </ListItemAvatar>

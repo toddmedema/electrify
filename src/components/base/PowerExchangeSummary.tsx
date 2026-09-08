@@ -22,7 +22,7 @@ export default function PowerExchangeSummary({
   return (
     <div className="powerExchangeSummary">
       <div className="powerExchangeHero">
-        <img src="/images/transmission-option-2.svg" alt="" />
+        <img src="/images/transmission.svg" alt="" />
         <div>
           <Typography variant="h6">{direction}</Typography>
           <Typography color="textSecondary" variant="body2">

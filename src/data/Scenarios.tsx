@@ -690,7 +690,7 @@ export const SCENARIOS = [
   {
     id: 112, // Append-only persisted scenario id; tutorial order is its position in this array
     name: "Mission 7: Interties",
-    icon: "transmission-option-2",
+    icon: "transmission",
     summary: "Share power with neighbors",
     locationId: "SF",
     ownership: "Investor",
