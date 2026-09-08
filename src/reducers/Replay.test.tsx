@@ -90,7 +90,7 @@ describe("recording a run", () => {
     played = playAScriptedGame();
   });
 
-  it("logs every simulation-affecting action the player took", () => {
+  it("logs every action while the decision ledger cancels lifetime churn", () => {
     const types = played.replayLog!.map((a) => a.type);
     expect(types).toEqual([
       "buildFacility",
@@ -100,25 +100,30 @@ describe("recording a run", () => {
       "togglePauseFacility",
       "sellFacility",
     ]);
-    expect(played.meaningfulDecisions).toHaveLength(6);
+    // The two pause clicks ultimately return the same plant to its baseline state, so they remain
+    // in the replay but correctly disappear from persistent decision progress.
+    expect(played.meaningfulDecisions).toHaveLength(4);
     expect(new Set(played.meaningfulDecisions.map(({ key }) => key)).size).toBe(
-      6,
+      4,
     );
   });
 
-  it("counts only accepted settled changes, not rejected targets or same-month churn", () => {
+  it("counts only accepted settled changes, not rejected targets or lifetime churn", () => {
     let state = createGame(OPTIONS);
     const startingRate = state.dollarsPerkWh;
 
     state = dispatch(state, delta({ dollarsPerkWh: startingRate + 0.001 }));
+    runMonths(state, 1);
     state = dispatch(state, delta({ dollarsPerkWh: startingRate + 0.002 }));
     expect(state.meaningfulDecisions).toHaveLength(1);
     expect(state.meaningfulDecisions[0]).toMatchObject({
       lever: "rate",
       before: String(startingRate),
       after: String(startingRate + 0.002),
+      month: 1,
     });
 
+    runMonths(state, 1);
     state = dispatch(state, delta({ dollarsPerkWh: startingRate }));
     expect(state.meaningfulDecisions).toHaveLength(0);
 
@@ -192,6 +197,19 @@ describe("watching a replay", () => {
   beforeAll(() => {
     played = playAScriptedGame();
     replay = roundTripped(serializeReplay(played)!);
+  });
+
+  it("preserves the visible legacy decision-gate waiver during playback", () => {
+    const doc = encodeReplay(serializeReplay(played)!) as unknown as Record<
+      string,
+      unknown
+    >;
+    doc.version = 5;
+    const legacy = decodeReplay(doc)!;
+    const watched = createGameFromReplay(legacy);
+
+    expect(legacy.meaningfulDecisionGateWaived).toBe(true);
+    expect(watched.meaningfulDecisionGateWaived).toBe(true);
   });
 
   /**

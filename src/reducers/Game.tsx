@@ -55,7 +55,11 @@ import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
 import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
 import {
+  CEO_MEANINGFUL_CATEGORIES_REQUIRED,
   CEO_MEANINGFUL_DECISIONS_REQUIRED,
+  INTERN_MEANINGFUL_DECISIONS_REQUIRED,
+  isMaterialCapacityDecision,
+  meaningfulDecisionCategoryCount,
   recordMeaningfulDecision,
 } from "../helpers/MeaningfulDecisions";
 import {
@@ -156,6 +160,7 @@ import {
   LocationType,
   GameType,
   GeneratorOperatingType,
+  MeaningfulDecisionType,
   MonthlyHistoryType,
   ScenarioFacilityType,
   ScenarioType,
@@ -679,6 +684,7 @@ const initialGame: GameType = {
   worldEvents: { active: [], occurrences: [], checkedKeys: [] },
   transmission: emptyTransmissionState(),
   meaningfulDecisions: [],
+  meaningfulDecisionGateWaived: false,
 };
 
 // Restarts the self-rescheduling tick() loop when leaving PAUSED, unless it's already running.
@@ -755,6 +761,7 @@ export const gameSlice = createSlice({
       if (recorded && recorded.dollarsPerkWh !== rateBefore) {
         recordMeaningfulDecision(state, {
           lever: "rate",
+          label: "Set the customer electricity rate",
           kind: "rate",
           before: String(rateBefore),
           after: String(recorded.dollarsPerkWh),
@@ -1029,6 +1036,7 @@ export const gameSlice = createSlice({
         // The loading screen reads this back rather than looking the scenario's location up,
         // which is what makes the replay run against the weather the original player saw
         location: cloneDeep(replay.location),
+        meaningfulDecisionGateWaived: !!replay.meaningfulDecisionGateWaived,
         replayPlayback: { actions: cloneDeep(replay.actions), index: 0 },
       };
     });
@@ -1195,12 +1203,15 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
-  recordMeaningfulDecision(state, {
-    lever: `facility:${added.id}`,
-    kind: "asset",
-    before: "absent",
-    after: `${added.name}:${added.peakWh ?? added.peakW}:${payload.financed ? "financed" : "cash"}`,
-  });
+  if (isMaterialCapacityDecision(state, added.peakW)) {
+    recordMeaningfulDecision(state, {
+      lever: `asset-build:${added.id}`,
+      label: `Build ${added.name} (${formatWatts(added.peakW)})`,
+      kind: "asset",
+      before: "absent",
+      after: `${added.name}:${added.peakWh ?? added.peakW}:${payload.financed ? "financed" : "cash"}`,
+    });
+  }
   // Assigned rather than spread into a new object: this is an immer draft, so a fresh object
   // assigned to the parameter is discarded and the forecast would never reach state
   state.timeline = reforecastSupply(state);
@@ -1231,12 +1242,15 @@ function applySellFacility(state: GameType, id: number): boolean {
       return true;
     },
   );
-  recordMeaningfulDecision(state, {
-    lever: `facility:${id}`,
-    kind: "sale",
-    before: ownedState,
-    after: "absent",
-  });
+  if (isMaterialCapacityDecision(state, sold.peakW)) {
+    recordMeaningfulDecision(state, {
+      lever: `asset-sale:${id}`,
+      label: `Sell ${sold.name} (${formatWatts(sold.peakW)})`,
+      kind: "sale",
+      before: ownedState,
+      after: "absent",
+    });
+  }
   state.timeline = reforecastSupply(state);
   return true;
 }
@@ -1248,6 +1262,7 @@ function applyTogglePauseFacility(state: GameType, id: number): boolean {
   facility.paused = !facility.paused;
   recordMeaningfulDecision(state, {
     lever: `operation:${id}`,
+    label: `${facility.paused ? "Pause" : "Run"} ${facility.name}`,
     kind: "operation",
     before,
     after: facility.paused ? "paused" : "operating",
@@ -1279,6 +1294,7 @@ function applyReprioritizeFacility(
   );
   recordMeaningfulDecision(state, {
     lever: `dispatch:${movedId}`,
+    label: `Set ${state.facilities[destination].name} dispatch priority`,
     kind: "dispatch",
     before: String(payload.spotInList),
     after: String(destination),
@@ -1297,11 +1313,14 @@ const TRADING_POLICIES: readonly TradingPolicyType[] = [
 function applyTradingPolicy(state: GameType, policy: unknown): boolean {
   if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
   if (!state.transmission) return false;
+  // A trading rule is only an actionable grid choice once there is a corridor to govern.
+  if (state.transmission.lines.length === 0) return false;
   if (state.transmission.tradingPolicy === policy) return false;
   const before = state.transmission.tradingPolicy;
   state.transmission.tradingPolicy = policy as TradingPolicyType;
   recordMeaningfulDecision(state, {
     lever: "trading",
+    label: "Set the regional trading rule",
     kind: "trading",
     before,
     after: policy as TradingPolicyType,
@@ -1359,6 +1378,7 @@ function applyBuildTransmissionLine(
   state.transmission.lines.push(line);
   recordMeaningfulDecision(state, {
     lever: `intertie:${line.id}`,
+    label: `Build ${line.name}`,
     kind: "asset",
     before: "absent",
     after: `${line.corridorId}:${financed ? "financed" : "cash"}`,
@@ -1422,6 +1442,10 @@ function applyPolicyEdit(
       state.policies!.programs[payload.id].tier);
   recordMeaningfulDecision(state, {
     lever: `policy:${payload.id}`,
+    label:
+      payload.id === "efficiency"
+        ? "Fund efficiency rebates"
+        : "Fund rooftop solar rebates",
     kind: "policy",
     before,
     after,
@@ -1484,6 +1508,7 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
         Object.assign(state, recorded);
         recordMeaningfulDecision(state, {
           lever: "rate",
+          label: "Set the customer electricity rate",
           kind: "rate",
           before: String(before),
           after: String(recorded.dollarsPerkWh),
@@ -1796,7 +1821,8 @@ export function tickState(state: GameType) {
               scenario,
               history,
               state.difficulty,
-              state.meaningfulDecisions.length,
+              state.meaningfulDecisions,
+              !!state.meaningfulDecisionGateWaived,
             )
           : undefined;
       const failure =
@@ -1945,7 +1971,8 @@ export function scenarioObjectiveFailure(
   scenario: ScenarioType,
   history: MonthlyHistoryType[],
   difficulty?: DifficultyType,
-  meaningfulDecisions = 0,
+  meaningfulDecisions: MeaningfulDecisionType[] = [],
+  decisionGateWaived = false,
 ): string | undefined {
   const reliabilityObjective = scenario.reliabilityObjective;
   if (reliabilityObjective) {
@@ -1978,12 +2005,21 @@ export function scenarioObjectiveFailure(
       return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
     }
   }
-  if (
-    !scenario.tutorialSteps &&
-    difficulty === "CEO" &&
-    meaningfulDecisions < CEO_MEANINGFUL_DECISIONS_REQUIRED
-  ) {
-    return `You made ${meaningfulDecisions} of ${CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions; CEO difficulty requires choices that change the grid or its economics.`;
+  if (!scenario.tutorialSteps && !decisionGateWaived) {
+    if (
+      difficulty === "Intern" &&
+      meaningfulDecisions.length < INTERN_MEANINGFUL_DECISIONS_REQUIRED
+    ) {
+      return "Make at least one meaningful decision that changes the grid or its economics.";
+    }
+    if (
+      difficulty === "CEO" &&
+      (meaningfulDecisions.length < CEO_MEANINGFUL_DECISIONS_REQUIRED ||
+        meaningfulDecisionCategoryCount(meaningfulDecisions) <
+          CEO_MEANINGFUL_CATEGORIES_REQUIRED)
+    ) {
+      return `You made ${meaningfulDecisions.length} of ${CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions across ${meaningfulDecisionCategoryCount(meaningfulDecisions)} of ${CEO_MEANINGFUL_CATEGORIES_REQUIRED} decision types; CEO difficulty requires a varied operating plan.`;
+    }
   }
   return undefined;
 }

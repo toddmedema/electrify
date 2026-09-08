@@ -1,9 +1,15 @@
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, GameType, ScenarioType } from "../Types";
+import {
+  DifficultyType,
+  GameType,
+  MeaningfulDecisionKindType,
+  ScenarioType,
+} from "../Types";
 import {
   createGame,
   createGameFromReplay,
   runSimulation,
+  SimOptionsType,
   SimResultType,
 } from "./Simulator";
 import {
@@ -13,7 +19,7 @@ import {
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
-import { scenarioObjectiveFailure, tickState } from "../reducers/Game";
+import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
 import { getAirborneWindOutputFactor } from "../helpers/Energy";
@@ -619,6 +625,27 @@ describe("airborne wind dispatch", () => {
 
 describe("simulation economics", () => {
   const scenarios = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+  const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
+    100: [
+      "asset",
+      "dispatch",
+      "operation",
+      "policy",
+      "rate",
+      "sale",
+      "trading",
+    ],
+    101: ["asset", "dispatch", "operation", "rate", "sale"],
+    102: ["asset", "dispatch", "operation", "rate", "sale"],
+    103: ["asset", "dispatch", "operation", "rate", "sale"],
+    104: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    105: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    106: ["asset", "dispatch", "policy", "rate", "sale", "trading"],
+    107: ["asset", "dispatch", "operation", "policy", "rate"],
+    108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+  };
   scenarios.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
@@ -661,9 +688,16 @@ describe("simulation economics", () => {
         ...play,
       });
       expectNoViolations(active);
-      expect(active.meaningfulDecisionCount).toBe(10);
-      expect(new Set(active.meaningfulDecisionKeys).size).toBe(10);
-      expect(active.outcome).toBe("completed");
+      expect([
+        active.meaningfulDecisionCount,
+        active.meaningfulDecisionCategoryCount >= 4,
+        new Set(active.meaningfulDecisionKeys).size,
+        active.outcome,
+        active.meaningfulDecisionLabels,
+      ]).toEqual([10, true, 10, "completed", expect.any(Array)]);
+      expect(active.meaningfulDecisionCategories).toEqual(
+        expectedCeoCategories[scenario.id],
+      );
     });
   });
 
@@ -705,28 +739,43 @@ describe("simulation economics", () => {
         expect([
           scenario.id,
           active.meaningfulDecisionCount,
+          active.meaningfulDecisionCategoryCount >= 4,
           active.outcome,
-        ]).toEqual([scenario.id, 10, "completed"]);
+        ]).toEqual([scenario.id, 10, true, "completed"]);
       });
     },
   );
 
-  it("rejects every one-action deletion from the authored ten-decision CEO plans", () => {
-    scenarios.forEach((scenario) => {
-      const play = STANDARD_BALANCE_PLAYS[scenario.id];
-      const authoredActionCount =
-        (play.scheduledActions?.length || 0) +
-        (play.initialBuild ? 1 : 0) +
-        (play.sellFacilityId !== undefined ? 1 : 0);
-      expect(authoredActionCount).toBe(10);
+  scenarios.forEach((scenario) => {
+    const play = STANDARD_BALANCE_PLAYS[scenario.id];
+    const omissions: Array<Partial<SimOptionsType>> = (
+      play.scheduledActions || []
+    ).map((_action, omitted) => ({
+      scheduledActions: play.scheduledActions!.filter(
+        (_candidate, index) => index !== omitted,
+      ),
+    }));
+    if (play.initialBuild) omissions.push({ initialBuild: undefined });
+    if (play.sellFacilityId !== undefined)
+      omissions.push({ sellFacilityId: undefined });
 
-      // Every possible one-action deletion leaves nine accepted commitments, so the explicit
-      // decision gate rejects it independently of how comfortably the economic goals were met.
-      for (let omitted = 0; omitted < authoredActionCount; omitted++) {
-        expect(scenarioObjectiveFailure(scenario, [], "CEO", 9)).toMatch(
-          /meaningful decisions/i,
-        );
-      }
+    if (omissions.length !== 10) {
+      throw new Error(
+        `CEO ${scenario.id} play must author exactly ten choices`,
+      );
+    }
+    omissions.forEach((omission, index) => {
+      it(`rejects actual CEO ${scenario.id} plan with choice ${index + 1} removed`, () => {
+        const shortened = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+          ...omission,
+        });
+        expectNoViolations(shortened);
+        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
+        expect(shortened.outcome).not.toBe("completed");
+      });
     });
   });
 

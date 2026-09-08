@@ -1,127 +1,183 @@
 import { ScheduledSimActionType, SimOptionsType } from "./Simulator";
 
-function rateSteps(
-  startingRate: number,
-  count: number,
-): ScheduledSimActionType[] {
-  return Array.from({ length: count }, (_, index) => ({
-    month: index * 2,
-    type: "rate" as const,
-    // A small, staged tariff plan: each setting remains in force for two settlements.
-    dollarsPerkWh: startingRate + index * 0.00025,
-  }));
-}
+const rate = (dollarsPerkWh: number): ScheduledSimActionType => ({
+  month: 0,
+  type: "rate",
+  dollarsPerkWh,
+});
 
-function modernDecisionPlan(
-  startingRate: number,
-  count: 8 | 9,
-): ScheduledSimActionType[] {
-  return rateSteps(startingRate, count);
-}
+const programs = (month: number): ScheduledSimActionType[] => [
+  { month, type: "policy", id: "efficiency", tier: "Small" },
+  { month, type: "policy", id: "solar", tier: "Small" },
+];
+
+const dispatch = (
+  facilityIds: number[],
+  startingMonth = 2,
+): ScheduledSimActionType[] =>
+  facilityIds.map((facilityId, index) => ({
+    month: startingMonth + index,
+    type: "reprioritize",
+    facilityId,
+  }));
+
+const line = (
+  corridorId: string,
+  tradingMonth = 1,
+  buildMonth = 0,
+): ScheduledSimActionType[] => [
+  { month: buildMonth, type: "intertie", corridorId, financed: true },
+  {
+    month: tradingMonth,
+    type: "trading",
+    policy: "RELIABILITY_FIRST",
+  },
+];
 
 /**
- * Reproducible, UI-legal playthroughs used by both the CEO economics gates and the seeded story
- * matrix. They deliberately contain only actions the headless simulator records as player input.
+ * Reproducible CEO plans made from persistent, UI-legal commitments. Every plan contains exactly
+ * ten material choices across at least four categories, no more than one rate setting, and no
+ * inverse action. Late operating/program changes still remain in force through a settlement.
  */
 export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
   100: {
-    // The announced carbon-fee step makes the old $0.055/kWh gas-heavy play insolvent.
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 150000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 150000000, financed: true },
     sellFacilityId: 2,
     sellAtMonth: 37,
-    scheduledActions: modernDecisionPlan(0.08, 8),
+    scheduledActions: [
+      rate(0.08),
+      ...line("california-north"),
+      ...dispatch([1, 3]),
+      { month: 36, type: "toggle", facilityId: 2 },
+      ...programs(142),
+    ],
   },
   101: {
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 300000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
     sellFacilityId: 2,
-    sellAtMonth: 39,
-    scheduledActions: modernDecisionPlan(0.1, 8),
+    sellAtMonth: 143,
+    scheduledActions: [
+      rate(0.1),
+      {
+        month: 1,
+        type: "build",
+        build: { name: "Natural Gas", peakW: 20000000, financed: true },
+      },
+      ...dispatch([1, 2, 3, 4]),
+      { month: 141, type: "toggle", facilityId: 1 },
+      { month: 142, type: "toggle", facilityId: 2 },
+    ],
   },
   102: {
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 300000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
     sellFacilityId: 1,
     sellAtMonth: 39,
-    scheduledActions: rateSteps(0.15, 8),
+    scheduledActions: [
+      rate(0.15),
+      {
+        month: 1,
+        type: "build",
+        build: { name: "Natural Gas", peakW: 20000000, financed: true },
+      },
+      ...dispatch([1, 2, 3, 4], 3),
+      { month: 38, type: "toggle", facilityId: 1 },
+      { month: 38, type: "toggle", facilityId: 2 },
+    ],
   },
   103: {
-    // This control must remain viable without the shale discount as well as with it.
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 600000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 600000000, financed: true },
     sellFacilityId: 1,
     sellAtMonth: 39,
-    scheduledActions: rateSteps(0.08, 8),
+    scheduledActions: [
+      rate(0.08),
+      {
+        month: 1,
+        type: "build",
+        build: { name: "Natural Gas", peakW: 10000000, financed: true },
+      },
+      {
+        month: 2,
+        type: "build",
+        build: { name: "Natural Gas", peakW: 10000000, financed: true },
+      },
+      ...dispatch([1, 2, 3, 4], 3),
+      { month: 38, type: "toggle", facilityId: 1 },
+    ],
   },
   104: {
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 300000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
     sellFacilityId: 1,
     sellAtMonth: 110,
-    scheduledActions: modernDecisionPlan(0.08, 8),
+    scheduledActions: [
+      rate(0.08),
+      ...dispatch([1, 2, 3, 4]),
+      { month: 109, type: "toggle", facilityId: 1 },
+      ...programs(238),
+    ],
   },
   105: {
-    // Oil's output-dependent O&M makes the old $0.08/kWh play run out of cash in 2007.
-    initialBuild: {
-      name: "Natural Gas",
-      peakW: 300000000,
-      financed: true,
-    },
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
     sellFacilityId: 3,
     sellAtMonth: 39,
-    scheduledActions: modernDecisionPlan(0.085, 8),
+    scheduledActions: [
+      rate(0.085),
+      ...dispatch([1, 2, 3, 4]),
+      { month: 38, type: "toggle", facilityId: 3 },
+      ...programs(142),
+    ],
   },
   106: {
     initialBuild: { name: "Natural Gas", peakW: 50000000, financed: true },
-    scheduledActions: modernDecisionPlan(0.101, 9),
+    sellFacilityId: 2,
+    sellAtMonth: 191,
+    scheduledActions: [
+      rate(0.101),
+      ...dispatch([1, 2, 3]),
+      ...line("pjm-miso-upgrade", 189, 188),
+      ...programs(190),
+    ],
   },
   107: {
     initialBuild: { name: "Natural Gas", peakW: 1800000000, financed: true },
-    scheduledActions: modernDecisionPlan(0.091, 9),
+    scheduledActions: [
+      rate(0.091),
+      ...dispatch([1, 2, 3, 4, 5]),
+      { month: 82, type: "toggle", facilityId: 4 },
+      ...programs(82),
+    ],
   },
   108: {
     initialBuild: { name: "Oil", peakW: 250000000, financed: true },
-    scheduledActions: modernDecisionPlan(0.241, 9),
+    scheduledActions: [
+      rate(0.241),
+      ...line("spain-portugal-upgrade"),
+      ...dispatch([1, 2, 7]),
+      { month: 35, type: "toggle", facilityId: 1 },
+      ...programs(34),
+    ],
   },
   110: {
     initialBuild: { name: "Oil", peakW: 400000000, financed: true },
-    scheduledActions: modernDecisionPlan(0.141, 9),
+    scheduledActions: [
+      rate(0.141),
+      ...line("france-core-upgrade"),
+      ...dispatch([2, 3, 6]),
+      { month: 47, type: "toggle", facilityId: 2 },
+      ...programs(46),
+    ],
   },
   111: {
-    // The one-year northern intertie is the only new firm resource that can be commissioned
-    // between the warning and the firestorm on full CEO construction times.
     scheduledActions: [
-      {
-        month: 0,
-        type: "intertie",
-        corridorId: "california-north",
-        financed: true,
-      },
-      ...modernDecisionPlan(0.171, 9),
+      rate(0.171),
+      ...line("california-north"),
+      ...dispatch([1, 2, 3, 4]),
+      { month: 35, type: "toggle", facilityId: 5 },
+      ...programs(34),
     ],
   },
 };
 
-/**
- * The single commitment that teaches each Intern scenario's intended first lesson. These use no
- * tariff change, sale, or reactive strategy: passive play must fail, while this one build wins.
- */
+/** The single material commitment that teaches each Intern scenario's intended first lesson. */
 export const INTERN_ONE_BUILD_PLAYS: Record<
   number,
   Pick<SimOptionsType, "initialBuild">

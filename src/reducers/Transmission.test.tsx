@@ -78,10 +78,28 @@ describe("transmission actions", () => {
     expect(Number.isFinite(before)).toBe(true);
   });
 
-  it("updates the trading rule", () => {
+  it("rejects an ineffective trading rule until an intertie exists", () => {
     const game = createGame({ scenarioId: 100, seed: 61 });
     const next = gameReducer(game, setTradingPolicy("RELIABILITY_FIRST"));
+    expect(next.transmission?.tradingPolicy).toBe("BALANCED");
+    expect(next.meaningfulDecisions).toEqual([]);
+  });
+
+  it("updates and records the trading rule once it governs an intertie", () => {
+    const next = gameReducer(
+      buildNorthernIntertie(),
+      setTradingPolicy("RELIABILITY_FIRST"),
+    );
     expect(next.transmission?.tradingPolicy).toBe("RELIABILITY_FIRST");
+    expect(next.meaningfulDecisions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "trading",
+          kind: "trading",
+          label: "Set the regional trading rule",
+        }),
+      ]),
+    );
   });
 
   it("keeps construction equity neutral instead of counting the intertie loan twice", () => {

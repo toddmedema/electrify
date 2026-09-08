@@ -35,9 +35,9 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Initial public schema. Increment this when a post-release change becomes incompatible.
-// Version 3 includes persistent customer programs. Accept and normalize v1/v2 saves;
-// older clients must not resume an active program as though its upgrades did not exist.
-export const SAVE_VERSION = 3;
+// Version 3 includes persistent customer programs. Version 4 adds the validated decision ledger.
+// Accept and normalize v1-v3 saves, but visibly waive the new gate for those in-progress games.
+export const SAVE_VERSION = 4;
 
 export interface SaveGameType {
   version: number;
@@ -119,7 +119,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     (save.version !== SAVE_VERSION &&
       save.version !== 1 &&
-      save.version !== 2) ||
+      save.version !== 2 &&
+      save.version !== 3) ||
     typeof save.savedAt !== "string" ||
     typeof save.appVersion !== "string"
   ) {
@@ -276,8 +277,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
   if (
-    game.meaningfulDecisions !== undefined &&
-    !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth)
+    (save.version === SAVE_VERSION &&
+      !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth)) ||
+    (game.meaningfulDecisionGateWaived !== undefined &&
+      typeof game.meaningfulDecisionGateWaived !== "boolean")
   )
     return null;
   const worldEvents = game.worldEvents as
@@ -348,7 +351,12 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission: transmissionEnabled
       ? (game.transmission ?? emptyTransmissionState())
       : undefined,
-    meaningfulDecisions: game.meaningfulDecisions ?? [],
+    meaningfulDecisions:
+      save.version === SAVE_VERSION ? game.meaningfulDecisions! : [],
+    meaningfulDecisionGateWaived:
+      save.version === SAVE_VERSION
+        ? (game.meaningfulDecisionGateWaived ?? false)
+        : true,
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,

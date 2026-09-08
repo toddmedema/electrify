@@ -3,7 +3,12 @@
 // the reducer directly. Importing Store creates and registers it.
 import cloneDeep from "lodash.clonedeep";
 import { schedulePolicy } from "../reducers/GameActions";
-import type { PolicyId, PolicyTier, TradingPolicyType } from "../Types";
+import type {
+  MeaningfulDecisionKindType,
+  PolicyId,
+  PolicyTier,
+  TradingPolicyType,
+} from "../Types";
 import "../Store";
 import gameReducer, {
   buildTransmissionLine,
@@ -26,6 +31,7 @@ import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
+import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
 import {
   ActiveWorldEventType,
   DifficultyType,
@@ -62,7 +68,7 @@ export type ScheduledSimActionType =
   | { month: number; type: "build"; build: InitialBuildType }
   | { month: number; type: "sell"; facilityId: number }
   | { month: number; type: "toggle"; facilityId: number }
-  | { month: number; type: "reprioritize"; spotInList: number; delta: number }
+  | { month: number; type: "reprioritize"; facilityId: number }
   | { month: number; type: "policy"; id: PolicyId; tier: PolicyTier }
   | { month: number; type: "trading"; policy: TradingPolicyType }
   | { month: number; type: "intertie"; corridorId: string; financed: boolean };
@@ -137,7 +143,10 @@ export interface SimResultType {
   outcome: "completed" | "bankrupt" | "fired";
   actionCount: number;
   meaningfulDecisionCount: number;
+  meaningfulDecisionCategoryCount: number;
+  meaningfulDecisionCategories: MeaningfulDecisionKindType[];
   meaningfulDecisionKeys: string[];
+  meaningfulDecisionLabels: string[];
   builds: BuildRecordType[];
   // Mean fill level of the storage fleet across the run, 0 - 1, or null with no storage built
   averageStateOfCharge: number | null;
@@ -455,15 +464,20 @@ export function runSimulation(options: SimOptionsType): SimResultType {
             );
             break;
           case "reprioritize":
-            state = cloneDeep(
-              gameReducer(
-                state,
-                reprioritizeFacility({
-                  spotInList: action.spotInList,
-                  delta: action.delta,
-                }),
-              ),
-            );
+            {
+              const spotInList = state.facilities.findIndex(
+                ({ id }) => id === action.facilityId,
+              );
+              state = cloneDeep(
+                gameReducer(
+                  state,
+                  reprioritizeFacility({
+                    spotInList,
+                    delta: spotInList === 0 ? 1 : -1,
+                  }),
+                ),
+              );
+            }
             break;
           case "policy":
             state = cloneDeep(
@@ -601,7 +615,8 @@ export function runSimulation(options: SimOptionsType): SimResultType {
       scenario,
       state.monthlyHistory,
       state.difficulty,
-      state.meaningfulDecisions.length,
+      state.meaningfulDecisions,
+      !!state.meaningfulDecisionGateWaived,
     )
   ) {
     firedAtMonth = state.date.monthsElapsed;
@@ -627,7 +642,16 @@ export function runSimulation(options: SimOptionsType): SimResultType {
           : "completed",
     actionCount: state.replayLog?.length || 0,
     meaningfulDecisionCount: state.meaningfulDecisions.length,
+    meaningfulDecisionCategoryCount: meaningfulDecisionCategoryCount(
+      state.meaningfulDecisions,
+    ),
+    meaningfulDecisionCategories: Array.from(
+      new Set(state.meaningfulDecisions.map(({ kind }) => kind)),
+    ).sort(),
     meaningfulDecisionKeys: state.meaningfulDecisions.map(({ key }) => key),
+    meaningfulDecisionLabels: state.meaningfulDecisions.map(
+      ({ label }) => label,
+    ),
     builds,
     averageStateOfCharge: stateOfChargeTicks
       ? stateOfChargeSum / stateOfChargeTicks

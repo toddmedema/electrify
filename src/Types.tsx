@@ -278,10 +278,11 @@ export interface ReplayActionType {
 export type MeaningfulDecisionKindType =
   "asset" | "sale" | "rate" | "policy" | "operation" | "dispatch" | "trading";
 
-/** One accepted player decision after same-month no-ops and reversals are coalesced. */
+/** One accepted player decision after lifetime no-ops and reversals are coalesced. */
 export interface MeaningfulDecisionType {
   key: string;
   lever: string;
+  label: string;
   month: number;
   kind: MeaningfulDecisionKindType;
   before: string;
@@ -299,6 +300,7 @@ export interface ReplayType {
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
   actions: ReplayActionType[];
+  meaningfulDecisionGateWaived?: boolean;
 }
 
 /**
@@ -916,6 +918,9 @@ export interface GameType {
   // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
   // same accepted state changes; saves persist and validate it so progress survives a reload.
   meaningfulDecisions: MeaningfulDecisionType[];
+  // Older in-progress saves/replays predate decision tracking. They keep their original victory
+  // rules rather than becoming impossible to finish after an upgrade.
+  meaningfulDecisionGateWaived?: boolean;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
   // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the

@@ -78,7 +78,11 @@ describe("SaveGame", () => {
   it("upgrades older saves without inventing missing chart history", () => {
     const restored = parseSave({ ...serializeSave(game), version: 1 });
     expect(restored?.version).toBe(SAVE_VERSION);
-    expect(restored?.game).toEqual({ ...game, policies: emptyPolicies() });
+    expect(restored?.game).toEqual({
+      ...game,
+      policies: emptyPolicies(),
+      meaningfulDecisionGateWaived: true,
+    });
   });
 
   it("keeps legacy saves disconnected from adjacent markets", () => {
@@ -93,8 +97,14 @@ describe("SaveGame", () => {
 
   it("normalizes old decision progress and round-trips validated progress", () => {
     const legacy = JSON.parse(JSON.stringify(serializeSave(game)));
-    delete legacy.game.meaningfulDecisions;
+    legacy.game.meaningfulDecisions = [{ key: "untrusted-old-ledger" }];
+    legacy.version = 3;
     expect(parseSave(legacy)?.game.meaningfulDecisions).toEqual([]);
+    expect(parseSave(legacy)?.game.meaningfulDecisionGateWaived).toBe(true);
+
+    const missingCurrent = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete missingCurrent.game.meaningfulDecisions;
+    expect(parseSave(missingCurrent)).toBeNull();
 
     const played = gameReducer(
       game,
@@ -103,6 +113,9 @@ describe("SaveGame", () => {
     expect(parseSave(serializeSave(played))?.game.meaningfulDecisions).toEqual(
       played.meaningfulDecisions,
     );
+    expect(
+      parseSave(serializeSave(played))?.game.meaningfulDecisionGateWaived,
+    ).toBe(false);
   });
 
   it("rejects malformed, duplicate, and future decision progress", () => {

@@ -1,8 +1,16 @@
 import * as React from "react";
-import { DifficultyType, ScenarioType } from "../../Types";
+import {
+  DifficultyType,
+  MeaningfulDecisionType,
+  ScenarioType,
+} from "../../Types";
 import { formatLargeMassApprox, KG_PER_MEGATONNE } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
-import { CEO_MEANINGFUL_DECISIONS_REQUIRED } from "../../helpers/MeaningfulDecisions";
+import {
+  meaningfulDecisionCategoryCount,
+  meaningfulDecisionRequirement,
+  MEANINGFUL_DECISION_CATEGORY_LABELS,
+} from "../../helpers/MeaningfulDecisions";
 
 export interface Props {
   ownership: ScenarioType["ownership"];
@@ -11,7 +19,8 @@ export interface Props {
   minimumCustomerRetention?: number;
   reliabilityObjective?: ScenarioType["reliabilityObjective"];
   difficulty?: DifficultyType;
-  meaningfulDecisionCount?: number;
+  meaningfulDecisions?: MeaningfulDecisionType[];
+  meaningfulDecisionGateWaived?: boolean;
 }
 
 /**
@@ -29,19 +38,50 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   } = props;
   const units = useUnits();
   const perEmissions = formatLargeMassApprox(KG_PER_MEGATONNE, units);
-  const ceoProgress =
-    props.difficulty === "CEO" ? (
-      <p data-testid="ceo-decision-progress">
-        Required: make {CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions
-        that change the grid or its economics. Progress:{" "}
-        {props.meaningfulDecisionCount ?? 0} of{" "}
-        {CEO_MEANINGFUL_DECISIONS_REQUIRED}.
-      </p>
-    ) : null;
+  const decisions = props.meaningfulDecisions ?? [];
+  const requirement = props.difficulty
+    ? meaningfulDecisionRequirement(props.difficulty)
+    : null;
+  const decisionProgress = requirement ? (
+    <div data-testid="meaningful-decision-progress">
+      {props.meaningfulDecisionGateWaived ? (
+        <p>
+          This game began before decision tracking was added, so its original
+          victory rules still apply.
+        </p>
+      ) : (
+        <>
+          <p>
+            Required: make {requirement.count} meaningful decision
+            {requirement.count === 1 ? "" : "s"} that change the grid or its
+            economics
+            {requirement.categories > 1
+              ? ` across at least ${requirement.categories} decision types`
+              : ""}
+            . Progress: {decisions.length} of {requirement.count}
+            {requirement.categories > 1
+              ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
+              : ""}
+            .
+          </p>
+          {decisions.length > 0 && (
+            <ul data-testid="meaningful-decision-history">
+              {decisions.map((decision) => (
+                <li key={decision.key}>
+                  {decision.label} —{" "}
+                  {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
   if (ownership === "Investor") {
     return (
       <div>
-        {ceoProgress}
+        {decisionProgress}
         <p>Earn 40 points per $1 billion of net worth at the end.</p>
         <p>Earn 2 points per 100,000 customers at the end.</p>
         <p>Earn 1 point per terawatt-hour (TWh) of electricity supplied.</p>
@@ -52,7 +92,7 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   }
   return (
     <div>
-      {ceoProgress}
+      {decisionProgress}
       {reliabilityObjective !== undefined && (
         <p>
           Required: serve at least{" "}
