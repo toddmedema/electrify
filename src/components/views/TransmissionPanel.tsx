@@ -41,9 +41,17 @@ export default function TransmissionPanel({
   onPolicy,
 }: TransmissionPanelProps) {
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
-  const corridors = corridorsForLocation(game.location);
+  const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readOnly = !!game.replayPlayback;
+  // The guided mission names the northern project. Showing only that choice until it is approved
+  // makes an exploratory tap recoverable instead of letting a much dearer three-year project
+  // consume the cash and time needed by the lesson.
+  const corridors =
+    game.scenarioId === 112 &&
+    !state.lines.some(({ corridorId }) => corridorId === "california-north")
+      ? availableCorridors.filter(({ id }) => id === "california-north")
+      : availableCorridors;
   const unbuiltCorridors = corridors.filter(
     (corridor) =>
       !state.lines.some(({ corridorId }) => corridorId === corridor.id),
@@ -92,6 +100,12 @@ export default function TransmissionPanel({
                 ? transmissionRatingW(line, now)
                 : line.capacityW;
               const building = line.yearsToBuildLeft > 0;
+              const direction =
+                (now?.importedW || 0) > (now?.exportedW || 0)
+                  ? "Importing"
+                  : (now?.exportedW || 0) > (now?.importedW || 0)
+                    ? "Exporting"
+                    : "Standing by";
               return (
                 <ListItem key={line.id} className="transmissionLine">
                   <ListItemAvatar>
@@ -105,14 +119,14 @@ export default function TransmissionPanel({
                     primary={line.name}
                     secondary={
                       building
-                        ? `${line.yearsToBuildLeft.toFixed(1)} ${line.yearsToBuildLeft <= 1 ? "year" : "years"} until power can flow`
+                        ? `${line.yearsToBuildLeft.toFixed(1)} ${line.yearsToBuildLeft <= 1 ? "year" : "years"} until power can flow · Monthly loan payments`
                         : `${formatWatts(rating)} available now · ${market?.name}`
                     }
                   />
                   <Chip
                     size="small"
                     color={building ? "default" : "success"}
-                    label={building ? "Building" : "Trading"}
+                    label={building ? "Building" : `Trading · ${direction}`}
                   />
                 </ListItem>
               );
@@ -153,7 +167,11 @@ export default function TransmissionPanel({
               const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
               const financed = corridor.buildCost - downpayment;
               return (
-                <article className="transmissionProject" key={corridor.id}>
+                <article
+                  className="transmissionProject"
+                  data-corridor-id={corridor.id}
+                  key={corridor.id}
+                >
                   <div className="transmissionProjectHeading">
                     <div>
                       <Typography variant="subtitle1">
@@ -193,6 +211,8 @@ export default function TransmissionPanel({
                   </dl>
                   {!readOnly && (
                     <Button
+                      id={`approve-intertie-${corridor.id}`}
+                      aria-label={`Approve ${market?.name} intertie`}
                       fullWidth
                       variant="contained"
                       disabled={!now || now.cash < downpayment}

@@ -662,6 +662,8 @@ export interface ScenarioType {
   recommendationOrder?: number;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
+  /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
+  intertiesEnabled?: boolean;
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -895,8 +897,8 @@ export interface GameType {
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
-  // Optional only at the type boundary so legacy fixtures/saves remain readable. New games and
-  // normalized saves always carry an explicit empty state.
+  // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
+  // scenarios and their normalized saves carry an explicit empty state.
   transmission?: TransmissionStateType;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is

@@ -567,6 +567,37 @@ describe("Insights layers", () => {
       "profit",
       "financeDetails",
     ]);
+    expect(withRequiredLayers(["cash", "powerExchange"], 112)).toEqual([
+      "powerExchange",
+      "cash",
+    ]);
+  });
+
+  it("puts Mission 7's required exchange track first once its line opens", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+
+    renderInsights(112, game);
+
+    expect(document.querySelector(".insightsTrack")).toHaveAttribute(
+      "data-layer",
+      "powerExchange",
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {

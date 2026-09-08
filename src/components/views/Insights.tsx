@@ -556,6 +556,8 @@ function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
       return ["customers"];
     case 5:
       return ["supplyDemand", "fuelPrices", "weather"];
+    case 112:
+      return ["powerExchange"];
     default:
       return [];
   }
@@ -565,6 +567,9 @@ export function withRequiredLayers(
   layers: InsightLayerId[],
   scenarioId: number,
 ): InsightLayerId[] {
+  if (scenarioId === 112) {
+    return ["powerExchange", ...layers.filter((id) => id !== "powerExchange")];
+  }
   const next = [...layers];
   for (const id of requiredTutorialLayers(scenarioId)) {
     if (!next.includes(id)) {
@@ -715,6 +720,7 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
       (this.state.layers.includes("powerExchange") &&
@@ -728,7 +734,14 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  public componentDidMount() {
+    this.scrollTutorialPowerExchangeIntoView();
+  }
+
   public componentDidUpdate(previousProps: Props) {
+    if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
+      this.scrollTutorialPowerExchangeIntoView();
+    }
     if (
       this.props.game.date.monthsElapsed !==
       previousProps.game.date.monthsElapsed
@@ -766,6 +779,21 @@ export default class Insights extends React.Component<Props, State> {
     }
   }
 
+  private scrollTutorialPowerExchangeIntoView() {
+    if (
+      this.props.game.scenarioId !== 112 ||
+      this.props.game.tutorialStep !== 7 ||
+      window.innerWidth > 768
+    ) {
+      return;
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-layer="powerExchange"]')
+        ?.scrollIntoView?.({ block: "nearest" });
+    }, 0);
+  }
+
   private setLayers(
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
@@ -775,8 +803,12 @@ export default class Insights extends React.Component<Props, State> {
       preset,
       this.state.presetLibrary,
     )?.layers;
-    setStorageKeyValue(LAYERS_KEY, required);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    // Mission 7 temporarily puts its teaching track first. Keep that guided ordering out of the
+    // player's saved preset so finishing the mission does not rearrange their normal Insights.
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, required);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    }
     this.setState({
       layers: required,
       preset,
@@ -804,8 +836,10 @@ export default class Insights extends React.Component<Props, State> {
       preset.layers,
       this.props.game.scenarioId,
     );
-    setStorageKeyValue(LAYERS_KEY, layers);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, layers);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    }
     this.setState({ layers, preset: id, presetDirty: false });
   }
 

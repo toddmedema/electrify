@@ -8,7 +8,10 @@ import gameReducer, {
   generateNewTimeline,
   setTradingPolicy,
   tickState,
+  togglePauseFacility,
 } from "./Game";
+import { AppStateType } from "../Types";
+import { getScenario } from "../data/Scenarios";
 
 function buildNorthernIntertie() {
   const game = createGame({ scenarioId: 100, seed: 61 });
@@ -25,6 +28,25 @@ function buildNorthernIntertie() {
 }
 
 describe("transmission actions", () => {
+  it("cannot enable transmission inside earlier tutorials", () => {
+    for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
+      const game = createGame({ scenarioId });
+      expect(game.transmission).toBeUndefined();
+      expect(
+        gameReducer(
+          game,
+          buildTransmissionLine({
+            corridorId: "california-north",
+            financed: true,
+          }),
+        ).transmission,
+      ).toBeUndefined();
+      expect(
+        gameReducer(game, setTradingPolicy("RELIABILITY_FIRST")).transmission,
+      ).toBeUndefined();
+    }
+  });
+
   it("builds one valid California corridor and charges the down payment", () => {
     const game = createGame({ scenarioId: 100, seed: 61 });
     const before = getTimeFromTimeline(game.date.minute, game.timeline)!.cash;
@@ -185,5 +207,136 @@ describe("transmission actions", () => {
         }),
       ],
     });
+  });
+
+  it("runs Mission 7 from financed build through imports and a later safe export", () => {
+    jest.useFakeTimers();
+    try {
+      const scenario = getScenario(112)!;
+      const steps = scenario.tutorialSteps!;
+      let state = createGame({ scenarioId: 112 });
+      const appState = () => ({ game: state }) as AppStateType;
+      expect(state.transmission).toEqual({
+        tradingPolicy: "BALANCED",
+        lines: [],
+      });
+      expect(state.facilities.map(({ fuel }) => fuel)).toEqual([
+        "Sun",
+        "Natural Gas",
+      ]);
+
+      const startingCash = getTimeFromTimeline(
+        state.date.minute,
+        state.timeline,
+      )!.cash;
+      state = cloneDeep(
+        gameReducer(
+          state,
+          buildTransmissionLine({
+            corridorId: "california-north",
+            financed: true,
+          }),
+        ),
+      );
+      expect(getTimeFromTimeline(state.date.minute, state.timeline)!.cash).toBe(
+        startingCash - 36000000,
+      );
+      expect(steps[1].advanceOn?.(appState())).toBe(true);
+
+      let constructionTicks = 0;
+      while (state.transmission!.lines[0].yearsToBuildLeft > 0) {
+        tickState(state);
+        constructionTicks++;
+      }
+      state.speed = "NORMAL";
+      expect(constructionTicks).toBeGreaterThanOrEqual(TICKS_PER_YEAR - 1);
+      expect(constructionTicks).toBeLessThanOrEqual(TICKS_PER_YEAR + 1);
+      expect(steps[2].advanceOn?.(appState())).toBe(false);
+      state.speed = "PAUSED";
+      expect(steps[2].advanceOn?.(appState())).toBe(true);
+
+      state = cloneDeep(
+        gameReducer(state, setTradingPolicy("RELIABILITY_FIRST")),
+      );
+      const gas = state.facilities.find(({ fuel }) => fuel === "Natural Gas")!;
+      state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
+      expect(steps[3].advanceOn?.(appState())).toBe(true);
+      expect(steps[5].advanceOn?.(appState())).toBe(true);
+
+      const operatingTicks = [] as Array<{
+        importedW: number;
+        exportedW: number;
+        capacityW: number;
+      }>;
+      while (state.date.monthsElapsed < 13) {
+        tickState(state);
+        const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+        operatingTicks.push({
+          importedW: now.importedW || 0,
+          exportedW: now.exportedW || 0,
+          capacityW: now.transmissionCapacityW || 0,
+        });
+      }
+      state.speed = "PAUSED";
+      expect(steps[6].advanceOn?.(appState())).toBe(true);
+      expect(
+        state.monthlyHistory.some(
+          (month) => (month.chartAverage?.importedW || 0) > 0,
+        ),
+      ).toBe(true);
+      expect(state.eventLog.some(({ kind }) => kind === "BLACKOUT")).toBe(
+        false,
+      );
+
+      const capstone = steps[9].capstone!;
+      state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+      const solar = state.facilities.find(({ fuel }) => fuel === "Sun")!;
+      state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
+      state.eventLog.push({
+        id: 999,
+        kind: "BLACKOUT",
+        label: "Recovered",
+        message: "Recovered test blackout",
+        importance: "CRITICAL",
+      });
+      while (state.date.monthsElapsed < 14) tickState(state);
+      expect(capstone.success(appState())).toBe(false);
+
+      state = cloneDeep(gameReducer(state, setTradingPolicy("BALANCED")));
+      state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
+      while (state.date.monthsElapsed < 15) {
+        tickState(state);
+        const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+        operatingTicks.push({
+          importedW: now.importedW || 0,
+          exportedW: now.exportedW || 0,
+          capacityW: now.transmissionCapacityW || 0,
+        });
+      }
+      expect(capstone.success(appState())).toBe(true);
+      expect(
+        state.monthlyHistory.some(
+          (month) =>
+            (month.chartAverage?.exportedW || 0) > 0 &&
+            (month.minimumSupplyMarginW ?? -1) >= 0,
+        ),
+      ).toBe(true);
+      expect(
+        operatingTicks.every(
+          ({ importedW, exportedW, capacityW }) =>
+            importedW + exportedW <= capacityW,
+        ),
+      ).toBe(true);
+      expect(
+        state.timeline.some(
+          ({ transmissionCapacityW }) =>
+            (transmissionCapacityW || 0) > 0 &&
+            (transmissionCapacityW || 0) < 500000000,
+        ),
+      ).toBe(true);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 });

@@ -87,6 +87,30 @@ describe("SaveGame", () => {
     });
   });
 
+  it("does not invent transmission when an older tutorial is restored", () => {
+    const tutorial = createGame({ scenarioId: 0, seed: 249001 });
+    const save = JSON.parse(JSON.stringify(serializeSave(tutorial)));
+    save.game.transmission = { tradingPolicy: "BALANCED", lines: [] };
+
+    expect(parseSave(save)?.game.transmission).toBeUndefined();
+
+    save.game.transmission.lines.push({
+      id: 1,
+      corridorId: "california-north",
+      name: "Northern intertie upgrade",
+      capacityW: 500000000,
+      buildCost: 180000000,
+      annualOperatingCost: 3600000,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      financed: false,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+    });
+    expect(parseSave(save)).toBeNull();
+  });
+
   it("rejects corrupt or impossible intertie financial state", () => {
     const california = createGame({ scenarioId: 100, seed: 61 });
     const built = gameReducer(

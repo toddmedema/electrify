@@ -57,6 +57,7 @@ import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
 import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
+import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
@@ -338,6 +339,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={selected ? "facilityRow selected" : "facilityRow"}
+          data-fuel={fuel}
           role={provided.dragHandleProps ? undefined : "button"}
           tabIndex={provided.dragHandleProps ? undefined : 0}
           aria-expanded={selected}
@@ -565,8 +567,19 @@ export default class Facilities extends React.Component<
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate() {
+  public componentDidUpdate(previousProps: Props) {
     this.throttle.rendered(this.props.game.date.minute);
+    if (
+      this.props.game.scenarioId === 112 &&
+      this.props.game.tutorialStep !== previousProps.game.tutorialStep &&
+      [1, 6].includes(this.props.game.tutorialStep) &&
+      this.state.view !== "INTERTIES"
+    ) {
+      // If Next was tapped before opening the first tab, reveal the gated approval instead of
+      // stranding it off-screen. The same transition brings the live flow label into view after
+      // Natural Gas is paused, so "Importing" is something the learner can actually observe.
+      this.setState({ view: "INTERTIES" });
+    }
   }
 
   public onBeforeDragStart() {
@@ -600,6 +613,10 @@ export default class Facilities extends React.Component<
     } = this.props;
     const facilitiesCount = game.facilities.length;
     const readOnly = !!game.replayPlayback;
+    const intertiesAvailable = !!(
+      game.transmission && corridorsForLocation(game.location).length
+    );
+    const activeView = intertiesAvailable ? this.state.view : "PLANTS";
     const storyEffects = combineStoryEffects(
       game.worldEvents.active.filter(
         (event) =>
@@ -610,108 +627,114 @@ export default class Facilities extends React.Component<
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
-        {/* The pane's own header rather than a row inside the list, so it lines up with the
+        <>
+          {/* The pane's own header rather than a row inside the list, so it lines up with the
             other panes' headers and the build buttons stay put as the fleet scrolls */}
-        <Toolbar className="paneHeader">
-          <Typography variant="h6">Facilities</Typography>
-          {!readOnly && this.state.view === "PLANTS" && (
-            <>
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                onClick={onGeneratorBuild}
-                className="button-buildGenerator"
-                startIcon={<ConceptIcon concept="generator" fontSize="small" />}
-              >
-                Generator
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                onClick={onStorageBuild}
-                className="button-buildStorage"
-                startIcon={<ConceptIcon concept="storage" fontSize="small" />}
-              >
-                Storage
-              </Button>
-            </>
-          )}
-        </Toolbar>
-        <Tabs
-          value={this.state.view}
-          onChange={(_event, view) => this.setState({ view })}
-          aria-label="Facility type"
-          className="facilityTabs"
-          variant="fullWidth"
-        >
-          <Tab value="PLANTS" label="Plants" />
-          <Tab value="INTERTIES" label="Interties" />
-        </Tabs>
-        {this.state.view === "PLANTS" ? (
-          <>
-            <ChartSupplyDemand
-              height={180}
-              timeline={game.timeline}
-              currentMinute={game.date.minute}
-              location={game.location}
-              legend={game.speed === "PAUSED"}
-              startingYear={game.startingYear}
-            />
-            <List dense className="scrollable">
-              <DragDropContext
-                onBeforeDragStart={this.onBeforeDragStart}
-                onDragEnd={this.onDragEnd}
-              >
-                <Droppable droppableId="droppable">
-                  {(provided) => (
-                    <div {...provided.droppableProps} ref={provided.innerRef}>
-                      {game.facilities.map(
-                        (g: FacilityOperatingType, i: number) => (
-                          <FacilityListItem
-                            facility={g}
-                            game={game}
-                            key={g.id}
-                            onSell={onSell}
-                            onTogglePause={onTogglePause}
-                            onPause={onPause}
-                            onReprioritize={onReprioritize}
-                            onSelect={onSelect}
-                            selected={selectedFacilityId === g.id}
-                            storyOutputMultiplier={storyOutputMultiplierForFacility(
-                              g,
-                              storyEffects,
-                            )}
-                            spotInList={i}
-                            listLength={facilitiesCount}
-                            readOnly={readOnly}
-                          />
-                        ),
-                      )}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-              {facilitiesCount < 2 && !readOnly && (
-                <Typography
-                  color="textSecondary"
-                  variant="body2"
-                  style={{ textAlign: "center", marginTop: "12px" }}
+          <Toolbar className="paneHeader">
+            <Typography variant="h6">Facilities</Typography>
+            {!readOnly && activeView === "PLANTS" && (
+              <>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={onGeneratorBuild}
+                  className="button-buildGenerator"
+                  startIcon={
+                    <ConceptIcon concept="generator" fontSize="small" />
+                  }
                 >
-                  (click "Generator" or "Storage" to build more)
-                </Typography>
-              )}
-            </List>
-          </>
-        ) : (
-          <TransmissionPanel
-            game={game}
-            onBuild={onTransmissionBuild}
-            onPolicy={onTradingPolicy}
-          />
-        )}
+                  Generator
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={onStorageBuild}
+                  className="button-buildStorage"
+                  startIcon={<ConceptIcon concept="storage" fontSize="small" />}
+                >
+                  Storage
+                </Button>
+              </>
+            )}
+          </Toolbar>
+          {intertiesAvailable && (
+            <Tabs
+              value={activeView}
+              onChange={(_event, view) => this.setState({ view })}
+              aria-label="Facility type"
+              className="facilityTabs"
+              variant="fullWidth"
+            >
+              <Tab id="plantsTab" value="PLANTS" label="Plants" />
+              <Tab id="intertiesTab" value="INTERTIES" label="Interties" />
+            </Tabs>
+          )}
+          {activeView === "PLANTS" ? (
+            <>
+              <ChartSupplyDemand
+                height={180}
+                timeline={game.timeline}
+                currentMinute={game.date.minute}
+                location={game.location}
+                legend={game.speed === "PAUSED"}
+                startingYear={game.startingYear}
+              />
+              <List dense className="scrollable">
+                <DragDropContext
+                  onBeforeDragStart={this.onBeforeDragStart}
+                  onDragEnd={this.onDragEnd}
+                >
+                  <Droppable droppableId="droppable">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef}>
+                        {game.facilities.map(
+                          (g: FacilityOperatingType, i: number) => (
+                            <FacilityListItem
+                              facility={g}
+                              game={game}
+                              key={g.id}
+                              onSell={onSell}
+                              onTogglePause={onTogglePause}
+                              onPause={onPause}
+                              onReprioritize={onReprioritize}
+                              onSelect={onSelect}
+                              selected={selectedFacilityId === g.id}
+                              storyOutputMultiplier={storyOutputMultiplierForFacility(
+                                g,
+                                storyEffects,
+                              )}
+                              spotInList={i}
+                              listLength={facilitiesCount}
+                              readOnly={readOnly}
+                            />
+                          ),
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+                {facilitiesCount < 2 && !readOnly && (
+                  <Typography
+                    color="textSecondary"
+                    variant="body2"
+                    style={{ textAlign: "center", marginTop: "12px" }}
+                  >
+                    (click "Generator" or "Storage" to build more)
+                  </Typography>
+                )}
+              </List>
+            </>
+          ) : (
+            <TransmissionPanel
+              game={game}
+              onBuild={onTransmissionBuild}
+              onPolicy={onTradingPolicy}
+            />
+          )}
+        </>
       </GameCard>
     );
   }

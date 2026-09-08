@@ -26,7 +26,7 @@ test("California players can build and understand an intertie", async ({
   ).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
     const firstBuild = facilities
-      .getByRole("button", { name: "Approve intertie" })
+      .getByRole("button", { name: "Approve Pacific Northwest intertie" })
       .first();
     const box = await firstBuild.boundingBox();
     expect(box).not.toBeNull();
@@ -34,7 +34,7 @@ test("California players can build and understand an intertie", async ({
   }
 
   await facilities
-    .getByRole("button", { name: "Approve intertie" })
+    .getByRole("button", { name: "Approve Pacific Northwest intertie" })
     .first()
     .click();
   await expect(facilities.getByText("Your interties")).toBeVisible();

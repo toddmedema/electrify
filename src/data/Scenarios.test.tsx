@@ -9,6 +9,7 @@ import {
 import { AppStateType, ScenarioType } from "../Types";
 import { render, screen } from "@testing-library/react";
 import { getScenarioLocation } from "../helpers/Locations";
+import { intertiesEnabledForScenario } from "./AdjacentMarkets";
 
 describe("getScenario", () => {
   it("finds an authored scenario by id", () => {
@@ -53,6 +54,11 @@ describe("getNextTutorial", () => {
 
   it("finds nothing after the last tutorial", () => {
     expect(getNextTutorial(TUTORIALS[TUTORIALS.length - 1].id)).toBeUndefined();
+  });
+
+  it("places Mission 7 after Forecasting and keeps its append-only id", () => {
+    expect(getNextTutorial(5)?.id).toBe(112);
+    expect(getNextTutorial(112)).toBeUndefined();
   });
 
   // Which is what both callers rely on to decide whether to offer one at all
@@ -117,6 +123,48 @@ describe("tutorial mission metadata", () => {
     expect(steps[3].advanceOn).toBeDefined();
     expect(steps[4].advanceOn).toBeUndefined();
     expect(steps[4].capstone).toBeDefined();
+  });
+
+  it("authors the Interties mission as a fixed two-plant California lesson", () => {
+    const interties = getScenario(112)!;
+    expect(interties).toMatchObject({
+      name: "Mission 7: Interties",
+      seed: 249007,
+      startingYear: 2019,
+      durationMonths: 24,
+      intertiesEnabled: true,
+    });
+    expect(interties.facilities).toEqual([
+      expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
+      expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
+    ]);
+    expect(interties.tutorialSteps).toHaveLength(10);
+  });
+
+  it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
+    for (const tutorial of TUTORIALS.filter(({ id }) => id !== 112)) {
+      expect(
+        intertiesEnabledForScenario(tutorial, getScenarioLocation(tutorial)!),
+      ).toBe(false);
+    }
+    const interties = getScenario(112)!;
+    expect(
+      intertiesEnabledForScenario(interties, getScenarioLocation(interties)!),
+    ).toBe(true);
+    const ordinaryCalifornia = getScenario(100)!;
+    expect(
+      intertiesEnabledForScenario(
+        ordinaryCalifornia,
+        getScenarioLocation(ordinaryCalifornia)!,
+      ),
+    ).toBe(true);
+    const noCorridor = getScenario(103)!;
+    expect(
+      intertiesEnabledForScenario(
+        { ...noCorridor, intertiesEnabled: true },
+        getScenarioLocation(noCorridor)!,
+      ),
+    ).toBe(false);
   });
 });
 

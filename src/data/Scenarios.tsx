@@ -71,6 +71,30 @@ const forecastingCapstoneSucceeded = (state: AppStateType) => {
   );
 };
 
+const tutorialNorthernIntertie = (state: AppStateType) =>
+  state.game.transmission?.lines.find(
+    (line) => line.corridorId === "california-north",
+  );
+
+const tutorialSawImports = (state: AppStateType) =>
+  state.game.monthlyHistory.some(
+    (month) => (month.chartAverage?.importedW || 0) > 0,
+  );
+
+const tutorialSawSafeExport = (state: AppStateType) =>
+  state.game.monthlyHistory.some(
+    (month) =>
+      (month.chartAverage?.exportedW || 0) > 0 &&
+      (month.minimumSupplyMarginW ?? -1) >= 0,
+  );
+
+const intertiesCapstoneSucceeded = (state: AppStateType) =>
+  state.game.date.monthsElapsed >= 14 &&
+  tutorialNorthernIntertie(state)?.yearsToBuildLeft === 0 &&
+  state.game.transmission?.tradingPolicy === "BALANCED" &&
+  tutorialSawImports(state) &&
+  tutorialSawSafeExport(state);
+
 export const SCENARIOS = [
   {
     id: 0, // Avoid changing IDs, linked to scores / completion, and doesn't impact order
@@ -661,6 +685,160 @@ export const SCENARIOS = [
             "Final challenge complete—construction finished before peak demand, and the added generator prevented the predicted summer shortage.",
           failureMessage:
             "Demand exceeded available supply before the new generator was ready. Recheck the forecast shortage and start construction sooner.",
+        },
+      },
+    ],
+  },
+  {
+    id: 112, // Append-only persisted scenario id; tutorial order is its position in this array
+    name: "Mission 7: Interties",
+    icon: "transmission-option-2",
+    summary: "Share power with neighbors",
+    locationId: "SF",
+    ownership: "Investor",
+    seed: 249007,
+    startingYear: 2019,
+    cash: 220000000,
+    feePerKgCO2e: 0,
+    dollarsPerkWh: 0.07,
+    durationMonths: 24,
+    intertiesEnabled: true,
+    endTitle: "Mission complete!",
+    endMessage:
+      "You used a limited grid connection to cover shortages and sell only safe surplus.",
+    facilities: [
+      // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
+      // much nameplate to create observable daytime surplus after demand and the 5% reserve.
+      { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
+      { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 12 },
+    ],
+    tutorialSteps: [
+      {
+        skipBeacon: true,
+        card: "FACILITIES",
+        target: "#intertiesTab",
+        content: (
+          <TutorialPrompt
+            concepts={["supply", "demand"]}
+            text="Tap Interties to see links to neighboring grids, then tap Next."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#approve-intertie-california-north",
+        advanceOn: (s: AppStateType) => !!tutorialNorthernIntertie(s),
+        content: (
+          <TutorialPrompt
+            concepts={["money", "construction"]}
+            text="Approve the Pacific Northwest intertie with financing."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#speedChangeButtons",
+        advanceOn: (s: AppStateType) =>
+          tutorialNorthernIntertie(s)?.yearsToBuildLeft === 0 &&
+          s.game.speed === "PAUSED",
+        content: (
+          <TutorialPrompt
+            concepts={["construction", "time"]}
+            text="Run time until the line says Trading, then pause."
+          />
+        ),
+        hint: "Tap 1× or fast speed, watch Building change to Trading, then tap pause.",
+      },
+      {
+        card: "FACILITIES",
+        target: ".tradingPolicy",
+        advanceOn: (s: AppStateType) =>
+          s.game.transmission?.tradingPolicy === "RELIABILITY_FIRST",
+        content: (
+          <TutorialPrompt
+            concepts={["demand", "supply"]}
+            text="Choose “Buy for shortages only” to use the neighboring grid as backup."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#plantsTab",
+        content: (
+          <TutorialPrompt
+            concepts={["generator", "pause"]}
+            text="Tap Plants to return to your power plants, then tap Next."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: '[data-fuel="Natural Gas"]',
+        advanceOn: (s: AppStateType) =>
+          s.game.facilities.some(
+            (facility) =>
+              "fuel" in facility &&
+              facility.fuel === "Natural Gas" &&
+              facility.paused,
+          ),
+        content: (
+          <TutorialPrompt
+            concepts={["pause", "demand"]}
+            text="Pause the natural-gas plant to create a shortage the intertie can cover."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#speedChangeButtons",
+        advanceOn: (s: AppStateType) =>
+          s.game.date.monthsElapsed >= 13 &&
+          tutorialSawImports(s) &&
+          s.game.speed === "PAUSED",
+        content: (
+          <TutorialPrompt
+            concepts={["play", "supply"]}
+            text="Run until you see Importing, then pause; the line can cover only up to its available capacity."
+          />
+        ),
+        hint: "If time is paused, tap 1× or fast speed; the line must say Trading.",
+      },
+      {
+        card: "INSIGHTS",
+        target: '[data-layer="powerExchange"]',
+        content: (
+          <TutorialPrompt
+            concepts={["supply", "money"]}
+            text="Compare power flowing with available capacity; imports cost the neighbor price shown."
+          />
+        ),
+      },
+      {
+        card: "INSIGHTS",
+        target: ".powerExchangeSummary",
+        content: (
+          <TutorialPrompt
+            concepts={["weather", "supply"]}
+            text="Hot, sunny weather warms the line, so it may safely carry less than 500 MW."
+          />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        content: (
+          <TutorialPrompt
+            concepts={["supply", "goal"]}
+            text="Your turn: choose “Buy for shortages, sell extra,” then run until the grid safely sends extra solar power out."
+          />
+        ),
+        hint: "An export starts only after local demand and the 5% reserve are covered. If flow stays at 0, make sure Solar is on.",
+        capstone: {
+          preserveProgress: true,
+          success: intertiesCapstoneSucceeded,
+          successMessage:
+            "You borrowed power at night and shared extra solar by day, while keeping your own grid safe.",
+          failureMessage:
+            "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
         },
       },
     ],

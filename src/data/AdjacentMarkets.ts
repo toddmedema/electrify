@@ -1,6 +1,7 @@
 import {
   AdjacentMarketDefinitionType,
   LocationType,
+  ScenarioType,
   TransmissionCorridorDefinitionType,
   TransmissionStateType,
 } from "../Types";
@@ -63,6 +64,18 @@ export function emptyTransmissionState(): TransmissionStateType {
 /** The first release is deliberately calibrated only for the California market. */
 export function transmissionAvailable(location: LocationType): boolean {
   return location.admin === "California" || location.id === "SF";
+}
+
+/** Tutorials opt into this extra system deliberately; normal games follow physical availability. */
+export function intertiesEnabledForScenario(
+  scenario: ScenarioType,
+  location: LocationType,
+): boolean {
+  if (!transmissionAvailable(location)) return false;
+  if (scenario.intertiesEnabled !== undefined) {
+    return scenario.intertiesEnabled;
+  }
+  return !scenario.tutorialSteps;
 }
 
 export function corridorsForLocation(

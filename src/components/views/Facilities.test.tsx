@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Facilities from "./Facilities";
 import { tickState } from "../../reducers/Game";
@@ -356,11 +356,55 @@ describe("the interties view", () => {
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
     expect(screen.queryByLabelText("Trading rule")).toBeNull();
     expect(
-      screen.getAllByRole("button", { name: "Approve intertie" }),
+      screen.getAllByRole("button", { name: /Approve .* intertie/ }),
     ).not.toHaveLength(0);
     expect(screen.getAllByText("Total cost")).toHaveLength(2);
     expect(
       screen.getByText(/Pay \$36M now · finance \$144M/),
     ).toBeInTheDocument();
+  });
+
+  it("keeps every earlier tutorial focused on plants", () => {
+    for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
+      renderFacilities(createGame({ scenarioId }), null);
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(screen.queryByText("Interties")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("gives Mission 7 stable Plants and Interties tabs", () => {
+    renderFacilities(createGame({ scenarioId: 112 }), null);
+
+    expect(screen.getByRole("tab", { name: "Plants" })).toHaveAttribute(
+      "id",
+      "plantsTab",
+    );
+    expect(screen.getByRole("tab", { name: "Interties" })).toHaveAttribute(
+      "id",
+      "intertiesTab",
+    );
+  });
+
+  it("does not render an empty interties destination where no corridor exists", () => {
+    renderFacilities(createGame({ scenarioId: 103 }), null);
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByText(/Interties are coming/)).toBeNull();
+  });
+
+  it("gives the guided northern approval a stable target and specific name", async () => {
+    renderFacilities(createGame({ scenarioId: 112 }), null);
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+
+    const approval = screen.getByRole("button", {
+      name: "Approve Pacific Northwest intertie",
+    });
+    expect(approval).toHaveAttribute("id", "approve-intertie-california-north");
+    expect(approval.closest("article")).toHaveAttribute(
+      "data-corridor-id",
+      "california-north",
+    );
+    expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 });

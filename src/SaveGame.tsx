@@ -11,8 +11,10 @@ import { snackbarOpen } from "./reducers/UI";
 import { GameType, TransmissionLineOperatingType } from "./Types";
 import {
   emptyTransmissionState,
+  intertiesEnabledForScenario,
   TRANSMISSION_CORRIDORS,
 } from "./data/AdjacentMarkets";
+import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
 
 /**
@@ -290,6 +292,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   const transmission = game.transmission;
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const transmissionEnabled = !!(
+    scenario && intertiesEnabledForScenario(scenario, game.location)
+  );
   if (
     transmission !== undefined &&
     (typeof transmission !== "object" ||
@@ -305,6 +311,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
         transmission.lines.length)
   )
     return null;
+  if (!transmissionEnabled && transmission?.lines.length) return null;
   if (
     [...game.timeline, ...game.monthlyHistory].some(
       (t) =>
@@ -319,7 +326,9 @@ export function parseSave(raw: unknown): SaveGameType | null {
     policies:
       game.policies ??
       emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
-    transmission: game.transmission ?? emptyTransmissionState(),
+    transmission: transmissionEnabled
+      ? (game.transmission ?? emptyTransmissionState())
+      : undefined,
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,

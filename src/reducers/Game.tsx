@@ -66,6 +66,7 @@ import {
   adjacentMarketForCorridor,
   corridorsForLocation,
   emptyTransmissionState,
+  intertiesEnabledForScenario,
 } from "../data/AdjacentMarkets";
 import {
   adjacentMarketPricePerMWh,
@@ -760,7 +761,7 @@ export const gameSlice = createSlice({
       state.eventLogReadThroughId = 0;
       state.worldEvents = { active: [], occurrences: [], checkedKeys: [] };
       state.fuelCostSnapshot = undefined;
-      state.transmission = emptyTransmissionState();
+      state.transmission = undefined;
       state.timeline = [] as TickPresentFutureType[];
       // A game being watched is not a game being recorded; anything else starts an empty log,
       // which is also what tells serializeReplay the run was recorded from its very first minute
@@ -793,6 +794,9 @@ export const gameSlice = createSlice({
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
       state.location = a.location;
+      state.transmission = intertiesEnabledForScenario(scenario, a.location)
+        ? emptyTransmissionState()
+        : undefined;
       state.timeline = generateNewTimeline(
         state,
         startingCash,
@@ -875,7 +879,7 @@ export const gameSlice = createSlice({
         }
       });
 
-      if (!scenario.tutorialSteps) {
+      if (!scenario.tutorialSteps || scenario.intertiesEnabled) {
         // buildFacilityHelper prepends generators because player-built capacity should dispatch
         // by default. For authored starting fleets, however, the scenario order is deliberate:
         // reverse just the resulting generator block back into that order while storage remains
@@ -1231,7 +1235,7 @@ const TRADING_POLICIES: readonly TradingPolicyType[] = [
 
 function applyTradingPolicy(state: GameType, policy: unknown): boolean {
   if (!TRADING_POLICIES.includes(policy as TradingPolicyType)) return false;
-  state.transmission ??= emptyTransmissionState();
+  if (!state.transmission) return false;
   if (state.transmission.tradingPolicy === policy) return false;
   state.transmission.tradingPolicy = policy as TradingPolicyType;
   state.timeline = reforecastSupply(state, true);
@@ -1247,7 +1251,7 @@ function applyBuildTransmissionLine(
     ({ id }) => id === payload.corridorId,
   );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  state.transmission ??= emptyTransmissionState();
+  if (!state.transmission) return false;
   if (
     !corridor ||
     !now ||
@@ -2162,7 +2166,9 @@ function updateSupplyFacilitiesFinances(
 
   const transmission = state.transmission ?? emptyTransmissionState();
   transmission.lines.forEach((line) => {
-    if (line.yearsToBuildLeft <= 0) return;
+    // Month-boundary pre-roll stabilizes generator output against the new weather frame. It is
+    // not elapsed game time and must not quietly shorten an intertie's authored build schedule.
+    if (preRoll || line.yearsToBuildLeft <= 0) return;
     line.yearsToBuildLeft = Math.max(
       0,
       line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
