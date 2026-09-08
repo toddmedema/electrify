@@ -166,9 +166,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           You run an electric utility: a company that supplies electricity.
-          Every hour, your customers need a certain amount of power and your
-          generators must match it. Supply too little and you cause blackouts;
-          spend too much and the company runs out of money.
+          Every hour, your customers need power. Meet that demand with
+          generation, stored energy, or imports where available. Supply too
+          little and you cause blackouts; spend too much and the company runs
+          out of money.
+        </p>
+        <p>
+          Start with three questions: will it keep the lights on, can you afford
+          it, and what will it emit? The game handles plant startups, reservoir
+          releases, and loan calculations automatically.
+        </p>
+        <p>
+          One simulated day represents a month. This makes long games playable,
+          but a four-hour battery still supplies power for about four hours when
+          full. A successful day does not prove a real grid could survive
+          several windless days.
         </p>
         <p>
           <strong>Facilities</strong> is your fleet. Generators higher in the
@@ -292,6 +304,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           scenario.
         </p>
         <p>
+          Sunlight is the main driver of solar output. Hotter panels produce
+          slightly less power from the same sunlight; panel temperature also
+          rises in strong sun. The game estimates this effect automatically and
+          caps output at the plant's rated power.
+        </p>
+        <p>
           Capacity factor is what turns a build cost into a cost per MWh, so
           it's baked into every Total Cost of Energy figure you see.
         </p>
@@ -319,8 +337,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Scenarios set their own fee, and custom games let you dial it from $0
-          upwards. Turning it up is the fastest way to see how much of the
-          fossil fuel fleet remains profitable when its emissions have no price.
+          upwards. A higher fee makes emitting plants more expensive to run. Oil
+          plants pay for their fuel-burning emissions too: quick construction
+          does not make them cheap for years of steady generation. Compare the
+          displayed emissions and total cost before building.
         </p>
       </div>
     ),
@@ -348,15 +368,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           hydro. It plots monthly precipitation, snow-water equivalent and the
           fleet's reservoir level together. Cold months can store precipitation
           as snow instead of immediate runoff, then release it during a warm
-          melt. Warming from your fleet's cumulative emissions shifts that
-          timing and reduces the standing snowpack.
+          melt. Weather and scenario events affect this timing; your utility's
+          emissions do not change the local weather in the game.
         </p>
         <p>
           Reservoirs also serve farms, cities, ecosystems and cultural uses.
           Those <strong>water rights</strong> create a seasonal minimum release.
           When the pool is high enough, that water becomes must-run generation
           even if demand is low. Below the dead-pool floor the plant cannot
-          produce power, but required water can still bypass its turbines.
+          produce power, but required water can still bypass its turbines. These
+          releases happen automatically. Your main decision is how much to rely
+          on hydro when its water supply is low.
         </p>
         <p>
           Pumped Hydro is different: Electrify models it as closed-loop storage,
@@ -438,6 +460,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           levels and observe how they change costs, investment choices, and the
           mix of power plants on the grid.
         </p>
+        <p>
+          Climate change depends on worldwide emissions over time. Your utility
+          contributes to that problem, but its emissions do not set local
+          temperatures, wind, or sunshine in this game. Emissions still affect
+          carbon fees and your score.
+        </p>
+        <p>
+          The game's total covers local generation. It does not include
+          emissions from imported electricity or a complete inventory of
+          construction and fuel-supply impacts. Zero reported emissions do not
+          mean zero real-world impact.
+        </p>
       </div>
     ),
   },
@@ -464,15 +498,23 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           up for a few hours, or baseload for a whole season.
         </p>
         <p>
-          <strong>Supply by Fuel</strong> breaks that same supply down by fuel,
-          in dispatch order. This is where you can see your merit order at work:
-          cheap, always-on sources carry the base, and expensive or fast-ramping
-          ones fill the peaks. Re-ordering your facilities changes this chart.
+          <strong>Supply by Fuel</strong> shows gross local generation by fuel,
+          in dispatch order. This is where you can see your merit order at work.
+          Available supply also includes storage discharge and imports, and
+          subtracts electricity used for charging or exports. The fuel stack can
+          therefore be higher than the supply available to customers.
+          Re-ordering your facilities changes this chart.
         </p>
         <p>
           <strong>Stored Energy</strong> (shown once you own storage) tracks how
           much energy is available in batteries and reservoirs. Their power
           rating tells you how quickly they can charge or discharge.
+        </p>
+        <p>
+          Charging uses part of the grid's supply. That electricity cannot also
+          serve customers or be exported. In scenarios with interties, imports
+          can fill the remaining shortage; exports use only the surplus left
+          after charging, local demand, and the game's reserve buffer.
         </p>
         <p>
           <strong>Fuel Prices</strong> projects the cost of each fuel you can
@@ -525,8 +567,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Companies build that order around each plant's fuel cost, how quickly
           it can change output, and whether operators can control when it runs.
-          Each plant below another runs only after the plants above reach their
-          maximum output.
+          Controllable plants lower in the list cover the remaining need.
+          Ramping and minimum output can limit how closely they follow that
+          request; solar and wind output follow the weather. The game handles
+          startups and shutdowns automatically.
         </p>
         <p>
           Here's a real-world generation stack from the PJM
@@ -572,9 +616,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Demand can swing by a third between 4am and 6pm, so a fleet has to be
-          able to follow it. A slow plant is only useful for the demand that's
-          there all day, which is why ramp rate, not price, is usually what
-          decides whether a plant can help with a peak.
+          able to follow it. Slow plants work best when demand stays steady. For
+          a peak, compare both the cost and how quickly a plant can respond; a
+          low price alone does not guarantee timely power.
         </p>
       </div>
     ),
@@ -605,10 +649,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           fleet is already mortgaged, and how many years of revenue it would
           take to repay what you owe. Fall short on any of them and the premium
           over prime goes up. The important consequence is that{" "}
-          <strong>debt makes debt more expensive</strong>: every plant you
-          finance raises the price of financing the next one. This reflects the
-          real-world idea that heavily indebted companies often pay more to
-          borrow.
+          <strong>more debt can make new borrowing more expensive</strong>.
+          Check the quoted down payment and monthly payment before building.
+          This reflects the real-world idea that heavily indebted companies
+          often pay more to borrow.
         </p>
         <p>
           A loan's rate is fixed on the day you sign it and never changes, so{" "}
@@ -636,8 +680,8 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Your rate is what you charge customers per kWh of electricity, and it
           creates nearly all of your revenue. Multiply this rate by the
-          electricity you sell to estimate your revenue. Real US residential the
-          game models each scenario's market and rules separately.
+          electricity you sell to estimate your revenue. The game models each
+          scenario's market and rules separately.
         </p>
         <p>
           In <strong>investor-owned</strong> scenarios you compete for
@@ -666,10 +710,23 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
       <div>
         <p>
           Storage never gives back everything you put in. Round-trip efficiency
-          is the share that survives the trip: charge a battery with 100 MWh at
-          85% round-trip efficiency, and you get 85 MWh back out. The rest is
-          lost as heat in the conversion, or - for pumped hydro, at about 80% -
-          as friction and evaporation moving water uphill and back down.
+          is the share that survives charging and discharging. At 80%
+          efficiency, drawing 10 MWh from the grid leaves 8 MWh to use later.
+          The game takes that conversion loss when charging, so the stored
+          energy bar shows what remains available. Self-discharge and
+          evaporation can gradually reduce it further, even while paused.
+        </p>
+        <p>
+          Charging cannot use more than the available surplus or the storage
+          system's power rating. With a 10 MW surplus for one hour and 80%
+          efficiency, at most 8 MWh is stored. That charging electricity cannot
+          also power customers or be sold to a neighbor. Pausing storage stops
+          its charging and discharging requests.
+        </p>
+        <p>
+          MW describes power; MWh describes stored energy. A full 20 MW battery
+          holding 80 MWh can deliver 20 MW for about four hours, before any
+          further standing losses.
         </p>
         <p>
           That loss is one cost of storage, on top of the build cost. Storage is
@@ -697,6 +754,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           leaderboard along with a replay of the run that set it. Any score with
           a play button beside it can be watched from the start, at whatever
           speed you like - a good way to see how somebody else got there.
+        </p>
+        <p>
+          Saves and replays require compatible simulation rules. This version
+          cannot open runs saved under the earlier physics rules. Original files
+          are left unchanged and need the older game version to open.
         </p>
         <p>Investor-owned scenarios are scored as follows:</p>
         <table className="points">
@@ -771,14 +833,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Total cost of energy estimates the average cost of all the electricity
           a plant will produce during its lifetime. It includes construction,
-          financing, maintenance, and fuel. It is also called the levelized cost
-          of energy (LCOE).
+          financing, maintenance, fuel, and the applicable carbon fee. It is
+          also called the levelized cost of energy (LCOE). The quote uses
+          estimated output and quoted fuel prices; it is not a guaranteed future
+          bill.
         </p>
         <p>
           Operating and maintenance (O&amp;M) costs can be fixed or depend on
           output. Oil plants pay fixed O&amp;M while available, plus variable
           O&amp;M for each MWh they actually generate; pausing halves the fixed
           charge and stops the variable charge.
+        </p>
+        <p>
+          A facility's lifetime revenue is an allocated share of the company's
+          electricity sales, including exports. Charging does not create a
+          second sale. The share supplied by imports is not credited to your
+          local plants.
         </p>
       </div>
     ),

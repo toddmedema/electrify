@@ -162,7 +162,7 @@ export const SCENARIOS = [
             text="Your turn: keep the lights on for a full day with no blackout."
           />
         ),
-        hint: "Reserve is unused capacity that could supply the grid right now. Positive reserve means available capacity is greater than demand.",
+        hint: "Watch available supply and the forecast. One simulated day represents a month in the game calendar; keep supply above demand throughout it.",
         capstone: {
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
@@ -315,7 +315,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["storage"]}
-            text="The vertical bar is how much energy it holds."
+            text="The bar shows usable stored energy in MWh. MW tells you how quickly the system can charge or discharge."
           />
         ),
       },
@@ -326,7 +326,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["reorder"]}
-            text="Drag facilities to change their dispatch order. Generators higher in the list run first; storage charges when they make more electricity than customers need."
+            text="Drag facilities to change their dispatch order. Storage charges from surplus after customer demand is met. Some charging energy is lost, so it returns less than it takes in."
           />
         ),
       },
@@ -343,10 +343,10 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["storage", "supply", "time"]}
-            text="Your turn: store extra energy when demand is low, then use it during the evening peak within two days without a blackout."
+            text="Your turn: store extra energy when demand is low, then use it during the evening peak within two simulated days without a blackout."
           />
         ),
-        hint: "Run the clock and watch how full the storage is. It should fill when demand is low, then empty while helping meet the evening peak.",
+        hint: "Put generation before storage to charge from its surplus. Watch usable energy fill and then supply the evening peak. Charging power cannot also serve customers; paused storage neither charges nor discharges.",
         capstone: {
           checkpoint: {
             facilities: [
@@ -450,7 +450,7 @@ export const SCENARIOS = [
             text="Your turn: turn the forecast monthly loss into a profit without causing a blackout."
           />
         ),
-        hint: "Compare revenue with fuel and operations and maintenance expenses. The rate control changes revenue for each unit sold; choose a rate that makes the next month profitable.",
+        hint: "Compare revenue with fuel, operating, loan, and any carbon-fee expenses. Oil also pays for its emissions when a fee applies. Choose a rate that makes the next month profitable.",
         capstone: {
           checkpoint: { dollarsPerkWh: 0.03 },
           success: financesCapstoneSucceeded,
@@ -649,7 +649,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["weather", "demand"]}
-            text="Weather drives demand - and solar and wind output."
+            text="Weather changes demand and renewable output. Hot panels produce slightly less solar power. Your emissions affect carbon costs and score, but do not change local weather."
           />
         ),
       },
@@ -807,7 +807,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "money"]}
-            text="Compare power flowing with available capacity; imports cost the neighbor price shown."
+            text="Imports fill a shortage up to the line's available capacity and cost the neighbor price shown. Their generation emissions are not included in your local emissions total."
           />
         ),
       },
@@ -829,12 +829,12 @@ export const SCENARIOS = [
             text="Your turn: choose “Buy for shortages, sell extra,” then run until the grid safely sends extra solar power out."
           />
         ),
-        hint: "An export starts only after local demand and the 5% reserve are covered. If flow stays at 0, make sure Solar is on.",
+        hint: "Exports use surplus left after storage charging, local demand, and the game's 5% reserve buffer. Charging power cannot also be sold. If flow stays at 0, make sure Solar is on.",
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,
           successMessage:
-            "You borrowed power at night and shared extra solar by day, while keeping your own grid safe.",
+            "You bought power at night and sold extra solar by day, while keeping your own grid safe.",
           failureMessage:
             "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
         },
