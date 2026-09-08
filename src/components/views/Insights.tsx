@@ -109,6 +109,9 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
+import ForecastScope from "../base/ForecastScope";
+import EconomicFutureComparison from "../base/EconomicFutureComparison";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
 import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
@@ -1116,51 +1119,13 @@ export default class Insights extends React.Component<Props, State> {
       domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
     }
     const [rangeMin, rangeMax] = viewportBounds(game);
-    const forecastMin = timeline[0].minute;
-    const forecastMax = timeline[timeline.length - 1].minute;
 
-    let blackoutTotalWh = 0;
-    let current = { wh: 0, peakW: 0, start: forecastMin, end: forecastMin };
-    let largestBlackout = current;
-    let isBlackout = timeline[0].demandW > timeline[0].supplyW;
-    const blackouts: BlackoutEdges[] = [{ minute: rangeMin, value: 0 }];
-    if (isBlackout) {
-      blackouts.push({ minute: forecastMin, value: 0 });
-      blackouts.push({ minute: forecastMin, value: domainMax });
-    }
-    for (const tick of timeline) {
-      if (tick.demandW > tick.supplyW) {
-        if (!isBlackout) {
-          blackouts.push({ minute: tick.minute, value: 0 });
-          blackouts.push({ minute: tick.minute, value: domainMax });
-          isBlackout = true;
-          current = { wh: 0, peakW: 0, start: tick.minute, end: tick.minute };
-        }
-        const amount = tick.demandW - tick.supplyW;
-        const amountWh =
-          amount * (projectionStepMinutes / 60) * GAME_TO_REAL_YEARS;
-        blackoutTotalWh += amountWh;
-        current.wh += amountWh;
-        current.peakW = Math.max(current.peakW, amount);
-      } else if (isBlackout) {
-        blackouts.push({ minute: tick.minute, value: domainMax });
-        blackouts.push({ minute: tick.minute, value: 0 });
-        isBlackout = false;
-        current.end = tick.minute;
-        if (current.wh > largestBlackout.wh) {
-          largestBlackout = current;
-        }
-      }
-    }
-    blackouts.push({
-      minute: forecastMax,
-      value: isBlackout ? domainMax : 0,
-    });
-    blackouts.push({ minute: rangeMax, value: 0 });
-    if (current.wh > largestBlackout.wh) {
-      largestBlackout = { ...current, end: current.end || forecastMax };
-    }
-
+    const { blackouts, blackoutTotalWh, largestBlackout } = forecastShortfalls(
+      timeline,
+      projectionStepMinutes,
+      domainMax,
+    );
+    blackouts.unshift({ minute: rangeMin, value: 0 });
     const sampled = sampleForecastTimeline(
       timeline,
       240 * MAX_FORECAST_YEARS,
@@ -1626,22 +1591,34 @@ export default class Insights extends React.Component<Props, State> {
     let body: React.ReactNode;
     if (finance) {
       body = (
-        <ChartFinances
-          id={chartId}
-          height={140}
-          timeline={financeSeries(
-            finance.key,
-            projection.financePast,
-            projection.financeProjected,
-            projection.domain.x,
-            game.startingYear,
+        <>
+          <ChartFinances
+            id={chartId}
+            height={140}
+            timeline={financeSeries(
+              finance.key,
+              projection.financePast,
+              projection.financeProjected,
+              projection.domain.x,
+              game.startingYear,
+            )}
+            title={finance.label}
+            format={finance.format}
+            startingYear={game.startingYear}
+            domain={projection.domain.x}
+            syncKey={SYNC_KEY}
+          />
+          {id === "emissions" && (
+            <Typography variant="caption" color="textSecondary" component="p">
+              Total includes local plants and estimated emissions from purchased
+              electricity. Last completed month:{" "}
+              {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local +{" "}
+              {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
+              imported ({largeMassUnit(this.context as UnitSystemType)} CO2e).
+              Neighboring-grid assumptions are in Interties.
+            </Typography>
           )}
-          title={finance.label}
-          format={finance.format}
-          startingYear={game.startingYear}
-          domain={projection.domain.x}
-          syncKey={SYNC_KEY}
-        />
+        </>
       );
     } else {
       switch (id) {
@@ -1684,6 +1661,16 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <Typography
+                variant="caption"
+                component="p"
+                color="text.secondary"
+                sx={{ mx: 2 }}
+              >
+                Supply is dispatched electricity. Reserve shows how much more
+                demand the grid could cover within 15 minutes. Plants do not
+                burn extra fuel just to create this cushion.
+              </Typography>
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
                   Forecasted shortfall: ~
@@ -1792,6 +1779,7 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <EconomicFutureComparison game={game} />
             </>
           );
           break;
@@ -2300,6 +2288,7 @@ export default class Insights extends React.Component<Props, State> {
                 )}
             </Menu>
           </Toolbar>
+          <ForecastScope />
           {this.renderLayerPanel(projection)}
           {this.renderLevers(now)}
           {game.monthlyHistory.length > 0 && (

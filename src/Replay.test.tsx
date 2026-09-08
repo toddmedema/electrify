@@ -192,7 +192,7 @@ describe("decodeReplay", () => {
     expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
   });
 
-  it.each([1, 2, 3, 4, 5, 6])(
+  it.each([1, 2, 3, 4, 5, 6, 7])(
     "rejects version %i recorded with older simulation rules",
     (version) => {
       expect(decodeReplay({ ...encodeReplay(aReplay()), version })).toBeNull();

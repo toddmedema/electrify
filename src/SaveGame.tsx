@@ -37,7 +37,8 @@ export const SAVE_KEY = "savedGame";
 // Version 5 corrects storage accounting, solar output, oil emissions and weather forcing.
 // Older snapshots contain forecasts and financial results calculated with different physics;
 // do not silently mix those results with the new simulation. Original files remain untouched.
-export const SAVE_VERSION = 5;
+// Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
+export const SAVE_VERSION = 6;
 
 export interface SaveGameType {
   version: number;
@@ -94,6 +95,26 @@ function validTransmissionLine(
       : line.loanAmountLeft === 0 &&
         line.loanMonthlyPayment === 0 &&
         line.interestRate === 0)
+  );
+}
+
+function validEmissions(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const record = raw as {
+    kgco2e?: number;
+    localKgco2e?: number;
+    importedKgco2e?: number;
+  };
+  if (
+    ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    )
+  )
+    return false;
+  return (
+    Math.abs(record.kgco2e! - record.localKgco2e! - record.importedKgco2e!) <=
+    Math.max(1, record.kgco2e!) * 1e-9
   );
 }
 
@@ -219,11 +240,29 @@ export function parseSave(raw: unknown): SaveGameType | null {
       );
     }) ||
     !Array.isArray(game.timeline) ||
+    game.timeline.some(
+      (tick) =>
+        !validEmissions(tick) ||
+        typeof tick.reserveW !== "number" ||
+        !Number.isFinite(tick.reserveW) ||
+        [
+          tick.storageChargeW,
+          tick.storageDischargeW,
+          tick.importKgco2ePerMWh,
+        ].some(
+          (value) =>
+            typeof value !== "number" || !Number.isFinite(value) || value < 0,
+        ),
+    ) ||
     !Array.isArray(game.monthlyHistory) ||
     game.monthlyHistory.length >
       Math.floor(game.date.minute / MINUTES_PER_MONTH) ||
     game.monthlyHistory.some((month) => {
-      if (typeof month !== "object" || month === null) {
+      if (
+        typeof month !== "object" ||
+        month === null ||
+        !validEmissions(month)
+      ) {
         return true;
       }
       const record = month as Partial<GameType["monthlyHistory"][number]>;

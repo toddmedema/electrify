@@ -42,19 +42,32 @@ const decisions: MeaningfulDecisionType[] = [
   },
 ];
 
-it("shows the absolute data-center customer threshold beside retention", () => {
-  render(
-    <VictoryConditions
-      ownership="Public"
-      dollarsPerkWh={0.1}
-      minimumCustomerRetention={0.9}
-      startingCustomers={16500}
-    />,
-  );
-  expect(screen.getByText(/Required: retain/)).toHaveTextContent(
-    "90% of starting customers (at least 14,850 customers, from 16,500 at the start)",
-  );
-});
+it.each(["Public", "Investor"] as const)(
+  "shows required retention and reliability objectives for %s ownership",
+  (ownership) => {
+    render(
+      <VictoryConditions
+        ownership={ownership}
+        dollarsPerkWh={0.1}
+        minimumCustomerRetention={0.9}
+        startingCustomers={16500}
+        reliabilityObjective={{
+          year: 2025,
+          month: 1,
+          minimumDemandServed: 0.99,
+          label: "winter emergency",
+          durationMonths: 2,
+        }}
+      />,
+    );
+    expect(screen.getByText(/Required: retain/)).toHaveTextContent(
+      "90% of starting customers (at least 14,850 customers, from 16,500 at the start)",
+    );
+    expect(screen.getByText(/Required: serve/)).toHaveTextContent(
+      "99% of demand during the winter emergency in every event month",
+    );
+  },
+);
 
 it("makes the CEO meaningful-decision gate visible with live progress", () => {
   render(

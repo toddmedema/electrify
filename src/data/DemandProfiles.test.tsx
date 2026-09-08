@@ -6,6 +6,8 @@ import {
   DEMAND_TYPES,
   demandByTypeAt,
   scheduledLoadAdditionWAt,
+  climateLoadArchetype,
+  temperatureDemandWattsPerCustomer,
 } from "./DemandProfiles";
 import { ScenarioLoadAdditionType } from "../Types";
 
@@ -24,6 +26,28 @@ function total(values: ReturnType<typeof demandByTypeAt>) {
 }
 
 describe("demand profiles", () => {
+  it("uses a comfortable-weather minimum and different heating and cooling responses", () => {
+    const texas = { ...location("TX"), lat: 30 };
+    const michigan = { ...location("MI"), lat: 43 };
+    const norway = { ...location(""), country: "Norway", lat: 60 };
+    expect(climateLoadArchetype(texas)).toBe("cooling");
+    expect(climateLoadArchetype(michigan)).toBe("fuel-heating");
+    expect(climateLoadArchetype(norway)).toBe("electric-heating");
+    expect(temperatureDemandWattsPerCustomer(35, texas)).toBeGreaterThan(
+      temperatureDemandWattsPerCustomer(35, michigan),
+    );
+    expect(temperatureDemandWattsPerCustomer(-10, norway)).toBeGreaterThan(
+      temperatureDemandWattsPerCustomer(-10, michigan),
+    );
+    for (const city of [texas, michigan, norway, undefined]) {
+      expect(temperatureDemandWattsPerCustomer(0, city)).toBeGreaterThan(
+        temperatureDemandWattsPerCustomer(18, city),
+      );
+      expect(temperatureDemandWattsPerCustomer(35, city)).toBeGreaterThan(
+        temperatureDemandWattsPerCustomer(18, city),
+      );
+    }
+  });
   it("preserves an authored scenario's opening demand while exposing five components", () => {
     const date = getDateFromMinute(0, 2019);
     const breakdown = demandByTypeAt(1_000_000, date, 2019, location("CA"));

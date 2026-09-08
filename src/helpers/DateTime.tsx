@@ -34,6 +34,8 @@ export const EMPTY_HISTORY = {
   customers: 0,
   cash: 0,
   kgco2e: 0,
+  localKgco2e: 0,
+  importedKgco2e: 0,
   revenue: 0,
   expensesFuel: 0,
   expensesOM: 0,
@@ -76,6 +78,8 @@ export function reduceHistories(
         : Math.min(acc.minimumSupplyMarginW, t.minimumSupplyMarginW);
   }
   acc.kgco2e += t.kgco2e;
+  acc.localKgco2e = (acc.localKgco2e || 0) + (t.localKgco2e || 0);
+  acc.importedKgco2e = (acc.importedKgco2e || 0) + (t.importedKgco2e || 0);
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
@@ -191,7 +195,15 @@ function accumulateTick(
   // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
   // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
   // excess. Storage is deliberately absent because it is not a fuel.
-  const deliveredShare = t.supplyW > 0 ? Math.min(1, t.demandW / t.supplyW) : 0;
+  const grossSourcesW =
+    Object.values(t.supplyByFuel).reduce<number>(
+      (sum, watts) => sum + (watts || 0),
+      0,
+    ) +
+    (t.storageDischargeW || 0) +
+    (t.importedW || 0);
+  const deliveredShare =
+    grossSourcesW > 0 ? Math.min(t.demandW, t.supplyW) / grossSourcesW : 0;
   Object.entries(t.supplyByFuel).forEach(([fuel, watts]) => {
     if (watts !== undefined) {
       summary.deliveredWhByFuel[fuel] =
@@ -202,12 +214,15 @@ function accumulateTick(
     }
   });
   summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
-  const supplyMarginW = t.supplyW - t.demandW;
+  const supplyMarginW = t.reserveW ?? t.supplyW - t.demandW;
   summary.minimumSupplyMarginW =
     summary.minimumSupplyMarginW === undefined
       ? supplyMarginW
       : Math.min(summary.minimumSupplyMarginW, supplyMarginW);
   summary.kgco2e += t.kgco2e;
+  summary.localKgco2e = (summary.localKgco2e || 0) + (t.localKgco2e || 0);
+  summary.importedKgco2e =
+    (summary.importedKgco2e || 0) + (t.importedKgco2e || 0);
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;

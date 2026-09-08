@@ -135,7 +135,6 @@ export const LOCATIONS = {
     resources: { hydro: true },
   },
 } as { [id: string]: LocationType };
-export const OUTSKIRTS_WIND_MULTIPLIER = 2; // https://github.com/toddmedema/electrify/issues/96
 export const EQUATOR_RADIANCE = 1000; // at sea level, equator, clear day, noon https://en.wikipedia.org/wiki/Solar_irradiance
 
 // How long between each simulated frame
@@ -150,7 +149,6 @@ export const TICK_MS = {
 // the projected cycles rest near. The played game reads its rates from data/Economy instead.
 export const INFLATION = 0.03;
 export const ORGANIC_GROWTH_MAX_ANNUAL = 0.015; // Includes organic / non-blackout attrition; Duke Energy grew 1.6% from 2018 to 2019
-export const RESERVE_MARGIN = 0.05;
 export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;
@@ -184,11 +182,13 @@ export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
 
-// Simplified operating emissions factors, not a consistent lifecycle inventory.
-// Zero operational factors omit construction and supply-chain emissions.
+// Operating combustion CO2, stored under the legacy CO2e field name (CO2 has GWP 1).
+// Excludes upstream methane, construction, regrowth credits and other lifecycle effects.
+// Coal is modeled as bituminous; geothermal as zero-venting/binary cycle.
+// https://www.eia.gov/electricity/annual/table.php?t=epa_a_03.html
 export const FUELS = {
   Coal: {
-    kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
+    kgCO2ePerBtu: 0.00009324, // Bituminous coal: 93.24 kg CO2/MMBtu.
   },
   Biomass: {
     // 195 lb CO2/MMBtu for biomass, converted to kg/Btu. This is direct combustion CO2:
@@ -197,7 +197,7 @@ export const FUELS = {
     kgCO2ePerBtu: 0.000088451,
   },
   "Natural Gas": {
-    kgCO2ePerBtu: 0.000068, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
+    kgCO2ePerBtu: 0.00005291, // Natural gas: 52.91 kg CO2/MMBtu.
   },
   Uranium: {
     kgCO2ePerBtu: 0,

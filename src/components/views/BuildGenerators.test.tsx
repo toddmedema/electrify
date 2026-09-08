@@ -63,6 +63,8 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).toHaveTextContent("Estimated average output");
   expect(impact).not.toHaveTextContent("Loan:");
@@ -332,7 +334,9 @@ it("explains unavailable technologies and hides their comparison button", () => 
   );
 
   expect(
-    screen.getByText("Not available at this location or point in time."),
+    screen.getByText(
+      "Not available in this game at this location or point in time.",
+    ),
   ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Unavailable Solar/ }),

@@ -7,6 +7,12 @@ Start with the [student guide](docs/simulation-student-guide.md) for the main gr
 The [simulation review](docs/simulation-review.md) explains the model's realism, teaching
 tradeoffs, and remaining limitations.
 
+The model separates spare capacity from delivered electricity and records local and purchased
+power emissions. Forecasts explain the representative-day calendar and offer a fixed-use economic
+comparison; plant operations and finance stay automatic. The review records the disposition of
+each realism/complexity finding and the limits of the wind, demand and emissions proxies.
+Current runs use save format 6 and replay format 8; older runs require the earlier game version.
+
 ## Getting started
 
 ### Setup

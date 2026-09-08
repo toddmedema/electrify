@@ -162,7 +162,7 @@ export const SCENARIOS = [
             text="Your turn: keep the lights on for a full day with no blackout."
           />
         ),
-        hint: "Watch available supply and the forecast. One simulated day represents a month in the game calendar; keep supply above demand throughout it.",
+        hint: "One simulated day represents a month. Keep supply at least equal to demand; reserve is extra capacity reachable within 15 minutes, not electricity already generated.",
         capstone: {
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
@@ -212,7 +212,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare cost and build time. Open Show details for fuel and operations and maintenance (O&M)."
+            text="Compare cost, build time and role: steady supply or quick backup. Starts and ramping are automatic; Show details explains fuel and upkeep."
           />
         ),
       },
@@ -223,7 +223,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "generator"]}
-            text="Choose a generator and decide whether to pay with cash or a loan."
+            text="Review the down payment, monthly loan payment and estimated upkeep. Choose cash or a loan, leaving enough money for bills during construction."
           />
         ),
       },
@@ -305,7 +305,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "storage"]}
-            text="Choose a storage system and decide whether to pay with cash or a loan."
+            text="Choose storage and review the cash price or loan payments. Compare upkeep too; charging electricity costs extra."
           />
         ),
       },
@@ -355,7 +355,7 @@ export const SCENARIOS = [
                 peakWh: 500000000,
                 initialAgeYears: 35,
               },
-              { fuel: "Coal", peakW: 370000000, initialAgeYears: 25 },
+              { fuel: "Coal", peakW: 390000000, initialAgeYears: 25 },
             ],
           },
           success: storageCapstoneSucceeded,
@@ -521,7 +521,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
-            text="The Customers layer shows how customer growth changes demand, revenue, and profit."
+            text="Customers respond gradually to price and reliability. This layer shows how their growth changes demand, revenue and profit; a rate cut takes time to work."
           />
         ),
       },
@@ -586,7 +586,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "blackout"]}
-            text="A blackout is predicted. Forecasts show what may happen during the coming year."
+            text="A blackout is predicted. Forecasts show representative days, one per month; they cannot prove the grid will survive every difficult day."
           />
         ),
       },
@@ -639,7 +639,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["fuel", "money"]}
-            text="Fuel prices move - and move your profits with them."
+            text="Fuel prices change profits. Future prices are estimates; compare possible costs in five years to see slower or faster price growth without changing your game."
           />
         ),
       },
@@ -706,7 +706,7 @@ export const SCENARIOS = [
       "You used a limited grid connection to cover shortages and sell only safe surplus.",
     facilities: [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
-      // much nameplate to create observable daytime surplus after demand and the 5% reserve.
+      // much nameplate to create observable daytime surplus after customer demand.
       { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
       { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 12 },
     ],
@@ -807,7 +807,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "money"]}
-            text="Imports fill a shortage up to the line's available capacity and cost the neighbor price shown. Their generation emissions are not included in your local emissions total."
+            text="Imports buy backup within line and neighbor limits. Their estimated emissions count in your total and score, separately from local plants. Interties explains the assumptions."
           />
         ),
       },
@@ -829,7 +829,7 @@ export const SCENARIOS = [
             text="Your turn: choose “Buy for shortages, sell extra,” then run until the grid safely sends extra solar power out."
           />
         ),
-        hint: "Exports use surplus left after storage charging, local demand, and the game's 5% reserve buffer. Charging power cannot also be sold. If flow stays at 0, make sure Solar is on.",
+        hint: "Exports use surplus after charging and local demand. Reserve is spare capacity, not extra generated electricity to withhold. Charging power cannot also be sold. If flow stays at 0, make sure Solar is on.",
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,
@@ -1020,7 +1020,7 @@ export const SCENARIOS = [
     startingCustomers: 16500,
     // Calibrates the customer-driven model to a 45-52 MW municipal average without inventing
     // hundreds of thousands of accounts. The authored data-center schedule is separate below.
-    startingDemandScale: 7.5,
+    startingDemandScale: 7.7,
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
     minimumCustomerRetention: 0.9,
@@ -1081,7 +1081,7 @@ export const SCENARIOS = [
     startingCustomers: 472701,
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
     // Calibrated without utility-emissions weather forcing; representative days remain approximate.
-    startingDemandScale: 7.7,
+    startingDemandScale: 7.75,
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,

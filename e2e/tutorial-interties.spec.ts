@@ -32,6 +32,12 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   await expect(page.getByLabel("Objective 1 of 10")).toBeVisible();
   await expect(page.locator("#intertiesTab")).toBeVisible();
+  if (testInfo.project.name.startsWith("mobile-")) {
+    for (const selector of ["#plantsTab", "#intertiesTab"]) {
+      const tabBox = await page.locator(selector).boundingBox();
+      expect(tabBox?.height).toBeGreaterThanOrEqual(44);
+    }
+  }
 
   // The explicit copy plus automatic recovery means an eager Next cannot strand the build gate.
   await page.getByRole("button", { name: "Next" }).click();
@@ -93,10 +99,6 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
         .locator(".insights:visible")
         .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     ).toBe(true);
-    for (const selector of ["#plantsTab", "#intertiesTab"]) {
-      const tabBox = await page.locator(selector).boundingBox();
-      expect(tabBox?.height).toBeGreaterThanOrEqual(44);
-    }
   }
 
   await page.getByRole("button", { name: "Next" }).click();

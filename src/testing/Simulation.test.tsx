@@ -18,8 +18,8 @@ import {
 } from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
-import { tickState } from "../reducers/Game";
+import { EMPTY_HISTORY, getTimeFromTimeline } from "../helpers/DateTime";
+import { scenarioObjectiveFailure, tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
 import { getAirborneWindOutputFactor } from "../helpers/Energy";
@@ -191,10 +191,10 @@ describe("researched public-utility scenarios", () => {
     const restored = parseSave(
       JSON.parse(JSON.stringify(serializeSave(state))),
     )!.game;
-    expect(restored.startingDemandScale).toBe(7.5);
+    expect(restored.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
     const replayed = createGameFromReplay(serializeReplay(state)!);
-    expect(replayed.startingDemandScale).toBe(7.5);
+    expect(replayed.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
     expect(replayed.timeline).toEqual(state.timeline);
   });
@@ -354,8 +354,7 @@ describe("researched public-utility scenarios", () => {
       "story:107:texas-deep-freeze:thaw",
     ]);
     event.timeline.forEach((tick, index) => {
-      // Different February dispatch changes cumulative emissions slightly; the 20°C event offset
-      // itself is gone, leaving only that normal climate-forcing consequence.
+      // Once the authored offset ends, different dispatch emissions do not change weather.
       expect(
         Math.abs(tick.temperatureC - control.timeline[index].temperatureC),
       ).toBeLessThan(0.1);
@@ -390,17 +389,43 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  it.each(operatingDifficulties)(
-    "rejects passive customer attrition as a Data Center Boom win on %s",
-    (difficulty) => {
-      const result = runSimulation({ scenarioId: 106, difficulty });
-      expectNoViolations(result);
-      expect(result.outcome).toBe("fired");
-      expect(result.months[result.months.length - 1].customers).toBeLessThan(
-        manassas.startingCustomers! * manassas.minimumCustomerRetention!,
-      );
-    },
-  );
+  it.each(
+    operatingDifficulties.filter((difficulty) => difficulty !== "Intern"),
+  )("rejects an unattended Data Center Boom run on %s", (difficulty) => {
+    const result = runSimulation({ scenarioId: 106, difficulty });
+    expectNoViolations(result);
+    expect(result.outcome).toBe("fired");
+    expect(result.months[result.months.length - 1].customers).toBeLessThan(
+      manassas.startingCustomers! * manassas.minimumCustomerRetention!,
+    );
+  });
+
+  it("rejects an unattended Data Center Boom run on Intern for chronic outages", () => {
+    const result = runSimulation({ scenarioId: 106, difficulty: "Intern" });
+    expectNoViolations(result);
+    expect(result.outcome).toBe("fired");
+    // The recalibrated load now causes chronic outages before attrition reaches 10%.
+    expect(result.months.slice(-3)).toHaveLength(3);
+    result.months.slice(-3).forEach((month) => {
+      expect(month.supplyWh / month.demandWh).toBeLessThan(0.9);
+    });
+  });
+
+  it("enforces Data Center Boom's customer-retention boundary independently of outage timing", () => {
+    const required =
+      manassas.startingCustomers! * manassas.minimumCustomerRetention!;
+    const history = [{ ...EMPTY_HISTORY, customers: required }];
+    expect(
+      scenarioObjectiveFailure(manassas, history, "Manager"),
+    ).toBeUndefined();
+    expect(
+      scenarioObjectiveFailure(
+        manassas,
+        [{ ...history[0], customers: required - 1 }],
+        "Manager",
+      ),
+    ).toContain("Customer attrition");
+  });
 
   it.each(difficulties)(
     "rejects an unattended Texas Deep Freeze run on %s",
@@ -423,7 +448,7 @@ describe("researched public-utility scenarios", () => {
         difficulty,
         initialBuild: {
           name: "Natural Gas",
-          peakW: 1_100_000_000,
+          peakW: 1_200_000_000,
           financed: true,
         },
       });
@@ -472,7 +497,7 @@ describe("researched public-utility scenarios", () => {
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
-      initialBuild: { name: "Oil", peakW: 600_000_000, financed: true },
+      initialBuild: { name: "Oil", peakW: 700_000_000, financed: true },
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");

@@ -84,7 +84,6 @@ export function clearTransmissionMarket({
   capacityW,
   importLimitW,
   exportLimitW,
-  reserveMargin,
   policy,
 }: {
   localSupplyW: number;
@@ -92,7 +91,6 @@ export function clearTransmissionMarket({
   capacityW: number;
   importLimitW: number;
   exportLimitW: number;
-  reserveMargin: number;
   policy: TradingPolicyType;
 }): { importedW: number; exportedW: number; localAvailableSupplyW: number } {
   const shortageW = Math.max(0, demandW - localSupplyW);
@@ -101,11 +99,14 @@ export function clearTransmissionMarket({
     : 0;
   const exportedW = allowsExports(policy)
     ? Math.min(
-        Math.max(0, localSupplyW + importedW - demandW * (1 + reserveMargin)),
+        Math.max(0, localSupplyW + importedW - demandW),
         capacityW - importedW,
         exportLimitW,
       )
     : 0;
+  const availableW = localSupplyW + importedW - exportedW;
+  const roundingSlack =
+    Number.EPSILON * Math.max(1, Math.abs(availableW), Math.abs(demandW)) * 8;
   return {
     importedW,
     exportedW,
@@ -113,8 +114,6 @@ export function clearTransmissionMarket({
     // below demand and trigger a false blackout. Fully covered demand is exact;
     // capped imports retain the real shortage.
     localAvailableSupplyW:
-      shortageW > 0 && importedW === shortageW
-        ? demandW - exportedW
-        : localSupplyW + importedW - exportedW,
+      Math.abs(availableW - demandW) <= roundingSlack ? demandW : availableW,
   };
 }

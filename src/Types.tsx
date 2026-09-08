@@ -35,6 +35,9 @@ export interface AdjacentMarketDefinitionType {
   basePricePerMWh: number;
   availableSupplyW: number;
   availableDemandW: number;
+  emissionsKgco2ePerMWh: number;
+  emissionsBasis: string;
+  emissionsSource: string;
 }
 
 /** A buildable physical connection to one adjacent market. */
@@ -357,6 +360,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     minute: number;
     supplyW: number; // Watts
     demandW: number; // Watts
+    reserveW?: number; // Signed supply margin plus local spare output reachable next tick
+    importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity
     // Components sum to demandW; monthly chart averages preserve the breakdown in saves.
     demandByType: DemandByTypeType;
     solarIrradianceWM2: number;
@@ -374,6 +379,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     hydroReservoirCapacityWh: number;
     hydroSpillWh: number; // Water above reservoir capacity lost during this tick
     hydroMandatedReleaseW: number; // Must-run water-rights flow through turbines
+    storageChargeW?: number; // Actual grid draw before conversion losses
+    storageDischargeW?: number; // Actual energy returned to the grid
     storageLossWh: number; // Charging conversion plus self-discharge / evaporation this tick
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
@@ -434,7 +441,9 @@ interface HistoryForecastShared {
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-  kgco2e: number; // total
+  kgco2e: number; // Local generation plus purchased-electricity emissions
+  localKgco2e?: number;
+  importedKgco2e?: number;
   // Point in time rather than totals: what a new loan would cost, and what prices were doing,
   // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
   // keeps the last one it sees, the way it does for cash and net worth.

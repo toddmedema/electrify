@@ -12,7 +12,7 @@ import {
   Select,
   Typography,
 } from "@mui/material";
-import { DOWNPAYMENT_PERCENT } from "../../Constants";
+import { DOWNPAYMENT_PERCENT, LOAN_MONTHS } from "../../Constants";
 import {
   adjacentMarketForCorridor,
   corridorsForLocation,
@@ -20,7 +20,10 @@ import {
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import { transmissionRatingW } from "../../helpers/Transmission";
+import { getMonthlyPayment } from "../../helpers/Financials";
 import { GameType, TradingPolicyType } from "../../Types";
+import { formatMass } from "../../helpers/Units";
+import { useUnits } from "../base/UnitsContext";
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -40,6 +43,7 @@ export default function TransmissionPanel({
   onBuild,
   onPolicy,
 }: TransmissionPanelProps) {
+  const units = useUnits();
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -68,8 +72,7 @@ export default function TransmissionPanel({
         <div>
           <Typography variant="h6">Share power with nearby grids</Typography>
           <Typography variant="body2" color="textSecondary">
-            An intertie links regional grids. Buy power during shortages or sell
-            safe surplus.
+            Buy backup; sell extra. Imports are limited.
           </Typography>
         </div>
       </section>
@@ -195,6 +198,19 @@ export default function TransmissionPanel({
                       <dt>Total cost</dt>
                       <dd>{formatMoneyConcise(corridor.buildCost)}</dd>
                     </div>
+                    <div>
+                      <dt>Loan payment</dt>
+                      <dd>
+                        {formatMoneyConcise(
+                          getMonthlyPayment(
+                            financed,
+                            game.interestRate,
+                            LOAN_MONTHS,
+                          ),
+                        )}
+                        /mo
+                      </dd>
+                    </div>
                   </dl>
                   {!readOnly && (
                     <Button
@@ -211,7 +227,9 @@ export default function TransmissionPanel({
                   {!readOnly && (
                     <Typography variant="caption" color="textSecondary">
                       Pay {formatMoneyConcise(downpayment)} now · finance{" "}
-                      {formatMoneyConcise(financed)}
+                      {formatMoneyConcise(financed)}. Payments begin during
+                      construction; electricity purchases and maintenance cost
+                      extra.
                     </Typography>
                   )}
                 </article>
@@ -220,6 +238,37 @@ export default function TransmissionPanel({
           </div>
         </section>
       )}
+      <details>
+        <summary style={{ minHeight: 44, cursor: "pointer" }}>
+          How trading and purchased emissions are estimated
+        </summary>
+        <Typography variant="body2" color="textSecondary" sx={{ my: 1 }}>
+          Buy backup during shortages; sell surplus after customers and storage.
+          Trading is automatic, limited by line capacity and neighboring supply;
+          imports are not guaranteed backup. Prices and flows are simplified
+          estimates, not a least-cost dispatch or a network engineering study.
+          Imported emissions count toward your total; the game's carbon fee
+          applies to your local plants.
+        </Typography>
+        {Array.from(new Set(corridors.map((corridor) => corridor.id))).map(
+          (id) => {
+            const market = adjacentMarketForCorridor(id);
+            return market ? (
+              <Typography key={id} variant="body2" sx={{ my: 1 }}>
+                {market.name}: {formatMass(market.emissionsKgco2ePerMWh, units)}
+                /MWh CO2e · {market.emissionsBasis}.{" "}
+                <a
+                  href={market.emissionsSource}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Source
+                </a>
+              </Typography>
+            ) : null;
+          },
+        )}
+      </details>
     </div>
   );
 }

@@ -1,4 +1,9 @@
-import { TICKS_PER_HOUR, TICK_MINUTES, RESERVE_MARGIN } from "../Constants";
+import {
+  TICKS_PER_HOUR,
+  TICK_MINUTES,
+  GAME_TO_REAL_YEARS,
+  FUELS,
+} from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { createGame } from "../testing/Simulator";
 import {
@@ -6,7 +11,7 @@ import {
   GeneratorOperatingType,
   StorageOperatingType,
 } from "../Types";
-import { tickState } from "./Game";
+import { generateNewTimeline, tickState } from "./Game";
 
 function fixture() {
   const game = createGame({ scenarioId: 103, seed: 44 });
@@ -100,7 +105,7 @@ describe("storage dispatch energy accounting", () => {
       const gen = generator(1),
         store = battery(2, overrides);
       run([gen, store]);
-      expect(gen.currentW).toBeCloseTo(100 * (1 + RESERVE_MARGIN));
+      expect(gen.currentW).toBeCloseTo(100);
       expect(store.currentWh).toBe(0);
     },
   );
@@ -109,7 +114,7 @@ describe("storage dispatch energy accounting", () => {
     const gen = generator(2),
       store = battery(1);
     run([store, gen]);
-    expect(gen.currentW).toBeCloseTo(100 * (1 + RESERVE_MARGIN));
+    expect(gen.currentW).toBeCloseTo(100);
     expect(store.currentWh).toBe(0);
   });
   it("caps a nearly full battery at its remaining energy room", () => {
@@ -121,12 +126,12 @@ describe("storage dispatch energy accounting", () => {
     expect(now.supplyW).toBeCloseTo(100);
     expect(store.currentW).toBeCloseTo(-60 / TICK_MINUTES);
   });
-  it("uses net supply when a final generator follows charging storage", () => {
+  it("does not dispatch an unused reserve after charging storage", () => {
     const { generator, battery, run } = fixture();
     const final = generator(3);
     const now = run([generator(1, 150), battery(2), final]);
-    expect(final.currentW).toBeCloseTo(100 * RESERVE_MARGIN);
-    expect(now.supplyW).toBeCloseTo(100 * (1 + RESERVE_MARGIN));
+    expect(final.currentW).toBeCloseTo(0);
+    expect(now.supplyW).toBeCloseTo(100);
   });
   it("returns only the stored energy on discharge without charging losses twice", () => {
     const { game, generator, battery, run } = fixture();
@@ -141,17 +146,30 @@ describe("storage dispatch energy accounting", () => {
     expect(discharged.storageLossWh).toBe(0);
   });
   it.each([
-    { mode: "charging", importedW: 0, exportedW: 0, revenueFraction: 1 },
+    {
+      mode: "charging",
+      importedW: 0,
+      exportedW: 0,
+      revenueFraction: 1,
+      reserveW: 280,
+    },
     {
       mode: "export",
       importedW: 0,
-      exportedW: 125 - 100 * (1 + RESERVE_MARGIN),
+      exportedW: 25,
+      reserveW: 280,
       revenueFraction: 1,
     },
-    { mode: "import", importedW: 50, exportedW: 0, revenueFraction: 0.5 },
+    {
+      mode: "import",
+      importedW: 50,
+      exportedW: 0,
+      revenueFraction: 0.5,
+      reserveW: 0,
+    },
   ])(
     "does not over-credit facility revenue during $mode",
-    ({ mode, importedW, exportedW, revenueFraction }) => {
+    ({ mode, importedW, exportedW, revenueFraction, reserveW }) => {
       const { game, generator, battery, run } = fixture();
       game.transmission!.lines = [
         {
@@ -186,6 +204,7 @@ describe("storage dispatch energy accounting", () => {
       expect(credited).toBeGreaterThan(0);
       expect(now.importedW).toBe(importedW);
       expect(now.exportedW).toBeCloseTo(exportedW);
+      expect(now.reserveW).toBeCloseTo(reserveW);
       expect(credited).toBeCloseTo(now.revenue * revenueFraction);
       const gridChargeW = fleet.reduce(
         (sum, f) =>
@@ -197,4 +216,71 @@ describe("storage dispatch energy accounting", () => {
       );
     },
   );
+  it("keeps spare capacity ready without generating or burning its energy", () => {
+    const { generator, run } = fixture();
+    const gen = generator(1);
+    const now = run([gen]);
+    expect(gen.currentW).toBe(100);
+    expect(now.reserveW).toBe(200);
+    expect(now.localKgco2e).toBeCloseTo(
+      (100 / TICKS_PER_HOUR) *
+        GAME_TO_REAL_YEARS *
+        gen.btuPerWh *
+        FUELS["Natural Gas"].kgCO2ePerBtu,
+    );
+    expect(now.importedKgco2e).toBe(0);
+  });
+  it("limits next-tick reserve by ramp rate and excludes unavailable plants", () => {
+    const { generator, run } = fixture();
+    const gen = generator(1);
+    gen.currentW = 100;
+    gen.spinMinutes = 60;
+    const paused = { ...generator(2), paused: true };
+    const unbuilt = { ...generator(3), yearsToBuildLeft: 1 };
+    const now = run([gen, paused, unbuilt]);
+    expect(now.supplyW).toBe(100);
+    expect(now.reserveW).toBe(75);
+  });
+  it("does not report depleted storage as spare capacity", () => {
+    const { battery, run } = fixture();
+    const now = run([battery(1, { currentWh: 10 })]);
+    expect(now.supplyW).toBe(40);
+    expect(now.reserveW).toBe(-60);
+  });
+  it("keeps the reserve response window at 15 minutes in hourly forecasts", () => {
+    const { game, generator } = fixture();
+    const gen = generator(1, 1000000000);
+    gen.currentW = 1000000;
+    gen.spinMinutes = 1000000;
+    game.facilities = [gen];
+    for (const sampleMinutes of [15, 60]) {
+      const forecast = generateNewTimeline(
+        game,
+        game.timeline[0].cash,
+        game.timeline[0].customers,
+        2,
+        sampleMinutes,
+      );
+      for (const tick of forecast) {
+        expect(tick.reserveW! - (tick.supplyW - tick.demandW)).toBeCloseTo(
+          15000,
+        );
+      }
+    }
+  });
+  it("limits reserve during an operating derate", () => {
+    const { game, generator, run } = fixture();
+    game.storyEffectsDisabled = false;
+    game.worldEvents.active.push({
+      key: "test",
+      definitionId: "test",
+      startsMinute: 0,
+      endsMinute: 10000,
+      attributes: {},
+      effects: { facilityOutputMultipliersById: { "1": 0.5 } },
+    });
+    const now = run([generator(1)]);
+    expect(now.supplyW).toBe(100);
+    expect(now.reserveW).toBe(50);
+  });
 });

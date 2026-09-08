@@ -29,6 +29,7 @@ const MAX_VIOLATIONS_PER_RULE = 5;
 // Tick fields that should always hold a real, finite number
 const FINITE_TICK_FIELDS: TickFieldType[] = [
   "supplyW",
+  "reserveW",
   "demandW",
   "solarIrradianceWM2",
   "windKph",
@@ -43,6 +44,11 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "hydroSpillWh",
   "hydroMandatedReleaseW",
   "storageLossWh",
+  "storageChargeW",
+  "storageDischargeW",
+  "localKgco2e",
+  "importedKgco2e",
+  "importKgco2ePerMWh",
   "cash",
   "customers",
   "customerRate",
@@ -205,6 +211,18 @@ export function checkTick(
       "demand is positive",
       when,
       `demandW = ${now.demandW} with ${now.customers} customers`,
+    );
+  }
+
+  const emissionsTotal = (now.localKgco2e || 0) + (now.importedKgco2e || 0);
+  if (
+    Math.abs(now.kgco2e - emissionsTotal) >
+    Math.max(1, emissionsTotal) * RELATIVE_TOLERANCE
+  ) {
+    collector.add(
+      "local and purchased emissions sum to total",
+      when,
+      `${now.kgco2e} vs ${emissionsTotal}`,
     );
   }
 

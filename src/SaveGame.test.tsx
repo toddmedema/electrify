@@ -75,7 +75,7 @@ describe("SaveGame", () => {
     expect(parseSave(raw)).toBeNull();
   });
 
-  it.each([1, 2, 3, 4])(
+  it.each([1, 2, 3, 4, 5])(
     "rejects version %i calculated with older physics without modifying it",
     (version) => {
       const legacy = { ...serializeSave(game), version };
@@ -528,4 +528,14 @@ describe("SaveGame", () => {
     expect(isResumedGame(game)).toBe(true);
     expect(isResumedGame({ ...game, timeline: [] })).toBe(false);
   });
+});
+
+it("rejects missing or contradictory local/purchased emissions in current saves", () => {
+  const game = createGame({ scenarioId: 103 });
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  delete raw.game.timeline[0].localKgco2e;
+  expect(parseSave(raw)).toBeNull();
+  const wrong = JSON.parse(JSON.stringify(serializeSave(game)));
+  wrong.game.timeline[0].importedKgco2e += 100;
+  expect(parseSave(wrong)).toBeNull();
 });

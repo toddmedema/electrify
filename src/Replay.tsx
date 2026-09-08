@@ -34,7 +34,8 @@ import {
 // Version 4 adds customer program actions; version 5 adds transmission builds and trading policy.
 // Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
 // reproduce their recorded outcomes and must not be relabeled as current replays.
-export const REPLAY_VERSION = 7;
+// Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
+export const REPLAY_VERSION = 8;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

@@ -474,9 +474,12 @@ export default class Compositor extends React.Component<Props, {}> {
       return true;
     }
 
-    // Don't update the main UI if we're on the same card
+    // A new loading request must remount even when it replaces another loading request.
     if (this.props.card.name === nextProps.card.name) {
-      return false;
+      return (
+        nextProps.card.name === "LOADING" &&
+        this.props.card.ts !== nextProps.card.ts
+      );
     }
 
     return true;
@@ -499,13 +502,18 @@ export default class Compositor extends React.Component<Props, {}> {
     // The pane layouts don't slide between their own cards: on desktop nothing about the screen
     // changes, and on two columns only the second one does -- sliding the pinned fleet off the
     // side with it would be a lie about what just happened
-    const transitionKey = !isNavCard(this.props.card.name)
-      ? this.props.card.name
-      : isDesktopScreen()
-        ? DESKTOP_PANES_KEY
-        : isPaneLayout()
-          ? TABLET_PANES_KEY
-          : this.props.card.name;
+    // A quick retry may start before the previous loading view finishes exiting.
+    // A fresh key guarantees the new mission runs its loading lifecycle.
+    const transitionKey =
+      this.props.card.name === "LOADING"
+        ? `LOADING:${this.props.card.ts}`
+        : !isNavCard(this.props.card.name)
+          ? this.props.card.name
+          : isDesktopScreen()
+            ? DESKTOP_PANES_KEY
+            : isPaneLayout()
+              ? TABLET_PANES_KEY
+              : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
@@ -527,6 +535,11 @@ export default class Compositor extends React.Component<Props, {}> {
           <CSSTransition
             key={transitionKey}
             nodeRef={transitionNodeRef}
+            onExited={() => {
+              if (transitionKey.startsWith("LOADING:")) {
+                this.nodeRefs.delete(transitionKey);
+              }
+            }}
             classNames={""}
             timeout={{
               enter: CARD_TRANSITION_ANIMATION_MS,

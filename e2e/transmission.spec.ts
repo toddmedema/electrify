@@ -19,7 +19,9 @@ test("California players can build and understand an intertie", async ({
   await expect(
     facilities.getByRole("heading", { name: "Share power with nearby grids" }),
   ).toBeVisible();
-  await expect(facilities.getByText("Pacific Northwest")).toBeVisible();
+  await expect(
+    facilities.getByRole("heading", { name: "Pacific Northwest", exact: true }),
+  ).toBeVisible();
   await expect(facilities.getByLabel("Trading rule")).toHaveCount(0);
   await expect(facilities.getByText("Total cost").first()).toBeVisible();
   await expect(

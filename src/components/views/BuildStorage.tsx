@@ -225,7 +225,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Expected lifespan</TableCell>
+                <TableCell>
+                  Accounting lifetime (not automatic retirement)
+                </TableCell>
                 <TableCell align="right">
                   {storage.lifespanYears} years
                 </TableCell>
@@ -263,6 +265,20 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 concept: "money",
                 label: "Cash purchase",
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
+              },
+              {
+                concept: "finances",
+                label: "Loan option",
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                detail:
+                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+              },
+              {
+                concept: "money",
+                label: "Estimated upkeep",
+                value: `${formatMoneyConcise(storage.annualOperatingCost / 12)}/mo`,
+                detail:
+                  "Maintenance estimate; charging electricity and loan payments are extra.",
               },
               {
                 concept: "time",

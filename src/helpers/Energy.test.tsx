@@ -39,19 +39,17 @@ describe("Airborne Wind", () => {
   });
 });
 
-// The argument is the wind at the site in kph, and the turbine sees a fraction of it - so the
-// speeds that matter to the power curve are several times the ones quoted in m/s below
+// Onshore input is raw 10m weather, with one explicit farm reference multiplier.
 describe("getWindOutputFactor", () => {
   it("follows the turbine curve from cut-in through cut-out", () => {
     expect(getWindOutputFactor(2)).toEqual(0);
-    // 20kph at the site is 5.6m/s, which the gradient and derate together turn into 4.9m/s at the
-    // hub: not quite two metres a second above cut-in, of the eleven that reach rated output
-    const result = getWindOutputFactor(20);
+    // 10kph becomes 4.86m/s at the representative farm.
+    const result = getWindOutputFactor(10);
     expect(result).toBeCloseTo(0.169, 3);
     // Doubling the wind more than doubles what comes out, until it flattens off at rated
-    expect(getWindOutputFactor(40)).toBeGreaterThan(2 * result);
-    expect(getWindOutputFactor(80)).toEqual(1);
-    expect(getWindOutputFactor(150)).toEqual(0);
+    expect(getWindOutputFactor(20)).toBeGreaterThan(2 * result);
+    expect(getWindOutputFactor(40)).toEqual(1);
+    expect(getWindOutputFactor(75)).toEqual(0);
   });
 });
 
@@ -61,10 +59,8 @@ describe("getOffshoreWindOutputFactor", () => {
     expect(getOffshoreWindOutputFactor(100)).toEqual(0);
   });
 
-  it("turns a real offshore surface reading into stronger output", () => {
-    expect(getOffshoreWindOutputFactor(20)).toBeGreaterThan(
-      getWindOutputFactor(20),
-    );
+  it("uses a sea gradient and array losses without a city siting multiplier", () => {
+    expect(getOffshoreWindOutputFactor(20)).toBeGreaterThan(0);
     expect(getOffshoreWindOutputFactor(40)).toBeCloseTo(0.85);
   });
 });

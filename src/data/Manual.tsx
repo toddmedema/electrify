@@ -313,6 +313,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Capacity factor is what turns a build cost into a cost per MWh, so
           it's baked into every Total Cost of Energy figure you see.
         </p>
+        <p>
+          Onshore wind uses a simple farm-speed estimate from the weather
+          readings, checked against a broad fleet-average capacity factor. It is
+          not a measured forecast for a particular wind farm; terrain and
+          turbine siting can change real output.
+        </p>
       </div>
     ),
   },
@@ -341,6 +347,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           plants pay for their fuel-burning emissions too: quick construction
           does not make them cheap for years of steady generation. Compare the
           displayed emissions and total cost before building.
+        </p>
+        <p>
+          The game's fee applies to local generation. Purchased electricity adds
+          estimated emissions to your score, but no separate local carbon fee:
+          its cost appears in the wholesale electricity bill.
         </p>
       </div>
     ),
@@ -381,6 +392,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           on hydro when its water supply is low.
         </p>
         <p>
+          Reservoir and watershed sizes are simplified game assumptions. These
+          charts explain seasonal scarcity, not the engineering of a real dam.
+        </p>
+        <p>
           Pumped Hydro is different: Electrify models it as closed-loop storage,
           so it only returns electricity previously used to pump water uphill.
           It does not receive rain or river inflow, and evaporation slowly
@@ -417,6 +432,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           leave. They react to several months of bills rather than a single rate
           change. Your customer base also naturally grows or shrinks depending
           on whether you provide good service, including avoiding blackouts.
+        </p>
+        <p>
+          Gradual changes are kept internally even in a very small utility. The
+          displayed whole-customer count may stay unchanged for a while; that
+          does not mean the effect of your decision has disappeared.
         </p>
         <p>
           Load changes continuously as people turn stuff on and off, as
@@ -467,10 +487,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           carbon fees and your score.
         </p>
         <p>
-          The game's total covers local generation. It does not include
-          emissions from imported electricity or a complete inventory of
-          construction and fuel-supply impacts. Zero reported emissions do not
-          mean zero real-world impact.
+          The total combines local plant emissions with estimated emissions from
+          purchased electricity. Insights shows both parts; Interties lists the
+          neighboring-grid assumptions and sources. These are fixed
+          generation-mix proxies, sometimes a world-average fallback, not a
+          measured hourly or historical mix.
+        </p>
+        <p>
+          Local fuel factors estimate combustion CO2. Biomass includes the CO2
+          released when burned, with no credit for later regrowth. Most import
+          factors also report CO2; the Québec source reports greenhouse gases in
+          CO2e. This is an operating-emissions comparison, not a complete
+          inventory of construction, fuel supply or land-use impacts. Zero
+          reported emissions do not mean zero real-world impact.
         </p>
       </div>
     ),
@@ -490,12 +519,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           <strong>Supply &amp; Demand</strong> plots your projected output
           against projected demand. Wherever demand rises above supply, the gap
-          is shaded as a blackout. If any are predicted, the table underneath
-          breaks them down: total energy not served, the size of the single
-          worst event, the peak shortage (how much extra capacity you'd need to
-          cover it) and when it happens. That "when" is the most useful number
-          on the page - it tells you whether you need generation that can ramp
-          up for a few hours, or baseload for a whole season.
+          is shaded as a blackout. The summary underneath estimates total energy
+          not served and the largest power shortage. Inspect the shaded dates to
+          see when extra supply is needed. Shortfall energy is scaled to the
+          represented month; the shaded period is not the duration of a real
+          continuous outage.
         </p>
         <p>
           <strong>Supply by Fuel</strong> shows gross local generation by fuel,
@@ -514,13 +542,25 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Charging uses part of the grid's supply. That electricity cannot also
           serve customers or be exported. In scenarios with interties, imports
           can fill the remaining shortage; exports use only the surplus left
-          after charging, local demand, and the game's reserve buffer.
+          after charging and local demand. Reserve means spare capacity, not
+          extra electricity that must be generated and withheld from sale.
         </p>
         <p>
-          <strong>Fuel Prices</strong> projects the cost of each fuel you can
-          burn, based on real historical price data. Fuel prices move suddenly
-          and by a lot, which can flip a profitable plant into a money-loser -
-          watch this chart before committing to a decades-long build.
+          The reserve display estimates extra supply reachable within 15
+          minutes, allowing for ramping, water, stored energy and plant limits.
+          Stopping charging or redirecting exports can help too. Unused import
+          promises do not count. A 10% warning is a game guide, not a guarantee
+          of reliability or an electricity-system standard.
+        </p>
+        <p>
+          <strong>Fuel Prices</strong> distinguishes historical data from
+          estimated future prices. Open{" "}
+          <strong>Compare possible costs in five years</strong> to compare
+          slower, baseline and faster price growth. It holds this month's fuel
+          use and fleet fixed, multiplies the fuel bill by 12, and applies 2%,
+          4% or 6% annual price growth. These are possible costs with no
+          assigned probability, not predictions or a full simulation of three
+          future grids. They change no game settings or existing loan contracts.
         </p>
         <p>
           <strong>Temperature</strong> projects heating and cooling conditions,
@@ -529,6 +569,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           weather-driven technology available there, whether or not you have
           built it. Once you own hydro, a separate <strong>Water</strong> chart
           shows watershed precipitation, snowpack and reservoir level.
+        </p>
+        <p>
+          Demand automatically uses a broad cooling, mixed, electric-heating or
+          fuel-heating pattern appropriate to the location. These authored
+          patterns preserve weather-driven peaks without asking you to choose
+          building coefficients; they are not measured city load curves.
+        </p>
+        <p>
+          One representative day stands for a month. Energy and bills scale to
+          the month, while a four-hour battery lasts four simulated hours. Try
+          Deep Freeze and Heatwave + Drought for tougher conditions. Those
+          scenarios use the same time shortcut: success does not prove a grid
+          could survive several consecutive windless or cloudy days.
         </p>
         <p>
           Insight projections assume you make no further changes, so treat them
@@ -631,29 +684,35 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Financing a plant means borrowing most of its cost over 30 years, and
-          paying interest on that loan. The interest rate depends on two things:
-          economy-wide borrowing costs and your company's financial health.
+          Start with the down payment, monthly loan payment and estimated upkeep
+          in the purchase review. Payments begin during construction, before the
+          plant earns money. Leave cash for fuel, carbon fees and other bills
+          too. Financing means borrowing most of the cost; the game calculates
+          the loan automatically.
         </p>
-        <p>
-          The first is the <strong>prime rate</strong>, a benchmark interest
-          rate for strong borrowers. It changes with the wider economy, and you
-          cannot control it. It has been as low as 3.25% and, in December 1980,
-          as high as 21.5%, so a scenario set in 1980 plays differently from one
-          set in 2020.
-        </p>
-        <p>
-          The second is your <strong>credit</strong>, and that part is entirely
-          yours. Four things are weighed: whether you're profitable, how much
-          cash you're sitting on relative to what you're worth, how much of the
-          fleet is already mortgaged, and how many years of revenue it would
-          take to repay what you owe. Fall short on any of them and the premium
-          over prime goes up. The important consequence is that{" "}
-          <strong>more debt can make new borrowing more expensive</strong>.
-          Check the quoted down payment and monthly payment before building.
-          This reflects the real-world idea that heavily indebted companies
-          often pay more to borrow.
-        </p>
+        <details>
+          <summary>How lenders set the quoted rate</summary>
+          <p>
+            The <strong>prime rate</strong> is a benchmark interest rate for
+            strong borrowers. It changes with the wider economy, and you cannot
+            control it. It has been as low as 3.25% and, in December 1980, as
+            high as 21.5%, so a scenario set in 1980 plays differently from one
+            set in 2020.
+          </p>
+          <p>
+            The second is your <strong>credit</strong>, and that part is
+            entirely yours. Four things are weighed: whether you're profitable,
+            how much cash you're sitting on relative to what you're worth, how
+            much of the fleet is already mortgaged, and how many years of
+            revenue it would take to repay what you owe. Fall short on any of
+            them and the premium over prime goes up. The important consequence
+            is that{" "}
+            <strong>more debt can make new borrowing more expensive</strong>.
+            Check the quoted down payment and monthly payment before building.
+            This reflects the real-world idea that heavily indebted companies
+            often pay more to borrow.
+          </p>
+        </details>
         <p>
           A loan's rate is fixed on the day you sign it and never changes, so{" "}
           <em>when</em> you borrow matters permanently. Building out during a
@@ -667,6 +726,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           inflation pushes up fuel, construction, and operating costs. Your rate
           per kWh does not rise automatically, so inflation can reduce your
           profit margin unless you adjust the rate when the scenario allows it.
+        </p>
+        <p>
+          Future price growth and economic cycles are authored estimates.
+          Compare possible costs in Insights before taking on debt; those
+          comparisons do not reprice a loan you already signed.
         </p>
       </div>
     ),
@@ -750,6 +814,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           the next time you play!
         </p>
         <p>
+          Points reflect the scenario's ownership and teaching priorities.
+          Compare reliability, operating expenses plus interest, and emissions
+          separately in the scenario details. A high total is not a universal
+          verdict on a utility's social value.
+        </p>
+        <p>
+          Open Victory conditions to check required reliability, customer
+          retention and decision goals for either ownership type. Regular
+          scenarios end early when cash is negative at a month-end check, or
+          less than 90% of demand is served in each of three consecutive
+          completed months. Intern requires one meaningful decision; CEO
+          requires ten across four types. These are learning rules, not
+          regulatory standards. Tutorial missions have their own objectives.
+        </p>
+        <p>
           If you're logged in, your score goes on the scenario's global
           leaderboard along with a replay of the run that set it. Any score with
           a play button beside it can be watched from the start, at whatever
@@ -757,8 +836,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Saves and replays require compatible simulation rules. This version
-          cannot open runs saved under the earlier physics rules. Original files
-          are left unchanged and need the older game version to open.
+          uses save format 6 and replay format 8 and cannot open runs saved
+          under earlier simulation rules. Original files are left unchanged and
+          need the older game version to open.
         </p>
         <p>Investor-owned scenarios are scored as follows:</p>
         <table className="points">
@@ -838,6 +918,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Loan interest is separate, so compare loan payments too. The quote
           uses estimated output and quoted fuel prices; it is not a guaranteed
           future bill.
+        </p>
+        <p>
+          Accounting lifetime sets the period used for depreciation and cost
+          estimates, not an automatic retirement date. Aging can reduce output
+          or raise upkeep while a plant keeps running. Sites labeled available
+          in this game are coarse project limits: zero sites does not prove the
+          resource is physically impossible at that location.
         </p>
         <p>
           Operating and maintenance (O&amp;M) costs can be fixed or depend on

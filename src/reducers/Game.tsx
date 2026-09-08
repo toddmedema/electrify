@@ -81,7 +81,11 @@ import {
   clearTransmissionMarket,
   transmissionRatingW,
 } from "../helpers/Transmission";
-import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
+import {
+  DEMAND_TYPES,
+  demandByTypeAt,
+  temperatureDemandWattsPerCustomer,
+} from "../data/DemandProfiles";
 import {
   combineStoryEffects,
   resolveStoryAtDate,
@@ -110,7 +114,6 @@ import {
   INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
   ORGANIC_GROWTH_MAX_ANNUAL,
-  RESERVE_MARGIN,
   TICK_MINUTES,
   TICK_MS,
   TICKS_PER_DAY,
@@ -118,7 +121,6 @@ import {
   TICKS_PER_MONTH,
   TICKS_PER_YEAR,
   YEARS_PER_TICK,
-  OUTSKIRTS_WIND_MULTIPLIER,
   LOCATIONS,
 } from "../Constants";
 import {
@@ -2059,8 +2061,6 @@ function getDemandW(
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
   // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
-  const temperatureNormalized =
-    0.0035 * Math.pow(now.temperatureC, 2) - 0.035 * now.temperatureC;
   const minutesFromDarkNormalized =
     sun.daylight === "polar-day"
       ? 1
@@ -2080,7 +2080,7 @@ function getDemandW(
     1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
   const demandMultiple =
     430 +
-    70 * temperatureNormalized -
+    temperatureDemandWattsPerCustomer(now.temperatureC, game.location) -
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
@@ -2142,7 +2142,7 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
           state.location,
           weather.CLOUD_PCT,
         ),
-        windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
+        windKph: weather.WIND_KPH,
         windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
         storedWh: 0,
@@ -2155,6 +2155,8 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
         hydroSpillWh: 0,
         hydroMandatedReleaseW: 0,
         storageLossWh: 0,
+        storageChargeW: 0,
+        storageDischargeW: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
       if (weather.WIND_OFFSHORE_KPH === undefined) {
@@ -2331,8 +2333,10 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
+  let reachableHeadroomW = 0;
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
+  let dischargedW = 0;
   let storedWh = 0;
   let storageLossWh = 0;
   let hydroReservoirWh = 0;
@@ -2442,10 +2446,7 @@ function updateSupplyFacilitiesFinances(
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) {
         // Capable of generating electricity
-        const targetW = Math.max(
-          0,
-          now.demandW * (1 + RESERVE_MARGIN) - (supply - charge),
-        );
+        const targetW = Math.max(0, now.demandW - (supply - charge));
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
@@ -2460,7 +2461,7 @@ function updateSupplyFacilitiesFinances(
           case "Airborne Wind":
             g.currentW = availablePeakW * airborneWindOutputFactor;
             break;
-          default: // on-demand produces up to demand + reserve margin
+          default: // Produce what customers and storage need; spare capacity is not energy.
             // If there's a battery after this plant, the dispatch request includes the extra
             // output the existing storage policy would use to charge it beyond current demand.
             const dispatchTargetW = Math.min(
@@ -2553,6 +2554,7 @@ function updateSupplyFacilitiesFinances(
           g.currentW = Math.min(g.peakW, targetW, g.currentWh * ticksPerHour);
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
+          dischargedW += g.currentW;
         } else if (g.currentWh < g.peakWh && supply - charge > now.demandW) {
           // The grid draw is capped before conversion losses. All round-trip losses are
           // applied on charging, so discharge can use the stored energy directly.
@@ -2575,6 +2577,37 @@ function updateSupplyFacilitiesFinances(
         totalChargeNeeded -= chargeRequests.get(g.id) || 0;
         storedWh += g.currentWh;
       }
+      // Report capacity that automatic dispatch can actually add within the next 15 minutes.
+      // Keep this response window fixed even when long forecasts integrate hourly samples.
+      // Ramping, weather/event derates and remaining water/charge constrain that headroom.
+      if (g.peakWh) {
+        const dischargeW = Math.min(g.peakW, g.currentWh * TICKS_PER_HOUR);
+        const currentGridW =
+          g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
+        reachableHeadroomW += Math.max(0, dischargeW - currentGridW);
+      } else if (
+        !["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(g.fuel)
+      ) {
+        const energyLimitedPeakW = hydro
+          ? Math.min(
+              availablePeakW,
+              (Math.max(
+                0,
+                (g.reservoirWh || 0) -
+                  (g.reservoirCapacityWh || 0) * HYDRO_DEADPOOL_FRACTION,
+              ) *
+                TICKS_PER_HOUR) /
+                GAME_TO_REAL_YEARS,
+            )
+          : availablePeakW;
+        reachableHeadroomW += Math.max(
+          0,
+          Math.min(
+            energyLimitedPeakW - g.currentW,
+            (g.peakW * TICK_MINUTES) / g.spinMinutes,
+          ),
+        );
+      }
       if (hydro) {
         hydroReservoirWh += g.reservoirWh || 0;
         hydroReservoirCapacityWh += g.reservoirCapacityWh || 0;
@@ -2587,6 +2620,7 @@ function updateSupplyFacilitiesFinances(
   let transmissionCapacity = 0;
   let weightedMarketPrice = 0;
   let marketImportLimitW = 0;
+  let weightedImportEmissions = 0;
   let marketExportLimitW = 0;
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
@@ -2599,13 +2633,16 @@ function updateSupplyFacilitiesFinances(
     );
     transmissionCapacity += rating;
     weightedMarketPrice += rating * price;
-    marketImportLimitW += Math.min(rating, market?.availableSupplyW || 0);
+    const importCapacityW = Math.min(rating, market?.availableSupplyW || 0);
+    marketImportLimitW += importCapacityW;
+    weightedImportEmissions +=
+      importCapacityW * (market?.emissionsKgco2ePerMWh || 0);
     marketExportLimitW += Math.min(rating, market?.availableDemandW || 0);
   }
   const marketPricePerMWh =
     transmissionCapacity > 0 ? weightedMarketPrice / transmissionCapacity : 0;
-  // Exports use only energy above demand plus the reserve margin. Trading can earn money, but it
-  // must never create a local shortage or sell the reliability buffer the dispatch stack built.
+  // Export already-produced surplus; unused dispatchable capacity remains ready without
+  // burning fuel or pretending that a reserve is electricity supplied to customers.
   const grossLocalSupplyW = supply;
   const clearing = clearTransmissionMarket({
     localSupplyW: supply - charge,
@@ -2613,7 +2650,6 @@ function updateSupplyFacilitiesFinances(
     capacityW: transmissionCapacity,
     importLimitW: marketImportLimitW,
     exportLimitW: marketExportLimitW,
-    reserveMargin: RESERVE_MARGIN,
     policy: transmission.tradingPolicy,
   });
   const { importedW, exportedW } = clearing;
@@ -2623,9 +2659,15 @@ function updateSupplyFacilitiesFinances(
   now.transmissionCapacityW = transmissionCapacity;
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
+  // Surplus exports are interruptible under the game policy and can be redirected locally.
+  now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
+  now.importKgco2ePerMWh =
+    marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
   now.storageLossWh = storageLossWh;
+  now.storageChargeW = charge;
+  now.storageDischargeW = dischargedW;
   now.hydroReservoirWh = hydroReservoirWh;
   now.hydroReservoirCapacityWh = hydroReservoirCapacityWh;
   now.hydroSpillWh = hydroSpillWh;
@@ -2831,7 +2873,9 @@ function updateSupplyFacilitiesFinances(
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
   now.expensesInterest = expensesInterest;
-  now.kgco2e = kgco2e;
+  now.localKgco2e = kgco2e;
+  now.importedKgco2e = (importedWh / 1000000) * now.importKgco2ePerMWh;
+  now.kgco2e = now.localKgco2e + now.importedKgco2e;
   // Deliberately this tick's own month rather than `date`, which is the month the game is
   // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
   // the same line serve the record and the projection: history keeps what the rate was, and the
@@ -3017,6 +3061,10 @@ export function generateNewTimeline(
       transmissionCapacityW: 0,
       marketPricePerMWh: 0,
       kgco2e: 0,
+      localKgco2e: 0,
+      importedKgco2e: 0,
+      reserveW: 0,
+      importKgco2ePerMWh: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
       interestRate: 0,
       inflationRate: 0,
