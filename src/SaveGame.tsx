@@ -12,6 +12,7 @@ import { GameType, TransmissionLineOperatingType } from "./Types";
 import {
   emptyTransmissionState,
   intertiesEnabledForScenario,
+  corridorsForLocation,
   TRANSMISSION_CORRIDORS,
 } from "./data/AdjacentMarkets";
 import { getScenario } from "./data/Scenarios";
@@ -312,6 +313,17 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   if (!transmissionEnabled && transmission?.lines.length) return null;
+  const locationCorridors = game.location
+    ? corridorsForLocation(game.location)
+    : [];
+  if (
+    transmissionEnabled &&
+    transmission?.lines.some(
+      ({ corridorId }) =>
+        !locationCorridors.some(({ id }) => id === corridorId),
+    )
+  )
+    return null;
   if (
     [...game.timeline, ...game.monthlyHistory].some(
       (t) =>

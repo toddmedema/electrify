@@ -58,18 +58,7 @@ export default function TransmissionPanel({
   );
 
   if (!corridors.length) {
-    return (
-      <div className="transmissionEmpty">
-        <img src="/images/transmission-option-2.svg" alt="Power exchange" />
-        <Typography variant="h6">
-          Interties are coming to this region
-        </Typography>
-        <Typography color="textSecondary">
-          The first market connection is calibrated for California. Your grid
-          keeps running normally without one.
-        </Typography>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -170,6 +159,7 @@ export default function TransmissionPanel({
                 <article
                   className="transmissionProject"
                   data-corridor-id={corridor.id}
+                  data-testid={`transmission-project-${corridor.id}`}
                   key={corridor.id}
                 >
                   <div className="transmissionProjectHeading">

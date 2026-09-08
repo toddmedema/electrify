@@ -125,6 +125,7 @@ import {
   zoomChartViewport,
 } from "../base/ChartViewportContext";
 import PowerExchangeSummary from "../base/PowerExchangeSummary";
+import { transmissionAvailable } from "../../data/AdjacentMarkets";
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -1176,6 +1177,7 @@ export default class Insights extends React.Component<Props, State> {
       (layer.availability === "storage" && projection.hasStorage) ||
       (layer.availability === "hydro" && projection.hasHydro) ||
       (layer.availability === "transmission" &&
+        transmissionAvailable(this.props.game.location) &&
         !!this.props.game.transmission?.lines.some(
           ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
         ))

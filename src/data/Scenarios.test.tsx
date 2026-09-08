@@ -159,10 +159,15 @@ describe("tutorial mission metadata", () => {
       ),
     ).toBe(true);
     const noCorridor = getScenario(103)!;
+    const islanded = {
+      ...getScenarioLocation(noCorridor)!,
+      id: "HNL",
+      name: "Honolulu, HI",
+    };
     expect(
       intertiesEnabledForScenario(
         { ...noCorridor, intertiesEnabled: true },
-        getScenarioLocation(noCorridor)!,
+        islanded,
       ),
     ).toBe(false);
   });

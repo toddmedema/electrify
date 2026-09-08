@@ -5,65 +5,113 @@ import {
   TransmissionCorridorDefinitionType,
   TransmissionStateType,
 } from "../Types";
+import {
+  NO_INTERTIE_LOCATION_IDS,
+  TRANSMISSION_PROFILE_DATA,
+  TRANSMISSION_PROFILE_LOCATION_IDS,
+  TransmissionProfileTuple,
+} from "./TransmissionProfiles";
 
-export const ADJACENT_MARKETS: readonly AdjacentMarketDefinitionType[] = [
-  {
-    id: "pacific-northwest",
-    name: "Pacific Northwest",
-    description:
-      "Hydropower often makes daytime imports affordable, but supply tightens in dry periods.",
-    basePricePerMWh: 48,
-    availableSupplyW: 1800000000,
-    availableDemandW: 1400000000,
-  },
-  {
-    id: "desert-southwest",
-    name: "Desert Southwest",
-    description:
-      "Solar power is plentiful near midday. Hot evenings raise prices and reduce line capacity.",
-    basePricePerMWh: 55,
-    availableSupplyW: 1500000000,
-    availableDemandW: 1700000000,
-  },
-] as const;
+interface TransmissionProfileDefinition {
+  markets: readonly AdjacentMarketDefinitionType[];
+  corridors: readonly TransmissionCorridorDefinitionType[];
+}
 
-export const TRANSMISSION_CORRIDORS: readonly TransmissionCorridorDefinitionType[] =
-  [
-    {
-      id: "california-north",
-      adjacentMarketId: "pacific-northwest",
-      name: "Northern intertie upgrade",
-      routeType: "EXISTING",
-      capacityW: 500000000,
-      buildCost: 180000000,
-      annualOperatingCost: 3600000,
-      yearsToBuild: 1,
-      heatDerateStartsC: 30,
-      heatDeratePerC: 0.012,
-      solarDerateFraction: 0.04,
-    },
-    {
-      id: "california-south",
-      adjacentMarketId: "desert-southwest",
-      name: "Desert connection",
-      routeType: "NEW",
-      capacityW: 750000000,
-      buildCost: 420000000,
-      annualOperatingCost: 7200000,
-      yearsToBuild: 3,
-      heatDerateStartsC: 32,
-      heatDeratePerC: 0.015,
-      solarDerateFraction: 0.06,
-    },
-  ] as const;
+function expandProfile(
+  tuple: TransmissionProfileTuple,
+): TransmissionProfileDefinition {
+  return {
+    markets: tuple[0].map(
+      ([
+        id,
+        name,
+        description,
+        basePricePerMWh,
+        availableSupplyW,
+        availableDemandW,
+      ]) => ({
+        id,
+        name,
+        description,
+        basePricePerMWh,
+        availableSupplyW,
+        availableDemandW,
+      }),
+    ),
+    corridors: tuple[1].map(
+      ([
+        id,
+        adjacentMarketId,
+        name,
+        routeType,
+        capacityW,
+        buildCost,
+        annualOperatingCost,
+        yearsToBuild,
+        heatDerateStartsC,
+        heatDeratePerC,
+        solarDerateFraction,
+      ]) => ({
+        id,
+        adjacentMarketId,
+        name,
+        routeType,
+        capacityW,
+        buildCost,
+        annualOperatingCost,
+        yearsToBuild,
+        heatDerateStartsC,
+        heatDeratePerC,
+        solarDerateFraction,
+      }),
+    ),
+  };
+}
+
+const TRANSMISSION_PROFILES = Object.fromEntries(
+  Object.entries(TRANSMISSION_PROFILE_DATA).map(([id, tuple]) => [
+    id,
+    expandProfile(tuple),
+  ]),
+) as Readonly<Record<string, TransmissionProfileDefinition>>;
+
+/** Every authored city is explicitly assigned either a researched profile or no interties. */
+export const LOCATION_TRANSMISSION_PROFILE_IDS: Readonly<
+  Record<string, string | null>
+> = Object.freeze({
+  ...Object.fromEntries(NO_INTERTIE_LOCATION_IDS.map((id) => [id, null])),
+  ...Object.fromEntries(
+    Object.entries(TRANSMISSION_PROFILE_LOCATION_IDS).flatMap(
+      ([profileId, ids]) => ids.map((id) => [id, profileId]),
+    ),
+  ),
+});
+
+const uniqueMarkets = new Map<string, AdjacentMarketDefinitionType>();
+const uniqueCorridors = new Map<string, TransmissionCorridorDefinitionType>();
+for (const profile of Object.values(TRANSMISSION_PROFILES)) {
+  for (const market of profile.markets) uniqueMarkets.set(market.id, market);
+  for (const corridor of profile.corridors) {
+    uniqueCorridors.set(corridor.id, corridor);
+  }
+}
+
+/** Complete catalog, retained for save/replay validation and built-line price/rating lookups. */
+export const ADJACENT_MARKETS = [...uniqueMarkets.values()] as const;
+export const TRANSMISSION_CORRIDORS = [...uniqueCorridors.values()] as const;
 
 export function emptyTransmissionState(): TransmissionStateType {
   return { tradingPolicy: "BALANCED", lines: [] };
 }
 
-/** The first release is deliberately calibrated only for the California market. */
-export function transmissionAvailable(location: LocationType): boolean {
-  return location.admin === "California" || location.id === "SF";
+export function transmissionProfileIdForLocation(
+  location: Pick<LocationType, "id">,
+): string | null {
+  return LOCATION_TRANSMISSION_PROFILE_IDS[location.id] ?? null;
+}
+
+export function transmissionAvailable(location: Pick<LocationType, "id">) {
+  return transmissionProfileIdForLocation(location) !== null;
 }
 
 /** Tutorials opt into this extra system deliberately; normal games follow physical availability. */
@@ -79,14 +127,22 @@ export function intertiesEnabledForScenario(
 }
 
 export function corridorsForLocation(
-  location: LocationType,
+  location: Pick<LocationType, "id">,
 ): readonly TransmissionCorridorDefinitionType[] {
-  return transmissionAvailable(location) ? TRANSMISSION_CORRIDORS : [];
+  const profileId = transmissionProfileIdForLocation(location);
+  return profileId ? (TRANSMISSION_PROFILES[profileId]?.corridors ?? []) : [];
+}
+
+export function adjacentMarketsForLocation(
+  location: Pick<LocationType, "id">,
+): readonly AdjacentMarketDefinitionType[] {
+  const profileId = transmissionProfileIdForLocation(location);
+  return profileId ? (TRANSMISSION_PROFILES[profileId]?.markets ?? []) : [];
 }
 
 export function adjacentMarketForCorridor(
   corridorId: string,
 ): AdjacentMarketDefinitionType | undefined {
-  const corridor = TRANSMISSION_CORRIDORS.find(({ id }) => id === corridorId);
-  return ADJACENT_MARKETS.find(({ id }) => id === corridor?.adjacentMarketId);
+  const corridor = uniqueCorridors.get(corridorId);
+  return corridor ? uniqueMarkets.get(corridor.adjacentMarketId) : undefined;
 }

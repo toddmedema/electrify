@@ -591,9 +591,8 @@ describe("Insights layers", () => {
 
     renderInsights(112, game);
 
-    expect(document.querySelector(".insightsTrack")).toHaveAttribute(
-      "data-layer",
-      "powerExchange",
+    expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
+      "Power exchange",
     );
     expect(localStorage.getItem("insightsLayers")).toBe(
       JSON.stringify(["cash", "supplyDemand"]),
@@ -872,5 +871,27 @@ describe("Insights layers", () => {
         ref.current!.state,
       ),
     ).toBe(true);
+  });
+
+  it("does not offer the power-exchange layer for an explicitly islanded grid", async () => {
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+
+    renderInsights(100, game);
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Power exchange" }),
+    ).toBeNull();
+    expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
   });
 });

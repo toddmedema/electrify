@@ -148,6 +148,14 @@ describe("SaveGame", () => {
       id: 2,
     });
     expect(parseSave(duplicate)).toBeNull();
+
+    const wrongRegion = JSON.parse(JSON.stringify(save));
+    wrongRegion.game.location.id = "PIT";
+    expect(parseSave(wrongRegion)).toBeNull();
+
+    const islanded = JSON.parse(JSON.stringify(save));
+    islanded.game.location.id = "HNL";
+    expect(parseSave(islanded)).toBeNull();
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game

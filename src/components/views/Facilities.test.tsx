@@ -387,10 +387,23 @@ describe("the interties view", () => {
   });
 
   it("does not render an empty interties destination where no corridor exists", () => {
-    renderFacilities(createGame({ scenarioId: 103 }), null);
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+    renderFacilities(game, null);
 
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByText(/Interties are coming/)).toBeNull();
+  });
+
+  it("shows researched local market names outside California", async () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "Dublin", name: "Dublin" };
+    renderFacilities(game, null);
+
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+
+    expect(screen.getByText("Great Britain")).toBeInTheDocument();
+    expect(screen.getByText("Continental Europe")).toBeInTheDocument();
   });
 
   it("gives the guided northern approval a stable target and specific name", async () => {
@@ -401,10 +414,9 @@ describe("the interties view", () => {
       name: "Approve Pacific Northwest intertie",
     });
     expect(approval).toHaveAttribute("id", "approve-intertie-california-north");
-    expect(approval.closest("article")).toHaveAttribute(
-      "data-corridor-id",
-      "california-north",
-    );
+    expect(
+      screen.getByTestId("transmission-project-california-north"),
+    ).toHaveAttribute("data-corridor-id", "california-north");
     expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 });
