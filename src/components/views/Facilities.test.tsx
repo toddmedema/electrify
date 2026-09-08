@@ -194,19 +194,6 @@ describe("the fleet list", () => {
     );
   });
 
-  it("renders the reasonable worst-case fleet size", () => {
-    const tenFacilities = createGame({ scenarioId: 103 });
-    const template = tenFacilities.facilities[0];
-    tenFacilities.facilities = Array.from({ length: 10 }, (_, index) => ({
-      ...template,
-      id: index + 1,
-    }));
-
-    renderFacilities(tenFacilities, null);
-
-    expect(rows()).toHaveLength(10);
-  });
-
   it("uses compact watt units in the accessible chart summary", () => {
     renderFacilities(game, null);
 

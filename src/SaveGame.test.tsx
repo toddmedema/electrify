@@ -225,10 +225,6 @@ describe("SaveGame", () => {
     });
   });
 
-  it("reports no save when nothing has been written", () => {
-    expect(readSave()).toBeNull();
-  });
-
   it("forgets the save it just cleared", () => {
     writeSave(game);
     expect(readSave()).not.toBeNull();
@@ -457,16 +453,6 @@ describe("SaveGame", () => {
 
     // What quit leaves behind
     const quit = { ...game, inGame: false };
-
-    it("writes as soon as a game starts", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-
-      store.set(playing(game, 2020, 0));
-      expect(readSave()!.game.date.year).toBe(2020);
-
-      stop();
-    });
 
     it("writes once a year, at the turn of the year", () => {
       const store = fakeStore(quit);

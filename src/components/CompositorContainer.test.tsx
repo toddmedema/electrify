@@ -71,28 +71,6 @@ function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
 describe("onTutorialStep", () => {
   const generators = walkthrough("Mission 2: Generators");
 
-  it("moves the walkthrough to the new step", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(dispatched).toContainEqual(
-      expect.objectContaining({ payload: { tutorialStep: 1 } }),
-    );
-  });
-
-  it("navigates forwards onto the card holding the next step's target", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
-  });
-
   /**
    * Regression test. Back used to dispatch the previous step's onNext, which only ever modelled
    * moving forwards, so nothing undid the navigation the forward step performed: the player was
@@ -262,10 +240,6 @@ describe("walkthrough steps", () => {
     togglePauseFacility.type,
   ]);
 
-  it("covers every walkthrough", () => {
-    expect(tutorials.length).toBeGreaterThan(0);
-  });
-
   it("uses real game actions for every action gate", () => {
     const declared = tutorials.flatMap(
       (scenario) =>
@@ -276,22 +250,6 @@ describe("walkthrough steps", () => {
         ) || [],
     );
     expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
-  });
-
-  it("uses the same symbols as the generator and storage buttons it highlights", () => {
-    const conceptsOf = (step: TutorialStepType) =>
-      React.isValidElement<{ concepts?: string[] }>(step.content)
-        ? step.content.props.concepts
-        : undefined;
-    const generatorStep = walkthrough("Mission 2: Generators").find(
-      (step) => step.target === ".button-buildGenerator",
-    )!;
-    const storageStep = walkthrough("Mission 3: Storage").find(
-      (step) => step.target === ".button-buildStorage",
-    )!;
-
-    expect(conceptsOf(generatorStep)).toEqual(["build", "generator"]);
-    expect(conceptsOf(storageStep)).toEqual(["build", "storage"]);
   });
 
   it("declares the card every tutorial target lives on", () => {

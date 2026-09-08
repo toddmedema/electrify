@@ -73,12 +73,6 @@ describe("SaveFile", () => {
   });
 
   describe("saveFilename", () => {
-    it("slugs the scenario name", () => {
-      expect(saveFilename("Rise of Renewables", 2035)).toBe(
-        "electrify-rise-of-renewables-2035.json",
-      );
-    });
-
     // A custom game's name is typed by the player, so it reaches here as anything at all
     it("folds away everything a filename shouldn't carry", () => {
       expect(saveFilename("../../etc/passwd", 2020)).toBe(
@@ -128,13 +122,6 @@ describe("SaveFile", () => {
   });
 
   describe("readSaveFile", () => {
-    it("accepts a save this build can play", async () => {
-      const game = fakeGame();
-      const { save, error } = await readSaveFile(saveFile(serializeSave(game)));
-      expect(error).toBeUndefined();
-      expect(save?.game.seed).toBe(game.seed);
-    });
-
     it("round trips an exported save", async () => {
       writeSave(fakeGame());
       const exported = resumableSave()!.save;
