@@ -184,7 +184,8 @@ export const INIT_DELAY = {
   LOAD_AUDIO_MILLIS: 2000,
 };
 
-// Lifetime GHG for all fuels: https://en.wikipedia.org/wiki/Life-cycle_greenhouse-gas_emissions_of_energy_sources
+// Simplified operating emissions factors, not a consistent lifecycle inventory.
+// Zero operational factors omit construction and supply-chain emissions.
 export const FUELS = {
   Coal: {
     kgCO2ePerBtu: 0.000112, // https://www.epa.gov/sites/production/files/2015-08/documents/aberdeen-merged-deter-ltr.pdf
@@ -202,7 +203,9 @@ export const FUELS = {
     kgCO2ePerBtu: 0,
   },
   Oil: {
-    kgCO2ePerBtu: 0.00002031, // https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references
+    // EIA distillate fuel oil: 74.14 kg CO2/MMBtu, converted to kg/Btu.
+    // https://www.eia.gov/electricity/annual/table.php?t=epa_a_03.html
+    kgCO2ePerBtu: 0.00007414,
   },
   Geothermal: {
     kgCO2ePerBtu: 0,

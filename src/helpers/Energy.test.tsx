@@ -70,10 +70,16 @@ describe("getOffshoreWindOutputFactor", () => {
 });
 
 describe("getSolarOutputFactor", () => {
-  it("derates hot panels without boosting cool ones", () => {
-    expect(getSolarOutputFactor(500, 20)).toEqual(0.45);
-    expect(getSolarOutputFactor(500, 5)).toEqual(0.5);
-    expect(getSolarOutputFactor(500, -10)).toEqual(0.5);
+  it("uses cell heating and a modest temperature coefficient", () => {
+    expect(getSolarOutputFactor(500, 20)).toBeCloseTo(0.48);
+    expect(getSolarOutputFactor(500, 5)).toBeCloseTo(0.51);
+    expect(getSolarOutputFactor(1000, 25)).toBeCloseTo(0.88);
+  });
+  it("clips extremes to zero and nameplate", () => {
+    expect(getSolarOutputFactor(-50, 20)).toBe(0);
+    expect(getSolarOutputFactor(0, -20)).toBe(0);
+    expect(getSolarOutputFactor(1500, -30)).toBe(1);
+    expect(getSolarOutputFactor(1000, 300)).toBe(0);
   });
 });
 

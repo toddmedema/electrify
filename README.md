@@ -3,6 +3,10 @@
 A mobile-friendly tycoon game about electricity markets. Play it at
 [electrifygame.com](https://electrifygame.com).
 
+Start with the [student guide](docs/simulation-student-guide.md) for the main grid decisions.
+The [simulation review](docs/simulation-review.md) explains the model's realism, teaching
+tradeoffs, and remaining limitations.
+
 ## Getting started
 
 ### Setup

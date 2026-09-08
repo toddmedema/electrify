@@ -10,6 +10,7 @@ test("California players can build and understand an intertie", async ({
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game" }).click();
 
+  await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
   if (!(await facilities.isVisible())) {
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
@@ -65,6 +66,7 @@ test("island grids do not offer interties or power exchange", async ({
   await page.goto("/?scenario=105");
   await page.getByRole("button", { name: "Start game" }).click();
 
+  await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
   if (!(await facilities.isVisible())) {
     await page.getByRole("button", { name: "Facilities", exact: true }).click();

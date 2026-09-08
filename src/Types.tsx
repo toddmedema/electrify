@@ -374,7 +374,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     hydroReservoirCapacityWh: number;
     hydroSpillWh: number; // Water above reservoir capacity lost during this tick
     hydroMandatedReleaseW: number; // Must-run water-rights flow through turbines
-    storageLossWh: number; // Self-discharge / evaporation during this simulated tick
+    storageLossWh: number; // Charging conversion plus self-discharge / evaporation this tick
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;

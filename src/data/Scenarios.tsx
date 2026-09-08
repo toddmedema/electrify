@@ -1080,7 +1080,8 @@ export const SCENARIOS = [
     durationMonths: 7 * 12,
     startingCustomers: 472701,
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
-    startingDemandScale: 7.61,
+    // Calibrated without utility-emissions weather forcing; representative days remain approximate.
+    startingDemandScale: 7.7,
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,

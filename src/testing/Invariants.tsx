@@ -208,8 +208,7 @@ export function checkTick(
     );
   }
 
-  // supplyByFuel only accounts for generators; supplyW also includes storage discharge,
-  // so the fuel breakdown can never exceed the total it is a breakdown of.
+  // Fuel totals are gross generation; the local grid also includes storage and trade.
   let supplyByFuelTotal = 0;
   Object.keys(now.supplyByFuel || {}).forEach((fuel: string) => {
     const value = now.supplyByFuel[fuel];
@@ -223,15 +222,32 @@ export function checkTick(
     }
     supplyByFuelTotal += value;
   });
+  const storageGridW = state.facilities.reduce(
+    (sum, f) =>
+      sum +
+      (f.peakWh && !f.paused && f.yearsToBuildLeft === 0
+        ? f.currentW < 0
+          ? f.currentW / f.roundTripEfficiency
+          : f.currentW
+        : 0),
+    0,
+  );
+  const expectedSupplyW =
+    supplyByFuelTotal +
+    storageGridW +
+    (now.importedW || 0) -
+    (now.exportedW || 0);
   if (
     isFinite_(now.supplyW) &&
-    supplyByFuelTotal >
-      (now.supplyW + (now.exportedW || 0)) * (1 + RELATIVE_TOLERANCE) + 1
+    Math.abs(expectedSupplyW - now.supplyW) >
+      Math.max(Math.abs(expectedSupplyW), Math.abs(now.supplyW)) *
+        RELATIVE_TOLERANCE +
+        1
   ) {
     collector.add(
-      "supplyByFuel sums to at most supplyW",
+      "generation, storage and trade balance supply",
       when,
-      `supplyByFuel totals ${Math.round(supplyByFuelTotal)}W but supplyW is ${Math.round(now.supplyW)}W`,
+      `expected ${Math.round(expectedSupplyW)}W but supplyW is ${Math.round(now.supplyW)}W`,
     );
   }
 
@@ -284,7 +300,9 @@ export function checkTick(
       );
     } else if (f.peakWh) {
       // Storage swings both ways: positive discharging, negative charging
-      if (Math.abs(f.currentW) > f.peakW * (1 + RELATIVE_TOLERANCE)) {
+      const gridW =
+        f.currentW < 0 ? f.currentW / f.roundTripEfficiency : f.currentW;
+      if (Math.abs(gridW) > f.peakW * (1 + RELATIVE_TOLERANCE)) {
         collector.add(
           "storage stays within its rated power",
           when,
@@ -443,11 +461,20 @@ function checkStorageEnergyBalance(
   when: string,
 ) {
   let netChargedWh = 0;
-  let hasStorage = false;
+  const hasStorage = state.facilities.some(
+    (f) => f.peakWh && f.yearsToBuildLeft === 0,
+  );
   state.facilities.forEach((f: FacilityOperatingType) => {
-    if (f.peakWh && isFinite_(f.currentW)) {
-      hasStorage = true;
-      netChargedWh -= f.currentW / TICKS_PER_HOUR; // Negative output is charging
+    if (
+      f.peakWh &&
+      !f.paused &&
+      f.yearsToBuildLeft === 0 &&
+      isFinite_(f.currentW)
+    ) {
+      // Negative currentW is stored power; recover the grid draw before subtracting losses.
+      netChargedWh -=
+        (f.currentW < 0 ? f.currentW / f.roundTripEfficiency : f.currentW) /
+        TICKS_PER_HOUR;
     }
   });
   if (!hasStorage || !isFinite_(now.storedWh) || !isFinite_(prev.storedWh)) {

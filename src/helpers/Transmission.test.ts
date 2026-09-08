@@ -79,4 +79,24 @@ describe("market clearing", () => {
       }),
     ).toEqual({ importedW: 0, exportedW: 0, localAvailableSupplyW: 500 });
   });
+  it("covers the exact demand when fractional imports completely fill a shortage", () => {
+    const request = {
+      localSupplyW: 27297688.384615093,
+      demandW: 355728534.5312337,
+      capacityW: 500000000,
+      importLimitW: 500000000,
+      exportLimitW: 500000000,
+      reserveMargin: 0.05,
+      policy: "RELIABILITY_FIRST" as const,
+    };
+    expect(clearTransmissionMarket(request).localAvailableSupplyW).toBe(
+      request.demandW,
+    );
+    const capped = clearTransmissionMarket({
+      ...request,
+      importLimitW: 300000000,
+    });
+    expect(capped.localAvailableSupplyW).toBe(request.localSupplyW + 300000000);
+    expect(capped.localAvailableSupplyW).toBeLessThan(request.demandW);
+  });
 });

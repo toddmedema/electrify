@@ -202,6 +202,19 @@ describe("LCWH", () => {
     );
   });
 
+  it("prices distillate oil carbon above gas for equal fuel energy", () => {
+    const oil = {
+      ...generator,
+      fuel: "Oil",
+      btuPerWh: 10,
+    } as GeneratorShoppingType;
+    const gas = { ...oil, fuel: "Natural Gas" } as GeneratorShoppingType;
+    const oilCarbon = LCWH(oil, date, 0.1, SEED) - LCWH(oil, date, 0, SEED);
+    const gasCarbon = LCWH(gas, date, 0.1, SEED) - LCWH(gas, date, 0, SEED);
+    expect(oilCarbon).toBeCloseTo(0.00007414 * 10 * 0.1, 10);
+    expect(oilCarbon).toBeGreaterThan(gasCarbon);
+  });
+
   it("integrates a known future carbon fee over the applicable operating years", () => {
     const gas = {
       ...generator,

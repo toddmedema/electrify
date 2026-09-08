@@ -35,16 +35,6 @@ const ANOMALY_PERSISTENCE = 0.3;
 // heatwave there will ever be -- but not so much that a forecast invents a climate.
 const FORECAST_HEADROOM_SDS = 1.5;
 
-// Emissions -> climate coupling. Warming approaches MAX_WARMING_C asymptotically rather than
-// linearly, so no amount of coal can produce a nonsense number, and WARMING_HALF_MEGATONS is the
-// cumulative total that gets halfway there. Calibrated against the headless simulator: a
-// fossil-heavy 20 year run of The Shale Boom emits about 80 megatons, which lands near +1.5C.
-const MAX_WARMING_C = 3;
-const WARMING_HALF_MEGATONS = 115;
-// At the same time the spread widens, which is the part a player feels: hotter peaks, colder
-// snaps, and a wider gap between them. Shares the saturating curve, so a clean run gets neither.
-const MAX_VARIANCE_GAIN = 0.35;
-
 interface WeatherSeriesType {
   // Ordered oldest first. Forecast rows are appended to this series only, so a watershed and the
   // city it supplies can be walked independently without one replacing the other.
@@ -65,8 +55,8 @@ const DUMMY_WEATHER = {
 };
 
 // The fields that are forecast, and the physical floor and ceiling each one has to respect
-// whatever the data says. Keyed this way so climatology, the forecast and the emissions coupling
-// can all walk the same fields rather than repeating themselves for each one.
+// whatever the data says. Keyed this way so climatology and the forecast
+// can both walk the same fields rather than repeating themselves for each one.
 const FORECAST_FIELDS = ["TEMP_C", "CLOUD_PCT", "WIND_KPH"] as const;
 const OFFSHORE_FIELD = "WIND_OFFSHORE_KPH" as const;
 type ForecastFieldType =
@@ -199,7 +189,7 @@ function buildClimatology(rows: RawWeatherType[]): MonthClimatologyType[] {
       const stats = month.stats[field];
       if (samples.length === 0) {
         // Nothing recorded for this month, which only happens for data that never loaded.
-        // Leave the stats at values the forecast and the coupling can both divide by safely.
+        // Leave the stats at values the forecast can use safely.
         stats.min = 0;
         stats.max = 0;
         return;
@@ -294,8 +284,8 @@ export function initWeather(
   callback?: (failure?: string) => void,
 ) {
   // Reset immediately, so a failed load can't be played on the last game's weather. The
-  // climatology goes with it: leaving the last location's monthly means behind would let
-  // applyClimateForcing bend a reading against a city it never came from.
+  // climatology goes with it: leaving the last location's monthly means behind would
+  // forecast a reading against a city it never came from.
   weatherSeries.clear();
   loadedLocation = undefined;
   // Two loads can be in flight at once -- backing out of the loading screen and picking somewhere
@@ -372,14 +362,14 @@ function forecastThroughDay(
 }
 
 /**
- * @param cumulativeMegatons - Greenhouse gas the player has emitted so far, in megatons of CO2e,
- *   which warms the temperature and widens the spread of every forecast field. Defaults to zero, the
- *   weather the location's own record describes.
+ * Weather follows the historical record and seeded variability. A single utility does not
+ * measurably change regional weather during a game. The unused emissions argument preserves
+ * the public calling convention; emissions still affect carbon fees and the final score.
  */
 export function getWeather(
   date: DateType,
   seed: number,
-  cumulativeMegatons = 0,
+  _cumulativeMegatons = 0,
   seriesId?: string,
 ): RawWeatherType {
   // A custom location generally has no separate basin, so callers may request its own id. If a
@@ -401,28 +391,14 @@ export function getWeather(
   forecastThroughDay(series, seed, Math.floor(nextRow / ROWS_PER_DAY));
 
   if (!weather[row] || !weather[nextRow]) {
-    return weather[row]
-      ? applyClimateForcing(series, weather[row], dayIndex, cumulativeMegatons)
-      : DUMMY_WEATHER;
+    return weather[row] || DUMMY_WEATHER;
   }
 
   // Otherwise, blend hours for smoother weather.
   // The weights run with the clock: on the hour the reading is entirely the hour we are in,
   // and it slides to the next hour's reading as the minutes tick over.
-  // Each row is forced against its own month before blending, because the last hour of a month
-  // blends into the first hour of the next one -- they do not share a climatology.
-  const prev = applyClimateForcing(
-    series,
-    weather[row],
-    dayIndex,
-    cumulativeMegatons,
-  );
-  const next = applyClimateForcing(
-    series,
-    weather[nextRow],
-    Math.floor(nextRow / ROWS_PER_DAY),
-    cumulativeMegatons,
-  );
+  const prev = weather[row];
+  const next = weather[nextRow];
   const nextPerc = minuteOfHour / 60;
   const prevPerc = 1 - nextPerc;
   const blended: RawWeatherType = {
@@ -596,66 +572,4 @@ function forecastDay(
     });
     weather[dayIndex * ROWS_PER_DAY + row] = forecast;
   }
-}
-
-/**
- * How far a cumulative emissions total bends the weather: a warming bias on temperature, and a
- * widening of every departure from normal.
- *
- * Both saturate, so a century of coal makes the climate hostile rather than absurd, and both are
- * zero at zero -- a player who builds clean gets exactly the weather the data describes.
- */
-function climateShift(cumulativeMegatons: number) {
-  const progress = 1 - Math.exp(-cumulativeMegatons / WARMING_HALF_MEGATONS);
-  return {
-    warmingC: MAX_WARMING_C * progress,
-    spread: 1 + MAX_VARIANCE_GAIN * progress,
-  };
-}
-
-/**
- * Applies the player's own emissions to a single reading, at the point it is read.
- *
- * Deliberately not baked into the stored rows. Forecast days are written before the emissions that
- * would shape them have happened, and a stored row has to come out the same whether the cache was
- * built by walking to a date or by jumping to it -- so the cache stays a pure function of the seed
- * and the coupling is applied on the way out. Historic rows get it too, which is what lets the
- * scenarios set before 2020 respond to how their player generates rather than being fixed replays.
- *
- * Scaling the departure from the monthly mean rather than the reading itself is what turns a
- * warmer average into a harsher one: the hot hours get hotter, the cold snaps get colder, and the
- * gap between them widens, which is what the demand curve and the wind fleet actually feel.
- */
-function applyClimateForcing(
-  series: WeatherSeriesType,
-  reading: RawWeatherType,
-  dayIndex: number,
-  cumulativeMegatons: number,
-): RawWeatherType {
-  if (cumulativeMegatons <= 0 || series.climatology.length === 0) {
-    return reading;
-  }
-  const month = series.climatology[monthSlotOf(dayIndex)];
-  const { warmingC, spread } = climateShift(cumulativeMegatons);
-  // Precipitation passes through untouched. Hydro still feels warming through the phase and
-  // timing of snow accumulation and melt; changing rainfall totals would require a separate,
-  // defensible regional precipitation response rather than a single global multiplier.
-  const forced = {
-    YEAR: reading.YEAR,
-    MONTH: reading.MONTH,
-    PRECIP_MM: reading.PRECIP_MM,
-  } as RawWeatherType;
-  activeForecastFields(series).forEach((field) => {
-    const { mean } = month.stats[field];
-    const physical = PHYSICAL_BOUNDS[field];
-    const bias = field === "TEMP_C" ? warmingC : 0;
-    forced[field] = Math.min(
-      physical.max,
-      Math.max(
-        physical.min,
-        mean + ((reading[field] as number) - mean) * spread + bias,
-      ),
-    );
-  });
-  return forced;
 }

@@ -78,16 +78,22 @@ export function getAirborneWindOutputFactor(wind100mKph: number): number {
   return curve * AIRBORNE_SYSTEM_AVAILABILITY;
 }
 
-// Solar nameplate wattages use peak irradiance as their baseline. Panel efficiency declines by
-// about 1% per degree above 10 C. Snow cover is not modeled because it would require persistent
-// accumulation state rather than only the current hour's weather.
+// A simple PV approximation: cell temperature rises 30 C at 1000 W/m2 (NOCT 44 C),
+// with a rounded -0.4%/C coefficient relative to a 25 C cell. See PVWatts:
+// https://samrepo.nrelcloud.org/help/pvwatts.html
+// Clip at nameplate; detailed inverter, mounting and snow-cover models are omitted.
 export function getSolarOutputFactor(
   irradianceWM2: number,
-  temepratureC: number,
+  temperatureC: number,
 ) {
-  return (
-    (irradianceWM2 * Math.min(1, 1 - (temepratureC - 10) / 100)) /
-    EQUATOR_RADIANCE
+  const irradiance = Math.max(0, irradianceWM2);
+  const cellTemperatureC = temperatureC + irradiance * 0.03;
+  return Math.max(
+    0,
+    Math.min(
+      1,
+      (irradiance / EQUATOR_RADIANCE) * (1 - 0.004 * (cellTemperatureC - 25)),
+    ),
   );
 }
 

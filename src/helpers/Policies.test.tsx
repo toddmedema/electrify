@@ -214,7 +214,7 @@ test("Off preserves installed upgrades through save/load and actions replay dete
   expect(restored.policies!.programs.efficiency.adoption).toBe(stock);
 });
 
-test("legacy neutral saves migrate; malformed stocks and new replay payloads are rejected", () => {
+test("neutral saves round-trip; malformed stocks and old replays are rejected", () => {
   const game = createGame({ scenarioId: 106 });
   const migrated = parseSave(serializeSave(game))!;
   expect(migrated.game.policies!.programs.solar.adoption).toBe(0);
@@ -234,5 +234,5 @@ test("legacy neutral saves migrate; malformed stocks and new replay payloads are
       ],
     }),
   ).toBeNull();
-  expect(decodeReplay({ ...replay, version: 3 })).not.toBeNull();
+  expect(decodeReplay({ ...replay, version: 3 })).toBeNull();
 });

@@ -95,8 +95,9 @@ export function clearTransmissionMarket({
   reserveMargin: number;
   policy: TradingPolicyType;
 }): { importedW: number; exportedW: number; localAvailableSupplyW: number } {
+  const shortageW = Math.max(0, demandW - localSupplyW);
   const importedW = allowsImports(policy)
-    ? Math.min(Math.max(0, demandW - localSupplyW), capacityW, importLimitW)
+    ? Math.min(shortageW, capacityW, importLimitW)
     : 0;
   const exportedW = allowsExports(policy)
     ? Math.min(
@@ -108,6 +109,12 @@ export function clearTransmissionMarket({
   return {
     importedW,
     exportedW,
-    localAvailableSupplyW: localSupplyW + importedW - exportedW,
+    // Adding a computed deficit back to local supply can round a fraction of a watt
+    // below demand and trigger a false blackout. Fully covered demand is exact;
+    // capped imports retain the real shortage.
+    localAvailableSupplyW:
+      shortageW > 0 && importedW === shortageW
+        ? demandW - exportedW
+        : localSupplyW + importedW - exportedW,
   };
 }

@@ -32,8 +32,9 @@ import {
 // Version 2 changes authored starting fleets and their facility IDs, so older action streams can
 // no longer reproduce the run they recorded.
 // Version 4 adds customer program actions; version 5 adds transmission builds and trading policy.
-// Version 6 adds the validated decision gate; older replays keep the victory rules they recorded.
-export const REPLAY_VERSION = 6;
+// Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
+// reproduce their recorded outcomes and must not be relabeled as current replays.
+export const REPLAY_VERSION = 7;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -233,12 +234,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (
-    doc.version !== REPLAY_VERSION &&
-    doc.version !== 5 &&
-    doc.version !== 4 &&
-    doc.version !== 3
-  ) {
+  if (doc.version !== REPLAY_VERSION) {
     return null;
   }
   if (
@@ -255,18 +251,7 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const actions = parseActions(doc.actions);
-  if (
-    !actions ||
-    (doc.version === 3 &&
-      actions.some(
-        (a) => a.type === "schedulePolicy" || a.type === "cancelPolicy",
-      )) ||
-    (doc.version < 5 &&
-      actions.some(
-        (a) =>
-          a.type === "buildTransmissionLine" || a.type === "setTradingPolicy",
-      ))
-  ) {
+  if (!actions) {
     return null;
   }
   return {
@@ -277,9 +262,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     seed: doc.seed,
     location: doc.location,
     actions,
-    meaningfulDecisionGateWaived:
-      doc.version < REPLAY_VERSION || doc.meaningfulDecisionGateWaived
-        ? true
-        : undefined,
+    meaningfulDecisionGateWaived: doc.meaningfulDecisionGateWaived || undefined,
   };
 }

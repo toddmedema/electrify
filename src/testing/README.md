@@ -91,7 +91,7 @@ code rather than a vibe.
 | Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                |
 | Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                    |
 | Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
-| Supply accounting   | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge                                                                                                              |
+| Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                       |
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends

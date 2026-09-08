@@ -199,12 +199,12 @@ describe("watching a replay", () => {
     replay = roundTripped(serializeReplay(played)!);
   });
 
-  it("preserves the visible legacy decision-gate waiver during playback", () => {
+  it("preserves an explicit decision-gate waiver during current playback", () => {
     const doc = encodeReplay(serializeReplay(played)!) as unknown as Record<
       string,
       unknown
     >;
-    doc.version = 5;
+    doc.meaningfulDecisionGateWaived = true;
     const legacy = decodeReplay(doc)!;
     const watched = createGameFromReplay(legacy);
 
