@@ -122,7 +122,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "goal"]}
-            text="Your goal: keep the lights on and finish with more cash."
+            text="Your goal: keep the lights on, pay the bills, and compare emissions."
           />
         ),
       },
@@ -162,7 +162,7 @@ export const SCENARIOS = [
             text="Your turn: keep the lights on for a full day with no blackout."
           />
         ),
-        hint: "One simulated day represents a month. Keep supply at least equal to demand; reserve is extra capacity reachable within 15 minutes, not electricity already generated.",
+        hint: "One simulated day represents a month. Keep supply at least equal to demand.",
         capstone: {
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
@@ -212,7 +212,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare cost, build time and role: steady supply or quick backup. Starts and ramping are automatic; Show details explains fuel and upkeep."
+            text="Compare cost, build time and role to choose a plant for the shortage. Starts and ramping are automatic."
           />
         ),
       },
@@ -223,7 +223,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "generator"]}
-            text="Review the down payment, monthly loan payment and estimated upkeep. Choose cash or a loan, leaving enough money for bills during construction."
+            text="Choose cash or a loan after checking the payments and upkeep. Leave money for bills during construction."
           />
         ),
       },
@@ -326,7 +326,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["reorder"]}
-            text="Drag facilities to change their dispatch order. Storage charges from surplus after customer demand is met. Some charging energy is lost, so it returns less than it takes in."
+            text="Move generation above storage in the list so spare power can charge it. Storage returns less energy than it takes in."
           />
         ),
       },
@@ -521,7 +521,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
-            text="Customers respond gradually to price and reliability. This layer shows how their growth changes demand, revenue and profit; a rate cut takes time to work."
+            text="Watch how customer growth changes demand and profit. Customers respond gradually to price and reliability."
           />
         ),
       },
@@ -586,7 +586,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "blackout"]}
-            text="A blackout is predicted. Forecasts show representative days, one per month; they cannot prove the grid will survive every difficult day."
+            text="Find the predicted blackout on the chart. It shows one representative day per month, not every difficult day."
           />
         ),
       },
@@ -608,7 +608,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["time", "blackout"]}
-            text="This dated event explains what changed. Events also report the first time one fuel becomes more expensive than another."
+            text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
           />
         ),
         desktop: {
@@ -616,7 +616,7 @@ export const SCENARIOS = [
           content: (
             <TutorialPrompt
               concepts={["time", "blackout"]}
-              text="This pane keeps dated explanations of important changes. It also reports the first time one fuel becomes more expensive than another."
+              text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
             />
           ),
         },
@@ -639,7 +639,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["fuel", "money"]}
-            text="Fuel prices change profits. Future prices are estimates; compare possible costs in five years to see slower or faster price growth without changing your game."
+            text="Compare possible fuel costs in five years to explore price changes. These examples leave your game unchanged."
           />
         ),
       },
@@ -649,7 +649,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["weather", "demand"]}
-            text="Weather changes demand and renewable output. Hot panels produce slightly less solar power. Your emissions affect carbon costs and score, but do not change local weather."
+            text="Compare weather with demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather."
           />
         ),
       },
@@ -807,7 +807,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "money"]}
-            text="Imports buy backup within line and neighbor limits. Their estimated emissions count in your total and score, separately from local plants. Interties explains the assumptions."
+            text="Check imports alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total."
           />
         ),
       },
@@ -817,7 +817,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["weather", "supply"]}
-            text="Hot, sunny weather warms the line, so it may safely carry less than 500 MW."
+            text="Compare the line’s available capacity with its 500 MW rating. Hot, sunny weather can reduce what it carries."
           />
         ),
       },
@@ -829,7 +829,7 @@ export const SCENARIOS = [
             text="Your turn: choose “Buy for shortages, sell extra,” then run until the grid safely sends extra solar power out."
           />
         ),
-        hint: "Exports use surplus after charging and local demand. Reserve is spare capacity, not extra generated electricity to withhold. Charging power cannot also be sold. If flow stays at 0, make sure Solar is on.",
+        hint: "Exports use surplus after charging and local demand. If flow stays at 0, make sure Solar is on.",
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,

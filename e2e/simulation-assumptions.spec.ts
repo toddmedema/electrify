@@ -93,7 +93,7 @@ for (const theme of ["light", "dark"] as const) {
       "carbon fee applies to your local plants",
     );
     await expect(
-      trade.getByRole("link", { name: "Source" }).first(),
+      trade.getByRole("link", { name: /Source for/ }).first(),
     ).toHaveAttribute("href", /https:\/\//);
     expect(
       await facilities.evaluate((el) => el.scrollWidth - el.clientWidth),

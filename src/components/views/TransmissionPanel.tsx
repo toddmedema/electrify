@@ -1,3 +1,5 @@
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import {
   Button,
@@ -238,6 +240,7 @@ export default function TransmissionPanel({
           </div>
         </section>
       )}
+      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
       <details>
         <summary style={{ minHeight: 44, cursor: "pointer" }}>
           How trading and purchased emissions are estimated
@@ -258,6 +261,7 @@ export default function TransmissionPanel({
                 {market.name}: {formatMass(market.emissionsKgco2ePerMWh, units)}
                 /MWh CO2e · {market.emissionsBasis}.{" "}
                 <a
+                  aria-label={`Source for ${market.name} emissions`}
                   href={market.emissionsSource}
                   target="_blank"
                   rel="noreferrer"

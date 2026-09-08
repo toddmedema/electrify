@@ -3983,3 +3983,34 @@ $sizemap: (
     min-height: 44px;
   }
 }
+
+// Quiet, readable help beside a decision; touch targets stay usable on phones.
+.manual-link-text,
+.manual-related-link.MuiButton-root {
+  min-height: 40px;
+  padding: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-align: left;
+  text-transform: none;
+}
+.buildOptionHelp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  padding: 0 8px;
+}
+.manual-related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+@media (pointer: coarse) {
+  .manual-link-text,
+  .manual-related-link.MuiButton-root {
+    min-height: 44px;
+  }
+}

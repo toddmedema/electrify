@@ -103,7 +103,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
-    page.getByText(/Hot, sunny weather warms the line/),
+    page.getByText(/Hot, sunny weather can reduce what it carries/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByLabel("Objective 10 of 10")).toBeVisible();

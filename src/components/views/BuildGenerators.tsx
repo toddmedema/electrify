@@ -124,10 +124,6 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
-  const gapCoverage =
-    props.forecastGapW && props.forecastGapW > 0
-      ? Math.round((typicalOutputW / props.forecastGapW) * 100)
-      : undefined;
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -208,7 +204,7 @@ export function GeneratorBuildItem(
             ? "Weather-dependent supply · pair with backup or storage"
             : generator.spinMinutes > 60
               ? "Steady supply · best for demand that lasts for hours"
-              : "Fast response · backup power"}
+              : "Fast response · can follow changing demand"}
       </Typography>
       {!canBuild && (
         <Typography
@@ -239,11 +235,6 @@ export function GeneratorBuildItem(
           />
         )}
       </Box>
-      {gapCoverage !== undefined && (
-        <Typography className="buildOptionContext" variant="caption">
-          ~{gapCoverage}% of largest forecast shortage
-        </Typography>
-      )}
       <Box className="buildOptionFooter">
         <Button
           color="primary"
@@ -512,16 +503,14 @@ export function GeneratorBuildItem(
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail: "Reserve does not change until construction finishes.",
+                detail:
+                  "Output and reserve do not increase until construction finishes.",
               },
               {
                 concept: "supply",
-                label: "Estimated average output",
+                label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail:
-                  gapCoverage === undefined
-                    ? `${formatWatts(generator.peakW)} maximum rated output; average output is not guaranteed during a shortage`
-                    : `About ${gapCoverage}% of the largest forecast shortage, based on average output`,
+                detail: `${formatWatts(generator.peakW)} maximum rated output; check availability during the shortage. Typical output is not guaranteed at that hour.`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",

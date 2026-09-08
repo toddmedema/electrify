@@ -98,6 +98,8 @@ import {
   mandatedReleaseFraction,
 } from "../helpers/Hydro";
 import {
+  manualHelpOpen,
+  manualHelpClose,
   dialogOpen,
   dialogClose,
   snackbarOpen,
@@ -213,6 +215,7 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
+let speedBeforeManualHelp: SpeedType | undefined;
 const BLOCKING_CARDS = new Set(["MANUAL", "BUILD_GENERATORS", "BUILD_STORAGE"]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
@@ -981,7 +984,8 @@ export const gameSlice = createSlice({
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
       // instructions frozen until the player actually closes the card.
       if (
-        speedBeforeBlockingCard !== undefined &&
+        (speedBeforeBlockingCard !== undefined ||
+          speedBeforeManualHelp !== undefined) &&
         action.payload !== "PAUSED"
       ) {
         return;
@@ -1012,6 +1016,7 @@ export const gameSlice = createSlice({
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
@@ -1029,6 +1034,7 @@ export const gameSlice = createSlice({
     builder.addCase(startReplay, (_state, action) => {
       const replay = action.payload;
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -1069,6 +1075,7 @@ export const gameSlice = createSlice({
     });
     builder.addCase(quit, () => {
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       return cloneDeep(initialGame);
     });
     // Opening a reading or construction card pauses the game, and closing it puts the speed back.
@@ -1086,6 +1093,19 @@ export const gameSlice = createSlice({
       }
     });
     builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
+    builder.addCase(manualHelpOpen, (state) => {
+      if (state.inGame && speedBeforeManualHelp === undefined) {
+        speedBeforeManualHelp = state.speed;
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(manualHelpClose, (state) => {
+      if (speedBeforeManualHelp !== undefined) {
+        state.speed = speedBeforeManualHelp;
+        speedBeforeManualHelp = undefined;
+        ensureTicking(state);
+      }
+    });
     builder.addCase(dialogOpen, (state) => {
       delete state.policyPause;
       speedBeforeDialog = state.speed;

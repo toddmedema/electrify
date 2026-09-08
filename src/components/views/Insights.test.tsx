@@ -1,7 +1,10 @@
 import * as React from "react";
 import cloneDeep from "lodash.clonedeep";
-import { render, screen, within } from "@testing-library/react";
+import { render as renderUI, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import uiReducer from "../../reducers/UI";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
@@ -193,6 +196,12 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+function render(element: React.ReactElement) {
+  const store = configureStore({ reducer: { ui: uiReducer } });
+  return renderUI(element, {
+    wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+  });
+}
 // MUI interaction tests share the coverage runner with the simulation suite in CI, where opening
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);

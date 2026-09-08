@@ -1,3 +1,5 @@
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import CustomerPrograms from "./CustomerPrograms";
 import {
@@ -1668,8 +1670,11 @@ export default class Insights extends React.Component<Props, State> {
                 sx={{ mx: 2 }}
               >
                 Supply is dispatched electricity. Reserve shows how much more
-                demand the grid could cover within 15 minutes. Plants do not
-                burn extra fuel just to create this cushion.
+                demand the grid could cover within 15 minutes.
+                <ManualLink
+                  entry={MANUAL_ENTRY.RESERVE_CAPACITY}
+                  text="How reserve works"
+                />
               </Typography>
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">

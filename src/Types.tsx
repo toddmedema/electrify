@@ -1036,6 +1036,7 @@ export interface VictoryDebriefType {
 }
 
 export interface UIType {
+  manualHelpEntry?: string;
   dialog: DialogType;
   snackbar: SnackbarType;
   // True only while the player is physically reordering the fleet. Expensive sibling panes can

@@ -1,7 +1,10 @@
 import * as React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 import Facilities from "./Facilities";
+import uiReducer from "../../reducers/UI";
 import { tickState } from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
@@ -49,6 +52,7 @@ function renderFacilities(
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
   };
+  const store = configureStore({ reducer: { ui: uiReducer } });
   render(
     <Facilities
       game={game}
@@ -65,6 +69,9 @@ function renderFacilities(
       onFacilityDragEnd={() => undefined}
       onSelect={handlers.onSelect}
     />,
+    {
+      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+    },
   );
   return handlers;
 }

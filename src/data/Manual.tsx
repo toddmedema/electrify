@@ -61,6 +61,9 @@ export const MANUAL_ENTRY = {
   PRIORITIZING_GENERATORS: "Prioritizing Generators",
   RAMP_RATE: "Ramp Rate",
   RATES: "Rates",
+  POWER_AND_ENERGY: "Power and Energy",
+  RESERVE_CAPACITY: "Reserve Capacity",
+  INTERTIES: "Interties",
   ROUND_TRIP_EFFICIENCY: "Round-trip Efficiency",
   SCORE: "Score",
   SYMBOLS: "Symbol Guide",
@@ -82,6 +85,7 @@ export interface ManualEntryType {
   // Pins the entry above the grouped list. Only "How to Play" uses it; a new player shouldn't
   // have to scroll past the glossary to find the overview.
   pinned?: boolean;
+  related?: ManualEntryTitleType[];
 }
 
 // The source line for an image, shown to the player rather than hidden in the alt attribute:
@@ -161,6 +165,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.HOW_TO_PLAY,
     group: "Gameplay",
     pinned: true,
+    related: [
+      MANUAL_ENTRY.POWER_AND_ENERGY,
+      MANUAL_ENTRY.FORECASTS,
+      MANUAL_ENTRY.SCORE,
+    ],
     keywords: "getting started tutorial basics overview intro new player",
     entry: (
       <div>
@@ -185,8 +194,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           <strong>Facilities</strong> is your fleet. Generators higher in the
           list are asked to run first, so the order you put them in decides
-          which ones burn fuel and which ones sit idle. Build from here, and
-          pause or sell anything that's costing more than it earns.
+          which ones burn fuel and which ones sit idle. Build from here. A
+          backup plant may earn little but still prevent a costly blackout;
+          check when it is needed before pausing or selling it.
         </p>
         <p>
           <strong>Insights</strong> combines the company's finances and its
@@ -195,12 +205,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           together. This is also where you set the electricity rate.
         </p>
         <p>
-          A good first move is to open Insights and scan the Overview: first for
-          blackouts or falling cash, then for the profit, customer and emissions
-          trends behind them. If supply falls short, choose Reliability to work
-          out whether the gap needs something cheap that runs constantly or
-          something expensive that starts quickly. The rest of this manual
-          explains the terms you'll meet along the way.
+          Pause and find a difficult hour in Insights when demand nearly exceeds
+          supply. Solar helps in daylight; wind follows the weather, so check
+          their output during that difficult hour. Compare controllable
+          generation, storage backed by a surplus, and an available intertie.
+          Check when each could be ready, its ongoing costs and its emissions
+          before committing. Then run the game, observe the result and explain
+          the tradeoff in one sentence.
         </p>
       </div>
     ),
@@ -506,6 +517,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   },
   {
     title: MANUAL_ENTRY.FORECASTS,
+    related: [
+      MANUAL_ENTRY.RESERVE_CAPACITY,
+      MANUAL_ENTRY.INTERTIES,
+      MANUAL_ENTRY.POWER_AND_ENERGY,
+    ],
     group: "Gameplay",
     keywords: "projection supply demand fuel prices weather peak shortage",
     entry: (
@@ -537,20 +553,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <strong>Stored Energy</strong> (shown once you own storage) tracks how
           much energy is available in batteries and reservoirs. Their power
           rating tells you how quickly they can charge or discharge.
-        </p>
-        <p>
-          Charging uses part of the grid's supply. That electricity cannot also
-          serve customers or be exported. In scenarios with interties, imports
-          can fill the remaining shortage; exports use only the surplus left
-          after charging and local demand. Reserve means spare capacity, not
-          extra electricity that must be generated and withheld from sale.
-        </p>
-        <p>
-          The reserve display estimates extra supply reachable within 15
-          minutes, allowing for ramping, water, stored energy and plant limits.
-          Stopping charging or redirecting exports can help too. Unused import
-          promises do not count. A 10% warning is a game guide, not a guarantee
-          of reliability or an electricity-system standard.
         </p>
         <p>
           <strong>Fuel Prices</strong> distinguishes historical data from
@@ -767,7 +769,103 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     ),
   },
   {
+    title: MANUAL_ENTRY.POWER_AND_ENERGY,
+    group: "Physics & Units",
+    keywords:
+      "MW MWh watts watt hours megawatt megawatt-hour battery duration discharge power energy capacity",
+    related: [MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY, MANUAL_ENTRY.FORECASTS],
+    entry: (
+      <div>
+        <p>
+          MW measures power: how quickly a plant produces electricity or storage
+          charges or discharges. MWh measures energy: how much electricity is
+          produced or stored over time.
+        </p>
+        <p>
+          A full 20 MW battery holding 80 MWh can deliver 20 MW for about four
+          hours, before further standing losses. Holding 80 MWh does not let it
+          supply 80 MW. Check both its power and its duration against the
+          shortage.
+        </p>
+        <p>
+          One simulated day represents a month, but a four-hour battery still
+          lasts four simulated hours. A successful representative day does not
+          prove a real grid could survive several cloudy or windless days.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.RESERVE_CAPACITY,
+    group: "Gameplay",
+    keywords:
+      "headroom spare capacity cushion fifteen minutes reliability warning",
+    related: [
+      MANUAL_ENTRY.RAMP_RATE,
+      MANUAL_ENTRY.INTERTIES,
+      MANUAL_ENTRY.FORECASTS,
+    ],
+    entry: (
+      <div>
+        <p>
+          Reserve is extra demand the grid could cover within 15 minutes. It is
+          spare capacity, not electricity that must be generated and left
+          unused.
+        </p>
+        <p>
+          The estimate allows for ramping, plant limits, water and stored
+          energy. Stopping charging or redirecting exports can help too. Unused
+          import promises do not count toward reserve.
+        </p>
+        <p>
+          A low-reserve warning is a cue to investigate the difficult hours and
+          compare available backup. The game's 10% warning is a teaching guide,
+          not a real-world reliability standard or a guarantee against
+          blackouts.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.INTERTIES,
+    group: "Gameplay",
+    keywords:
+      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus",
+    related: [
+      MANUAL_ENTRY.RESERVE_CAPACITY,
+      MANUAL_ENTRY.EMISSIONS,
+      MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY,
+    ],
+    entry: (
+      <div>
+        <p>
+          Interties connect neighboring grids. Your trading rule can buy backup
+          during shortages and sell surplus after customers and storage
+          charging. Electricity used to charge storage cannot also be sold.
+        </p>
+        <p>
+          Imports are limited by the line and the neighbor's available supply;
+          hot, sunny weather can reduce line capacity. They are not guaranteed
+          backup. Check construction time, loan payments, maintenance and the
+          wholesale electricity bill before relying on a new connection.
+        </p>
+        <p>
+          Purchased electricity adds estimated emissions to your total and
+          score, shown separately in Insights. Each neighboring grid uses a
+          fixed emissions factor, with its basis and source listed in the
+          Interties panel. Imports pay their wholesale bill rather than an extra
+          local carbon fee. These simplified flows and fixed factors are not a
+          network engineering study or a full lifecycle assessment.
+        </p>
+      </div>
+    ),
+  },
+  {
     title: MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY,
+    related: [
+      MANUAL_ENTRY.POWER_AND_ENERGY,
+      MANUAL_ENTRY.PRIORITIZING_GENERATORS,
+    ],
     group: "Physics & Units",
     keywords: "storage losses battery pumped hydro charge discharge",
     entry: (
@@ -778,7 +876,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           efficiency, drawing 10 MWh from the grid leaves 8 MWh to use later.
           The game takes that conversion loss when charging, so the stored
           energy bar shows what remains available. Self-discharge and
-          evaporation can gradually reduce it further, even while paused.
+          evaporation can gradually reduce it further while game time runs, even
+          if the storage facility is paused. Pausing the game clock stops these
+          losses too.
         </p>
         <p>
           Charging cannot use more than the available surplus or the storage
@@ -786,11 +886,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           efficiency, at most 8 MWh is stored. That charging electricity cannot
           also power customers or be sold to a neighbor. Pausing storage stops
           its charging and discharging requests.
-        </p>
-        <p>
-          MW describes power; MWh describes stored energy. A full 20 MW battery
-          holding 80 MWh can deliver 20 MW for about four hours, before any
-          further standing losses.
         </p>
         <p>
           That loss is one cost of storage, on top of the build cost. Storage is
@@ -805,7 +900,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.SCORE,
     group: "Gameplay",
     keywords:
-      "points scoring high score end of game investor public replay watch",
+      "points scoring high score meaningful decisions end of game investor public replay watch",
     entry: (
       <div>
         <p>
