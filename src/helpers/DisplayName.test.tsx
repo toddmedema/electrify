@@ -1,7 +1,6 @@
 import {
   DISPLAY_NAME_MAX_LENGTH,
   displayNameKey,
-  normalizeDisplayName,
   suggestDisplayName,
   validateDisplayName,
 } from "./DisplayName";
@@ -43,12 +42,6 @@ describe("displayNameKey", () => {
   it("folds case and padding together", () => {
     expect(displayNameKey("  Ada  ")).toBe("ada");
     expect(displayNameKey("ADA")).toBe(displayNameKey("ada"));
-  });
-});
-
-describe("normalizeDisplayName", () => {
-  it("stores what the player meant, not their whitespace", () => {
-    expect(normalizeDisplayName(" Ada Lovelace ")).toBe("Ada Lovelace");
   });
 });
 

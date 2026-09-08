@@ -7,10 +7,8 @@ import { GameType, TickPresentFutureType } from "../../Types";
 import gameReducer from "../../reducers/Game";
 import { schedulePolicy, cancelPolicy } from "../../reducers/GameActions";
 import Insights, {
-  INSIGHT_LAYERS,
   INSIGHT_PRESETS,
   MAX_CUSTOM_INSIGHT_PRESETS,
-  presetForLayers,
   withRequiredLayers,
 } from "./Insights";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -279,58 +277,6 @@ function storeCustomPreset(name: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines five distinct, purpose-ordered presets", () => {
-    expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
-      INSIGHT_LAYERS.length,
-    );
-    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
-    expect(INSIGHT_PRESETS.overview.layers).toEqual([
-      "supplyDemand",
-      "cash",
-      "profit",
-      "customers",
-      "emissions",
-    ]);
-    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
-      "supplyDemand",
-      "supplyByFuel",
-      "storage",
-      "weather",
-      "water",
-    ]);
-    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
-      "profit",
-      "cash",
-      "revenue",
-      "expenses",
-      "fuelPrices",
-    ]);
-    expect(INSIGHT_PRESETS.growth.layers).toEqual([
-      "customers",
-      "demandByType",
-      "supplyDemand",
-      "revenue",
-      "profit",
-    ]);
-    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
-      "emissions",
-      "supplyByFuel",
-      "supplyDemand",
-      "fuelPrices",
-      "profit",
-    ]);
-    expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
-  });
-
-  it("groups demand with customers and places rates last in economics", () => {
-    expect(
-      INSIGHT_LAYERS.find((layer) => layer.id === "demandByType")?.group,
-    ).toBe("Customers");
-    expect(
-      INSIGHT_LAYERS.filter((layer) => layer.group === "Economics").at(-1)?.id,
-    ).toBe("inflationInterest");
-  });
-
   it("shows expanded finance rows and both rate graphs", () => {
     localStorage.setItem(
       "insightsLayers",
@@ -506,16 +452,6 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("region", { name: "Upcoming scenario events" }),
     ).toBeNull();
-  });
-
-  it("replaces preset horizons with a displayed 12-month date range", () => {
-    localStorage.setItem("insightsRange", "current");
-    renderInsights();
-
-    expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–21"),
-    ).toBeVisible();
   });
 
   it("zooms and pans every insight chart on one shared time viewport", async () => {

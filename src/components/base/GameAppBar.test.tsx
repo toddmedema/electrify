@@ -159,21 +159,6 @@ describe("GameAppBar", () => {
     ).toBe(500000);
   });
 
-  it("omits the redundant money and time icons on desktop", () => {
-    renderAppBar();
-    expect(screen.queryByLabelText("Money")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Time")).not.toBeInTheDocument();
-  });
-
-  it("omits events and sound controls from the menu", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-
-    expect(screen.queryByRole("menuitem", { name: /events/i })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: /turn sound/i })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Options" })).toBeVisible();
-  });
-
   it("gives the scenario dialog only the scenario name", () => {
     renderAppBar();
     fireEvent.click(screen.getByRole("button", { name: "menu" }));

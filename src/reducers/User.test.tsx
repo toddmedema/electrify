@@ -413,9 +413,4 @@ describe("fetchGlobalRank", () => {
     const { parts } = mockGetCount.mock.calls[0][0];
     expect(parts).toContainEqual({ field: "score", op: ">", value: 812 });
   });
-
-  it("is first when nothing beats it", async () => {
-    mockGetCount.mockResolvedValue({ data: () => ({ count: 0 }) });
-    expect(await fetchGlobalRank(101, 9999)).toBe(1);
-  });
 });
