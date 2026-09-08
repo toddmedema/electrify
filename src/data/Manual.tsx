@@ -833,10 +833,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Total cost of energy estimates the average cost of all the electricity
           a plant will produce during its lifetime. It includes construction,
-          financing, maintenance, fuel, and the applicable carbon fee. It is
-          also called the levelized cost of energy (LCOE). The quote uses
-          estimated output and quoted fuel prices; it is not a guaranteed future
-          bill.
+          estimated maintenance and startup costs, fuel, and the applicable
+          carbon fee. It is also called the levelized cost of energy (LCOE).
+          Loan interest is separate, so compare loan payments too. The quote
+          uses estimated output and quoted fuel prices; it is not a guaranteed
+          future bill.
         </p>
         <p>
           Operating and maintenance (O&amp;M) costs can be fixed or depend on

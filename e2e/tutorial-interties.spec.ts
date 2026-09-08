@@ -126,7 +126,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByRole("heading", { name: "Mission complete!" }),
   ).toBeVisible({ timeout: 15000 });
   await expect(
-    page.getByText(/borrowed power at night and shared extra solar by day/i),
+    page.getByText(/bought power at night and sold extra solar by day/i),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Next tutorial" })).toHaveCount(
     0,
