@@ -13,7 +13,11 @@ import {
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
-import { tickState } from "./reducers/Game";
+import gameReducer, {
+  buildTransmissionLine,
+  delta,
+  tickState,
+} from "./reducers/Game";
 import { emptyPolicies } from "./helpers/Policies";
 
 jest.setTimeout(60000);
@@ -74,7 +78,138 @@ describe("SaveGame", () => {
   it("upgrades older saves without inventing missing chart history", () => {
     const restored = parseSave({ ...serializeSave(game), version: 1 });
     expect(restored?.version).toBe(SAVE_VERSION);
-    expect(restored?.game).toEqual({ ...game, policies: emptyPolicies() });
+    expect(restored?.game).toEqual({
+      ...game,
+      policies: emptyPolicies(),
+      meaningfulDecisionGateWaived: true,
+    });
+  });
+
+  it("keeps legacy saves disconnected from adjacent markets", () => {
+    const legacy = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete legacy.game.transmission;
+    const restored = parseSave({ ...legacy, version: 2 });
+    expect(restored?.game.transmission).toEqual({
+      tradingPolicy: "BALANCED",
+      lines: [],
+    });
+  });
+
+  it("normalizes old decision progress and round-trips validated progress", () => {
+    const legacy = JSON.parse(JSON.stringify(serializeSave(game)));
+    legacy.game.meaningfulDecisions = [{ key: "untrusted-old-ledger" }];
+    legacy.version = 3;
+    expect(parseSave(legacy)?.game.meaningfulDecisions).toEqual([]);
+    expect(parseSave(legacy)?.game.meaningfulDecisionGateWaived).toBe(true);
+
+    const missingCurrent = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete missingCurrent.game.meaningfulDecisions;
+    expect(parseSave(missingCurrent)).toBeNull();
+
+    const played = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    expect(parseSave(serializeSave(played))?.game.meaningfulDecisions).toEqual(
+      played.meaningfulDecisions,
+    );
+    expect(
+      parseSave(serializeSave(played))?.game.meaningfulDecisionGateWaived,
+    ).toBe(false);
+  });
+
+  it("rejects malformed, duplicate, and future decision progress", () => {
+    const valid = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    const corrupt = JSON.parse(JSON.stringify(serializeSave(valid)));
+    corrupt.game.meaningfulDecisions[0].month =
+      corrupt.game.date.monthsElapsed + 1;
+    corrupt.game.meaningfulDecisions[0].key = `${corrupt.game.meaningfulDecisions[0].lever}@${corrupt.game.meaningfulDecisions[0].month}`;
+    expect(parseSave(corrupt)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(serializeSave(valid)));
+    duplicate.game.meaningfulDecisions.push({
+      ...duplicate.game.meaningfulDecisions[0],
+    });
+    expect(parseSave(duplicate)).toBeNull();
+
+    const noOp = JSON.parse(JSON.stringify(serializeSave(valid)));
+    noOp.game.meaningfulDecisions[0].after =
+      noOp.game.meaningfulDecisions[0].before;
+    expect(parseSave(noOp)).toBeNull();
+  });
+
+  it("does not invent transmission when an older tutorial is restored", () => {
+    const tutorial = createGame({ scenarioId: 0, seed: 249001 });
+    const save = JSON.parse(JSON.stringify(serializeSave(tutorial)));
+    save.game.transmission = { tradingPolicy: "BALANCED", lines: [] };
+
+    expect(parseSave(save)?.game.transmission).toBeUndefined();
+
+    save.game.transmission.lines.push({
+      id: 1,
+      corridorId: "california-north",
+      name: "Northern intertie upgrade",
+      capacityW: 500000000,
+      buildCost: 180000000,
+      annualOperatingCost: 3600000,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      financed: false,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+    });
+    expect(parseSave(save)).toBeNull();
+  });
+
+  it("rejects corrupt or impossible intertie financial state", () => {
+    const california = createGame({ scenarioId: 100, seed: 61 });
+    const built = gameReducer(
+      california,
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: true,
+      }),
+    );
+    const save = JSON.parse(JSON.stringify(serializeSave(built)));
+    expect(parseSave(save)).not.toBeNull();
+
+    for (const field of [
+      "capacityW",
+      "buildCost",
+      "annualOperatingCost",
+      "yearsToBuildLeft",
+      "minuteCreated",
+      "loanAmountLeft",
+      "loanMonthlyPayment",
+      "interestRate",
+    ]) {
+      const corrupt = JSON.parse(JSON.stringify(save));
+      corrupt.game.transmission.lines[0][field] = -1;
+      expect(parseSave(corrupt)).toBeNull();
+    }
+
+    const wrongCapacity = JSON.parse(JSON.stringify(save));
+    wrongCapacity.game.transmission.lines[0].capacityW = 1;
+    expect(parseSave(wrongCapacity)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(save));
+    duplicate.game.transmission.lines.push({
+      ...duplicate.game.transmission.lines[0],
+      id: 2,
+    });
+    expect(parseSave(duplicate)).toBeNull();
+
+    const wrongRegion = JSON.parse(JSON.stringify(save));
+    wrongRegion.game.location.id = "PIT";
+    expect(parseSave(wrongRegion)).toBeNull();
+
+    const islanded = JSON.parse(JSON.stringify(save));
+    islanded.game.location.id = "HNL";
+    expect(parseSave(islanded)).toBeNull();
   });
 
   // The memo must never alias the live game slice, or a Continue button would describe a game

@@ -40,6 +40,8 @@ export const EMPTY_HISTORY = {
   expensesCarbonFee: 0,
   expensesInterest: 0,
   expensesPolicy: 0,
+  expensesImports: 0,
+  revenueExports: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
@@ -80,6 +82,8 @@ export function reduceHistories(
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
   acc.expensesPolicy = (acc.expensesPolicy || 0) + (t.expensesPolicy || 0);
+  acc.expensesImports = (acc.expensesImports || 0) + (t.expensesImports || 0);
+  acc.revenueExports = (acc.revenueExports || 0) + (t.revenueExports || 0);
   acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
@@ -101,13 +105,14 @@ export function deriveExpandedSummary(
     s.expensesCarbonFee +
     s.expensesInterest +
     (s.expensesPolicy || 0);
+  const expensesWithImports = expenses + (s.expensesImports || 0);
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
     ...s,
-    profit: s.revenue - expenses,
-    profitPerkWh: (s.revenue - expenses) / supplykWh,
+    profit: s.revenue - expensesWithImports,
+    profitPerkWh: (s.revenue - expensesWithImports) / supplykWh,
     revenuePerkWh: s.revenue / supplykWh,
-    expenses,
+    expenses: expensesWithImports,
     kgco2ePerMWh: s.kgco2e / (supplykWh / 1000),
   };
 }
@@ -210,6 +215,10 @@ function accumulateTick(
   summary.expensesInterest += t.expensesInterest;
   summary.expensesPolicy =
     (summary.expensesPolicy || 0) + (t.expensesPolicy || 0);
+  summary.expensesImports =
+    (summary.expensesImports || 0) + (t.expensesImports || 0);
+  summary.revenueExports =
+    (summary.revenueExports || 0) + (t.revenueExports || 0);
   summary.cash = t.cash;
   summary.customers = t.customers;
   summary.netWorth = t.netWorth;

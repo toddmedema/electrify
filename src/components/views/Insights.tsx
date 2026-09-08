@@ -124,9 +124,12 @@ import {
   rangesEqual,
   zoomChartViewport,
 } from "../base/ChartViewportContext";
+import PowerExchangeSummary from "../base/PowerExchangeSummary";
+import { transmissionAvailable } from "../../data/AdjacentMarkets";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
   | "storage"
@@ -149,11 +152,17 @@ export interface InsightLayerDefinition {
   id: InsightLayerId;
   label: string;
   group: LayerGroup;
-  availability?: "storage" | "hydro";
+  availability?: "storage" | "hydro" | "transmission";
 }
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
+  {
+    id: "powerExchange",
+    label: "Power exchange",
+    group: "Grid",
+    availability: "transmission",
+  },
   {
     id: "demandByType",
     label: "Demand by use",
@@ -222,7 +231,14 @@ export const INSIGHT_PRESETS: Record<
   },
   reliability: {
     label: "Reliability",
-    layers: ["supplyDemand", "supplyByFuel", "storage", "weather", "water"],
+    layers: [
+      "supplyDemand",
+      "powerExchange",
+      "supplyByFuel",
+      "storage",
+      "weather",
+      "water",
+    ],
   },
   profitability: {
     label: "Profitability",
@@ -541,6 +557,8 @@ function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
       return ["customers"];
     case 5:
       return ["supplyDemand", "fuelPrices", "weather"];
+    case 112:
+      return ["powerExchange"];
     default:
       return [];
   }
@@ -550,6 +568,9 @@ export function withRequiredLayers(
   layers: InsightLayerId[],
   scenarioId: number,
 ): InsightLayerId[] {
+  if (scenarioId === 112) {
+    return ["powerExchange", ...layers.filter((id) => id !== "powerExchange")];
+  }
   const next = [...layers];
   for (const id of requiredTutorialLayers(scenarioId)) {
     if (!next.includes(id)) {
@@ -657,7 +678,7 @@ function policySignature(game: GameType): string {
 }
 
 function facilitySignature(game: GameType): string {
-  return game.facilities
+  const facilities = game.facilities
     .map((facility) =>
       [
         facility.id,
@@ -667,6 +688,10 @@ function facilitySignature(game: GameType): string {
       ].join(":"),
     )
     .join("|");
+  const transmission = (game.transmission?.lines || [])
+    .map((line) => [line.id, line.corridorId, line.yearsToBuildLeft].join(":"))
+    .join("|");
+  return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
 }
 
 export default class Insights extends React.Component<Props, State> {
@@ -717,8 +742,11 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
+      (this.state.layers.includes("powerExchange") &&
+        nextProps.game.date.minute !== this.props.game.date.minute) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -729,7 +757,14 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  public componentDidMount() {
+    this.scrollTutorialPowerExchangeIntoView();
+  }
+
   public componentDidUpdate(previousProps: Props) {
+    if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
+      this.scrollTutorialPowerExchangeIntoView();
+    }
     if (
       this.props.game.date.monthsElapsed !==
       previousProps.game.date.monthsElapsed
@@ -767,6 +802,21 @@ export default class Insights extends React.Component<Props, State> {
     }
   }
 
+  private scrollTutorialPowerExchangeIntoView() {
+    if (
+      this.props.game.scenarioId !== 112 ||
+      this.props.game.tutorialStep !== 7 ||
+      window.innerWidth > 768
+    ) {
+      return;
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-layer="powerExchange"]')
+        ?.scrollIntoView?.({ block: "nearest" });
+    }, 0);
+  }
+
   private setLayers(
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
@@ -776,8 +826,12 @@ export default class Insights extends React.Component<Props, State> {
       preset,
       this.state.presetLibrary,
     )?.layers;
-    setStorageKeyValue(LAYERS_KEY, required);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    // Mission 7 temporarily puts its teaching track first. Keep that guided ordering out of the
+    // player's saved preset so finishing the mission does not rearrange their normal Insights.
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, required);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    }
     this.setState({
       layers: required,
       preset,
@@ -805,8 +859,10 @@ export default class Insights extends React.Component<Props, State> {
       preset.layers,
       this.props.game.scenarioId,
     );
-    setStorageKeyValue(LAYERS_KEY, layers);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, layers);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    }
     this.setState({ layers, preset: id, presetDirty: false });
   }
 
@@ -1142,7 +1198,12 @@ export default class Insights extends React.Component<Props, State> {
     return (
       !layer.availability ||
       (layer.availability === "storage" && projection.hasStorage) ||
-      (layer.availability === "hydro" && projection.hasHydro)
+      (layer.availability === "hydro" && projection.hasHydro) ||
+      (layer.availability === "transmission" &&
+        transmissionAvailable(this.props.game.location) &&
+        !!this.props.game.transmission?.lines.some(
+          ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+        ))
     );
   }
 
@@ -1632,6 +1693,14 @@ export default class Insights extends React.Component<Props, State> {
                 </Typography>
               )}
             </>
+          );
+          break;
+        case "powerExchange":
+          body = (
+            <PowerExchangeSummary
+              game={game}
+              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
+            />
           );
           break;
         case "demandByType": {

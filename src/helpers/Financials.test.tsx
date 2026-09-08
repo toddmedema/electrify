@@ -358,6 +358,17 @@ describe("getCreditInputs", () => {
     ]);
     expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
   });
+
+  it("counts financed interties in company debt", () => {
+    const inputs = getCreditInputs(
+      [aMonth(100, 50)],
+      500,
+      1000,
+      [],
+      [{ loanAmountLeft: 1000 }],
+    );
+    expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
+  });
 });
 
 describe("facilityLifetime", () => {

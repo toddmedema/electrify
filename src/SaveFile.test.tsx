@@ -31,6 +31,8 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     reportedEventKeys: [],
     eventLogReadThroughId: 0,
     worldEvents: { active: [], occurrences: [], checkedKeys: [] },
+    meaningfulDecisions: [],
+    meaningfulDecisionGateWaived: false,
     ...overrides,
   } as unknown as GameType;
 }

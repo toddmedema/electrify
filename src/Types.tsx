@@ -23,6 +23,55 @@ export type MonthType =
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
 
+/** How an intertie may trade with neighbouring electricity markets. */
+export type TradingPolicyType =
+  "BALANCED" | "RELIABILITY_FIRST" | "SURPLUS_ONLY" | "CLOSED";
+
+/** Authored facts about a neighbouring wholesale electricity market. */
+export interface AdjacentMarketDefinitionType {
+  id: string;
+  name: string;
+  description: string;
+  basePricePerMWh: number;
+  availableSupplyW: number;
+  availableDemandW: number;
+}
+
+/** A buildable physical connection to one adjacent market. */
+export interface TransmissionCorridorDefinitionType {
+  id: string;
+  adjacentMarketId: string;
+  name: string;
+  routeType: "EXISTING" | "NEW";
+  capacityW: number;
+  buildCost: number;
+  annualOperatingCost: number;
+  yearsToBuild: number;
+  heatDerateStartsC: number;
+  heatDeratePerC: number;
+  solarDerateFraction: number;
+}
+
+export interface TransmissionLineOperatingType {
+  id: number;
+  corridorId: string;
+  name: string;
+  capacityW: number;
+  buildCost: number;
+  annualOperatingCost: number;
+  yearsToBuildLeft: number;
+  minuteCreated: number;
+  financed: boolean;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+}
+
+export interface TransmissionStateType {
+  tradingPolicy: TradingPolicyType;
+  lines: TransmissionLineOperatingType[];
+}
+
 // Deliberately open rather than a union of the places that happen to ship today: a custom game
 // may hold a location that isn't in LOCATIONS at all, so nothing is allowed to key off the
 // closed set. Resolve one through getLocation / getScenarioLocation rather than indexing
@@ -213,6 +262,8 @@ export type ReplayActionNameType =
   | "sellFacility"
   | "togglePauseFacility"
   | "reprioritizeFacility"
+  | "buildTransmissionLine"
+  | "setTradingPolicy"
   | "delta";
 
 export interface ReplayActionType {
@@ -222,6 +273,20 @@ export interface ReplayActionType {
   // The reducer's own payload, verbatim. Untyped here because it differs per action and comes
   // back off the network as untrusted JSON; decodeReplay is what makes it safe to apply
   payload: unknown;
+}
+
+export type MeaningfulDecisionKindType =
+  "asset" | "sale" | "rate" | "policy" | "operation" | "dispatch" | "trading";
+
+/** One accepted player decision after lifetime no-ops and reversals are coalesced. */
+export interface MeaningfulDecisionType {
+  key: string;
+  lever: string;
+  label: string;
+  month: number;
+  kind: MeaningfulDecisionKindType;
+  before: string;
+  after: string;
 }
 
 export interface ReplayType {
@@ -235,6 +300,7 @@ export interface ReplayType {
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
   actions: ReplayActionType[];
+  meaningfulDecisionGateWaived?: boolean;
 }
 
 /**
@@ -312,6 +378,11 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     supplyByFuel: FuelProductionType;
+    /** Positive gross flow into/out of the player's grid during this tick. */
+    importedW?: number;
+    exportedW?: number;
+    transmissionCapacityW?: number;
+    marketPricePerMWh?: number;
     renewableCapacityFactors?: Record<string, number>;
   };
 
@@ -353,6 +424,8 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
 
 interface HistoryForecastShared {
   expensesPolicy?: number; // Monthly funded upgrades; absent in legacy histories.
+  revenueExports?: number;
+  expensesImports?: number;
   cash: number;
   customers: number;
   netWorth: number;
@@ -604,6 +677,8 @@ export interface ScenarioType {
   recommendationOrder?: number;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
+  /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
+  intertiesEnabled?: boolean;
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -837,6 +912,15 @@ export interface GameType {
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
+  // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
+  // scenarios and their normalized saves carry an explicit empty state.
+  transmission?: TransmissionStateType;
+  // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
+  // same accepted state changes; saves persist and validate it so progress survives a reload.
+  meaningfulDecisions: MeaningfulDecisionType[];
+  // Older in-progress saves/replays predate decision tracking. They keep their original victory
+  // rules rather than becoming impossible to finish after an upgrade.
+  meaningfulDecisionGateWaived?: boolean;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
   // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the

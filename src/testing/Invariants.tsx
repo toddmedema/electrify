@@ -55,6 +55,12 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "kgco2e",
   "interestRate",
   "inflationRate",
+  "importedW",
+  "exportedW",
+  "transmissionCapacityW",
+  "marketPricePerMWh",
+  "revenueExports",
+  "expensesImports",
 ];
 
 // Tick fields that are physically incapable of going negative (cash and netWorth can, by design)
@@ -82,6 +88,12 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "kgco2e",
   // A lender can quote any rate it likes, but never a negative one
   "interestRate",
+  "importedW",
+  "exportedW",
+  "transmissionCapacityW",
+  "marketPricePerMWh",
+  "revenueExports",
+  "expensesImports",
 ];
 
 const FINITE_MONTH_FIELDS: MonthFieldType[] = [
@@ -98,6 +110,8 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "kgco2e",
   "interestRate",
   "inflationRate",
+  "revenueExports",
+  "expensesImports",
 ];
 
 /**
@@ -211,7 +225,8 @@ export function checkTick(
   });
   if (
     isFinite_(now.supplyW) &&
-    supplyByFuelTotal > now.supplyW * (1 + RELATIVE_TOLERANCE) + 1
+    supplyByFuelTotal >
+      (now.supplyW + (now.exportedW || 0)) * (1 + RELATIVE_TOLERANCE) + 1
   ) {
     collector.add(
       "supplyByFuel sums to at most supplyW",
@@ -228,13 +243,23 @@ export function checkTick(
       now.expensesOM +
       now.expensesCarbonFee +
       now.expensesInterest +
+      (now.expensesImports || 0) +
       (now.expensesPolicy || 0);
-    const maxPrincipal = state.facilities.reduce(
-      (acc: number, f: FacilityOperatingType) =>
-        acc +
-        (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
-      0,
-    );
+    const maxPrincipal =
+      state.facilities.reduce(
+        (acc: number, f: FacilityOperatingType) =>
+          acc +
+          (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
+        0,
+      ) +
+      (state.transmission?.lines || []).reduce(
+        (acc, line) =>
+          acc +
+          (line.loanAmountLeft > 0
+            ? line.loanMonthlyPayment / TICKS_PER_MONTH
+            : 0),
+        0,
+      );
     const upperBound = prev.cash + now.revenue - expenses;
     const lowerBound = upperBound - maxPrincipal;
     if (
@@ -336,6 +361,24 @@ export function checkTick(
         "loan balance stays within 0..original",
         when,
         `${label} loanAmountLeft = ${Math.round(f.loanAmountLeft)} of ${Math.round(f.loanAmountTotal)}`,
+      );
+    }
+  });
+
+  (state.transmission?.lines || []).forEach((line) => {
+    const label = `${line.name} #${line.id}`;
+    if (!isFinite_(line.yearsToBuildLeft) || line.yearsToBuildLeft < 0) {
+      collector.add(
+        "transmission construction time remaining is non-negative",
+        when,
+        `${label} yearsToBuildLeft = ${line.yearsToBuildLeft}`,
+      );
+    }
+    if (!isFinite_(line.loanAmountLeft) || line.loanAmountLeft < 0) {
+      collector.add(
+        "transmission loan balance is finite and non-negative",
+        when,
+        `${label} loanAmountLeft = ${line.loanAmountLeft}`,
       );
     }
   });

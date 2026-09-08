@@ -187,6 +187,14 @@ describe("decodeReplay", () => {
     ).toEqual(replay);
   });
 
+  it("grandfathers pre-ledger replays but leaves current runs gated", () => {
+    const current = encodeReplay(aReplay());
+    expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
+
+    const legacy = { ...current, version: REPLAY_VERSION - 1 };
+    expect(decodeReplay(legacy)?.meaningfulDecisionGateWaived).toBe(true);
+  });
+
   it("ignores anything that isn't a replay", () => {
     expect(decodeReplay(null)).toBeNull();
     expect(decodeReplay("nope")).toBeNull();

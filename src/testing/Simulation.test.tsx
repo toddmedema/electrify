@@ -1,9 +1,15 @@
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, GameType, ScenarioType } from "../Types";
+import {
+  DifficultyType,
+  GameType,
+  MeaningfulDecisionKindType,
+  ScenarioType,
+} from "../Types";
 import {
   createGame,
   createGameFromReplay,
   runSimulation,
+  SimOptionsType,
   SimResultType,
 } from "./Simulator";
 import {
@@ -364,7 +370,10 @@ describe("researched public-utility scenarios", () => {
     "VP",
     "CEO",
   ];
-  it.each(difficulties)(
+  const operatingDifficulties = difficulties.filter(
+    (difficulty) => difficulty !== "CEO",
+  );
+  it.each(operatingDifficulties)(
     "completes Data Center Boom on %s with capacity planned before the arrival",
     (difficulty) => {
       const result = runSimulation({
@@ -381,7 +390,7 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  it.each(difficulties)(
+  it.each(operatingDifficulties)(
     "rejects passive customer attrition as a Data Center Boom win on %s",
     (difficulty) => {
       const result = runSimulation({ scenarioId: 106, difficulty });
@@ -406,7 +415,7 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  it.each(difficulties)(
+  it.each(operatingDifficulties)(
     "keeps Texas Deep Freeze winnable with planned firm capacity on %s",
     (difficulty) => {
       const result = runSimulation({
@@ -589,9 +598,29 @@ describe("airborne wind dispatch", () => {
 });
 
 describe("simulation economics", () => {
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
+  const scenarios = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+  const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
+    100: [
+      "asset",
+      "dispatch",
+      "operation",
+      "policy",
+      "rate",
+      "sale",
+      "trading",
+    ],
+    101: ["asset", "dispatch", "operation", "rate", "sale"],
+    102: ["asset", "dispatch", "operation", "rate", "sale"],
+    103: ["asset", "dispatch", "operation", "rate", "sale"],
+    104: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    105: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    106: ["asset", "dispatch", "policy", "rate", "sale", "trading"],
+    107: ["asset", "dispatch", "operation", "policy", "rate"],
+    108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+  };
+  scenarios.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
@@ -599,6 +628,7 @@ describe("simulation economics", () => {
       });
       expectNoViolations(passive);
       expect(passive.actionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
       const active = runSimulation({
@@ -608,45 +638,21 @@ describe("simulation economics", () => {
       });
       expectNoViolations(active);
       expect(active.actionCount).toBe(1);
+      expect(active.meaningfulDecisionCount).toBe(1);
       expect(active.builds).toHaveLength(1);
       expect(active.outcome).toBe("completed");
     });
   });
 
-  SCENARIOS.filter((scenario) => [108, 110].includes(scenario.id)).forEach(
-    (scenario) => {
-      it(`requires player input but accepts one build on Intern in "${scenario.name}"`, () => {
-        const passive = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-        });
-        expectNoViolations(passive);
-        expect(passive.actionCount).toBe(0);
-        expect(passive.outcome).not.toBe("completed");
-
-        const active = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
-        });
-        expectNoViolations(active);
-        expect(active.actionCount).toBe(1);
-        expect(active.builds).toHaveLength(1);
-        expect(active.outcome).toBe("completed");
-      });
-    },
-  );
-
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
-    it(`rejects passive play and accepts a multi-action plan in "${scenario.name}" on CEO`, () => {
+  scenarios.forEach((scenario) => {
+    it(`requires ten validated decisions in "${scenario.name}" on CEO`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "CEO",
       });
       expectNoViolations(passive);
       expect(passive.actionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
       const play = STANDARD_BALANCE_PLAYS[scenario.id];
@@ -656,8 +662,94 @@ describe("simulation economics", () => {
         ...play,
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBeGreaterThanOrEqual(3);
-      expect(active.outcome).toBe("completed");
+      expect([
+        active.meaningfulDecisionCount,
+        active.meaningfulDecisionCategoryCount >= 4,
+        new Set(active.meaningfulDecisionKeys).size,
+        active.outcome,
+        active.meaningfulDecisionLabels,
+      ]).toEqual([10, true, 10, "completed", expect.any(Array)]);
+      expect(active.meaningfulDecisionCategories).toEqual(
+        expectedCeoCategories[scenario.id],
+      );
+    });
+  });
+
+  it.each([107, 111])(
+    "keeps Intern scenario %s passive-fail / one-build-win across seeds 1-20",
+    (scenarioId) => {
+      for (let seed = 1; seed <= 20; seed++) {
+        const passive = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+        });
+        const active = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+          ...INTERN_ONE_BUILD_PLAYS[scenarioId],
+        });
+        expectNoViolations(passive);
+        expectNoViolations(active);
+        expect([seed, passive.outcome]).not.toEqual([seed, "completed"]);
+        expect([seed, active.outcome]).toEqual([seed, "completed"]);
+        expect(active.meaningfulDecisionCount).toBe(1);
+      }
+    },
+  );
+
+  it.each([1, 7, 20])(
+    "wins all CEO playbooks with ten decisions on representative seed %s",
+    (seed) => {
+      scenarios.forEach((scenario) => {
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          seed,
+          ...STANDARD_BALANCE_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect([
+          scenario.id,
+          active.meaningfulDecisionCount,
+          active.meaningfulDecisionCategoryCount >= 4,
+          active.outcome,
+        ]).toEqual([scenario.id, 10, true, "completed"]);
+      });
+    },
+  );
+
+  scenarios.forEach((scenario) => {
+    const play = STANDARD_BALANCE_PLAYS[scenario.id];
+    const omissions: Array<Partial<SimOptionsType>> = (
+      play.scheduledActions || []
+    ).map((_action, omitted) => ({
+      scheduledActions: play.scheduledActions!.filter(
+        (_candidate, index) => index !== omitted,
+      ),
+    }));
+    if (play.initialBuild) omissions.push({ initialBuild: undefined });
+    if (play.sellFacilityId !== undefined)
+      omissions.push({ sellFacilityId: undefined });
+
+    if (omissions.length !== 10) {
+      throw new Error(
+        `CEO ${scenario.id} play must author exactly ten choices`,
+      );
+    }
+    omissions.forEach((omission, index) => {
+      it(`rejects actual CEO ${scenario.id} plan with choice ${index + 1} removed`, () => {
+        const shortened = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+          ...omission,
+        });
+        expectNoViolations(shortened);
+        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
+        expect(shortened.outcome).not.toBe("completed");
+      });
     });
   });
 

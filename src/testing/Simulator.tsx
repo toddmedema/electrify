@@ -3,18 +3,27 @@
 // the reducer directly. Importing Store creates and registers it.
 import cloneDeep from "lodash.clonedeep";
 import { schedulePolicy } from "../reducers/GameActions";
-import type { PolicyId, PolicyTier } from "../Types";
+import type {
+  MeaningfulDecisionKindType,
+  PolicyId,
+  PolicyTier,
+  TradingPolicyType,
+} from "../Types";
 import "../Store";
 import gameReducer, {
+  buildTransmissionLine,
   buildFacility,
   delta,
   initGame,
   hasChronicBlackouts,
   scenarioObjectiveFailure,
+  reprioritizeFacility,
+  setTradingPolicy,
   start,
   startReplay,
   sellFacility,
   tickState,
+  togglePauseFacility,
 } from "../reducers/Game";
 import { DIFFICULTIES } from "../Constants";
 import { GENERATORS, STORAGE } from "../data/Facilities";
@@ -22,10 +31,12 @@ import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { getScenarioLocation } from "../helpers/Locations";
+import { meaningfulDecisionCategoryCount } from "../helpers/MeaningfulDecisions";
 import {
   ActiveWorldEventType,
   DifficultyType,
   FacilityOperatingType,
+  FacilityShoppingType,
   GameType,
   GeneratorShoppingType,
   LocationType,
@@ -51,6 +62,16 @@ interface InitialBuildBaseType {
 
 export type InitialBuildType = InitialBuildBaseType &
   ({ peakW: number; peakWh?: never } | { peakWh: number; peakW?: never });
+
+export type ScheduledSimActionType =
+  | { month: number; type: "rate"; dollarsPerkWh: number }
+  | { month: number; type: "build"; build: InitialBuildType }
+  | { month: number; type: "sell"; facilityId: number }
+  | { month: number; type: "toggle"; facilityId: number }
+  | { month: number; type: "reprioritize"; facilityId: number }
+  | { month: number; type: "policy"; id: PolicyId; tier: PolicyTier }
+  | { month: number; type: "trading"; policy: TradingPolicyType }
+  | { month: number; type: "intertie"; corridorId: string; financed: boolean };
 
 /**
  * Where a scenario is played, or a hard failure. The browser can put an alert on screen and go
@@ -83,6 +104,7 @@ export interface SimOptionsType {
   sellFacilityId?: number;
   sellAtMonth?: number;
   storyEffectsEnabled?: boolean;
+  scheduledActions?: ScheduledSimActionType[];
 }
 
 export interface ResolvedSimOptionsType {
@@ -97,6 +119,7 @@ export interface ResolvedSimOptionsType {
   sellFacilityId: number | null;
   sellAtMonth: number;
   storyEffectsEnabled: boolean;
+  scheduledActions: ScheduledSimActionType[];
 }
 
 export interface BuildRecordType {
@@ -119,6 +142,11 @@ export interface SimResultType {
   firedAtMonth: number | null;
   outcome: "completed" | "bankrupt" | "fired";
   actionCount: number;
+  meaningfulDecisionCount: number;
+  meaningfulDecisionCategoryCount: number;
+  meaningfulDecisionCategories: MeaningfulDecisionKindType[];
+  meaningfulDecisionKeys: string[];
+  meaningfulDecisionLabels: string[];
   builds: BuildRecordType[];
   // Mean fill level of the storage fleet across the run, 0 - 1, or null with no storage built
   averageStateOfCharge: number | null;
@@ -334,7 +362,28 @@ function resolveOptions(
     sellFacilityId: options.sellFacilityId ?? null,
     sellAtMonth: options.sellAtMonth || 0,
     storyEffectsEnabled: options.storyEffectsEnabled !== false,
+    scheduledActions: options.scheduledActions || [],
   };
+}
+
+function shoppingFacility(
+  state: GameType,
+  build: InitialBuildType,
+): FacilityShoppingType | undefined {
+  return build.peakWh !== undefined
+    ? STORAGE(state, build.peakWh).find(
+        (facility) => facility.available && facility.name === build.name,
+      )
+    : GENERATORS(
+        state,
+        build.peakW,
+        state.timeline.map((tick) => tick.windKph),
+        state.timeline.map((tick) => tick.solarIrradianceWM2),
+        state.timeline
+          .map((tick) => tick.windOffshoreKph)
+          .filter((wind): wind is number => wind !== undefined),
+        state.timeline.map((tick) => tick.windAirborneKph),
+      ).find((facility) => facility.available && facility.name === build.name);
 }
 
 export function runSimulation(options: SimOptionsType): SimResultType {
@@ -364,6 +413,104 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         },
       ]
     : [];
+  const applyScheduledActions = (month: number) => {
+    resolved.scheduledActions
+      .filter((action) => action.month === month)
+      .forEach((action) => {
+        const previousIds = new Set(state.facilities.map(({ id }) => id));
+        switch (action.type) {
+          case "rate":
+            state = cloneDeep(
+              gameReducer(
+                state,
+                delta({ dollarsPerkWh: action.dollarsPerkWh }),
+              ),
+            );
+            break;
+          case "build": {
+            const facility = shoppingFacility(state, action.build);
+            if (!facility)
+              throw new Error(
+                `Cannot build ${action.build.name} in ${scenario.name}`,
+              );
+            state = cloneDeep(
+              gameReducer(
+                state,
+                buildFacility({
+                  facility,
+                  financed: action.build.financed,
+                }),
+              ),
+            );
+            const added = state.facilities.find(
+              ({ id }) => !previousIds.has(id),
+            );
+            if (added)
+              builds.push({
+                month,
+                name: added.name,
+                buildCost: added.buildCost,
+              });
+            break;
+          }
+          case "sell":
+            state = cloneDeep(
+              gameReducer(state, sellFacility(action.facilityId)),
+            );
+            break;
+          case "toggle":
+            state = cloneDeep(
+              gameReducer(state, togglePauseFacility(action.facilityId)),
+            );
+            break;
+          case "reprioritize":
+            {
+              const spotInList = state.facilities.findIndex(
+                ({ id }) => id === action.facilityId,
+              );
+              state = cloneDeep(
+                gameReducer(
+                  state,
+                  reprioritizeFacility({
+                    spotInList,
+                    delta: spotInList === 0 ? 1 : -1,
+                  }),
+                ),
+              );
+            }
+            break;
+          case "policy":
+            state = cloneDeep(
+              gameReducer(
+                state,
+                schedulePolicy({
+                  id: action.id,
+                  tier: action.tier,
+                  month: month + 1,
+                }),
+              ),
+            );
+            break;
+          case "trading":
+            state = cloneDeep(
+              gameReducer(state, setTradingPolicy(action.policy)),
+            );
+            break;
+          case "intertie":
+            state = cloneDeep(
+              gameReducer(
+                state,
+                buildTransmissionLine({
+                  corridorId: action.corridorId,
+                  financed: action.financed,
+                }),
+              ),
+            );
+            break;
+        }
+      });
+  };
+  applyScheduledActions(0);
   let stateOfChargeSum = 0;
   let stateOfChargeTicks = 0;
   let ticks = 0;
@@ -453,6 +600,9 @@ export function runSimulation(options: SimOptionsType): SimResultType {
         justBuilt = true;
       }
     }
+    if (state.date.monthsElapsed < resolved.months) {
+      applyScheduledActions(state.date.monthsElapsed);
+    }
     // The timeline was just regenerated and pre-rolled, so tick continuity restarts next tick
     prevTick = null;
   }
@@ -461,7 +611,13 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     firedAtMonth === null &&
     bankruptAtMonth === null &&
     state.date.monthsElapsed >= scenario.durationMonths &&
-    scenarioObjectiveFailure(scenario, state.monthlyHistory)
+    scenarioObjectiveFailure(
+      scenario,
+      state.monthlyHistory,
+      state.difficulty,
+      state.meaningfulDecisions,
+      !!state.meaningfulDecisionGateWaived,
+    )
   ) {
     firedAtMonth = state.date.monthsElapsed;
   }
@@ -485,6 +641,17 @@ export function runSimulation(options: SimOptionsType): SimResultType {
           ? "fired"
           : "completed",
     actionCount: state.replayLog?.length || 0,
+    meaningfulDecisionCount: state.meaningfulDecisions.length,
+    meaningfulDecisionCategoryCount: meaningfulDecisionCategoryCount(
+      state.meaningfulDecisions,
+    ),
+    meaningfulDecisionCategories: Array.from(
+      new Set(state.meaningfulDecisions.map(({ kind }) => kind)),
+    ).sort(),
+    meaningfulDecisionKeys: state.meaningfulDecisions.map(({ key }) => key),
+    meaningfulDecisionLabels: state.meaningfulDecisions.map(
+      ({ label }) => label,
+    ),
     builds,
     averageStateOfCharge: stateOfChargeTicks
       ? stateOfChargeSum / stateOfChargeTicks

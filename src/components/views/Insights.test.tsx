@@ -1,10 +1,11 @@
 import * as React from "react";
+import cloneDeep from "lodash.clonedeep";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
-import gameReducer from "../../reducers/Game";
+import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { schedulePolicy, cancelPolicy } from "../../reducers/GameActions";
 import Insights, {
   INSIGHT_PRESETS,
@@ -564,6 +565,36 @@ describe("Insights layers", () => {
       "profit",
       "financeDetails",
     ]);
+    expect(withRequiredLayers(["cash", "powerExchange"], 112)).toEqual([
+      "powerExchange",
+      "cash",
+    ]);
+  });
+
+  it("puts Mission 7's required exchange track first once its line opens", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+
+    renderInsights(112, game);
+
+    expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
+      "Power exchange",
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {
@@ -803,5 +834,62 @@ describe("Insights layers", () => {
       <Insights {...props} game={nextGame} facilityDragActive={false} />,
     );
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
+  });
+
+  it("refreshes a visible power exchange on every simulation tick", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    const props: React.ComponentProps<typeof Insights> = {
+      game,
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const ref = React.createRef<Insights>();
+    render(<Insights {...props} ref={ref} />);
+
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            date: { ...game.date, minute: game.date.minute + 600 },
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not offer the power-exchange layer for an explicitly islanded grid", async () => {
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+
+    renderInsights(100, game);
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Power exchange" }),
+    ).toBeNull();
+    expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
   });
 });

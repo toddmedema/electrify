@@ -8,7 +8,15 @@ import {
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { GameType } from "./Types";
+import { GameType, TransmissionLineOperatingType } from "./Types";
+import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
+import {
+  emptyTransmissionState,
+  intertiesEnabledForScenario,
+  corridorsForLocation,
+  TRANSMISSION_CORRIDORS,
+} from "./data/AdjacentMarkets";
+import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
 
 /**
@@ -27,9 +35,9 @@ import type { AppStore } from "./Store";
 
 export const SAVE_KEY = "savedGame";
 // Initial public schema. Increment this when a post-release change becomes incompatible.
-// Version 3 includes persistent customer programs. Accept and normalize v1/v2 saves;
-// older clients must not resume an active program as though its upgrades did not exist.
-export const SAVE_VERSION = 3;
+// Version 3 includes persistent customer programs. Version 4 adds the validated decision ledger.
+// Accept and normalize v1-v3 saves, but visibly waive the new gate for those in-progress games.
+export const SAVE_VERSION = 4;
 
 export interface SaveGameType {
   version: number;
@@ -43,6 +51,51 @@ export interface SaveGameType {
 // clearing invalidate it rather than filling it in, so what's cached is always what's in storage
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
+
+function validTransmissionLine(
+  raw: unknown,
+): raw is TransmissionLineOperatingType {
+  if (typeof raw !== "object" || raw === null) return false;
+  const line = raw as Partial<TransmissionLineOperatingType>;
+  const corridor = TRANSMISSION_CORRIDORS.find(
+    ({ id }) => id === line.corridorId,
+  );
+  if (!corridor) return false;
+  const nonNegative = [
+    line.capacityW,
+    line.buildCost,
+    line.annualOperatingCost,
+    line.yearsToBuildLeft,
+    line.minuteCreated,
+    line.loanAmountLeft,
+    line.loanMonthlyPayment,
+    line.interestRate,
+  ];
+  return (
+    typeof line.name === "string" &&
+    line.name.length > 0 &&
+    Number.isInteger(line.id) &&
+    line.id! > 0 &&
+    nonNegative.every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    ) &&
+    line.capacityW === corridor.capacityW &&
+    line.buildCost === corridor.buildCost &&
+    line.annualOperatingCost === corridor.annualOperatingCost &&
+    line.yearsToBuildLeft! <= corridor.yearsToBuild &&
+    Number.isInteger(line.minuteCreated) &&
+    line.interestRate! <= 1 &&
+    line.loanAmountLeft! <= corridor.buildCost &&
+    line.loanMonthlyPayment! <= corridor.buildCost &&
+    typeof line.financed === "boolean" &&
+    (line.financed
+      ? line.loanMonthlyPayment! > 0
+      : line.loanAmountLeft === 0 &&
+        line.loanMonthlyPayment === 0 &&
+        line.interestRate === 0)
+  );
+}
 
 export function serializeSave(game: GameType): SaveGameType {
   return {
@@ -66,7 +119,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     (save.version !== SAVE_VERSION &&
       save.version !== 1 &&
-      save.version !== 2) ||
+      save.version !== 2 &&
+      save.version !== 3) ||
     typeof save.savedAt !== "string" ||
     typeof save.appVersion !== "string"
   ) {
@@ -221,6 +275,14 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
+  if (
+    (save.version === SAVE_VERSION &&
+      !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth)) ||
+    (game.meaningfulDecisionGateWaived !== undefined &&
+      typeof game.meaningfulDecisionGateWaived !== "boolean")
+  )
+    return null;
   const worldEvents = game.worldEvents as
     Partial<GameType["worldEvents"]> | undefined;
   if (
@@ -240,6 +302,38 @@ export function parseSave(raw: unknown): SaveGameType | null {
     )
   )
     return null;
+  const transmission = game.transmission;
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const transmissionEnabled = !!(
+    scenario && intertiesEnabledForScenario(scenario, game.location)
+  );
+  if (
+    transmission !== undefined &&
+    (typeof transmission !== "object" ||
+      transmission === null ||
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        transmission.tradingPolicy,
+      ) ||
+      !Array.isArray(transmission.lines) ||
+      transmission.lines.some((line) => !validTransmissionLine(line)) ||
+      new Set(transmission.lines.map(({ id }) => id)).size !==
+        transmission.lines.length ||
+      new Set(transmission.lines.map(({ corridorId }) => corridorId)).size !==
+        transmission.lines.length)
+  )
+    return null;
+  if (!transmissionEnabled && transmission?.lines.length) return null;
+  const locationCorridors = game.location
+    ? corridorsForLocation(game.location)
+    : [];
+  if (
+    transmissionEnabled &&
+    transmission?.lines.some(
+      ({ corridorId }) =>
+        !locationCorridors.some(({ id }) => id === corridorId),
+    )
+  )
+    return null;
   if (
     [...game.timeline, ...game.monthlyHistory].some(
       (t) =>
@@ -254,13 +348,30 @@ export function parseSave(raw: unknown): SaveGameType | null {
     policies:
       game.policies ??
       emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
+    transmission: transmissionEnabled
+      ? (game.transmission ?? emptyTransmissionState())
+      : undefined,
+    meaningfulDecisions:
+      save.version === SAVE_VERSION ? game.meaningfulDecisions! : [],
+    meaningfulDecisionGateWaived:
+      save.version === SAVE_VERSION
+        ? (game.meaningfulDecisionGateWaived ?? false)
+        : true,
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
+      importedW: t.importedW ?? 0,
+      exportedW: t.exportedW ?? 0,
+      transmissionCapacityW: t.transmissionCapacityW ?? 0,
+      marketPricePerMWh: t.marketPricePerMWh ?? 0,
     })),
     monthlyHistory: game.monthlyHistory.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
     })),
   };
   // Version 1 saves remain playable. New months collect chart history; older months have only
