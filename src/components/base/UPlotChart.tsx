@@ -330,7 +330,7 @@ export default function UPlotChart<S>(
         max: viewport.range[1],
       });
     }
-  }, [viewport, width]);
+  }, [viewport, width, height, structureKey, themeVersion]);
 
   React.useLayoutEffect(() => {
     const plot = plotRef.current;
@@ -521,7 +521,7 @@ export default function UPlotChart<S>(
       if (frame !== undefined) cancelAnimationFrame(frame);
       if (wheelTimer) clearTimeout(wheelTimer);
     };
-  }, [width, viewportEnabled]);
+  }, [width, height, structureKey, themeVersion, viewportEnabled]);
 
   React.useLayoutEffect(() => {
     plotRef.current?.redraw();

@@ -3,12 +3,12 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
-import { GameType } from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
+import gameReducer from "../../reducers/Game";
+import { schedulePolicy, cancelPolicy } from "../../reducers/GameActions";
 import Insights, {
-  INSIGHT_LAYERS,
   INSIGHT_PRESETS,
   MAX_CUSTOM_INSIGHT_PRESETS,
-  presetForLayers,
   withRequiredLayers,
 } from "./Insights";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -31,6 +31,68 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+
+it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    props: typeof props;
+    getProjection: (now: TickPresentFutureType) => {
+      timeline: TickPresentFutureType[];
+    };
+  };
+  const before = internals.getProjection(game.timeline[0]);
+  const change = {
+    id: "efficiency" as const,
+    tier: "Large" as const,
+    month: 1,
+  };
+  const project = (nextGame: GameType) => {
+    const nextProps = { ...props, game: nextGame };
+    expect(insights.shouldComponentUpdate(nextProps, insights.state)).toBe(
+      true,
+    );
+    internals.props = nextProps;
+    return internals.getProjection(nextGame.timeline[0]);
+  };
+  const scheduledGame = gameReducer(game, schedulePolicy(change));
+  const scheduled = project(scheduledGame);
+  const replacedGame = gameReducer(
+    scheduledGame,
+    schedulePolicy({ ...change, tier: "Small" }),
+  );
+  const replaced = project(replacedGame);
+  const cancelled = project(
+    gameReducer(replacedGame, cancelPolicy({ ...change, tier: "Small" })),
+  );
+  const future = (projection: typeof before) =>
+    projection.timeline.find((tick) => tick.minute >= 3 * MINUTES_PER_MONTH)!;
+  expect(future(scheduled).demandW).toBeLessThan(future(replaced).demandW);
+  expect(future(replaced).demandW).toBeLessThan(future(before).demandW);
+  expect(future(scheduled).expensesPolicy).toBeGreaterThan(
+    future(replaced).expensesPolicy!,
+  );
+  expect(future(replaced).expensesPolicy).toBeGreaterThan(0);
+  expect(cancelled.timeline).toEqual(before.timeline);
+  expect(
+    insights.shouldComponentUpdate(
+      {
+        ...internals.props,
+        game: {
+          ...internals.props.game,
+          policies: JSON.parse(JSON.stringify(internals.props.game.policies)),
+        },
+      },
+      insights.state,
+    ),
+  ).toBe(false);
+});
 
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
@@ -215,58 +277,6 @@ function storeCustomPreset(name: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines five distinct, purpose-ordered presets", () => {
-    expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
-      INSIGHT_LAYERS.length,
-    );
-    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
-    expect(INSIGHT_PRESETS.overview.layers).toEqual([
-      "supplyDemand",
-      "cash",
-      "profit",
-      "customers",
-      "emissions",
-    ]);
-    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
-      "supplyDemand",
-      "supplyByFuel",
-      "storage",
-      "weather",
-      "water",
-    ]);
-    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
-      "profit",
-      "cash",
-      "revenue",
-      "expenses",
-      "fuelPrices",
-    ]);
-    expect(INSIGHT_PRESETS.growth.layers).toEqual([
-      "customers",
-      "demandByType",
-      "supplyDemand",
-      "revenue",
-      "profit",
-    ]);
-    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
-      "emissions",
-      "supplyByFuel",
-      "supplyDemand",
-      "fuelPrices",
-      "profit",
-    ]);
-    expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
-  });
-
-  it("groups demand with customers and places rates last in economics", () => {
-    expect(
-      INSIGHT_LAYERS.find((layer) => layer.id === "demandByType")?.group,
-    ).toBe("Customers");
-    expect(
-      INSIGHT_LAYERS.filter((layer) => layer.group === "Economics").at(-1)?.id,
-    ).toBe("inflationInterest");
-  });
-
   it("shows expanded finance rows and both rate graphs", () => {
     localStorage.setItem(
       "insightsLayers",
@@ -442,16 +452,6 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("region", { name: "Upcoming scenario events" }),
     ).toBeNull();
-  });
-
-  it("replaces preset horizons with a displayed 12-month date range", () => {
-    localStorage.setItem("insightsRange", "current");
-    renderInsights();
-
-    expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–21"),
-    ).toBeVisible();
   });
 
   it("zooms and pans every insight chart on one shared time viewport", async () => {

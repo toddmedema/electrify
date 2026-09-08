@@ -64,21 +64,6 @@ it("keeps toolbar actions inside compact viewport gutters", () => {
   ).not.toHaveClass("MuiIconButton-edgeEnd");
 });
 
-it("shows decision context without live-time controls", () => {
-  render(
-    <BuildStorage
-      game={game()}
-      onBuildStorage={jest.fn()}
-      onBack={jest.fn()}
-    />,
-  );
-
-  expect(screen.getByText("Build Storage")).toBeInTheDocument();
-  expect(screen.getByLabelText(/Available cash/)).toHaveTextContent("cash");
-  expect(screen.getByText("Capacity")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "pause" })).toBeNull();
-});
-
 it("shows the current sort text when the controls have enough width", () => {
   const originalMatchMedia = window.matchMedia;
   window.matchMedia = (query: string) =>

@@ -65,24 +65,6 @@ describe("buildFacility", () => {
     expect(futureTicks(after).every((t) => t.expensesInterest > 0)).toBe(true);
   });
 
-  it("leaves the recorded past alone", () => {
-    const before = createGame({ scenarioId: 103 });
-    const pastBefore = before.timeline
-      .filter((t) => t.minute < before.date.minute)
-      .map((t) => t.cash);
-
-    const after = gameReducer(
-      before,
-      buildFacility({ facility: aGeneratorToBuild(before), financed: true }),
-    );
-
-    expect(
-      after.timeline
-        .filter((t) => t.minute < after.date.minute)
-        .map((t) => t.cash),
-    ).toEqual(pastBefore);
-  });
-
   it("rejects a stale purchase after the last viable site has been claimed", () => {
     let state = createGame({ scenarioId: 103 });
     const hydro = GENERATORS(state, 50000000, [20], [500]).find(

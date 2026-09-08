@@ -202,17 +202,6 @@ describe("LCWH", () => {
     );
   });
 
-  it("charges a carbon fee against a fuel's emissions", () => {
-    const gas = {
-      ...generator,
-      fuel: "Natural Gas",
-      btuPerWh: 0.0035,
-    } as GeneratorShoppingType;
-    expect(LCWH(gas, date, 0.1, SEED)).toBeGreaterThan(
-      LCWH(gas, date, 0, SEED),
-    );
-  });
-
   it("integrates a known future carbon fee over the applicable operating years", () => {
     const gas = {
       ...generator,

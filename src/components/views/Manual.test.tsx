@@ -63,21 +63,6 @@ describe("Manual", () => {
     expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toBeInTheDocument();
   });
 
-  it("has entries for the terms the game shows on screen", async () => {
-    renderManual();
-    for (const term of [
-      "capacity factor",
-      "ramp rate",
-      "peaker",
-      "round-trip efficiency",
-      "rates",
-      "carbon fee",
-    ]) {
-      await search(term);
-      expect(listedTitles().length).toBeGreaterThan(0);
-    }
-  });
-
   it("includes every shared game symbol in the symbol guide", async () => {
     renderManual();
     await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));

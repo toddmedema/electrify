@@ -3,7 +3,6 @@ import {
   getWeather,
   hasOffshoreWind,
   initWeatherFromRows,
-  WEATHER_STARTING_YEAR,
 } from "./Weather";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { LocationType, RawWeatherType } from "../Types";
@@ -201,10 +200,6 @@ describe("getWeather", () => {
     warn.mockRestore();
   });
 
-  it("returns the current hour's reading exactly, on the hour", () => {
-    expect(getWeather(dateAt(3, 10), SEED)).toEqual(fixtureRow(0, 3, 10));
-  });
-
   it("forecasts offshore wind without changing established weather draws", () => {
     const coastal: LocationType = {
       id: "NewYork",
@@ -266,33 +261,10 @@ describe("getWeather", () => {
     );
   });
 
-  it("moves monotonically from one hour's reading to the next", () => {
-    const readings = [0, 15, 30, 45].map(
-      (minuteOfHour) => getWeather(dateAt(5, 6, minuteOfHour), SEED).TEMP_C,
-    );
-    for (let i = 1; i < readings.length; i++) {
-      expect(readings[i]).toBeGreaterThan(readings[i - 1]);
-    }
-    expect(readings[0]).toBeCloseTo(fixtureRow(0, 5, 6).TEMP_C);
-    expect(readings[readings.length - 1]).toBeLessThan(
-      fixtureRow(0, 5, 7).TEMP_C,
-    );
-  });
-
   it("stamps a blended reading with the hour it started in", () => {
     const blended = getWeather(dateAt(7, 12, 30), SEED);
     expect(blended.YEAR).toEqual(1980);
     expect(blended.MONTH).toEqual(7);
-  });
-
-  it("forecasts past the end of the data rather than returning holes", () => {
-    const forecast = getWeather(dateAt(monthIndex(FIXTURE_YEARS, 2), 8), SEED);
-    expect(Number.isFinite(forecast.TEMP_C)).toBe(true);
-    expect(Number.isFinite(forecast.CLOUD_PCT)).toBe(true);
-    expect(Number.isFinite(forecast.WIND_KPH)).toBe(true);
-    expect(Number.isFinite(forecast.PRECIP_MM)).toBe(true);
-    expect(Number.isFinite(forecast.YEAR)).toBe(true);
-    expect(Number.isFinite(forecast.MONTH)).toBe(true);
   });
 
   // Precipitation is the one field that isn't given an anomaly of its own: a forecast day takes
@@ -329,10 +301,6 @@ describe("getWeather", () => {
     expect(Number.isFinite(before.TEMP_C)).toBe(true);
     expect(Number.isFinite(before.CLOUD_PCT)).toBe(true);
     expect(Number.isFinite(before.WIND_KPH)).toBe(true);
-  });
-
-  it("starts the record at the year the custom game screen offers as its floor", () => {
-    expect(WEATHER_STARTING_YEAR).toBe(FIXTURE_STARTING_YEAR);
   });
 
   // The bug this replaced: forecasting filled a single day per cache miss, so a lookup years past

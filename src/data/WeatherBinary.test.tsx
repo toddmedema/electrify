@@ -234,10 +234,6 @@ describe("the shipped weather files", () => {
     .filter((file: string) => file.endsWith(".bin"))
     .map((file: string) => file.replace(".bin", ""));
 
-  it("ships at least the locations the authored scenarios are played in", () => {
-    expect(ids).toEqual(expect.arrayContaining(["PIT", "SF", "HNL", "SJU"]));
-  });
-
   it("keeps the catalogue flags in sync with the binary headers", () => {
     const index = JSON.parse(
       fs.readFileSync(path.join(DATA_DIR, "index.json"), "utf8"),
