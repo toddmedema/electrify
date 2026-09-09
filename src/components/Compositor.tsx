@@ -91,6 +91,7 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (document.querySelector('[data-scenario-choice="true"]')) return true;
     if (document.querySelector('[data-manual-help="true"]')) return true;
     if (document.querySelector('[data-customer-programs="true"]')) return true;
     if (event.key === "Escape") {

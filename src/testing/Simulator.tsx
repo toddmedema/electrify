@@ -1,3 +1,5 @@
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
+import { chooseScenarioResponse } from "../reducers/GameActions";
 // The game reducer dispatches follow-up actions of its own (the construction complete snackbar,
 // the end of game dialogs), so it needs a live store to reach even though the simulation drives
 // the reducer directly. Importing Store creates and registers it.
@@ -525,6 +527,25 @@ export function runSimulation(options: SimOptionsType): SimResultType {
   // loop watches state directly instead and stops on the same conditions the player would hit:
   // monthsElapsed reaching the scenario duration, negative cash, or chronic blackouts.
   while (state.date.monthsElapsed < resolved.months) {
+    // The baseline bot explicitly chooses a free option; the game never defaults for a player.
+    const decision = pendingScenarioChoice(state);
+    if (decision && !state.replayPlayback) {
+      const choiceDifficulty = state.difficulty;
+      const option = decision.options.find(
+        (option) => option.cost(choiceDifficulty) === 0,
+      );
+      if (!option)
+        throw new Error("Simulation needs a choice policy for " + decision.id);
+      state = cloneDeep(
+        gameReducer(
+          state,
+          chooseScenarioResponse({
+            decisionId: decision.id,
+            optionId: option.id,
+          }),
+        ),
+      );
+    }
     tickState(state);
     ticks++;
 

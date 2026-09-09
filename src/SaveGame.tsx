@@ -38,7 +38,8 @@ export const SAVE_KEY = "savedGame";
 // Older snapshots contain forecasts and financial results calculated with different physics;
 // do not silently mix those results with the new simulation. Original files remain untouched.
 // Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
-export const SAVE_VERSION = 6;
+// Version 7 requires explicit scenario choices; older runs could advance past unanswered prompts.
+export const SAVE_VERSION = 7;
 
 export interface SaveGameType {
   version: number;

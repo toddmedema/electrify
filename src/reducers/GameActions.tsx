@@ -47,6 +47,7 @@ export const resume = createAction<GameType>("game/resume");
  */
 export const startReplay = createAction<ReplayType>("game/startReplay");
 
-export const chooseWildfireResponse = createAction<"prepare" | "standard">(
-  "game/chooseWildfireResponse",
-);
+export const chooseScenarioResponse = createAction<{
+  decisionId: string;
+  optionId: string;
+}>("game/chooseScenarioResponse");

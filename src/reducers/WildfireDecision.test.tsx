@@ -1,7 +1,12 @@
 import cloneDeep from "lodash.clonedeep";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
-import reducer, { generateNewTimeline, tickState, delta } from "./Game";
-import { chooseWildfireResponse } from "./GameActions";
+import reducer, {
+  generateNewTimeline,
+  tickState,
+  delta,
+  setSpeed,
+} from "./Game";
+import { chooseScenarioResponse } from "./GameActions";
 import {
   getDateFromMinute,
   getTimeFromTimeline,
@@ -15,6 +20,9 @@ import {
   wildfirePreparationCost,
 } from "../data/WorldEvents";
 import { buildStorySnapshot } from "../helpers/Story";
+
+const chooseWildfireResponse = (optionId: "prepare" | "standard") =>
+  chooseScenarioResponse({ decisionId: WILDFIRE_DECISION_KEY, optionId });
 
 function ready(month = 11, cash = 100000000) {
   const game = createGame({
@@ -67,14 +75,16 @@ test("preparedness costs cash once, records operating expense and survives save/
   expect(replay.actions).toEqual([
     {
       minute: before.date.minute,
-      type: "chooseWildfireResponse",
-      payload: "prepare",
+      type: "chooseScenarioResponse",
+      payload: { decisionId: WILDFIRE_DECISION_KEY, optionId: "prepare" },
     },
   ]);
   expect(
     reducer(
       before,
-      chooseWildfireResponse(replay.actions[0].payload as "prepare"),
+      chooseScenarioResponse(
+        replay.actions[0].payload as { decisionId: string; optionId: string },
+      ),
     ),
   ).toEqual(after);
 });
@@ -100,15 +110,16 @@ test("prepared crews halve physical losses, keep restoration cost, and recovery 
   expect(emergency(after, 14).effects).toEqual({});
 });
 
-test("standard response and ignored decision retain baseline effects", () => {
+test("keeping cash retains baseline effects", () => {
   const before = ready();
   const after = reducer(before, chooseWildfireResponse("standard"));
   expect(now(after).cash).toBe(now(before).cash);
+  expect(after.meaningfulDecisions).toEqual(before.meaningfulDecisions);
   expect(emergency(after).effects).toEqual(emergency(before).effects);
 });
 
 test("rejects insufficient funds, wrong scenario, disabled stories, replay UI and deadline boundaries", () => {
-  for (const month of [10, 12, 14]) {
+  for (const month of [10]) {
     const game = ready(month);
     expect(reducer(game, chooseWildfireResponse("prepare"))).toBe(game);
   }
@@ -125,7 +136,7 @@ test("rejects insufficient funds, wrong scenario, disabled stories, replay UI an
   expect(reducer(poor, chooseWildfireResponse("standard"))).not.toBe(poor);
 });
 
-test.each(["prepare", "standard", undefined] as const)(
+test.each(["prepare", "standard"] as const)(
   "live/save/replay agree after recovery with %s",
   (choice) => {
     let live = createGame({
@@ -183,4 +194,26 @@ test("forecast refresh includes funded disconnections without changing customer 
   expect(prepared[0].demandW / baseline[0].demandW).toBeCloseTo(0.98 / 0.96, 8);
   const repeatedBaseline = generateNewTimeline(standard, 100000000, 1000000);
   expect(repeatedBaseline[0].demandW).toBe(baseline[0].demandW);
+});
+
+test("an unanswered choice blocks ticks and speed changes and survives save/load", () => {
+  const game = ready();
+  const minute = game.date.minute;
+  const cash = now(game).cash;
+  tickState(game);
+  tickState(game);
+  expect(game.date.minute).toBe(minute);
+  expect(now(game).cash).toBe(cash);
+  expect(game.speed).toBe("PAUSED");
+  expect(reducer(game, setSpeed("FAST")).speed).toBe("PAUSED");
+  const saved = cloneDeep(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game,
+  );
+  tickState(saved);
+  expect(saved.date.minute).toBe(minute);
+  const selected = cloneDeep(
+    reducer(saved, chooseWildfireResponse("standard")),
+  );
+  tickState(selected);
+  expect(selected.date.minute).toBeGreaterThan(minute);
 });

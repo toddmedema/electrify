@@ -1337,7 +1337,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose a preparedness response in Events before January. Fund crews to halve physical outages, or preserve cash and use the standard response. Ignoring this decision keeps the standard response.",
+          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose whether to fund preparedness crews or preserve cash. The game is paused until you select.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "CRITICAL",

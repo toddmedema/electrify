@@ -1,8 +1,8 @@
-import { chooseWildfireResponse } from "./GameActions";
+import { chooseScenarioResponse } from "./GameActions";
 import {
-  WILDFIRE_DECISION_KEY,
-  wildfirePreparationCost,
-} from "../data/WorldEvents";
+  pendingScenarioChoice,
+  validScenarioResponse,
+} from "../helpers/ScenarioChoices";
 import { getViableLocationCount } from "../data/FacilitySites";
 import {
   advancePolicies,
@@ -582,9 +582,12 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     state.seed,
     date.monthsElapsed,
     fleetKey,
-    state.worldEvents.occurrences.find(
-      (event) => event.key === WILDFIRE_DECISION_KEY,
-    )?.attributes.choice || "standard",
+    JSON.stringify(
+      state.worldEvents.occurrences.map((event) => [
+        event.key,
+        event.attributes,
+      ]),
+    ),
   ].join("|");
 }
 
@@ -988,6 +991,7 @@ export const gameSlice = createSlice({
       }
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      if (pendingScenarioChoice(state) && action.payload !== "PAUSED") return;
       delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
       // instructions frozen until the player actually closes the card.
@@ -1123,9 +1127,9 @@ export const gameSlice = createSlice({
       state.speed = speedBeforeDialog;
       ensureTicking(state);
     });
-    builder.addCase(chooseWildfireResponse, (state, action) => {
-      if (!state.replayPlayback && applyWildfireResponse(state, action.payload))
-        recordReplayAction(state, "chooseWildfireResponse", action.payload);
+    builder.addCase(chooseScenarioResponse, (state, action) => {
+      if (!state.replayPlayback && applyScenarioResponse(state, action.payload))
+        recordReplayAction(state, "chooseScenarioResponse", action.payload);
     });
     builder.addCase(schedulePolicy, (state, action) => {
       if (
@@ -1430,58 +1434,46 @@ function applyBuildTransmissionLine(
   return true;
 }
 
-/**
- * Replays one recorded action. The payload came off the network, so anything shaped wrong is
- * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
- * wrong is a disappointment, one that throws takes the whole game down with it.
- */
-function applyWildfireResponse(state: GameType, choice: unknown): boolean {
+/** Accepts one authored choice for live play, replay and headless simulation. */
+function applyScenarioResponse(state: GameType, payload: unknown): boolean {
+  if (!validScenarioResponse(payload)) return false;
+  const decision = pendingScenarioChoice(state);
+  if (!decision || decision.id !== payload.decisionId) return false;
+  const option = decision.options.find(
+    (option) => option.id === payload.optionId,
+  );
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
-  if (
-    (choice !== "prepare" && choice !== "standard") ||
-    state.scenarioId !== 111 ||
-    state.storyEffectsDisabled ||
-    state.date.monthsElapsed !== 11 ||
-    Math.floor(state.date.minute / MINUTES_PER_MONTH) !== 11 ||
-    !now ||
-    state.worldEvents.occurrences.some(
-      (event) => event.key === WILDFIRE_DECISION_KEY,
-    )
-  )
+  if (!option || !now) return false;
+  const cost = option.cost(state.difficulty);
+  if (!Number.isFinite(cost) || cost < 0 || (cost > 0 && now.cash < cost))
     return false;
-  const cost =
-    choice === "prepare" ? wildfirePreparationCost(state.difficulty) : 0;
-  if (cost > 0 && now.cash < cost) return false;
   now.cash -= cost;
   now.netWorth -= cost;
   now.expensesOM += cost;
-  const message =
-    choice === "prepare"
-      ? `Committed $${(cost / 1000000).toFixed(1)}M to preparedness. Crews halve physical disconnections and generator output losses in January and February; normal restoration costs still apply.`
-      : "Standard wildfire response selected: preserve cash now and accept the full January and February outage impact and restoration costs.";
   state.worldEvents.occurrences.push({
-    key: WILDFIRE_DECISION_KEY,
-    definitionId: WILDFIRE_DECISION_KEY,
+    key: decision.id,
+    definitionId: decision.id,
     startsMinute: state.date.minute,
     endsMinute: state.date.minute,
-    attributes: { choice, cost },
+    attributes: { choice: option.id, cost, scenarioChoice: true },
     effects: {},
-    title: "Wildfire response chosen",
-    message,
+    title: decision.title,
+    message: option.message,
   });
-  logGameEvent(state, "WORLD_EVENT", message, {
-    title: "Wildfire response chosen",
+  logGameEvent(state, "WORLD_EVENT", option.message, {
+    title: decision.title,
     importance: "NOTABLE",
-    storyPhaseKey: WILDFIRE_DECISION_KEY,
+    storyPhaseKey: decision.id,
     turningPointPriority: 115,
   });
-  recordMeaningfulDecision(state, {
-    lever: "wildfire-response",
-    label: "Choose wildfire response",
-    kind: "policy",
-    before: "undecided",
-    after: choice,
-  });
+  if (option.meaningful !== false)
+    recordMeaningfulDecision(state, {
+      lever: decision.id,
+      label: decision.title,
+      kind: "policy",
+      before: "undecided",
+      after: option.id,
+    });
   state.timeline = reforecastSupply(state, true);
   return true;
 }
@@ -1544,8 +1536,8 @@ function applyPolicyEdit(
 function applyReplayAction(state: GameType, entry: ReplayActionType) {
   const payload = entry.payload;
   switch (entry.type) {
-    case "chooseWildfireResponse":
-      applyWildfireResponse(state, payload);
+    case "chooseScenarioResponse":
+      applyScenarioResponse(state, payload);
       break;
     case "schedulePolicy":
     case "cancelPolicy":
@@ -1695,6 +1687,11 @@ export function tutorialCompleteDialog({
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
 export function tickState(state: GameType) {
+  applyPendingReplayActions(state);
+  if (pendingScenarioChoice(state)) {
+    state.speed = "PAUSED";
+    return;
+  }
   state.date = getDateFromMinute(
     state.date.minute + TICK_MINUTES,
     state.startingYear,
@@ -2044,6 +2041,7 @@ export function tickState(state: GameType) {
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
   applyPendingReplayActions(state);
+  if (pendingScenarioChoice(state)) state.speed = "PAUSED";
 }
 
 /** The same three completed-month firing rule used by the game and headless playtests. */
@@ -2780,7 +2778,7 @@ function updateSupplyFacilitiesFinances(
   expensesOM += state.worldEvents.occurrences
     .filter(
       (event) =>
-        event.key === WILDFIRE_DECISION_KEY &&
+        event.attributes.scenarioChoice === true &&
         event.startsMinute === now.minute,
     )
     .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);

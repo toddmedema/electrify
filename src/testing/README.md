@@ -136,3 +136,23 @@ out to jest pointed at `SimCli.tsx`, which is named so CRA's default `testMatch`
   rollovers, which is why the cash and energy checks only run within a month.
 - **`getFuelPricesPerMBTU` loops forever if no prices are loaded**, and `getWeather` throws. Any
   non-browser entry point has to call `loadSimData` first.
+
+## Time-triggered scenario choices
+
+Add a definition to `src/data/ScenarioChoices.ts`: a unique persisted `id`, scenario ID,
+zero-based trigger month, prompt, and options with stable IDs, outcome copy and difficulty-based
+upfront costs. Include a free option so a player with no cash can still choose. Definitions are
+presented in array order when several are due. No UI or reducer wiring is needed.
+
+The shared modal blocks navigation and dismissal; the reducer blocks the clock until an explicit
+response is accepted. Selecting closes the prompt and leaves play paused so the player can inspect
+the result before resuming. Saves retain unanswered prompts and replay actions retain answers.
+
+Accepted choices are story occurrences with the definition ID as their key and
+`attributes.choice` as the option ID. Future `WorldEvents` phase descriptions and previews can
+read these through `context.occurrences` (see `wildfirePrepared`) to branch narrative and effects.
+The forecast cache includes occurrence attributes, so an answer refreshes future effects.
+Costs are charged once and retained as operating expenses through reforecasting.
+
+The headless baseline bot explicitly selects the first free option. Add focused reducer tests
+for each consequential branch, including future effects, save and replay parity.

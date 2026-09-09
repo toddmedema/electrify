@@ -1,3 +1,4 @@
+import { validScenarioResponse } from "./helpers/ScenarioChoices";
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
@@ -35,8 +36,8 @@ import {
 // Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
 // reproduce their recorded outcomes and must not be relabeled as current replays.
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
-// Version 9 adds irreversible wildfire response actions.
-export const REPLAY_VERSION = 9;
+// Version 10 replaces wildfire actions with mandatory generic scenario choices.
+export const REPLAY_VERSION = 10;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -64,7 +65,7 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
-  "chooseWildfireResponse",
+  "chooseScenarioResponse",
   "schedulePolicy",
   "cancelPolicy",
   "buildFacility",
@@ -212,9 +213,8 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     )
       return null;
     if (
-      action.type === "chooseWildfireResponse" &&
-      action.payload !== "prepare" &&
-      action.payload !== "standard"
+      action.type === "chooseScenarioResponse" &&
+      !validScenarioResponse(action.payload)
     )
       return null;
     actions.push({

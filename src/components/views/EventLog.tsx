@@ -1,7 +1,5 @@
 import * as React from "react";
 import {
-  Box,
-  Button,
   IconButton,
   ListItemIcon,
   ListItemText,
@@ -80,19 +78,12 @@ const EVENT_HISTORY_FILTERS: {
 ];
 
 export interface StateProps {
-  wildfireDecision?: {
-    cost: number;
-    cash: number;
-    choice?: string;
-    available: boolean;
-  };
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
   ongoing?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
-  onChooseWildfire?: (choice: "prepare" | "standard") => void;
   onOpen: () => void;
   onSelect: (target?: StoryActionTargetType) => void;
 }
@@ -121,73 +112,6 @@ export default function EventLog(props: Props): React.JSX.Element {
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
       <div className="scrollable">
-        {props.wildfireDecision && (
-          <Box
-            component="section"
-            aria-labelledby="wildfireDecisionTitle"
-            sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}
-          >
-            <Typography id="wildfireDecisionTitle" variant="subtitle2">
-              Wildfire preparedness
-            </Typography>
-            {props.wildfireDecision.available ? (
-              <>
-                <Typography variant="body2" sx={{ my: 1 }}>
-                  Decide before January. Prepared crews halve physical customer
-                  disconnections and generator output losses during January and
-                  February. Normal restoration costs still apply. Keeping cash
-                  means accepting the full outage impact.
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  One-time cost: $
-                  {(props.wildfireDecision.cost / 1000000).toFixed(1)}M. Cash
-                  available: $
-                  {(props.wildfireDecision.cash / 1000000).toFixed(1)}M. No
-                  response by January selects standard response.
-                </Typography>
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 1,
-                    "& button": {
-                      minHeight: 44,
-                      flex: "1 1 180px",
-                      whiteSpace: "normal",
-                    },
-                  }}
-                >
-                  <Button
-                    variant="contained"
-                    disabled={
-                      props.wildfireDecision.cash < props.wildfireDecision.cost
-                    }
-                    onClick={() => props.onChooseWildfire?.("prepare")}
-                  >
-                    Fund preparedness
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => props.onChooseWildfire?.("standard")}
-                  >
-                    Keep cash (standard response)
-                  </Button>
-                </Box>
-                {props.wildfireDecision.cash < props.wildfireDecision.cost && (
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    Insufficient cash to fund preparedness.
-                  </Typography>
-                )}
-              </>
-            ) : (
-              <Typography role="status" variant="body2" sx={{ mt: 1 }}>
-                {props.wildfireDecision.choice === "prepare"
-                  ? "Preparedness funded. Crews halve disconnections and generation losses during January and February."
-                  : "Standard response: preparedness cash preserved; full outage impact applies."}
-              </Typography>
-            )}
-          </Box>
-        )}
         {ongoing.length > 0 && (
           <section
             className="eventLogSection ongoingEvents"

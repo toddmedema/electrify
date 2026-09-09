@@ -34,9 +34,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
     .first()
     .click();
 
-  await page
-    .getByRole("button", { name: "Keep cash (standard response)" })
-    .click();
+  await page.getByRole("button", { name: "Keep cash" }).click();
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "fast speed" })
