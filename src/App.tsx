@@ -1,3 +1,4 @@
+import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
@@ -258,6 +259,7 @@ export default function App() {
           <OfflineNotice />
           <UnitsProvider>
             <CompositorContainer store={store} />
+            <ScenarioChoiceDialog />
           </UnitsProvider>
         </InstallPromptProvider>
       </ThemedApp>

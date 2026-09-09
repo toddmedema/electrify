@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Avatar,
   Button,
   Card,
   CardHeader,
@@ -200,12 +201,12 @@ function facilitySize(facility: Partial<FacilityShoppingType>): string {
 }
 
 function demandServedLabel(outlook: YearOneOutlook): string {
-  if (outlook.worstShortfallW === 0) {
-    return "100%";
+  const percent = outlook.demandServed * 100;
+  // Preserve a near-100% annual deficit without hiding surplus generation.
+  if (percent >= 99 && percent < 100) {
+    return `${Math.min(99.9, percent).toFixed(1)}%`;
   }
-  // Never round a real deficit up to the covered state's 100%.
-  const percent = Math.min(99.9, outlook.demandServed * 100);
-  return `${percent >= 99 ? percent.toFixed(1) : Math.round(percent)}%`;
+  return `${Math.round(percent)}%`;
 }
 
 /**
@@ -828,7 +829,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       variant="caption"
                       className="customSetupOutlookAssumption"
                     >
-                      Assumes this fleet and rate stay unchanged.
+                      Includes spare generation capacity. Assumes this fleet and
+                      rate stay unchanged.
                     </Typography>
                   </>
                 )}
@@ -843,6 +845,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     key={`${facilityName(f)}${i}`}
                   >
                     <CardHeader
+                      avatar={
+                        <Avatar
+                          alt=""
+                          src={`/images/${facilityName(f).toLowerCase()}.svg`}
+                        />
+                      }
                       title={facilityName(f)}
                       subheader={facilitySize(f)}
                       action={

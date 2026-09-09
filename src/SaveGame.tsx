@@ -42,7 +42,7 @@ export const SAVE_KEY = "savedGame";
 // Older snapshots contain forecasts and financial results calculated with different physics;
 // do not silently mix those results with the new simulation. Original files remain untouched.
 // Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
-// Version 7 adds operating tariffs/contracts and their recorded billing rates.
+// Version 7 adds mandatory scenario choices and operating tariffs/contracts.
 // Version 8 conserves deferred residential tariff energy until later in the day.
 // Version 9 retains configurable demand windows and cross-month recovery batches.
 export const SAVE_VERSION = 9;

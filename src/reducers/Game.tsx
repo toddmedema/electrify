@@ -1,3 +1,8 @@
+import { chooseScenarioResponse } from "./GameActions";
+import {
+  pendingScenarioChoice,
+  validScenarioResponse,
+} from "../helpers/ScenarioChoices";
 import { getViableLocationCount } from "../data/FacilitySites";
 import {
   advancePolicies,
@@ -581,6 +586,12 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     state.seed,
     date.monthsElapsed,
     fleetKey,
+    JSON.stringify(
+      state.worldEvents.occurrences.map((event) => [
+        event.key,
+        event.attributes,
+      ]),
+    ),
   ].join("|");
 }
 
@@ -984,6 +995,7 @@ export const gameSlice = createSlice({
       }
     },
     setSpeed: (state, action: PayloadAction<SpeedType>) => {
+      if (pendingScenarioChoice(state) && action.payload !== "PAUSED") return;
       delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
       // instructions frozen until the player actually closes the card.
@@ -1118,6 +1130,10 @@ export const gameSlice = createSlice({
     builder.addCase(dialogClose, (state) => {
       state.speed = speedBeforeDialog;
       ensureTicking(state);
+    });
+    builder.addCase(chooseScenarioResponse, (state, action) => {
+      if (!state.replayPlayback && applyScenarioResponse(state, action.payload))
+        recordReplayAction(state, "chooseScenarioResponse", action.payload);
     });
     builder.addCase(schedulePolicy, (state, action) => {
       if (
@@ -1422,11 +1438,50 @@ function applyBuildTransmissionLine(
   return true;
 }
 
-/**
- * Replays one recorded action. The payload came off the network, so anything shaped wrong is
- * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
- * wrong is a disappointment, one that throws takes the whole game down with it.
- */
+/** Accepts one authored choice for live play, replay and headless simulation. */
+function applyScenarioResponse(state: GameType, payload: unknown): boolean {
+  if (!validScenarioResponse(payload)) return false;
+  const decision = pendingScenarioChoice(state);
+  if (!decision || decision.id !== payload.decisionId) return false;
+  const option = decision.options.find(
+    (option) => option.id === payload.optionId,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (!option || !now) return false;
+  const cost = option.cost(state.difficulty);
+  if (!Number.isFinite(cost) || cost < 0 || (cost > 0 && now.cash < cost))
+    return false;
+  now.cash -= cost;
+  now.netWorth -= cost;
+  now.expensesOM += cost;
+  state.worldEvents.occurrences.push({
+    key: decision.id,
+    definitionId: decision.id,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: { choice: option.id, cost, scenarioChoice: true },
+    effects: {},
+    title: decision.title,
+    message: option.message,
+  });
+  logGameEvent(state, "WORLD_EVENT", option.message, {
+    title: decision.title,
+    importance: "NOTABLE",
+    storyPhaseKey: decision.id,
+    turningPointPriority: 115,
+  });
+  if (option.meaningful !== false)
+    recordMeaningfulDecision(state, {
+      lever: decision.id,
+      label: decision.title,
+      kind: "policy",
+      before: "undecided",
+      after: option.id,
+    });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 function applyPolicyEdit(
   state: GameType,
   payload: unknown,
@@ -1492,6 +1547,9 @@ function applyPolicyEdit(
 function applyReplayAction(state: GameType, entry: ReplayActionType) {
   const payload = entry.payload;
   switch (entry.type) {
+    case "chooseScenarioResponse":
+      applyScenarioResponse(state, payload);
+      break;
     case "schedulePolicy":
     case "cancelPolicy":
       applyPolicyEdit(state, payload, entry.type === "cancelPolicy");
@@ -1640,6 +1698,11 @@ export function tutorialCompleteDialog({
 // Exported so the headless simulator (src/testing/Simulator.tsx) can drive the sim
 // without the wall-clock timers that the `tick` action uses.
 export function tickState(state: GameType) {
+  applyPendingReplayActions(state);
+  if (pendingScenarioChoice(state)) {
+    state.speed = "PAUSED";
+    return;
+  }
   state.date = getDateFromMinute(
     state.date.minute + TICK_MINUTES,
     state.startingYear,
@@ -1989,6 +2052,7 @@ export function tickState(state: GameType) {
 
   // After the tick, the way a player's click lands after the tick that brought the clock to it
   applyPendingReplayActions(state);
+  if (pendingScenarioChoice(state)) state.speed = "PAUSED";
 }
 
 /** The same three completed-month firing rule used by the game and headless playtests. */
@@ -2376,6 +2440,7 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
+  let spareGenerationW = 0;
   let reachableHeadroomW = 0;
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
@@ -2566,6 +2631,11 @@ function updateSupplyFacilitiesFinances(
                 ? Math.min(committedTargetW, g.currentW + rampW)
                 : Math.max(committedTargetW, g.currentW - rampW),
             );
+            // Setup can show surplus capacity even when dispatch follows demand. Hydro stays
+            // at its dispatched output so stored water is not counted repeatedly as energy.
+            if (!hydro) {
+              spareGenerationW += Math.max(0, dispatchPeakW - g.currentW);
+            }
             break;
         }
         supply += g.currentW;
@@ -2702,10 +2772,13 @@ function updateSupplyFacilitiesFinances(
   now.transmissionCapacityW = transmissionCapacity;
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
+  // Exported surplus remains available to redirect to local demand in the setup outlook.
+  now.availableSupplyW = supply + spareGenerationW + exportedW;
   // Surplus exports are interruptible under the game policy and can be redirected locally.
   now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
   now.importKgco2ePerMWh =
     marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
+
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
   now.storageLossWh = storageLossWh;
@@ -2738,6 +2811,13 @@ function updateSupplyFacilitiesFinances(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
+  expensesOM += state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.scenarioChoice === true &&
+        event.startsMinute === now.minute,
+    )
+    .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;

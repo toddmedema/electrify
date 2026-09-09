@@ -259,6 +259,7 @@ export interface ScoreType {
 // The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
 // prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
 export type ReplayActionNameType =
+  | "chooseScenarioResponse"
   | "schedulePolicy"
   | "cancelPolicy"
   | "buildFacility"
@@ -359,6 +360,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
     minute: number;
     supplyW: number; // Watts
+    availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
     reserveW?: number; // Signed supply margin plus local spare output reachable next tick
     importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity
@@ -1100,4 +1102,21 @@ export interface AppStateType {
   settings: SettingsType;
   ui: UIType;
   user: UserType;
+}
+
+/** Authored time-triggered choices; IDs are persisted in story occurrences. */
+export interface ScenarioChoiceType {
+  id: string;
+  scenarioId: number;
+  atMonth: number;
+  title: string;
+  message: string;
+  options: {
+    id: string;
+    label: string;
+    message: string;
+    cost: (difficulty: DifficultyType) => number;
+    /** False for a response that preserves the baseline without changing the operating plan. */
+    meaningful?: boolean;
+  }[];
 }

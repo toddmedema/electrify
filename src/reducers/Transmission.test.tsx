@@ -335,6 +335,9 @@ describe("transmission actions", () => {
       while (state.date.monthsElapsed < 15) {
         tickState(state);
         const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+        expect(now.availableSupplyW).toBeGreaterThanOrEqual(
+          now.supplyW + (now.exportedW || 0),
+        );
         operatingTicks.push({
           importedW: now.importedW || 0,
           exportedW: now.exportedW || 0,

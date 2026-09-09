@@ -171,7 +171,7 @@ it("ignores an older forecast result after the setup changes", () => {
     worker.onmessage?.({
       data: {
         requestId: secondRequest.requestId,
-        outlook: { demandServed: 1, worstShortfallW: 0 },
+        outlook: { demandServed: 3, worstShortfallW: 0 },
       },
     } as MessageEvent);
     worker.onmessage?.({
@@ -183,6 +183,7 @@ it("ignores an older forecast result after the setup changes", () => {
   });
 
   expect(screen.getByText("Demand covered")).toBeInTheDocument();
+  expect(screen.getByText("300%")).toBeInTheDocument();
   expect(screen.queryByText("Deficit forecast")).not.toBeInTheDocument();
 });
 

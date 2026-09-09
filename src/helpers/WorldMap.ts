@@ -28,7 +28,7 @@ export interface MapCluster<T extends MapLocation> extends MapPoint {
 
 export type MapControl<T extends MapLocation> = MapMarker<T> | MapCluster<T>;
 
-export const MAP_ZOOM_SCALES = [1, 2, 4, 8] as const;
+export const MAP_ZOOM_SCALES = [1, 2, 4, 8, 16] as const;
 
 export function projectLocation(
   location: Pick<MapLocation, "lat" | "long">,

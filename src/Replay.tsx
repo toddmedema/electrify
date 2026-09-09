@@ -1,3 +1,4 @@
+import { validScenarioResponse } from "./helpers/ScenarioChoices";
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
@@ -35,8 +36,7 @@ import {
 // Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
 // reproduce their recorded outcomes and must not be relabeled as current replays.
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
-// Version 9 is reserved for wildfire response actions. Version 10 adds operating
-// customer tariffs/contracts and their effective billed-price retention signal.
+// Version 10 adds mandatory generic scenario choices and operating tariffs/contracts.
 // Version 11 shifts residential tariff energy to later hours instead of eliminating it.
 // Version 12 supports independently configurable four-hour customer demand windows.
 export const REPLAY_VERSION = 12;
@@ -67,6 +67,7 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "chooseScenarioResponse",
   "schedulePolicy",
   "cancelPolicy",
   "buildFacility",
@@ -211,6 +212,11 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
         action.payload as string,
       )
+    )
+      return null;
+    if (
+      action.type === "chooseScenarioResponse" &&
+      !validScenarioResponse(action.payload)
     )
       return null;
     actions.push({

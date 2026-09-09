@@ -1,3 +1,4 @@
+import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import {
   DifficultyType,
@@ -33,6 +34,14 @@ function runMonths(state: GameType, months: number) {
   while (state.date.monthsElapsed < until) {
     tickState(state);
   }
+}
+
+// Mandatory baseline responses are recorded actions, but do not earn decision credit.
+function baselineChoiceActions(result: SimResultType, scenarioId: number) {
+  return SCENARIO_CHOICES.filter(
+    (choice) =>
+      choice.scenarioId === scenarioId && choice.atMonth < result.months.length,
+  ).length;
 }
 
 function describeViolations(result: SimResultType): string {
@@ -652,7 +661,9 @@ describe("simulation economics", () => {
         difficulty: "Intern",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(0);
+      expect(passive.actionCount).toBe(
+        baselineChoiceActions(passive, scenario.id),
+      );
       expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
@@ -662,7 +673,9 @@ describe("simulation economics", () => {
         ...INTERN_ONE_BUILD_PLAYS[scenario.id],
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBe(1);
+      expect(active.actionCount).toBe(
+        1 + baselineChoiceActions(active, scenario.id),
+      );
       expect(active.meaningfulDecisionCount).toBe(1);
       expect(active.builds).toHaveLength(1);
       expect(active.outcome).toBe("completed");
@@ -676,7 +689,9 @@ describe("simulation economics", () => {
         difficulty: "CEO",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(0);
+      expect(passive.actionCount).toBe(
+        baselineChoiceActions(passive, scenario.id),
+      );
       expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
