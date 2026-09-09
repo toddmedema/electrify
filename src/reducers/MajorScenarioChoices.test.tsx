@@ -185,3 +185,10 @@ test.each([
   },
   120000,
 );
+
+// A fixed 2020-dollar planning allowance covers the same protection service;
+// difficulty changes demand/economics rather than introducing another price multiplier.
+test.each(["Intern", "Employee", "Manager", "VP", "CEO"] as const)(
+  "winterization keeps the research-based allowance on %s",
+  (difficulty) => expect(winterizationCost(difficulty)).toBe(90000000),
+);

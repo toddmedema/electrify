@@ -22,7 +22,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 48,
     title: "Negotiate the data-center connection",
     message:
-      "Developers want their full 100 MW connection in January 2026. Accept construction funding now, or require a slower connection schedule to give your grid more time.",
+      "Developers want their full 100 MW connection in January 2026. Accept a contribution toward capacity and connection work now, or require a slower schedule to give your grid more time.",
     options: [
       {
         id: "fast-track",
@@ -30,7 +30,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
         cost: () => 0,
         upfrontGrant: (difficulty) => DATA_CENTER_GRANT[difficulty],
         description:
-          "Receive construction funding now. All 100 MW arrives in January 2026; electricity sales begin in 2026 at the full load.",
+          "Receive a developer contribution toward capacity and connection work, not its full cost. All 100 MW arrives in January 2026; electricity sales begin then at the full load.",
         message:
           "Developer funding received. Your binding agreement connects the full 100 MW in January 2026.",
       },
@@ -69,7 +69,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 36,
     title: "Prepare for the deep freeze",
     message:
-      "A winterization program can protect your fleet before the February 2021 emergency. Funding covers existing plants and new capacity commissioned before the freeze.",
+      "Fund targeted plant protection and coordination with power suppliers in the run-up to February 2021. This program reduces output losses across your grid; it does not prevent the demand surge or gas-price spike.",
     options: [
       {
         id: "winterize",
@@ -98,14 +98,14 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Extreme Santa Ana winds are forecast for January. Prepared crews halve physical customer disconnections and generator output losses during January and February. Normal restoration costs still apply.",
+      "Extreme Santa Ana winds are forecast for January. Advance inspections, staged backup equipment and response resources halve physical customer disconnections and generator output losses during January and February. Normal restoration costs still apply.",
     options: [
       {
         id: "prepare",
         label: "Fund preparedness",
         cost: wildfirePreparationCost,
         message:
-          "Preparedness funded. Crews halve physical disconnections and generator output losses in January and February; normal restoration costs still apply.",
+          "Preparedness funded. Advance inspections, staged equipment and response resources halve physical disconnections and generator output losses in January and February; normal restoration costs still apply.",
       },
       {
         id: "standard",

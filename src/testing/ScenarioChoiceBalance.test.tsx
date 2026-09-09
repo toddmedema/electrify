@@ -175,4 +175,31 @@ describe("major scenario choice balance", () => {
       }
     },
   );
+
+  it.each(["Intern", "CEO"] as const)(
+    "wildfire cash preservation remains useful with an adequate grid on %s",
+    (difficulty) => {
+      const decision = SCENARIO_CHOICES.find(
+        (choice) => choice.scenarioId === 111,
+      )!;
+      const play =
+        difficulty === "CEO"
+          ? STANDARD_BALANCE_PLAYS[111]
+          : INTERN_ONE_BUILD_PLAYS[111];
+      const simulate = (optionId: string) =>
+        runSimulation({
+          scenarioId: 111,
+          difficulty,
+          ...play,
+          scenarioResponses: { [decision.id]: optionId },
+        });
+      const prepared = simulate("prepare");
+      const standard = simulate("standard");
+      [prepared, standard].forEach((result) => {
+        expect(result.violations).toEqual([]);
+        expect(result.outcome).toBe("completed");
+      });
+      expect(standard.finalCash).toBeGreaterThan(prepared.finalCash);
+    },
+  );
 });

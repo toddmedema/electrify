@@ -33,11 +33,11 @@ for (const scenario of [106, 107]) {
       await expect(dialog).toContainText("Game paused");
       await expect(dialog.getByRole("button")).toHaveCount(2);
       if (scenario === 106) {
-        await expect(dialog).toContainText("One-time funding:");
+        await expect(dialog).toContainText("One-time funding: $15.0M");
         await expect(dialog).toContainText("2026");
         await expect(dialog).toContainText("2028");
       } else {
-        await expect(dialog).toContainText("One-time cost:");
+        await expect(dialog).toContainText("One-time cost: $90.0M");
         await expect(dialog).toContainText(/gas.price/i);
       }
       await expect(dialog).toContainText("No upfront cost");
