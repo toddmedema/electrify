@@ -1,6 +1,15 @@
 import cloneDeep from "lodash.clonedeep";
-import { TICKS_PER_YEAR, YEARS_PER_TICK } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
+import {
+  TICKS_PER_YEAR,
+  YEARS_PER_TICK,
+  TICKS_PER_HOUR,
+  GAME_TO_REAL_YEARS,
+} from "../Constants";
+import {
+  getTimeFromTimeline,
+  summarizeTimeline,
+  summarizeHistory,
+} from "../helpers/DateTime";
 import { serializeReplay } from "../Replay";
 import { createGame, createGameFromReplay } from "../testing/Simulator";
 import gameReducer, {
@@ -12,6 +21,7 @@ import gameReducer, {
 } from "./Game";
 import { AppStateType } from "../Types";
 import { getScenario } from "../data/Scenarios";
+import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
 
 function buildNorthernIntertie() {
   const game = createGame({ scenarioId: 100, seed: 61 });
@@ -356,5 +366,59 @@ describe("transmission actions", () => {
       jest.clearAllTimers();
       jest.useRealTimers();
     }
+  });
+  it("records purchased emissions separately and charges local carbon only once", () => {
+    const state = buildNorthernIntertie();
+    state.facilities = [];
+    state.transmission!.lines[0].yearsToBuildLeft = 0;
+    state.timeline.forEach((t) => {
+      t.demandW = 100000000;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const intensity =
+      adjacentMarketForCorridor("california-north")!.emissionsKgco2ePerMWh;
+    expect(now.importedW).toBe(100000000);
+    expect(now.localKgco2e).toBe(0);
+    expect(now.importedKgco2e).toBeCloseTo(
+      (((100000000 / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1000000) *
+        intensity,
+    );
+    expect(now.kgco2e).toBe(now.importedKgco2e);
+    expect(now.expensesCarbonFee).toBe(0);
+    expect(now.expensesImports).toBeGreaterThan(0);
+    const month = summarizeTimeline([now], state.startingYear);
+    expect(month.importedKgco2e).toBe(now.importedKgco2e);
+    expect(month.localKgco2e).toBe(0);
+    expect(summarizeHistory([month]).importedKgco2e).toBe(now.importedKgco2e);
+  });
+  it("weights purchased emissions by usable neighboring capacity", () => {
+    const state = buildNorthernIntertie();
+    state.facilities = [];
+    const north = state.transmission!.lines[0];
+    north.yearsToBuildLeft = 0;
+    north.capacityW = 100000000;
+    state.transmission!.lines.push({
+      ...north,
+      id: 2,
+      corridorId: "california-south",
+      capacityW: 300000000,
+    });
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+      t.temperatureC = 20;
+      t.solarIrradianceWM2 = 0;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const northwest =
+      adjacentMarketForCorridor("california-north")!.emissionsKgco2ePerMWh;
+    expect(now.importKgco2ePerMWh).toBeCloseTo((northwest + 3 * 445) / 4);
+    expect(now.importedW).toBe(200000000);
+    expect(now.kgco2e).toBeCloseTo(
+      ((((200000000 / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS) / 1000000) *
+        (northwest + 3 * 445)) /
+        4,
+    );
   });
 });

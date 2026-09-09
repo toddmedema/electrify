@@ -32,6 +32,12 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   await expect(page.getByLabel("Objective 1 of 10")).toBeVisible();
   await expect(page.locator("#intertiesTab")).toBeVisible();
+  if (testInfo.project.name.startsWith("mobile-")) {
+    for (const selector of ["#plantsTab", "#intertiesTab"]) {
+      const tabBox = await page.locator(selector).boundingBox();
+      expect(tabBox?.height).toBeGreaterThanOrEqual(44);
+    }
+  }
 
   // The explicit copy plus automatic recovery means an eager Next cannot strand the build gate.
   await page.getByRole("button", { name: "Next" }).click();
@@ -93,15 +99,11 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
         .locator(".insights:visible")
         .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     ).toBe(true);
-    for (const selector of ["#plantsTab", "#intertiesTab"]) {
-      const tabBox = await page.locator(selector).boundingBox();
-      expect(tabBox?.height).toBeGreaterThanOrEqual(44);
-    }
   }
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
-    page.getByText(/Hot, sunny weather warms the line/),
+    page.getByText(/Hot, sunny weather can reduce what it carries/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByLabel("Objective 10 of 10")).toBeVisible();
@@ -126,7 +128,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     page.getByRole("heading", { name: "Mission complete!" }),
   ).toBeVisible({ timeout: 15000 });
   await expect(
-    page.getByText(/borrowed power at night and shared extra solar by day/i),
+    page.getByText(/bought power at night and sold extra solar by day/i),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Next tutorial" })).toHaveCount(
     0,

@@ -11,6 +11,28 @@ import { TICKS_PER_MONTH, TICKS_PER_YEAR } from "../Constants";
 import { initEconomyFromCsv } from "../data/Economy";
 
 describe("customer price competition", () => {
+  it("accumulates sub-customer investor switching instead of rounding each tick", () => {
+    const input = {
+      customerRate: 0.09,
+      marketRate: 0.1,
+      marketSize: 200,
+      ownership: "Investor" as const,
+      organicGrowthRate: 0,
+    };
+    let customers = 100;
+    const first = nextCustomerCount({ ...input, customers });
+    expect(first).toBeGreaterThan(100);
+    expect(first).toBeLessThan(100.5);
+    for (let tick = 0; tick < TICKS_PER_YEAR; tick++) {
+      // JSON represents the same numeric state as saving and resuming it.
+      customers = nextCustomerCount({
+        ...input,
+        customers: JSON.parse(JSON.stringify(customers)),
+      });
+    }
+    expect(customers).toBeGreaterThan(101);
+    expect(customers).toBeLessThan(200);
+  });
   it("preserves a small utility's growth across a whole year", () => {
     let customers = 100;
     for (let tick = 0; tick < TICKS_PER_YEAR; tick++) {

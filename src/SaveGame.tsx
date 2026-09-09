@@ -34,10 +34,11 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Initial public schema. Increment this when a post-release change becomes incompatible.
-// Version 3 includes persistent customer programs. Version 4 adds the validated decision ledger.
-// Accept and normalize v1-v3 saves, but visibly waive the new gate for those in-progress games.
-export const SAVE_VERSION = 4;
+// Version 5 corrects storage accounting, solar output, oil emissions and weather forcing.
+// Older snapshots contain forecasts and financial results calculated with different physics;
+// do not silently mix those results with the new simulation. Original files remain untouched.
+// Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
+export const SAVE_VERSION = 6;
 
 export interface SaveGameType {
   version: number;
@@ -97,6 +98,26 @@ function validTransmissionLine(
   );
 }
 
+function validEmissions(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const record = raw as {
+    kgco2e?: number;
+    localKgco2e?: number;
+    importedKgco2e?: number;
+  };
+  if (
+    ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    )
+  )
+    return false;
+  return (
+    Math.abs(record.kgco2e! - record.localKgco2e! - record.importedKgco2e!) <=
+    Math.max(1, record.kgco2e!) * 1e-9
+  );
+}
+
 export function serializeSave(game: GameType): SaveGameType {
   return {
     version: SAVE_VERSION,
@@ -117,10 +138,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   const save = raw as Partial<SaveGameType>;
   if (
-    (save.version !== SAVE_VERSION &&
-      save.version !== 1 &&
-      save.version !== 2 &&
-      save.version !== 3) ||
+    save.version !== SAVE_VERSION ||
     typeof save.savedAt !== "string" ||
     typeof save.appVersion !== "string"
   ) {
@@ -222,11 +240,29 @@ export function parseSave(raw: unknown): SaveGameType | null {
       );
     }) ||
     !Array.isArray(game.timeline) ||
+    game.timeline.some(
+      (tick) =>
+        !validEmissions(tick) ||
+        typeof tick.reserveW !== "number" ||
+        !Number.isFinite(tick.reserveW) ||
+        [
+          tick.storageChargeW,
+          tick.storageDischargeW,
+          tick.importKgco2ePerMWh,
+        ].some(
+          (value) =>
+            typeof value !== "number" || !Number.isFinite(value) || value < 0,
+        ),
+    ) ||
     !Array.isArray(game.monthlyHistory) ||
     game.monthlyHistory.length >
       Math.floor(game.date.minute / MINUTES_PER_MONTH) ||
     game.monthlyHistory.some((month) => {
-      if (typeof month !== "object" || month === null) {
+      if (
+        typeof month !== "object" ||
+        month === null ||
+        !validEmissions(month)
+      ) {
         return true;
       }
       const record = month as Partial<GameType["monthlyHistory"][number]>;
@@ -277,8 +313,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   }
   const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
   if (
-    (save.version === SAVE_VERSION &&
-      !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth)) ||
+    !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth) ||
     (game.meaningfulDecisionGateWaived !== undefined &&
       typeof game.meaningfulDecisionGateWaived !== "boolean")
   )
@@ -351,12 +386,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission: transmissionEnabled
       ? (game.transmission ?? emptyTransmissionState())
       : undefined,
-    meaningfulDecisions:
-      save.version === SAVE_VERSION ? game.meaningfulDecisions! : [],
-    meaningfulDecisionGateWaived:
-      save.version === SAVE_VERSION
-        ? (game.meaningfulDecisionGateWaived ?? false)
-        : true,
+    meaningfulDecisions: game.meaningfulDecisions!,
+    meaningfulDecisionGateWaived: game.meaningfulDecisionGateWaived ?? false,
     timeline: game.timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
@@ -374,8 +405,6 @@ export function parseSave(raw: unknown): SaveGameType | null {
       revenueExports: t.revenueExports ?? 0,
     })),
   };
-  // Version 1 saves remain playable. New months collect chart history; older months have only
-  // their original financial and supply/demand records. Replays use a separate strict version.
   return { ...save, game: normalized, version: SAVE_VERSION } as SaveGameType;
 }
 

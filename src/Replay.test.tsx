@@ -187,13 +187,17 @@ describe("decodeReplay", () => {
     ).toEqual(replay);
   });
 
-  it("grandfathers pre-ledger replays but leaves current runs gated", () => {
+  it("leaves current runs gated", () => {
     const current = encodeReplay(aReplay());
     expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
-
-    const legacy = { ...current, version: REPLAY_VERSION - 1 };
-    expect(decodeReplay(legacy)?.meaningfulDecisionGateWaived).toBe(true);
   });
+
+  it.each([1, 2, 3, 4, 5, 6, 7])(
+    "rejects version %i recorded with older simulation rules",
+    (version) => {
+      expect(decodeReplay({ ...encodeReplay(aReplay()), version })).toBeNull();
+    },
+  );
 
   it("ignores anything that isn't a replay", () => {
     expect(decodeReplay(null)).toBeNull();

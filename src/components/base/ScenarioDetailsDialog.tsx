@@ -13,11 +13,17 @@ import CloseIcon from "@mui/icons-material/Close";
 import { GameType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
 import { getScenarioLocation } from "../../helpers/Locations";
-import { summarizeHistory } from "../../helpers/DateTime";
+import {
+  deriveExpandedSummary,
+  summarizeHistory,
+} from "../../helpers/DateTime";
 import { computeScoreBreakdown, totalScore } from "../../helpers/Scoring";
 import VictoryConditions from "./VictoryConditions";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore, SCORE_LABELS } from "./VictoryDialog";
+import { formatMoneyConcise } from "../../helpers/Format";
+import { formatLargeMass } from "../../helpers/Units";
+import { useUnits } from "./UnitsContext";
 
 export interface Props {
   open: boolean;
@@ -28,16 +34,18 @@ export interface Props {
 /** An in-game reminder of the mission and its score through completed months. */
 export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
   const { open, game, onClose } = props;
+  const units = useUnits();
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) {
     return <Dialog open={false} />;
   }
   const location = getScenarioLocation(scenario);
   const history = game.monthlyHistory;
-  const breakdown =
+  const summary =
     history.length > 0
-      ? computeScoreBreakdown(scenario, summarizeHistory(history))
+      ? deriveExpandedSummary(summarizeHistory(history))
       : null;
+  const breakdown = summary ? computeScoreBreakdown(scenario, summary) : null;
   const facts = [
     {
       label: "Timeframe",
@@ -212,6 +220,41 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
             >
               Current score
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Points reflect this ownership's teaching priorities. Compare
+              reliability, spending, and emissions separately; the total is not
+              a universal measure of a good utility.
+            </Typography>
+            {summary && (
+              <Box component="dl" sx={{ my: 2 }} aria-label="Utility outcomes">
+                <Typography component="dt">
+                  Reliability: demand served
+                </Typography>
+                <Typography component="dd" sx={{ ml: 0, mb: 1 }}>
+                  {summary.demandWh > 0
+                    ? `${(Math.min(1, summary.supplyWh / summary.demandWh) * 100).toFixed(2)}%`
+                    : "No demand recorded"}
+                </Typography>
+                <Typography component="dt">
+                  Operating expenses and interest
+                </Typography>
+                <Typography component="dd" sx={{ ml: 0, mb: 1 }}>
+                  {formatMoneyConcise(summary.expenses)}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  component="dd"
+                  sx={{ ml: 0, mb: 1 }}
+                >
+                  Construction purchases and loan principal are separate cash
+                  costs.
+                </Typography>
+                <Typography component="dt">Total recorded emissions</Typography>
+                <Typography component="dd" sx={{ ml: 0 }}>
+                  {formatLargeMass(summary.kgco2e, units)} CO2e
+                </Typography>
+              </Box>
+            )}
             {breakdown ? (
               <>
                 <Typography

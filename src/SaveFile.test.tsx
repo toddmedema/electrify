@@ -174,13 +174,16 @@ describe("SaveFile", () => {
       expect(error).toMatch(/isn't an Electrify save/);
     });
 
-    it("rejects a save from a different schema", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/isn't a valid Electrify save/);
-    });
+    it.each([SAVE_VERSION - 1, SAVE_VERSION + 1])(
+      "rejects a save from incompatible version %i",
+      async (version) => {
+        const { save, error } = await readSaveFile(
+          saveFile({ ...serializeSave(fakeGame()), version }),
+        );
+        expect(save).toBeUndefined();
+        expect(error).toMatch(/isn't a valid Electrify save/);
+      },
+    );
 
     it("rejects a save whose scenario this build doesn't have", async () => {
       const { save, error } = await readSaveFile(

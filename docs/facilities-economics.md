@@ -253,6 +253,25 @@ No additional facility type is added in this pass:
 - Fixed-bottom offshore wind is already represented by the separately researched Offshore Wind
   facility, so it is retained rather than duplicated here.
 
+## Simulation and teaching boundaries
+
+Purchase reviews lead with down payment, monthly payment and estimated upkeep; detailed plant
+operation and loan terms are optional. Starts, ramps, water releases and underwriting remain
+automatic. Loan payments begin during construction. LCOE excludes loan interest and holds quoted
+fuel-price assumptions; neither it nor the five-year fixed-use economic comparison guarantees
+future costs. Site counts are projects available in this game, not a site survey. Displayed
+accounting life controls depreciation and estimates, not automatic retirement.
+
+The local emissions boundary is operating combustion CO2: bituminous coal 93.24, natural gas 52.91,
+and distillate oil 74.14 kg/MMBtu; biomass uses 195 lb/MMBtu including biogenic combustion without
+regrowth credit. Geothermal assumes binary generation with no venting for emissions even though
+some cost/lifetime references describe dual-flash technology. This is a coarse technology model,
+not a harmonized plant engineering specification. Imported electricity uses separately sourced
+fixed generation proxies in `ImportEmissions.ts` (mostly CO2; Québec reports GHG CO2e). Both local
+and imported amounts affect score, while carbon fees charge only local generation. Construction,
+upstream supply chains and land-use emissions are omitted; zero operating emissions is not zero
+lifecycle impact.
+
 ## Primary references
 
 - [EIA, Capital Cost and Performance Characteristics for Utility-Scale Electric Power Generating Technologies, AEO2025](https://www.eia.gov/analysis/studies/powerplants/capitalcost/pdf/capital_cost_AEO2025.pdf)

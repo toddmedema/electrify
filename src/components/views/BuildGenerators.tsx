@@ -124,10 +124,6 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
-  const gapCoverage =
-    props.forecastGapW && props.forecastGapW > 0
-      ? Math.round((typicalOutputW / props.forecastGapW) * 100)
-      : undefined;
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -199,6 +195,17 @@ export function GeneratorBuildItem(
         }
         title={generator.name}
       />
+      <Typography className="buildOptionContext" variant="body2">
+        {generator.fuel === "Hydro"
+          ? "Flexible water supply · rain and snow refill the reservoir; generation drains it"
+          : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
+                generator.fuel,
+              )
+            ? "Weather-dependent supply · pair with backup or storage"
+            : generator.spinMinutes > 60
+              ? "Steady supply · best for demand that lasts for hours"
+              : "Fast response · can follow changing demand"}
+      </Typography>
       {!canBuild && (
         <Typography
           component="div"
@@ -228,11 +235,6 @@ export function GeneratorBuildItem(
           />
         )}
       </Box>
-      {gapCoverage !== undefined && (
-        <Typography className="buildOptionContext" variant="caption">
-          ~{gapCoverage}% of largest forecast shortage (average output)
-        </Typography>
-      )}
       <Box className="buildOptionFooter">
         <Button
           color="primary"
@@ -257,7 +259,8 @@ export function GeneratorBuildItem(
           variant="body2"
           color="textSecondary"
         >
-          {generator.description}
+          {generator.description} Starts, minimum output, and ramping are
+          managed automatically.
         </Typography>
         {(props.advantages || []).length > 0 && (
           <Box sx={{ px: 2, pb: 1 }}>
@@ -426,7 +429,13 @@ export function GeneratorBuildItem(
                 </TableRow>
               )}
               <TableRow>
-                <TableCell>Expected lifespan</TableCell>
+                <TableCell>
+                  Accounting lifetime
+                  <Typography variant="body2" color="textSecondary">
+                    Used for asset value and cost estimates; plants do not
+                    automatically retire at this age.
+                  </Typography>
+                </TableCell>
                 <TableCell align="right">
                   {generator.lifespanYears} years
                 </TableCell>
@@ -477,19 +486,31 @@ export function GeneratorBuildItem(
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - generator.buildCost)}`,
               },
               {
+                concept: "finances",
+                label: "Loan option",
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                detail:
+                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+              },
+              {
+                concept: "money",
+                label: "Estimated upkeep",
+                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(generator) / 12)}/mo`,
+                detail:
+                  "Operations and maintenance at typical use; fuel, carbon fees, and loan payments are extra. Actual use changes costs.",
+              },
+              {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail: "Reserve does not change until construction finishes.",
+                detail:
+                  "Output and reserve do not increase until construction finishes.",
               },
               {
                 concept: "supply",
-                label: "Estimated average output",
+                label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail:
-                  gapCoverage === undefined
-                    ? `${formatWatts(generator.peakW)} maximum rated output; average output is not guaranteed during a shortage`
-                    : `About ${gapCoverage}% of the largest forecast shortage, based on average output`,
+                detail: `${formatWatts(generator.peakW)} maximum rated output; check availability during the shortage. Typical output is not guaranteed at that hour.`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",

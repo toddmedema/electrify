@@ -10,6 +10,7 @@ test("California players can build and understand an intertie", async ({
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game" }).click();
 
+  await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
   if (!(await facilities.isVisible())) {
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
@@ -18,7 +19,9 @@ test("California players can build and understand an intertie", async ({
   await expect(
     facilities.getByRole("heading", { name: "Share power with nearby grids" }),
   ).toBeVisible();
-  await expect(facilities.getByText("Pacific Northwest")).toBeVisible();
+  await expect(
+    facilities.getByRole("heading", { name: "Pacific Northwest", exact: true }),
+  ).toBeVisible();
   await expect(facilities.getByLabel("Trading rule")).toHaveCount(0);
   await expect(facilities.getByText("Total cost").first()).toBeVisible();
   await expect(
@@ -65,6 +68,7 @@ test("island grids do not offer interties or power exchange", async ({
   await page.goto("/?scenario=105");
   await page.getByRole("button", { name: "Start game" }).click();
 
+  await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
   if (!(await facilities.isVisible())) {
     await page.getByRole("button", { name: "Facilities", exact: true }).click();

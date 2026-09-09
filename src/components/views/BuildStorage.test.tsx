@@ -41,10 +41,10 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   );
 
   const row = screen.getByRole("row", {
-    name: /Suitable project sites remaining.*648/,
+    name: /Project sites available in this game.*648/,
   });
   expect(row).toHaveTextContent("648");
-  expect(row).toHaveTextContent("Each project uses one suitable site");
+  expect(row).toHaveTextContent("Each project uses one site");
 });
 
 it("keeps toolbar actions inside compact viewport gutters", () => {
@@ -131,6 +131,8 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();

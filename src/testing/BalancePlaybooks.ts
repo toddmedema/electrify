@@ -157,7 +157,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   110: {
-    initialBuild: { name: "Oil", peakW: 400000000, financed: true },
+    // Oil cannot economically serve this long replacement duty at its corrected carbon cost.
+    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
     scheduledActions: [
       rate(0.141),
       ...line("france-core-upgrade"),

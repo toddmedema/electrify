@@ -1,4 +1,5 @@
-import type { AppDispatch } from "../../Store";
+import type { Dispatch, UnknownAction } from "@reduxjs/toolkit";
+import type { AppDispatch, AppThunk } from "../../Store";
 import { connect } from "react-redux";
 import { logEvent } from "../../Globals";
 import { initEconomy } from "../../data/Economy";
@@ -14,7 +15,7 @@ import { AppStateType, GameType, TutorialStepType } from "../../Types";
 import Loading, { DispatchProps, StateProps } from "./Loading";
 
 export function restoreTutorialAfterLoading(
-  dispatch: AppDispatch,
+  dispatch: Dispatch<UnknownAction>,
   tutorialSteps: TutorialStepType[],
   tutorialStep: number,
 ): void {
@@ -26,6 +27,29 @@ export function restoreTutorialAfterLoading(
     dispatch(navigate(destination));
   }
   dispatch(delta({ tutorialStep }));
+}
+
+// A previous load's delayed callback can outlive a quick capstone retry. Do not
+// navigate away from the new loading screen or rewind a step the player has left.
+export function restoreLoadedTutorial(
+  requestedGame: GameType,
+  tutorialSteps: TutorialStepType[],
+): AppThunk {
+  return (dispatch, getState) => {
+    const current = getState().game;
+    if (
+      !current.inGame ||
+      current.scenarioId !== requestedGame.scenarioId ||
+      current.tutorialStep !== requestedGame.tutorialStep
+    ) {
+      return;
+    }
+    restoreTutorialAfterLoading(
+      dispatch,
+      tutorialSteps,
+      requestedGame.tutorialStep >= 0 ? requestedGame.tutorialStep : 0,
+    );
+  };
 }
 
 const mapStateToProps = (state: AppStateType): StateProps => {
@@ -134,14 +158,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           // A capstone retry comes through the same clean scenario-start path with its authored
           // step already selected. Preserve it; a normal tutorial still arrives with -1 and
           // starts at the first objective after the card transition has mounted its controls.
-          const tutorialStep = game.tutorialStep >= 0 ? game.tutorialStep : 0;
           setTimeout(
             () =>
-              restoreTutorialAfterLoading(
-                dispatch,
-                scenario.tutorialSteps!,
-                tutorialStep,
-              ),
+              dispatch(restoreLoadedTutorial(game, scenario.tutorialSteps!)),
             300,
           );
         }

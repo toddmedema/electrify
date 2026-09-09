@@ -210,9 +210,8 @@ function demandServedLabel(outlook: YearOneOutlook): string {
 
 /**
  * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
- * The default 500 MW plant for one million customers covers the opening demand plus the game's
- * 5% reserve margin; scaling every starting generator together preserves that coverage and the
- * player's chosen generation mix. Storage is energy capacity rather than firm generation, so it
+ * Scaling every starting generator together preserves the chosen capacity per customer and
+ * generation mix. The setup forecast checks actual demand coverage and reachable headroom. Storage is energy capacity rather than firm generation, so it
  * stays at the size the player selected.
  */
 function facilitiesForStartingCustomers(

@@ -1,3 +1,5 @@
+import ManualLink from "./ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { GameType, TickPresentFutureType } from "../../Types";
@@ -31,6 +33,7 @@ export default function PowerExchangeSummary({
           </Typography>
         </div>
       </div>
+      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
       <dl className="powerExchangeMetrics">
         <div>
           <dt>Power flowing</dt>

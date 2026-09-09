@@ -12,6 +12,8 @@ import {
   TransmissionProfileTuple,
 } from "./TransmissionProfiles";
 
+import { importEmissionsAssumption } from "./ImportEmissions";
+
 interface TransmissionProfileDefinition {
   markets: readonly AdjacentMarketDefinitionType[];
   corridors: readonly TransmissionCorridorDefinitionType[];
@@ -36,6 +38,7 @@ function expandProfile(
         basePricePerMWh,
         availableSupplyW,
         availableDemandW,
+        ...importEmissionsAssumption(id),
       }),
     ),
     corridors: tuple[1].map(

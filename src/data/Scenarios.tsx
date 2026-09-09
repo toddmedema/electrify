@@ -122,7 +122,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "goal"]}
-            text="Your goal: keep the lights on and finish with more cash."
+            text="Your goal: keep the lights on, pay the bills, and compare emissions."
           />
         ),
       },
@@ -162,7 +162,7 @@ export const SCENARIOS = [
             text="Your turn: keep the lights on for a full day with no blackout."
           />
         ),
-        hint: "Reserve is unused capacity that could supply the grid right now. Positive reserve means available capacity is greater than demand.",
+        hint: "One simulated day represents a month. Keep supply at least equal to demand.",
         capstone: {
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
@@ -212,7 +212,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
-            text="Compare cost and build time. Open Show details for fuel and operations and maintenance (O&M)."
+            text="Compare cost, build time and role to choose a plant for the shortage. Starts and ramping are automatic."
           />
         ),
       },
@@ -223,7 +223,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "generator"]}
-            text="Choose a generator and decide whether to pay with cash or a loan."
+            text="Choose cash or a loan after checking the payments and upkeep. Leave money for bills during construction."
           />
         ),
       },
@@ -305,7 +305,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["buy", "storage"]}
-            text="Choose a storage system and decide whether to pay with cash or a loan."
+            text="Choose storage and review the cash price or loan payments. Compare upkeep too; charging electricity costs extra."
           />
         ),
       },
@@ -315,7 +315,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["storage"]}
-            text="The vertical bar is how much energy it holds."
+            text="The bar shows usable stored energy in MWh. MW tells you how quickly the system can charge or discharge."
           />
         ),
       },
@@ -326,7 +326,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["reorder"]}
-            text="Drag facilities to change their dispatch order. Generators higher in the list run first; storage charges when they make more electricity than customers need."
+            text="Move generation above storage in the list so spare power can charge it. Storage returns less energy than it takes in."
           />
         ),
       },
@@ -343,10 +343,10 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["storage", "supply", "time"]}
-            text="Your turn: store extra energy when demand is low, then use it during the evening peak within two days without a blackout."
+            text="Your turn: store extra energy when demand is low, then use it during the evening peak within two simulated days without a blackout."
           />
         ),
-        hint: "Run the clock and watch how full the storage is. It should fill when demand is low, then empty while helping meet the evening peak.",
+        hint: "Put generation before storage to charge from its surplus. Watch usable energy fill and then supply the evening peak. Charging power cannot also serve customers; paused storage neither charges nor discharges.",
         capstone: {
           checkpoint: {
             facilities: [
@@ -355,7 +355,7 @@ export const SCENARIOS = [
                 peakWh: 500000000,
                 initialAgeYears: 35,
               },
-              { fuel: "Coal", peakW: 370000000, initialAgeYears: 25 },
+              { fuel: "Coal", peakW: 390000000, initialAgeYears: 25 },
             ],
           },
           success: storageCapstoneSucceeded,
@@ -450,7 +450,7 @@ export const SCENARIOS = [
             text="Your turn: turn the forecast monthly loss into a profit without causing a blackout."
           />
         ),
-        hint: "Compare revenue with fuel and operations and maintenance expenses. The rate control changes revenue for each unit sold; choose a rate that makes the next month profitable.",
+        hint: "Compare revenue with fuel, operating, loan, and any carbon-fee expenses. Oil also pays for its emissions when a fee applies. Choose a rate that makes the next month profitable.",
         capstone: {
           checkpoint: { dollarsPerkWh: 0.03 },
           success: financesCapstoneSucceeded,
@@ -521,7 +521,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
-            text="The Customers layer shows how customer growth changes demand, revenue, and profit."
+            text="Watch how customer growth changes demand and profit. Customers respond gradually to price and reliability."
           />
         ),
       },
@@ -586,7 +586,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["forecast", "blackout"]}
-            text="A blackout is predicted. Forecasts show what may happen during the coming year."
+            text="Find the predicted blackout on the chart. It shows one representative day per month, not every difficult day."
           />
         ),
       },
@@ -608,7 +608,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["time", "blackout"]}
-            text="This dated event explains what changed. Events also report the first time one fuel becomes more expensive than another."
+            text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
           />
         ),
         desktop: {
@@ -616,7 +616,7 @@ export const SCENARIOS = [
           content: (
             <TutorialPrompt
               concepts={["time", "blackout"]}
-              text="This pane keeps dated explanations of important changes. It also reports the first time one fuel becomes more expensive than another."
+              text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
             />
           ),
         },
@@ -639,7 +639,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["fuel", "money"]}
-            text="Fuel prices move - and move your profits with them."
+            text="Compare possible fuel costs in five years to explore price changes. These examples leave your game unchanged."
           />
         ),
       },
@@ -649,7 +649,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["weather", "demand"]}
-            text="Weather drives demand - and solar and wind output."
+            text="Compare weather with demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather."
           />
         ),
       },
@@ -706,7 +706,7 @@ export const SCENARIOS = [
       "You used a limited grid connection to cover shortages and sell only safe surplus.",
     facilities: [
       // Slightly above the design sketch's 650 MW calibration: the fixed weather seed needs this
-      // much nameplate to create observable daytime surplus after demand and the 5% reserve.
+      // much nameplate to create observable daytime surplus after customer demand.
       { fuel: "Sun", peakW: 800000000, initialAgeYears: 5 },
       { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 12 },
     ],
@@ -807,7 +807,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["supply", "money"]}
-            text="Compare power flowing with available capacity; imports cost the neighbor price shown."
+            text="Check imports alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total."
           />
         ),
       },
@@ -817,7 +817,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["weather", "supply"]}
-            text="Hot, sunny weather warms the line, so it may safely carry less than 500 MW."
+            text="Compare the line’s available capacity with its 500 MW rating. Hot, sunny weather can reduce what it carries."
           />
         ),
       },
@@ -829,12 +829,12 @@ export const SCENARIOS = [
             text="Your turn: choose “Buy for shortages, sell extra,” then run until the grid safely sends extra solar power out."
           />
         ),
-        hint: "An export starts only after local demand and the 5% reserve are covered. If flow stays at 0, make sure Solar is on.",
+        hint: "Exports use surplus after charging and local demand. If flow stays at 0, make sure Solar is on.",
         capstone: {
           preserveProgress: true,
           success: intertiesCapstoneSucceeded,
           successMessage:
-            "You borrowed power at night and shared extra solar by day, while keeping your own grid safe.",
+            "You bought power at night and sold extra solar by day, while keeping your own grid safe.",
           failureMessage:
             "The grid has not safely used both directions yet. Choose the balanced rule, keep Solar on, and run time.",
         },
@@ -1020,7 +1020,7 @@ export const SCENARIOS = [
     startingCustomers: 16500,
     // Calibrates the customer-driven model to a 45-52 MW municipal average without inventing
     // hundreds of thousands of accounts. The authored data-center schedule is separate below.
-    startingDemandScale: 7.5,
+    startingDemandScale: 7.7,
     // Surviving by shedding a third of the municipal customer base is not a successful response
     // to the boom. This is shown with the victory conditions before play and checked at the end.
     minimumCustomerRetention: 0.9,
@@ -1080,7 +1080,8 @@ export const SCENARIOS = [
     durationMonths: 7 * 12,
     startingCustomers: 472701,
     // Reconciles the customer model to Austin Energy's FY2017 13.010 TWh / 2.654 GW system.
-    startingDemandScale: 7.61,
+    // Calibrated without utility-emissions weather forcing; representative days remain approximate.
+    startingDemandScale: 7.75,
     dollarsPerkWh: 0.09,
     cash: 335000000,
     feePerKgCO2e: 0,

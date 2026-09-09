@@ -81,7 +81,11 @@ import {
   clearTransmissionMarket,
   transmissionRatingW,
 } from "../helpers/Transmission";
-import { DEMAND_TYPES, demandByTypeAt } from "../data/DemandProfiles";
+import {
+  DEMAND_TYPES,
+  demandByTypeAt,
+  temperatureDemandWattsPerCustomer,
+} from "../data/DemandProfiles";
 import {
   combineStoryEffects,
   resolveStoryAtDate,
@@ -94,6 +98,8 @@ import {
   mandatedReleaseFraction,
 } from "../helpers/Hydro";
 import {
+  manualHelpOpen,
+  manualHelpClose,
   dialogOpen,
   dialogClose,
   snackbarOpen,
@@ -110,7 +116,6 @@ import {
   INTEREST_RATE_YEARLY,
   LOAN_MONTHS,
   ORGANIC_GROWTH_MAX_ANNUAL,
-  RESERVE_MARGIN,
   TICK_MINUTES,
   TICK_MS,
   TICKS_PER_DAY,
@@ -118,7 +123,6 @@ import {
   TICKS_PER_MONTH,
   TICKS_PER_YEAR,
   YEARS_PER_TICK,
-  OUTSKIRTS_WIND_MULTIPLIER,
   LOCATIONS,
 } from "../Constants";
 import {
@@ -211,6 +215,7 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // Undefined whenever a card isn't what paused us, so leaving one never resumes a deliberate
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
+let speedBeforeManualHelp: SpeedType | undefined;
 const BLOCKING_CARDS = new Set(["MANUAL", "BUILD_GENERATORS", "BUILD_STORAGE"]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
@@ -918,7 +923,7 @@ export const gameSlice = createSlice({
       // intentionally skipped for a fleet with no Hydro, so refresh it now that a starting dam
       // may exist; otherwise its first forecast has zero inflow for every month.
       if (state.facilities.some((facility) => facility.fuel === "Hydro")) {
-        state.timeline = reforecastWeatherAndPrices(state, 0);
+        state.timeline = reforecastWeatherAndPrices(state);
       }
       // Pre-roll a few frames once we have weather and demand info so generators and batteries start in a more accurate state
       for (let i = 0; i < 4; i++) {
@@ -979,7 +984,8 @@ export const gameSlice = createSlice({
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
       // instructions frozen until the player actually closes the card.
       if (
-        speedBeforeBlockingCard !== undefined &&
+        (speedBeforeBlockingCard !== undefined ||
+          speedBeforeManualHelp !== undefined) &&
         action.payload !== "PAUSED"
       ) {
         return;
@@ -1010,6 +1016,7 @@ export const gameSlice = createSlice({
       previousFuelPrices = undefined;
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
@@ -1027,6 +1034,7 @@ export const gameSlice = createSlice({
     builder.addCase(startReplay, (_state, action) => {
       const replay = action.payload;
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -1067,6 +1075,7 @@ export const gameSlice = createSlice({
     });
     builder.addCase(quit, () => {
       speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
       return cloneDeep(initialGame);
     });
     // Opening a reading or construction card pauses the game, and closing it puts the speed back.
@@ -1084,6 +1093,19 @@ export const gameSlice = createSlice({
       }
     });
     builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
+    builder.addCase(manualHelpOpen, (state) => {
+      if (state.inGame && speedBeforeManualHelp === undefined) {
+        speedBeforeManualHelp = state.speed;
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(manualHelpClose, (state) => {
+      if (speedBeforeManualHelp !== undefined) {
+        state.speed = speedBeforeManualHelp;
+        speedBeforeManualHelp = undefined;
+        ensureTicking(state);
+      }
+    });
     builder.addCase(dialogOpen, (state) => {
       delete state.policyPause;
       speedBeforeDialog = state.speed;
@@ -2059,8 +2081,6 @@ function getDemandW(
   // https://www.e-education.psu.edu/ebf200/node/151
   // Demand estimation: http://www.iitk.ac.in/npsc/Papers/NPSC2016/1570293957.pdf
   // Pricing estimation: http://www.stat.cmu.edu/tr/tr817/tr817.pdf
-  const temperatureNormalized =
-    0.0035 * Math.pow(now.temperatureC, 2) - 0.035 * now.temperatureC;
   const minutesFromDarkNormalized =
     sun.daylight === "polar-day"
       ? 1
@@ -2080,7 +2100,7 @@ function getDemandW(
     1 / (1 + Math.pow(Math.E, -minutesFrom5pmNormalized * 2));
   const demandMultiple =
     430 +
-    70 * temperatureNormalized -
+    temperatureDemandWattsPerCustomer(now.temperatureC, game.location) -
     40 * minutesFrom9amLogistics +
     30 * minutesFromDarkLogistics -
     65 * minutesFrom5pmLogistics;
@@ -2104,29 +2124,7 @@ function getDemandW(
   );
 }
 
-const KG_PER_MEGATON = 1000000000;
-
-/**
- * Everything the player has emitted so far, in megatons of CO2e, which is what the weather warms
- * and destabilises in proportion to.
- *
- * Summed from the monthly history rather than carried as its own field, keeping it out of the
- * persisted shape and preventing it from disagreeing with the emissions the player is actually
- * scored on. The history is one entry per month -- a few hundred at the very most -- and this
- * runs once per reforecast, not once per tick.
- */
-function getCumulativeMegatons(monthlyHistory: MonthlyHistoryType[]): number {
-  let kgco2e = 0;
-  for (let i = 0; i < monthlyHistory.length; i++) {
-    kgco2e += monthlyHistory[i].kgco2e;
-  }
-  return kgco2e / KG_PER_MEGATON;
-}
-
-function reforecastWeatherAndPrices(
-  state: GameType,
-  cumulativeMegatons: number,
-): TickPresentFutureType[] {
+function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
   // Resource forecasts are also shown before the player builds a hydro plant.
   const hasHydro =
     (getViableLocationCount(state.location, "Hydro") || 0) > 0 ||
@@ -2139,19 +2137,14 @@ function reforecastWeatherAndPrices(
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
-      const weather = getWeather(date, state.seed, cumulativeMegatons);
+      const weather = getWeather(date, state.seed);
       const fuelPrices = getEffectiveFuelPrices(date, state);
       const effects = storyEffectsAt(date, state);
       const hydroKey = `${date.year}-${date.monthNumber}`;
       let hydrology = hydrologyByMonth.get(hydroKey);
       if (!hydrology) {
         hydrology = hasHydro
-          ? getHydroConditions(
-              date,
-              state.seed,
-              cumulativeMegatons,
-              watershedId,
-            )
+          ? getHydroConditions(date, state.seed, 0, watershedId)
           : {
               precipitationMm: 0,
               snowpackMm: 0,
@@ -2169,7 +2162,7 @@ function reforecastWeatherAndPrices(
           state.location,
           weather.CLOUD_PCT,
         ),
-        windKph: OUTSKIRTS_WIND_MULTIPLIER * weather.WIND_KPH,
+        windKph: weather.WIND_KPH,
         windAirborneKph: getAirborneWindReferenceKph(weather.WIND_KPH),
         temperatureC: weather.TEMP_C + (effects.temperatureOffsetC || 0),
         storedWh: 0,
@@ -2182,6 +2175,8 @@ function reforecastWeatherAndPrices(
         hydroSpillWh: 0,
         hydroMandatedReleaseW: 0,
         storageLossWh: 0,
+        storageChargeW: 0,
+        storageDischargeW: 0,
         supplyByFuel: {} as FuelProductionType,
       } as TickPresentFutureType;
       if (weather.WIND_OFFSHORE_KPH === undefined) {
@@ -2338,20 +2333,30 @@ function updateSupplyFacilitiesFinances(
   // Pre-check how much extra supply we'll need to charge batteries
   let indexOfLastUnchargedBattery = -1;
   let totalChargeNeeded = 0;
+  const chargeRequests = new Map<number, number>();
   facilities.forEach((g: FacilityOperatingType, i: number) => {
-    if (g.peakWh && g.currentWh < g.peakWh && g.yearsToBuildLeft === 0) {
+    if (
+      g.peakWh &&
+      g.currentWh < g.peakWh &&
+      g.yearsToBuildLeft === 0 &&
+      !g.paused
+    ) {
       indexOfLastUnchargedBattery = i;
-      totalChargeNeeded += Math.min(
+      const requestedW = Math.min(
         g.peakW,
-        (g.peakWh - g.currentWh) * ticksPerHour,
+        ((g.peakWh - g.currentWh) * ticksPerHour) / g.roundTripEfficiency,
       );
+      chargeRequests.set(g.id, requestedW);
+      totalChargeNeeded += requestedW;
     }
   });
 
   // Update supply and facility outputs
   let supply = 0;
+  let reachableHeadroomW = 0;
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
+  let dischargedW = 0;
   let storedWh = 0;
   let storageLossWh = 0;
   let hydroReservoirWh = 0;
@@ -2461,10 +2466,7 @@ function updateSupplyFacilitiesFinances(
     if (g.yearsToBuildLeft === 0) {
       if (g.fuel) {
         // Capable of generating electricity
-        const targetW = Math.max(
-          0,
-          now.demandW * (1 + RESERVE_MARGIN) - supply,
-        );
+        const targetW = Math.max(0, now.demandW - (supply - charge));
         const requiredTargetW = Math.max(targetW, mandatedW);
         switch (g.fuel) {
           case "Sun":
@@ -2479,14 +2481,17 @@ function updateSupplyFacilitiesFinances(
           case "Airborne Wind":
             g.currentW = availablePeakW * airborneWindOutputFactor;
             break;
-          default: // on-demand produces up to demand + reserve margin
+          default: // Produce what customers and storage need; spare capacity is not energy.
             // If there's a battery after this plant, the dispatch request includes the extra
             // output the existing storage policy would use to charge it beyond current demand.
             const dispatchTargetW = Math.min(
               dispatchPeakW,
               indexOfLastUnchargedBattery >= 0 &&
                 i < indexOfLastUnchargedBattery
-                ? now.demandW + totalChargeNeeded - charge
+                ? Math.max(
+                    mandatedW,
+                    now.demandW + totalChargeNeeded - (supply - charge),
+                  )
                 : requiredTargetW,
             );
             if (!optimizeCommitment) {
@@ -2563,29 +2568,65 @@ function updateSupplyFacilitiesFinances(
       }
       if (g.peakWh) {
         // Capable of storing electricity
-        const targetW = Math.max(0, now.demandW - supply);
+        const targetW = Math.max(0, now.demandW - (supply - charge));
         if (g.currentWh > 0 && targetW > 0) {
           // If there's a need and we have charge, discharge
           g.currentW = Math.min(g.peakW, targetW, g.currentWh * ticksPerHour);
           g.currentWh = Math.max(0, g.currentWh - g.currentW / ticksPerHour);
           supply += g.currentW;
+          dischargedW += g.currentW;
         } else if (g.currentWh < g.peakWh && supply - charge > now.demandW) {
-          // If there's spare capacity, charge
-          g.currentW = -Math.min(
+          // The grid draw is capped before conversion losses. All round-trip losses are
+          // applied on charging, so discharge can use the stored energy directly.
+          const gridChargeW = Math.min(
             g.peakW,
             supply - now.demandW - charge,
-            (g.peakWh - g.currentWh) * ticksPerHour,
+            ((g.peakWh - g.currentWh) * ticksPerHour) / g.roundTripEfficiency,
           );
+          g.currentW = -gridChargeW * g.roundTripEfficiency;
           g.currentWh = Math.min(
             g.peakWh,
             g.currentWh - g.currentW / ticksPerHour,
           );
-          charge -= g.currentW / g.roundTripEfficiency;
+          charge += gridChargeW;
+          storageLossWh += (gridChargeW + g.currentW) / ticksPerHour;
         } else {
           // Otherwise, don't charge or discharge: reset to 0
           g.currentW = 0;
         }
+        totalChargeNeeded -= chargeRequests.get(g.id) || 0;
         storedWh += g.currentWh;
+      }
+      // Report capacity that automatic dispatch can actually add within the next 15 minutes.
+      // Keep this response window fixed even when long forecasts integrate hourly samples.
+      // Ramping, weather/event derates and remaining water/charge constrain that headroom.
+      if (g.peakWh) {
+        const dischargeW = Math.min(g.peakW, g.currentWh * TICKS_PER_HOUR);
+        const currentGridW =
+          g.currentW < 0 ? g.currentW / g.roundTripEfficiency : g.currentW;
+        reachableHeadroomW += Math.max(0, dischargeW - currentGridW);
+      } else if (
+        !["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(g.fuel)
+      ) {
+        const energyLimitedPeakW = hydro
+          ? Math.min(
+              availablePeakW,
+              (Math.max(
+                0,
+                (g.reservoirWh || 0) -
+                  (g.reservoirCapacityWh || 0) * HYDRO_DEADPOOL_FRACTION,
+              ) *
+                TICKS_PER_HOUR) /
+                GAME_TO_REAL_YEARS,
+            )
+          : availablePeakW;
+        reachableHeadroomW += Math.max(
+          0,
+          Math.min(
+            energyLimitedPeakW - g.currentW,
+            (g.peakW * TICK_MINUTES) / g.spinMinutes,
+          ),
+        );
       }
       if (hydro) {
         hydroReservoirWh += g.reservoirWh || 0;
@@ -2599,6 +2640,7 @@ function updateSupplyFacilitiesFinances(
   let transmissionCapacity = 0;
   let weightedMarketPrice = 0;
   let marketImportLimitW = 0;
+  let weightedImportEmissions = 0;
   let marketExportLimitW = 0;
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
@@ -2611,20 +2653,23 @@ function updateSupplyFacilitiesFinances(
     );
     transmissionCapacity += rating;
     weightedMarketPrice += rating * price;
-    marketImportLimitW += Math.min(rating, market?.availableSupplyW || 0);
+    const importCapacityW = Math.min(rating, market?.availableSupplyW || 0);
+    marketImportLimitW += importCapacityW;
+    weightedImportEmissions +=
+      importCapacityW * (market?.emissionsKgco2ePerMWh || 0);
     marketExportLimitW += Math.min(rating, market?.availableDemandW || 0);
   }
   const marketPricePerMWh =
     transmissionCapacity > 0 ? weightedMarketPrice / transmissionCapacity : 0;
-  // Exports use only energy above demand plus the reserve margin. Trading can earn money, but it
-  // must never create a local shortage or sell the reliability buffer the dispatch stack built.
+  // Export already-produced surplus; unused dispatchable capacity remains ready without
+  // burning fuel or pretending that a reserve is electricity supplied to customers.
+  const grossLocalSupplyW = supply;
   const clearing = clearTransmissionMarket({
-    localSupplyW: supply,
+    localSupplyW: supply - charge,
     demandW: now.demandW,
     capacityW: transmissionCapacity,
     importLimitW: marketImportLimitW,
     exportLimitW: marketExportLimitW,
-    reserveMargin: RESERVE_MARGIN,
     policy: transmission.tradingPolicy,
   });
   const { importedW, exportedW } = clearing;
@@ -2634,9 +2679,15 @@ function updateSupplyFacilitiesFinances(
   now.transmissionCapacityW = transmissionCapacity;
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
+  // Surplus exports are interruptible under the game policy and can be redirected locally.
+  now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
+  now.importKgco2ePerMWh =
+    marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
   now.storageLossWh = storageLossWh;
+  now.storageChargeW = charge;
+  now.storageDischargeW = dischargedW;
   now.hydroReservoirWh = hydroReservoirWh;
   now.hydroReservoirCapacityWh = hydroReservoirCapacityWh;
   now.hydroSpillWh = hydroSpillWh;
@@ -2666,10 +2717,11 @@ function updateSupplyFacilitiesFinances(
   // Hoisted out of the loop below, the way the demand pass at the top of this file already does
   // it: prices move by the month, and this is per facility per tick
   const fuelPrices = getEffectiveFuelPrices(date, state);
-  // What one facility earns is its share of what the company actually sold, so the row can say
-  // whether it has paid for itself. Curtailed output earns nothing, which pro-rating against the
-  // served total is exactly what expresses
-  const revenuePerSuppliedW = supply > 0 ? customerRevenue / supply : 0;
+  // Attribute sales proportionally to gross local output and imports. Using net supply
+  // after charging or exports would credit local facilities with more than the company earned.
+  // The imported share remains outside local facility lifetime revenue.
+  const revenueBasisW = grossLocalSupplyW + importedW;
+  const revenuePerSuppliedW = revenueBasisW > 0 ? revenue / revenueBasisW : 0;
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below
@@ -2841,7 +2893,9 @@ function updateSupplyFacilitiesFinances(
   now.expensesFuel = expensesFuel;
   now.expensesCarbonFee = expensesCarbonFee;
   now.expensesInterest = expensesInterest;
-  now.kgco2e = kgco2e;
+  now.localKgco2e = kgco2e;
+  now.importedKgco2e = (importedWh / 1000000) * now.importKgco2ePerMWh;
+  now.kgco2e = now.localKgco2e + now.importedKgco2e;
   // Deliberately this tick's own month rather than `date`, which is the month the game is
   // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
   // the same line serve the record and the projection: history keeps what the rate was, and the
@@ -2983,9 +3037,6 @@ export function generateNewTimeline(
     monthlyHistory: readOnlyState.monthlyHistory.slice(0, 12),
     timeline: new Array(ticks) as TickPresentFutureType[],
   };
-  const cumulativeMegatons = getCumulativeMegatons(
-    readOnlyState.monthlyHistory,
-  );
   // Loop invariant: the fleet is fixed across the horizon and the cash is a parameter, so this
   // was the same number recomputed for every one of up to a year's worth of ticks
   const netWorth = getNetWorth(
@@ -3030,6 +3081,10 @@ export function generateNewTimeline(
       transmissionCapacityW: 0,
       marketPricePerMWh: 0,
       kgco2e: 0,
+      localKgco2e: 0,
+      importedKgco2e: 0,
+      reserveW: 0,
+      importKgco2ePerMWh: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
       interestRate: 0,
       inflationRate: 0,
@@ -3052,11 +3107,7 @@ export function generateNewTimeline(
       // reforecastWeatherAndPrices asserts its own tick literal.
     } as TickPresentFutureType;
   }
-  // Read off the caller's history, not the blanked copy above, and frozen for the whole horizon:
-  // what the player emits over the coming month is exactly what the forecast cannot know. It
-  // advances at the month rollover, which is when this runs, so the forecast never shifts under a
-  // player mid-month.
-  state.timeline = reforecastWeatherAndPrices(state, cumulativeMegatons);
+  state.timeline = reforecastWeatherAndPrices(state);
   state.timeline = reforecastDemand(state, tickScale);
   state.timeline = reforecastSupply(state, true, stepMinutes);
   return state.timeline;

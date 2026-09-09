@@ -8,19 +8,12 @@ import {
   reserveCapacityW,
 } from "./GameAppBar";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { FacilityOperatingType, TickPresentFutureType } from "../../Types";
+import { TickPresentFutureType } from "../../Types";
 
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
   isBigScreen: () => true,
 }));
-
-const WEATHER_DRIVEN_TEST_FUELS = [
-  "Sun",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-];
 
 function renderAppBar(overrides: Partial<Props> = {}) {
   const game = createGame({ scenarioId: 101 });
@@ -50,77 +43,47 @@ describe("GameAppBar", () => {
     expect(onSpeedChange).toHaveBeenCalledWith("FAST");
   });
 
-  it("reports reserve and grows when a plant is added", () => {
+  it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const plant = game.facilities.find(
-      (facility: FacilityOperatingType) =>
-        facility.fuel &&
-        !["Sun", "Wind", "Offshore Wind"].includes(facility.fuel),
-    )!;
-    const before = reserveCapacityW(game, now);
-    game.facilities.push({ ...plant, id: 999 });
-
-    expect(reserveCapacityW(game, now) - before).toBe(plant.peakW);
+    now.supplyW = now.demandW;
+    now.reserveW = now.demandW * 0.25;
+    // Changing a displayed nameplate cannot invent immediately available output.
+    game.facilities = game.facilities.map((plant) => ({
+      ...plant,
+      peakW: 1e15,
+    }));
+    expect(reserveCapacityW(game, now)).toBe(now.reserveW);
     renderAppBar({ game: { ...game, inGame: true } });
-    expect(screen.getByText(/\+.*W reserve/)).toBeInTheDocument();
     expect(screen.getByText("Stable")).toBeInTheDocument();
+    expect(screen.getByText(/\+.*W reserve/)).toBeInTheDocument();
   });
 
-  it("warns when reserve falls to ten percent of demand", () => {
+  it("warns when reachable reserve falls to five percent of demand", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const plant = game.facilities.find(
-      (facility: FacilityOperatingType) =>
-        facility.fuel &&
-        !facility.peakWh &&
-        !WEATHER_DRIVEN_TEST_FUELS.includes(facility.fuel),
-    )!;
-    const lowReserveGame = {
-      ...game,
-      facilities: [
-        {
-          ...plant,
-          paused: false,
-          yearsToBuildLeft: 0,
-          peakW: now.demandW * 1.05,
-        },
-      ],
-    };
-
-    expect(getGridHealth(lowReserveGame, now)).toMatchObject({
+    now.supplyW = now.demandW;
+    now.reserveW = now.demandW * 0.05;
+    expect(getGridHealth(game, now)).toMatchObject({
       state: "low-reserve",
-      label: "Low reserve",
       metric: expect.stringMatching(/reserve \(5%\)/),
     });
-    renderAppBar({ game: { ...lowReserveGame, inGame: true } });
+    renderAppBar({ game: { ...game, inGame: true } });
     expect(
       screen.getByLabelText(/Current grid status: Low reserve/),
-    ).toHaveTextContent("Low reserve");
+    ).toBeVisible();
   });
 
-  it("distinguishes an exhausted reserve from a blackout", () => {
+  it("distinguishes zero reserve from a blackout and prioritizes actual shortages", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const plant = game.facilities.find(
-      (facility: FacilityOperatingType) =>
-        facility.fuel &&
-        !facility.peakWh &&
-        !WEATHER_DRIVEN_TEST_FUELS.includes(facility.fuel),
-    )!;
-    const atLimitGame = {
-      ...game,
-      facilities: [
-        {
-          ...plant,
-          paused: false,
-          yearsToBuildLeft: 0,
-          peakW: now.demandW,
-        },
-      ],
-    };
-
-    expect(getGridHealth(atLimitGame, now)).toMatchObject({
+    expect(
+      getGridHealth(game, {
+        ...now,
+        supplyW: now.demandW,
+        reserveW: 0,
+      } as TickPresentFutureType),
+    ).toMatchObject({
       state: "at-limit",
       metric: "0W reserve",
     });
@@ -128,37 +91,13 @@ describe("GameAppBar", () => {
       getGridHealth(game, {
         ...now,
         supplyW: now.demandW - 373000000,
+        reserveW: 500000000,
       } as TickPresentFutureType),
     ).toMatchObject({
       state: "blackout",
-      label: "Blackout",
       metric: "373MW short",
     });
   });
-
-  it("counts only current weather-limited Airborne Wind output as reserve", () => {
-    const game = createGame({ scenarioId: 101 });
-    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const template = game.facilities.find(
-      (facility: FacilityOperatingType) => facility.fuel,
-    )!;
-    const airborne = {
-      ...template,
-      fuel: "Airborne Wind" as const,
-      peakW: 2000000,
-      currentW: 500000,
-      yearsToBuildLeft: 0,
-      paused: false,
-    };
-
-    expect(
-      reserveCapacityW({ ...game, facilities: [airborne] }, {
-        ...now,
-        demandW: 0,
-      } as TickPresentFutureType),
-    ).toBe(500000);
-  });
-
   it("gives the scenario dialog only the scenario name", () => {
     renderAppBar();
     fireEvent.click(screen.getByRole("button", { name: "menu" }));

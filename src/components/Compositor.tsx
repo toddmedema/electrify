@@ -39,6 +39,7 @@ import FacilitiesContainer from "./views/FacilitiesContainer";
 import InsightsContainer from "./views/InsightsContainer";
 import LoadingContainer from "./views/LoadingContainer";
 import MainMenuContainer from "./views/MainMenuContainer";
+import Manual from "./views/Manual";
 import ManualContainer from "./views/ManualContainer";
 import NewGameContainer from "./views/NewGameContainer";
 import NewGameDetailsContainer from "./views/NewGameDetailsContainer";
@@ -49,7 +50,7 @@ import {
   setSpeed,
   togglePauseFacility,
 } from "../reducers/Game";
-import { snackbarOpen } from "../reducers/UI";
+import { snackbarOpen, manualHelpClose } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
 
@@ -90,6 +91,7 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 configure({
   ignoreEventsCondition: (event: KeyboardEvent) => {
+    if (document.querySelector('[data-manual-help="true"]')) return true;
     if (document.querySelector('[data-customer-programs="true"]')) return true;
     if (event.key === "Escape") {
       return false;
@@ -469,14 +471,18 @@ export default class Compositor extends React.Component<Props, {}> {
     // Update if dialog / snackbar changes
     if (
       this.props.ui.dialog.open !== nextProps.ui.dialog.open ||
-      this.props.ui.snackbar.open !== nextProps.ui.snackbar.open
+      this.props.ui.snackbar.open !== nextProps.ui.snackbar.open ||
+      this.props.ui.manualHelpEntry !== nextProps.ui.manualHelpEntry
     ) {
       return true;
     }
 
-    // Don't update the main UI if we're on the same card
+    // A new loading request must remount even when it replaces another loading request.
     if (this.props.card.name === nextProps.card.name) {
-      return false;
+      return (
+        nextProps.card.name === "LOADING" &&
+        this.props.card.ts !== nextProps.card.ts
+      );
     }
 
     return true;
@@ -499,13 +505,18 @@ export default class Compositor extends React.Component<Props, {}> {
     // The pane layouts don't slide between their own cards: on desktop nothing about the screen
     // changes, and on two columns only the second one does -- sliding the pinned fleet off the
     // side with it would be a lie about what just happened
-    const transitionKey = !isNavCard(this.props.card.name)
-      ? this.props.card.name
-      : isDesktopScreen()
-        ? DESKTOP_PANES_KEY
-        : isPaneLayout()
-          ? TABLET_PANES_KEY
-          : this.props.card.name;
+    // A quick retry may start before the previous loading view finishes exiting.
+    // A fresh key guarantees the new mission runs its loading lifecycle.
+    const transitionKey =
+      this.props.card.name === "LOADING"
+        ? `LOADING:${this.props.card.ts}`
+        : !isNavCard(this.props.card.name)
+          ? this.props.card.name
+          : isDesktopScreen()
+            ? DESKTOP_PANES_KEY
+            : isPaneLayout()
+              ? TABLET_PANES_KEY
+              : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
@@ -527,6 +538,11 @@ export default class Compositor extends React.Component<Props, {}> {
           <CSSTransition
             key={transitionKey}
             nodeRef={transitionNodeRef}
+            onExited={() => {
+              if (transitionKey.startsWith("LOADING:")) {
+                this.nodeRefs.delete(transitionKey);
+              }
+            }}
             classNames={""}
             timeout={{
               enter: CARD_TRANSITION_ANIMATION_MS,
@@ -540,7 +556,9 @@ export default class Compositor extends React.Component<Props, {}> {
         </TransitionGroup>
         {tutorialSteps &&
           currentTutorialStep &&
-          this.props.card.name !== "LOADING" && (
+          this.props.card.name !== "LOADING" &&
+          this.props.card.name !== "MANUAL" &&
+          !ui.manualHelpEntry && (
             <TutorialHud
               desktop={isDesktopScreen()}
               step={currentTutorialStep}
@@ -552,6 +570,18 @@ export default class Compositor extends React.Component<Props, {}> {
               onExit={() => this.props.onTutorialEnd(tutorialSteps)}
             />
           )}
+        <Dialog
+          fullScreen
+          open={!!ui.manualHelpEntry}
+          onClose={() => store.dispatch(manualHelpClose())}
+          data-manual-help="true"
+          slotProps={{ paper: { "aria-label": "Manual help" } }}
+        >
+          <Manual
+            focusEntry={ui.manualHelpEntry}
+            onBack={() => store.dispatch(manualHelpClose())}
+          />
+        </Dialog>
         <Dialog
           open={ui.dialog.open}
           // v9 replaced `disableEscapeKeyDown` with filtering on the close reason. A

@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
-import { TICKS_PER_HOUR, TICK_MS } from "../../Constants";
+import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
@@ -21,7 +21,6 @@ import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import {
   AppStateType,
-  FacilityOperatingType,
   GameType,
   SpeedType,
   TickPresentFutureType,
@@ -70,13 +69,6 @@ function speedMultiplier(speed: SpeedType): string {
   return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
 }
 
-const WEATHER_DRIVEN_FUELS = new Set([
-  "Sun",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-]);
-
 const LOW_RESERVE_RATIO = 0.1;
 
 type GridHealthState = "stable" | "low-reserve" | "at-limit" | "blackout";
@@ -88,35 +80,12 @@ interface GridHealth {
   announcement: string;
 }
 
-/** Capacity that could serve demand now, rather than the deliberately dispatched output. */
+/** The reducer includes ramp, water and storage limits in this available cushion. */
 export function reserveCapacityW(
-  game: GameType,
+  _game: GameType,
   now: TickPresentFutureType,
 ): number {
-  const available = game.facilities.reduce(
-    (total: number, facility: FacilityOperatingType) => {
-      if (facility.paused || facility.yearsToBuildLeft > 0) {
-        return total;
-      }
-      if (facility.peakWh) {
-        return (
-          total +
-          Math.min(
-            facility.peakW,
-            Math.max(0, facility.currentWh) * TICKS_PER_HOUR,
-          )
-        );
-      }
-      return (
-        total +
-        (WEATHER_DRIVEN_FUELS.has(facility.fuel)
-          ? Math.max(0, facility.currentW)
-          : facility.peakW)
-      );
-    },
-    0,
-  );
-  return available - now.demandW;
+  return now.reserveW ?? now.supplyW - now.demandW;
 }
 
 /** Turns the live supply margin into the few states a player can act on at a glance. */

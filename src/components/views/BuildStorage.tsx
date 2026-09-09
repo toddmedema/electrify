@@ -225,7 +225,9 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Expected lifespan</TableCell>
+                <TableCell>
+                  Accounting lifetime (not automatic retirement)
+                </TableCell>
                 <TableCell align="right">
                   {storage.lifespanYears} years
                 </TableCell>
@@ -265,6 +267,20 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
               },
               {
+                concept: "finances",
+                label: "Loan option",
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                detail:
+                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+              },
+              {
+                concept: "money",
+                label: "Estimated upkeep",
+                value: `${formatMoneyConcise(storage.annualOperatingCost / 12)}/mo`,
+                detail:
+                  "Maintenance estimate; charging electricity and loan payments are extra.",
+              },
+              {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
@@ -284,6 +300,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               },
             ]}
           />
+          <Box className="buildOptionHelp">
+            <ManualLink
+              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+              text="Power, energy & duration"
+            />
+            <ManualLink
+              entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+              text="Charging & losses"
+            />
+          </Box>
           <Button
             color="primary"
             size="small"
@@ -438,6 +464,16 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         onSliderChange={setSliderTick}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
+      <Box className="buildOptionHelp">
+        <ManualLink
+          entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+          text="Power, energy & duration"
+        />
+        <ManualLink
+          entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+          text="Charging & losses"
+        />
+      </Box>
       <List dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem

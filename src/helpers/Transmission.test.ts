@@ -46,13 +46,12 @@ describe("market clearing", () => {
         capacityW: 200,
         importLimitW: 500,
         exportLimitW: 500,
-        reserveMargin: 0.15,
         policy: "BALANCED",
       }),
     ).toEqual({ importedW: 200, exportedW: 0, localAvailableSupplyW: 900 });
   });
 
-  it("exports only above demand plus the reserve margin", () => {
+  it("exports actual surplus without burning an energy reserve", () => {
     expect(
       clearTransmissionMarket({
         localSupplyW: 1400,
@@ -60,10 +59,9 @@ describe("market clearing", () => {
         capacityW: 500,
         importLimitW: 500,
         exportLimitW: 500,
-        reserveMargin: 0.15,
         policy: "SURPLUS_ONLY",
       }),
-    ).toEqual({ importedW: 0, exportedW: 250, localAvailableSupplyW: 1150 });
+    ).toEqual({ importedW: 0, exportedW: 400, localAvailableSupplyW: 1000 });
   });
 
   it("keeps the line idle when trading is closed", () => {
@@ -74,9 +72,27 @@ describe("market clearing", () => {
         capacityW: 500,
         importLimitW: 500,
         exportLimitW: 500,
-        reserveMargin: 0.15,
         policy: "CLOSED",
       }),
     ).toEqual({ importedW: 0, exportedW: 0, localAvailableSupplyW: 500 });
+  });
+  it("covers the exact demand when fractional imports completely fill a shortage", () => {
+    const request = {
+      localSupplyW: 27297688.384615093,
+      demandW: 355728534.5312337,
+      capacityW: 500000000,
+      importLimitW: 500000000,
+      exportLimitW: 500000000,
+      policy: "RELIABILITY_FIRST" as const,
+    };
+    expect(clearTransmissionMarket(request).localAvailableSupplyW).toBe(
+      request.demandW,
+    );
+    const capped = clearTransmissionMarket({
+      ...request,
+      importLimitW: 300000000,
+    });
+    expect(capped.localAvailableSupplyW).toBe(request.localSupplyW + 300000000);
+    expect(capped.localAvailableSupplyW).toBeLessThan(request.demandW);
   });
 });
