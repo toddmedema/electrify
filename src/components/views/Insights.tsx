@@ -676,6 +676,8 @@ function policySignature(game: GameType): string {
           program.adoption,
           program.spending,
           program.pending?.tier,
+          program.startHour,
+          program.pending?.startHour,
           program.pending?.month,
         ];
       }),

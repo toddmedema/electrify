@@ -38,7 +38,8 @@ import {
 // Version 9 is reserved for wildfire response actions. Version 10 adds operating
 // customer tariffs/contracts and their effective billed-price retention signal.
 // Version 11 shifts residential tariff energy to later hours instead of eliminating it.
-export const REPLAY_VERSION = 11;
+// Version 12 supports independently configurable four-hour customer demand windows.
+export const REPLAY_VERSION = 12;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

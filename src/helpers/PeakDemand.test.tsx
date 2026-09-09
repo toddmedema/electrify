@@ -35,7 +35,7 @@ import {
   TICKS_PER_HOUR,
   TICKS_PER_MONTH,
 } from "../Constants";
-import { GameType } from "../Types";
+import { GameType, DeferredResidentialLoad } from "../Types";
 import { parseSave, serializeSave, SAVE_VERSION } from "../SaveGame";
 import { decodeReplay, serializeReplay, REPLAY_VERSION } from "../Replay";
 
@@ -92,7 +92,7 @@ test.each([0, 6 * 60, 17 * 60 - 1, 17 * 60, 21 * 60 - 1, 21 * 60, 1440])(
     const tick = demand(minute);
     const peak = minute >= 1020 && minute < 1260;
     const late = minute % 1440 >= 1260;
-    applyPeakDemand(game, tick);
+    applyPeakDemand(game, tick, [], 1);
     expect(tick.demandByType.Residential).toBe(peak ? 90 : 100);
     expect(tick.demandByType.Commercial).toBe(100);
     expect(tick.demandByType.Industrial).toBe(peak ? 95 : 100);
@@ -318,7 +318,7 @@ test("both offer actions cancel, save, resume and replay deterministically throu
   expect(
     decodeReplay({ ...serializeReplay(game), version: REPLAY_VERSION - 1 }),
   ).toBeNull();
-  expect(REPLAY_VERSION).toBe(11);
+  expect(REPLAY_VERSION).toBe(12);
   expect(decodeReplay(serializeReplay(game))).not.toBeNull();
 });
 
@@ -330,8 +330,8 @@ test.each([false, true])(
       game.policies!.programs.efficiency.adoption = 0.5;
       game.policies!.programs.solar.adoption = 0.2;
     }
-    let queued = 0,
-      residentialBefore = 0,
+    let queued: DeferredResidentialLoad[] = [];
+    let residentialBefore = 0,
       residentialAfter = 0,
       industrialBefore = 0,
       industrialAfter = 0;
@@ -344,7 +344,7 @@ test.each([false, true])(
       residentialBefore += before.Residential / 4;
       industrialBefore += before.Industrial / 4;
       applyPeakDemand(game, tick, queued);
-      queued = tick.deferredResidentialWh!;
+      queued = tick.deferredResidential!;
       residentialAfter += tick.demandByType.Residential / 4;
       industrialAfter += tick.demandByType.Industrial / 4;
       expect(tick.demandByType.Commercial).toBe(before.Commercial);
@@ -375,7 +375,7 @@ test.each([false, true])(
       }
     }
     /* eslint-enable jest/no-conditional-expect */
-    expect(queued).toBeCloseTo(0, 8);
+    expect(queued).toEqual([]);
     expect(residentialAfter).toBeCloseTo(residentialBefore, 8);
     expect(industrialBefore - industrialAfter).toBeCloseTo(20);
   },

@@ -16,20 +16,20 @@ export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Move home electricity use to later in the evening in exchange for a discount.",
+      "Move home electricity use out of your chosen peak hours in exchange for a discount.",
     mechanism:
-      "When on, half of homes participate. They shift 20% of their 17:00–21:00 electricity use to 21:00–24:00, such as charging cars later. Participants pay 30% more during the peak and 10% less afterward. Total energy use is unchanged.",
+      "When on, half of homes participate. Choose a four-hour daily window: participants shift 20% of that electricity use into the following three hours, such as charging cars later. They pay 30% more during the chosen peak window and 10% less during the following three hours. Total energy use is unchanged, including across midnight.",
     tradeoff:
-      "Rates apply only to enrolled residential consumption actually supplied. Higher evening bills can affect customer retention. Fixed local-clock windows may miss your seasonal peak.",
+      "Rates apply only to enrolled residential consumption actually supplied. Higher bills can affect customer retention. Compare the forecast: shifted consumption can create a later peak.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Pay industrial users and data centers to use less electricity during the evening peak. This load is eliminated.",
+      "Pay industrial users and data centers to use less electricity during your chosen peak hours. This load is eliminated.",
     mechanism:
-      "When on, half of industrial and data-center load participates. Enrolled loads forgo 20% of consumption from 17:00–21:00 every day (four hours maximum), for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
+      "When on, half of industrial and data-center load participates. Enrolled loads forgo 20% of consumption during your chosen four-hour daily window, for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
     tradeoff:
       "Credits reduce sales revenue, including outside the curtailment window. Curtailment is agreed service, not a blackout. Contracts do not affect homes, businesses or transport, and do nothing without eligible industrial or data-center load.",
     cap: 0.2,

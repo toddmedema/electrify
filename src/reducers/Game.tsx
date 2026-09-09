@@ -7,8 +7,10 @@ import {
   emptyPolicies,
   policyAvailable,
   validPolicyChange,
+  samePolicyChoice,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
+import { policyChoiceLabel } from "../helpers/PolicyWindow";
 import {
   schedulePolicy,
   cancelPolicy,
@@ -1443,27 +1445,37 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
-  const before = existing?.pending?.tier ?? existing?.tier ?? "Off";
+  const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
   if (cancel) {
     if (
       !existing?.pending ||
       existing.pending.month !== payload.month ||
-      existing.pending.tier !== payload.tier
+      !samePolicyChoice(payload.id, existing.pending, payload)
     )
       return false;
     delete existing.pending;
   } else {
-    if (payload.tier === (existing?.pending?.tier ?? existing?.tier ?? "Off"))
+    if (
+      samePolicyChoice(
+        payload.id,
+        payload,
+        existing?.pending ?? existing ?? { tier: "Off" },
+      )
+    )
       return false;
     state.policies ??= emptyPolicies(state.date.monthsElapsed);
     const program = state.policies.programs[payload.id];
-    if (payload.tier === program.tier) delete program.pending;
-    else program.pending = { tier: payload.tier, month: payload.month };
+    if (samePolicyChoice(payload.id, payload, program)) delete program.pending;
+    else {
+      const { id: _id, ...pending } = payload;
+      program.pending = pending;
+    }
   }
-  const after = cancel
-    ? (existing?.tier ?? "Off")
-    : (state.policies!.programs[payload.id].pending?.tier ??
-      state.policies!.programs[payload.id].tier);
+  const program = state.policies!.programs[payload.id];
+  const after = policyChoiceLabel(
+    payload.id,
+    cancel ? existing : (program.pending ?? program),
+  );
   recordMeaningfulDecision(state, {
     lever: `policy:${payload.id.toLowerCase()}`,
     label: POLICIES[payload.id].name,
@@ -1715,7 +1727,7 @@ export function tickState(state: GameType) {
         logGameEvent(
           state,
           "WORLD_EVENT",
-          `${POLICIES[id].name}: ${state.policies!.programs[id].tier} starts this month.`,
+          `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
       state.timeline = generateNewTimeline(state, cash, customers);
@@ -2120,7 +2132,7 @@ function getDemandW(
   applyPeakDemand(
     game,
     now,
-    prev.deferredResidentialWh,
+    prev.deferredResidential,
     TICK_MINUTES * tickScale,
   );
   now.customerBillingRate = customerBillingRate(game, now);
@@ -2199,12 +2211,12 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
 function reforecastDemand(
   state: GameType,
   tickScale = 1,
-  initialDeferredWh = 0,
+  initialDeferred: TickPresentFutureType["deferredResidential"] = [],
 ): TickPresentFutureType[] {
   const projection = { ...state, policies: cloneDeep(state.policies) };
   let prev = {
     ...state.timeline[0],
-    deferredResidentialWh: initialDeferredWh,
+    deferredResidential: initialDeferred,
   } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
@@ -3144,10 +3156,10 @@ export function generateNewTimeline(
   state.timeline = reforecastDemand(
     state,
     tickScale,
-    previousDemandTick?.deferredResidentialWh ??
+    previousDemandTick?.deferredResidential ??
       getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
-        ?.deferredResidentialWhStart ??
-      0,
+        ?.deferredResidentialStart ??
+      [],
   );
   state.timeline = reforecastSupply(state, true, stepMinutes);
   return state.timeline;

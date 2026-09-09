@@ -387,6 +387,8 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     customerBillingRate?: number; // Delivered-energy blended rate, including enrolled offers.
     deferredResidentialWh?: number; // Unscaled representative-day energy awaiting late-evening use.
     deferredResidentialWhStart?: number; // Queue before this tick, retained when forecasts trim prior history.
+    deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
+    deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
     shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
@@ -865,11 +867,17 @@ export interface WorldEventStateType {
 
 export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
 export type PolicyTier = "Off" | "Small" | "Large";
+export interface DeferredResidentialLoad {
+  energyWh: number; // Unscaled representative-day energy.
+  recoveryStartMinute: number; // Absolute simulation minute, including across month boundaries.
+  recoveryEndMinute: number;
+}
 export interface PolicyProgramType {
   tier: PolicyTier;
+  startHour?: number; // Four-hour local-clock window; absent means 17 for earlier callers.
   adoption: number; // Installed potential for rebates; current enrolled share for operating offers.
   spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
-  pending?: { tier: PolicyTier; month: number };
+  pending?: { tier: PolicyTier; month: number; startHour?: number };
 }
 export interface PoliciesType {
   month: number; // Last processed elapsed month; prevents duplicate enrollment and charges.
@@ -879,6 +887,7 @@ export interface PolicyChangeType {
   id: PolicyId;
   tier: PolicyTier;
   month: number;
+  startHour?: number;
 }
 export interface GameType {
   policies?: PoliciesType;

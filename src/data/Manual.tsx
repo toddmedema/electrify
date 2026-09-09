@@ -163,20 +163,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         </p>
         <p>
           Turn the time-of-use tariff On or Off. When on, half of homes
-          participate: they move 20% of their 17:00–21:00 electricity use to
-          21:00–24:00, such as charging cars later. The energy removed after
-          efficiency and rooftop solar is spread evenly over those later hours;
-          total energy use is unchanged. Businesses and transport-sector load
-          are not enrolled. Participants pay 30% above your base rate during the
-          peak, 10% below it from 21:00–24:00, and the base rate otherwise. All
-          returned energy receives the later discount. Higher bills can affect
-          customer retention through the previous tick's effective billed rate.
+          participate: choose a four-hour daily window and they move 20% of that
+          electricity use into the following three hours, such as charging cars
+          later. For example, a 22:00–02:00 window shifts use to 02:00–05:00.
+          The energy removed after efficiency and rooftop solar is spread evenly
+          over those later hours; total energy use is unchanged. Businesses and
+          transport-sector load are not enrolled. Participants pay 30% above
+          your base rate during the chosen window, 10% below it during the
+          following three hours, and the base rate otherwise. All returned
+          energy receives the later discount. Higher bills can affect customer
+          retention through the previous tick's effective billed rate.
         </p>
         <p>
           Turn peak curtailment contracts On or Off. When on, half of industrial
           and data-center load participates, including authored scenario
-          additions. Participants forgo 20% of demand from 17:00–21:00 every
-          day, four hours maximum, even when supply is adequate. In exchange,
+          additions. Participants forgo 20% of demand during their own chosen
+          four-hour daily window, even when supply is adequate. In exchange,
           they receive a 10% credit on electricity actually supplied all day. No
           delivery means no credit. Supply and credits are allocated
           proportionally during shortages. This load is eliminated, not shifted
@@ -186,14 +188,19 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           a time-of-use rate.
         </p>
         <p>
-          Both offers use fixed local-clock windows in every season, which may
-          miss your grid's actual peak. There are no installation costs; compare
-          demand and cash before committing. Changes start next month and
-          continue until changed. Off ends enrollment, bill adjustments and load
-          changes next month; unlike rebates, these effects do not persist.
-          Estimates include billed sales, credits, spending and dispatch costs,
-          holding weather, fuel prices, fleet, base rate and other accepted
-          programs constant.
+          Each program suggests a window around the forecast peak when first
+          opened. Keep it or choose any start hour; the window lasts four hours
+          and repeats on the scenario's local clock. Windows can cross midnight.
+          Compare the forecast before applying: shifting demand can create a
+          later peak, and your best window may change with the seasons. There
+          are no installation costs; compare demand and cash before committing.
+          Changes start next month and continue until changed. Off ends new
+          enrollment effects next month. Any already-shifted residential energy
+          still returns in its originally scheduled hours at the discounted
+          rate, even if you stop or change the window. Energy is preserved
+          across midnight and representative-month boundaries. Estimates include
+          billed sales, credits, spending and dispatch costs, holding weather,
+          fuel prices, fleet, base rate and other accepted programs constant.
         </p>
       </div>
     ),

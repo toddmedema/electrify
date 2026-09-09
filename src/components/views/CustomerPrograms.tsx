@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   Radio,
   RadioGroup,
+  TextField,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -40,6 +41,10 @@ import { PolicyPreviewResult } from "../../helpers/PolicyPreview";
 import PolicyDemandChart from "../base/PolicyDemandChart";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
+import {
+  policyWindowLabel,
+  suggestedPolicyStartHour,
+} from "../../helpers/PolicyWindow";
 const programLabel = (id: PolicyId, tier: PolicyTier) =>
   isOperatingPolicy(id) && tier !== "Off" ? "On" : tier;
 
@@ -73,6 +78,7 @@ function Decision({
   }, [onClose, manualOpen]);
   const [selected, setSelected] = React.useState<PolicyId>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
+  const [startHour, setStartHour] = React.useState(17);
   const [later, setLater] = React.useState(false);
   const [preview, setPreview] = React.useState<{
     key: string;
@@ -90,7 +96,7 @@ function Decision({
   const end =
     getScenario(game.scenarioId, game.customScenario)?.durationMonths ?? 0;
   const month = later ? Math.min(effective + 11, end - 1) : effective;
-  const key = `${selected}/${tier}/${month}/${game.date.minute}`;
+  const key = `${selected}/${tier}/${startHour}/${month}/${game.date.minute}`;
   React.useEffect(() => {
     if (!selected || effective >= end) return;
     let worker: Worker | undefined;
@@ -112,7 +118,12 @@ function Decision({
         };
         worker.postMessage({
           game: JSON.parse(JSON.stringify(game)),
-          change: { id: selected, tier, month: effective },
+          change: {
+            id: selected,
+            tier,
+            month: effective,
+            ...(isOperatingPolicy(selected) ? { startHour } : {}),
+          },
           month,
         });
       } catch (_error) {
@@ -128,14 +139,18 @@ function Decision({
       window.clearTimeout(timer);
       worker?.terminate();
     };
-  }, [game, selected, tier, month, effective, end, key]);
+  }, [game, selected, tier, startHour, month, effective, end, key]);
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   const current = selected ? programs[selected] : undefined;
   const operating = selected ? isOperatingPolicy(selected) : false;
   const settled = preview?.key === key && preview.snapshot === game;
   const result = settled ? preview.result : undefined;
   const error = settled ? preview.error : undefined;
-  const unchanged = tier === (current?.pending?.tier ?? current?.tier ?? "Off");
+  const unchanged =
+    tier === (current?.pending?.tier ?? current?.tier ?? "Off") &&
+    (!operating ||
+      tier === "Off" ||
+      startHour === (current?.pending?.startHour ?? current?.startHour ?? 17));
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
   return (
@@ -171,6 +186,13 @@ function Decision({
                   onClick={() => {
                     setSelected(id);
                     setTier(programs[id].pending?.tier ?? programs[id].tier);
+                    setStartHour(
+                      programs[id].pending?.startHour ??
+                        programs[id].startHour ??
+                        (programs[id].tier !== "Off"
+                          ? 17
+                          : suggestedPolicyStartHour(game)),
+                    );
                     setLater(false);
                   }}
                 >
@@ -181,6 +203,18 @@ function Decision({
                   <Typography variant="body2">
                     {programLabel(id, programs[id].pending!.tier)} starts{" "}
                     {labelMonth(game, programs[id].pending!.month)}
+                    {isOperatingPolicy(id) &&
+                      programs[id].pending!.tier !== "Off" && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          {policyWindowLabel(
+                            programs[id].pending!.startHour ??
+                              programs[id].startHour ??
+                              17,
+                          )}
+                        </>
+                      )}
                   </Typography>
                 )}
               </Box>
@@ -233,6 +267,30 @@ function Decision({
                 />
               ))}
             </RadioGroup>
+            {operating && tier !== "Off" && (
+              <TextField
+                select
+                fullWidth
+                label="Daily window"
+                value={startHour}
+                onChange={(event) => setStartHour(Number(event.target.value))}
+                slotProps={{
+                  select: { native: true },
+                  htmlInput: { style: { minHeight: 24 } },
+                }}
+                helperText={
+                  selected === "timeOfUse"
+                    ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                    : undefined
+                }
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {policyWindowLabel(hour)}
+                  </option>
+                ))}
+              </TextField>
+            )}
             {!operating && (
               <>
                 <Typography variant="body2">
@@ -310,7 +368,7 @@ function Decision({
                         <Typography variant="body2">
                           Little change in peak demand.{" "}
                           {operating
-                            ? "The contracted evening window may not match your peak; only eligible loads respond."
+                            ? "Only eligible loads respond. Try a different daily window to target your peak."
                             : selected === "solar"
                               ? "Daylight savings may leave the evening peak unchanged."
                               : "Efficiency savings build gradually as upgrades are installed."}
@@ -364,7 +422,12 @@ function Decision({
             }
             onClick={() => {
               dispatch(
-                schedulePolicy({ id: selected, tier, month: effective }),
+                schedulePolicy({
+                  id: selected,
+                  tier,
+                  month: effective,
+                  ...(operating ? { startHour } : {}),
+                }),
               );
               setSelected(undefined);
             }}
@@ -372,7 +435,9 @@ function Decision({
             {operating
               ? tier === "Off"
                 ? "Turn off next month"
-                : "Turn on next month"
+                : (current?.pending?.tier ?? current?.tier) !== "Off"
+                  ? "Update next month"
+                  : "Turn on next month"
               : tier === "Off"
                 ? "Stop next month"
                 : "Start next month"}

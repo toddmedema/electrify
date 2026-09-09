@@ -29,13 +29,19 @@ for (const theme of ["light", "dark"]) {
       await expect(dialog).not.toContainText("Base rate:");
       await expect(dialog).not.toContainText("installed upgrades");
       const large = dialog.getByRole("radio", { name: "On", exact: true });
+      await expect(dialog.getByLabel("Daily window")).toHaveCount(0);
       await large.check();
+      const window = dialog.getByLabel("Daily window", { exact: true });
+      await expect(window).toBeVisible();
+      await window.selectOption(offer === "Time-of-use tariff" ? "22" : "9");
+      await expect(dialog).toContainText(offer === "Time-of-use tariff" ? "02:00–05:00" : "This load is eliminated");
       await dialog.getByRole("button", { name: "What is Customer programs?" }).click();
       const manual = page.getByRole("dialog", { name: "Manual help" });
       await expect(manual).toContainText("total energy use is unchanged");
       await page.keyboard.press("Escape");
       await expect(manual).toHaveCount(0);
       await expect(large).toBeChecked();
+      await expect(window).toHaveValue(offer === "Time-of-use tariff" ? "22" : "9");
       const apply = dialog.getByRole("button", {
         name: "Turn on next month",
         exact: true,
@@ -70,6 +76,13 @@ for (const theme of ["light", "dark"]) {
       await dialog
         .getByRole("button", { name: `${offer} · Off`, exact: true })
         .click();
+      await expect(window).toHaveValue(offer === "Time-of-use tariff" ? "22" : "9");
+      await window.selectOption("12");
+      const update = dialog.getByRole("button", { name: "Update next month", exact: true });
+      await expect(update).toBeEnabled({ timeout: 30000 });
+      await update.click();
+      await expect(dialog).toContainText("12:00–16:00");
+      await dialog.getByRole("button", { name: `${offer} · Off`, exact: true }).click();
       await dialog
         .getByRole("button", { name: "Cancel scheduled change" })
         .click();

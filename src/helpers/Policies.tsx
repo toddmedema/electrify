@@ -1,5 +1,6 @@
 import type {
   GameType,
+  DeferredResidentialLoad,
   PoliciesType,
   PolicyChangeType,
   PolicyId,
@@ -41,6 +42,7 @@ export function validPolicyChange(value: unknown): value is PolicyChangeType {
     !!p &&
     POLICY_IDS.includes(p.id) &&
     POLICY_TIERS.includes(p.tier) &&
+    validStartHour(p.startHour) &&
     Number.isInteger(p.month) &&
     p.month > 0
   );
@@ -61,6 +63,7 @@ export function validPolicies(
       return (
         !!s &&
         POLICY_TIERS.includes(s.tier) &&
+        validStartHour(s.startHour) &&
         Number.isFinite(s.adoption) &&
         s.adoption >= 0 &&
         s.adoption <= 1 &&
@@ -103,6 +106,10 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
       const s = p.programs[id];
       if (s.pending && s.pending.month <= m) {
         s.tier = s.pending.tier;
+        if (isOperatingPolicy(id)) {
+          if (s.pending.startHour === undefined) delete s.startHour;
+          else s.startHour = s.pending.startHour;
+        }
         delete s.pending;
         activated.push(id);
       }
@@ -131,45 +138,105 @@ export const isOperatingPolicy = (id: PolicyId) =>
 export const participation = (tier: PolicyTier) =>
   tier === "Large" ? 0.5 : tier === "Small" ? 0.25 : 0;
 
-const peakHour = (minute: number) => {
-  const localMinute =
-    ((minute % MINUTES_PER_MONTH) + MINUTES_PER_MONTH) % MINUTES_PER_MONTH;
-  return localMinute >= 17 * 60 && localMinute < 21 * 60;
-};
+const validStartHour = (hour: unknown) =>
+  hour === undefined ||
+  (typeof hour === "number" &&
+    Number.isInteger(hour) &&
+    hour >= 0 &&
+    hour < 24);
+export const policyStartHour = (program?: { startHour?: number }) =>
+  program?.startHour ?? 17;
+const windowOffset = (minute: number, startHour: number) =>
+  (((minute - startHour * 60) % MINUTES_PER_MONTH) + MINUTES_PER_MONTH) %
+  MINUTES_PER_MONTH;
+export const policyPeakHour = (minute: number, startHour = 17) =>
+  windowOffset(minute, startHour) < 240;
+export const samePolicyChoice = (
+  id: PolicyId,
+  a: { tier: PolicyTier; startHour?: number },
+  b: { tier: PolicyTier; startHour?: number },
+) =>
+  a.tier === b.tier &&
+  (!isOperatingPolicy(id) || policyStartHour(a) === policyStartHour(b));
 
-/** Defer actual residential energy until later in the same representative day.
- * Industrial curtailment is eliminated consumption and never enters the queue. */
+export function validDeferredResidential(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (entry: DeferredResidentialLoad) =>
+      entry &&
+      Number.isFinite(entry.energyWh) &&
+      entry.energyWh >= 0 &&
+      Number.isInteger(entry.recoveryStartMinute) &&
+      entry.recoveryStartMinute >= 0 &&
+      entry.recoveryEndMinute === entry.recoveryStartMinute + 180,
+  );
+}
+
+/** Each batch keeps its original three-hour recovery window, including when
+ * a new month changes or disables the tariff. Industry never enters the queue. */
 export function applyPeakDemand(
   game: GameType,
   tick: TickPresentFutureType,
-  deferredWh = 0,
+  deferred: readonly DeferredResidentialLoad[] = [],
   stepMinutes = TICK_MINUTES,
 ) {
-  const localMinute = tick.minute % MINUTES_PER_MONTH;
-  tick.deferredResidentialWh = localMinute === 0 ? 0 : deferredWh;
-  tick.deferredResidentialWhStart = tick.deferredResidentialWh;
+  tick.deferredResidentialStart = deferred.map((entry) => ({ ...entry }));
+  tick.deferredResidentialWhStart = deferred.reduce(
+    (sum, entry) => sum + entry.energyWh,
+    0,
+  );
+  const queue = deferred.map((entry) => ({ ...entry }));
   tick.shiftedResidentialW = 0;
   const p = game.policies?.programs;
   const tariff =
     participation(p?.timeOfUse?.tier ?? "Off") * POLICIES.timeOfUse.cap;
   const contract =
     participation(p?.curtailment?.tier ?? "Off") * POLICIES.curtailment.cap;
-  if (peakHour(tick.minute)) {
+  if (policyPeakHour(tick.minute, policyStartHour(p?.timeOfUse))) {
     const removedW = tick.demandByType.Residential * tariff;
     tick.demandByType.Residential -= removedW;
-    tick.deferredResidentialWh += (removedW * stepMinutes) / 60;
+    const recoveryStartMinute =
+      tick.minute -
+      windowOffset(tick.minute, policyStartHour(p?.timeOfUse)) +
+      240;
+    if (removedW > 0) {
+      let batch = queue.find(
+        (entry) => entry.recoveryStartMinute === recoveryStartMinute,
+      );
+      if (!batch) {
+        batch = {
+          energyWh: 0,
+          recoveryStartMinute,
+          recoveryEndMinute: recoveryStartMinute + 180,
+        };
+        queue.push(batch);
+      }
+      batch.energyWh += (removedW * stepMinutes) / 60;
+    }
+  }
+  if (policyPeakHour(tick.minute, policyStartHour(p?.curtailment))) {
     tick.demandByType.Industrial *= 1 - contract;
     tick.demandByType["Data centers"] *= 1 - contract;
-  } else if (localMinute >= 21 * 60) {
-    const remainingMinutes = MINUTES_PER_MONTH - localMinute;
-    const returnedW = (tick.deferredResidentialWh * 60) / remainingMinutes;
-    tick.shiftedResidentialW = returnedW;
-    tick.demandByType.Residential += returnedW;
-    tick.deferredResidentialWh = Math.max(
-      0,
-      tick.deferredResidentialWh - (returnedW * stepMinutes) / 60,
-    );
   }
+  for (const batch of queue) {
+    const start = Math.max(tick.minute, batch.recoveryStartMinute);
+    const duration = Math.max(
+      0,
+      Math.min(tick.minute + stepMinutes, batch.recoveryEndMinute) - start,
+    );
+    if (duration === 0) continue;
+    const returnedWh =
+      (batch.energyWh * duration) / (batch.recoveryEndMinute - start);
+    tick.shiftedResidentialW += (returnedWh * 60) / stepMinutes;
+    batch.energyWh = Math.max(0, batch.energyWh - returnedWh);
+  }
+  tick.demandByType.Residential += tick.shiftedResidentialW;
+  tick.deferredResidential = queue.filter((entry) => entry.energyWh > 0);
+  tick.deferredResidentialWh = tick.deferredResidential.reduce(
+    (sum, entry) => sum + entry.energyWh,
+    0,
+  );
 }
 
 /** Bill only delivered energy. After curtailment, enrolled users form a smaller
@@ -185,18 +252,23 @@ export function customerBillingRate(
   const p = game.policies?.programs;
   const enrolledTariff = participation(p?.timeOfUse?.tier ?? "Off");
   const enrolledContract = participation(p?.curtailment?.tier ?? "Off");
-  const peak = peakHour(tick.minute);
-  const fraction = (enrolled: number) =>
+  const tariffOffset = windowOffset(tick.minute, policyStartHour(p?.timeOfUse));
+  const tariffPeak = tariffOffset < 240;
+  const contractPeak = policyPeakHour(
+    tick.minute,
+    policyStartHour(p?.curtailment),
+  );
+  const fraction = (enrolled: number, peak: boolean) =>
     peak ? (enrolled * 0.8) / (1 - enrolled * 0.2) : enrolled;
-  const tariffDelta = peak
+  const tariffDelta = tariffPeak
     ? 0.3
-    : tick.minute % MINUTES_PER_MONTH >= 21 * 60
+    : tariffOffset >= 240 && tariffOffset < 420
       ? -0.1
       : 0;
   const returnedW = tick.shiftedResidentialW ?? 0;
   const enrolledResidentialW =
-    (tick.demandByType.Residential - returnedW) * fraction(enrolledTariff) +
-    returnedW;
+    (tick.demandByType.Residential - returnedW) *
+    fraction(enrolledTariff, tariffPeak);
   const industrial =
     tick.demandByType.Industrial + tick.demandByType["Data centers"];
   const total = Object.values(tick.demandByType).reduce(
@@ -208,7 +280,8 @@ export function customerBillingRate(
     (total > 0
       ? 1 +
         (enrolledResidentialW * tariffDelta -
-          industrial * fraction(enrolledContract) * 0.1) /
+          returnedW * 0.1 -
+          industrial * fraction(enrolledContract, contractPeak) * 0.1) /
           total
       : 1)
   );

@@ -12,10 +12,85 @@ import { PolicyId } from "../../Types";
 import { POLICIES } from "../../data/Policies";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { emptyPolicies } from "../../helpers/Policies";
+import { suggestedPolicyStartHour } from "../../helpers/PolicyWindow";
 
 jest.mock("../../helpers/PolicyPreviewClient", () => ({
   createPolicyPreviewWorker: jest.fn(),
 }));
+
+test("window defaults to the forecast peak and only a fresh preview can schedule a changed window", () => {
+  jest.useFakeTimers();
+  const workers: Array<{
+    onmessage: ((event: { data: unknown }) => void) | null;
+    postMessage: jest.Mock;
+    terminate: jest.Mock;
+  }> = [];
+  const stub = jest
+    .spyOn(client, "createPolicyPreviewWorker")
+    .mockImplementation(() => {
+      const worker = {
+        onmessage: null,
+        postMessage: jest.fn(),
+        terminate: jest.fn(),
+      };
+      workers.push(worker);
+      return worker as unknown as Worker;
+    });
+  const game = createGame({ scenarioId: 106 });
+  const store = configureStore({
+    reducer: { game: gameReducer, ui: uiReducer },
+    preloadedState: { game },
+  });
+  const view = render(
+    <Provider store={store}>
+      <CustomerPrograms game={game} onViewDemand={jest.fn()} />
+    </Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Customer programs" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+  );
+  expect(screen.queryByLabelText("Daily window")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: /^On$/ }));
+  expect(screen.getByLabelText("Daily window")).toHaveValue(
+    String(suggestedPolicyStartHour(game)),
+  );
+  act(() => jest.advanceTimersByTime(250));
+  const old = workers[workers.length - 1];
+  fireEvent.change(screen.getByLabelText("Daily window"), {
+    target: { value: "22" },
+  });
+  const result = previewPolicy(
+    game,
+    { id: "timeOfUse", tier: "Large", month: 1, startHour: 22 },
+    1,
+  );
+  act(() => old.onmessage!({ data: { result } }));
+  const apply = screen.getByRole("button", { name: "Turn on next month" });
+  expect(apply).toBeDisabled();
+  act(() => jest.advanceTimersByTime(250));
+  const worker = workers[workers.length - 1];
+  expect(worker.postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      change: { id: "timeOfUse", tier: "Large", month: 1, startHour: 22 },
+    }),
+  );
+  act(() => worker.onmessage!({ data: { result } }));
+  fireEvent.click(apply);
+  expect(
+    store.getState().game.policies!.programs.timeOfUse.pending!.startHour,
+  ).toBe(22);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Time-of-use tariff · Off" }),
+  );
+  expect(screen.getByLabelText("Daily window")).toHaveValue("22");
+  expect(
+    screen.getByRole("button", { name: "Update next month" }),
+  ).toBeDisabled();
+  view.unmount();
+  stub.mockRestore();
+  jest.useRealTimers();
+});
 
 test("stale and failed worker results cannot enable Apply, and closing terminates preview", () => {
   jest.useFakeTimers();
