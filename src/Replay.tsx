@@ -37,7 +37,8 @@ import {
 // reproduce their recorded outcomes and must not be relabeled as current replays.
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
 // Version 10 replaces wildfire actions with mandatory generic scenario choices.
-export const REPLAY_VERSION = 10;
+// Version 11 adds mandatory connection/winterization choices and their economic effects.
+export const REPLAY_VERSION = 11;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

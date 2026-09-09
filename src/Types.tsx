@@ -1103,6 +1103,10 @@ export interface ScenarioChoiceType {
     label: string;
     message: string;
     cost: (difficulty: DifficultyType) => number;
+    description?: string;
+    /** One-time company contribution, never plant electricity sales. */
+    upfrontGrant?: (difficulty: DifficultyType) => number;
+    loadAdditions?: ScenarioLoadAdditionType[];
     /** False for a response that preserves the baseline without changing the operating plan. */
     meaningful?: boolean;
   }[];

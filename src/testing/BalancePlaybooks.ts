@@ -36,7 +36,8 @@ const line = (
 
 /**
  * Reproducible CEO plans made from persistent, UI-legal commitments. Every plan contains exactly
- * ten material choices across at least four categories, no more than one rate setting, and no
+ * ten material choices (including mandatory scenario responses) across at least four categories,
+ * no more than one rate setting, and no
  * inverse action. Late operating/program changes still remain in force through a settlement.
  */
 export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
@@ -132,7 +133,8 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     sellAtMonth: 191,
     scheduledActions: [
       rate(0.101),
-      ...dispatch([1, 2, 3]),
+      // The binding data-center connection is the tenth material choice.
+      ...dispatch([1, 2]),
       ...line("pjm-miso-upgrade", 189, 188),
       ...programs(190),
     ],

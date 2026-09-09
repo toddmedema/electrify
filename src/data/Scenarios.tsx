@@ -1012,7 +1012,8 @@ export const SCENARIOS = [
       fantasy: "Guide a small city grid through explosive growth.",
       objective:
         "Build enough dependable generation and storage before data-center demand arrives.",
-      threat: "New demand will overwhelm the grid if you build too late.",
+      threat:
+        "New demand will overwhelm the grid if you build too late. In January 2024, choose funded full connections in 2026 or phased connections in 2026 and 2028.",
     },
     ownership: "Public",
     startingYear: 2020,
@@ -1072,7 +1073,8 @@ export const SCENARIOS = [
       fantasy: "Keep Austin powered through a brutal winter storm.",
       objective:
         "Strengthen the grid and keep every customer supplied during the February 2021 freeze.",
-      threat: "Extreme cold will cut supplies just as demand surges.",
+      threat:
+        "Extreme cold will cut supplies just as demand surges. In January 2020, choose winterization or preserve your construction budget.",
     },
     ownership: "Public",
     seed: 268107,

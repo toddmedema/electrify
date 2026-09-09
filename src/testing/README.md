@@ -144,6 +144,11 @@ zero-based trigger month, prompt, and options with stable IDs, outcome copy and 
 upfront costs. Include a free option so a player with no cash can still choose. Definitions are
 presented in array order when several are due. No UI or reducer wiring is needed.
 
+Use `description` for consequences shown before commitment, `upfrontGrant` for a one-time
+company contribution, and `loadAdditions` to replace an authored connection schedule. Grants
+are booked as company revenue, never as a plant's electricity sales. Multiple load additions
+with the same demand type should share a label because Insights groups them into one series.
+
 The shared modal blocks navigation and dismissal; the reducer blocks the clock until an explicit
 response is accepted. Selecting closes the prompt and leaves play paused so the player can inspect
 the result before resuming. Saves retain unanswered prompts and replay actions retain answers.
@@ -156,3 +161,7 @@ Costs are charged once and retained as operating expenses through reforecasting.
 
 The headless baseline bot explicitly selects the first free option. Add focused reducer tests
 for each consequential branch, including future effects, save and replay parity.
+Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch in a simulation;
+an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
+See [the scenario choice balance report](SCENARIO_CHOICE_BALANCE.md) for the reproducible
+Data Center, Deep Freeze and Wildfire win/loss matrix and price rationale.

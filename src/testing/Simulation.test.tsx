@@ -1,3 +1,6 @@
+import cloneDeep from "lodash.clonedeep";
+import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
+import { chooseScenarioResponse } from "../reducers/GameActions";
 import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
 import {
@@ -20,7 +23,7 @@ import {
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 import { EMPTY_HISTORY, getTimeFromTimeline } from "../helpers/DateTime";
-import { scenarioObjectiveFailure, tickState } from "../reducers/Game";
+import reducer, { scenarioObjectiveFailure, tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
 import { getAirborneWindOutputFactor } from "../helpers/Energy";
@@ -32,15 +35,43 @@ jest.setTimeout(120000);
 function runMonths(state: GameType, months: number) {
   const until = state.date.monthsElapsed + months;
   while (state.date.monthsElapsed < until) {
+    const decision = pendingScenarioChoice(state);
+    if (decision && !state.replayPlayback) {
+      const option = decision.options.find(
+        (option) => option.cost(state.difficulty) === 0,
+      )!;
+      Object.assign(
+        state,
+        cloneDeep(
+          reducer(
+            cloneDeep(state),
+            chooseScenarioResponse({
+              decisionId: decision.id,
+              optionId: option.id,
+            }),
+          ),
+        ),
+      );
+    }
     tickState(state);
   }
 }
 
-// Mandatory baseline responses are recorded actions, but do not earn decision credit.
+// Mandatory baseline responses are recorded actions; a binding connection also earns credit.
 function baselineChoiceActions(result: SimResultType, scenarioId: number) {
   return SCENARIO_CHOICES.filter(
     (choice) =>
       choice.scenarioId === scenarioId && choice.atMonth < result.months.length,
+  ).length;
+}
+
+function baselineMeaningfulChoices(scenarioId: number, result?: SimResultType) {
+  return SCENARIO_CHOICES.filter(
+    (choice) =>
+      choice.scenarioId === scenarioId &&
+      (!result || choice.atMonth < result.months.length) &&
+      choice.options.find((option) => option.cost("Intern") === 0)
+        ?.meaningful !== false,
   ).length;
 }
 
@@ -359,6 +390,7 @@ describe("researched public-utility scenarios", () => {
     expect(
       event.worldEvents.occurrences.map((occurrence) => occurrence.key),
     ).toEqual([
+      "story:107:texas-deep-freeze:winterization",
       "story:107:texas-deep-freeze:uri",
       "story:107:texas-deep-freeze:thaw",
     ]);
@@ -664,7 +696,9 @@ describe("simulation economics", () => {
       expect(passive.actionCount).toBe(
         baselineChoiceActions(passive, scenario.id),
       );
-      expect(passive.meaningfulDecisionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(
+        baselineMeaningfulChoices(scenario.id, passive),
+      );
       expect(passive.outcome).not.toBe("completed");
 
       const active = runSimulation({
@@ -676,7 +710,9 @@ describe("simulation economics", () => {
       expect(active.actionCount).toBe(
         1 + baselineChoiceActions(active, scenario.id),
       );
-      expect(active.meaningfulDecisionCount).toBe(1);
+      expect(active.meaningfulDecisionCount).toBe(
+        1 + baselineMeaningfulChoices(scenario.id, active),
+      );
       expect(active.builds).toHaveLength(1);
       expect(active.outcome).toBe("completed");
     });
@@ -692,7 +728,9 @@ describe("simulation economics", () => {
       expect(passive.actionCount).toBe(
         baselineChoiceActions(passive, scenario.id),
       );
-      expect(passive.meaningfulDecisionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(
+        baselineMeaningfulChoices(scenario.id, passive),
+      );
       expect(passive.outcome).not.toBe("completed");
 
       const play = STANDARD_BALANCE_PLAYS[scenario.id];
@@ -773,9 +811,9 @@ describe("simulation economics", () => {
     if (play.sellFacilityId !== undefined)
       omissions.push({ sellFacilityId: undefined });
 
-    if (omissions.length !== 10) {
+    if (omissions.length + baselineMeaningfulChoices(scenario.id) !== 10) {
       throw new Error(
-        `CEO ${scenario.id} play must author exactly ten choices`,
+        `CEO ${scenario.id} play must total ten choices including mandatory responses`,
       );
     }
     omissions.forEach((omission, index) => {

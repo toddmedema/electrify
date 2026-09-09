@@ -1076,6 +1076,33 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export const DEEP_FREEZE_DECISION_KEY =
+  "story:107:texas-deep-freeze:winterization";
+// An authored Austin-scale program budget, not a real-world engineering estimate.
+// The protected fleet is unchanged by difficulty; demand and economics already scale risk.
+// $250M balances a smaller winterized fleet against additional unprotected generation.
+export const WINTERIZATION_COST = {
+  Intern: 250000000,
+  Employee: 250000000,
+  Manager: 250000000,
+  VP: 250000000,
+  CEO: 250000000,
+};
+export function winterizationCost(difficulty: DifficultyType): number {
+  return WINTERIZATION_COST[difficulty];
+}
+export function deepFreezeWinterized(
+  occurrences?: ActiveWorldEventType[],
+): boolean {
+  return (
+    occurrences?.some(
+      (event) =>
+        event.key === DEEP_FREEZE_DECISION_KEY &&
+        event.attributes.choice === "winterize",
+    ) ?? false
+  );
+}
+
 export const TEXAS_DEEP_FREEZE_DEMAND: Record<DifficultyType, number> = {
   // The joint FERC/NERC report measured actual ERCOT peak load 20% above the normal-weather
   // forecast and estimated unconstrained demand 33% above it. Difficulty spans that observed
@@ -1102,11 +1129,14 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       // January 2017 is month zero, so February 2021 is month 49.
       schedule: { atMonth: 49 },
       durationMonths: 1,
-      describe: ({ difficulty }) => {
+      describe: ({ difficulty, occurrences }) => {
+        const winterized = deepFreezeWinterized(occurrences);
+        const protectedOutput = (normal: number) =>
+          winterized ? (1 + normal) / 2 : normal;
         const demandMultiplier = TEXAS_DEEP_FREEZE_DEMAND[difficulty];
         return {
           title: "The deep freeze",
-          message: `Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
+          message: `${winterized ? "Your funded winterization halves plant output losses. " : "Without funded winterization, the full plant output losses apply. "}Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
           concept: "blackout",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1118,10 +1148,10 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
             demandMultiplier,
             fuelPriceMultipliers: { "Natural Gas": 2.8 },
             facilityOutputMultipliersByFuel: {
-              "Natural Gas": 0.62,
-              Coal: 0.73,
-              Uranium: 0.77,
-              Wind: 0.44,
+              "Natural Gas": protectedOutput(0.62),
+              Coal: protectedOutput(0.73),
+              Uranium: protectedOutput(0.77),
+              Wind: protectedOutput(0.44),
             },
           },
           turningPointPriority: 110,
@@ -1131,17 +1161,20 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
     {
       id: "thaw",
       schedule: { atMonth: 50 },
-      describe: ({ periodSnapshots }) => {
+      describe: ({ periodSnapshots, occurrences }) => {
         const event = periodSnapshots?.[1];
         const unservedWh = event?.unservedWh || 0;
+        const preparation = deepFreezeWinterized(occurrences)
+          ? "Your funded winterization halved plant output losses. "
+          : "Your construction budget was preserved, with full plant output losses. ";
         return {
           title: "The thaw",
           message:
             event === undefined
               ? "The freeze ends next month, restoring normal plant output and gas prices."
               : unservedWh > 0
-                ? "The freeze has ended, leaving the grid with a difficult recovery after blackouts."
-                : "The freeze has ended, and your preparations kept every customer supplied.",
+                ? `${preparation}The freeze has ended, leaving the grid with a difficult recovery after blackouts.`
+                : `${preparation}The freeze has ended, and your preparations kept every customer supplied.`,
           concept: "weather",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
