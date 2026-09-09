@@ -2,6 +2,8 @@ import { getViableLocationCount } from "../data/FacilitySites";
 import {
   advancePolicies,
   applyPolicyDemand,
+  applyPeakDemand,
+  customerBillingRate,
   emptyPolicies,
   policyAvailable,
   validPolicyChange,
@@ -1463,11 +1465,8 @@ function applyPolicyEdit(
     : (state.policies!.programs[payload.id].pending?.tier ??
       state.policies!.programs[payload.id].tier);
   recordMeaningfulDecision(state, {
-    lever: `policy:${payload.id}`,
-    label:
-      payload.id === "efficiency"
-        ? "Fund efficiency rebates"
-        : "Fund rooftop solar rebates",
+    lever: `policy:${payload.id.toLowerCase()}`,
+    label: POLICIES[payload.id].name,
     kind: "policy",
     before,
     after,
@@ -1716,7 +1715,7 @@ export function tickState(state: GameType) {
         logGameEvent(
           state,
           "WORLD_EVENT",
-          `${POLICIES[id].name}: ${state.policies!.programs[id].tier} funding starts this month.`,
+          `${POLICIES[id].name}: ${state.policies!.programs[id].tier} starts this month.`,
         ),
       );
       state.timeline = generateNewTimeline(state, cash, customers);
@@ -2059,7 +2058,7 @@ function getDemandW(
     getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
   now.customerRate = updateCustomerRate(
     prev.customerRate || game.customerRate,
-    game.dollarsPerkWh,
+    prev.customerBillingRate ?? game.dollarsPerkWh,
     tickScale,
   );
   now.customers = nextCustomerCount({
@@ -2118,6 +2117,8 @@ function getDemandW(
     game.loadAdditions,
   );
   applyPolicyDemand(game, now);
+  applyPeakDemand(game, now);
+  now.customerBillingRate = customerBillingRate(game, now);
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
     0,
@@ -2698,7 +2699,11 @@ function updateSupplyFacilitiesFinances(
     (Math.min(now.supplyW, now.demandW) / ticksPerHour) * GAME_TO_REAL_YEARS;
   // Scale the representative simulated day to the real month it stands for.
   const demandWh = (now.demandW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const customerRevenue = (supplyWh / 1000) * state.dollarsPerkWh;
+  // Re-read the base rate for live slider edits; demand forecasts may have been
+  // generated before that edit. Forecast passes advance their own policy copy.
+  now.customerBillingRate = customerBillingRate(state, now);
+  const customerRevenue =
+    (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
@@ -2854,6 +2859,11 @@ function updateSupplyFacilitiesFinances(
     getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
 
   // Save new financial info
+  now.customerRate = updateCustomerRate(
+    prev.customerRate || state.customerRate,
+    prev.customerBillingRate ?? state.dollarsPerkWh,
+    tickScale,
+  );
   now.customers = nextCustomerCount({
     customers: prev.customers,
     customerRate: now.customerRate,
@@ -2922,6 +2932,7 @@ function supplyForecastPass(
   // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
   const newState = {
     ...state,
+    policies: cloneDeep(state.policies),
     facilities: cloneDeep(state.facilities),
     transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),
   };
@@ -2939,6 +2950,7 @@ function supplyForecastPass(
   return newState.timeline.map((t: TickPresentFutureType) => {
     const sourceTick = t;
     if (t.minute >= state.date.minute) {
+      advancePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
       t = { ...t };
       copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
@@ -3048,6 +3060,13 @@ export function generateNewTimeline(
   const currentCustomerRate =
     getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
       ?.customerRate || readOnlyState.customerRate;
+  // Retention responds to the last delivered-energy bill, with one tick of lag.
+  // Carry that signal across month boundaries and isolated forecast horizons.
+  const currentBillingRate =
+    getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
+      ?.customerBillingRate ??
+    readOnlyState.timeline.at(-1)?.customerBillingRate ??
+    readOnlyState.dollarsPerkWh;
   for (let i = 0; i < ticks; i++) {
     state.timeline[i] = {
       minute: state.date.minute + i * stepMinutes,
@@ -3067,6 +3086,7 @@ export function generateNewTimeline(
       cash,
       customers,
       customerRate: currentCustomerRate,
+      customerBillingRate: currentBillingRate,
       netWorth,
       revenue: 0,
       expensesFuel: 0,

@@ -269,6 +269,27 @@ export function checkTick(
     );
   }
 
+  if (now.customerBillingRate !== undefined) {
+    const billedRevenue =
+      (((Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) *
+        GAME_TO_REAL_YEARS) /
+        1000) *
+        now.customerBillingRate +
+      (now.revenueExports || 0);
+    if (
+      !isFinite_(now.customerBillingRate) ||
+      now.customerBillingRate < 0 ||
+      Math.abs(now.revenue - billedRevenue) >
+        Math.max(1, Math.abs(billedRevenue) * RELATIVE_TOLERANCE)
+    ) {
+      collector.add(
+        "revenue bills only delivered energy at the effective rate",
+        when,
+        `recorded revenue ${now.revenue}, delivered-energy bill ${billedRevenue}`,
+      );
+    }
+  }
+
   // Cash moves only by the tick's own revenue and expenses. Loan principal is spent but not
   // recorded on the tick, so the expected value is a range bounded by the outstanding payments.
   if (prev && !builtThisTick && isFinite_(now.cash) && isFinite_(prev.cash)) {

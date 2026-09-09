@@ -26,6 +26,8 @@ import {
   emptyPolicies,
   policyAvailable,
   policyBudget,
+  isOperatingPolicy,
+  participation,
 } from "../../helpers/Policies";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import {
@@ -125,6 +127,7 @@ function Decision({
   }, [game, selected, tier, month, effective, end, key]);
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   const current = selected ? programs[selected] : undefined;
+  const operating = selected ? isOperatingPolicy(selected) : false;
   const settled = preview?.key === key && preview.snapshot === game;
   const result = settled ? preview.result : undefined;
   const error = settled ? preview.error : undefined;
@@ -144,7 +147,13 @@ function Decision({
       <DialogTitle id="program-title">
         {selected ? POLICIES[selected].name : "Customer programs"}
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent
+        dividers
+        sx={{
+          "& button": { minHeight: 44 },
+          "& summary": { minHeight: 44, cursor: "pointer" },
+        }}
+      >
         {!selected ? (
           <Box sx={{ display: "grid", gap: 2 }}>
             {POLICY_IDS.map((id) => (
@@ -169,27 +178,29 @@ function Decision({
               </Box>
             ))}
             <Typography variant="body2">
-              Funding continues monthly until changed. Installed upgrades stay
-              for the rest of this run, including after funding stops.
+              Changes start next month. Rebates install lasting upgrades;
+              tariffs and contracts apply only while enabled.
             </Typography>
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
             <Typography>{POLICIES[selected].mechanism}</Typography>
-            <Typography variant="body2">
-              {current!.adoption >= 1
-                ? "Fully adopted"
-                : current!.adoption > 0
-                  ? current!.tier === "Off"
-                    ? "Installed upgrades retained"
-                    : "Building up"
-                  : "No funded upgrades yet"}{" "}
-              · {Math.round(current!.adoption * 100)}% of eligible potential
-              installed
-            </Typography>
+            {!operating && (
+              <Typography variant="body2">
+                {current!.adoption >= 1
+                  ? "Fully adopted"
+                  : current!.adoption > 0
+                    ? current!.tier === "Off"
+                      ? "Installed upgrades retained"
+                      : "Building up"
+                    : "No funded upgrades yet"}{" "}
+                · {Math.round(current!.adoption * 100)}% of eligible potential
+                installed
+              </Typography>
+            )}
             <RadioGroup
               row={!phone}
-              aria-label="Monthly funding"
+              aria-label={operating ? "Enrollment" : "Monthly funding"}
               value={tier}
               onChange={(e) => setTier(e.target.value as PolicyTier)}
             >
@@ -199,20 +210,55 @@ function Decision({
                   value={choice}
                   control={<Radio />}
                   sx={{ minHeight: 44, m: 0, flex: 1 }}
-                  label={`${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`}
+                  label={
+                    operating
+                      ? `${choice} · ${participation(choice) * 100}% enrolled`
+                      : `${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`
+                  }
                 />
               ))}
             </RadioGroup>
-            <Typography variant="body2">
-              Off stops new spending; installed upgrades remain.
-            </Typography>
-            <Typography variant="body2">
-              Small installs upgrades at a lower cost per upgrade. Large
-              installs them faster, at a higher cost per upgrade.
-            </Typography>
-            <Typography variant="body2">
-              Rebates cost money and reduce electricity sales.
-            </Typography>
+            {operating ? (
+              <Typography variant="body2">
+                Off restores the base rate and uncurtailed consumption next
+                month. No installation fees. Bill changes are included in cash
+                estimates. All hours use the scenario's local clock, year-round.
+              </Typography>
+            ) : (
+              <>
+                <Typography variant="body2">
+                  Off stops new spending; installed upgrades remain.
+                </Typography>
+                <Typography variant="body2">
+                  Small installs upgrades at a lower cost per upgrade. Large
+                  installs them faster, at a higher cost per upgrade.
+                </Typography>
+                <Typography variant="body2">
+                  Rebates cost money and reduce electricity sales.
+                </Typography>
+              </>
+            )}
+            {operating && (
+              <Typography variant="body2">
+                Base rate: {formatMoneyConcise(game.dollarsPerkWh)}/kWh.
+                {selected === "timeOfUse" && (
+                  <>
+                    {" "}
+                    Enrolled rates:{" "}
+                    {formatMoneyConcise(game.dollarsPerkWh * 1.3)}/kWh evening;{" "}
+                    {formatMoneyConcise(game.dollarsPerkWh * 0.9)}/kWh
+                    overnight.
+                  </>
+                )}
+                {selected === "curtailment" && (
+                  <>
+                    {" "}
+                    Enrolled rate after credit:{" "}
+                    {formatMoneyConcise(game.dollarsPerkWh * 0.9)}/kWh all day.
+                  </>
+                )}
+              </Typography>
+            )}
             {effective >= end ? (
               <Alert severity="info">
                 This run ends before another funding change could take effect.
@@ -245,10 +291,13 @@ function Decision({
                       changed={result.changed}
                     />
                     <Box role="status">
-                      <Typography>
-                        Program spending: {formatMoneyConcise(result.spending)}{" "}
-                        in {labelMonth(game, month)}
-                      </Typography>
+                      {!operating && (
+                        <Typography>
+                          Program spending:{" "}
+                          {formatMoneyConcise(result.spending)} in{" "}
+                          {labelMonth(game, month)}
+                        </Typography>
+                      )}
                       <Typography>
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
@@ -265,36 +314,50 @@ function Decision({
                         {formatMoneyConcise(result.cashChange)}
                       </Typography>
                       <Typography variant="body2">
-                        Includes program spending, less electricity sold, and
-                        actual dispatch costs.
+                        Includes program spending, billed sales after tariff
+                        adjustments and credits, and actual dispatch costs.
                       </Typography>
                       {(formatWatts(peakBefore) === formatWatts(peakAfter) ||
                         Math.abs(peakAfter - peakBefore) <
                           peakBefore * 0.001) && (
                         <Typography variant="body2">
                           Little change in peak demand.{" "}
-                          {selected === "solar"
-                            ? "Daylight savings may leave the evening peak unchanged."
-                            : "Efficiency savings build gradually as upgrades are installed."}
+                          {operating
+                            ? "The contracted evening window may not match your peak; only eligible loads respond."
+                            : selected === "solar"
+                              ? "Daylight savings may leave the evening peak unchanged."
+                              : "Efficiency savings build gradually as upgrades are installed."}
                         </Typography>
                       )}
                     </Box>
                     <details>
                       <summary>Why this changes</summary>
                       <Typography variant="body2">
-                        {POLICIES[selected].tradeoff} Budgets adjust with
-                        inflation. Spending pays only for new upgrades and stops
-                        at full adoption. Installed upgrades persist for this
-                        run.
+                        {POLICIES[selected].tradeoff}{" "}
+                        {!operating && (
+                          <>
+                            Budgets adjust with inflation. Spending pays only
+                            for new upgrades and stops at full adoption.
+                            Installed upgrades persist for this run.
+                          </>
+                        )}
                       </Typography>
                       <Typography variant="body2">
                         Estimates hold weather, fuel prices, fleet, rate and
                         customer assumptions, and other accepted programs
-                        constant. Efficiency is a simplified end-use reduction
-                        for homes and businesses. Solar offsets their remaining
-                        load after efficiency; surplus is curtailed. No export
-                        payments or utility generation credits. Hint: compare
-                        daylight savings with the time of your shortage.
+                        constant.{" "}
+                        {operating ? (
+                          "Enrollment changes consumption and the effective billed rate. Credits apply proportionally to delivered eligible energy during shortages; unserved energy earns no revenue or credit. Avoided consumption is not shifted, and scheduled curtailment is not a reliability failure."
+                        ) : (
+                          <>
+                            Efficiency is a simplified end-use reduction for
+                            homes and businesses. Solar offsets their remaining
+                            load after efficiency; surplus is curtailed. No
+                            export payments or utility generation credits. Hint:
+                            compare daylight savings with the time of your
+                            shortage.
+                          </>
+                        )}
                       </Typography>
                     </details>
                     {result.after.cash < 0 && (
@@ -402,8 +465,10 @@ export default function CustomerPrograms({
       ) : (
         active > 0 && (
           <Typography variant="caption">
-            {active} program{active > 1 ? "s" : ""} active · up to{" "}
-            {formatMoneyConcise(budget)}/month
+            {active} program{active > 1 ? "s" : ""} active
+            {budget > 0 && (
+              <> · up to {formatMoneyConcise(budget)}/month in rebates</>
+            )}
           </Typography>
         )
       )}

@@ -38,7 +38,8 @@ export const SAVE_KEY = "savedGame";
 // Older snapshots contain forecasts and financial results calculated with different physics;
 // do not silently mix those results with the new simulation. Original files remain untouched.
 // Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
-export const SAVE_VERSION = 6;
+// Version 7 adds operating tariffs/contracts and their recorded billing rates.
+export const SAVE_VERSION = 7;
 
 export interface SaveGameType {
   version: number;
@@ -366,6 +367,14 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission?.lines.some(
       ({ corridorId }) =>
         !locationCorridors.some(({ id }) => id === corridorId),
+    )
+  )
+    return null;
+  if (
+    game.timeline.some(
+      (t) =>
+        t.customerBillingRate !== undefined &&
+        (!Number.isFinite(t.customerBillingRate) || t.customerBillingRate < 0),
     )
   )
     return null;

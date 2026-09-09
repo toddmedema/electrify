@@ -145,20 +145,52 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: "Customer programs",
     group: "Gameplay",
-    keywords: "efficiency rooftop solar rebates funding adoption demand",
+    keywords:
+      "efficiency rooftop solar rebates funding adoption demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
-      <p>
-        In Insights, Customer programs lets you fund efficiency or rooftop solar
-        rebates. Choose Off, Small, or Large and compare estimated utility
-        demand before applying next month. Funding persists until changed.
-        Charges pay only for new upgrades, up to the monthly budget, and stop at
-        full adoption. Off stops new adoption and spending; installed upgrades
-        stay for the rest of the run. Efficiency reduces residential and
-        commercial use. Solar offsets their remaining daylight load, with
-        surplus curtailed and no export payment. It does not directly cover an
-        evening peak. Lower demand also means less electricity sold, so compare
-        cash as well as peak demand.
-      </p>
+      <div>
+        <p>
+          In Insights, Customer programs lets you fund efficiency or rooftop
+          solar rebates. Choose Off, Small, or Large and compare estimated
+          utility demand before applying next month. Funding persists until
+          changed. Charges pay only for new upgrades, up to the monthly budget,
+          and stop at full adoption. Off stops new adoption and spending;
+          installed upgrades stay for the rest of the run. Efficiency reduces
+          residential and commercial use. Solar offsets their remaining daylight
+          load, with surplus curtailed and no export payment. It does not
+          directly cover an evening peak. Lower demand also means less
+          electricity sold, so compare cash as well as peak demand.
+        </p>
+        <p>
+          Time-of-use tariffs enroll 25% (Small) or 50% (Large) of homes and
+          businesses. Enrolled users pay 30% above your base rate from
+          17:00–21:00, 10% below it from 00:00–06:00, and the base rate
+          otherwise. They forgo 20% of evening consumption by avoiding
+          discretionary uses. This model reduces energy consumption; it does not
+          move energy to another hour. The previous tick's effective billed rate
+          feeds customer price memory and retention, with one tick of delay.
+        </p>
+        <p>
+          Peak curtailment contracts enroll 25% or 50% of industrial and
+          data-center load, including authored scenario additions. Participants
+          forgo 20% of demand from 17:00–21:00 every day, four hours maximum,
+          even when supply is adequate. In exchange, they receive a 10% credit
+          on electricity actually supplied all day. No delivery means no credit.
+          Supply and credits are allocated proportionally during shortages.
+          Contracted curtailment does not count as a blackout. There is no
+          effect without eligible load; transport is excluded. The tariff and
+          contract cover different sectors, so credits never stack on a
+          time-of-use rate.
+        </p>
+        <p>
+          Both offers use fixed local-clock windows in every season, which may
+          miss your grid's actual peak. There are no installation costs; compare
+          demand and cash before committing. Changes start next month and
+          continue until changed. Off ends enrollment, bill adjustments and
+          consumption reductions next month; unlike rebates, these effects do
+          not persist.
+        </p>
+      </div>
     ),
   },
   {
@@ -746,7 +778,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Your rate is what you charge customers per kWh of electricity, and it
           creates nearly all of your revenue. Multiply this rate by the
-          electricity you sell to estimate your revenue. The game models each
+          electricity you sell to estimate your revenue with no customer offers.
+          Time-of-use tariffs and curtailment contracts adjust the base rate for
+          enrolled consumption; reported revenue already includes those rates
+          and credits and bills only electricity delivered. The game models each
           scenario's market and rules separately.
         </p>
         <p>

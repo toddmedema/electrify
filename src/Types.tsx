@@ -384,6 +384,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     storageLossWh: number; // Charging conversion plus self-discharge / evaporation this tick
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
+    customerBillingRate?: number; // Delivered-energy blended rate, including enrolled offers.
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
     importedW?: number;
@@ -859,12 +860,12 @@ export interface WorldEventStateType {
   checkedKeys: string[];
 }
 
-export type PolicyId = "efficiency" | "solar";
+export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
 export type PolicyTier = "Off" | "Small" | "Large";
 export interface PolicyProgramType {
   tier: PolicyTier;
-  adoption: number; // Fraction of the authored potential installed; persists within the run.
-  spending: number; // Actual funded upgrades this month, in nominal dollars.
+  adoption: number; // Installed potential for rebates; current enrolled share for operating offers.
+  spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
   pending?: { tier: PolicyTier; month: number };
 }
 export interface PoliciesType {

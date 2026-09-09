@@ -23,6 +23,8 @@ export function emptyPolicies(month = 0): PoliciesType {
     programs: {
       efficiency: { tier: "Off", adoption: 0, spending: 0 },
       solar: { tier: "Off", adoption: 0, spending: 0 },
+      timeOfUse: { tier: "Off", adoption: 0, spending: 0 },
+      curtailment: { tier: "Off", adoption: 0, spending: 0 },
     },
   };
 }
@@ -104,6 +106,11 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
         delete s.pending;
         activated.push(id);
       }
+      if (isOperatingPolicy(id)) {
+        s.adoption = participation(s.tier);
+        s.spending = 0;
+        return;
+      }
       const increment = Math.min(
         1 - s.adoption,
         POLICY_FUNDING[s.tier].adoption,
@@ -118,6 +125,68 @@ export function advancePolicies(game: GameType, month: number): PolicyId[] {
     p.month = m;
   }
   return activated;
+}
+export const isOperatingPolicy = (id: PolicyId) =>
+  id === "timeOfUse" || id === "curtailment";
+export const participation = (tier: PolicyTier) =>
+  tier === "Large" ? 0.5 : tier === "Small" ? 0.25 : 0;
+
+const peakHour = (minute: number) => {
+  const localMinute =
+    ((minute % MINUTES_PER_MONTH) + MINUTES_PER_MONTH) % MINUTES_PER_MONTH;
+  return localMinute >= 17 * 60 && localMinute < 21 * 60;
+};
+
+/** Contracted reductions remove only enrolled consumption, never create energy.
+ * The simulated representative day is the local clock for each scenario month. */
+export function applyPeakDemand(game: GameType, tick: TickPresentFutureType) {
+  if (!peakHour(tick.minute)) return;
+  const p = game.policies?.programs;
+  const tariff =
+    participation(p?.timeOfUse?.tier ?? "Off") * POLICIES.timeOfUse.cap;
+  const contract =
+    participation(p?.curtailment?.tier ?? "Off") * POLICIES.curtailment.cap;
+  tick.demandByType.Residential *= 1 - tariff;
+  tick.demandByType.Commercial *= 1 - tariff;
+  tick.demandByType.Industrial *= 1 - contract;
+  tick.demandByType["Data centers"] *= 1 - contract;
+}
+
+/** Bill only delivered energy. After curtailment, enrolled users form a smaller
+ * fraction of each sector's remaining load, so discounting the original fraction
+ * would over-credit them. The two offers apply to disjoint sectors. */
+export function customerBillingRate(
+  game: GameType,
+  tick: Pick<TickPresentFutureType, "minute" | "demandByType">,
+) {
+  const p = game.policies?.programs;
+  const enrolledTariff = participation(p?.timeOfUse?.tier ?? "Off");
+  const enrolledContract = participation(p?.curtailment?.tier ?? "Off");
+  const peak = peakHour(tick.minute);
+  const fraction = (enrolled: number) =>
+    peak ? (enrolled * 0.8) / (1 - enrolled * 0.2) : enrolled;
+  const tariffDelta = peak
+    ? 0.3
+    : tick.minute % MINUTES_PER_MONTH < 6 * 60
+      ? -0.1
+      : 0;
+  const household =
+    tick.demandByType.Residential + tick.demandByType.Commercial;
+  const industrial =
+    tick.demandByType.Industrial + tick.demandByType["Data centers"];
+  const total = Object.values(tick.demandByType).reduce(
+    (sum, watts) => sum + watts,
+    0,
+  );
+  return (
+    game.dollarsPerkWh *
+    (total > 0
+      ? 1 +
+        (household * fraction(enrolledTariff) * tariffDelta -
+          industrial * fraction(enrolledContract) * 0.1) /
+          total
+      : 1)
+  );
 }
 export function applyPolicyDemand(game: GameType, tick: TickPresentFutureType) {
   const p = game.policies?.programs;
