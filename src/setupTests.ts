@@ -1,6 +1,14 @@
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 // https://github.com/testing-library/jest-dom
 import "@testing-library/jest-dom";
+jest.mock("./helpers/PolicyPreviewClient", () => ({
+  createPolicyPreviewWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));
 
 // uPlot watches for device-pixel-ratio changes as soon as it is imported, and jsdom has no
 // matchMedia, so merely importing a chart would fail a suite. The charts never render in jsdom

@@ -5,6 +5,7 @@ import {
   GeneratorShoppingType,
   LocationType,
   MonthlyHistoryType,
+  TransmissionLineOperatingType,
 } from "../Types";
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
@@ -54,11 +55,10 @@ const PREMIUM_PER_POINT = 0.05;
 // end of the scale stays a number rather than running away.
 export const MAX_CREDIT_POINTS = 40;
 
-export function getTotalDebt(facilities: FacilityOperatingType[]): number {
-  return facilities.reduce(
-    (debt: number, g: FacilityOperatingType) => debt + g.loanAmountLeft,
-    0,
-  );
+export function getTotalDebt(
+  assets: readonly Pick<FacilityOperatingType, "loanAmountLeft">[],
+): number {
+  return assets.reduce((debt: number, asset) => debt + asset.loanAmountLeft, 0);
 }
 
 export interface CreditInputsType {
@@ -106,6 +106,10 @@ export function getCreditInputs(
   cash: number,
   netWorth: number,
   facilities: FacilityOperatingType[],
+  transmissionLines: readonly Pick<
+    TransmissionLineOperatingType,
+    "loanAmountLeft"
+  >[] = [],
 ): CreditInputsType {
   const trailing = deriveExpandedSummary(
     monthlyHistory
@@ -114,7 +118,7 @@ export function getCreditInputs(
       .reverse()
       .reduce(reduceHistories, { ...EMPTY_HISTORY }),
   );
-  const debt = getTotalDebt(facilities);
+  const debt = getTotalDebt([...facilities, ...transmissionLines]);
   // Annualised, so that a company three months into its first year is judged on the rate it is
   // earning rather than on a quarter of a year's revenue
   const months = Math.min(TRAILING_MONTHS, monthlyHistory.length);

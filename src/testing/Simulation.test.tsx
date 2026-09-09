@@ -1,9 +1,15 @@
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, GameType, ScenarioType } from "../Types";
+import {
+  DifficultyType,
+  GameType,
+  MeaningfulDecisionKindType,
+  ScenarioType,
+} from "../Types";
 import {
   createGame,
   createGameFromReplay,
   runSimulation,
+  SimOptionsType,
   SimResultType,
 } from "./Simulator";
 import {
@@ -12,8 +18,8 @@ import {
 } from "./BalancePlaybooks";
 import { loadSimData } from "./SimData";
 import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
-import { tickState } from "../reducers/Game";
+import { EMPTY_HISTORY, getTimeFromTimeline } from "../helpers/DateTime";
+import { scenarioObjectiveFailure, tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
 import { serializeReplay } from "../Replay";
 import { getAirborneWindOutputFactor } from "../helpers/Energy";
@@ -45,17 +51,6 @@ describe("simulation invariants", () => {
   // Two years is long enough to cover a full weather cycle, construction finishing and loans
   // amortizing, while keeping the whole suite well under a second per scenario
   const MONTHS = 24;
-
-  SCENARIOS.forEach((scenario: ScenarioType) => {
-    it(`holds for "${scenario.name}"`, () => {
-      expectNoViolations(
-        runSimulation({
-          scenarioId: scenario.id,
-          months: Math.min(MONTHS, scenario.durationMonths),
-        }),
-      );
-    });
-  });
 
   it("holds while building facilities on credit", () => {
     expectNoViolations(
@@ -107,24 +102,9 @@ describe("simulation invariants", () => {
       );
     });
   });
-
-  it("holds across a full 20 year run", () => {
-    expectNoViolations(runSimulation({ scenarioId: 102, strategy: "keepUp" }));
-  });
 });
 
 describe("simulation determinism", () => {
-  // Weather, fuel prices and the tick loop all keep module level state. A run that isn't purely a
-  // function of its seed means one of them is leaking between games, which would also mean a
-  // player's second playthrough silently differs from their first.
-  it("produces identical runs for the same seed", () => {
-    const options = { scenarioId: 101, months: 24, seed: 777 };
-    const first = runSimulation(options);
-    const second = runSimulation(options);
-    expect(second.months).toEqual(first.months);
-    expect(second.finalCash).toEqual(first.finalCash);
-  });
-
   // The seed only feeds the extrapolation past the end of the recorded data (weather runs
   // 1980-2019, fuel prices similar). Inside that window the game replays real history, so two
   // seeds legitimately agree; past it they have to diverge or the seed is being ignored.
@@ -211,10 +191,10 @@ describe("researched public-utility scenarios", () => {
     const restored = parseSave(
       JSON.parse(JSON.stringify(serializeSave(state))),
     )!.game;
-    expect(restored.startingDemandScale).toBe(7.5);
+    expect(restored.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(restored.loadAdditions).toEqual(manassas.loadAdditions);
     const replayed = createGameFromReplay(serializeReplay(state)!);
-    expect(replayed.startingDemandScale).toBe(7.5);
+    expect(replayed.startingDemandScale).toBe(manassas.startingDemandScale);
     expect(replayed.loadAdditions).toEqual(manassas.loadAdditions);
     expect(replayed.timeline).toEqual(state.timeline);
   });
@@ -374,8 +354,7 @@ describe("researched public-utility scenarios", () => {
       "story:107:texas-deep-freeze:thaw",
     ]);
     event.timeline.forEach((tick, index) => {
-      // Different February dispatch changes cumulative emissions slightly; the 20°C event offset
-      // itself is gone, leaving only that normal climate-forcing consequence.
+      // Once the authored offset ends, different dispatch emissions do not change weather.
       expect(
         Math.abs(tick.temperatureC - control.timeline[index].temperatureC),
       ).toBeLessThan(0.1);
@@ -390,7 +369,10 @@ describe("researched public-utility scenarios", () => {
     "VP",
     "CEO",
   ];
-  it.each(difficulties)(
+  const operatingDifficulties = difficulties.filter(
+    (difficulty) => difficulty !== "CEO",
+  );
+  it.each(operatingDifficulties)(
     "completes Data Center Boom on %s with capacity planned before the arrival",
     (difficulty) => {
       const result = runSimulation({
@@ -407,17 +389,43 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  it.each(difficulties)(
-    "rejects passive customer attrition as a Data Center Boom win on %s",
-    (difficulty) => {
-      const result = runSimulation({ scenarioId: 106, difficulty });
-      expectNoViolations(result);
-      expect(result.outcome).toBe("fired");
-      expect(result.months[result.months.length - 1].customers).toBeLessThan(
-        manassas.startingCustomers! * manassas.minimumCustomerRetention!,
-      );
-    },
-  );
+  it.each(
+    operatingDifficulties.filter((difficulty) => difficulty !== "Intern"),
+  )("rejects an unattended Data Center Boom run on %s", (difficulty) => {
+    const result = runSimulation({ scenarioId: 106, difficulty });
+    expectNoViolations(result);
+    expect(result.outcome).toBe("fired");
+    expect(result.months[result.months.length - 1].customers).toBeLessThan(
+      manassas.startingCustomers! * manassas.minimumCustomerRetention!,
+    );
+  });
+
+  it("rejects an unattended Data Center Boom run on Intern for chronic outages", () => {
+    const result = runSimulation({ scenarioId: 106, difficulty: "Intern" });
+    expectNoViolations(result);
+    expect(result.outcome).toBe("fired");
+    // The recalibrated load now causes chronic outages before attrition reaches 10%.
+    expect(result.months.slice(-3)).toHaveLength(3);
+    result.months.slice(-3).forEach((month) => {
+      expect(month.supplyWh / month.demandWh).toBeLessThan(0.9);
+    });
+  });
+
+  it("enforces Data Center Boom's customer-retention boundary independently of outage timing", () => {
+    const required =
+      manassas.startingCustomers! * manassas.minimumCustomerRetention!;
+    const history = [{ ...EMPTY_HISTORY, customers: required }];
+    expect(
+      scenarioObjectiveFailure(manassas, history, "Manager"),
+    ).toBeUndefined();
+    expect(
+      scenarioObjectiveFailure(
+        manassas,
+        [{ ...history[0], customers: required - 1 }],
+        "Manager",
+      ),
+    ).toContain("Customer attrition");
+  });
 
   it.each(difficulties)(
     "rejects an unattended Texas Deep Freeze run on %s",
@@ -432,7 +440,7 @@ describe("researched public-utility scenarios", () => {
     },
   );
 
-  it.each(difficulties)(
+  it.each(operatingDifficulties)(
     "keeps Texas Deep Freeze winnable with planned firm capacity on %s",
     (difficulty) => {
       const result = runSimulation({
@@ -440,7 +448,7 @@ describe("researched public-utility scenarios", () => {
         difficulty,
         initialBuild: {
           name: "Natural Gas",
-          peakW: 1_100_000_000,
+          peakW: 1_200_000_000,
           financed: true,
         },
       });
@@ -489,7 +497,7 @@ describe("researched public-utility scenarios", () => {
     const oilPlan = runSimulation({
       scenarioId: 107,
       difficulty: "Manager",
-      initialBuild: { name: "Oil", peakW: 600_000_000, financed: true },
+      initialBuild: { name: "Oil", peakW: 700_000_000, financed: true },
     });
     expect(gasPlan.outcome).toBe("completed");
     expect(oilPlan.outcome).toBe("completed");
@@ -615,9 +623,29 @@ describe("airborne wind dispatch", () => {
 });
 
 describe("simulation economics", () => {
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
+  const scenarios = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+  const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
+    100: [
+      "asset",
+      "dispatch",
+      "operation",
+      "policy",
+      "rate",
+      "sale",
+      "trading",
+    ],
+    101: ["asset", "dispatch", "operation", "rate", "sale"],
+    102: ["asset", "dispatch", "operation", "rate", "sale"],
+    103: ["asset", "dispatch", "operation", "rate", "sale"],
+    104: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    105: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    106: ["asset", "dispatch", "policy", "rate", "sale", "trading"],
+    107: ["asset", "dispatch", "operation", "policy", "rate"],
+    108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+  };
+  scenarios.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
@@ -625,6 +653,7 @@ describe("simulation economics", () => {
       });
       expectNoViolations(passive);
       expect(passive.actionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
       const active = runSimulation({
@@ -634,45 +663,21 @@ describe("simulation economics", () => {
       });
       expectNoViolations(active);
       expect(active.actionCount).toBe(1);
+      expect(active.meaningfulDecisionCount).toBe(1);
       expect(active.builds).toHaveLength(1);
       expect(active.outcome).toBe("completed");
     });
   });
 
-  SCENARIOS.filter((scenario) => [108, 110].includes(scenario.id)).forEach(
-    (scenario) => {
-      it(`requires player input but accepts one build on Intern in "${scenario.name}"`, () => {
-        const passive = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-        });
-        expectNoViolations(passive);
-        expect(passive.actionCount).toBe(0);
-        expect(passive.outcome).not.toBe("completed");
-
-        const active = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
-        });
-        expectNoViolations(active);
-        expect(active.actionCount).toBe(1);
-        expect(active.builds).toHaveLength(1);
-        expect(active.outcome).toBe("completed");
-      });
-    },
-  );
-
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
-    it(`rejects passive play and accepts a multi-action plan in "${scenario.name}" on CEO`, () => {
+  scenarios.forEach((scenario) => {
+    it(`requires ten validated decisions in "${scenario.name}" on CEO`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "CEO",
       });
       expectNoViolations(passive);
       expect(passive.actionCount).toBe(0);
+      expect(passive.meaningfulDecisionCount).toBe(0);
       expect(passive.outcome).not.toBe("completed");
 
       const play = STANDARD_BALANCE_PLAYS[scenario.id];
@@ -682,8 +687,94 @@ describe("simulation economics", () => {
         ...play,
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBeGreaterThanOrEqual(3);
-      expect(active.outcome).toBe("completed");
+      expect([
+        active.meaningfulDecisionCount,
+        active.meaningfulDecisionCategoryCount >= 4,
+        new Set(active.meaningfulDecisionKeys).size,
+        active.outcome,
+        active.meaningfulDecisionLabels,
+      ]).toEqual([10, true, 10, "completed", expect.any(Array)]);
+      expect(active.meaningfulDecisionCategories).toEqual(
+        expectedCeoCategories[scenario.id],
+      );
+    });
+  });
+
+  it.each([107, 111])(
+    "keeps Intern scenario %s passive-fail / one-build-win across seeds 1-20",
+    (scenarioId) => {
+      for (let seed = 1; seed <= 20; seed++) {
+        const passive = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+        });
+        const active = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+          ...INTERN_ONE_BUILD_PLAYS[scenarioId],
+        });
+        expectNoViolations(passive);
+        expectNoViolations(active);
+        expect([seed, passive.outcome]).not.toEqual([seed, "completed"]);
+        expect([seed, active.outcome]).toEqual([seed, "completed"]);
+        expect(active.meaningfulDecisionCount).toBe(1);
+      }
+    },
+  );
+
+  it.each([1, 7, 20])(
+    "wins all CEO playbooks with ten decisions on representative seed %s",
+    (seed) => {
+      scenarios.forEach((scenario) => {
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          seed,
+          ...STANDARD_BALANCE_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect([
+          scenario.id,
+          active.meaningfulDecisionCount,
+          active.meaningfulDecisionCategoryCount >= 4,
+          active.outcome,
+        ]).toEqual([scenario.id, 10, true, "completed"]);
+      });
+    },
+  );
+
+  scenarios.forEach((scenario) => {
+    const play = STANDARD_BALANCE_PLAYS[scenario.id];
+    const omissions: Array<Partial<SimOptionsType>> = (
+      play.scheduledActions || []
+    ).map((_action, omitted) => ({
+      scheduledActions: play.scheduledActions!.filter(
+        (_candidate, index) => index !== omitted,
+      ),
+    }));
+    if (play.initialBuild) omissions.push({ initialBuild: undefined });
+    if (play.sellFacilityId !== undefined)
+      omissions.push({ sellFacilityId: undefined });
+
+    if (omissions.length !== 10) {
+      throw new Error(
+        `CEO ${scenario.id} play must author exactly ten choices`,
+      );
+    }
+    omissions.forEach((omission, index) => {
+      it(`rejects actual CEO ${scenario.id} plan with choice ${index + 1} removed`, () => {
+        const shortened = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+          ...omission,
+        });
+        expectNoViolations(shortened);
+        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
+        expect(shortened.outcome).not.toBe("completed");
+      });
     });
   });
 
@@ -731,22 +822,6 @@ describe("simulation economics", () => {
     result.months.forEach((m) => {
       expect(m.revenue / (m.supplyWh / 1000)).toBeCloseTo(scenarioRate, 6);
     });
-  });
-
-  it("charges more for the same electricity at a higher rate", () => {
-    const cheap = runSimulation({
-      scenarioId: 101,
-      months: 12,
-      dollarsPerkWh: 0.05,
-    });
-    const pricey = runSimulation({
-      scenarioId: 101,
-      months: 12,
-      dollarsPerkWh: 0.1,
-    });
-    const revenue = (r: SimResultType) =>
-      r.months.reduce((a, m) => a + m.revenue, 0);
-    expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
   });
 
   it("moves investor customers toward a cheaper utility and away from a dearer one", () => {

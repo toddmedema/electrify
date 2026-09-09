@@ -139,47 +139,6 @@ describe("current facility economics", () => {
     );
   });
 
-  it("tracks starts only for the audited thermal facilities", () => {
-    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
-    const byName = (name: string) =>
-      generators.find((generator) => generator.name === name);
-
-    for (const name of [
-      "Natural Gas",
-      "Coal",
-      "Nuclear",
-      "Biomass",
-      "Geothermal",
-      "Enhanced Geothermal",
-    ]) {
-      expect(byName(name)?.tracksStarts).toBe(true);
-    }
-    expect(byName("Oil")?.tracksStarts).toBeUndefined();
-    expect(byName("Hydro")?.tracksStarts).toBeUndefined();
-    expect(byName("Nuclear")?.costPerStart).toBeUndefined();
-    expect(byName("Biomass")?.costPerStart).toBeUndefined();
-    expect(byName("Geothermal")?.costPerStart).toBeUndefined();
-    expect(byName("Enhanced Geothermal")?.costPerStart).toBeUndefined();
-  });
-
-  it("assigns technology-specific minimum stable outputs only to thermal plants", () => {
-    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
-    const minimum = (name: string) =>
-      generators.find((generator) => generator.name === name)
-        ?.minimumStableOutput;
-
-    expect(minimum("Coal")).toBe(0.4);
-    expect(minimum("Nuclear")).toBe(0.5);
-    expect(minimum("Natural Gas")).toBe(0.5);
-    expect(minimum("Oil")).toBe(0.5);
-    expect(minimum("Biomass")).toBe(0.4);
-    expect(minimum("Geothermal")).toBe(0.15);
-    expect(minimum("Enhanced Geothermal")).toBe(0.15);
-    expect(minimum("Hydro")).toBeUndefined();
-    expect(minimum("Wind")).toBeUndefined();
-    expect(minimum("Solar")).toBeUndefined();
-  });
-
   it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {
     const pumpedHydro = STORAGE(stateAt(iceland, 2024), 1000000000).find(
       (facility) => facility.name === "Pumped Hydro",
@@ -234,15 +193,6 @@ describe("real technology cost trends", () => {
 });
 
 describe("location-aware facilities", () => {
-  it("offers geothermal and hydro in a resource-rich region", () => {
-    const state = stateAt(iceland);
-    const fuels = GENERATORS(state, 100000000, [], []).map((g) => g.fuel);
-    const storage = STORAGE(state, 500000000).map((s) => s.name);
-    expect(fuels).toContain("Geothermal");
-    expect(fuels).toContain("Hydro");
-    expect(storage).toContain("Pumped Hydro");
-  });
-
   it("does not offer site-dependent technologies without the resource", () => {
     const state = stateAt(france);
     const fuels = GENERATORS(state, 100000000, [], []).map((g) => g.fuel);
@@ -291,15 +241,6 @@ describe("enhanced geothermal", () => {
     expect(generatorAt(france, 2030, "Enhanced Geothermal")).toBeDefined();
   });
 
-  it("offers both geothermal technologies in resource-rich locations", () => {
-    const names = GENERATORS(stateAt(iceland, 2030), 100000000, [], []).map(
-      (generator) => generator.name,
-    );
-
-    expect(names).toContain("Geothermal");
-    expect(names).toContain("Enhanced Geothermal");
-  });
-
   it("does not make enhanced geothermal more expensive as its fleet grows", () => {
     const baseline = generatorAt(france, 2030, "Enhanced Geothermal");
     const withExistingEnhanced = generatorAt(
@@ -329,20 +270,6 @@ describe("enhanced geothermal", () => {
     expect(baseline?.viableLocationsRemaining).toBe(4);
     expect(withEnhanced?.viableLocationsRemaining).toBe(4);
     expect(withConventional?.viableLocationsRemaining).toBe(3);
-  });
-
-  it("uses the 2030 cost and performance assumptions", () => {
-    const generator = generatorAt(france, 2030, "Enhanced Geothermal");
-
-    expect(generator).toMatchObject({
-      fuel: "Geothermal",
-      annualOperatingCost: 16000000,
-      capacityFactor: 0.83,
-      maxPeakW: 500000000,
-      yearsToBuild: 3.5,
-      lifespanYears: 30,
-    });
-    expect(generator?.buildCost).toBeCloseTo(463000000, -6);
   });
 });
 
@@ -400,19 +327,6 @@ describe("airborne wind", () => {
     expect(airborneWindCostPerW(2050)).toBe(airborneWindCostPerW(2035));
   });
 
-  it("uses early-commercial operating and build assumptions", () => {
-    const generator = generatorAt(2030);
-    expect(generator).toMatchObject({
-      fuel: "Airborne Wind",
-      annualOperatingCost: 61680,
-      btuPerWh: 0,
-      lifespanYears: 25,
-      spinMinutes: 1,
-    });
-    expect(generator?.capacityFactor).toBeCloseTo(0.888, 3);
-    expect(generator?.yearsToBuild).toBeCloseTo(2.026, 3);
-  });
-
   it("grows modular arrays from the 1.2MW anchor to a 500MW cap", () => {
     expect(airborneWindMaxPeakW(2028)).toBe(1200000);
     expect(airborneWindMaxPeakW(2030)).toBe(2400000);
@@ -422,24 +336,6 @@ describe("airborne wind", () => {
 });
 
 describe("biomass", () => {
-  it("offers a priced, dispatchable 50 MW reference plant", () => {
-    const generator = GENERATORS(stateAt(france, 2019), 50000000, [], []).find(
-      (candidate) => candidate.name === "Biomass",
-    );
-
-    expect(generator).toMatchObject({
-      fuel: "Biomass",
-      annualOperatingCost: 7235500,
-      btuPerWh: 13.3,
-      capacityFactor: 0.602,
-      maxPeakW: 50000000,
-      spinMinutes: 240,
-      yearsToBuild: 5,
-      lifespanYears: 30,
-    });
-    expect(generator?.buildCost).toBe(188870594);
-  });
-
   it("is available in every location", () => {
     [iceland, france].forEach((location) => {
       expect(

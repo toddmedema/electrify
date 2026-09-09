@@ -17,14 +17,15 @@ export function getBuildAvailability(
   if (!available && viableLocationsRemaining !== 0) {
     return {
       buildable: false,
-      secondaryText: "Not available at this location or point in time.",
+      secondaryText:
+        "Not available in this game at this location or point in time.",
     };
   }
   const siteBuildable = viableLocationsRemaining !== 0;
   if (!siteBuildable) {
     return {
       buildable: false,
-      secondaryText: "No suitable project sites remain at this location.",
+      secondaryText: "No project sites remain in this game at this location.",
     };
   }
   if (!sizeBuildable) {
@@ -52,9 +53,10 @@ export function ViableLocationsRow(props: {
   return (
     <TableRow>
       <TableCell>
-        Suitable project sites remaining
+        Project sites available in this game
         <Typography variant="body2" color="textSecondary">
-          Each project uses one suitable site
+          Each project uses one site. These game limits are not a site survey;
+          zero does not prove the resource is impossible here.
         </Typography>
       </TableCell>
       <TableCell align="right">{props.remaining}</TableCell>

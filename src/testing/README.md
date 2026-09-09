@@ -1,5 +1,14 @@
 # Headless simulation
 
+Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
+`initialPrograms: { efficiency: "Small", solar: "Large" }` and schedules each through the real
+reducer for month two. The matrix compares Off, Small, Large, solar-only, and combined funding
+in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant.
+Program costs are authored game assumptions, scaled by initial customer market and demand
+scale, then inflated from the starting year. Adoption is allocated once at the month boundary;
+its actual cost is spread across that month's ticks. Installed upgrades persist within the run.
+These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
+
 Plays the game without a browser, then checks that the economy behaved lawfully. A 20 year
 scenario runs in about half a second, so a change to the simulation can be sanity checked in
 seconds instead of by clicking through the UI in real time.
@@ -82,7 +91,7 @@ code rather than a vibe.
 | Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                |
 | Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                    |
 | Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
-| Supply accounting   | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge                                                                                                              |
+| Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                       |
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends

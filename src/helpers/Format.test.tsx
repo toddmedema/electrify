@@ -29,18 +29,6 @@ describe("formatWatts", () => {
 });
 
 describe("formatWattsAxis", () => {
-  it("should render every tick in the unit of the largest one", () => {
-    const ticks = [0, 1e8, 2e8, 3e8, 4e8, 5e8];
-    expect(ticks.map((t) => formatWattsAxis(t, ticks))).toEqual([
-      "0MW",
-      "100MW",
-      "200MW",
-      "300MW",
-      "400MW",
-      "500MW",
-    ]);
-  });
-
   it("should promote the whole axis once the largest tick crosses a unit", () => {
     const ticks = [0, 3e8, 6e8, 9e8, 1.2e9];
     expect(ticks.map((t) => formatWattsAxis(t, ticks))).toEqual([

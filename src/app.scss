@@ -821,6 +821,158 @@ $pane_header_height: 40px;
   }
 }
 
+.facilityTabs {
+  min-height: 40px !important;
+  border-bottom: 1px solid var(--border-subtle);
+
+  .MuiTab-root {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+}
+
+.transmissionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-sunken);
+}
+
+.transmissionIntro,
+.powerExchangeHero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  img {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+  }
+}
+
+.tradingPolicy,
+.transmissionProject,
+.transmissionLine,
+.powerExchangeSummary {
+  background: var(--bg-primary);
+}
+
+.transmissionPanel section > h6,
+.transmissionPanel section > .MuiTypography-subtitle2 {
+  margin-bottom: 8px;
+}
+
+.transmissionProjects {
+  display: grid;
+  gap: 12px;
+}
+
+.transmissionProject {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-tile);
+  border-radius: 8px;
+}
+
+.transmissionProjectHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.transmissionMetrics,
+.powerExchangeMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+
+  div {
+    min-width: 0;
+  }
+
+  dt {
+    color: $font_color_faded;
+    font-size: 0.75rem;
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-weight: 600;
+  }
+}
+
+.transmissionListIcon {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.transmissionEmpty {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+
+  img {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+.powerExchangeSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
+@media screen and (max-width: 359px) {
+  .transmissionPanel {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .transmissionIntro {
+    img {
+      width: 40px;
+      height: 40px;
+      flex-basis: 40px;
+    }
+
+    h6 {
+      font-size: 1.125rem;
+      line-height: 1.35;
+    }
+  }
+
+  .transmissionProject {
+    gap: 8px;
+    padding: 8px;
+
+    // On the shortest supported phone, the intro teaches the decision and the market card keeps
+    // the identifying facts. Omitting this secondary flavor copy leaves the build decision and
+    // its financing above the persistent navigation instead of making the player hunt for it.
+    > .MuiTypography-body2,
+    .transmissionProjectHeading .MuiTypography-caption {
+      display: none;
+    }
+  }
+
+  .powerExchangeMetrics {
+    grid-template-columns: 1fr;
+  }
+}
+
 // Keep the compact pane-header height on phones while preventing the global coarse-pointer
 // target size from making these two labeled controls spill into the chart below.
 @media (pointer: coarse) {
@@ -864,6 +1016,7 @@ $pane_header_height: 40px;
 
 .insightsHeaderControls {
   display: flex;
+  justify-content: flex-end;
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
@@ -1361,7 +1514,7 @@ $pane_header_height: 40px;
       align-items: stretch;
 
       &.insightsRateMetricsPublic {
-        grid-template-columns: 72px minmax(0, 1fr);
+        grid-template-columns: 68px 60px minmax(0, 1fr);
       }
     }
 
@@ -1380,7 +1533,7 @@ $pane_header_height: 40px;
     }
 
     .insightsRateMetricGrowth {
-      grid-column: 2;
+      grid-column: 3;
     }
 
     .insightsRateMetricLabel,
@@ -1550,19 +1703,6 @@ $pane_header_height: 40px;
   border: 1px solid var(--border-tile);
   border-radius: 7px;
   background: var(--bg-primary);
-}
-
-.generatorDecisionLead {
-  display: grid;
-  gap: 4px;
-  padding: 0 16px 12px;
-}
-
-.generatorBuildSubtitle {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .generatorComparison {
@@ -3775,5 +3915,102 @@ $sizemap: (
   }
   100% {
     background-color: transparent;
+  }
+}
+
+// Shared purchase rows: keep the decision and touch targets compact without clipping copy.
+.build-list-item.buildOption {
+  .MuiCardHeader-root {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+    .MuiCardHeader-avatar {
+      margin: 0;
+    }
+    .MuiCardHeader-content {
+      min-width: 0;
+    }
+    .MuiCardHeader-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .MuiCardHeader-action {
+      width: auto;
+      margin: 0 !important;
+      align-self: center;
+      flex-shrink: 0;
+    }
+  }
+  .MuiButton-root {
+    min-height: 40px;
+  }
+  .buildOptionMetrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 12px 8px;
+  }
+  .buildOptionMetric {
+    min-width: 0;
+  }
+  .buildOptionContext {
+    display: block;
+    padding: 0 12px 8px;
+  }
+  .buildOptionWarning,
+  .buildOptionDescription {
+    padding: 0 12px 8px;
+  }
+  .buildOptionFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 12px;
+    padding: 4px 0;
+    border-top: 1px solid var(--border-subtle);
+    .expand-details.MuiButton-root {
+      width: auto;
+      margin: 0;
+      border: 0;
+      border-radius: 4px;
+    }
+  }
+}
+@media (pointer: coarse) {
+  .build-list-item.buildOption .MuiButton-root {
+    min-height: 44px;
+  }
+}
+
+// Quiet, readable help beside a decision; touch targets stay usable on phones.
+.manual-link-text,
+.manual-related-link.MuiButton-root {
+  min-height: 40px;
+  padding: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-align: left;
+  text-transform: none;
+}
+.buildOptionHelp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  padding: 0 8px;
+}
+.manual-related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+@media (pointer: coarse) {
+  .manual-link-text,
+  .manual-related-link.MuiButton-root {
+    min-height: 44px;
   }
 }

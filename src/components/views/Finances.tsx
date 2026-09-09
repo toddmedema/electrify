@@ -86,7 +86,7 @@ interface ChartKeyMetadataType {
 
 // Two tables rather than one built per render: the labels are the same either way, and only
 // the two emissions rows care which system they are read in
-function buildChartKeys(units: UnitSystemType): {
+export function buildChartKeys(units: UnitSystemType): {
   [index: string]: ChartKeyMetadataType;
 } {
   return {
@@ -150,6 +150,13 @@ function buildChartKeys(units: UnitSystemType): {
     },
     expensesOM: {
       label: "Operations & maintenance",
+      higherIsBetter: false,
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    expensesPolicy: {
+      label: "Customer programs",
       higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,

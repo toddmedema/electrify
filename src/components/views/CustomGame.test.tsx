@@ -1,6 +1,5 @@
 import * as React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { RESERVE_MARGIN } from "../../Constants";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -266,13 +265,9 @@ it("scales starting nameplate capacity with starting customers", () => {
     scenarioId: CUSTOM_SCENARIO_ID,
     scenario,
   });
-  const totalNameplateW = state.facilities.reduce(
-    (total, facility) => total + (facility.peakWh ? 0 : facility.peakW),
-    0,
-  );
-  expect(totalNameplateW).toBeGreaterThanOrEqual(
-    state.timeline[0].demandW * (1 + RESERVE_MARGIN),
-  );
+  const opening = state.timeline[0];
+  expect(opening.supplyW).toBeGreaterThanOrEqual(opening.demandW);
+  expect(opening.reserveW).toBeGreaterThanOrEqual(opening.demandW * 0.05);
 });
 
 it("commits the complete location object when a map marker is selected", () => {

@@ -1,12 +1,21 @@
+import cloneDeep from "lodash.clonedeep";
 import { getStore } from "../StoreRegistry";
-import { AppStateType, GameType, ScenarioType } from "../Types";
+import {
+  AppStateType,
+  GameType,
+  MonthlyHistoryType,
+  ScenarioType,
+  TickPresentFutureType,
+} from "../Types";
 import gameReducer, {
   buildFacility,
+  buildTransmissionLine,
   delta,
   initGame,
   start,
   tickState,
 } from "../reducers/Game";
+import { summarizeTimeline } from "../helpers/DateTime";
 import { GENERATORS } from "./Facilities";
 import { createGame } from "../testing/Simulator";
 import { TUTORIALS } from "./Scenarios";
@@ -153,5 +162,46 @@ describe("authored tutorial capstones", () => {
     expect(objective.failure?.(appState(prepared))).toBe(false);
     expect(tickUntil(unprepared, objective.failure!, 800)).toBe(true);
     expect(objective.success(appState(unprepared))).toBe(false);
+  });
+
+  it("requires Mission 7 to settle a new safe-export month after observing imports", () => {
+    const objective = capstone(112);
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.transmission!.tradingPolicy = "BALANCED";
+    game.date.monthsElapsed = 15;
+    const month = summarizeTimeline(game.timeline, game.startingYear);
+    const imported: MonthlyHistoryType = {
+      ...month,
+      chartAverage: {
+        ...month.chartAverage,
+        importedW: 1,
+        exportedW: 0,
+      } as TickPresentFutureType,
+      minimumSupplyMarginW: 0,
+    };
+    const olderExport: MonthlyHistoryType = {
+      ...month,
+      chartAverage: {
+        ...month.chartAverage,
+        importedW: 0,
+        exportedW: 1,
+      } as TickPresentFutureType,
+      minimumSupplyMarginW: 1,
+    };
+    game.monthlyHistory = [imported, olderExport];
+
+    expect(objective.success(appState(game))).toBe(false);
+
+    game.monthlyHistory = [olderExport, imported];
+    expect(objective.success(appState(game))).toBe(true);
   });
 });

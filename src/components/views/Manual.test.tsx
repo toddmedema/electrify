@@ -63,19 +63,16 @@ describe("Manual", () => {
     expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toBeInTheDocument();
   });
 
-  it("has entries for the terms the game shows on screen", async () => {
+  it.each([
+    ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
+    ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
+    ["meaningful decisions", MANUAL_ENTRY.SCORE],
+  ])("finds the right lesson when searching %s", (term, title) => {
     renderManual();
-    for (const term of [
-      "capacity factor",
-      "ramp rate",
-      "peaker",
-      "round-trip efficiency",
-      "rates",
-      "carbon fee",
-    ]) {
-      await search(term);
-      expect(listedTitles().length).toBeGreaterThan(0);
-    }
+    search(term);
+    expect(
+      screen.getByRole("button", { name: title, expanded: true }),
+    ).toBeVisible();
   });
 
   it("includes every shared game symbol in the symbol guide", async () => {
@@ -102,7 +99,9 @@ describe("Manual", () => {
       "true",
     );
     // The phrase is mid-paragraph, so only the highlight wrapper matches it exactly
-    expect(screen.getByText("available supply").tagName).toBe("MARK");
+    screen.getAllByText("available supply").forEach((match) => {
+      expect(match.tagName).toBe("MARK");
+    });
   });
 
   it("lets the player collapse an auto-expanded result", async () => {
@@ -194,4 +193,55 @@ describe("Manual", () => {
     renderManual(MANUAL_ENTRY.RAMP_RATE);
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
   });
+});
+
+it("opens a related entry outside the search results and focuses its expanded heading", async () => {
+  clearManualMemory();
+  renderManual();
+  search("round-trip");
+  await userEvent.click(
+    within(
+      screen.getByRole("navigation", {
+        name: "Related to Round-trip Efficiency",
+      }),
+    ).getByRole("button", { name: "Power and Energy" }),
+  );
+  expect(screen.getByLabelText("Search the manual")).toHaveValue("");
+  const heading = screen.getByRole("button", {
+    name: "Power and Energy",
+    expanded: true,
+  });
+  expect(heading).toHaveAttribute("aria-expanded", "true");
+  expect(heading).toHaveFocus();
+  expect(
+    screen.getByText(/Holding 80 MWh does not let it supply 80 MW/),
+  ).toBeVisible();
+});
+
+it("refocuses and scrolls to the same related entry after search hid it", async () => {
+  clearManualMemory();
+  renderManual(MANUAL_ENTRY.POWER_AND_ENERGY);
+  search("round-trip");
+  const scrollIntoView = jest.fn();
+  const original = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  try {
+    await userEvent.click(
+      within(
+        screen.getByRole("navigation", {
+          name: "Related to Round-trip Efficiency",
+        }),
+      ).getByRole("button", { name: "Power and Energy" }),
+    );
+    expect(screen.getByLabelText("Search the manual")).toHaveValue("");
+    const heading = screen.getByRole("button", {
+      name: "Power and Energy",
+      expanded: true,
+    });
+    expect(heading).toHaveAttribute("aria-expanded", "true");
+    expect(heading).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  } finally {
+    HTMLElement.prototype.scrollIntoView = original;
+  }
 });

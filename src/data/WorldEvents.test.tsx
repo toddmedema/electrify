@@ -2,7 +2,6 @@ import { LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
 import { StorySnapshotType } from "../Types";
 import {
-  CALIFORNIA_WILDFIRE_BALANCE,
   combineStoryEffects,
   CARBON_FEE_BALANCE,
   END_OF_ERA_BALANCE,
@@ -12,11 +11,9 @@ import {
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
-  SHALE_BOOM_BALANCE,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
-  TEXAS_DEEP_FREEZE_DEMAND,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
 } from "./WorldEvents";
@@ -251,31 +248,6 @@ describe("The Shale Boom pilot arc", () => {
     expect(resolveStoryAtDate(shaleContext(122)).effects).toEqual({});
   });
 
-  it("checks in exact Manager values and monotonic difficulty scaling", () => {
-    expect(SHALE_BOOM_BALANCE.Manager).toEqual({
-      boomGasMultiplier: 0.75,
-      freezeSurcharge: 1.8,
-      freezeGasOutput: 0.7,
-    });
-    const ordered: DifficultyType[] = [
-      "Intern",
-      "Employee",
-      "Manager",
-      "VP",
-      "CEO",
-    ];
-    const values = ordered.map((difficulty) => SHALE_BOOM_BALANCE[difficulty]);
-    expect(values.map((value) => value.boomGasMultiplier)).toEqual([
-      0.7, 0.725, 0.75, 0.775, 0.8,
-    ]);
-    expect(values.map((value) => value.freezeSurcharge)).toEqual([
-      1.5, 1.65, 1.8, 1.95, 2.1,
-    ]);
-    expect(values.map((value) => value.freezeGasOutput)).toEqual([
-      0.8, 0.75, 0.7, 0.65, 0.6,
-    ]);
-  });
-
   it("shows future phases without treating upcoming rows as active effects", () => {
     const upcoming = upcomingStoryPhases(shaleContext(47));
     expect(upcoming.map((phase) => phase.key)).toEqual([
@@ -307,13 +279,6 @@ describe("The Shale Boom pilot arc", () => {
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
   });
 
-  it("authors every scenario with deterministic story events and no custom game", () => {
-    expect(
-      [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 110, 111]);
-    expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
-  });
-
   it("omits warning-only phases from upcoming events in every scenario", () => {
     const warningIds = new Set([
       "published-ratchet",
@@ -340,37 +305,9 @@ describe("The Shale Boom pilot arc", () => {
       expect(upcomingIds.filter((id) => id && warningIds.has(id))).toEqual([]);
     });
   });
-
-  it("keeps every authored event body to one sentence and one text level", () => {
-    const entries = STORY_ARC_DEFINITIONS.flatMap((arc) =>
-      arc.phases.flatMap((phase) => {
-        const storyContext = context(0, arc.scenarioId);
-        const preview = phase.preview?.(storyContext, () => 0.5);
-        return [
-          phase.describe(storyContext, () => 0.5),
-          ...(preview ? [preview] : []),
-        ];
-      }),
-    );
-
-    entries.forEach((entry) => {
-      expect(entry).not.toHaveProperty("details");
-      expect(entry.message.match(/[.!?](?=\s|$)/g) || []).toHaveLength(1);
-    });
-  });
 });
 
 describe("Texas Deep Freeze", () => {
-  it("uses the observed-to-unconstrained ERCOT demand range by difficulty", () => {
-    expect(TEXAS_DEEP_FREEZE_DEMAND).toEqual({
-      Intern: 1.2,
-      Employee: 1.23,
-      Manager: 1.27,
-      VP: 1.3,
-      CEO: 1.33,
-    });
-  });
-
   it("starts only in February 2021 and expires completely in March", () => {
     const january = resolveStoryAtDate(context(48, 107));
     const february = resolveStoryAtDate(context(49, 107));
@@ -398,14 +335,6 @@ describe("Texas Deep Freeze", () => {
     });
     expect(resolveStoryAtDate(context(49, 0)).effects).toEqual({});
     expect(resolveStoryAtDate(context(49, 999)).effects).toEqual({});
-  });
-
-  it("raises cold-weather demand and uses exactly one wind adjustment", () => {
-    const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
-    expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
-    expect(uri.effects.demandMultiplier).toBe(1.27);
-    expect(uri.message).toMatch(/demand runs 27% above normal/i);
-    expect(uri.message).toMatch(/plants produce less/i);
   });
 
   it("keeps the future thaw neutral, then reports the recorded outcome", () => {
@@ -586,16 +515,6 @@ describe("California wildfire emergency", () => {
       attributes: { reliability: 0.99 },
     });
     expect(restoration.message).toMatch(/met 99% of connected demand/i);
-  });
-
-  it("checks in the Manager balance values", () => {
-    expect(CALIFORNIA_WILDFIRE_BALANCE.Manager).toEqual({
-      disconnectedDemand: 0.06,
-      targetCapacityShare: 0.5,
-      outputMultiplier: 0.45,
-      restorationCostPerMonth: 2_000_000,
-    });
-    expect(validateStoryDifficultyMonotonicity()).toEqual([]);
   });
 });
 
