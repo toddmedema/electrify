@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+const port = process.env.E2E_PORT || "3000";
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: ".",
   timeout: 45000,
@@ -9,7 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -51,13 +54,13 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm start",
-    url: "http://127.0.0.1:3000",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     env: {
       BROWSER: "none",
       HOST: "127.0.0.1",
-      PORT: "3000",
+      PORT: port,
     },
   },
 });

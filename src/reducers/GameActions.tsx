@@ -46,3 +46,8 @@ export const resume = createAction<GameType>("game/resume");
  * that rebuilds the run the actions will be applied to.
  */
 export const startReplay = createAction<ReplayType>("game/startReplay");
+
+export const chooseScenarioResponse = createAction<{
+  decisionId: string;
+  optionId: string;
+}>("game/chooseScenarioResponse");
