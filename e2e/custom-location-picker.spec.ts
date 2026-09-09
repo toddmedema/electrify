@@ -170,6 +170,24 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+  const row = facilities.locator(".build-list-item").first();
+  const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
+  const removeBox = await row
+    .getByRole("button", { name: "Remove Natural Gas" })
+    .boundingBox();
+  expect(contentBox).not.toBeNull();
+  expect(removeBox).not.toBeNull();
+  expect(removeBox!.x).toBeGreaterThanOrEqual(
+    contentBox!.x + contentBox!.width,
+  );
+  expect(
+    Math.abs(
+      removeBox!.y +
+        removeBox!.height / 2 -
+        (contentBox!.y + contentBox!.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(removeBox!.height).toBeGreaterThanOrEqual(44);
   const settingsBox = await settings.boundingBox();
   const facilitiesBox = await facilities.boundingBox();
   const outlookBox = await outlook.boundingBox();
