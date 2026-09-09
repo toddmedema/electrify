@@ -11,7 +11,9 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const insights = page.locator(".insights:visible");
-    if (!(await insights.isVisible()))
+    if (page.viewportSize()!.width >= 1400)
+      await expect(insights).toBeVisible();
+    else
       await page.getByRole("button", { name: "Insights", exact: true }).click();
     const entry = insights.getByRole("button", {
       name: "Customer programs",
