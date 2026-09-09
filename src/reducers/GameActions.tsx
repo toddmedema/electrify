@@ -1,5 +1,16 @@
 import { createAction } from "@reduxjs/toolkit";
-import type { GameType, ReplayType } from "../Types";
+import type { GameType, ReplayType, PolicyChangeType } from "../Types";
+
+export const schedulePolicy = createAction<PolicyChangeType>(
+  "game/schedulePolicy",
+);
+export const cancelPolicy = createAction<PolicyChangeType>("game/cancelPolicy");
+export const openPolicyDecision = createAction<string>(
+  "game/openPolicyDecision",
+);
+export const closePolicyDecision = createAction<string>(
+  "game/closePolicyDecision",
+);
 
 /**
  * The game actions that other slices react to, declared here rather than by the game slice so that

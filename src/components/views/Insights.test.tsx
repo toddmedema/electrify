@@ -1,14 +1,18 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import cloneDeep from "lodash.clonedeep";
+import { render as renderUI, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import uiReducer from "../../reducers/UI";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
-import { GameType } from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
+import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
+import { schedulePolicy, cancelPolicy } from "../../reducers/GameActions";
 import Insights, {
-  INSIGHT_LAYERS,
   INSIGHT_PRESETS,
   MAX_CUSTOM_INSIGHT_PRESETS,
-  presetForLayers,
   withRequiredLayers,
 } from "./Insights";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -31,6 +35,68 @@ const domainValue = (domain?: ChartMockProps["domain"]) =>
   JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
+
+it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    props: typeof props;
+    getProjection: (now: TickPresentFutureType) => {
+      timeline: TickPresentFutureType[];
+    };
+  };
+  const before = internals.getProjection(game.timeline[0]);
+  const change = {
+    id: "efficiency" as const,
+    tier: "Large" as const,
+    month: 1,
+  };
+  const project = (nextGame: GameType) => {
+    const nextProps = { ...props, game: nextGame };
+    expect(insights.shouldComponentUpdate(nextProps, insights.state)).toBe(
+      true,
+    );
+    internals.props = nextProps;
+    return internals.getProjection(nextGame.timeline[0]);
+  };
+  const scheduledGame = gameReducer(game, schedulePolicy(change));
+  const scheduled = project(scheduledGame);
+  const replacedGame = gameReducer(
+    scheduledGame,
+    schedulePolicy({ ...change, tier: "Small" }),
+  );
+  const replaced = project(replacedGame);
+  const cancelled = project(
+    gameReducer(replacedGame, cancelPolicy({ ...change, tier: "Small" })),
+  );
+  const future = (projection: typeof before) =>
+    projection.timeline.find((tick) => tick.minute >= 3 * MINUTES_PER_MONTH)!;
+  expect(future(scheduled).demandW).toBeLessThan(future(replaced).demandW);
+  expect(future(replaced).demandW).toBeLessThan(future(before).demandW);
+  expect(future(scheduled).expensesPolicy).toBeGreaterThan(
+    future(replaced).expensesPolicy!,
+  );
+  expect(future(replaced).expensesPolicy).toBeGreaterThan(0);
+  expect(cancelled.timeline).toEqual(before.timeline);
+  expect(
+    insights.shouldComponentUpdate(
+      {
+        ...internals.props,
+        game: {
+          ...internals.props.game,
+          policies: JSON.parse(JSON.stringify(internals.props.game.policies)),
+        },
+      },
+      insights.state,
+    ),
+  ).toBe(false);
+});
 
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
@@ -130,6 +196,12 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+function render(element: React.ReactElement) {
+  const store = configureStore({ reducer: { ui: uiReducer } });
+  return renderUI(element, {
+    wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+  });
+}
 // MUI interaction tests share the coverage runner with the simulation suite in CI, where opening
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);
@@ -215,47 +287,36 @@ function storeCustomPreset(name: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines five distinct, purpose-ordered presets", () => {
-    expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
-      INSIGHT_LAYERS.length,
+  it("shows expanded finance rows and both rate graphs", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["financeDetails", "inflationInterest"]),
     );
-    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
-    expect(INSIGHT_PRESETS.overview.layers).toEqual([
-      "supplyDemand",
-      "cash",
-      "profit",
-      "customers",
-      "emissions",
-    ]);
-    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
-      "supplyDemand",
-      "supplyByFuel",
-      "storage",
-      "weather",
-      "water",
-    ]);
-    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
-      "profit",
-      "cash",
-      "revenue",
-      "expenses",
-      "fuelPrices",
-    ]);
-    expect(INSIGHT_PRESETS.growth.layers).toEqual([
-      "customers",
-      "demandByType",
-      "supplyDemand",
-      "revenue",
-      "profit",
-    ]);
-    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
-      "emissions",
-      "supplyByFuel",
-      "supplyDemand",
-      "fuelPrices",
-      "profit",
-    ]);
-    expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
+    const game = createGame({ scenarioId: 100 });
+    renderInsights(100, game);
+    for (const label of [
+      "Fuel",
+      "Operations & maintenance",
+      "Loan interest",
+      "Carbon fees",
+      "Profit per kWh",
+      "Net worth",
+      "Current interest rate",
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    const interestRow = screen.getByRole("row", {
+      name: /Current interest rate/,
+    });
+    expect(interestRow).toHaveTextContent(
+      (game.timeline[0].interestRate * 100).toFixed(2) + "%",
+    );
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinflationRate"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinterestRate"),
+    ).toBeInTheDocument();
   });
 
   it("starts new players on the five-chart overview in priority order", () => {
@@ -324,7 +385,7 @@ describe("Insights layers", () => {
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
-    expect(levers).not.toHaveTextContent(/market/i);
+    expect(levers).toHaveTextContent(/market benchmark/i);
     expect(
       within(levers).getByText("Customer growth / yr"),
     ).toBeInTheDocument();
@@ -378,6 +439,7 @@ describe("Insights layers", () => {
       "data-domain",
       JSON.stringify([5.9 * MINUTES_PER_MONTH, 7.1 * MINUTES_PER_MONTH]),
     );
+    expect(screen.queryByRole("dialog")).toBeNull();
     await user.keyboard("{Escape}");
     expect(event).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -400,16 +462,6 @@ describe("Insights layers", () => {
     expect(
       screen.queryByRole("region", { name: "Upcoming scenario events" }),
     ).toBeNull();
-  });
-
-  it("replaces preset horizons with a displayed 12-month date range", () => {
-    localStorage.setItem("insightsRange", "current");
-    renderInsights();
-
-    expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–21"),
-    ).toBeVisible();
   });
 
   it("zooms and pans every insight chart on one shared time viewport", async () => {
@@ -522,6 +574,36 @@ describe("Insights layers", () => {
       "profit",
       "financeDetails",
     ]);
+    expect(withRequiredLayers(["cash", "powerExchange"], 112)).toEqual([
+      "powerExchange",
+      "cash",
+    ]);
+  });
+
+  it("puts Mission 7's required exchange track first once its line opens", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+
+    renderInsights(112, game);
+
+    expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
+      "Power exchange",
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {
@@ -761,5 +843,62 @@ describe("Insights layers", () => {
       <Insights {...props} game={nextGame} facilityDragActive={false} />,
     );
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
+  });
+
+  it("refreshes a visible power exchange on every simulation tick", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    const props: React.ComponentProps<typeof Insights> = {
+      game,
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const ref = React.createRef<Insights>();
+    render(<Insights {...props} ref={ref} />);
+
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            date: { ...game.date, minute: game.date.minute + 600 },
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not offer the power-exchange layer for an explicitly islanded grid", async () => {
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+
+    renderInsights(100, game);
+    await user.click(screen.getByRole("button", { name: /Layers/ }));
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Power exchange" }),
+    ).toBeNull();
+    expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
   });
 });

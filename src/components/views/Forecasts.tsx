@@ -39,6 +39,9 @@ import ChartForecastStorage from "../base/ChartForecastStorage";
 import ChartForecastWater from "../base/ChartForecastWater";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
+import ForecastScope from "../base/ForecastScope";
+import EconomicFutureComparison from "../base/EconomicFutureComparison";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { TICK_MINUTES } from "../../Constants";
 import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
@@ -51,11 +54,6 @@ const FORECAST_YEARS_OPTIONS = [1, 5, 10, 20];
 // together. Only the bottom chart draws the month names; the rest keep their ticks and hand
 // the height back to the plot
 const FORECAST_SYNC_KEY = "forecasts";
-
-interface BlackoutEdges {
-  minute: number;
-  value: number;
-}
 
 export interface StateProps {
   game: GameType;
@@ -140,71 +138,11 @@ export default class Forecasts extends React.Component<Props, State> {
       domainMax = Math.max(domainMax, d.supplyW, d.demandW);
     });
 
-    // BLACKOUT CALCULATION
-    // Less precise (+faster) than the realtime calculator b/c longer term
-    // But also tracks blackout metrics for reporting
-    let blackoutTotalWh = 0;
-    let currentBlackout = {
-      wh: 0,
-      peakW: 0,
-      start: rangeMin,
-      end: rangeMin,
-    };
-    let largestBlackout = currentBlackout;
-    const blackouts = [
-      {
-        minute: rangeMin,
-        value: 0,
-      },
-    ] as BlackoutEdges[];
-    let prev = forecastedTimeline[0];
-    let isBlackout = prev.demandW > prev.supplyW;
-    if (isBlackout) {
-      blackouts.push({
-        minute: rangeMin,
-        value: domainMax,
-      });
-    }
-    forecastedTimeline.forEach((d: TickPresentFutureType) => {
-      if (d.demandW > d.supplyW) {
-        if (!isBlackout) {
-          // Blackout starting: low then high edge, start a new current blackout entryr
-          blackouts.push({ minute: d.minute, value: 0 });
-          blackouts.push({ minute: d.minute, value: domainMax });
-          isBlackout = true;
-          currentBlackout = {
-            wh: 0,
-            peakW: 0,
-            start: d.minute,
-            end: d.minute,
-          };
-        }
-        const amount = d.demandW - d.supplyW;
-        blackoutTotalWh += amount;
-        currentBlackout.wh += amount;
-        currentBlackout.peakW = Math.max(currentBlackout.peakW, amount);
-      } else if (d.demandW < d.supplyW && isBlackout) {
-        // Blackout ending: high then low edge, close current blackout entry
-        blackouts.push({ minute: d.minute, value: domainMax });
-        blackouts.push({ minute: d.minute, value: 0 });
-        isBlackout = false;
-        currentBlackout.end = d.minute;
-        if (currentBlackout.wh > largestBlackout.wh) {
-          largestBlackout = currentBlackout;
-        }
-      }
-      prev = d;
-    });
-    // Close out
-    blackouts.push({
-      minute: rangeMax,
-      value: isBlackout ? domainMax : 0,
-    });
-    if (currentBlackout.wh > largestBlackout.wh) {
-      largestBlackout = currentBlackout;
-    }
-    largestBlackout.end = largestBlackout.end || rangeMax;
-
+    const { blackouts, blackoutTotalWh, largestBlackout } = forecastShortfalls(
+      forecastedTimeline,
+      projectionStepMinutes,
+      domainMax,
+    );
     const blackoutStart = getDateFromMinute(
       largestBlackout.start,
       game.startingYear,
@@ -263,6 +201,7 @@ export default class Forecasts extends React.Component<Props, State> {
               ))}
             </Select>
           </Toolbar>
+          <ForecastScope />
           <Toolbar>
             <Typography variant="h6">Supply & Demand</Typography>
           </Toolbar>
@@ -276,19 +215,29 @@ export default class Forecasts extends React.Component<Props, State> {
             showXLabels={false}
             syncKey={FORECAST_SYNC_KEY}
           />
+          <Typography
+            variant="caption"
+            component="p"
+            color="text.secondary"
+            sx={{ mx: 2 }}
+          >
+            Supply is dispatched electricity. Reserve shows how much more demand
+            the grid could cover within 15 minutes. Plants do not burn extra
+            fuel just to create this cushion.
+          </Typography>
           {blackoutTotalWh > 0 && (
             <Table size="small">
               <TableBody>
                 <TableRow className="bold">
                   <TableCell colSpan={2}>
-                    Predicted electricity shortfalls
+                    Estimated electricity shortfalls
                   </TableCell>
                   <TableCell align="right">
                     ~{formatWattHours(blackoutTotalWh)}
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={2}>Largest blackout</TableCell>
+                  <TableCell colSpan={2}>Largest modeled shortfall</TableCell>
                   <TableCell align="right">
                     ~{formatWattHours(largestBlackout.wh)}
                   </TableCell>
@@ -377,6 +326,7 @@ export default class Forecasts extends React.Component<Props, State> {
             showXLabels={false}
             syncKey={FORECAST_SYNC_KEY}
           />
+          <EconomicFutureComparison game={game} />
           {hasHydro && (
             <div>
               <Toolbar className="forecastSection">

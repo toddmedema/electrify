@@ -18,15 +18,6 @@ function props(overrides: Partial<Props> = {}): Props {
 }
 
 describe("MainMenu", () => {
-  it("explains the game without specialist language", () => {
-    render(<MainMenu {...props()} />);
-
-    expect(
-      screen.getByText(/Keep the lights on. Build a cleaner grid/i),
-    ).toHaveClass("gameSubtitle", "MuiTypography-body1");
-    expect(screen.queryByText(/no energy or gaming experience/i)).toBeNull();
-  });
-
   it("starts a new game from the primary play action", async () => {
     const onStart = jest.fn();
     const user = userEvent.setup();
@@ -55,38 +46,6 @@ describe("MainMenu", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("places account actions below the sound and discovery actions", () => {
-    render(
-      <MainMenu
-        {...props({
-          audioEnabled: undefined,
-          hasSavedGame: false,
-          uid: undefined,
-        })}
-      />,
-    );
-
-    const resources = screen.getByRole("navigation", {
-      name: "Game resources",
-    });
-    const account = screen.getByRole("region", { name: "Account actions" });
-    const discovery = screen.getByRole("region", {
-      name: "Discovery actions",
-    });
-    expect(
-      resources.compareDocumentPosition(discovery) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      discovery.compareDocumentPosition(account) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(within(account).getByText("Free · no sign-up needed")).toBeVisible();
-    expect(
-      within(account).getByRole("button", { name: "Sign in" }),
-    ).toBeVisible();
-  });
-
   it("prioritizes continuing a save while offering mission selection", () => {
     render(<MainMenu {...props({ hasSavedGame: true })} />);
 
@@ -102,33 +61,6 @@ describe("MainMenu", () => {
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
       { gap: "12px" },
     );
-  });
-
-  it("groups secondary actions into compact rows", () => {
-    render(
-      <MainMenu
-        {...props({
-          audioEnabled: undefined,
-          hasSavedGame: true,
-          uid: undefined,
-        })}
-      />,
-    );
-
-    const primary = screen.getByRole("region", { name: "Primary actions" });
-    const resources = screen.getByRole("navigation", {
-      name: "Game resources",
-    });
-    const discovery = screen.getByRole("region", {
-      name: "Discovery actions",
-    });
-
-    expect(primary).toHaveStyle({ flexDirection: "column" });
-    expect(resources).toHaveStyle({ flexDirection: "row", gap: "8px" });
-    expect(
-      within(resources).queryByRole("button", { name: "Sign in" }),
-    ).not.toBeInTheDocument();
-    expect(discovery).toHaveStyle({ flexDirection: "row", gap: "8px" });
   });
 
   it("keeps sharing as a compact footer icon", () => {

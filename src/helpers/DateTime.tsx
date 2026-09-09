@@ -1,5 +1,11 @@
 import { getPosition, getTimes } from "suncalc";
 import {
+  getWindCapacityFactor,
+  getOffshoreWindCapacityFactor,
+  getAirborneWindCapacityFactor,
+  getSolarCapacityFactor,
+} from "./Energy";
+import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
   GAME_TO_REAL_YEARS,
@@ -28,11 +34,16 @@ export const EMPTY_HISTORY = {
   customers: 0,
   cash: 0,
   kgco2e: 0,
+  localKgco2e: 0,
+  importedKgco2e: 0,
   revenue: 0,
   expensesFuel: 0,
   expensesOM: 0,
   expensesCarbonFee: 0,
   expensesInterest: 0,
+  expensesPolicy: 0,
+  expensesImports: 0,
+  revenueExports: 0,
   netWorth: 0,
   interestRate: 0,
   inflationRate: 0,
@@ -67,11 +78,16 @@ export function reduceHistories(
         : Math.min(acc.minimumSupplyMarginW, t.minimumSupplyMarginW);
   }
   acc.kgco2e += t.kgco2e;
+  acc.localKgco2e = (acc.localKgco2e || 0) + (t.localKgco2e || 0);
+  acc.importedKgco2e = (acc.importedKgco2e || 0) + (t.importedKgco2e || 0);
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
   acc.expensesCarbonFee += t.expensesCarbonFee;
   acc.expensesInterest += t.expensesInterest;
+  acc.expensesPolicy = (acc.expensesPolicy || 0) + (t.expensesPolicy || 0);
+  acc.expensesImports = (acc.expensesImports || 0) + (t.expensesImports || 0);
+  acc.revenueExports = (acc.revenueExports || 0) + (t.revenueExports || 0);
   acc.cash = t.cash;
   acc.customers = t.customers;
   acc.netWorth = t.netWorth;
@@ -88,14 +104,19 @@ export function deriveExpandedSummary(
   s: MonthlyHistoryType,
 ): DerivedHistoryType {
   const expenses =
-    s.expensesFuel + s.expensesOM + s.expensesCarbonFee + s.expensesInterest;
+    s.expensesFuel +
+    s.expensesOM +
+    s.expensesCarbonFee +
+    s.expensesInterest +
+    (s.expensesPolicy || 0);
+  const expensesWithImports = expenses + (s.expensesImports || 0);
   const supplykWh = (s.supplyWh || 1) / 1000;
   return {
     ...s,
-    profit: s.revenue - expenses,
-    profitPerkWh: (s.revenue - expenses) / supplykWh,
+    profit: s.revenue - expensesWithImports,
+    profitPerkWh: (s.revenue - expensesWithImports) / supplykWh,
     revenuePerkWh: s.revenue / supplykWh,
-    expenses,
+    expenses: expensesWithImports,
     kgco2ePerMWh: s.kgco2e / (supplykWh / 1000),
   };
 }
@@ -112,6 +133,57 @@ function accumulateTick(
   tickScale: number,
 ) {
   const date = getMonthYearFromMinute(t.minute, startingYear);
+  const weight = summary.chartTickWeight || 0;
+  const share = tickScale / (weight + tickScale);
+  const factors = {
+    Wind: getWindCapacityFactor([t.windKph]),
+    "Offshore Wind": getOffshoreWindCapacityFactor(
+      t.windOffshoreKph === undefined ? [] : [t.windOffshoreKph],
+    ),
+    "Airborne Wind": getAirborneWindCapacityFactor([t.windAirborneKph]),
+    Solar: getSolarCapacityFactor([t.solarIrradianceWM2]),
+  };
+  // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
+  const sample = Object.fromEntries(Object.entries(t)) as TickPresentFutureType;
+  sample.renewableCapacityFactors = factors;
+  if (!summary.chartAverage) {
+    summary.chartAverage = {
+      ...sample,
+      demandByType: { ...t.demandByType },
+      supplyByFuel: { ...t.supplyByFuel },
+    } as TickPresentFutureType;
+  } else {
+    // Average levels, including fuel prices and weather. Financial totals live above this
+    // chart-only record. Clone nested maps so summarizing never mutates simulation ticks.
+    const average = summary.chartAverage;
+    for (const key of Object.keys(sample) as (keyof TickPresentFutureType)[]) {
+      const value = sample[key];
+      if (typeof value === "number") {
+        Object.assign(average, {
+          [key]:
+            Number(average[key] ?? value) +
+            (value - Number(average[key] ?? value)) * share,
+        });
+      }
+    }
+    for (const key of [
+      "demandByType",
+      "supplyByFuel",
+      "renewableCapacityFactors",
+    ] as const) {
+      const previous = average[key] as Record<string, number>;
+      const current = (sample[key] || {}) as Record<string, number>;
+      for (const name of new Set([
+        ...Object.keys(previous),
+        ...Object.keys(current),
+      ])) {
+        previous[name] =
+          (previous[name] || 0) +
+          ((current[name] || 0) - (previous[name] || 0)) * share;
+      }
+    }
+  }
+  summary.chartTickWeight = weight + tickScale;
   // Integrate instantaneous electricity (watts) to watt hours
   // Only electricity isn't multiplied by this during tick calculations (financials are)
   summary.supplyWh +=
@@ -123,7 +195,15 @@ function accumulateTick(
   // Dispatch can briefly oversupply while a minimum-load plant ramps. Attribute only the share
   // that demand accepted, so fuel totals describe delivered energy and never claim the curtailed
   // excess. Storage is deliberately absent because it is not a fuel.
-  const deliveredShare = t.supplyW > 0 ? Math.min(1, t.demandW / t.supplyW) : 0;
+  const grossSourcesW =
+    Object.values(t.supplyByFuel).reduce<number>(
+      (sum, watts) => sum + (watts || 0),
+      0,
+    ) +
+    (t.storageDischargeW || 0) +
+    (t.importedW || 0);
+  const deliveredShare =
+    grossSourcesW > 0 ? Math.min(t.demandW, t.supplyW) / grossSourcesW : 0;
   Object.entries(t.supplyByFuel).forEach(([fuel, watts]) => {
     if (watts !== undefined) {
       summary.deliveredWhByFuel[fuel] =
@@ -134,17 +214,26 @@ function accumulateTick(
     }
   });
   summary.peakDemandW = Math.max(summary.peakDemandW, t.demandW);
-  const supplyMarginW = t.supplyW - t.demandW;
+  const supplyMarginW = t.reserveW ?? t.supplyW - t.demandW;
   summary.minimumSupplyMarginW =
     summary.minimumSupplyMarginW === undefined
       ? supplyMarginW
       : Math.min(summary.minimumSupplyMarginW, supplyMarginW);
   summary.kgco2e += t.kgco2e;
+  summary.localKgco2e = (summary.localKgco2e || 0) + (t.localKgco2e || 0);
+  summary.importedKgco2e =
+    (summary.importedKgco2e || 0) + (t.importedKgco2e || 0);
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;
   summary.expensesCarbonFee += t.expensesCarbonFee;
   summary.expensesInterest += t.expensesInterest;
+  summary.expensesPolicy =
+    (summary.expensesPolicy || 0) + (t.expensesPolicy || 0);
+  summary.expensesImports =
+    (summary.expensesImports || 0) + (t.expensesImports || 0);
+  summary.revenueExports =
+    (summary.revenueExports || 0) + (t.revenueExports || 0);
   summary.cash = t.cash;
   summary.customers = t.customers;
   summary.netWorth = t.netWorth;

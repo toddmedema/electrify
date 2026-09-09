@@ -155,6 +155,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
 
   return (
     <div className="facilityDetails">
+      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+        {isHydro
+          ? "Rain and snow refill the reservoir; generation drains it. Seasonal shortages matter, while water releases are handled automatically."
+          : "Dispatch and equipment limits are managed automatically. Inspect costs and output here before changing the plant priority."}
+      </Typography>
       <div className="facilityStats">
         {underConstruction ? (
           <Stat
@@ -164,7 +169,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         ) : (
           <>
             <Stat
-              label="Age / expected life"
+              label="Age / accounting life"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
             />
             <Stat
@@ -336,6 +341,11 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </div>
         )}
       </div>
+      <Typography variant="caption" color="textSecondary" component="p">
+        Accounting life determines asset depreciation, not a shutdown date.
+        Aging can reduce output and increase upkeep while the plant keeps
+        running.
+      </Typography>
     </div>
   );
 }

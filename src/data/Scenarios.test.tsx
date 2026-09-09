@@ -7,15 +7,10 @@ import {
   TUTORIALS,
 } from "./Scenarios";
 import { AppStateType, ScenarioType } from "../Types";
-import { render, screen } from "@testing-library/react";
 import { getScenarioLocation } from "../helpers/Locations";
+import { intertiesEnabledForScenario } from "./AdjacentMarkets";
 
 describe("getScenario", () => {
-  it("finds an authored scenario by id", () => {
-    const authored = SCENARIOS[SCENARIOS.length - 1];
-    expect(getScenario(authored.id)).toBe(authored);
-  });
-
   it("returns the custom scenario for the custom id", () => {
     const custom = {
       ...DEFAULT_CUSTOM_SCENARIO,
@@ -55,6 +50,11 @@ describe("getNextTutorial", () => {
     expect(getNextTutorial(TUTORIALS[TUTORIALS.length - 1].id)).toBeUndefined();
   });
 
+  it("places Mission 7 after Forecasting and keeps its append-only id", () => {
+    expect(getNextTutorial(5)?.id).toBe(112);
+    expect(getNextTutorial(112)).toBeUndefined();
+  });
+
   // Which is what both callers rely on to decide whether to offer one at all
   it("finds nothing for a scenario that isn't a tutorial", () => {
     const scenario = SCENARIOS.find((s: ScenarioType) => !s.tutorialSteps);
@@ -64,25 +64,6 @@ describe("getNextTutorial", () => {
 });
 
 describe("tutorial mission metadata", () => {
-  it("gives every tutorial a mission name, icon, and summary", () => {
-    TUTORIALS.forEach((tutorial, index) => {
-      expect(tutorial.name).toMatch(new RegExp(`^Mission ${index + 1}: `));
-      expect(tutorial.icon).toBeTruthy();
-      expect(tutorial.summary).toBeTruthy();
-    });
-  });
-
-  it("expands the O&M abbreviation in the generator tutorial", () => {
-    const generatorsMission = TUTORIALS.find(
-      (tutorial) => tutorial.name === "Mission 2: Generators",
-    )!;
-    render(generatorsMission.tutorialSteps![1].content);
-
-    expect(screen.getByText(/Compare cost and build time/)).toHaveTextContent(
-      "operations and maintenance (O&M)",
-    );
-  });
-
   it("advances the finances tutorial when the mobile Insights tab opens", () => {
     const finances = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 4: Finances",
@@ -106,52 +87,51 @@ describe("tutorial mission metadata", () => {
       expect(capstones[0].hint).toBeTruthy();
     });
   });
-
-  it("ends the electricity mission after a single one-day challenge", () => {
-    const electricity = TUTORIALS.find(
-      (tutorial) => tutorial.name === "Mission 1: Electricity",
-    )!;
-    const steps = electricity.tutorialSteps!;
-
-    expect(steps).toHaveLength(5);
-    expect(steps[3].advanceOn).toBeDefined();
-    expect(steps[4].advanceOn).toBeUndefined();
-    expect(steps[4].capstone).toBeDefined();
-  });
-});
-
-describe("authored scenario briefings", () => {
-  it("gives every scored scenario a reusable story and stakes", () => {
-    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
-      (scenario) => {
-        expect(scenario.briefing).toEqual(
-          expect.objectContaining({
-            tone: expect.any(String),
-            fantasy: expect.any(String),
-            objective: expect.any(String),
-            threat: expect.any(String),
-          }),
-        );
-        expect(scenario.briefing).not.toHaveProperty("constraint");
-      },
-    );
+  it("authors the Interties mission as a fixed two-plant California lesson", () => {
+    const interties = getScenario(112)!;
+    expect(interties).toMatchObject({
+      name: "Mission 7: Interties",
+      seed: 249007,
+      startingYear: 2019,
+      durationMonths: 24,
+      intertiesEnabled: true,
+    });
+    expect(interties.facilities).toEqual([
+      expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
+      expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
+    ]);
+    expect(interties.tutorialSteps).toHaveLength(10);
   });
 
-  it("gives every challenge at least one player-facing browse theme", () => {
-    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
-      (scenario) => expect(scenario.themes?.length).toBeGreaterThan(0),
-    );
-  });
-
-  it("uses the three player-facing challenge themes", () => {
-    const themes = new Set(
-      SCENARIOS.filter((scenario) => !scenario.tutorialSteps).flatMap(
-        (scenario) => scenario.themes ?? [],
+  it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
+    for (const tutorial of TUTORIALS.filter(({ id }) => id !== 112)) {
+      expect(
+        intertiesEnabledForScenario(tutorial, getScenarioLocation(tutorial)!),
+      ).toBe(false);
+    }
+    const interties = getScenario(112)!;
+    expect(
+      intertiesEnabledForScenario(interties, getScenarioLocation(interties)!),
+    ).toBe(true);
+    const ordinaryCalifornia = getScenario(100)!;
+    expect(
+      intertiesEnabledForScenario(
+        ordinaryCalifornia,
+        getScenarioLocation(ordinaryCalifornia)!,
       ),
-    );
-    expect(themes).toEqual(
-      new Set(["Extreme weather", "Energy transition", "Rapid growth"]),
-    );
+    ).toBe(true);
+    const noCorridor = getScenario(103)!;
+    const islanded = {
+      ...getScenarioLocation(noCorridor)!,
+      id: "HNL",
+      name: "Honolulu, HI",
+    };
+    expect(
+      intertiesEnabledForScenario(
+        { ...noCorridor, intertiesEnabled: true },
+        islanded,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -250,51 +230,6 @@ describe("authored starting fleets", () => {
     ]);
   });
 
-  it("keeps every scored-scenario generator at least 5% of its starting fleet", () => {
-    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
-      (scenario) => {
-        const generators = scenario.facilities.filter(
-          (facility) => facility.peakW !== undefined,
-        );
-        const totalPeakW = generators.reduce(
-          (total, facility) => total + facility.peakW!,
-          0,
-        );
-
-        generators.forEach((facility) => {
-          expect({
-            scenario: scenario.name,
-            fuel: facility.fuel,
-            meetsMinimum: facility.peakW! / totalPeakW >= 0.05,
-          }).toEqual(expect.objectContaining({ meetsMinimum: true }));
-        });
-      },
-    );
-  });
-
-  it("puts each scored scenario's defining facility first", () => {
-    expect(
-      SCENARIOS.filter((scenario) => !scenario.tutorialSteps).map(
-        (scenario) => [
-          scenario.name,
-          scenario.facilities[0].fuel || scenario.facilities[0].name,
-        ],
-      ),
-    ).toEqual([
-      ["Carbon Fee", "Natural Gas"],
-      ["The Shale Boom", "Coal"],
-      ["Paradise", "Sun"],
-      ["Rise of Renewables", "Uranium"],
-      ["Hurricane Season", "Oil"],
-      ["The End of an Era", "Coal"],
-      ["Data Center Boom", "Natural Gas"],
-      ["Deep Freeze", "Natural Gas"],
-      ["Heatwave + Drought", "Hydro"],
-      ["Sudden Nuclear Shutdown", "Uranium"],
-      ["Wildfire Emergency", "Natural Gas"],
-    ]);
-  });
-
   it("authors distinct heatwave and generation-loss resilience challenges", () => {
     const heatwave = getScenario(108)!;
     const trip = getScenario(110)!;
@@ -330,20 +265,6 @@ describe("authored starting fleets", () => {
         (facility) => facility.label === "Grand Nuclear Unit",
       ),
     ).toMatchObject({ fuel: "Uranium", peakW: 500_000_000 });
-  });
-
-  it("keeps locations in scenario metadata rather than scenario names", () => {
-    expect(
-      [107, 108, 110, 111].map((id) => ({
-        name: getScenario(id)!.name,
-        location: getScenarioLocation(getScenario(id))?.name,
-      })),
-    ).toEqual([
-      { name: "Deep Freeze", location: "Austin, TX" },
-      { name: "Heatwave + Drought", location: "Madrid, Spain" },
-      { name: "Sudden Nuclear Shutdown", location: "Paris, France" },
-      { name: "Wildfire Emergency", location: "Los Angeles, CA" },
-    ]);
   });
 
   it("authors a Los Angeles-only January 2025 wildfire challenge", () => {

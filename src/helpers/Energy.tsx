@@ -1,4 +1,4 @@
-import { EQUATOR_RADIANCE, OUTSKIRTS_WIND_MULTIPLIER } from "../Constants";
+import { EQUATOR_RADIANCE } from "../Constants";
 import { FacilityOperatingType, GeneratorOperatingType } from "../Types";
 
 const KPH_PER_MS = 3.6;
@@ -10,19 +10,14 @@ function powerCurve(windMS: number) {
     : Math.max(0, Math.min(1, (windMS - 3) / 11));
 }
 
-export function getWindOutputFactor(windKph: number) {
-  // Wind gradient, assuming 10m weather station, 100m wind turbine, neutral air above human habitation - https://en.wikipedia.org/wiki/Wind_gradient
-  // The 5 was labelled as the kph to m/s conversion, but it never was one: the CSVs this was
-  // tuned against stored metres per second under a WIND_KPH heading, so it is really the derate
-  // that made a 10m reading behave like a turbine. The ERA5 files that replaced them are honestly
-  // in kph, so the conversion is now done properly alongside it, and the derate is left exactly
-  // as it was - the point of the change is the data source, not a rebalanced wind fleet.
-  const turbineWindMS =
-    (OUTSKIRTS_WIND_MULTIPLIER *
-      ((windKph / KPH_PER_MS) * Math.pow(100 / 10, 0.34))) /
-    5;
+// One authored city-10m-to-farm reference multiplier represents both height and
+// siting, not a measured local gradient. This exposes the old net approximation
+// instead of a hidden double outskirts boost and /5 derate. All inputs are raw
+// 10m weather in kph. Regional fleet comparisons live in WindBenchmark.test.ts.
+const ONSHORE_REFERENCE_MULTIPLIER = 1.75;
 
-  return powerCurve(turbineWindMS);
+export function getWindOutputFactor(wind10mKph: number) {
+  return powerCurve((wind10mKph / KPH_PER_MS) * ONSHORE_REFERENCE_MULTIPLIER);
 }
 
 // Wind at sea starts from a reading at the farm rather than a city station, and its vertical
@@ -44,8 +39,8 @@ export function getOffshoreWindOutputFactor(windKph: number) {
 // Airborne Wind follows the fixed-wing, ground-generation reference design from Joshi,
 // von Terzi & Schmehl (2025): its published curve takes wind at 100m, cuts in at 6m/s,
 // reaches rated power at 11m/s and cuts out above 20m/s. The weather files currently carry
-// raw 10m wind, so the reference-height conversion happens explicitly before the legacy
-// OUTSKIRTS_WIND_MULTIPLIER can touch it.
+// raw 10m wind, so the reference-height conversion happens explicitly and independently
+// of the onshore farm siting approximation.
 const AIRBORNE_SHEAR_EXPONENT = 0.2;
 const AIRBORNE_REFERENCE_HEIGHT_M = 100;
 const AIRBORNE_CUT_IN_MS = 6;
@@ -78,16 +73,22 @@ export function getAirborneWindOutputFactor(wind100mKph: number): number {
   return curve * AIRBORNE_SYSTEM_AVAILABILITY;
 }
 
-// Solar nameplate wattages use peak irradiance as their baseline. Panel efficiency declines by
-// about 1% per degree above 10 C. Snow cover is not modeled because it would require persistent
-// accumulation state rather than only the current hour's weather.
+// A simple PV approximation: cell temperature rises 30 C at 1000 W/m2 (NOCT 44 C),
+// with a rounded -0.4%/C coefficient relative to a 25 C cell. See PVWatts:
+// https://samrepo.nrelcloud.org/help/pvwatts.html
+// Clip at nameplate; detailed inverter, mounting and snow-cover models are omitted.
 export function getSolarOutputFactor(
   irradianceWM2: number,
-  temepratureC: number,
+  temperatureC: number,
 ) {
-  return (
-    (irradianceWM2 * Math.min(1, 1 - (temepratureC - 10) / 100)) /
-    EQUATOR_RADIANCE
+  const irradiance = Math.max(0, irradianceWM2);
+  const cellTemperatureC = temperatureC + irradiance * 0.03;
+  return Math.max(
+    0,
+    Math.min(
+      1,
+      (irradiance / EQUATOR_RADIANCE) * (1 - 0.004 * (cellTemperatureC - 25)),
+    ),
   );
 }
 

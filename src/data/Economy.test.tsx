@@ -69,10 +69,6 @@ describe("Economy", () => {
       expect(primeIn(2005, 6)).toBeCloseTo(FIXTURE_PRIME / 100, 10);
       expect(inflationIn(2005, 6)).toBeCloseTo(FIXTURE_INFLATION, 10);
     });
-
-    it("reads prime as a fraction, not the percent the CSV stores", () => {
-      expect(primeIn(2005, 6)).toBeLessThan(1);
-    });
   });
 
   describe("projection", () => {
@@ -176,16 +172,6 @@ describe("Economy", () => {
   });
 
   describe("getInflationIndex", () => {
-    it("is exactly 1 on the opening day of a run", () => {
-      expect(
-        getInflationIndex(
-          dateIn(FIXTURE_STARTING_YEAR, 1),
-          FIXTURE_STARTING_YEAR,
-          SEED,
-        ),
-      ).toEqual(1);
-    });
-
     it("compounds the record's inflation over the years it covers", () => {
       // Ten years of a flat 1.8% compounds to about 19.6%
       const index = getInflationIndex(

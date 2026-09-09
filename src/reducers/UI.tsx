@@ -22,6 +22,12 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    manualHelpOpen: (state, action: PayloadAction<string>) => {
+      state.manualHelpEntry = action.payload;
+    },
+    manualHelpClose: (state) => {
+      delete state.manualHelpEntry;
+    },
     delta: (state, action: PayloadAction<Partial<UIType>>) => {
       return { ...state, ...action.payload };
     },
@@ -80,6 +86,7 @@ export const uiSlice = createSlice({
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
       state.victory = null;
+      delete state.manualHelpEntry;
       state.selectedFacilityId = null;
       state.facilityDragActive = false;
     });
@@ -87,6 +94,8 @@ export const uiSlice = createSlice({
 });
 
 export const {
+  manualHelpOpen,
+  manualHelpClose,
   delta,
   snackbarOpen,
   snackbarClose,

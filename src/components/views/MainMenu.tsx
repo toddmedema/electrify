@@ -128,7 +128,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
             {props.audioEnabled === undefined && (
               <Button
                 color="primary"
-                startIcon={<VolumeUpIcon />}
+                endIcon={<VolumeUpIcon />}
                 onClick={() => props.onAudioChange(true)}
               >
                 Turn on sound

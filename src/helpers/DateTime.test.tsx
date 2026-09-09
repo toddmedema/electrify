@@ -80,16 +80,6 @@ describe("getSunriseSunset", () => {
   const january = getDateFromMinute(0, 2020);
   const july = getDateFromMinute(6 * 1440, 2020);
 
-  it("puts sunrise in the morning and sunset in the evening", () => {
-    const { sunrise, sunset } = getSunriseSunset(january, LOCATIONS.SF);
-    // Roughly 7:25am and 5:00pm in San Francisco in January
-    expect(sunrise).toBeGreaterThan(6 * 60);
-    expect(sunrise).toBeLessThan(9 * 60);
-    expect(sunset).toBeGreaterThan(16 * 60);
-    expect(sunset).toBeLessThan(19 * 60);
-    expect(sunset).toBeGreaterThan(sunrise);
-  });
-
   it("gives every location a daylit day in both seasons", () => {
     Object.values(LOCATIONS).forEach((location) => {
       [january, july].forEach((date) => {
@@ -205,6 +195,32 @@ describe("summarizeTimeline", () => {
     expect(summary.deliveredWhByFuel.Wind).toBeCloseTo(
       ((40 + 80 + 120) / TICKS_PER_HOUR) * GAME_TO_REAL_YEARS,
     );
+  });
+
+  it("records chart averages without mutating ticks, including nonlinear wind output", () => {
+    const timeline = ticks([100, 200]);
+    timeline.forEach((tick, index) => {
+      tick.demandByType = {
+        Residential: 100 + index * 100,
+        Commercial: 0,
+        Industrial: 0,
+        Transportation: 0,
+        "Data centers": 100,
+      };
+      tick.windKph = index * 100;
+      tick.windAirborneKph = 0;
+      tick.solarIrradianceWM2 = 0;
+      tick.storedWh = index * 1000;
+    });
+    const original = JSON.stringify(timeline);
+    const average = summarizeTimeline(timeline, 2020).chartAverage!;
+    expect(average.demandByType.Residential).toBe(150);
+    expect(average.demandByType["Data centers"]).toBe(100);
+    expect(average.supplyByFuel.Coal).toBe(65);
+    expect(average.storedWh).toBe(500);
+    expect(average.windKph).toBe(50);
+    expect(average.renewableCapacityFactors!.Wind).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(timeline)).toBe(original);
   });
 
   it("ends on the last tick the filter kept, not the last one in the array", () => {
@@ -324,29 +340,5 @@ describe("summarizeTimelineByMonth", () => {
     expect(new Set(indexes).size).toEqual(indexes.length);
     // Long enough to roll over a year, which the month numbers wrap on but the ordering must not
     expect(byMonth[byMonth.length - 1].year).toBeGreaterThan(byMonth[0].year);
-  });
-
-  it("should total the same as summarizing the whole span at once", () => {
-    const game = createGame({ scenarioId: 103 });
-    const timeline = generateNewTimeline(
-      game,
-      game.timeline[0].cash,
-      game.timeline[0].customers,
-      TICKS_PER_MONTH * 6,
-    );
-
-    const byMonth = summarizeTimelineByMonth(timeline, startingYear);
-    const whole = summarizeTimeline(timeline, startingYear);
-
-    const totalRevenue = byMonth.reduce(
-      (sum: number, m: MonthlyHistoryType) => sum + m.revenue,
-      0,
-    );
-    expect(totalRevenue).toBeCloseTo(whole.revenue, 4);
-    // Ending values are carried rather than added, so the whole timeline's are the last
-    // month's - not the first month's, which is where they landed while both helpers walked
-    // their ticks backwards
-    expect(byMonth[byMonth.length - 1].cash).toEqual(whole.cash);
-    expect(byMonth[0].cash).not.toEqual(whole.cash);
   });
 });

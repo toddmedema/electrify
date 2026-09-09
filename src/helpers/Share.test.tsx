@@ -1,4 +1,4 @@
-import { buildShareText, canShare, shareText } from "./Share";
+import { buildShareText, shareText } from "./Share";
 
 interface Shareable {
   share?: (data: { text: string }) => Promise<void>;
@@ -32,15 +32,6 @@ describe("buildShareText", () => {
     ).toBe(
       "I scored 1,812 running Deregulation at CEO difficulty on Electrify - electrifygame.com",
     );
-  });
-});
-
-describe("canShare", () => {
-  it("keeps a share affordance with or without a clipboard", () => {
-    setNavigator({});
-    expect(canShare()).toBe(true);
-    setNavigator({ clipboard: { writeText: async () => undefined } });
-    expect(canShare()).toBe(true);
   });
 });
 

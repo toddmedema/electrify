@@ -3,6 +3,7 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Button,
   IconButton,
   InputAdornment,
   InputBase,
@@ -145,6 +146,7 @@ interface ManualItemProps {
   expanded: boolean;
   onToggle: (title: string, expanded: boolean) => void;
   itemRef?: React.Ref<HTMLDivElement>;
+  onRelated: (title: string) => void;
 }
 
 function ManualItem(props: ManualItemProps): React.JSX.Element {
@@ -173,13 +175,34 @@ function ManualItem(props: ManualItemProps): React.JSX.Element {
       </AccordionSummary>
       <AccordionDetails id={`${id}-content`}>
         {highlight(entry.entry, searchTerm, id)}
+        {!!entry.related?.length && (
+          <nav
+            aria-label={`Related to ${entry.title}`}
+            className="manual-related"
+          >
+            <Typography variant="body2" color="textSecondary">
+              Related entries
+            </Typography>
+            {entry.related.map((title) => (
+              <Button
+                key={title}
+                className="manual-related-link"
+                onClick={() => props.onRelated(title)}
+              >
+                {title}
+              </Button>
+            ))}
+          </nav>
+        )}
       </AccordionDetails>
     </Accordion>
   );
 }
 
 export default function Manual(props: Props): React.JSX.Element {
-  const { focusEntry, onBack } = props;
+  const { onBack } = props;
+  const [focusEntry, setFocusEntry] = React.useState(props.focusEntry);
+  const [focusRequest, setFocusRequest] = React.useState(0);
   // A deep link is a fresh question, so it ignores (and clears) whatever the last visit left
   const [searchTerm, setSearchTerm] = React.useState<string>(
     focusEntry ? "" : lastSearchTerm,
@@ -201,6 +224,19 @@ export default function Manual(props: Props): React.JSX.Element {
     setToggled({});
   }
 
+  const openEntry = React.useCallback((title: string) => {
+    setSearchTerm("");
+    setToggled({ [title]: true });
+    setFocusEntry(title);
+    // Revisit requests matter even when the entry title has not changed:
+    // searching may have hidden it and moved keyboard focus elsewhere.
+    setFocusRequest((request) => request + 1);
+  }, []);
+
+  React.useEffect(() => {
+    if (props.focusEntry) openEntry(props.focusEntry);
+  }, [props.focusEntry, openEntry]);
+
   React.useEffect(() => {
     lastSearchTerm = searchTerm;
   }, [searchTerm]);
@@ -216,10 +252,13 @@ export default function Manual(props: Props): React.JSX.Element {
   React.useEffect(() => {
     const focused = focusRef.current;
     // jsdom has no layout, and so no scrollIntoView
-    if (focusEntry && focused && focused.scrollIntoView) {
-      focused.scrollIntoView({ block: "start" });
+    if (focusEntry && focused) {
+      focused.scrollIntoView?.({ block: "start" });
+      focused
+        .querySelector<HTMLButtonElement>(".MuiAccordionSummary-root")
+        ?.focus();
     }
-  }, [focusEntry]);
+  }, [focusEntry, focusRequest]);
 
   const matches = React.useMemo(
     () =>
@@ -247,6 +286,7 @@ export default function Manual(props: Props): React.JSX.Element {
         searchTerm={term}
         expanded={toggled[entry.title] ?? (searching || isFocused)}
         onToggle={onToggle}
+        onRelated={openEntry}
         itemRef={isFocused ? focusRef : undefined}
       />
     );

@@ -36,7 +36,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.getByText(/typical output/)).toBeInTheDocument();
+  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
   );
@@ -63,8 +63,12 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
-  expect(impact).toHaveTextContent("Estimated average output");
+  expect(impact).toHaveTextContent("Typical output");
+  expect(impact).toHaveTextContent("check availability during the shortage");
+  expect(impact).not.toHaveTextContent("largest forecast shortage");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
     screen.queryByRole("table", { name: "Financing terms" }),
@@ -209,8 +213,10 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   );
 
   expect(screen.getByText("Natural Gas")).toBeInTheDocument();
-  expect(screen.getByText(/typical output/)).toBeInTheDocument();
-  expect(screen.getByText(/largest forecast shortage/)).toBeInTheDocument();
+  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
+  expect(
+    screen.queryByText(/largest forecast shortage/),
+  ).not.toBeInTheDocument();
   expect(screen.getByText("Build cost")).toBeInTheDocument();
   expect(screen.getByText("Build time")).toBeInTheDocument();
   expect(screen.queryByText("Fastest online")).not.toBeInTheDocument();
@@ -332,7 +338,9 @@ it("explains unavailable technologies and hides their comparison button", () => 
   );
 
   expect(
-    screen.getByText("Not available at this location or point in time."),
+    screen.getByText(
+      "Not available in this game at this location or point in time.",
+    ),
   ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Unavailable Solar/ }),

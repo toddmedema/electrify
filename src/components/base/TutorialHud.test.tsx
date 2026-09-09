@@ -55,14 +55,6 @@ describe("TutorialHud", () => {
     expect(hudProps.onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the compact objective visible without collapse controls", () => {
-    render(<TutorialHud {...props()} />);
-
-    expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Collapse objective")).toBeNull();
-    expect(screen.queryByLabelText("Expand objective")).toBeNull();
-  });
-
   it("reveals help only when requested and has no redundant Next for gates", async () => {
     const user = userEvent.setup();
     render(
