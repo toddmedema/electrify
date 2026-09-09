@@ -2353,6 +2353,7 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
+  let spareGenerationW = 0;
   let reachableHeadroomW = 0;
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
@@ -2543,6 +2544,11 @@ function updateSupplyFacilitiesFinances(
                 ? Math.min(committedTargetW, g.currentW + rampW)
                 : Math.max(committedTargetW, g.currentW - rampW),
             );
+            // Setup can show surplus capacity even when dispatch follows demand. Hydro stays
+            // at its dispatched output so stored water is not counted repeatedly as energy.
+            if (!hydro) {
+              spareGenerationW += Math.max(0, dispatchPeakW - g.currentW);
+            }
             break;
         }
         supply += g.currentW;
@@ -2679,10 +2685,13 @@ function updateSupplyFacilitiesFinances(
   now.transmissionCapacityW = transmissionCapacity;
   now.marketPricePerMWh = marketPricePerMWh;
   now.supplyW = supply;
+  // Exported surplus remains available to redirect to local demand in the setup outlook.
+  now.availableSupplyW = supply + spareGenerationW + exportedW;
   // Surplus exports are interruptible under the game policy and can be redirected locally.
   now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
   now.importKgco2ePerMWh =
     marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
+
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
   now.storageLossWh = storageLossWh;

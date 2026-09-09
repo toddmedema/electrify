@@ -170,6 +170,24 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+  const row = facilities.locator(".build-list-item").first();
+  const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
+  const removeBox = await row
+    .getByRole("button", { name: "Remove Natural Gas" })
+    .boundingBox();
+  expect(contentBox).not.toBeNull();
+  expect(removeBox).not.toBeNull();
+  expect(removeBox!.x).toBeGreaterThanOrEqual(
+    contentBox!.x + contentBox!.width,
+  );
+  expect(
+    Math.abs(
+      removeBox!.y +
+        removeBox!.height / 2 -
+        (contentBox!.y + contentBox!.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(removeBox!.height).toBeGreaterThanOrEqual(44);
   const settingsBox = await settings.boundingBox();
   const facilitiesBox = await facilities.boundingBox();
   const outlookBox = await outlook.boundingBox();
@@ -222,7 +240,25 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
   await page.getByRole("button", { name: "Add facility" }).click();
   await expect(outlook).toContainText("Calculating Year 1 outlook…");
   await expect(outlook).toContainText("Demand covered", { timeout: 20000 });
-  await expect(outlook).toContainText("100%");
+  await expect
+    .poll(async () =>
+      Number(
+        (
+          await outlook
+            .locator(".customSetupOutlookMetrics strong")
+            .first()
+            .innerText()
+        ).replace("%", ""),
+      ),
+    )
+    .toBeGreaterThan(300);
+  const icon = page
+    .getByRole("region", { name: "Facilities", exact: true })
+    .locator(".MuiCardHeader-avatar img");
+  await expect(icon).toHaveAttribute("src", "/images/natural gas.svg");
+  await expect
+    .poll(() => icon.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
   await expect(outlook).toContainText("No forecast shortfall");
 });
 
@@ -282,7 +318,14 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await zoomIn.click();
   await zoomIn.click();
   await zoomIn.click();
+  await expect(zoomIn).toBeEnabled();
+  await zoomIn.click();
+  await expect(map.locator(".worldMapLand > g")).toHaveAttribute(
+    "transform",
+    /scale\(16\)/,
+  );
   await expect(zoomIn).toBeDisabled();
+  await zoomOut.click();
   await zoomOut.click();
   await zoomOut.click();
   await zoomOut.click();

@@ -359,6 +359,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
     minute: number;
     supplyW: number; // Watts
+    availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
     reserveW?: number; // Signed supply margin plus local spare output reachable next tick
     importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity

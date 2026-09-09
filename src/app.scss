@@ -3925,6 +3925,28 @@ $sizemap: (
   }
 }
 
+// Setup rows have one compact removal action beside the facility name.
+.customSetupFacilities .build-list-item .MuiCardHeader-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .MuiCardHeader-avatar {
+    margin: 0;
+  }
+
+  .MuiCardHeader-content {
+    min-width: 0;
+  }
+
+  .MuiCardHeader-action {
+    width: auto;
+    margin: 0 !important;
+    align-self: center;
+    flex-shrink: 0;
+  }
+}
+
 // Shared purchase rows: keep the decision and touch targets compact without clipping copy.
 .build-list-item.buildOption {
   .MuiCardHeader-root {

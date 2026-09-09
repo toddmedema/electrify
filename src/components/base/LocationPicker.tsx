@@ -35,7 +35,7 @@ interface Props {
 }
 
 const WORLD_VIEW: MapViewport = { center: { x: 0.5, y: 0.5 }, zoom: 0 };
-const MAX_ZOOM = 3;
+const MAX_ZOOM = MAP_ZOOM_SCALES.length - 1;
 
 interface MapDrag {
   pointerId: number;
