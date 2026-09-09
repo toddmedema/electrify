@@ -932,7 +932,7 @@ export default class Finances extends React.Component<Props, State> {
               variant="body2"
               color="textSecondary"
             >
-              Electricity Rate
+              Electricity Base Rate
               <ManualLink
                 entry={MANUAL_ENTRY.RATES}
                 label="electricity rates"
@@ -956,6 +956,15 @@ export default class Finances extends React.Component<Props, State> {
               )}
             </Typography>
             <div className="budgetSlider flex-newline">
+              {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
+                game.policies?.programs.curtailment?.tier !== "Off") &&
+                game.policies && (
+                  <Typography variant="caption">
+                    Tariffs and credits adjust this base rate. The customer
+                    estimate assumes a flat rate; revenue and cash include
+                    active offers.
+                  </Typography>
+                )}
               <Slider
                 id="rateSlider"
                 disabled={!!game.replayPlayback}

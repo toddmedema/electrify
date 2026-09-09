@@ -145,6 +145,9 @@ function accumulateTick(
   };
   // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
   const sample = Object.fromEntries(Object.entries(t)) as TickPresentFutureType;
+  // Recovery batches belong to resumable ticks, not averaged chart history.
+  delete sample.deferredResidential;
+  delete sample.deferredResidentialStart;
   sample.renewableCapacityFactors = factors;
   if (!summary.chartAverage) {
     summary.chartAverage = {

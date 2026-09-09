@@ -676,6 +676,8 @@ function policySignature(game: GameType): string {
           program.adoption,
           program.spending,
           program.pending?.tier,
+          program.startHour,
+          program.pending?.startHour,
           program.pending?.month,
         ];
       }),
@@ -1262,7 +1264,8 @@ export default class Insights extends React.Component<Props, State> {
           color="textSecondary"
           aria-hidden="true"
         >
-          Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
+          Base rate{" "}
+          <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
           {scenario.ownership === "Investor" && (
             <>
               {" "}
@@ -1288,7 +1291,7 @@ export default class Insights extends React.Component<Props, State> {
           aria-hidden="true"
         >
           <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Rate</span>
+            <span className="insightsRateMetricLabel">Base rate</span>
             <strong className="insightsRateMetricValue">
               {formatRateCompact(game.dollarsPerkWh)}/kWh
             </strong>
@@ -1322,6 +1325,15 @@ export default class Insights extends React.Component<Props, State> {
         <span id="insightsRateSummary" className="srOnly">
           {rateSummary}
         </span>
+        {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
+          game.policies?.programs.curtailment?.tier !== "Off") &&
+          game.policies && (
+            <Typography variant="caption">
+              Tariffs and credits adjust this base rate. Customer estimates here
+              assume a flat rate; use Customer programs for demand and cash with
+              offers.
+            </Typography>
+          )}
         <div
           className={`budgetSlider flex-newline ${
             this.state.leversOpen ? "" : "insightsRateSliderCollapsed"

@@ -145,20 +145,64 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
   {
     title: "Customer programs",
     group: "Gameplay",
-    keywords: "efficiency rooftop solar rebates funding adoption demand",
+    keywords:
+      "efficiency rooftop solar rebates funding adoption demand time-of-use tariff curtailment contracts peak enrollment",
     entry: (
-      <p>
-        In Insights, Customer programs lets you fund efficiency or rooftop solar
-        rebates. Choose Off, Small, or Large and compare estimated utility
-        demand before applying next month. Funding persists until changed.
-        Charges pay only for new upgrades, up to the monthly budget, and stop at
-        full adoption. Off stops new adoption and spending; installed upgrades
-        stay for the rest of the run. Efficiency reduces residential and
-        commercial use. Solar offsets their remaining daylight load, with
-        surplus curtailed and no export payment. It does not directly cover an
-        evening peak. Lower demand also means less electricity sold, so compare
-        cash as well as peak demand.
-      </p>
+      <div>
+        <p>
+          In Insights, Customer programs lets you fund efficiency or rooftop
+          solar rebates. Choose Off, Small, or Large and compare estimated
+          utility demand before applying next month. Funding persists until
+          changed. Charges pay only for new upgrades, up to the monthly budget,
+          and stop at full adoption. Off stops new adoption and spending;
+          installed upgrades stay for the rest of the run. Efficiency reduces
+          residential and commercial use. Solar offsets their remaining daylight
+          load, with surplus curtailed and no export payment. It does not
+          directly cover an evening peak. Lower demand also means less
+          electricity sold, so compare cash as well as peak demand.
+        </p>
+        <p>
+          Turn the time-of-use tariff On or Off. When on, half of homes
+          participate: choose a four-hour daily window and they move 20% of that
+          electricity use into the following three hours, such as charging cars
+          later. For example, a 22:00–02:00 window shifts use to 02:00–05:00.
+          The energy removed after efficiency and rooftop solar is spread evenly
+          over those later hours; total energy use is unchanged. Businesses and
+          transport-sector load are not enrolled. Participants pay 30% above
+          your base rate during the chosen window, 10% below it during the
+          following three hours, and the base rate otherwise. All returned
+          energy receives the later discount. Higher bills can affect customer
+          retention through the previous tick's effective billed rate.
+        </p>
+        <p>
+          Turn peak curtailment contracts On or Off. When on, half of industrial
+          and data-center load participates, including authored scenario
+          additions. Participants forgo 20% of demand during their own chosen
+          four-hour daily window, even when supply is adequate. In exchange,
+          they receive a 10% credit on electricity actually supplied all day. No
+          delivery means no credit. Supply and credits are allocated
+          proportionally during shortages. This load is eliminated, not shifted
+          to later hours. Contracted curtailment does not count as a blackout.
+          There is no effect without eligible load; transport is excluded. The
+          tariff and contract cover different sectors, so credits never stack on
+          a time-of-use rate.
+        </p>
+        <p>
+          Each program suggests a window around the forecast peak when first
+          opened. Keep it or choose any start hour; the window lasts four hours
+          and repeats on the scenario's local clock. Windows can cross midnight.
+          Compare the forecast before applying: shifting demand can create a
+          later peak, and your best window may change with the seasons. There
+          are no installation costs; compare demand and cash before committing.
+          Changes start next month and continue until changed. Off ends new
+          enrollment effects next month. Any already-shifted residential energy
+          still returns in its originally scheduled hours at the discounted
+          rate, even if you stop or change the window. Energy is preserved
+          across midnight and representative-month boundaries. Estimates include
+          billed sales, credits, spending and dispatch costs, holding weather,
+          fuel prices, fleet, base rate and other accepted programs constant.
+        </p>
+      </div>
     ),
   },
   {
@@ -746,7 +790,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Your rate is what you charge customers per kWh of electricity, and it
           creates nearly all of your revenue. Multiply this rate by the
-          electricity you sell to estimate your revenue. The game models each
+          electricity you sell to estimate your revenue with no customer offers.
+          Time-of-use tariffs and curtailment contracts adjust the base rate for
+          enrolled consumption; reported revenue already includes those rates
+          and credits and bills only electricity delivered. The game models each
           scenario's market and rules separately.
         </p>
         <p>

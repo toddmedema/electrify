@@ -7,11 +7,15 @@ import { getViableLocationCount } from "../data/FacilitySites";
 import {
   advancePolicies,
   applyPolicyDemand,
+  applyPeakDemand,
+  customerBillingRate,
   emptyPolicies,
   policyAvailable,
   validPolicyChange,
+  samePolicyChoice,
 } from "../helpers/Policies";
 import { POLICIES, POLICY_IDS } from "../data/Policies";
+import { policyChoiceLabel } from "../helpers/PolicyWindow";
 import {
   schedulePolicy,
   cancelPolicy,
@@ -1501,33 +1505,40 @@ function applyPolicyEdit(
   )
     return false;
   const existing = state.policies?.programs[payload.id];
-  const before = existing?.pending?.tier ?? existing?.tier ?? "Off";
+  const before = policyChoiceLabel(payload.id, existing?.pending ?? existing);
   if (cancel) {
     if (
       !existing?.pending ||
       existing.pending.month !== payload.month ||
-      existing.pending.tier !== payload.tier
+      !samePolicyChoice(payload.id, existing.pending, payload)
     )
       return false;
     delete existing.pending;
   } else {
-    if (payload.tier === (existing?.pending?.tier ?? existing?.tier ?? "Off"))
+    if (
+      samePolicyChoice(
+        payload.id,
+        payload,
+        existing?.pending ?? existing ?? { tier: "Off" },
+      )
+    )
       return false;
     state.policies ??= emptyPolicies(state.date.monthsElapsed);
     const program = state.policies.programs[payload.id];
-    if (payload.tier === program.tier) delete program.pending;
-    else program.pending = { tier: payload.tier, month: payload.month };
+    if (samePolicyChoice(payload.id, payload, program)) delete program.pending;
+    else {
+      const { id: _id, ...pending } = payload;
+      program.pending = pending;
+    }
   }
-  const after = cancel
-    ? (existing?.tier ?? "Off")
-    : (state.policies!.programs[payload.id].pending?.tier ??
-      state.policies!.programs[payload.id].tier);
+  const program = state.policies!.programs[payload.id];
+  const after = policyChoiceLabel(
+    payload.id,
+    cancel ? existing : (program.pending ?? program),
+  );
   recordMeaningfulDecision(state, {
-    lever: `policy:${payload.id}`,
-    label:
-      payload.id === "efficiency"
-        ? "Fund efficiency rebates"
-        : "Fund rooftop solar rebates",
+    lever: `policy:${payload.id.toLowerCase()}`,
+    label: POLICIES[payload.id].name,
     kind: "policy",
     before,
     after,
@@ -1784,7 +1795,7 @@ export function tickState(state: GameType) {
         logGameEvent(
           state,
           "WORLD_EVENT",
-          `${POLICIES[id].name}: ${state.policies!.programs[id].tier} funding starts this month.`,
+          `${POLICIES[id].name}: ${policyChoiceLabel(id, state.policies!.programs[id])} starts this month.`,
         ),
       );
       state.timeline = generateNewTimeline(state, cash, customers);
@@ -2128,7 +2139,7 @@ function getDemandW(
     getScenario(game.scenarioId, game.customScenario) || SCENARIOS[0];
   now.customerRate = updateCustomerRate(
     prev.customerRate || game.customerRate,
-    game.dollarsPerkWh,
+    prev.customerBillingRate ?? game.dollarsPerkWh,
     tickScale,
   );
   now.customers = nextCustomerCount({
@@ -2187,6 +2198,13 @@ function getDemandW(
     game.loadAdditions,
   );
   applyPolicyDemand(game, now);
+  applyPeakDemand(
+    game,
+    now,
+    prev.deferredResidential,
+    TICK_MINUTES * tickScale,
+  );
+  now.customerBillingRate = customerBillingRate(game, now);
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
     0,
@@ -2262,9 +2280,13 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
 function reforecastDemand(
   state: GameType,
   tickScale = 1,
+  initialDeferred: TickPresentFutureType["deferredResidential"] = [],
 ): TickPresentFutureType[] {
   const projection = { ...state, policies: cloneDeep(state.policies) };
-  let prev = state.timeline[0];
+  let prev = {
+    ...state.timeline[0],
+    deferredResidential: initialDeferred,
+  } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
@@ -2281,6 +2303,7 @@ function reforecastDemand(
       prev = t;
       return t;
     }
+    prev = t;
     return t;
   });
 }
@@ -2776,7 +2799,11 @@ function updateSupplyFacilitiesFinances(
     (Math.min(now.supplyW, now.demandW) / ticksPerHour) * GAME_TO_REAL_YEARS;
   // Scale the representative simulated day to the real month it stands for.
   const demandWh = (now.demandW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const customerRevenue = (supplyWh / 1000) * state.dollarsPerkWh;
+  // Re-read the base rate for live slider edits; demand forecasts may have been
+  // generated before that edit. Forecast passes advance their own policy copy.
+  now.customerBillingRate = customerBillingRate(state, now);
+  const customerRevenue =
+    (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
@@ -2950,6 +2977,11 @@ function updateSupplyFacilitiesFinances(
     getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
 
   // Save new financial info
+  now.customerRate = updateCustomerRate(
+    prev.customerRate || state.customerRate,
+    prev.customerBillingRate ?? state.dollarsPerkWh,
+    tickScale,
+  );
   now.customers = nextCustomerCount({
     customers: prev.customers,
     customerRate: now.customerRate,
@@ -3018,6 +3050,7 @@ function supplyForecastPass(
   // instead of ramping, and every reforecast silently aged construction and loans by a whole day.
   const newState = {
     ...state,
+    policies: cloneDeep(state.policies),
     facilities: cloneDeep(state.facilities),
     transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),
   };
@@ -3035,6 +3068,7 @@ function supplyForecastPass(
   return newState.timeline.map((t: TickPresentFutureType) => {
     const sourceTick = t;
     if (t.minute >= state.date.minute) {
+      advancePolicies(newState, Math.floor(t.minute / MINUTES_PER_MONTH));
       t = { ...t };
       copyCommitmentMetadata(sourceTick, t);
       t = updateSupplyFacilitiesFinances(
@@ -3144,6 +3178,13 @@ export function generateNewTimeline(
   const currentCustomerRate =
     getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
       ?.customerRate || readOnlyState.customerRate;
+  // Retention responds to the last delivered-energy bill, with one tick of lag.
+  // Carry that signal across month boundaries and isolated forecast horizons.
+  const currentBillingRate =
+    getTimeFromTimeline(readOnlyState.date.minute, readOnlyState.timeline)
+      ?.customerBillingRate ??
+    readOnlyState.timeline.at(-1)?.customerBillingRate ??
+    readOnlyState.dollarsPerkWh;
   for (let i = 0; i < ticks; i++) {
     state.timeline[i] = {
       minute: state.date.minute + i * stepMinutes,
@@ -3163,6 +3204,7 @@ export function generateNewTimeline(
       cash,
       customers,
       customerRate: currentCustomerRate,
+      customerBillingRate: currentBillingRate,
       netWorth,
       revenue: 0,
       expensesFuel: 0,
@@ -3204,7 +3246,17 @@ export function generateNewTimeline(
     } as TickPresentFutureType;
   }
   state.timeline = reforecastWeatherAndPrices(state);
-  state.timeline = reforecastDemand(state, tickScale);
+  const previousDemandTick = readOnlyState.timeline.findLast(
+    (tick) => tick.minute < state.date.minute,
+  );
+  state.timeline = reforecastDemand(
+    state,
+    tickScale,
+    previousDemandTick?.deferredResidential ??
+      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
+        ?.deferredResidentialStart ??
+      [],
+  );
   state.timeline = reforecastSupply(state, true, stepMinutes);
   return state.timeline;
 }

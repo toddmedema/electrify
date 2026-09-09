@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   Radio,
   RadioGroup,
+  TextField,
   Typography,
   useMediaQuery,
 } from "@mui/material";
@@ -26,6 +27,7 @@ import {
   emptyPolicies,
   policyAvailable,
   policyBudget,
+  isOperatingPolicy,
 } from "../../helpers/Policies";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import {
@@ -37,6 +39,14 @@ import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
 import { PolicyPreviewResult } from "../../helpers/PolicyPreview";
 import PolicyDemandChart from "../base/PolicyDemandChart";
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
+import {
+  policyWindowLabel,
+  suggestedPolicyStartHour,
+} from "../../helpers/PolicyWindow";
+const programLabel = (id: PolicyId, tier: PolicyTier) =>
+  isOperatingPolicy(id) && tier !== "Off" ? "On" : tier;
 
 const labelMonth = (game: GameType, month: number) => {
   const d = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
@@ -52,11 +62,12 @@ function Decision({
 }) {
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
+  const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
   const phone = useMediaQuery("(max-width:600px)");
   const token = React.useId();
   React.useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !manualOpen) {
         event.preventDefault();
         event.stopPropagation();
         onClose();
@@ -64,9 +75,10 @@ function Decision({
     };
     document.addEventListener("keydown", closeOnEscape, true);
     return () => document.removeEventListener("keydown", closeOnEscape, true);
-  }, [onClose]);
+  }, [onClose, manualOpen]);
   const [selected, setSelected] = React.useState<PolicyId>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
+  const [startHour, setStartHour] = React.useState(17);
   const [later, setLater] = React.useState(false);
   const [preview, setPreview] = React.useState<{
     key: string;
@@ -84,7 +96,7 @@ function Decision({
   const end =
     getScenario(game.scenarioId, game.customScenario)?.durationMonths ?? 0;
   const month = later ? Math.min(effective + 11, end - 1) : effective;
-  const key = `${selected}/${tier}/${month}/${game.date.minute}`;
+  const key = `${selected}/${tier}/${startHour}/${month}/${game.date.minute}`;
   React.useEffect(() => {
     if (!selected || effective >= end) return;
     let worker: Worker | undefined;
@@ -106,7 +118,12 @@ function Decision({
         };
         worker.postMessage({
           game: JSON.parse(JSON.stringify(game)),
-          change: { id: selected, tier, month: effective },
+          change: {
+            id: selected,
+            tier,
+            month: effective,
+            ...(isOperatingPolicy(selected) ? { startHour } : {}),
+          },
           month,
         });
       } catch (_error) {
@@ -122,13 +139,18 @@ function Decision({
       window.clearTimeout(timer);
       worker?.terminate();
     };
-  }, [game, selected, tier, month, effective, end, key]);
+  }, [game, selected, tier, startHour, month, effective, end, key]);
   const programs = game.policies?.programs ?? emptyPolicies().programs;
   const current = selected ? programs[selected] : undefined;
+  const operating = selected ? isOperatingPolicy(selected) : false;
   const settled = preview?.key === key && preview.snapshot === game;
   const result = settled ? preview.result : undefined;
   const error = settled ? preview.error : undefined;
-  const unchanged = tier === (current?.pending?.tier ?? current?.tier ?? "Off");
+  const unchanged =
+    tier === (current?.pending?.tier ?? current?.tier ?? "Off") &&
+    (!operating ||
+      tier === "Off" ||
+      startHour === (current?.pending?.startHour ?? current?.startHour ?? 17));
   const peakBefore = result ? Math.max(...result.current) : 0;
   const peakAfter = result ? Math.max(...result.changed) : 0;
   return (
@@ -141,10 +163,20 @@ function Decision({
       aria-labelledby="program-title"
       data-customer-programs="true"
     >
-      <DialogTitle id="program-title">
+      <DialogTitle
+        id="program-title"
+        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+      >
         {selected ? POLICIES[selected].name : "Customer programs"}
+        <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent
+        dividers
+        sx={{
+          "& button": { minHeight: 44 },
+          "& summary": { minHeight: 44, cursor: "pointer" },
+        }}
+      >
         {!selected ? (
           <Box sx={{ display: "grid", gap: 2 }}>
             {POLICY_IDS.map((id) => (
@@ -154,75 +186,135 @@ function Decision({
                   onClick={() => {
                     setSelected(id);
                     setTier(programs[id].pending?.tier ?? programs[id].tier);
+                    setStartHour(
+                      programs[id].pending?.startHour ??
+                        programs[id].startHour ??
+                        (programs[id].tier !== "Off"
+                          ? 17
+                          : suggestedPolicyStartHour(game)),
+                    );
                     setLater(false);
                   }}
                 >
-                  {POLICIES[id].name} · {programs[id].tier}
+                  {POLICIES[id].name} · {programLabel(id, programs[id].tier)}
                 </Button>
                 <Typography>{POLICIES[id].description}</Typography>
                 {programs[id].pending && (
                   <Typography variant="body2">
-                    {programs[id].pending!.tier} starts{" "}
+                    {programLabel(id, programs[id].pending!.tier)} starts{" "}
                     {labelMonth(game, programs[id].pending!.month)}
+                    {isOperatingPolicy(id) &&
+                      programs[id].pending!.tier !== "Off" && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          {policyWindowLabel(
+                            programs[id].pending!.startHour ??
+                              programs[id].startHour ??
+                              17,
+                          )}
+                        </>
+                      )}
                   </Typography>
                 )}
               </Box>
             ))}
             <Typography variant="body2">
-              Funding continues monthly until changed. Installed upgrades stay
-              for the rest of this run, including after funding stops.
+              Changes start next month. Rebates install lasting upgrades;
+              tariffs and contracts apply only while enabled.
             </Typography>
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography>{POLICIES[selected].mechanism}</Typography>
-            <Typography variant="body2">
-              {current!.adoption >= 1
-                ? "Fully adopted"
-                : current!.adoption > 0
-                  ? current!.tier === "Off"
-                    ? "Installed upgrades retained"
-                    : "Building up"
-                  : "No funded upgrades yet"}{" "}
-              · {Math.round(current!.adoption * 100)}% of eligible potential
-              installed
+            <Typography>
+              {operating
+                ? POLICIES[selected].description
+                : POLICIES[selected].mechanism}
             </Typography>
+            {!operating && (
+              <Typography variant="body2">
+                {current!.adoption >= 1
+                  ? "Fully adopted"
+                  : current!.adoption > 0
+                    ? current!.tier === "Off"
+                      ? "Installed upgrades retained"
+                      : "Building up"
+                    : "No funded upgrades yet"}{" "}
+                · {Math.round(current!.adoption * 100)}% of eligible potential
+                installed
+              </Typography>
+            )}
             <RadioGroup
-              row={!phone}
-              aria-label="Monthly funding"
-              value={tier}
+              row={operating || !phone}
+              aria-label={operating ? "Program status" : "Monthly funding"}
+              value={operating && tier !== "Off" ? "Large" : tier}
               onChange={(e) => setTier(e.target.value as PolicyTier)}
             >
-              {POLICY_TIERS.map((choice) => (
+              {(operating
+                ? (["Off", "Large"] as PolicyTier[])
+                : POLICY_TIERS
+              ).map((choice) => (
                 <FormControlLabel
                   key={choice}
                   value={choice}
                   control={<Radio />}
                   sx={{ minHeight: 44, m: 0, flex: 1 }}
-                  label={`${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`}
+                  label={
+                    operating
+                      ? programLabel(selected, choice)
+                      : `${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`
+                  }
                 />
               ))}
             </RadioGroup>
-            <Typography variant="body2">
-              Off stops new spending; installed upgrades remain.
-            </Typography>
-            <Typography variant="body2">
-              Small installs upgrades at a lower cost per upgrade. Large
-              installs them faster, at a higher cost per upgrade.
-            </Typography>
-            <Typography variant="body2">
-              Rebates cost money and reduce electricity sales.
-            </Typography>
+            {operating && tier !== "Off" && (
+              <TextField
+                select
+                fullWidth
+                label="Daily window"
+                value={startHour}
+                onChange={(event) => setStartHour(Number(event.target.value))}
+                slotProps={{
+                  select: { native: true },
+                  htmlInput: { style: { minHeight: 24 } },
+                }}
+                helperText={
+                  selected === "timeOfUse"
+                    ? `Use moves to ${policyWindowLabel((startHour + 4) % 24, 3)} afterward.`
+                    : undefined
+                }
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {policyWindowLabel(hour)}
+                  </option>
+                ))}
+              </TextField>
+            )}
+            {!operating && (
+              <>
+                <Typography variant="body2">
+                  Off stops new spending; installed upgrades remain.
+                </Typography>
+                <Typography variant="body2">
+                  Small installs upgrades at a lower cost per upgrade. Large
+                  installs them faster, at a higher cost per upgrade.
+                </Typography>
+                <Typography variant="body2">
+                  Rebates cost money and reduce electricity sales.
+                </Typography>
+              </>
+            )}
             {effective >= end ? (
               <Alert severity="info">
-                This run ends before another funding change could take effect.
+                This run ends before another program change could take effect.
               </Alert>
             ) : (
               <>
                 <Typography component="h3" variant="subtitle1">
                   Estimated utility demand · {labelMonth(game, month)}
                 </Typography>
-                {end - 1 > effective && (
+                {!operating && end - 1 > effective && (
                   <Button onClick={() => setLater(!later)}>
                     {later
                       ? "First effective month"
@@ -245,58 +337,44 @@ function Decision({
                       changed={result.changed}
                     />
                     <Box role="status">
-                      <Typography>
-                        Program spending: {formatMoneyConcise(result.spending)}{" "}
-                        in {labelMonth(game, month)}
-                      </Typography>
+                      {!operating && (
+                        <Typography>
+                          Program spending:{" "}
+                          {formatMoneyConcise(result.spending)} in{" "}
+                          {labelMonth(game, month)}
+                        </Typography>
+                      )}
                       <Typography>
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
                       </Typography>
-                      <Typography>
-                        Electricity supplied:{" "}
-                        {formatWattHours(result.before.supplyWh)} →{" "}
-                        {formatWattHours(result.after.supplyWh)} in{" "}
-                        {labelMonth(game, month)}
-                      </Typography>
+                      {!operating && (
+                        <Typography>
+                          Electricity supplied:{" "}
+                          {formatWattHours(result.before.supplyWh)} →{" "}
+                          {formatWattHours(result.after.supplyWh)} in{" "}
+                          {labelMonth(game, month)}
+                        </Typography>
+                      )}
                       <Typography>
                         Change in utility cash from now through{" "}
                         {labelMonth(game, month)}:{" "}
                         {formatMoneyConcise(result.cashChange)}
                       </Typography>
-                      <Typography variant="body2">
-                        Includes program spending, less electricity sold, and
-                        actual dispatch costs.
-                      </Typography>
+
                       {(formatWatts(peakBefore) === formatWatts(peakAfter) ||
                         Math.abs(peakAfter - peakBefore) <
                           peakBefore * 0.001) && (
                         <Typography variant="body2">
                           Little change in peak demand.{" "}
-                          {selected === "solar"
-                            ? "Daylight savings may leave the evening peak unchanged."
-                            : "Efficiency savings build gradually as upgrades are installed."}
+                          {operating
+                            ? "Only eligible loads respond. Try a different daily window to target your peak."
+                            : selected === "solar"
+                              ? "Daylight savings may leave the evening peak unchanged."
+                              : "Efficiency savings build gradually as upgrades are installed."}
                         </Typography>
                       )}
                     </Box>
-                    <details>
-                      <summary>Why this changes</summary>
-                      <Typography variant="body2">
-                        {POLICIES[selected].tradeoff} Budgets adjust with
-                        inflation. Spending pays only for new upgrades and stops
-                        at full adoption. Installed upgrades persist for this
-                        run.
-                      </Typography>
-                      <Typography variant="body2">
-                        Estimates hold weather, fuel prices, fleet, rate and
-                        customer assumptions, and other accepted programs
-                        constant. Efficiency is a simplified end-use reduction
-                        for homes and businesses. Solar offsets their remaining
-                        load after efficiency; surplus is curtailed. No export
-                        payments or utility generation credits. Hint: compare
-                        daylight savings with the time of your shortage.
-                      </Typography>
-                    </details>
                     {result.after.cash < 0 && (
                       <Alert severity="warning">
                         Projected cash is negative. Existing debt rules still
@@ -344,12 +422,25 @@ function Decision({
             }
             onClick={() => {
               dispatch(
-                schedulePolicy({ id: selected, tier, month: effective }),
+                schedulePolicy({
+                  id: selected,
+                  tier,
+                  month: effective,
+                  ...(operating ? { startHour } : {}),
+                }),
               );
               setSelected(undefined);
             }}
           >
-            {tier === "Off" ? "Stop next month" : "Start next month"}
+            {operating
+              ? tier === "Off"
+                ? "Turn off next month"
+                : (current?.pending?.tier ?? current?.tier) !== "Off"
+                  ? "Update next month"
+                  : "Turn on next month"
+              : tier === "Off"
+                ? "Stop next month"
+                : "Start next month"}
           </Button>
         )}
       </DialogActions>
@@ -402,8 +493,10 @@ export default function CustomerPrograms({
       ) : (
         active > 0 && (
           <Typography variant="caption">
-            {active} program{active > 1 ? "s" : ""} active · up to{" "}
-            {formatMoneyConcise(budget)}/month
+            {active} program{active > 1 ? "s" : ""} active
+            {budget > 0 && (
+              <> · up to {formatMoneyConcise(budget)}/month in rebates</>
+            )}
           </Typography>
         )
       )}
