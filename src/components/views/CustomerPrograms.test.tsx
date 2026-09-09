@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import gameReducer from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import * as client from "../../helpers/PolicyPreviewClient";
 import { previewPolicy } from "../../helpers/PolicyPreview";
@@ -43,7 +44,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
     1,
   );
   const store = configureStore({
-    reducer: { game: gameReducer },
+    reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
   });
   const view = render(
@@ -110,7 +111,7 @@ test.each<PolicyId>(["solar", "efficiency"])(
       changed: [47000000, 30000000],
     };
     const store = configureStore({
-      reducer: { game: gameReducer },
+      reducer: { game: gameReducer, ui: uiReducer },
       preloadedState: { game },
     });
     const view = render(
@@ -151,7 +152,7 @@ test("stopped funding describes retained upgrades without announcing another cha
   game.policies = emptyPolicies();
   game.policies.programs.efficiency.adoption = 0.05;
   const store = configureStore({
-    reducer: { game: gameReducer },
+    reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
   });
   const view = render(

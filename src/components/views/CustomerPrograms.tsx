@@ -27,7 +27,6 @@ import {
   policyAvailable,
   policyBudget,
   isOperatingPolicy,
-  participation,
 } from "../../helpers/Policies";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import {
@@ -39,6 +38,10 @@ import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
 import { PolicyPreviewResult } from "../../helpers/PolicyPreview";
 import PolicyDemandChart from "../base/PolicyDemandChart";
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
+const programLabel = (id: PolicyId, tier: PolicyTier) =>
+  isOperatingPolicy(id) && tier !== "Off" ? "On" : tier;
 
 const labelMonth = (game: GameType, month: number) => {
   const d = getDateFromMinute(month * MINUTES_PER_MONTH, game.startingYear);
@@ -54,11 +57,12 @@ function Decision({
 }) {
   const game = useAppSelector((s) => s.game);
   const dispatch = useAppDispatch();
+  const manualOpen = useAppSelector((s) => !!s.ui.manualHelpEntry);
   const phone = useMediaQuery("(max-width:600px)");
   const token = React.useId();
   React.useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !manualOpen) {
         event.preventDefault();
         event.stopPropagation();
         onClose();
@@ -66,7 +70,7 @@ function Decision({
     };
     document.addEventListener("keydown", closeOnEscape, true);
     return () => document.removeEventListener("keydown", closeOnEscape, true);
-  }, [onClose]);
+  }, [onClose, manualOpen]);
   const [selected, setSelected] = React.useState<PolicyId>();
   const [tier, setTier] = React.useState<PolicyTier>("Off");
   const [later, setLater] = React.useState(false);
@@ -144,8 +148,12 @@ function Decision({
       aria-labelledby="program-title"
       data-customer-programs="true"
     >
-      <DialogTitle id="program-title">
+      <DialogTitle
+        id="program-title"
+        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+      >
         {selected ? POLICIES[selected].name : "Customer programs"}
+        <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
       </DialogTitle>
       <DialogContent
         dividers
@@ -166,12 +174,12 @@ function Decision({
                     setLater(false);
                   }}
                 >
-                  {POLICIES[id].name} · {programs[id].tier}
+                  {POLICIES[id].name} · {programLabel(id, programs[id].tier)}
                 </Button>
                 <Typography>{POLICIES[id].description}</Typography>
                 {programs[id].pending && (
                   <Typography variant="body2">
-                    {programs[id].pending!.tier} starts{" "}
+                    {programLabel(id, programs[id].pending!.tier)} starts{" "}
                     {labelMonth(game, programs[id].pending!.month)}
                   </Typography>
                 )}
@@ -184,7 +192,11 @@ function Decision({
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography>{POLICIES[selected].mechanism}</Typography>
+            <Typography>
+              {operating
+                ? POLICIES[selected].description
+                : POLICIES[selected].mechanism}
+            </Typography>
             {!operating && (
               <Typography variant="body2">
                 {current!.adoption >= 1
@@ -199,12 +211,15 @@ function Decision({
               </Typography>
             )}
             <RadioGroup
-              row={!phone}
-              aria-label={operating ? "Enrollment" : "Monthly funding"}
-              value={tier}
+              row={operating || !phone}
+              aria-label={operating ? "Program status" : "Monthly funding"}
+              value={operating && tier !== "Off" ? "Large" : tier}
               onChange={(e) => setTier(e.target.value as PolicyTier)}
             >
-              {POLICY_TIERS.map((choice) => (
+              {(operating
+                ? (["Off", "Large"] as PolicyTier[])
+                : POLICY_TIERS
+              ).map((choice) => (
                 <FormControlLabel
                   key={choice}
                   value={choice}
@@ -212,19 +227,13 @@ function Decision({
                   sx={{ minHeight: 44, m: 0, flex: 1 }}
                   label={
                     operating
-                      ? `${choice} · ${participation(choice) * 100}% enrolled`
+                      ? programLabel(selected, choice)
                       : `${choice} · ${choice === "Off" ? "$0/month" : `up to ${formatMoneyConcise(policyBudget(game, selected, choice, effective))}/month`}`
                   }
                 />
               ))}
             </RadioGroup>
-            {operating ? (
-              <Typography variant="body2">
-                Off restores the base rate and uncurtailed consumption next
-                month. No installation fees. Bill changes are included in cash
-                estimates. All hours use the scenario's local clock, year-round.
-              </Typography>
-            ) : (
+            {!operating && (
               <>
                 <Typography variant="body2">
                   Off stops new spending; installed upgrades remain.
@@ -238,37 +247,16 @@ function Decision({
                 </Typography>
               </>
             )}
-            {operating && (
-              <Typography variant="body2">
-                Base rate: {formatMoneyConcise(game.dollarsPerkWh)}/kWh.
-                {selected === "timeOfUse" && (
-                  <>
-                    {" "}
-                    Enrolled rates:{" "}
-                    {formatMoneyConcise(game.dollarsPerkWh * 1.3)}/kWh evening;{" "}
-                    {formatMoneyConcise(game.dollarsPerkWh * 0.9)}/kWh
-                    overnight.
-                  </>
-                )}
-                {selected === "curtailment" && (
-                  <>
-                    {" "}
-                    Enrolled rate after credit:{" "}
-                    {formatMoneyConcise(game.dollarsPerkWh * 0.9)}/kWh all day.
-                  </>
-                )}
-              </Typography>
-            )}
             {effective >= end ? (
               <Alert severity="info">
-                This run ends before another funding change could take effect.
+                This run ends before another program change could take effect.
               </Alert>
             ) : (
               <>
                 <Typography component="h3" variant="subtitle1">
                   Estimated utility demand · {labelMonth(game, month)}
                 </Typography>
-                {end - 1 > effective && (
+                {!operating && end - 1 > effective && (
                   <Button onClick={() => setLater(!later)}>
                     {later
                       ? "First effective month"
@@ -302,21 +290,20 @@ function Decision({
                         Peak demand: {formatWatts(peakBefore)} →{" "}
                         {formatWatts(peakAfter)}
                       </Typography>
-                      <Typography>
-                        Electricity supplied:{" "}
-                        {formatWattHours(result.before.supplyWh)} →{" "}
-                        {formatWattHours(result.after.supplyWh)} in{" "}
-                        {labelMonth(game, month)}
-                      </Typography>
+                      {!operating && (
+                        <Typography>
+                          Electricity supplied:{" "}
+                          {formatWattHours(result.before.supplyWh)} →{" "}
+                          {formatWattHours(result.after.supplyWh)} in{" "}
+                          {labelMonth(game, month)}
+                        </Typography>
+                      )}
                       <Typography>
                         Change in utility cash from now through{" "}
                         {labelMonth(game, month)}:{" "}
                         {formatMoneyConcise(result.cashChange)}
                       </Typography>
-                      <Typography variant="body2">
-                        Includes program spending, billed sales after tariff
-                        adjustments and credits, and actual dispatch costs.
-                      </Typography>
+
                       {(formatWatts(peakBefore) === formatWatts(peakAfter) ||
                         Math.abs(peakAfter - peakBefore) <
                           peakBefore * 0.001) && (
@@ -330,36 +317,6 @@ function Decision({
                         </Typography>
                       )}
                     </Box>
-                    <details>
-                      <summary>Why this changes</summary>
-                      <Typography variant="body2">
-                        {POLICIES[selected].tradeoff}{" "}
-                        {!operating && (
-                          <>
-                            Budgets adjust with inflation. Spending pays only
-                            for new upgrades and stops at full adoption.
-                            Installed upgrades persist for this run.
-                          </>
-                        )}
-                      </Typography>
-                      <Typography variant="body2">
-                        Estimates hold weather, fuel prices, fleet, rate and
-                        customer assumptions, and other accepted programs
-                        constant.{" "}
-                        {operating ? (
-                          "Enrollment changes consumption and the effective billed rate. Credits apply proportionally to delivered eligible energy during shortages; unserved energy earns no revenue or credit. Avoided consumption is not shifted, and scheduled curtailment is not a reliability failure."
-                        ) : (
-                          <>
-                            Efficiency is a simplified end-use reduction for
-                            homes and businesses. Solar offsets their remaining
-                            load after efficiency; surplus is curtailed. No
-                            export payments or utility generation credits. Hint:
-                            compare daylight savings with the time of your
-                            shortage.
-                          </>
-                        )}
-                      </Typography>
-                    </details>
                     {result.after.cash < 0 && (
                       <Alert severity="warning">
                         Projected cash is negative. Existing debt rules still
@@ -412,7 +369,13 @@ function Decision({
               setSelected(undefined);
             }}
           >
-            {tier === "Off" ? "Stop next month" : "Start next month"}
+            {operating
+              ? tier === "Off"
+                ? "Turn off next month"
+                : "Turn on next month"
+              : tier === "Off"
+                ? "Stop next month"
+                : "Start next month"}
           </Button>
         )}
       </DialogActions>

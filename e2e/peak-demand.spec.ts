@@ -25,13 +25,19 @@ for (const theme of ["light", "dark"]) {
       await dialog
         .getByRole("button", { name: `${offer} · Off`, exact: true })
         .click();
-      await expect(dialog).toContainText("17:00–21:00");
-      await expect(dialog).toContainText("Base rate:");
+      await expect(dialog.getByRole("radio")).toHaveCount(2);
+      await expect(dialog).not.toContainText("Base rate:");
       await expect(dialog).not.toContainText("installed upgrades");
-      const large = dialog.getByRole("radio", { name: "Large · 50% enrolled" });
+      const large = dialog.getByRole("radio", { name: "On", exact: true });
       await large.check();
+      await dialog.getByRole("button", { name: "What is Customer programs?" }).click();
+      const manual = page.getByRole("dialog", { name: "Manual help" });
+      await expect(manual).toContainText("total energy use is unchanged");
+      await page.keyboard.press("Escape");
+      await expect(manual).toHaveCount(0);
+      await expect(large).toBeChecked();
       const apply = dialog.getByRole("button", {
-        name: "Start next month",
+        name: "Turn on next month",
         exact: true,
       });
       await expect(apply).toBeEnabled({ timeout: 30000 });
@@ -60,14 +66,14 @@ for (const theme of ["light", "dark"]) {
         ),
       });
       await apply.click();
-      await expect(dialog).toContainText("Large starts Feb 2020");
+      await expect(dialog).toContainText("On starts Feb 2020");
       await dialog
         .getByRole("button", { name: `${offer} · Off`, exact: true })
         .click();
       await dialog
         .getByRole("button", { name: "Cancel scheduled change" })
         .click();
-      await expect(dialog).not.toContainText("Large starts");
+      await expect(dialog).not.toContainText("On starts");
     }
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

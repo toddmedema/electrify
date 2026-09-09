@@ -385,6 +385,9 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
     customerBillingRate?: number; // Delivered-energy blended rate, including enrolled offers.
+    deferredResidentialWh?: number; // Unscaled representative-day energy awaiting late-evening use.
+    deferredResidentialWhStart?: number; // Queue before this tick, retained when forecasts trim prior history.
+    shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
     supplyByFuel: FuelProductionType;
     /** Positive gross flow into/out of the player's grid during this tick. */
     importedW?: number;

@@ -37,7 +37,8 @@ import {
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
 // Version 9 is reserved for wildfire response actions. Version 10 adds operating
 // customer tariffs/contracts and their effective billed-price retention signal.
-export const REPLAY_VERSION = 10;
+// Version 11 shifts residential tariff energy to later hours instead of eliminating it.
+export const REPLAY_VERSION = 11;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

@@ -91,17 +91,17 @@ test.each([0, 6 * 60, 17 * 60 - 1, 17 * 60, 21 * 60 - 1, 21 * 60, 1440])(
     const game = offers();
     const tick = demand(minute);
     const peak = minute >= 1020 && minute < 1260;
-    const overnight = minute % 1440 < 360;
+    const late = minute % 1440 >= 1260;
     applyPeakDemand(game, tick);
     expect(tick.demandByType.Residential).toBe(peak ? 90 : 100);
-    expect(tick.demandByType.Commercial).toBe(peak ? 90 : 100);
+    expect(tick.demandByType.Commercial).toBe(100);
     expect(tick.demandByType.Industrial).toBe(peak ? 95 : 100);
     expect(tick.demandByType["Data centers"]).toBe(peak ? 95 : 100);
     expect(tick.demandByType.Transportation).toBe(100);
     // Explicit enrolled/un-enrolled bills: contracts and TOU never share a sector.
     const bill = peak
-      ? 2 * (50 + 40 * 1.3) + 2 * (75 + 20 * 0.9) + 100
-      : 2 * (50 + 50 * (overnight ? 0.9 : 1)) + 2 * (75 + 25 * 0.9) + 100;
+      ? 50 + 40 * 1.3 + 100 + 2 * (75 + 20 * 0.9) + 100
+      : 50 + 50 * (late ? 0.9 : 1) + 100 + 2 * (75 + 25 * 0.9) + 100;
     const watts = Object.values(tick.demandByType).reduce((a, b) => a + b, 0);
     expect(customerBillingRate(game, tick) * watts).toBeCloseTo(
       bill * game.dollarsPerkWh,
@@ -130,7 +130,7 @@ test("season/month windows repeat; no enrolled load means no effect; rebates com
   };
   const before = cloneDeep(tick);
   applyPeakDemand(game, tick);
-  expect(tick).toEqual(before);
+  expect(tick.demandByType).toEqual(before.demandByType);
   expect(customerBillingRate(game, tick)).toBe(game.dollarsPerkWh);
   tick.demandByType.Transportation = 0;
   expect(customerBillingRate(game, tick)).toBe(game.dollarsPerkWh);
@@ -318,6 +318,112 @@ test("both offer actions cancel, save, resume and replay deterministically throu
   expect(
     decodeReplay({ ...serializeReplay(game), version: REPLAY_VERSION - 1 }),
   ).toBeNull();
-  expect(REPLAY_VERSION).toBe(10);
+  expect(REPLAY_VERSION).toBe(11);
   expect(decodeReplay(serializeReplay(game))).not.toBeNull();
 });
+
+test.each([false, true])(
+  "residential energy returns later after rebates=%s; industrial load never rebounds",
+  (rebates) => {
+    const game = offers();
+    if (rebates) {
+      game.policies!.programs.efficiency.adoption = 0.5;
+      game.policies!.programs.solar.adoption = 0.2;
+    }
+    let queued = 0,
+      residentialBefore = 0,
+      residentialAfter = 0,
+      industrialBefore = 0,
+      industrialAfter = 0;
+    for (let minute = 0; minute < 1440; minute += 15) {
+      const tick = demand(minute);
+      tick.demandByType.Residential = 100 + minute / 10;
+      tick.solarIrradianceWM2 = minute >= 360 && minute < 1200 ? 0.001 : 0;
+      applyPolicyDemand(game, tick);
+      const before = cloneDeep(tick.demandByType);
+      residentialBefore += before.Residential / 4;
+      industrialBefore += before.Industrial / 4;
+      applyPeakDemand(game, tick, queued);
+      queued = tick.deferredResidentialWh!;
+      residentialAfter += tick.demandByType.Residential / 4;
+      industrialAfter += tick.demandByType.Industrial / 4;
+      expect(tick.demandByType.Commercial).toBe(before.Commercial);
+      expect(
+        minute >= 1020 || tick.demandByType.Residential === before.Residential,
+      ).toBe(true);
+      // Each late tick must return load at the discount while industry never rebounds.
+      /* eslint-disable jest/no-conditional-expect */
+      if (minute >= 1260) {
+        expect(tick.demandByType.Residential).toBeGreaterThan(
+          before.Residential,
+        );
+        expect(tick.demandByType.Industrial).toBe(before.Industrial);
+        const expectedBill =
+          before.Residential * 0.95 +
+          tick.shiftedResidentialW! * 0.9 +
+          before.Commercial +
+          before.Industrial * 0.975 +
+          before["Data centers"] * 0.975 +
+          before.Transportation;
+        const total = Object.values(tick.demandByType).reduce(
+          (a, b) => a + b,
+          0,
+        );
+        expect(customerBillingRate(game, tick) * total).toBeCloseTo(
+          expectedBill * game.dollarsPerkWh,
+        );
+      }
+    }
+    /* eslint-enable jest/no-conditional-expect */
+    expect(queued).toBeCloseTo(0, 8);
+    expect(residentialAfter).toBeCloseTo(residentialBefore, 8);
+    expect(industrialBefore - industrialAfter).toBeCloseTo(20);
+  },
+);
+
+test.each([18 * 60, 22 * 60])(
+  "save and reforecast preserve queued energy at minute %i",
+  (minute) => {
+    let game = createGame({
+      scenarioId: 106,
+      seed: 4,
+      initialPrograms: { timeOfUse: "Large" },
+    });
+    month(game);
+    while (game.date.minute < 1440 + minute) tickState(game);
+    game = parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game;
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    const rebuilt = generateNewTimeline(game, now.cash, now.customers);
+    const prior = game.timeline.findLast((t) => t.minute < game.date.minute)!;
+    const first = rebuilt[0];
+    const addedWh =
+      minute < 1260
+        ? ((first.demandByType.Residential / 0.9) * 0.1) / 4
+        : -first.shiftedResidentialW! / 4;
+    expect(first.deferredResidentialWh).toBeCloseTo(
+      prior.deferredResidentialWh! + addedWh,
+      6,
+    );
+    const replayedForecast = generateNewTimeline(
+      parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game,
+      now.cash,
+      now.customers,
+    );
+    expect(rebuilt.map((t) => t.deferredResidentialWh)).toEqual(
+      replayedForecast.map((t) => t.deferredResidentialWh),
+    );
+    expect(
+      rebuilt.find((t) => t.minute % 1440 === 1425)!.deferredResidentialWh,
+    ).toBeCloseTo(0, 6);
+    game.timeline = rebuilt;
+    game = parseSave(JSON.parse(JSON.stringify(serializeSave(game))))!.game;
+    const rebuiltAgain = generateNewTimeline(game, now.cash, now.customers);
+    expect(rebuiltAgain[0].deferredResidentialWhStart).toBe(
+      first.deferredResidentialWhStart,
+    );
+    expect(rebuiltAgain[0].deferredResidentialWhStart).toBeGreaterThan(0);
+    const invalid = serializeSave(game);
+    invalid.game.timeline[0].deferredResidentialWh = -1;
+    expect(parseSave(invalid)).toBeNull();
+  },
+);

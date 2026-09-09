@@ -14,7 +14,7 @@ import {
   POLICY_FUNDING,
 } from "../data/Policies";
 import { getInflationIndex } from "../data/Economy";
-import { EQUATOR_RADIANCE } from "../Constants";
+import { EQUATOR_RADIANCE, TICK_MINUTES } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 
 export function emptyPolicies(month = 0): PoliciesType {
@@ -137,19 +137,39 @@ const peakHour = (minute: number) => {
   return localMinute >= 17 * 60 && localMinute < 21 * 60;
 };
 
-/** Contracted reductions remove only enrolled consumption, never create energy.
- * The simulated representative day is the local clock for each scenario month. */
-export function applyPeakDemand(game: GameType, tick: TickPresentFutureType) {
-  if (!peakHour(tick.minute)) return;
+/** Defer actual residential energy until later in the same representative day.
+ * Industrial curtailment is eliminated consumption and never enters the queue. */
+export function applyPeakDemand(
+  game: GameType,
+  tick: TickPresentFutureType,
+  deferredWh = 0,
+  stepMinutes = TICK_MINUTES,
+) {
+  const localMinute = tick.minute % MINUTES_PER_MONTH;
+  tick.deferredResidentialWh = localMinute === 0 ? 0 : deferredWh;
+  tick.deferredResidentialWhStart = tick.deferredResidentialWh;
+  tick.shiftedResidentialW = 0;
   const p = game.policies?.programs;
   const tariff =
     participation(p?.timeOfUse?.tier ?? "Off") * POLICIES.timeOfUse.cap;
   const contract =
     participation(p?.curtailment?.tier ?? "Off") * POLICIES.curtailment.cap;
-  tick.demandByType.Residential *= 1 - tariff;
-  tick.demandByType.Commercial *= 1 - tariff;
-  tick.demandByType.Industrial *= 1 - contract;
-  tick.demandByType["Data centers"] *= 1 - contract;
+  if (peakHour(tick.minute)) {
+    const removedW = tick.demandByType.Residential * tariff;
+    tick.demandByType.Residential -= removedW;
+    tick.deferredResidentialWh += (removedW * stepMinutes) / 60;
+    tick.demandByType.Industrial *= 1 - contract;
+    tick.demandByType["Data centers"] *= 1 - contract;
+  } else if (localMinute >= 21 * 60) {
+    const remainingMinutes = MINUTES_PER_MONTH - localMinute;
+    const returnedW = (tick.deferredResidentialWh * 60) / remainingMinutes;
+    tick.shiftedResidentialW = returnedW;
+    tick.demandByType.Residential += returnedW;
+    tick.deferredResidentialWh = Math.max(
+      0,
+      tick.deferredResidentialWh - (returnedW * stepMinutes) / 60,
+    );
+  }
 }
 
 /** Bill only delivered energy. After curtailment, enrolled users form a smaller
@@ -157,7 +177,10 @@ export function applyPeakDemand(game: GameType, tick: TickPresentFutureType) {
  * would over-credit them. The two offers apply to disjoint sectors. */
 export function customerBillingRate(
   game: GameType,
-  tick: Pick<TickPresentFutureType, "minute" | "demandByType">,
+  tick: Pick<
+    TickPresentFutureType,
+    "minute" | "demandByType" | "shiftedResidentialW"
+  >,
 ) {
   const p = game.policies?.programs;
   const enrolledTariff = participation(p?.timeOfUse?.tier ?? "Off");
@@ -167,11 +190,13 @@ export function customerBillingRate(
     peak ? (enrolled * 0.8) / (1 - enrolled * 0.2) : enrolled;
   const tariffDelta = peak
     ? 0.3
-    : tick.minute % MINUTES_PER_MONTH < 6 * 60
+    : tick.minute % MINUTES_PER_MONTH >= 21 * 60
       ? -0.1
       : 0;
-  const household =
-    tick.demandByType.Residential + tick.demandByType.Commercial;
+  const returnedW = tick.shiftedResidentialW ?? 0;
+  const enrolledResidentialW =
+    (tick.demandByType.Residential - returnedW) * fraction(enrolledTariff) +
+    returnedW;
   const industrial =
     tick.demandByType.Industrial + tick.demandByType["Data centers"];
   const total = Object.values(tick.demandByType).reduce(
@@ -182,7 +207,7 @@ export function customerBillingRate(
     game.dollarsPerkWh *
     (total > 0
       ? 1 +
-        (household * fraction(enrolledTariff) * tariffDelta -
+        (enrolledResidentialW * tariffDelta -
           industrial * fraction(enrolledContract) * 0.1) /
           total
       : 1)

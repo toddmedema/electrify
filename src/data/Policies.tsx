@@ -16,20 +16,20 @@ export const POLICIES = {
   timeOfUse: {
     name: "Time-of-use tariff",
     description:
-      "Offer homes and businesses overnight discounts for higher evening rates.",
+      "Move home electricity use to later in the evening in exchange for a discount.",
     mechanism:
-      "Small enrolls 25% of homes and businesses; Large enrolls 50%. Participants pay 30% more from 17:00–21:00, 10% less from 00:00–06:00, and the base rate otherwise. They forgo 20% of evening consumption by avoiding discretionary uses; this energy is not shifted to another hour.",
+      "When on, half of homes participate. They shift 20% of their 17:00–21:00 electricity use to 21:00–24:00, such as charging cars later. Participants pay 30% more during the peak and 10% less afterward. Total energy use is unchanged.",
     tradeoff:
-      "Rates apply only to enrolled residential and commercial consumption actually supplied. Higher evening bills can affect customer retention. Fixed local-clock windows may miss your seasonal peak.",
+      "Rates apply only to enrolled residential consumption actually supplied. Higher evening bills can affect customer retention. Fixed local-clock windows may miss your seasonal peak.",
     cap: 0.2,
     costPerCustomer: 0,
   },
   curtailment: {
     name: "Peak curtailment contracts",
     description:
-      "Credit industrial users and data centers for scheduled evening curtailment.",
+      "Pay industrial users and data centers to use less electricity during the evening peak. This load is eliminated.",
     mechanism:
-      "Small enrolls 25% of industrial and data-center load; Large enrolls 50%. Enrolled loads forgo 20% of consumption from 17:00–21:00 every day (four hours maximum), for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
+      "When on, half of industrial and data-center load participates. Enrolled loads forgo 20% of consumption from 17:00–21:00 every day (four hours maximum), for a 10% bill credit on their electricity actually supplied throughout the day. This is scheduled curtailment, even without a shortage.",
     tradeoff:
       "Credits reduce sales revenue, including outside the curtailment window. Curtailment is agreed service, not a blackout. Contracts do not affect homes, businesses or transport, and do nothing without eligible industrial or data-center load.",
     cap: 0.2,

@@ -162,33 +162,38 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           electricity sold, so compare cash as well as peak demand.
         </p>
         <p>
-          Time-of-use tariffs enroll 25% (Small) or 50% (Large) of homes and
-          businesses. Enrolled users pay 30% above your base rate from
-          17:00–21:00, 10% below it from 00:00–06:00, and the base rate
-          otherwise. They forgo 20% of evening consumption by avoiding
-          discretionary uses. This model reduces energy consumption; it does not
-          move energy to another hour. The previous tick's effective billed rate
-          feeds customer price memory and retention, with one tick of delay.
+          Turn the time-of-use tariff On or Off. When on, half of homes
+          participate: they move 20% of their 17:00–21:00 electricity use to
+          21:00–24:00, such as charging cars later. The energy removed after
+          efficiency and rooftop solar is spread evenly over those later hours;
+          total energy use is unchanged. Businesses and transport-sector load
+          are not enrolled. Participants pay 30% above your base rate during the
+          peak, 10% below it from 21:00–24:00, and the base rate otherwise. All
+          returned energy receives the later discount. Higher bills can affect
+          customer retention through the previous tick's effective billed rate.
         </p>
         <p>
-          Peak curtailment contracts enroll 25% or 50% of industrial and
-          data-center load, including authored scenario additions. Participants
-          forgo 20% of demand from 17:00–21:00 every day, four hours maximum,
-          even when supply is adequate. In exchange, they receive a 10% credit
-          on electricity actually supplied all day. No delivery means no credit.
-          Supply and credits are allocated proportionally during shortages.
-          Contracted curtailment does not count as a blackout. There is no
-          effect without eligible load; transport is excluded. The tariff and
-          contract cover different sectors, so credits never stack on a
-          time-of-use rate.
+          Turn peak curtailment contracts On or Off. When on, half of industrial
+          and data-center load participates, including authored scenario
+          additions. Participants forgo 20% of demand from 17:00–21:00 every
+          day, four hours maximum, even when supply is adequate. In exchange,
+          they receive a 10% credit on electricity actually supplied all day. No
+          delivery means no credit. Supply and credits are allocated
+          proportionally during shortages. This load is eliminated, not shifted
+          to later hours. Contracted curtailment does not count as a blackout.
+          There is no effect without eligible load; transport is excluded. The
+          tariff and contract cover different sectors, so credits never stack on
+          a time-of-use rate.
         </p>
         <p>
           Both offers use fixed local-clock windows in every season, which may
           miss your grid's actual peak. There are no installation costs; compare
           demand and cash before committing. Changes start next month and
-          continue until changed. Off ends enrollment, bill adjustments and
-          consumption reductions next month; unlike rebates, these effects do
-          not persist.
+          continue until changed. Off ends enrollment, bill adjustments and load
+          changes next month; unlike rebates, these effects do not persist.
+          Estimates include billed sales, credits, spending and dispatch costs,
+          holding weather, fuel prices, fleet, base rate and other accepted
+          programs constant.
         </p>
       </div>
     ),

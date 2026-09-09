@@ -39,7 +39,8 @@ export const SAVE_KEY = "savedGame";
 // do not silently mix those results with the new simulation. Original files remain untouched.
 // Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
 // Version 7 adds operating tariffs/contracts and their recorded billing rates.
-export const SAVE_VERSION = 7;
+// Version 8 conserves deferred residential tariff energy until later in the day.
+export const SAVE_VERSION = 8;
 
 export interface SaveGameType {
   version: number;
@@ -371,10 +372,16 @@ export function parseSave(raw: unknown): SaveGameType | null {
   )
     return null;
   if (
-    game.timeline.some(
-      (t) =>
-        t.customerBillingRate !== undefined &&
-        (!Number.isFinite(t.customerBillingRate) || t.customerBillingRate < 0),
+    game.timeline.some((t) =>
+      [
+        t.customerBillingRate,
+        t.deferredResidentialWh,
+        t.deferredResidentialWhStart,
+        t.shiftedResidentialW,
+      ].some(
+        (value) =>
+          value !== undefined && (!Number.isFinite(value) || value < 0),
+      ),
     )
   )
     return null;

@@ -2117,7 +2117,12 @@ function getDemandW(
     game.loadAdditions,
   );
   applyPolicyDemand(game, now);
-  applyPeakDemand(game, now);
+  applyPeakDemand(
+    game,
+    now,
+    prev.deferredResidentialWh,
+    TICK_MINUTES * tickScale,
+  );
   now.customerBillingRate = customerBillingRate(game, now);
   return DEMAND_TYPES.reduce(
     (total, type) => total + now.demandByType[type],
@@ -2194,9 +2199,13 @@ function reforecastWeatherAndPrices(state: GameType): TickPresentFutureType[] {
 function reforecastDemand(
   state: GameType,
   tickScale = 1,
+  initialDeferredWh = 0,
 ): TickPresentFutureType[] {
   const projection = { ...state, policies: cloneDeep(state.policies) };
-  let prev = state.timeline[0];
+  let prev = {
+    ...state.timeline[0],
+    deferredResidentialWh: initialDeferredWh,
+  } as TickPresentFutureType;
   return state.timeline.map((t: TickPresentFutureType) => {
     if (t.minute >= state.date.minute) {
       const date = getDateFromMinute(t.minute, state.startingYear);
@@ -2213,6 +2222,7 @@ function reforecastDemand(
       prev = t;
       return t;
     }
+    prev = t;
     return t;
   });
 }
@@ -3128,7 +3138,17 @@ export function generateNewTimeline(
     } as TickPresentFutureType;
   }
   state.timeline = reforecastWeatherAndPrices(state);
-  state.timeline = reforecastDemand(state, tickScale);
+  const previousDemandTick = readOnlyState.timeline.findLast(
+    (tick) => tick.minute < state.date.minute,
+  );
+  state.timeline = reforecastDemand(
+    state,
+    tickScale,
+    previousDemandTick?.deferredResidentialWh ??
+      getTimeFromTimeline(state.date.minute, readOnlyState.timeline)
+        ?.deferredResidentialWhStart ??
+      0,
+  );
   state.timeline = reforecastSupply(state, true, stepMinutes);
   return state.timeline;
 }
