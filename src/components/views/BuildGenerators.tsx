@@ -61,6 +61,7 @@ import {
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import InvestmentPlanner from "../base/InvestmentPlanner";
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -781,6 +782,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         onSliderChange={setSliderTick}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />
+      <InvestmentPlanner game={game} />
       <GeneratorComparison
         generators={comparedGenerators}
         onClear={() => setComparedNames([])}

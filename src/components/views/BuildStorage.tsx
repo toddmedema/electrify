@@ -41,6 +41,7 @@ import {
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import InvestmentPlanner from "../base/InvestmentPlanner";
 import { GameType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
@@ -464,6 +465,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         onSliderChange={setSliderTick}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
+      <InvestmentPlanner game={game} />
       <Box className="buildOptionHelp">
         <ManualLink
           entry={MANUAL_ENTRY.POWER_AND_ENERGY}

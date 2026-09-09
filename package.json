@@ -118,6 +118,7 @@
       "!src/react-app-env.d.ts",
       "!src/helpers/CustomGameForecastClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",
+      "!src/helpers/InvestmentPreviewClient.ts",
       "!src/workers/**/*.ts",
       "!src/testing/SimCli.tsx"
     ],

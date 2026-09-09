@@ -1,6 +1,14 @@
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 // https://github.com/testing-library/jest-dom
 import "@testing-library/jest-dom";
+jest.mock("./helpers/InvestmentPreviewClient", () => ({
+  createInvestmentPreviewWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));
 jest.mock("./helpers/PolicyPreviewClient", () => ({
   createPolicyPreviewWorker: () => ({
     onmessage: null,
