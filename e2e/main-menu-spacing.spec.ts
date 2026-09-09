@@ -24,8 +24,8 @@ for (const theme of ["light", "dark"]) {
     await expect(primary).toBeVisible();
     await expectGap(page.locator(".gameSubtitle"), primary, 16);
     await expectGap(primary, resources, 8);
-    await expectGap(resources, discovery, 16);
-    await expectGap(discovery, account, 8);
+    await expectGap(resources, discovery, 0);
+    await expectGap(discovery, account, 0);
     await expectGap(
       account.getByRole("button"),
       account.locator(".MuiTypography-caption"),
@@ -37,7 +37,7 @@ for (const theme of ["light", "dark"]) {
 
     await page.getByRole("button", { name: "Turn on sound" }).click();
     await expect(discovery).toBeHidden();
-    await expectGap(resources, account, 16);
+    await expectGap(resources, account, 0);
     const overflow = await page
       .locator("#menuCard")
       .evaluate((element) => element.scrollWidth - element.clientWidth);

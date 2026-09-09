@@ -2298,10 +2298,8 @@ html[data-theme="dark"] .uplot {
       }
 
       .utilityActions {
-        margin-top: $space-4;
         display: flex;
         flex-direction: column;
-        gap: $space-2;
 
         // InstallAppButton can render nothing, leaving an empty discovery row.
         &:has(> .discoveryActions:empty):not(:has(> .accountActions)) {
