@@ -6,7 +6,7 @@ import {
   MINUTES_PER_MONTH,
   summarizeTimeline,
 } from "./DateTime";
-import { advancePolicies, emptyPolicies } from "./Policies";
+import { advancePolicies, emptyPolicies, samePolicyChoice } from "./Policies";
 import { TICK_MINUTES } from "../Constants";
 
 export function previewPolicy(
@@ -17,8 +17,11 @@ export function previewPolicy(
   const draft = cloneDeep(game);
   draft.policies ??= emptyPolicies(game.date.monthsElapsed);
   const program = draft.policies.programs[change.id];
-  if (change.tier === program.tier) delete program.pending;
-  else program.pending = { tier: change.tier, month: change.month };
+  if (samePolicyChoice(change.id, change, program)) delete program.pending;
+  else {
+    const { id: _id, ...pending } = change;
+    program.pending = pending;
+  }
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   if (!now) throw new Error("No current simulation tick");
   const ticks = Math.ceil(

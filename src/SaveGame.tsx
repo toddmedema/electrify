@@ -1,4 +1,8 @@
-import { emptyPolicies, validPolicies } from "./helpers/Policies";
+import {
+  emptyPolicies,
+  validPolicies,
+  validDeferredResidential,
+} from "./helpers/Policies";
 import packageJson from "../package.json";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
@@ -38,8 +42,10 @@ export const SAVE_KEY = "savedGame";
 // Older snapshots contain forecasts and financial results calculated with different physics;
 // do not silently mix those results with the new simulation. Original files remain untouched.
 // Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
-// Version 7 requires explicit scenario choices; older runs could advance past unanswered prompts.
-export const SAVE_VERSION = 7;
+// Version 7 adds mandatory scenario choices and operating tariffs/contracts.
+// Version 8 conserves deferred residential tariff energy until later in the day.
+// Version 9 retains configurable demand windows and cross-month recovery batches.
+export const SAVE_VERSION = 9;
 
 export interface SaveGameType {
   version: number;
@@ -367,6 +373,23 @@ export function parseSave(raw: unknown): SaveGameType | null {
     transmission?.lines.some(
       ({ corridorId }) =>
         !locationCorridors.some(({ id }) => id === corridorId),
+    )
+  )
+    return null;
+  if (
+    game.timeline.some(
+      (t) =>
+        !validDeferredResidential(t.deferredResidential) ||
+        !validDeferredResidential(t.deferredResidentialStart) ||
+        [
+          t.customerBillingRate,
+          t.deferredResidentialWh,
+          t.deferredResidentialWhStart,
+          t.shiftedResidentialW,
+        ].some(
+          (value) =>
+            value !== undefined && (!Number.isFinite(value) || value < 0),
+        ),
     )
   )
     return null;

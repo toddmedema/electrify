@@ -36,8 +36,10 @@ import {
 // Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
 // reproduce their recorded outcomes and must not be relabeled as current replays.
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
-// Version 10 replaces wildfire actions with mandatory generic scenario choices.
-export const REPLAY_VERSION = 10;
+// Version 10 adds mandatory generic scenario choices and operating tariffs/contracts.
+// Version 11 shifts residential tariff energy to later hours instead of eliminating it.
+// Version 12 supports independently configurable four-hour customer demand windows.
+export const REPLAY_VERSION = 12;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
