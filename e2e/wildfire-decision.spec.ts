@@ -20,9 +20,40 @@ for (const theme of ["light", "dark"]) {
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Game paused");
     await expect(region).toContainText("Normal restoration costs still apply");
+    const titleInset = await region
+      .locator("#scenarioChoiceTitle")
+      .evaluate(
+        (el) =>
+          el.getBoundingClientRect().left +
+          parseFloat(getComputedStyle(el).paddingLeft),
+      );
+    const descriptionBox = (await region
+      .locator("#scenarioChoiceDescription")
+      .boundingBox())!;
+    expect(titleInset).toBe(descriptionBox.x);
     expect(
       await region.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
+    if (page.viewportSize()!.width < 600) {
+      const dialogBox = (await region.boundingBox())!;
+      expect(dialogBox.width).toBeGreaterThanOrEqual(
+        page.viewportSize()!.width - 32,
+      );
+      const fundBox = (await fund.boundingBox())!;
+      const costBox = (await region
+        .getByText("One-time cost:", { exact: false })
+        .boundingBox())!;
+      const keepCashBox = (await region
+        .getByRole("button", { name: "Keep cash" })
+        .boundingBox())!;
+      // Keep the cost attached to its own action and separate from the next choice.
+      expect(costBox.y - (fundBox.y + fundBox.height)).toBeLessThanOrEqual(8);
+      expect(
+        keepCashBox.y - (costBox.y + costBox.height),
+      ).toBeGreaterThanOrEqual(16);
+      expect(keepCashBox.x).toBe(fundBox.x);
+      expect(keepCashBox.width).toBe(fundBox.width);
+    }
     for (const button of await region.getByRole("button").all()) {
       const box = await button.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);

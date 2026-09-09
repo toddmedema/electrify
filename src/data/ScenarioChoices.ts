@@ -7,7 +7,7 @@ export const SCENARIO_CHOICES: ScenarioChoiceType[] = [
     atMonth: 11,
     title: "Wildfire preparedness",
     message:
-      "Extreme Santa Ana winds are forecast for January. Prepared crews halve physical customer disconnections and generator output losses during January and February. Normal restoration costs still apply. Keeping cash means accepting the full outage impact.",
+      "Extreme Santa Ana winds are forecast for January. Prepared crews halve physical customer disconnections and generator output losses during January and February. Normal restoration costs still apply.",
     options: [
       {
         id: "prepare",
