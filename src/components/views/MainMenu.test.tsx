@@ -100,7 +100,7 @@ describe("MainMenu", () => {
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
-      { gap: "10px" },
+      { gap: "12px" },
     );
   });
 
@@ -124,11 +124,11 @@ describe("MainMenu", () => {
     });
 
     expect(primary).toHaveStyle({ flexDirection: "column" });
-    expect(resources).toHaveStyle({ flexDirection: "row", gap: "6px" });
+    expect(resources).toHaveStyle({ flexDirection: "row", gap: "8px" });
     expect(
       within(resources).queryByRole("button", { name: "Sign in" }),
     ).not.toBeInTheDocument();
-    expect(discovery).toHaveStyle({ flexDirection: "row", gap: "6px" });
+    expect(discovery).toHaveStyle({ flexDirection: "row", gap: "8px" });
   });
 
   it("keeps sharing as a compact footer icon", () => {

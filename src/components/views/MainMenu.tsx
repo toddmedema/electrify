@@ -61,7 +61,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           component="section"
           aria-label="Primary actions"
           className="mainActions"
-          spacing={1.25}
+          spacing={1.5}
           useFlexGap
         >
           {props.hasSavedGame && (
@@ -90,7 +90,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           aria-label="Game resources"
           className="resourceActions"
           direction="row"
-          spacing={0.75}
+          spacing={1}
           useFlexGap
           sx={{
             alignItems: "center",
@@ -110,47 +110,49 @@ const MainMenu = (props: Props): React.JSX.Element => {
             Settings
           </Button>
         </Stack>
-        <Stack
-          component="section"
-          aria-label="Discovery actions"
-          className="discoveryActions"
-          direction="row"
-          spacing={0.75}
-          useFlexGap
-          sx={{
-            alignItems: "center",
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <InstallAppButton />
-          {props.audioEnabled === undefined && (
-            <Button
-              color="primary"
-              startIcon={<VolumeUpIcon />}
-              onClick={() => props.onAudioChange(true)}
-            >
-              Turn on sound
-            </Button>
-          )}
-        </Stack>
-        {!props.uid && (
+        <Box className="utilityActions">
           <Stack
             component="section"
-            aria-label="Account actions"
-            className="accountActions"
-            spacing={0}
+            aria-label="Discovery actions"
+            className="discoveryActions"
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{
+              alignItems: "center",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
           >
-            <Button variant="text" color="primary" onClick={login}>
-              Sign in
-            </Button>
-            {!props.hasSavedGame && (
-              <Typography variant="caption" color="text.secondary">
-                Free · no sign-up needed
-              </Typography>
+            <InstallAppButton />
+            {props.audioEnabled === undefined && (
+              <Button
+                color="primary"
+                startIcon={<VolumeUpIcon />}
+                onClick={() => props.onAudioChange(true)}
+              >
+                Turn on sound
+              </Button>
             )}
           </Stack>
-        )}
+          {!props.uid && (
+            <Stack
+              component="section"
+              aria-label="Account actions"
+              className="accountActions"
+              spacing={0.5}
+            >
+              <Button variant="text" color="primary" onClick={login}>
+                Sign in
+              </Button>
+              {!props.hasSavedGame && (
+                <Typography variant="caption" color="text.secondary">
+                  Free · no sign-up needed
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </Box>
         <Typography className="srOnly" role="status" aria-live="polite">
           {shareStatus}
         </Typography>
