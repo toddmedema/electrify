@@ -1946,6 +1946,7 @@ function updateSupplyFacilitiesFinances(
 
   // Update supply and facility outputs
   let supply = 0;
+  let spareGenerationW = 0;
   const supplyByFuel = {} as FuelProductionType;
   let charge = 0;
   let storedWh = 0;
@@ -2134,6 +2135,11 @@ function updateSupplyFacilitiesFinances(
                 ? Math.min(committedTargetW, g.currentW + rampW)
                 : Math.max(committedTargetW, g.currentW - rampW),
             );
+            // Setup can show surplus capacity even when dispatch follows demand. Hydro stays
+            // at its dispatched output so stored water is not counted repeatedly as energy.
+            if (!hydro) {
+              spareGenerationW += Math.max(0, dispatchPeakW - g.currentW);
+            }
             break;
         }
         supply += g.currentW;
@@ -2190,6 +2196,7 @@ function updateSupplyFacilitiesFinances(
     }
   });
   now.supplyW = supply;
+  now.availableSupplyW = supply + spareGenerationW;
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
   now.storageLossWh = storageLossWh;

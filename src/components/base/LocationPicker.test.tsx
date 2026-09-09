@@ -236,7 +236,7 @@ it("drills into a cluster and lists unresolved cities at maximum zoom", async ()
     />,
   );
 
-  for (let level = 0; level < 4; level += 1) {
+  for (let level = 0; level < 5; level += 1) {
     await user.click(
       screen.getByRole("button", { name: /Zoom to 3 locations/ }),
     );

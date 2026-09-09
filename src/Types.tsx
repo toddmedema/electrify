@@ -288,6 +288,7 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
     minute: number;
     supplyW: number; // Watts
+    availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
     // Components sum to demandW. Kept on forecast ticks so Insights can explain what is driving
     // load without bloating the long-lived monthly history in saves.

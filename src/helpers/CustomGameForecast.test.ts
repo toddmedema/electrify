@@ -12,9 +12,9 @@ function tick(demandW: number, supplyW: number): TickPresentFutureType {
 }
 
 describe("summarizeYearOneOutlook", () => {
-  it("reports full coverage with no shortfall", () => {
-    expect(summarizeYearOneOutlook([tick(100, 105), tick(200, 220)])).toEqual({
-      demandServed: 1,
+  it("reports surplus annual generation with no shortfall", () => {
+    expect(summarizeYearOneOutlook([tick(100, 300), tick(200, 600)])).toEqual({
+      demandServed: 3,
       worstShortfallW: 0,
     });
   });
@@ -22,7 +22,14 @@ describe("summarizeYearOneOutlook", () => {
   it("combines annual coverage with the worst instantaneous deficit", () => {
     expect(
       summarizeYearOneOutlook([tick(100, 80), tick(200, 150), tick(100, 120)]),
-    ).toEqual({ demandServed: 0.825, worstShortfallW: 50 });
+    ).toEqual({ demandServed: 0.875, worstShortfallW: 50 });
+  });
+
+  it("keeps an instantaneous shortfall even with an annual surplus", () => {
+    expect(summarizeYearOneOutlook([tick(100, 50), tick(100, 550)])).toEqual({
+      demandServed: 3,
+      worstShortfallW: 50,
+    });
   });
 
   it("handles an empty forecast without inventing a shortfall", () => {
@@ -59,7 +66,7 @@ describe("forecastCustomGameYearOne", () => {
 
     expect(empty.demandServed).toBe(0);
     expect(empty.worstShortfallW).toBeGreaterThan(0);
-    expect(supplied.demandServed).toBeGreaterThan(empty.demandServed);
+    expect(supplied.demandServed).toBeGreaterThan(3);
     expect(supplied.worstShortfallW).toBeLessThan(empty.worstShortfallW);
   });
 });
