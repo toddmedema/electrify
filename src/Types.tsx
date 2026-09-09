@@ -259,6 +259,7 @@ export interface ScoreType {
 // The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
 // prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
 export type ReplayActionNameType =
+  | "chooseWildfireResponse"
   | "schedulePolicy"
   | "cancelPolicy"
   | "buildFacility"

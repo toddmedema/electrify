@@ -35,7 +35,8 @@ import {
 // Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
 // reproduce their recorded outcomes and must not be relabeled as current replays.
 // Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
-export const REPLAY_VERSION = 8;
+// Version 9 adds irreversible wildfire response actions.
+export const REPLAY_VERSION = 9;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -63,6 +64,7 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "chooseWildfireResponse",
   "schedulePolicy",
   "cancelPolicy",
   "buildFacility",
@@ -207,6 +209,12 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
         action.payload as string,
       )
+    )
+      return null;
+    if (
+      action.type === "chooseWildfireResponse" &&
+      action.payload !== "prepare" &&
+      action.payload !== "standard"
     )
       return null;
     actions.push({

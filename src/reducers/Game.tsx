@@ -1,3 +1,8 @@
+import { chooseWildfireResponse } from "./GameActions";
+import {
+  WILDFIRE_DECISION_KEY,
+  wildfirePreparationCost,
+} from "../data/WorldEvents";
 import { getViableLocationCount } from "../data/FacilitySites";
 import {
   advancePolicies,
@@ -577,6 +582,9 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     state.seed,
     date.monthsElapsed,
     fleetKey,
+    state.worldEvents.occurrences.find(
+      (event) => event.key === WILDFIRE_DECISION_KEY,
+    )?.attributes.choice || "standard",
   ].join("|");
 }
 
@@ -1115,6 +1123,10 @@ export const gameSlice = createSlice({
       state.speed = speedBeforeDialog;
       ensureTicking(state);
     });
+    builder.addCase(chooseWildfireResponse, (state, action) => {
+      if (!state.replayPlayback && applyWildfireResponse(state, action.payload))
+        recordReplayAction(state, "chooseWildfireResponse", action.payload);
+    });
     builder.addCase(schedulePolicy, (state, action) => {
       if (
         !state.replayPlayback &&
@@ -1423,6 +1435,57 @@ function applyBuildTransmissionLine(
  * skipped rather than allowed to crash the sim mid-tick -- a replay that plays back slightly
  * wrong is a disappointment, one that throws takes the whole game down with it.
  */
+function applyWildfireResponse(state: GameType, choice: unknown): boolean {
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  if (
+    (choice !== "prepare" && choice !== "standard") ||
+    state.scenarioId !== 111 ||
+    state.storyEffectsDisabled ||
+    state.date.monthsElapsed !== 11 ||
+    Math.floor(state.date.minute / MINUTES_PER_MONTH) !== 11 ||
+    !now ||
+    state.worldEvents.occurrences.some(
+      (event) => event.key === WILDFIRE_DECISION_KEY,
+    )
+  )
+    return false;
+  const cost =
+    choice === "prepare" ? wildfirePreparationCost(state.difficulty) : 0;
+  if (cost > 0 && now.cash < cost) return false;
+  now.cash -= cost;
+  now.netWorth -= cost;
+  now.expensesOM += cost;
+  const message =
+    choice === "prepare"
+      ? `Committed $${(cost / 1000000).toFixed(1)}M to preparedness. Crews halve physical disconnections and generator output losses in January and February; normal restoration costs still apply.`
+      : "Standard wildfire response selected: preserve cash now and accept the full January and February outage impact and restoration costs.";
+  state.worldEvents.occurrences.push({
+    key: WILDFIRE_DECISION_KEY,
+    definitionId: WILDFIRE_DECISION_KEY,
+    startsMinute: state.date.minute,
+    endsMinute: state.date.minute,
+    attributes: { choice, cost },
+    effects: {},
+    title: "Wildfire response chosen",
+    message,
+  });
+  logGameEvent(state, "WORLD_EVENT", message, {
+    title: "Wildfire response chosen",
+    importance: "NOTABLE",
+    storyPhaseKey: WILDFIRE_DECISION_KEY,
+    turningPointPriority: 115,
+  });
+  recordMeaningfulDecision(state, {
+    lever: "wildfire-response",
+    label: "Choose wildfire response",
+    kind: "policy",
+    before: "undecided",
+    after: choice,
+  });
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
 function applyPolicyEdit(
   state: GameType,
   payload: unknown,
@@ -1481,6 +1544,9 @@ function applyPolicyEdit(
 function applyReplayAction(state: GameType, entry: ReplayActionType) {
   const payload = entry.payload;
   switch (entry.type) {
+    case "chooseWildfireResponse":
+      applyWildfireResponse(state, payload);
+      break;
     case "schedulePolicy":
     case "cancelPolicy":
       applyPolicyEdit(state, payload, entry.type === "cancelPolicy");
@@ -2711,6 +2777,13 @@ function updateSupplyFacilitiesFinances(
   // plant, such as field crews and rebuilding damaged distribution equipment.
   let expensesOM =
     (tickStoryEffects.operatingExpensePerMonth || 0) / ticksPerMonth;
+  expensesOM += state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.key === WILDFIRE_DECISION_KEY &&
+        event.startsMinute === now.minute,
+    )
+    .reduce((total, event) => total + Number(event.attributes.cost || 0), 0);
   let expensesFuel = 0;
   let expensesInterest = 0;
   let principalRepayment = 0;

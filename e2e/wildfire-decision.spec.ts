@@ -1,0 +1,65 @@
+import { expect, test } from "@playwright/test";
+for (const theme of ["light", "dark"]) {
+  test(`wildfire response is actionable and persistent in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=111");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    if (!(await page.locator(".eventLog:visible").isVisible()))
+      await page.getByRole("button", { name: "Events", exact: true }).click();
+    const fast = page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "fast speed" })
+      .first();
+    await fast.click();
+    const region = page.getByRole("region", { name: "Wildfire preparedness" });
+    await expect(region).toBeVisible({ timeout: 30000 });
+    const fund = region.getByRole("button", { name: "Fund preparedness" });
+    await expect(fund).toBeEnabled();
+    await expect(region).toContainText("before January");
+    await expect(region).toContainText("Normal restoration costs still apply");
+    expect(
+      await region.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    for (const button of await region.getByRole("button").all()) {
+      const box = await button.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(
+        page.viewportSize()!.width,
+      );
+    }
+    await fund.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: testInfo.outputPath(`wildfire-choice-${theme}.png`),
+    });
+    await (
+      theme === "light"
+        ? fund
+        : region.getByRole("button", { name: "Keep cash (standard response)" })
+    ).focus();
+    await page.keyboard.press("Enter");
+    await expect(region.getByRole("status")).toContainText(
+      theme === "light" ? "Preparedness funded" : "Standard response",
+    );
+    await expect(region.getByRole("button")).toHaveCount(0);
+    await fast.click();
+    await expect(page.getByText("Through Feb 2025")).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(
+      page.getByText(
+        theme === "light"
+          ? /Prepared crews are in place/
+          : /Standard response is in place/,
+      ),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`wildfire-outcome-${theme}.png`),
+    });
+  });
+}

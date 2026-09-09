@@ -1309,6 +1309,23 @@ export const CALIFORNIA_WILDFIRE_BALANCE: Record<
   },
 };
 
+export const WILDFIRE_DECISION_KEY =
+  "story:111:california-wildfire-2025:preparedness";
+export function wildfirePrepared(
+  occurrences?: ActiveWorldEventType[],
+): boolean {
+  return (
+    occurrences?.some(
+      (event) =>
+        event.key === WILDFIRE_DECISION_KEY &&
+        event.attributes.choice === "prepare",
+    ) ?? false
+  );
+}
+export function wildfirePreparationCost(difficulty: DifficultyType): number {
+  return CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth * 2;
+}
+
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
   id: "california-wildfire-2025",
   scenarioId: 111,
@@ -1320,24 +1337,34 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so prepare backup power for possible safety shutoffs.",
+          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose a preparedness response in Events before January. Fund crews to halve physical outages, or preserve cash and use the standard response. Ignoring this decision keeps the standard response.",
         concept: "forecast",
         kind: "WORLD_EVENT",
-        importance: "NOTABLE",
-        actionTarget: FLEET_TARGET,
+        importance: "CRITICAL",
+        actionTarget: { card: "EVENTS" },
       }),
     },
     {
       id: "firestorm",
       schedule: { atMonth: 12 },
       durationMonths: 2,
-      preview: () => ({
+      preview: (context) => ({
         title: "January wildfire emergency",
-        message:
-          "Extreme fire weather may force two months of safety shutoffs, lost sales, constrained generation, and restoration work.",
+        message: wildfirePrepared(context.occurrences)
+          ? "Prepared crews halve disconnected load and generation output losses during January and February. Normal restoration costs still apply."
+          : "Extreme fire weather may force two months of safety shutoffs, lost sales, constrained generation, and restoration work.",
       }),
       describe: (context, random) => {
-        const balance = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
+        const original = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
+        const prepared = wildfirePrepared(context.occurrences);
+        const balance = {
+          ...original,
+          disconnectedDemand:
+            original.disconnectedDemand * (prepared ? 0.5 : 1),
+          outputMultiplier: prepared
+            ? (1 + original.outputMultiplier) / 2
+            : original.outputMultiplier,
+        };
         const candidates = context.snapshot.facilities
           .filter((facility) => facility.operational && !!facility.fuel)
           .map((facility) => ({
@@ -1371,12 +1398,13 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
           : "No operating generators";
         return {
           title: "Wildfire emergency",
-          message: `${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${(balance.restorationCostPerMonth / 1000000).toFixed(1)}M per month through February.`,
+          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${(balance.restorationCostPerMonth / 1000000).toFixed(1)}M per month through February.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
           actionTarget: FLEET_TARGET,
           attributes: {
+            prepared,
             disconnectedDemand: balance.disconnectedDemand,
             targetCapacityShare: balance.targetCapacityShare,
             selectedCapacityShare: share(selectedPeakW, totalPeakW),
@@ -1411,7 +1439,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
           []) as string[];
         return {
           title: "Wildfire restoration complete",
-          message: `Safety shutoffs are lifted, ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal, and the grid met ${percent(reliability)} of connected demand during the emergency.`,
+          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved physical disconnections and generator output losses during the emergency. " : "The standard response preserved your preparedness budget. "}Safety shutoffs are lifted, ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal, and the grid met ${percent(reliability)} of connected demand during the emergency.`,
           concept: "supply",
           kind: "WORLD_EVENT",
           importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",

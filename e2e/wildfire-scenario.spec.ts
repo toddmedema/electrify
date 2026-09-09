@@ -34,6 +34,15 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
     .first()
     .click();
 
+  await page
+    .getByRole("button", { name: "Keep cash (standard response)" })
+    .click();
+  await page
+    .locator("#appbar:visible")
+    .getByRole("button", { name: "fast speed" })
+    .first()
+    .click();
+
   await expect(
     page.getByRole("heading", { name: "Ongoing events" }),
   ).toBeVisible({ timeout: 25000 });

@@ -5,6 +5,7 @@ import {
   StoryActionTargetType,
 } from "../../Types";
 import {
+  WILDFIRE_DECISION_KEY,
   STORY_ARC_DEFINITIONS,
   upcomingStoryPhases,
 } from "../../data/WorldEvents";
@@ -78,6 +79,9 @@ export function selectUpcomingStoryEvents(
     game.date.monthsElapsed,
     game.startingYear,
     game.location.id,
+    game.worldEvents.occurrences.find(
+      (event) => event.key === WILDFIRE_DECISION_KEY,
+    )?.attributes.choice || "standard",
     historyKey,
     fleetKey,
   ].join("|");
@@ -90,6 +94,7 @@ export function selectUpcomingStoryEvents(
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
+    occurrences: game.worldEvents.occurrences,
     snapshot: buildStorySnapshot(
       game.monthlyHistory,
       game.facilities,

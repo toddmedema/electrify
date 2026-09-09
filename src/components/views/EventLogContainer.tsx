@@ -1,3 +1,9 @@
+import { chooseWildfireResponse } from "../../reducers/GameActions";
+import {
+  WILDFIRE_DECISION_KEY,
+  wildfirePreparationCost,
+} from "../../data/WorldEvents";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { connect } from "react-redux";
 import {
   AppStateType,
@@ -64,12 +70,33 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     events: state.game.eventLog.filter(
       (event) => !event.storyPhaseKey || !ongoingKeys.has(event.storyPhaseKey),
     ),
+    wildfireDecision:
+      state.game.scenarioId === 111 &&
+      !state.game.storyEffectsDisabled &&
+      state.game.date.monthsElapsed >= 11
+        ? {
+            cost: wildfirePreparationCost(state.game.difficulty),
+            cash:
+              getTimeFromTimeline(state.game.date.minute, state.game.timeline)
+                ?.cash ?? 0,
+            choice: state.game.worldEvents.occurrences.find(
+              (event) => event.key === WILDFIRE_DECISION_KEY,
+            )?.attributes.choice as string | undefined,
+            available:
+              !state.game.replayPlayback &&
+              state.game.date.monthsElapsed === 11 &&
+              !state.game.worldEvents.occurrences.some(
+                (event) => event.key === WILDFIRE_DECISION_KEY,
+              ),
+          }
+        : undefined,
     ongoing,
     upcoming: selectUpcomingStoryEvents(state),
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
+  onChooseWildfire: (choice) => dispatch(chooseWildfireResponse(choice)),
   onOpen: () => dispatch(markEventsRead()),
   onSelect: (target?: StoryActionTargetType) => {
     if (target) {

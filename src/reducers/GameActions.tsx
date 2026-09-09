@@ -46,3 +46,7 @@ export const resume = createAction<GameType>("game/resume");
  * that rebuilds the run the actions will be applied to.
  */
 export const startReplay = createAction<ReplayType>("game/startReplay");
+
+export const chooseWildfireResponse = createAction<"prepare" | "standard">(
+  "game/chooseWildfireResponse",
+);
