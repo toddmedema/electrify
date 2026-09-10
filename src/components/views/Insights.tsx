@@ -2172,7 +2172,7 @@ export default class Insights extends React.Component<Props, State> {
                         id as DefaultInsightPresetId
                       ];
                     return (
-                      <MenuItem key={id} value={id}>
+                      <MenuItem key={id} value={id} data-insight-preset={id}>
                         <span>{preset.label}</span>
                         {modified && (
                           <span className="insightsPresetMenuHint">
@@ -2189,7 +2189,11 @@ export default class Insights extends React.Component<Props, State> {
                     </ListSubheader>
                   )}
                   {this.state.presetLibrary.custom.map((preset) => (
-                    <MenuItem key={preset.id} value={`saved:${preset.id}`}>
+                    <MenuItem
+                      key={preset.id}
+                      value={`saved:${preset.id}`}
+                      data-insight-preset={preset.id}
+                    >
                       <span className="insightsPresetMenuName">
                         {preset.name}
                       </span>

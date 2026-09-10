@@ -209,6 +209,8 @@ export const SCENARIOS = [
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".build-list-item",
+        continueOn: (s: AppStateType) => s.game.facilities.length >= 2,
+        continueOnClick: ".buildOption .expand-details",
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
@@ -394,7 +396,7 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
-        advanceOn: (s: AppStateType) => s.card.name === "INSIGHTS",
+        continueOn: (s: AppStateType) => s.card.name === "INSIGHTS",
         content: (
           <TutorialPrompt
             concepts={["finances", "money"]}
@@ -414,6 +416,8 @@ export const SCENARIOS = [
       {
         card: "INSIGHTS",
         target: "#chartFinances",
+        continueOnClick:
+          ".insightsViewportToolbar button, [data-insight-preset]",
         content: (
           <TutorialPrompt
             concepts={["forecast", "money"]}
@@ -424,6 +428,7 @@ export const SCENARIOS = [
       {
         card: "INSIGHTS",
         target: ".insightsLayerControls",
+        continueOnClick: "#insightsLayersButton, [data-insight-preset]",
         content: (
           <TutorialPrompt
             concepts={["finances"]}
@@ -488,6 +493,8 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
+        continueOn: (s: AppStateType) =>
+          s.card.name === "INSIGHTS" || s.game.dollarsPerkWh < 0.07,
         content: (
           <TutorialPrompt
             concepts={["rate", "customers"]}
@@ -572,7 +579,8 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: ".facility",
-        advanceOnAction: "game/togglePauseFacility",
+        advanceOn: (s: AppStateType) =>
+          s.game.facilities.some((facility) => facility.paused),
         content: (
           <TutorialPrompt
             concepts={["pause", "generator"]}
@@ -715,10 +723,11 @@ export const SCENARIOS = [
         skipBeacon: true,
         card: "FACILITIES",
         target: "#intertiesTab",
+        continueOnClick: "#intertiesTab",
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Tap Interties to see links to neighboring grids, then tap Next."
+            text="Tap Interties to see links to neighboring grids."
           />
         ),
       },
@@ -762,10 +771,11 @@ export const SCENARIOS = [
       {
         card: "FACILITIES",
         target: "#plantsTab",
+        continueOnClick: "#plantsTab",
         content: (
           <TutorialPrompt
             concepts={["generator", "pause"]}
-            text="Tap Plants to return to your power plants, then tap Next."
+            text="Tap Plants to return to your power plants."
           />
         ),
       },

@@ -71,10 +71,10 @@ describe("tutorial mission metadata", () => {
     const firstStep = finances.tutorialSteps![0];
 
     expect(
-      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+      firstStep.continueOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
     ).toBe(true);
     expect(
-      firstStep.advanceOn?.({ card: { name: "FACILITIES" } } as AppStateType),
+      firstStep.continueOn?.({ card: { name: "FACILITIES" } } as AppStateType),
     ).toBe(false);
   });
 

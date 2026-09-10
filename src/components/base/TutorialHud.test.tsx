@@ -36,6 +36,74 @@ function props(overrides: Partial<TutorialHudProps> = {}): TutorialHudProps {
 }
 
 describe("TutorialHud", () => {
+  it("continues on explicit UI controls, including keyboard activation, and cleans up", async () => {
+    const user = userEvent.setup();
+    const hudProps = props({ step: objective({ continueOnClick: "#tab" }) });
+    const { rerender } = render(
+      <>
+        <button id="tab">
+          <span>Interties</span>
+        </button>
+        <button>Unrelated</button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByText("Unrelated"));
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+    screen.getByRole("button", { name: "Interties" }).focus();
+    await user.keyboard("{Enter}");
+    expect(hudProps.onNext).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Next" })).toBeVisible();
+    rerender(
+      <>
+        <button id="tab">Interties</button>
+        <TutorialHud {...hudProps} step={objective()} />
+      </>,
+    );
+    await user.click(screen.getByText("Interties"));
+    expect(hudProps.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores disabled controls and cancels a click when its action removes the objective", async () => {
+    const user = userEvent.setup();
+    const hudProps = props({ step: objective({ continueOnClick: "#tab" }) });
+    const { rerender } = render(
+      <>
+        <button id="tab" disabled>
+          Interties
+        </button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByText("Interties"));
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+    rerender(
+      <>
+        <button id="tab" onClick={() => rerender(<span>Finished</span>)}>
+          Interties
+        </button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByText("Interties"));
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+  });
+
+  it("does not count a click on a required purchase gate", async () => {
+    const user = userEvent.setup();
+    const hudProps = props({
+      step: objective({ continueOnClick: "button", advanceOn: () => false }),
+    });
+    render(
+      <>
+        <button>Buy</button>
+        <TutorialHud {...hudProps} />
+      </>,
+    );
+    await user.click(screen.getByRole("button", { name: "Buy" }));
+    expect(hudProps.onNext).not.toHaveBeenCalled();
+  });
+
   it("exposes the current objective, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
     const hudProps = props({ canGoBack: true, stepIndex: 1 });

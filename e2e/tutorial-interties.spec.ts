@@ -39,8 +39,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     }
   }
 
-  // The explicit copy plus automatic recovery means an eager Next cannot strand the build gate.
-  await page.getByRole("button", { name: "Next" }).click();
+  // Opening the tab completes navigation without a redundant Next click.
+  await page.locator("#intertiesTab").click();
+  await expect(page.getByLabel("Objective 2 of 10")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Approve Pacific Northwest intertie" }),
   ).toBeVisible();
@@ -50,6 +51,8 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .click();
   await expect(page.getByText("Building")).toBeVisible();
   await expect(page.getByLabel("Objective 3 of 10")).toBeVisible();
+  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("intertie-approved.png") });
 
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(page.getByText(/Trading ·/)).toBeVisible({ timeout: 20000 });
@@ -62,7 +65,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.getByRole("option", { name: "Buy for shortages only" }).click();
   await expect(page.getByLabel("Objective 5 of 10")).toBeVisible();
   await page.locator("#plantsTab").click();
-  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByLabel("Objective 6 of 10")).toBeVisible();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await expect(page.getByLabel("Objective 7 of 10")).toBeVisible();
 
