@@ -33,7 +33,6 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
-import LayersIcon from "@mui/icons-material/Layers";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
@@ -1758,6 +1757,7 @@ export default class Insights extends React.Component<Props, State> {
       body = (
         <>
           <ChartFinances
+            hideTitle
             id={chartId}
             height={140}
             timeline={financeSeries(
@@ -2436,19 +2436,23 @@ export default class Insights extends React.Component<Props, State> {
                 </Tooltip>
               </div>
               <Tooltip title={`Choose layers (${visible.length} shown)`}>
-                <IconButton
+                <Button
                   id="insightsLayersButton"
                   className="insightsLayerControls"
                   size="small"
                   onClick={() =>
                     this.setState({ layersOpen: !this.state.layersOpen })
                   }
-                  aria-label={`Layers (${visible.length} shown)`}
+                  aria-label={
+                    this.state.layersOpen
+                      ? "Done choosing layers"
+                      : `Layers (${visible.length} shown)`
+                  }
                   aria-expanded={this.state.layersOpen}
                   aria-controls="insightsLayerPanel"
                 >
-                  <LayersIcon fontSize="small" />
-                </IconButton>
+                  {this.state.layersOpen ? "Done" : "Layers"}
+                </Button>
               </Tooltip>
             </div>
             <Menu

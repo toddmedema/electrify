@@ -22,6 +22,7 @@ export interface Props {
   height?: number;
   id?: string;
   title: string;
+  hideTitle?: boolean;
   timeline: ChartData[];
   format: (n: number) => number | string;
   /**
@@ -174,7 +175,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
 
   const state: State = {
     timeline: props.timeline,
-    title: props.title,
+    title: props.hideTitle ? "" : props.title,
     format: props.format,
     range: [rangeMin, rangeMax],
     domain: padRange(domainMin, domainMax),

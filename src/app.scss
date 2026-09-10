@@ -39,7 +39,7 @@
   --capacity-bar: #212121; /* grey900 */
   --shadow-ring: rgba(0, 0, 0, 0.15);
   --tooltip-border: rgba(0, 0, 0, 0.2);
-  --tooltip-bg: rgba(255, 255, 255, 0.96);
+  --tooltip-bg: #ffffff;
   --tooltip-shadow: rgba(15, 23, 42, 0.16);
   --cursor-line: #757575; /* grey600 */
   --chart-surface: #ffffff;
@@ -72,7 +72,7 @@
   --capacity-bar: #e0e0e0;
   --shadow-ring: rgba(0, 0, 0, 0.72);
   --tooltip-border: rgba(148, 163, 184, 0.24);
-  --tooltip-bg: rgba(17, 24, 32, 0.94);
+  --tooltip-bg: #111820;
   --tooltip-shadow: rgba(0, 0, 0, 0.45);
   --cursor-line: rgba(106, 184, 247, 0.55);
   --chart-surface: #0f161f;
@@ -1134,6 +1134,7 @@ $pane_header_height: 40px;
 }
 
 .insightsHeader {
+  --insights-control-size: 40px;
   gap: 8px;
 
   > h6 {
@@ -1153,16 +1154,16 @@ $pane_header_height: 40px;
   .headerControl {
     width: 180px;
     min-width: 112px;
-    height: 36px;
+    height: var(--insights-control-size);
     flex: 0 1 180px;
     margin-left: 0;
   }
 
   .insightsLayerControls {
-    width: 36px;
-    height: 36px;
-    min-width: 36px !important;
-    min-height: 36px !important;
+    width: 64px;
+    height: var(--insights-control-size);
+    min-width: 64px !important;
+    min-height: var(--insights-control-size) !important;
     flex: 0 0 auto;
     color: $interactive_blue;
   }
@@ -1184,10 +1185,10 @@ $pane_header_height: 40px;
 
   .insightsPresetSave,
   .insightsPresetActions {
-    width: 36px;
-    height: 36px;
-    min-width: 36px !important;
-    min-height: 36px !important;
+    width: var(--insights-control-size);
+    height: var(--insights-control-size);
+    min-width: var(--insights-control-size) !important;
+    min-height: var(--insights-control-size) !important;
     flex: 0 0 auto;
     color: $interactive_blue;
   }
@@ -1213,7 +1214,7 @@ $pane_header_height: 40px;
   flex: 0 0 auto;
   padding: 1px 5px;
   border-radius: 999px;
-  font-size: 0.65rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1.45;
 }
@@ -1367,7 +1368,7 @@ $pane_header_height: 40px;
 .insightEventRailLabel {
   flex: 0 0 auto;
   color: $font_color_faded;
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1425,7 +1426,7 @@ $pane_header_height: 40px;
   border-radius: 50%;
   background: $interactive_blue;
   color: white;
-  font-size: 0.68rem;
+  font-size: 0.8125rem;
   font-weight: 800;
 }
 
@@ -1490,10 +1491,9 @@ $pane_header_height: 40px;
 
 @media screen and (max-width: 700px) {
   .base_main .MuiToolbar-root.insightsHeader {
-    // Toolbar min-height is content height; the 8px padding is added around it. Match the
-    // 36px controls instead of accidentally adding another 16px of empty height.
-    min-height: 36px !important;
-    padding: 8px !important;
+    // Match the shared touch target size without adding an empty band around the controls.
+    min-height: var(--insights-control-size) !important;
+    padding: 4px 8px !important;
   }
 
   .insightsHeader > h6 {
@@ -1502,7 +1502,7 @@ $pane_header_height: 40px;
 
   .insightsHeaderControls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 36px;
+    grid-template-columns: minmax(0, 1fr) 64px;
     width: 100%;
     gap: 4px;
     margin-left: 0;
@@ -1527,8 +1527,8 @@ $pane_header_height: 40px;
     }
 
     .insightsLayerControls {
-      width: 36px;
-      height: 36px;
+      width: 64px;
+      height: var(--insights-control-size);
     }
   }
 
@@ -1672,7 +1672,7 @@ $pane_header_height: 40px;
 
     .insightsRateMetricLabel {
       color: var(--text-secondary);
-      font-size: 0.6rem;
+      font-size: 0.8125rem;
       line-height: 1.15;
       text-transform: uppercase;
       letter-spacing: 0.02em;
@@ -1706,7 +1706,7 @@ $pane_header_height: 40px;
 
     .insightsRateMarkMobile {
       display: inline;
-      font-size: 0.65rem;
+      font-size: 0.8125rem;
       white-space: nowrap;
     }
   }
@@ -1981,7 +1981,7 @@ $pane_header_height: 40px;
   line-height: 1.45;
   white-space: pre;
   pointer-events: none;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
 }
 
 // The canvas is transparent, so one quiet surface behind it frames the axes and plot together.
@@ -2170,7 +2170,7 @@ html[data-theme="dark"] .uplot {
     min-width: 0;
     flex: 1;
     padding: 5px 6px;
-    font-size: 0.72rem;
+    font-size: 0.8125rem;
     line-height: 1.25;
   }
 
@@ -3107,7 +3107,7 @@ html[data-theme="dark"] .uplot {
   .tutorialSpotlightEyebrow {
     margin-bottom: 2px;
     color: $interactive_blue;
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     letter-spacing: 0.055em;
     text-transform: uppercase;
@@ -3242,7 +3242,7 @@ html[data-theme="dark"] .uplot {
     .missionThemeTag {
       height: 20px;
       color: $font_color_faded;
-      font-size: 0.68rem;
+      font-size: 0.8125rem;
 
       .MuiChip-label {
         padding: 0 7px;
@@ -3380,7 +3380,7 @@ html[data-theme="dark"] .uplot {
     }
 
     .MuiSlider-markLabel {
-      font-size: 0.7rem;
+      font-size: 0.8125rem;
     }
   }
 
@@ -3459,7 +3459,7 @@ html[data-theme="dark"] .uplot {
     background: var(--bg-sunken);
 
     .eventLogItem {
-      border-style: dashed;
+      border-style: solid;
       border-left: 4px solid $interactive_blue;
       background: var(--bg-primary);
 
@@ -3744,7 +3744,7 @@ html[data-theme="dark"] .uplot {
   background: var(--tooltip-bg);
   box-shadow: 0 3px 12px var(--tooltip-shadow);
   color: $font_color_primary;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
 }
 
 .tutorialHudHeader {
@@ -4259,5 +4259,500 @@ $sizemap: (
 @media (pointer: coarse) {
   .base_main .facilities .MuiToolbar-root.paneHeader {
     min-height: 52px !important;
+  }
+}
+
+// A shared solid, restrained presentation for the game and its standalone screens.
+.facilitySupplyDisclosure {
+  flex: 0 0 auto;
+  > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 16px;
+    cursor: pointer;
+    list-style: none;
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: 600;
+  }
+  > summary::-webkit-details-marker {
+    display: none;
+  }
+  &[open] > summary > svg {
+    transform: rotate(180deg);
+  }
+}
+@media (min-width: 600px) {
+  .facilitySupplyDisclosure > summary {
+    display: none;
+  }
+}
+.facilities .tradingSummary {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+}
+.facilities .facilitySectionLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--font-color-primary);
+}
+.facilitySectionLabel > span {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--font-color-faded);
+}
+.facilityRowHeader {
+  display: flex;
+  align-items: center;
+}
+.facilityDisclosure {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  &:hover {
+    background: var(--bg-raised);
+  }
+  &[aria-expanded="true"] .facilityChevron {
+    transform: rotate(180deg);
+  }
+  .facilityChevron {
+    flex-shrink: 0;
+    width: 20px;
+    color: var(--font-color-faded);
+  }
+}
+.base_main .facilityDisclosure .facility {
+  width: 100%;
+  padding: 12px 16px;
+  gap: 8px;
+}
+.facilityDisclosure .MuiListItemAvatar-root {
+  min-width: 48px;
+}
+.facilityDisclosure .MuiListItemText-root {
+  margin: 0;
+  min-width: 0;
+}
+.facilityDisclosure .MuiListItemText-primary {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.facilityDisclosure .MuiListItemText-secondary {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.base_main .facilityActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 0 16px 8px;
+  opacity: 1;
+  visibility: visible;
+}
+.base_main .facilityDragHandle {
+  margin: 4px 16px;
+}
+.base_main .facilityDetails {
+  padding: 8px 16px 16px;
+}
+.transmissionFleet {
+  margin-top: 0;
+}
+.transmissionLine > .facilityDisclosure {
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.transmissionLine .transmissionListIcon {
+  margin-right: 8px;
+}
+.transmissionLine .transmissionLineText > span:first-child {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.transmissionLine .MuiChip-root {
+  margin: 0;
+}
+.transmissionLine .transmissionLineDetails {
+  padding: 0 16px 16px;
+}
+.transmissionPanel {
+  padding: 0;
+  background: transparent;
+}
+.transmissionMetrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.transmissionProject {
+  padding: 16px;
+  border-radius: 8px;
+}
+.transmissionIntro h6 {
+  font-size: 1rem;
+}
+.base_main #menuCard #logo {
+  margin-top: auto;
+  padding-top: 32px;
+}
+.base_main #menuCard #centeredMenu {
+  flex: 0 0 auto;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+.base_main #menuCard .mainMenuFooter {
+  margin-top: auto;
+}
+.screenCatalog > .cardList,
+.screenCatalog > .constructionHeader,
+.screenCatalog > .MuiToolbar-root,
+.screenCatalog > .generatorComparison,
+.screenCatalog > .buildOptionHelp {
+  width: 100%;
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+.screenManual > .cardList,
+.screenManual > .MuiToolbar-root {
+  width: 100%;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+.screenCustom > .MuiToolbar-root {
+  width: 100%;
+  max-width: 992px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+.base_main .manual-entry,
+.base_main .buildOption {
+  box-shadow: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.base_main .manual-group,
+.base_main .tutorialSpotlightEyebrow,
+.base_main .missionSectionHeader {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.base_main .customSetupColumns {
+  box-sizing: border-box;
+  padding: 0 16px;
+  gap: 16px;
+}
+.base_main .customSetupSectionHeading {
+  padding: 8px 0;
+}
+.base_main .customSetupOutlook {
+  margin-left: 0;
+  margin-right: 0;
+  border-radius: 8px;
+}
+.base_main .customSetupSettings #gameSetupTable {
+  width: 100%;
+  margin: 0;
+}
+.base_main .customSetupSettings #gameSetupTable td {
+  padding: 8px 0;
+}
+.base_main .customSetupSettings #gameSetupTable td + td {
+  padding-left: 12px;
+}
+.base_main .customFacilityPicker {
+  padding: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.base_main .customFacilityPicker .MuiInputBase-root {
+  flex: 1 1 120px;
+}
+.base_main .customFacilityPicker .MuiSelect-select {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.decisionImpact {
+  padding: 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.decisionImpact > h3 {
+  margin-bottom: 8px;
+}
+.decisionImpactFacts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.decisionImpactFact {
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  gap: 12px;
+}
+.decisionImpactFact > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
+  gap: 4px 12px;
+}
+.decisionImpactFact
+  > div
+  > .MuiTypography-caption:last-child:not(:first-child) {
+  grid-column: 2;
+}
+.MuiDialog-paper .noPadding > .decisionImpact {
+  margin: 0;
+}
+.buildOption .MuiCardHeader-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.buildOption .MuiCardHeader-root {
+  padding: 16px;
+}
+.buildOption .buildOptionMetrics {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.buildOption .buildOptionFooter {
+  padding: 8px 16px 12px;
+}
+.forecastScope > summary {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+.forecastScope > summary::before {
+  content: "›";
+  margin-right: 8px;
+}
+.forecastScope[open] > summary::before {
+  transform: rotate(90deg);
+}
+.insights .insightsLevers {
+  padding: 0 16px 12px;
+}
+.insights .insightsTrackHeader {
+  padding: 0 16px;
+}
+.insights .insightsTrackHeader > h6 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.insights .insightsTrackActions .MuiIconButton-root {
+  color: var(--font-color-faded);
+}
+.insights .insightsRateMetricLabel,
+.insights .insightsRateMarkMobile,
+.insightsPresetMenuHint,
+.insightsPresetCustomized {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.insights .insightsRateMetricValue {
+  font-size: 0.9375rem;
+}
+.customerProgramChoice {
+  border-bottom: 1px solid var(--border-subtle);
+}
+.customerProgramChoiceButton.MuiButton-root {
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  color: var(--font-color-primary);
+}
+.customerProgramChoiceButton > span:first-child {
+  display: grid;
+  gap: 8px;
+}
+.customerProgramChoiceButton > span:last-child {
+  font-size: 24px;
+  color: var(--interactive-blue);
+}
+.base_main .eventLogItem {
+  border-style: solid;
+  border-radius: 8px;
+}
+.tutorialHud {
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: var(--bg-primary);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.tutorialHudContent {
+  margin-top: 4px;
+}
+.tutorialHudFooter {
+  gap: 4px;
+}
+.missionSummary {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+@media (max-width: 599px) {
+  .decisionImpactFact > div {
+    grid-template-columns: 1fr;
+  }
+  .decisionImpactFact
+    > div
+    > .MuiTypography-caption:last-child:not(:first-child) {
+    grid-column: 1;
+  }
+  .transmissionLine > .facilityDisclosure {
+    flex-wrap: wrap;
+  }
+  .transmissionLine .transmissionLineText {
+    flex-basis: calc(100% - 80px);
+  }
+  .transmissionLine .MuiChip-root {
+    margin-left: 56px;
+  }
+  .transmissionLine .facilityChevron {
+    margin-left: auto;
+  }
+  .insights .insightsRateMetric {
+    padding: 0 8px;
+  }
+  .insights .insightsRateMetrics {
+    padding: 0;
+  }
+}
+@media (max-width: 359px) {
+  .MuiDialogActions-root {
+    align-items: stretch;
+  }
+  .MuiDialogActions-root > .MuiButton-root {
+    flex: 1 1 100%;
+    margin: 0;
+  }
+  .facilitySectionLabel {
+    flex-wrap: wrap;
+  }
+}
+
+// Final alignment corrections: target the standalone screens' nested header toolbars.
+.screenCatalog > #topbar > .MuiToolbar-root,
+.screenManual > #topbar > .MuiToolbar-root,
+.screenCustom > #topbar > .MuiToolbar-root {
+  box-sizing: border-box;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.screenCatalog > #topbar > .MuiToolbar-root {
+  max-width: 1040px;
+}
+.screenManual > #topbar > .MuiToolbar-root {
+  max-width: 880px;
+}
+.screenCustom > #topbar > .MuiToolbar-root {
+  max-width: 992px;
+}
+.base_main #manual .manual-group {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.base_main .manual-entry .MuiAccordionSummary-content > .MuiTypography-root {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.facilities .tradingSummary > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 0;
+  list-style: none;
+}
+.facilities .tradingSummary > summary::-webkit-details-marker {
+  display: none;
+}
+.facilities .tradingSummary .networkTradingCopy {
+  flex: 1;
+  min-width: 0;
+}
+.facilities .tradingSummary .networkTradingHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+}
+.networkTradingHeading > strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.networkTradingFlow {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.facilities .tradingSummary .tradingSummaryRule {
+  padding: 4px 0 0;
+  font-size: 0.8125rem;
+}
+.facilities .tradingSummary .facilityChevron {
+  flex: 0 0 20px;
+  width: 20px;
+  color: var(--font-color-faded);
+}
+.facilities .tradingSummary[open] .facilityChevron {
+  transform: rotate(180deg);
+}
+.transmissionLine > .facilityDisclosure {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+}
+.transmissionLine .transmissionLineText {
+  min-width: 0;
+}
+.transmissionLine .transmissionLineText > .MuiTypography-body2 {
+  font-size: 0.8125rem;
+}
+.transmissionLine .facilityChevron {
+  margin-left: 0;
+}
+
+@media (pointer: coarse) {
+  .insightsHeader {
+    --insights-control-size: 44px;
   }
 }

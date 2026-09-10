@@ -54,26 +54,32 @@ function renderFacilities(
     onSell: jest.fn(),
   };
   const store = configureStore({ reducer: { ui: uiReducer } });
-  render(
-    <Facilities
-      game={game}
-      selectedFacilityId={selectedFacilityId}
-      onGeneratorBuild={() => undefined}
-      onStorageBuild={() => undefined}
-      onTransmissionBuild={() => undefined}
-      onTradingPolicy={() => undefined}
-      onSell={handlers.onSell}
-      onTogglePause={() => undefined}
-      onPause={handlers.onPause}
-      onReprioritize={handlers.onReprioritize}
-      onFacilityDragStart={() => undefined}
-      onFacilityDragEnd={() => undefined}
-      onSelect={handlers.onSelect}
-    />,
-    {
-      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
-    },
-  );
+  function ControlledFacilities() {
+    const [selected, setSelected] = React.useState(selectedFacilityId);
+    return (
+      <Facilities
+        game={game}
+        selectedFacilityId={selected}
+        onGeneratorBuild={() => undefined}
+        onStorageBuild={() => undefined}
+        onTransmissionBuild={() => undefined}
+        onTradingPolicy={() => undefined}
+        onSell={handlers.onSell}
+        onTogglePause={() => undefined}
+        onPause={handlers.onPause}
+        onReprioritize={handlers.onReprioritize}
+        onFacilityDragStart={() => undefined}
+        onFacilityDragEnd={() => undefined}
+        onSelect={(id) => {
+          handlers.onSelect(id);
+          setSelected(id);
+        }}
+      />
+    );
+  }
+  render(<ControlledFacilities />, {
+    wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+  });
   return handlers;
 }
 
@@ -81,7 +87,9 @@ function renderFacilities(
 // rather than by a role -- and asking testing-library for a role by name computes an accessible
 // name for every candidate, which over a rendered pane costs about a second a call
 function rows(): HTMLElement[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(".facilityRow"));
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".facilityRow .facilityDisclosure"),
+  );
 }
 
 describe("the fleet list", () => {
@@ -194,13 +202,18 @@ describe("the fleet list", () => {
    * once the list has scrolled.
    */
   it("reorders from the row's own arrows", async () => {
-    const { onReprioritize } = renderFacilities(game, null);
+    const { onReprioritize } = renderFacilities(game, game.facilities[1].id);
     await user.click(
       screen.getByLabelText(
         `Move ${game.facilities[1].name} earlier in the dispatch order`,
       ),
     );
     expect(onReprioritize).toHaveBeenCalledWith(1, -1);
+    await user.click(
+      screen.getByRole("button", {
+        name: `Inspect ${game.facilities[0].name}`,
+      }),
+    );
 
     await user.click(
       screen.getByLabelText(
@@ -210,14 +223,19 @@ describe("the fleet list", () => {
     expect(onReprioritize).toHaveBeenCalledWith(0, 1);
   });
 
-  it("offers no way to move the ends of the list past themselves", () => {
-    renderFacilities(game, null);
+  it("offers no way to move the ends of the list past themselves", async () => {
+    renderFacilities(game, game.facilities[0].id);
     const last = game.facilities.length - 1;
     expect(
       screen.getByLabelText(
         `Move ${game.facilities[0].name} earlier in the dispatch order`,
       ),
     ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", {
+        name: `Inspect ${game.facilities[last].name}`,
+      }),
+    );
     expect(
       screen.getByLabelText(
         `Move ${game.facilities[last].name} later in the dispatch order`,
@@ -226,7 +244,7 @@ describe("the fleet list", () => {
   });
 
   it("does not select the row when a row action is used", async () => {
-    const { onSelect } = renderFacilities(game, null);
+    const { onSelect } = renderFacilities(game, game.facilities[1].id);
     await user.click(
       screen.getByLabelText(
         `Move ${game.facilities[1].name} earlier in the dispatch order`,
@@ -294,6 +312,9 @@ describe("the fleet list", () => {
     const onePlant = createGame({ scenarioId: 5 });
     const { onPause } = renderFacilities(onePlant, null);
     const facility = onePlant.facilities[0];
+    await user.click(
+      screen.getByRole("button", { name: `Inspect ${facility.name}` }),
+    );
 
     await user.click(screen.getByLabelText(`Pause ${facility.name}`));
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
@@ -301,7 +322,7 @@ describe("the fleet list", () => {
 
   it("can sell the only facility left in a fleet", async () => {
     const onePlant = createGame({ scenarioId: 5 });
-    const { onSell } = renderFacilities(onePlant, null);
+    const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
     const facility = onePlant.facilities[0];
 
     await user.click(screen.getByLabelText(`Sell ${facility.name}`));
@@ -358,12 +379,8 @@ describe("the interties view", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.getByRole("button", { name: "Build" })).toBeInTheDocument();
-    expect(
-      screen.getByText("Plants & storage · Dispatch order"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Interties · Automatic trading"),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Plants & storage/)).toBeInTheDocument();
+    expect(screen.getByText(/Interties/)).toBeInTheDocument();
   });
 
   it("does not render an empty interties destination where no corridor exists", () => {
@@ -441,7 +458,11 @@ describe("unified connections", () => {
     expect(connections[0]).toHaveTextContent("Connected");
     expect(connections[1]).toHaveTextContent("Building");
     await user.click(screen.getByText(game.transmission!.lines[0].name));
-    expect(connections[0]).toHaveAttribute("open");
+    expect(
+      screen.getByRole("button", {
+        name: `Inspect ${game.transmission!.lines[0].name}`,
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
   });
 

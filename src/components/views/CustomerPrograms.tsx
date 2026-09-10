@@ -180,8 +180,12 @@ function Decision({
         {!selected ? (
           <Box sx={{ display: "grid", gap: 2 }}>
             {POLICY_IDS.map((id) => (
-              <Box key={id}>
+              <Box key={id} className="customerProgramChoice">
                 <Button
+                  className="customerProgramChoiceButton"
+                  aria-label={`${POLICIES[id].name} · ${programLabel(id, programs[id].tier)}`}
+                  aria-describedby={`program-description-${id}`}
+                  fullWidth
                   sx={{ minHeight: 44, textAlign: "left" }}
                   onClick={() => {
                     setSelected(id);
@@ -196,9 +200,22 @@ function Decision({
                     setLater(false);
                   }}
                 >
-                  {POLICIES[id].name} · {programLabel(id, programs[id].tier)}
+                  <span>
+                    <strong>
+                      {POLICIES[id].name} ·{" "}
+                      {programLabel(id, programs[id].tier)}
+                    </strong>
+                    <Typography
+                      id={`program-description-${id}`}
+                      component="span"
+                      variant="body2"
+                      color="textSecondary"
+                    >
+                      {POLICIES[id].description}
+                    </Typography>
+                  </span>
+                  <span aria-hidden>›</span>
                 </Button>
-                <Typography>{POLICIES[id].description}</Typography>
                 {programs[id].pending && (
                   <Typography variant="body2">
                     {programLabel(id, programs[id].pending!.tier)} starts{" "}

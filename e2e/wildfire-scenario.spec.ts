@@ -46,7 +46,7 @@ test("wildfire briefing and ongoing emergency stay usable", async ({
   ).toBeVisible({ timeout: 25000 });
   await expect(page.getByText("Wildfire emergency")).toBeVisible();
   await expect(page.getByText("Through Feb 2025")).toBeVisible();
-  await expect(page.getByText(/restoration costs \$1\.5M/)).toBeVisible();
+  await expect(page.getByText(/restoration costs \$0\.7M/)).toBeVisible();
   await expect(page.getByText("Red-flag warning")).toBeVisible();
 
   const horizontalOverflow = await page

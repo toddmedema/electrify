@@ -45,6 +45,17 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "fast speed", exact: true })
       .first()
       .click();
+    // The preparedness decision pauses this scenario before the first month can finish.
+    const preparedness = page.getByRole("dialog", {
+      name: "Wildfire preparedness",
+    });
+    await expect(preparedness).toBeVisible();
+    await preparedness.getByRole("button", { name: "Keep cash" }).click();
+    await page
+      .locator("#appbar:visible")
+      .getByRole("button", { name: "fast speed", exact: true })
+      .first()
+      .click();
     // Wait for a real completed month, then stop the clock before inspecting its score.
     await expect(
       page.getByText("Wildfire emergency", { exact: true }),

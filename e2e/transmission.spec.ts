@@ -47,10 +47,26 @@ test("California players can build and understand an intertie", async ({
     page.getByText("Intertie approved — power can flow in 1 year."),
   ).toBeVisible();
   await expect(
-    facilities.getByText("Interties · Automatic trading"),
+    facilities
+      .getByText("Interties", { exact: false })
+      .filter({ hasText: "Automatic trading" }),
   ).toBeVisible();
   await expect(facilities.getByText("Building")).toBeVisible();
-  await facilities.locator(".tradingSummary > summary").click();
+  await expect(
+    facilities.getByText("Network trading", { exact: true }),
+  ).toHaveCount(1);
+  const line = facilities.locator(".transmissionLine").first();
+  const [rowBox, chevronBox] = await Promise.all([
+    line.locator(".facilityDisclosure").boundingBox(),
+    line.locator(".facilityChevron").boundingBox(),
+  ]);
+  expect(
+    Math.abs(
+      rowBox!.y + rowBox!.height / 2 - (chevronBox!.y + chevronBox!.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  await facilities.locator(".tradingSummary > summary").focus();
+  await page.keyboard.press("Enter");
   await expect(facilities.getByLabel("Trading rule")).toContainText(
     "Buy for shortages, sell extra",
   );
@@ -109,19 +125,34 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
   const originalFirstId = await rows
     .first()
     .getAttribute("data-rfd-draggable-id");
-  await expect(rows.first()).toHaveAttribute("role", "button");
-  await expect(rows.first()).toHaveAttribute("tabindex", "0");
+  await expect(rows.first().locator(".facilityDisclosure")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   await facilities.getByRole("button", { name: "Build", exact: true }).focus();
   for (let step = 0; step < 12; step++) {
     await page.keyboard.press("Tab");
-    if (await rows.first().evaluate((row) => row === document.activeElement))
+    if (
+      await rows
+        .first()
+        .locator(".facilityDisclosure")
+        .evaluate((row) => row === document.activeElement)
+    )
       break;
   }
-  await expect(rows.first()).toBeFocused();
+  await expect(rows.first().locator(".facilityDisclosure")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "true");
+  await expect(rows.first().locator(".facilityDisclosure")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await page.keyboard.press("Enter");
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+  await expect(rows.first().locator(".facilityDisclosure")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await page.keyboard.press("Enter");
+  await rows.first().locator(".facilityDragHandle").focus();
   await page.keyboard.press("Space");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
@@ -129,6 +160,6 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
     "data-rfd-draggable-id",
     originalFirstId!,
   );
-  await expect(rows.last()).toBeFocused();
+  await expect(rows.last().locator(".facilityDragHandle")).toBeFocused();
   await expect(facilities.locator(".transmissionFleet")).toBeVisible();
 });

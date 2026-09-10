@@ -315,7 +315,7 @@ export default function NewGame(props: Props): React.JSX.Element {
   )!.label;
 
   return (
-    <div id="listCard" className="flexContainer">
+    <div id="listCard" className="flexContainer screenCatalog">
       <div id="topbar">
         <Toolbar>
           <IconButton

@@ -76,7 +76,7 @@ for (const mission of [
           : "bar shows usable stored energy",
       );
     } else if (mission === "Forecasting") {
-      await page.locator(".facilityRow").first().click();
+      await page.locator(".facilityRow .facilityDisclosure").first().click();
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();

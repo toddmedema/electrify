@@ -295,7 +295,7 @@ export default function Manual(props: Props): React.JSX.Element {
   const pinned = matches.filter((entry: ManualEntryType) => entry.pinned);
 
   return (
-    <div className="flexContainer" id="gameCard">
+    <div className="flexContainer screenManual" id="gameCard">
       <div id="topbar">
         <Toolbar>
           <IconButton

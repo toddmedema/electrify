@@ -1,6 +1,7 @@
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import {
   Button,
   Chip,
@@ -37,13 +38,75 @@ export interface TransmissionPanelProps {
   onPolicy: (policy: TradingPolicyType) => void;
 }
 
+export function TransmissionTradingSummary({
+  game,
+  onPolicy,
+}: Pick<TransmissionPanelProps, "game" | "onPolicy">) {
+  const state = game.transmission;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const readOnly = !!game.replayPlayback;
+  if (!state?.lines.length) return null;
+  return (
+    <details
+      className="tradingSummary"
+      open={
+        game.scenarioId === 112 && [3, 9].includes(game.tutorialStep)
+          ? true
+          : undefined
+      }
+    >
+      <summary>
+        <span className="networkTradingCopy">
+          <span className="networkTradingHeading">
+            <strong>Network trading</strong>
+            <span className="networkTradingFlow">
+              {(now?.importedW || 0) > 0
+                ? "Importing " + formatWatts(now!.importedW || 0)
+                : (now?.exportedW || 0) > 0
+                  ? "Exporting " + formatWatts(now!.exportedW || 0)
+                  : "No power flowing"}
+            </span>
+          </span>
+          <span className="tradingSummaryRule">
+            {POLICY_LABELS[state.tradingPolicy]}
+          </span>
+        </span>
+        <KeyboardArrowDownIcon className="facilityChevron" aria-hidden />
+      </summary>
+      <FormControl fullWidth size="small" className="tradingPolicy">
+        <InputLabel id="trading-policy-label">Trading rule</InputLabel>
+        <Select
+          labelId="trading-policy-label"
+          label="Trading rule"
+          value={state.tradingPolicy}
+          disabled={readOnly}
+          onChange={(event) =>
+            onPolicy(event.target.value as TradingPolicyType)
+          }
+        >
+          {Object.entries(POLICY_LABELS).map(([value, label]) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Typography variant="caption" color="textSecondary">
+        One rule for all connections. Imports depend on line capacity and
+        neighboring supply.
+      </Typography>
+      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
+    </details>
+  );
+}
+
 export default function TransmissionPanel({
   game,
   onBuild,
-  onPolicy,
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
+  const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -87,9 +150,9 @@ export default function TransmissionPanel({
           <Typography
             id="your-interties-title"
             className="facilitySectionLabel"
-            variant="overline"
+            variant="subtitle2"
           >
-            Interties · Automatic trading
+            Interties <span>Automatic trading</span>
           </Typography>
           {!state.lines.length && (
             <Typography
@@ -100,55 +163,6 @@ export default function TransmissionPanel({
               No connections yet. Choose Build to connect a nearby grid.
             </Typography>
           )}
-          {!!state.lines.length && (
-            <details
-              className="tradingSummary"
-              open={
-                game.scenarioId === 112 && [3, 9].includes(game.tutorialStep)
-                  ? true
-                  : undefined
-              }
-            >
-              <summary>
-                <span>
-                  {(now?.importedW || 0) > 0
-                    ? "Importing " + formatWatts(now!.importedW || 0)
-                    : (now?.exportedW || 0) > 0
-                      ? "Exporting " + formatWatts(now!.exportedW || 0)
-                      : "No power flowing"}
-                </span>
-                <span className="tradingSummaryRule">
-                  {POLICY_LABELS[state.tradingPolicy]}
-                </span>
-              </summary>
-              <FormControl fullWidth size="small" className="tradingPolicy">
-                <InputLabel id="trading-policy-label">Trading rule</InputLabel>
-                <Select
-                  labelId="trading-policy-label"
-                  label="Trading rule"
-                  value={state.tradingPolicy}
-                  disabled={readOnly}
-                  onChange={(event) =>
-                    onPolicy(event.target.value as TradingPolicyType)
-                  }
-                >
-                  {Object.entries(POLICY_LABELS).map(([value, label]) => (
-                    <MenuItem key={value} value={value}>
-                      {label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Typography variant="caption" color="textSecondary">
-                One rule for all connections. Imports depend on line capacity
-                and neighboring supply.
-              </Typography>
-              <ManualLink
-                entry={MANUAL_ENTRY.INTERTIES}
-                text="How interties work"
-              />
-            </details>
-          )}
           {state.lines.map((line) => {
             const market = adjacentMarketForCorridor(line.corridorId);
             const rating = now
@@ -156,8 +170,16 @@ export default function TransmissionPanel({
               : line.capacityW;
             const building = line.yearsToBuildLeft > 0;
             return (
-              <details key={line.id} className="transmissionLine">
-                <summary>
+              <div key={line.id} className="transmissionLine">
+                <button
+                  type="button"
+                  className="facilityDisclosure"
+                  aria-label={"Inspect " + line.name}
+                  aria-expanded={selectedLine === line.id}
+                  onClick={() =>
+                    setSelectedLine(selectedLine === line.id ? null : line.id)
+                  }
+                >
                   <img
                     className="transmissionListIcon"
                     src="/images/transmission.svg"
@@ -175,38 +197,44 @@ export default function TransmissionPanel({
                           (line.yearsToBuildLeft <= 1 ? " year" : " years") +
                           " remaining"
                         : formatWatts(rating) + " available"}
+                      {" · "}
+                      <span className="transmissionLineStatus">
+                        {building ? "Building" : "Connected"}
+                      </span>
                     </Typography>
                   </span>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={building ? "Building" : "Connected"}
+                  <KeyboardArrowDownIcon
+                    className="facilityChevron"
+                    aria-hidden
                   />
-                </summary>
-                <div className="transmissionLineDetails">
-                  <Typography variant="body2">
-                    {market?.name} · {formatWatts(line.capacityW)} rated
-                    capacity
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {building
-                      ? "Power can flow when construction finishes."
-                      : "Available capacity changes with weather. Trading is automatic across the network."}
-                  </Typography>
-                  {line.loanAmountLeft > 0 && (
+                </button>
+                {selectedLine === line.id && (
+                  <div className="transmissionLineDetails">
                     <Typography variant="body2">
-                      Loan balance {formatMoneyConcise(line.loanAmountLeft)} ·
-                      Monthly payments during construction and operation
+                      {market?.name} · {formatWatts(line.capacityW)} rated
+                      capacity
                     </Typography>
-                  )}
-                  {market && (
-                    <Typography variant="caption" color="textSecondary">
-                      Purchased emissions:{" "}
-                      {formatMass(market.emissionsKgco2ePerMWh, units)}/MWh CO2e
+                    <Typography variant="body2" color="textSecondary">
+                      {building
+                        ? "Power can flow when construction finishes."
+                        : "Available capacity changes with weather. Trading is automatic across the network."}
                     </Typography>
-                  )}
-                </div>
-              </details>
+                    {line.loanAmountLeft > 0 && (
+                      <Typography variant="body2">
+                        Loan balance {formatMoneyConcise(line.loanAmountLeft)} ·
+                        Monthly payments during construction and operation
+                      </Typography>
+                    )}
+                    {market && (
+                      <Typography variant="caption" color="textSecondary">
+                        Purchased emissions:{" "}
+                        {formatMass(market.emissionsKgco2ePerMWh, units)}/MWh
+                        CO2e
+                      </Typography>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </section>

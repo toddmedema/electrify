@@ -42,11 +42,11 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
       "Cash ≥ $0 ($",
     );
-    const reorder = page.locator(".facilityReorderButton:visible");
+    const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
     } else {
-      await expect(reorder.first()).toBeVisible();
+      await expect(reorder).toHaveCount(0);
       const grid = await page.locator(".gridHealth:visible").boundingBox();
       const mission = await page
         .locator(".missionSummary:visible")
@@ -64,7 +64,9 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
     await expect(details).toBeFocused();
-    await page.locator(".facilityRow").filter({ hasText: "Coal" }).click();
+    await page
+      .getByRole("button", { name: "Inspect Coal", exact: true })
+      .click();
     await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
     await expect(page.locator(".gridHealth-blackout:visible")).toBeVisible();
@@ -82,6 +84,8 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.locator(".gridHealth-blackout:visible"),
     ).not.toContainText("Now");
+    if (!(await page.locator("#chartSupplyDemand").isVisible()))
+      await page.locator(".facilitySupplyDisclosure > summary").click();
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
       await page.getByRole("button", { name: speed, exact: true }).click();
@@ -335,7 +339,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
-  await page.locator(".facilityRow").filter({ hasText: "Coal" }).click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
   await expect(page.locator(".missionRiskButton:visible")).toContainText(
@@ -348,6 +352,12 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator("#chartSupplyDemand")).toBeVisible();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
+  if (info.project.name.startsWith("mobile-")) {
+    await page.locator(".facilitySupplyDisclosure > summary").click();
+    await expect(page.locator(".facilitySupplyDisclosure")).not.toHaveAttribute(
+      "open",
+    );
+  }
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator(".operatingEvidence")).toContainText(

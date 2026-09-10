@@ -154,7 +154,7 @@ export function GeneratorBuildItem(
   const compareAction = props.onCompare && canBuild && (
     <Button
       size="small"
-      variant={props.compared ? "contained" : "outlined"}
+      variant={props.compared ? "contained" : "text"}
       aria-pressed={props.compared}
       aria-label={`Compare ${generator.name}`}
       disabled={props.compareDisabled && !props.compared}
@@ -182,7 +182,7 @@ export function GeneratorBuildItem(
             <Button
               className="buy-button"
               size="small"
-              variant="contained"
+              variant="outlined"
               color="primary"
               onClick={toggleOpen}
               disabled={!canBuild}
@@ -590,7 +590,7 @@ export function GeneratorBuildItem(
           </Button>
           <Button
             color="primary"
-            variant="contained"
+            variant="outlined"
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(true, e)
             }
@@ -790,7 +790,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   return (
     <div
       id="topbar"
-      className="flexContainer"
+      className="flexContainer screenCatalog"
       ref={evidenceAnchor}
       tabIndex={-1}
       aria-label="Generator build options"

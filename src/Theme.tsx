@@ -285,24 +285,77 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           : { default: "#ffffff", paper: "#ffffff" },
     },
     typography: {
-      fontSize: 15,
-      body1: {
-        lineHeight: 1.35,
+      fontFamily: "Roboto, Arial, sans-serif",
+      fontSize: 14,
+      h6: { fontSize: "1.25rem", fontWeight: 600, lineHeight: 1.3 },
+      subtitle1: { fontSize: "1rem", fontWeight: 600, lineHeight: 1.4 },
+      subtitle2: { fontSize: "1rem", fontWeight: 600, lineHeight: 1.4 },
+      body1: { fontSize: "0.9375rem", lineHeight: 1.45 },
+      body2: { fontSize: "0.875rem", lineHeight: 1.45 },
+      caption: { fontSize: "0.8125rem", lineHeight: 1.4 },
+      overline: {
+        fontSize: "0.8125rem",
+        fontWeight: 600,
+        lineHeight: 1.4,
+        textTransform: "none",
+        letterSpacing: 0,
       },
     },
     shape: {
-      borderRadius: 6,
+      borderRadius: 8,
     },
     components: {
       MuiButton: {
+        defaultProps: { disableElevation: true },
         styleOverrides: {
           root: {
             minHeight: 40,
+            "@media (pointer: coarse)": { minHeight: 44 },
             fontWeight: 600,
             textTransform: "none",
             touchAction: "manipulation",
           },
         },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            minWidth: 40,
+            minHeight: 40,
+            "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 },
+          },
+        },
+      },
+      MuiInputBase: {
+        styleOverrides: {
+          root: {
+            minHeight: 40,
+            "@media (pointer: coarse)": { minHeight: 44 },
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            borderRadius: 8,
+            "@media (max-width:599px)": {
+              margin: 12,
+              width: "calc(100% - 24px)",
+              maxHeight: "calc(100% - 24px)",
+            },
+          },
+          paperFullScreen: {
+            margin: 0,
+            width: "100%",
+            maxHeight: "100%",
+            borderRadius: 0,
+          },
+        },
+      },
+      MuiDialogTitle: { styleOverrides: { root: { padding: 16 } } },
+      MuiDialogContent: { styleOverrides: { root: { padding: 16 } } },
+      MuiDialogActions: {
+        styleOverrides: { root: { padding: 16, gap: 8, flexWrap: "wrap" } },
       },
       MuiButtonBase: {
         defaultProps: {

@@ -30,6 +30,8 @@ jest.mock("../base/GameCard", () => ({
 }));
 
 interface ChartMockProps {
+  title?: string;
+  hideTitle?: boolean;
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
@@ -105,11 +107,19 @@ it("refreshes paused projections when a customer program is scheduled, replaced,
 
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
-  default: ({ id, syncKey, timeline, domain }: ChartMockProps) => (
+  default: ({
+    id,
+    syncKey,
+    timeline,
+    domain,
+    title,
+    hideTitle,
+  }: ChartMockProps) => (
     <div
       role="img"
       id={id}
       data-testid={id}
+      data-visible-title={hideTitle ? "" : title}
       data-sync-key={syncKey}
       data-points={timeline?.length}
       data-domain={domainValue(domain)}
@@ -401,10 +411,10 @@ describe("Insights layers", () => {
     );
     expect(
       screen.getByTestId("chartInsightsInflationInterestPlotinflationRate"),
-    ).toBeInTheDocument();
+    ).toHaveAttribute("data-visible-title", "Inflation");
     expect(
       screen.getByTestId("chartInsightsInflationInterestPlotinterestRate"),
-    ).toBeInTheDocument();
+    ).toHaveAttribute("data-visible-title", "Interest rate");
   });
 
   it("starts new players on the five-chart overview in priority order", () => {

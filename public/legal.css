@@ -5,14 +5,13 @@
   --brand-deep: #064a87;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
-  --surface: rgba(255, 255, 255, 0.9);
+  --surface: #ffffff;
   --surface-solid: #ffffff;
   --surface-soft: #eaf3fa;
   --text: #17212b;
   --text-muted: #5b6875;
   --border: rgba(27, 66, 96, 0.14);
-  --shadow:
-    0 22px 55px rgba(33, 77, 111, 0.1), 0 2px 8px rgba(33, 77, 111, 0.05);
+  --shadow: none;
   --max-width: 70rem;
   --reading-width: 45rem;
 }
@@ -24,13 +23,13 @@
     --brand-deep: #b8ddfa;
     --brand-wash: rgba(100, 181, 246, 0.13);
     --page: #0d141a;
-    --surface: rgba(23, 32, 40, 0.92);
+    --surface: #172028;
     --surface-solid: #172028;
     --surface-soft: #111c24;
     --text: #f2f6f9;
     --text-muted: #a9b6c1;
     --border: rgba(179, 211, 235, 0.16);
-    --shadow: 0 24px 60px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow: none;
   }
 }
 
@@ -101,8 +100,7 @@ a:hover {
   z-index: 20;
   padding-top: env(safe-area-inset-top);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--page) 84%, transparent);
-  backdrop-filter: blur(16px);
+  background: var(--page);
 }
 
 .topbar__inner {

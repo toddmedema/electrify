@@ -453,7 +453,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   return (
-    <div id="listCard" className="flexContainer">
+    <div id="listCard" className="flexContainer screenCustom">
       <div id="topbar">
         <Toolbar>
           <IconButton
