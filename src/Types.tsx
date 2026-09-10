@@ -211,6 +211,15 @@ export type StoryActionTargetType =
     }
   | { card: "EVENTS" };
 
+export type EvidenceTargetType =
+  "supply-demand" | "finances" | "mission-details" | StoryActionTargetType;
+
+export interface EvidenceRequestType {
+  id: number;
+  runId: number;
+  target: EvidenceTargetType;
+}
+
 // What the card reducer's navigate action accepts, beyond a bare card name
 export interface NavigateActionType {
   name: CardNameType;
@@ -219,6 +228,9 @@ export interface NavigateActionType {
   // while a popstate restoration must not write another browser-history entry.
   url?: string;
   skipBrowserHistory?: boolean;
+  replaceCurrentCard?: boolean;
+  journeyTraversal?: "origin" | "control";
+  journeyMarker?: { id: number; runId: number; role: "origin" | "control" };
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
   storyTarget?: StoryActionTargetType;
@@ -1052,7 +1064,25 @@ export interface VictoryDebriefType {
   >;
 }
 
+export interface InsightsOriginType {
+  viewport: [number, number];
+  month: number;
+  layers: string[];
+  preset: string;
+  revision: number;
+  temporaryLayer?: string;
+  anchor?: string;
+  scrollTop: number;
+}
+
 export interface UIType {
+  insightsConfigurationRevision?: number;
+  evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
+  evidenceJourneyMarker?: { id: number; runId: number };
+  insightsRestore?: InsightsOriginType;
+  evidenceRequest?: EvidenceRequestType;
+  evidenceSequence?: number;
+  evidenceRunId?: number;
   manualHelpEntry?: string;
   dialog: DialogType;
   snackbar: SnackbarType;

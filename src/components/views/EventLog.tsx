@@ -78,12 +78,18 @@ const EVENT_HISTORY_FILTERS: {
 ];
 
 export interface StateProps {
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  facilityDragActive?: boolean;
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
   ongoing?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onOpen: () => void;
   onSelect: (target?: StoryActionTargetType) => void;
 }
@@ -91,6 +97,20 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
+  const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
+  const openedForEvidence = React.useRef(!!evidenceRequest);
+  const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const request = evidenceRequest;
+    if (
+      request &&
+      typeof request.target === "object" &&
+      request.target.card === "EVENTS" &&
+      !facilityDragActive
+    ) {
+      onEvidenceReady?.(request, evidenceAnchor.current);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
   const [historyFilter, setHistoryFilter] =
     React.useState<EventHistoryFilterType>("ALL");
@@ -107,11 +127,18 @@ export default function EventLog(props: Props): React.JSX.Element {
   // so the expression-bodied form returned an object here; React later tried to call that object
   // while unmounting this phone-only pane and crashed the app to a blank screen.
   React.useEffect(() => {
-    onOpen();
+    // A semantic evidence request changes presentation only. Ordinary visits retain the
+    // existing mark-read action; resolving or acknowledging a request must not dispatch it.
+    if (!openedForEvidence.current) onOpen();
   }, [onOpen]);
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
-      <div className="scrollable">
+      <div
+        className="scrollable"
+        ref={evidenceAnchor}
+        tabIndex={-1}
+        aria-label="Announced events and event history evidence"
+      >
         {ongoing.length > 0 && (
           <section
             className="eventLogSection ongoingEvents"

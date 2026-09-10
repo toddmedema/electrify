@@ -17,9 +17,12 @@ import {
 import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
+import { focusEvidence } from "../../helpers/Evidence";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
+    evidenceRequest: state.ui.evidenceRequest,
+    facilityDragActive: state.ui.facilityDragActive,
     game: state.game,
     selectedFacilityId: state.ui.selectedFacilityId,
   };
@@ -27,6 +30,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onEvidenceReady: (request, element) => {
+      dispatch(focusEvidence(request, element));
+    },
     onGeneratorBuild: () => {
       dispatch(navigate({ name: "BUILD_GENERATORS", dontRemember: true }));
     },

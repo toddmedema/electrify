@@ -27,6 +27,14 @@ import {
 } from "../../Types";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
+import MissionSummary from "./MissionSummary";
+import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
+import { acknowledgeEvidence } from "../../reducers/UI";
+import { openEvidence } from "../../helpers/Evidence";
+import {
+  selectUpcomingStoryEvents,
+  UpcomingStoryEventType,
+} from "../views/StoryEventSelectors";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -39,10 +47,15 @@ import ConceptIcon from "./ConceptIcon";
  */
 
 export interface StateProps {
+  upcomingEvents?: UpcomingStoryEventType[];
   game: GameType;
+  evidenceRequest?: EvidenceRequestType;
+  facilityDragActive?: boolean;
 }
 
 export interface DispatchProps {
+  onEvidence?: (target: EvidenceTargetType) => void;
+  onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
   onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
@@ -174,6 +187,7 @@ function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
+  const { evidenceRequest, facilityDragActive, onEvidenceAcknowledged } = props;
   const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
     props;
   const date = game.date;
@@ -182,6 +196,12 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
+      onEvidenceAcknowledged?.(evidenceRequest);
+      setScenarioDetailsOpen(true);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceAcknowledged]);
 
   const bigScreen = isBigScreen();
   const speed = game.speed;
@@ -304,46 +324,45 @@ export function GameAppBar(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
-            {inBlackout && (
-              <span className="gameStatusBlackout">
-                <ConceptIcon concept="blackout" fontSize="small" />
-              </span>
-            )}
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      <div
-        className={`gridHealth gridHealth-${gridHealth.state}`}
-        aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
-      >
-        <div className="gridHealthSummary">
-          <span className="gridHealthState">
-            <span className="gridHealthIcon" aria-hidden="true">
-              <ConceptIcon
-                concept={
-                  inBlackout
-                    ? "blackout"
-                    : gridHealth.state === "stable"
-                      ? "supply"
-                      : "danger"
-                }
-                fontSize="small"
-              />
+      <div className="gameStatusBar">
+        <div
+          className={`gridHealth gridHealth-${gridHealth.state}`}
+          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
+        >
+          <div className="gridHealthSummary">
+            <span className="gridHealthState">
+              <span className="gridHealthIcon" aria-hidden="true">
+                <ConceptIcon
+                  concept={
+                    inBlackout
+                      ? "blackout"
+                      : gridHealth.state === "stable"
+                        ? "supply"
+                        : "danger"
+                  }
+                  fontSize="small"
+                />
+              </span>
+              {!inBlackout && <span>Now · </span>}
+              <strong>{gridHealth.label}</strong>
             </span>
-            <strong>{gridHealth.label}</strong>
-          </span>
-          <span className="gridHealthSeparator" aria-hidden="true">
-            |
-          </span>
-          <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+            <span className="gridHealthSeparator" aria-hidden="true">
+              |
+            </span>
+            <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+          </div>
         </div>
-        {inBlackout && (
-          <span className="gridHealthAdvice">
-            Resume generation or discharge storage now.
-          </span>
-        )}
+        <MissionSummary
+          game={game}
+          upcoming={props.upcomingEvents}
+          onEvidence={props.onEvidence}
+          onDetails={() => setScenarioDetailsOpen(true)}
+        />
       </div>
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
@@ -364,11 +383,20 @@ export function GameAppBar(props: Props) {
 }
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
+  upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
+  evidenceRequest: state.ui.evidenceRequest,
+  facilityDragActive: state.ui.facilityDragActive,
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onEvidence: (target) => {
+      dispatch(openEvidence(target));
+    },
+    onEvidenceAcknowledged: (request) => {
+      dispatch(acknowledgeEvidence(request));
+    },
     onManual: () => {
       dispatch(navigate("MANUAL"));
     },

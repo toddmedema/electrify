@@ -1,3 +1,13 @@
+import { configureStore } from "@reduxjs/toolkit";
+import gameReducer, { buildFacility } from "../../reducers/Game";
+import card, { navigate } from "../../reducers/Card";
+import ui from "../../reducers/UI";
+import {
+  beginGeneratorJourney,
+  returnToEvidence,
+  traverseEvidenceJourney,
+} from "../../helpers/EvidenceJourney";
+import type { AppDispatch } from "../../Store";
 import * as React from "react";
 import {
   fireEvent,
@@ -368,4 +378,65 @@ it("pins up to three current-grid choices into a comparison tray", () => {
   expect(
     screen.getByRole("region", { name: "Generator comparison" }),
   ).toHaveTextContent("Comparing 2/3");
+});
+
+it("commits a loan purchase then closes the selected journey through browser Return without resuming", () => {
+  const store = configureStore({
+    reducer: { card, ui, game: gameReducer },
+    preloadedState: {
+      game: {
+        ...createGame({ scenarioId: 100, difficulty: "Employee" }),
+        inGame: true,
+        speed: "FAST" as const,
+      },
+    },
+  });
+  const dispatch = store.dispatch as AppDispatch;
+  dispatch(navigate("INSIGHTS"));
+  const origin = {
+    viewport: [0, 69120] as [number, number],
+    month: 0,
+    layers: ["supplyDemand"],
+    preset: "grid",
+    revision: 0,
+    scrollTop: 120,
+    anchor: "supplyDemand",
+  };
+  dispatch(beginGeneratorJourney(origin));
+  const marker = store.getState().ui.evidenceJourneyMarker!;
+  const back = jest
+    .spyOn(window.history, "back")
+    .mockImplementation(() => undefined);
+  const onBack = jest.fn();
+  const beforeCount = store.getState().game.facilities.length;
+  render(
+    <BuildGenerators
+      game={store.getState().game}
+      hasEvidenceReturn
+      onBack={onBack}
+      onBuildGenerator={(facility, financed) => {
+        dispatch(buildFacility({ facility, financed }));
+      }}
+      onEvidenceReturn={() => {
+        dispatch(returnToEvidence());
+      }}
+    />,
+  );
+  const purchase = screen
+    .getAllByRole("button", { name: /^Review purchase/ })
+    .find((button) => !(button as HTMLButtonElement).disabled)!;
+  fireEvent.click(purchase);
+  fireEvent.click(screen.getByRole("button", { name: /Take loan/i }));
+  expect(store.getState().game.facilities).toHaveLength(beforeCount + 1);
+  expect(back).toHaveBeenCalledTimes(1);
+  expect(onBack).not.toHaveBeenCalled();
+  const purchasedGame = store.getState().game;
+  dispatch(
+    traverseEvidenceJourney({ evidenceJourney: { ...marker, role: "origin" } }),
+  );
+  expect(store.getState().card.name).toBe("INSIGHTS");
+  expect(store.getState().ui.insightsRestore).toEqual(origin);
+  expect(store.getState().game).toBe(purchasedGame);
+  expect(store.getState().game.speed).toBe("PAUSED");
+  back.mockRestore();
 });

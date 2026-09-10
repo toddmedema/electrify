@@ -1,3 +1,4 @@
+import { traverseEvidenceJourney } from "./helpers/EvidenceJourney";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -170,6 +171,10 @@ export default function App() {
     }
 
     const onPopState = (e: PopStateEvent) => {
+      if (store.dispatch(traverseEvidenceJourney(e.state))) {
+        e.preventDefault();
+        return;
+      }
       const sharedScenario = scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));

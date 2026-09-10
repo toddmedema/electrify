@@ -41,6 +41,7 @@ import {
   GameType,
   GeneratorOperatingType,
   WorldEventEffectsType,
+  EvidenceRequestType,
 } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
 import {
@@ -170,6 +171,7 @@ function FacilityActions(props: {
               onReprioritize(spotInList, -1);
             }}
             aria-label={`Move ${facility.name} earlier in the dispatch order`}
+            className="facilityReorderButton"
             disabled={spotInList === 0}
             edge="end"
             color="primary"
@@ -183,6 +185,7 @@ function FacilityActions(props: {
               onReprioritize(spotInList, 1);
             }}
             aria-label={`Move ${facility.name} later in the dispatch order`}
+            className="facilityReorderButton"
             disabled={spotInList === listLength - 1}
             edge="end"
             color="primary"
@@ -502,6 +505,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 }
 
 export interface StateProps {
+  evidenceRequest?: EvidenceRequestType;
+  facilityDragActive?: boolean;
   game: GameType;
   // The row the player has open, from the UI slice rather than this component's own state:
   // Finances and Forecasts read it too, and building a facility unmounts this pane
@@ -509,6 +514,10 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onEvidenceReady?: (
+    request: EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
@@ -549,7 +558,10 @@ export default class Facilities extends React.Component<
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(nextProps: Props) {
+  public shouldComponentUpdate(
+    nextProps: Props,
+    nextState: Readonly<{ view: "PLANTS" | "INTERTIES" }>,
+  ) {
     if (this.dragging) {
       return false;
     }
@@ -557,6 +569,9 @@ export default class Facilities extends React.Component<
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
+      nextState !== this.state ||
+      nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.facilityDragActive !== this.props.facilityDragActive ||
       nextProps.game.speed !== "FAST" ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.game.facilities.map((facility) => facility.id).join("|") !==
@@ -568,6 +583,7 @@ export default class Facilities extends React.Component<
   }
 
   public componentDidUpdate(previousProps: Props) {
+    this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
     if (
       this.props.game.scenarioId === 112 &&
@@ -580,6 +596,31 @@ export default class Facilities extends React.Component<
       // Natural Gas is paused, so "Importing" is something the learner can actually observe.
       this.setState({ view: "INTERTIES" });
     }
+  }
+
+  public componentDidMount() {
+    this.resolveEvidence();
+  }
+
+  private evidenceAnchor = React.createRef<HTMLDivElement>();
+
+  private resolveEvidence() {
+    const request = this.props.evidenceRequest;
+    if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (
+      request.target !== "supply-demand" &&
+      !(
+        typeof request.target === "object" &&
+        request.target.card === "FACILITIES" &&
+        request.target.view !== "BUILD_GENERATORS"
+      )
+    )
+      return;
+    if (this.state.view !== "PLANTS") {
+      this.setState({ view: "PLANTS" });
+      return;
+    }
+    this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
   public onBeforeDragStart() {
@@ -673,14 +714,25 @@ export default class Facilities extends React.Component<
           )}
           {activeView === "PLANTS" ? (
             <>
-              <ChartSupplyDemand
-                height={180}
-                timeline={game.timeline}
-                currentMinute={game.date.minute}
-                location={game.location}
-                legend={game.speed === "PAUSED"}
-                startingYear={game.startingYear}
-              />
+              <div
+                ref={this.evidenceAnchor}
+                tabIndex={-1}
+                className="operatingEvidence"
+                aria-label="Supply and demand evidence: this month's representative day"
+              >
+                <div className="operatingSampleLabel">
+                  This month's representative day · Supply — solid · Demand – –
+                  dashed · W
+                </div>
+                <ChartSupplyDemand
+                  height={180}
+                  timeline={game.timeline}
+                  currentMinute={game.date.minute}
+                  location={game.location}
+                  legend
+                  startingYear={game.startingYear}
+                />
+              </div>
               <List dense className="scrollable">
                 <DragDropContext
                   onBeforeDragStart={this.onBeforeDragStart}

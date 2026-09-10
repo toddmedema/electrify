@@ -7,7 +7,7 @@ import {
 import EventLog, { DispatchProps, StateProps } from "./EventLog";
 import type { AppDispatch } from "../../Store";
 import { markEventsRead } from "../../reducers/Game";
-import { navigate } from "../../reducers/Card";
+import { focusEvidence, openEvidence } from "../../helpers/Evidence";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import {
   selectUpcomingStoryEvents,
@@ -59,6 +59,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   const ongoing = selectOngoing(state);
   const ongoingKeys = new Set(ongoing.map((event) => event.key));
   return {
+    evidenceRequest: state.ui.evidenceRequest,
+    facilityDragActive: state.ui.facilityDragActive,
     // An active story belongs in the status section; its original log row returns to history as
     // soon as the effect expires.
     events: state.game.eventLog.filter(
@@ -70,10 +72,13 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
+  onEvidenceReady: (request, element) => {
+    dispatch(focusEvidence(request, element));
+  },
   onOpen: () => dispatch(markEventsRead()),
   onSelect: (target?: StoryActionTargetType) => {
     if (target) {
-      dispatch(navigate(navigationForStoryTarget(target)));
+      dispatch(openEvidence(target));
     }
   },
 });

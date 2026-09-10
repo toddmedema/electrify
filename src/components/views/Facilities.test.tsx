@@ -259,13 +259,16 @@ describe("the fleet list", () => {
     ref.current!.onBeforeDragStart();
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
     expect(
-      ref.current!.shouldComponentUpdate({
-        ...props,
-        game: {
-          ...fast,
-          date: { ...fast.date, minute: fast.date.minute + 1_000 },
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...fast,
+            date: { ...fast.date, minute: fast.date.minute + 1_000 },
+          },
         },
-      }),
+        ref.current!.state,
+      ),
     ).toBe(false);
 
     ref.current!.onDragEnd({
@@ -278,7 +281,12 @@ describe("the fleet list", () => {
       combine: null,
     });
     expect(onFacilityDragEnd).toHaveBeenCalledWith(0, null, "FAST");
-    expect(ref.current!.shouldComponentUpdate({ ...props, game })).toBe(true);
+    expect(
+      ref.current!.shouldComponentUpdate(
+        { ...props, game },
+        ref.current!.state,
+      ),
+    ).toBe(true);
   });
 
   it("can pause the only facility in a fleet", async () => {

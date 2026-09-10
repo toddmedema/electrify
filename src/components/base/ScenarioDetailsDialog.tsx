@@ -24,6 +24,7 @@ import { formatScore, SCORE_LABELS } from "./VictoryDialog";
 import { formatMoneyConcise } from "../../helpers/Format";
 import { formatLargeMass } from "../../helpers/Units";
 import { useUnits } from "./UnitsContext";
+import { getMissionStatus } from "../../helpers/MissionStatus";
 
 export interface Props {
   open: boolean;
@@ -40,6 +41,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
     return <Dialog open={false} />;
   }
   const location = getScenarioLocation(scenario);
+  const mission = getMissionStatus(game);
   const history = game.monthlyHistory;
   const summary =
     history.length > 0
@@ -177,6 +179,33 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               Victory conditions
             </Typography>
             {scenario.id === 3 && <CustomerGrowthChallenge />}
+            <Typography variant="body2">
+              {mission.monthsRemaining} simulation months remaining.{" "}
+              {mission.finalNote}
+            </Typography>
+            <Box component="dl" className="missionRequirements">
+              {mission.requirements.map((requirement) => (
+                <React.Fragment key={requirement.id}>
+                  <Typography component="dt" sx={{ mt: 2, fontWeight: 700 }}>
+                    {requirement.label} · {requirement.status.replace("-", " ")}
+                  </Typography>
+                  <Typography component="dd" sx={{ m: 0 }}>
+                    {requirement.current}
+                  </Typography>
+                  <Typography component="dd" sx={{ m: 0 }}>
+                    {requirement.target}
+                  </Typography>
+                  <Typography
+                    component="dd"
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ m: 0 }}
+                  >
+                    {requirement.timing}
+                  </Typography>
+                </React.Fragment>
+              ))}
+            </Box>
             <Box
               sx={{
                 typography: "body2",

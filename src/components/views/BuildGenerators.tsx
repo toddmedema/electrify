@@ -673,11 +673,19 @@ function valueLabelFormat(x: number) {
 }
 
 export interface StateProps {
+  hasEvidenceReturn?: boolean;
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  facilityDragActive?: boolean;
   game: GameType;
   focusFuel?: FuelNameType;
 }
 
 export interface DispatchProps {
+  onEvidenceReturn?: () => void;
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onBuildGenerator: (
     generator: GeneratorShoppingType,
     financed: boolean,
@@ -688,6 +696,20 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function BuildGenerators(props: Props): React.JSX.Element {
+  const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
+  const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const request = evidenceRequest;
+    if (
+      request &&
+      typeof request.target === "object" &&
+      request.target.card === "FACILITIES" &&
+      request.target.view === "BUILD_GENERATORS" &&
+      !facilityDragActive
+    ) {
+      onEvidenceReady?.(request, evidenceAnchor.current);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => !f.peakWh);
@@ -766,7 +788,30 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   };
 
   return (
-    <div id="topbar" className="flexContainer">
+    <div
+      id="topbar"
+      className="flexContainer"
+      ref={evidenceAnchor}
+      tabIndex={-1}
+      aria-label="Generator build options"
+    >
+      {props.hasEvidenceReturn && (
+        <Button
+          onClick={props.onEvidenceReturn}
+          sx={{ minHeight: 44, alignSelf: "flex-start" }}
+        >
+          Return to evidence
+        </Button>
+      )}
+      {props.focusFuel &&
+        !buildableGenerators.some(
+          (generator) => generator.fuel === props.focusFuel,
+        ) && (
+          <Typography role="status" sx={{ px: 2, py: 1 }}>
+            The requested fuel has no available generator at this size. Showing
+            generator options.
+          </Typography>
+        )}
       <ConstructionBuildHeader
         concept="generator"
         title="Build Generator"
@@ -811,7 +856,9 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
               onCompare={() => toggleCompare(g.name)}
               onBuild={(financed: boolean) => {
                 props.onBuildGenerator(g, financed);
-                onBack();
+                if (props.hasEvidenceReturn && props.onEvidenceReturn)
+                  props.onEvidenceReturn();
+                else onBack();
               }}
             />
           );

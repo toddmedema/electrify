@@ -1,3 +1,7 @@
+import {
+  hasChronicBlackouts,
+  scenarioObjectiveFailure,
+} from "../helpers/ObjectiveRules";
 import { chooseScenarioResponse } from "./GameActions";
 import { validBuildFacility } from "../helpers/BuildValidation";
 import {
@@ -65,11 +69,7 @@ import { buildStartedMessage } from "../helpers/BuildConsequences";
 import { buildVictoryDebrief } from "../helpers/Debrief";
 import { buildStoryPeriodSnapshot, buildStorySnapshot } from "../helpers/Story";
 import {
-  CEO_MEANINGFUL_CATEGORIES_REQUIRED,
-  CEO_MEANINGFUL_DECISIONS_REQUIRED,
-  INTERN_MEANINGFUL_DECISIONS_REQUIRED,
   isMaterialCapacityDecision,
-  meaningfulDecisionCategoryCount,
   recordMeaningfulDecision,
 } from "../helpers/MeaningfulDecisions";
 import {
@@ -163,7 +163,6 @@ import { clearSaveFor } from "../SaveGame";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   DateType,
-  DifficultyType,
   FacilityOperatingType,
   FacilityShoppingType,
   FuelPricesType,
@@ -174,7 +173,6 @@ import {
   LocationType,
   GameType,
   GeneratorOperatingType,
-  MeaningfulDecisionType,
   MonthlyHistoryType,
   ScenarioFacilityType,
   ScenarioType,
@@ -1099,6 +1097,14 @@ export const gameSlice = createSlice({
     // The sim should not punish the player for reading, or mutate a quote during a decision.
     builder.addCase(navigate, (state, action) => {
       const payload = action.payload;
+      if (
+        typeof payload === "object" &&
+        payload?.journeyTraversal === "origin"
+      ) {
+        // Return restores presentation only. Discard the construction card's pending resume.
+        speedBeforeBlockingCard = undefined;
+        return;
+      }
       const name = typeof payload === "string" ? payload : payload?.name;
       if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it
@@ -2056,71 +2062,10 @@ export function tickState(state: GameType) {
   if (pendingScenarioChoice(state)) state.speed = "PAUSED";
 }
 
-/** The same three completed-month firing rule used by the game and headless playtests. */
-export function hasChronicBlackouts(history: MonthlyHistoryType[]): boolean {
-  return (
-    history.length >= 3 &&
-    history.slice(0, 3).every((month) => month.supplyWh < month.demandWh * 0.9)
-  );
-}
-
-/** A scenario-specific end gate, kept pure so headless QA and the live game agree exactly. */
-export function scenarioObjectiveFailure(
-  scenario: ScenarioType,
-  history: MonthlyHistoryType[],
-  difficulty?: DifficultyType,
-  meaningfulDecisions: MeaningfulDecisionType[] = [],
-  decisionGateWaived = false,
-): string | undefined {
-  const reliabilityObjective = scenario.reliabilityObjective;
-  if (reliabilityObjective) {
-    const firstAbsoluteMonth =
-      reliabilityObjective.year * 12 + reliabilityObjective.month - 1;
-    const durationMonths = reliabilityObjective.durationMonths || 1;
-    const targets = history.filter((month) => {
-      const absoluteMonth = month.year * 12 + month.month - 1;
-      return (
-        absoluteMonth >= firstAbsoluteMonth &&
-        absoluteMonth < firstAbsoluteMonth + durationMonths
-      );
-    });
-    for (const target of targets) {
-      const demandServed =
-        target.demandWh > 0 ? target.supplyWh / target.demandWh : 1;
-      if (demandServed < reliabilityObjective.minimumDemandServed) {
-        return `You served ${(demandServed * 100).toFixed(2)}% of demand during the ${reliabilityObjective.label}; this mission requires ${Math.round(reliabilityObjective.minimumDemandServed * 100)}%.`;
-      }
-    }
-  }
-
-  if (
-    scenario.minimumCustomerRetention !== undefined &&
-    scenario.startingCustomers !== undefined &&
-    history.length > 0
-  ) {
-    const retained = history[0].customers / scenario.startingCustomers;
-    if (retained < scenario.minimumCustomerRetention) {
-      return `Customer attrition left you with only ${Math.round(retained * 100)}% of the community you started with; this mission requires retaining at least ${Math.round(scenario.minimumCustomerRetention * 100)}%.`;
-    }
-  }
-  if (!scenario.tutorialSteps && !decisionGateWaived) {
-    if (
-      difficulty === "Intern" &&
-      meaningfulDecisions.length < INTERN_MEANINGFUL_DECISIONS_REQUIRED
-    ) {
-      return "Make at least one meaningful decision that changes the grid or its economics.";
-    }
-    if (
-      difficulty === "CEO" &&
-      (meaningfulDecisions.length < CEO_MEANINGFUL_DECISIONS_REQUIRED ||
-        meaningfulDecisionCategoryCount(meaningfulDecisions) <
-          CEO_MEANINGFUL_CATEGORIES_REQUIRED)
-    ) {
-      return `You made ${meaningfulDecisions.length} of ${CEO_MEANINGFUL_DECISIONS_REQUIRED} meaningful decisions across ${meaningfulDecisionCategoryCount(meaningfulDecisions)} of ${CEO_MEANINGFUL_CATEGORIES_REQUIRED} decision types; CEO difficulty requires a varied operating plan.`;
-    }
-  }
-  return undefined;
-}
+export {
+  hasChronicBlackouts,
+  scenarioObjectiveFailure,
+} from "../helpers/ObjectiveRules";
 
 // Simplified customer forecast, assumes no blackouts since supply calculation depends on demand
 // (circular dependency). The supply pass repeats the calculation with reliability attrition.
