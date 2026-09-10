@@ -32,6 +32,7 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import LayersIcon from "@mui/icons-material/Layers";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
@@ -322,6 +323,11 @@ interface ProjectionView {
 }
 
 export interface StateProps {
+  journeyRestore?: import("../../Types").InsightsOriginType;
+  configurationRevision?: number;
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  evidenceRunId?: number;
+  activeCard?: import("../../Types").CardNameType;
   game: GameType;
   selectedFacilityId: number | null;
   facilityDragActive: boolean;
@@ -330,12 +336,24 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onGeneratorJourney?: (
+    origin: import("../../Types").InsightsOriginType,
+  ) => void;
+  onConfigurationEdit?: () => void;
+  onJourneyRestored?: (
+    origin: import("../../Types").InsightsOriginType,
+  ) => boolean;
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onDelta: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
 interface State {
+  temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
   presetDirty: boolean;
@@ -710,16 +728,14 @@ export default class Insights extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const presetLibrary = storedPresetLibrary();
-    const layers = withRequiredLayers(storedLayers(), props.game.scenarioId);
-    if (props.focusLayer && !layers.includes(props.focusLayer)) {
-      layers.push(props.focusLayer);
-    }
+    const layers = storedLayers();
     const storedPreset = getStorageString(ACTIVE_PRESET_KEY, "");
     const preset = isStoredPreset(storedPreset, presetLibrary)
       ? storedPreset
       : matchingPreset(layers, presetLibrary);
     const savedLayers = presetDefinition(preset, presetLibrary)?.layers;
     this.state = {
+      temporaryLayer: props.focusLayer,
       layers,
       preset,
       presetDirty: !savedLayers || !sameLayers(layers, savedLayers),
@@ -731,7 +747,9 @@ export default class Insights extends React.Component<Props, State> {
       layersOpen: false,
       leversOpen: true,
       activeEventKey: undefined,
-      viewport: initialViewport(props.game),
+      viewport: props.journeyRestore
+        ? this.restoredViewport(props.journeyRestore)
+        : initialViewport(props.game),
       viewportAnnouncement: "",
     };
   }
@@ -749,6 +767,10 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
+      nextProps.journeyRestore !== this.props.journeyRestore ||
+      nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.evidenceRunId !== this.props.evidenceRunId ||
+      nextProps.activeCard !== this.props.activeCard ||
       nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
@@ -766,9 +788,21 @@ export default class Insights extends React.Component<Props, State> {
 
   public componentDidMount() {
     this.scrollTutorialPowerExchangeIntoView();
+    this.resolveEvidence();
+    this.restoreJourney();
   }
 
   public componentDidUpdate(previousProps: Props) {
+    if (
+      this.props.evidenceRunId !== previousProps.evidenceRunId ||
+      (this.props.activeCard !== previousProps.activeCard &&
+        !this.props.evidenceRequest)
+    ) {
+      if (this.state.temporaryLayer)
+        this.setState({ temporaryLayer: undefined });
+    }
+    this.resolveEvidence();
+    if (this.props.journeyRestore) this.restoreJourney();
     if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
       this.scrollTutorialPowerExchangeIntoView();
     }
@@ -805,8 +839,112 @@ export default class Insights extends React.Component<Props, State> {
       this.props.focusLayer !== previousProps.focusLayer &&
       !this.state.layers.includes(this.props.focusLayer)
     ) {
-      this.setLayers([...this.state.layers, this.props.focusLayer]);
+      this.setState({ temporaryLayer: this.props.focusLayer });
     }
+  }
+
+  private restoredViewport(
+    origin: import("../../Types").InsightsOriginType,
+  ): ChartViewportRange {
+    const bounds = viewportBounds(this.props.game);
+    const delta =
+      (this.props.game.date.monthsElapsed - origin.month) * MINUTES_PER_MONTH;
+    return clampChartViewport(
+      bounds,
+      [
+        origin.viewport[0] === 0 ? 0 : origin.viewport[0] + delta,
+        origin.viewport[1] + delta,
+      ],
+      MINUTES_PER_MONTH,
+    );
+  }
+
+  private beginJourney(sourceLayer?: InsightLayerId) {
+    const pane = document.querySelector<HTMLElement>(".insights .scrollable");
+    const anchor = Array.from(
+      document.querySelectorAll<HTMLElement>(".insights [data-layer]"),
+    ).find(
+      (element) =>
+        element.getBoundingClientRect().bottom >
+        (pane?.getBoundingClientRect().top ?? 0),
+    );
+    this.props.onGeneratorJourney?.({
+      viewport: [...this.state.viewport],
+      month: this.props.game.date.monthsElapsed,
+      layers: [...this.state.layers],
+      preset: this.state.preset,
+      revision: this.props.configurationRevision ?? 0,
+      temporaryLayer: this.state.temporaryLayer,
+      anchor: sourceLayer ?? anchor?.dataset.layer,
+      scrollTop: pane?.scrollTop ?? 0,
+    });
+  }
+
+  private restoreJourney() {
+    const origin = this.props.journeyRestore;
+    if (!origin || this.props.facilityDragActive) return;
+    if (this.props.onJourneyRestored && !this.props.onJourneyRestored(origin))
+      return;
+    const unchanged =
+      origin.revision === (this.props.configurationRevision ?? 0);
+    const viewport = this.restoredViewport(origin);
+    this.setState(
+      {
+        viewport,
+        viewportAnnouncement: viewportAnnouncement(
+          viewport,
+          this.props.game.startingYear,
+        ),
+        layers: unchanged
+          ? (origin.layers as InsightLayerId[])
+          : this.state.layers,
+        preset: unchanged
+          ? (origin.preset as InsightPresetId)
+          : this.state.preset,
+        temporaryLayer: (unchanged ? origin.temporaryLayer : origin.anchor) as
+          InsightLayerId | undefined,
+      },
+      () => {
+        const pane = document.querySelector<HTMLElement>(
+          ".insights .scrollable",
+        );
+        if (pane) pane.scrollTop = origin.scrollTop;
+        const anchor = document.querySelector<HTMLElement>(
+          origin.anchor
+            ? '.insights [data-layer="' + origin.anchor + '"]'
+            : "#insightsGeneratorJourney",
+        );
+        anchor?.focus({ preventScroll: true });
+      },
+    );
+  }
+
+  private resolveEvidence() {
+    const request = this.props.evidenceRequest;
+    if (!request || this.props.facilityDragActive) return;
+    const target = request.target;
+    let layer: InsightLayerId | undefined;
+    if (target === "finances") layer = "financeDetails";
+    else if (typeof target === "object" && target.card === "INSIGHTS") {
+      layer =
+        target.layer === "FINANCES"
+          ? "financeDetails"
+          : target.layer === "FUEL_PRICES"
+            ? "fuelPrices"
+            : "supplyDemand";
+    }
+    if (!layer) return;
+    if (
+      !this.state.layers.includes(layer) &&
+      this.state.temporaryLayer !== layer
+    ) {
+      this.setState({ temporaryLayer: layer });
+      return;
+    }
+    this.props.onEvidenceReady?.(
+      request,
+      document.querySelector<HTMLElement>(`[data-layer="${layer}"]`),
+    );
   }
 
   private scrollTutorialPowerExchangeIntoView() {
@@ -828,7 +966,8 @@ export default class Insights extends React.Component<Props, State> {
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
   ) {
-    const required = withRequiredLayers(layers, this.props.game.scenarioId);
+    this.props.onConfigurationEdit?.();
+    const required = layers;
     const savedLayers = presetDefinition(
       preset,
       this.state.presetLibrary,
@@ -840,6 +979,7 @@ export default class Insights extends React.Component<Props, State> {
       setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
     }
     this.setState({
+      temporaryLayer: undefined,
       layers: required,
       preset,
       presetDirty: !savedLayers || !sameLayers(required, savedLayers),
@@ -862,15 +1002,18 @@ export default class Insights extends React.Component<Props, State> {
     if (!preset) {
       return;
     }
-    const layers = withRequiredLayers(
-      preset.layers,
-      this.props.game.scenarioId,
-    );
+    this.props.onConfigurationEdit?.();
+    const layers = [...preset.layers];
     if (this.props.game.scenarioId !== 112) {
       setStorageKeyValue(LAYERS_KEY, layers);
       setStorageKeyValue(ACTIVE_PRESET_KEY, id);
     }
-    this.setState({ layers, preset: id, presetDirty: false });
+    this.setState({
+      layers,
+      preset: id,
+      presetDirty: false,
+      temporaryLayer: undefined,
+    });
   }
 
   private moveLayer(id: InsightLayerId, neighbour: InsightLayerId) {
@@ -878,6 +1021,8 @@ export default class Insights extends React.Component<Props, State> {
     const from = layers.indexOf(id);
     const to = layers.indexOf(neighbour);
     if (from < 0 || to < 0) {
+      // An explicit edit ends temporary evidence, but never adds an unconfigured chart.
+      this.setLayers(layers);
       return;
     }
     [layers[from], layers[to]] = [layers[to], layers[from]];
@@ -1055,15 +1200,13 @@ export default class Insights extends React.Component<Props, State> {
     const defaults = { ...presetLibrary.defaults };
     delete defaults[defaultId];
     const library = { ...presetLibrary, defaults };
-    const layers = withRequiredLayers(
-      INSIGHT_PRESETS[defaultId].layers,
-      this.props.game.scenarioId,
-    );
+    const layers = [...INSIGHT_PRESETS[defaultId].layers];
     this.savePresetLibrary(library);
     setStorageKeyValue(LAYERS_KEY, layers);
     setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
     this.setState({
       presetLibrary: library,
+      temporaryLayer: undefined,
       layers,
       presetDirty: false,
       presetDialog: null,
@@ -1586,6 +1729,14 @@ export default class Insights extends React.Component<Props, State> {
   ) {
     const { game, selectedFacilityId } = this.props;
     const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
+    const configured = this.state.layers.includes(id);
+    const previousConfigured = visible
+      .slice(0, index)
+      .reverse()
+      .find((layer) => this.state.layers.includes(layer));
+    const nextConfigured = visible
+      .slice(index + 1)
+      .find((layer) => this.state.layers.includes(layer));
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
@@ -1866,37 +2017,71 @@ export default class Insights extends React.Component<Props, State> {
     }
 
     return (
-      <section className="insightsTrack" key={id} data-layer={id}>
+      <section
+        className="insightsTrack"
+        key={id}
+        data-layer={id}
+        tabIndex={-1}
+        aria-label={`${definition.label} evidence`}
+      >
         <Toolbar className="insightsTrackHeader">
           <Typography variant="h6">{definition.label}</Typography>
           <span className="insightsTrackActions">
             <IconButton
               size="small"
               aria-label={`Move ${definition.label} up`}
-              disabled={index === 0}
-              onClick={() => this.moveLayer(id, visible[index - 1])}
+              disabled={!configured || !previousConfigured}
+              onClick={() =>
+                previousConfigured && this.moveLayer(id, previousConfigured)
+              }
             >
               <ArrowUpwardIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
               aria-label={`Move ${definition.label} down`}
-              disabled={index === visible.length - 1}
-              onClick={() => this.moveLayer(id, visible[index + 1])}
+              disabled={!configured || !nextConfigured}
+              onClick={() =>
+                nextConfigured && this.moveLayer(id, nextConfigured)
+              }
             >
               <ArrowDownwardIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
-              aria-label={`Remove ${definition.label}`}
+              aria-label={
+                this.state.temporaryLayer === id &&
+                !this.state.layers.includes(id)
+                  ? `Keep ${definition.label}`
+                  : `Remove ${definition.label}`
+              }
               disabled={requiredTutorialLayers(game.scenarioId).includes(id)}
               onClick={() => this.toggleLayer(id)}
             >
-              <CloseIcon fontSize="small" />
+              {this.state.temporaryLayer === id && !configured ? (
+                <AddIcon fontSize="small" />
+              ) : (
+                <CloseIcon fontSize="small" />
+              )}
             </IconButton>
           </span>
         </Toolbar>
+        {this.state.temporaryLayer === id &&
+          !this.state.layers.includes(id) && (
+            <div className="temporaryEvidence">
+              Temporary evidence · not saved with preset
+            </div>
+          )}
         {body}
+        {id === "supplyDemand" && (
+          <Button
+            id="insightsGeneratorJourney"
+            onClick={() => this.beginJourney("supplyDemand")}
+            sx={{ minHeight: 44, mx: 1, mb: 1 }}
+          >
+            Generator
+          </Button>
+        )}
       </section>
     );
   }
@@ -2087,7 +2272,13 @@ export default class Insights extends React.Component<Props, State> {
           announce,
         ),
     };
-    const visible = this.state.layers.filter((id) => {
+    const visible = withRequiredLayers(
+      this.state.temporaryLayer &&
+        !this.state.layers.includes(this.state.temporaryLayer)
+        ? [...this.state.layers, this.state.temporaryLayer]
+        : this.state.layers,
+      game.scenarioId,
+    ).filter((id) => {
       const definition = INSIGHT_LAYERS.find((layer) => layer.id === id);
       return !!definition && this.available(definition, projection);
     });

@@ -119,6 +119,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       {
         stroke: chartPalette().demand,
         width: 2.5,
+        dash: [6, 4],
         points: { show: false },
       },
     ],

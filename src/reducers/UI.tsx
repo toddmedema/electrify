@@ -1,6 +1,14 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { DialogType, SnackbarType, UIType, VictoryType } from "../Types";
-import { quit } from "./GameActions";
+import {
+  DialogType,
+  SnackbarType,
+  UIType,
+  VictoryType,
+  EvidenceTargetType,
+  EvidenceRequestType,
+} from "../Types";
+import { quit, start, resume, startReplay, loaded } from "./GameActions";
+import { navigate, navigateBack } from "./Card";
 
 export const initialUI: UIType = {
   dialog: {
@@ -22,6 +30,28 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    requestEvidence: (state, action: PayloadAction<EvidenceTargetType>) => {
+      delete state.evidenceJourney;
+      delete state.insightsRestore;
+      const id = (state.evidenceSequence ?? 0) + 1;
+      state.evidenceSequence = id;
+      state.evidenceRequest = {
+        id,
+        runId: state.evidenceRunId ?? 0,
+        target: action.payload,
+      };
+    },
+    acknowledgeEvidence: (
+      state,
+      action: PayloadAction<Pick<EvidenceRequestType, "id" | "runId">>,
+    ) => {
+      if (
+        state.evidenceRequest?.id === action.payload.id &&
+        state.evidenceRequest.runId === action.payload.runId
+      ) {
+        delete state.evidenceRequest;
+      }
+    },
     manualHelpOpen: (state, action: PayloadAction<string>) => {
       state.manualHelpEntry = action.payload;
     },
@@ -89,11 +119,51 @@ export const uiSlice = createSlice({
       delete state.manualHelpEntry;
       state.selectedFacilityId = null;
       state.facilityDragActive = false;
+      delete state.evidenceRequest;
+      delete state.evidenceJourney;
+      delete state.evidenceJourneyMarker;
+      delete state.insightsRestore;
+      state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
+    builder.addMatcher(
+      (action) =>
+        [
+          start.type,
+          resume.type,
+          startReplay.type,
+          loaded.type,
+          "game/initGame",
+        ].includes(action.type),
+      (state) => {
+        delete state.evidenceRequest;
+        delete state.evidenceJourney;
+        delete state.evidenceJourneyMarker;
+        delete state.insightsRestore;
+        state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
+      },
+    );
+    builder.addMatcher(
+      (action) =>
+        action.type === navigate.type || action.type === navigateBack.type,
+      (state, action) => {
+        delete state.evidenceRequest;
+        const payload = (
+          action as PayloadAction<import("../Types").NavigateActionType>
+        ).payload;
+        if (
+          !payload?.journeyMarker ||
+          payload.journeyMarker.id !== state.evidenceJourney?.id
+        )
+          delete state.evidenceJourney;
+        delete state.insightsRestore;
+      },
+    );
   },
 });
 
 export const {
+  requestEvidence,
+  acknowledgeEvidence,
   manualHelpOpen,
   manualHelpClose,
   delta,

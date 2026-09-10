@@ -673,8 +673,100 @@ $topbar_height: 56px;
 
 // Never squeezed by whatever is below it, on either layout
 #appbar {
+  min-width: 0;
   flex: 0 0 auto;
   position: relative;
+}
+
+.missionSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 4px 16px 8px;
+  border-top: 1px solid var(--tooltip-border);
+  background: var(--bg-raised);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+
+  .MuiButton-root {
+    min-height: 40px;
+    text-align: left;
+    line-height: 1.4;
+  }
+  .missionDetailsButton {
+    flex-shrink: 0;
+  }
+  .missionRiskButton {
+    margin-left: auto;
+  }
+}
+
+.missionSummaryCopy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  min-width: 0;
+  flex: 1 1 360px;
+  overflow-wrap: anywhere;
+  strong {
+    flex-basis: 100%;
+  }
+}
+
+.missionSummaryTutorial {
+  justify-content: flex-end;
+  padding-block: 0;
+}
+.operatingEvidence,
+.insightsTrack {
+  scroll-margin-block: 12px;
+}
+.operatingSampleLabel {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.temporaryEvidence {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
+@media (pointer: coarse) {
+  .missionSummary .MuiButton-root {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 768px) {
+  .missionSummary {
+    padding: 4px 8px;
+    gap: 0 8px;
+  }
+  .missionSummaryCopy {
+    flex-basis: 200px;
+  }
+  .missionSummary .missionRiskButton {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+// Short windows and large text must scroll the operating header with the body instead of
+// squeezing the charts and controls beneath a growing fixed status stack.
+@media (max-width: 768px) and (max-height: 600px) {
+  #gameCard {
+    overflow-y: auto;
+    display: block;
+  }
+  #gameCard .scrollable {
+    overflow: visible;
+  }
+  #gameCard #navfooter {
+    position: sticky;
+    bottom: 0;
+  }
 }
 
 .gridHealth {
@@ -1585,6 +1677,10 @@ $pane_header_height: 40px;
   }
 
   @media screen and (max-width: 359px) {
+    .insightsViewportDate {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
     .base_main .MuiToolbar-root.insightsTrackHeader {
       flex-flow: row nowrap !important;
       padding-right: 8px;

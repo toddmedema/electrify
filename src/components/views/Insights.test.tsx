@@ -201,12 +201,95 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+
+it("reveals finance evidence temporarily and lets explicit selection own saved layers", async () => {
+  localStorage.clear();
+  const configured = ["supplyDemand"];
+  localStorage.setItem("insightsLayers", JSON.stringify(configured));
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+    onEvidenceReady: jest.fn(),
+  };
+  const request = { id: 1, runId: 0, target: "finances" as const };
+  const { rerender } = render(
+    <Insights {...props} evidenceRequest={request} />,
+  );
+  expect(screen.getByLabelText("Finance details evidence")).toBeInTheDocument();
+  expect(props.onEvidenceReady).toHaveBeenCalledWith(
+    request,
+    screen.getByLabelText("Finance details evidence"),
+  );
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(
+    configured,
+  );
+  rerender(<Insights {...props} />);
+  await choosePreset("Reliability");
+  expect(
+    screen.queryByLabelText("Finance details evidence"),
+  ).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
+    "financeDetails",
+  );
+  rerender(<Insights {...props} evidenceRequest={{ ...request, id: 2 }} />);
+  expect(screen.getByText(/Temporary evidence/)).toBeInTheDocument();
+  rerender(<Insights {...props} />);
+  await user.click(
+    screen.getByRole("button", { name: "Keep Finance details" }),
+  );
+  expect(screen.queryByText(/Temporary evidence/)).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toContain(
+    "financeDetails",
+  );
+});
+
 function render(element: React.ReactElement) {
   const store = configureStore({ reducer: { ui: uiReducer } });
   return renderUI(element, {
     wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
   });
 }
+
+it("reorders configured charts while ending temporary reveal without saving it", async () => {
+  localStorage.clear();
+  localStorage.setItem(
+    "insightsLayers",
+    JSON.stringify(["supplyDemand", "cash"]),
+  );
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+    onEvidenceReady: jest.fn(),
+  };
+  const { rerender } = render(
+    <Insights
+      {...props}
+      evidenceRequest={{ id: 1, runId: 0, target: "finances" }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Move Finance details up" }),
+  ).toBeDisabled();
+  expect(
+    within(
+      screen.getByRole("button", { name: "Keep Finance details" }),
+    ).getByTestId("AddIcon"),
+  ).toBeInTheDocument();
+  rerender(<Insights {...props} />);
+  await user.click(screen.getByRole("button", { name: "Move Cash up" }));
+  expect(screen.queryByText(/Temporary evidence/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Finance details evidence"),
+  ).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual([
+    "cash",
+    "supplyDemand",
+  ]);
+});
 // MUI interaction tests share the coverage runner with the simulation suite in CI, where opening
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);
@@ -893,3 +976,69 @@ function labelledButton(label: string | RegExp): HTMLElement {
   expect(isInaccessible(button)).toBe(false);
   return button;
 }
+
+it("restores the investigation range against the live period and keeps newer layer configuration", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const origin = {
+    viewport: [0, 48 * MINUTES_PER_MONTH] as [number, number],
+    month: 0,
+    layers: ["supplyDemand"],
+    preset: "grid",
+    revision: 0,
+    temporaryLayer: "financeDetails",
+    anchor: "financeDetails",
+    scrollTop: 100,
+  };
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    journeyRestore: origin,
+    configurationRevision: 1,
+    onJourneyRestored: jest.fn(() => true),
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    restoreJourney: () => void;
+    restoredViewport: (value: typeof origin) => [number, number];
+  };
+  const setState = jest
+    .spyOn(insights, "setState")
+    .mockImplementation(() => undefined);
+  internals.restoreJourney();
+  expect(props.onJourneyRestored).toHaveBeenCalledTimes(1);
+  expect(setState).toHaveBeenCalledWith(
+    expect.objectContaining({
+      layers: insights.state.layers,
+      preset: insights.state.preset,
+      temporaryLayer: "financeDetails",
+      viewport: origin.viewport,
+    }),
+    expect.any(Function),
+  );
+  game.date.monthsElapsed = 2;
+  game.date.minute = 2 * MINUTES_PER_MONTH;
+  expect(internals.restoredViewport(origin)).toEqual([
+    0,
+    50 * MINUTES_PER_MONTH,
+  ]);
+  const moved = {
+    ...origin,
+    viewport: [MINUTES_PER_MONTH, 3 * MINUTES_PER_MONTH] as [number, number],
+  };
+  expect(internals.restoredViewport(moved)).toEqual([
+    3 * MINUTES_PER_MONTH,
+    5 * MINUTES_PER_MONTH,
+  ]);
+  const beyond = {
+    ...origin,
+    viewport: [1000 * MINUTES_PER_MONTH, 1002 * MINUTES_PER_MONTH] as [
+      number,
+      number,
+    ],
+  };
+  expect(internals.restoredViewport(beyond)[1]).toBeLessThanOrEqual(
+    game.date.minute + 240 * MINUTES_PER_MONTH,
+  );
+});

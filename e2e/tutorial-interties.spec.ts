@@ -51,6 +51,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .click();
   await expect(page.getByText("Building")).toBeVisible();
   await expect(page.getByLabel("Objective 3 of 10")).toBeVisible();
+  // Playwright's mouse remains over the new snackbar after the approval layout changes.
+  // MUI deliberately pauses auto-hide on hover; move away as a touch user would release.
+  await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("intertie-approved.png") });
 

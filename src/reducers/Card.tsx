@@ -26,6 +26,7 @@ export const cardSlice = createSlice({
         a = { name: a } as NavigateActionType;
       }
       if (
+        !a.replaceCurrentCard &&
         a.name === state.name &&
         Date.now() - state.ts < NAVIGATION_DEBOUNCE_MS
       ) {
@@ -33,7 +34,11 @@ export const cardSlice = createSlice({
       }
       logEvent("card_view", { card: a.name });
       if (!a.skipBrowserHistory) {
-        getHistoryApi().pushState(null, "", a.url || "#");
+        getHistoryApi().pushState(
+          a.journeyMarker ? { evidenceJourney: a.journeyMarker } : null,
+          "",
+          a.url || "#",
+        );
       }
       // TODO better implementation for don't remember, right now it still makes an entry!
       return {
@@ -45,7 +50,12 @@ export const cardSlice = createSlice({
         storyTarget: a.storyTarget,
         history: [
           a.dontRemember ? state.name : a.name,
-          ...(state.history || []),
+          ...(a.journeyTraversal === "origin" &&
+          state.name === "BUILD_GENERATORS"
+            ? (state.history || []).slice(2)
+            : a.replaceCurrentCard
+              ? (state.history || []).slice(1)
+              : state.history || []),
         ],
         toPrevious: false,
       };
