@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, IconButton, Tooltip } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { EvidenceTargetType, GameType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
 import {
@@ -30,26 +31,33 @@ export default function MissionSummary({
       className={`missionSummary${tutorial ? " missionSummaryTutorial" : ""}`}
       aria-label="Mission progress"
     >
-      {!tutorial && (
-        <div className="missionSummaryCopy">
-          <span>
-            {mission.monthsRemaining === 0
-              ? "Term complete"
-              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
-          </span>
-          {mission.headline && (
-            <span
-              title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
-            >
-              {mission.headline.compact ||
-                `${mission.headline.label}: ${mission.headline.current}`}
+      <div className="missionSummaryHeader">
+        {!tutorial && (
+          <div className="missionSummaryCopy">
+            <span>
+              {mission.monthsRemaining === 0
+                ? "Term complete"
+                : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
             </span>
-          )}
-        </div>
-      )}
-      <Button className="missionDetailsButton" onClick={onDetails}>
-        All requirements
-      </Button>
+            {mission.headline && (
+              <span
+                title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
+              >
+                {mission.headline.compact}
+              </span>
+            )}
+          </div>
+        )}
+        <Tooltip title="All requirements">
+          <IconButton
+            className="missionDetailsButton"
+            aria-label="All requirements"
+            onClick={onDetails}
+          >
+            <InfoOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </div>
       {!tutorial && risk && risk.id !== "shortage" && (
         <Button
           className="missionRiskButton"

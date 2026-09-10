@@ -78,7 +78,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   });
   expect(requirement(failed, "reliability").status).toBe("failed");
   expect(getMissionStatus(failed).prominent?.id).toBe("reliability");
-  expect(getMissionStatus(failed).headline?.compact).toContain("99.00% /");
+  expect(getMissionStatus(failed).headline?.compact).toContain("(99.00%)");
   expect(scenarioObjectiveFailure(wildfire, failed.monthlyHistory)).toContain(
     "99.00%",
   );
@@ -131,6 +131,9 @@ test("survival is chronological completed evidence and ignores current partial h
     ];
   });
   expect(requirement(game, "survival").status).toBe("failed");
+  expect(requirement(game, "survival").compact).toBe(
+    "Avoid 3 consecutive months < 90% served (80.0%, 80.0%, 80.0%)",
+  );
   expect(requirement(game, "cash").timing).toContain(
     "negative cash now is a warning",
   );
@@ -155,7 +158,9 @@ test("retention shows current customers against final target and remains recover
   });
   expect(requirement(low, "retention").status).toBe("in-progress");
   expect(getMissionStatus(low).headline?.id).toBe("retention");
-  expect(getMissionStatus(low).headline?.compact).toMatch(/^Customers: 1 \/ /);
+  expect(getMissionStatus(low).headline?.compact).toMatch(
+    /^Customers ≥ .* \(1\)$/,
+  );
   expect(requirement(low, "retention").target).toContain("customers");
   expect(requirement(low, "retention").timing).toContain(
     "Required at term end",
@@ -179,6 +184,9 @@ test("decision gates use retained categories, waiver and tutorial/custom rules",
   });
   expect(requirement(game, "decisions").current).toContain(
     "1 retained decisions across 1 categories",
+  );
+  expect(requirement(game, "decisions").compact).toBe(
+    "Decisions ≥ 10 (1) · Categories ≥ 4 (1)",
   );
   expect(requirement(game, "decisions").target).toContain(
     "10 decisions across 4 categories",

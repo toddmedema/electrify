@@ -628,8 +628,8 @@ $topbar_height: 56px;
   #topbar .gameStatus {
     flex: 1 1 auto;
     overflow: hidden;
-    gap: 2px;
-    font-size: clamp(0.65rem, 3.2vw, 0.875rem);
+    gap: 4px;
+    font-size: clamp(0.75rem, 3.5vw, 1rem);
     white-space: nowrap;
   }
 
@@ -637,12 +637,29 @@ $topbar_height: 56px;
   // to scan. Keep the compressed scale below 360px, where the four speed controls need it.
   @media screen and (min-width: 360px) {
     #topbar .gameStatus {
-      font-size: clamp(0.95rem, 4vw, 1.125rem);
+      gap: 8px;
+      font-size: clamp(1rem, 4.2vw, 1.25rem);
     }
   }
 
   #speedChangeButtons {
     flex: 0 0 auto;
+  }
+
+  #topbar .gameStatus .weak {
+    font-size: 0.875rem;
+  }
+  @media screen and (max-width: 359px) {
+    #topbar .gameStatus {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+    #topbar .gameStatus .weak {
+      font-size: 0.75rem;
+    }
   }
 }
 
@@ -696,10 +713,21 @@ $topbar_height: 56px;
   }
   .missionDetailsButton {
     flex-shrink: 0;
+    width: 40px;
+    height: 40px;
   }
   .missionRiskButton {
     margin-left: auto;
   }
+}
+
+.missionSummaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .missionSummaryCopy {
@@ -707,6 +735,7 @@ $topbar_height: 56px;
   flex-wrap: wrap;
   gap: 4px 12px;
   min-width: 0;
+  flex: 1 1 auto;
   overflow-wrap: anywhere;
 }
 
@@ -732,6 +761,16 @@ $topbar_height: 56px;
   .missionSummary .MuiButton-root {
     min-height: 44px;
   }
+  .missionSummary .missionDetailsButton {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (pointer: coarse), (max-width: 768px) {
+  .facilityActions .facilityReorderButton {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
@@ -742,6 +781,13 @@ $topbar_height: 56px;
   .missionSummary .missionRiskButton {
     margin-left: 0;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 599px) {
+  .missionSummaryHeader {
+    width: 100%;
+    gap: 8px;
   }
 }
 
@@ -822,41 +868,30 @@ $topbar_height: 56px;
   color: $interactive_blue;
 }
 
-// On a wide layout, stable and low reserve share one fixed chip in the toolbar, so crossing the
-// warning threshold changes emphasis without shifting the game beneath it. More severe states
-// still break out into a banner below the toolbar.
+// Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
+// within its share of the row without overlapping the operating status.
 @media screen and (min-width: $pane_breakpoint) {
-  .gridHealth-stable,
-  .gridHealth-low-reserve {
-    position: absolute;
-    top: calc(env(safe-area-inset-top) + 13px);
-    left: 50%;
-    z-index: 1;
-    min-height: 30px;
-    padding: 0 10px;
-    transform: translateX(-50%);
-    border-radius: 999px;
-
-    .gridHealthMetric {
-      min-width: 7.75rem;
-    }
+  .gameStatusBar {
+    display: flex;
+    align-items: stretch;
+    border-block: 1px solid var(--border-subtle);
+    background: var(--bg-raised);
   }
-
-  .gridHealth-stable {
-    border: 1px solid var(--border-selected);
-    background: var(--bg-selected);
-    color: $interactive_blue;
+  .gameStatusBar .gridHealth {
+    flex: 0 0 auto;
+    border: 0;
+    border-right: 1px solid var(--border-subtle);
   }
-
-  .gridHealth-low-reserve {
-    border: 1px solid var(--mark-bg);
-    background: var(--mark-bg);
-    color: $font_color_primary;
+  .gameStatusBar .missionSummary {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 0;
+    padding-block: 0;
   }
 }
 
 // Phones and narrow tablets keep the readout in its own intentional row: state on the left,
-// operational cushion on the right. Emergency guidance gets the row to itself.
+// operational cushion on the right.
 @media screen and (max-width: ($pane_breakpoint - 1px)) {
   .gridHealth {
     flex-direction: column;
@@ -2354,7 +2389,6 @@ html[data-theme="dark"] .uplot {
   // interface. Text remains beside it for first-time recognition and screen magnification.
   .gameStatus,
   .gameStatusValue,
-  .gameStatusBlackout,
   .iconLabel,
   .scoreBreakdownRow {
     display: flex;
@@ -2370,10 +2404,6 @@ html[data-theme="dark"] .uplot {
   .iconLabel,
   .scoreBreakdownRow {
     gap: size(tiny);
-  }
-
-  .gameStatusBlackout {
-    color: $blackout_red;
   }
 
   .scoreBreakdownRow {

@@ -171,6 +171,7 @@ function FacilityActions(props: {
               onReprioritize(spotInList, -1);
             }}
             aria-label={`Move ${facility.name} earlier in the dispatch order`}
+            className="facilityReorderButton"
             disabled={spotInList === 0}
             edge="end"
             color="primary"
@@ -184,6 +185,7 @@ function FacilityActions(props: {
               onReprioritize(spotInList, 1);
             }}
             aria-label={`Move ${facility.name} later in the dispatch order`}
+            className="facilityReorderButton"
             disabled={spotInList === listLength - 1}
             edge="end"
             color="primary"

@@ -40,8 +40,19 @@ for (const theme of ["light", "dark"]) {
       "144 months left",
     );
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
-      "Cash:",
+      "Cash ≥ $0 ($",
     );
+    const reorder = page.locator(".facilityReorderButton:visible");
+    if (info.project.name.startsWith("mobile")) {
+      await expect(reorder).toHaveCount(0);
+    } else {
+      await expect(reorder.first()).toBeVisible();
+      const grid = await page.locator(".gridHealth:visible").boundingBox();
+      const mission = await page
+        .locator(".missionSummary:visible")
+        .boundingBox();
+      expect(grid!.y).toBe(mission!.y);
+    }
     await settle(page);
     const details = page.getByRole("button", {
       name: "All requirements",

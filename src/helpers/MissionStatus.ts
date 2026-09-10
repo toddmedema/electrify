@@ -25,7 +25,7 @@ export interface MissionRequirement {
   label: string;
   current: string;
   target: string;
-  compact?: string;
+  compact: string;
   timing: string;
   status:
     "pending" | "in-progress" | "completed" | "failed" | "unknown" | "waived";
@@ -71,7 +71,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Reliability: ${minimum === undefined ? "pending" : `${(minimum * 100).toFixed(2)}% / ${Math.round(objective.minimumDemandServed * 100)}% served`}${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : `${(minimum * 100).toFixed(2)}%`})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
@@ -106,7 +106,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "retention",
       label: "Retain the community",
-      compact: `Customers: ${now ? Math.round(now.customers).toLocaleString() : "unavailable"} / ${Math.ceil(threshold).toLocaleString()}`,
+      compact: `Customers ≥ ${Math.ceil(threshold).toLocaleString()} (${now ? Math.round(now.customers).toLocaleString() : "unavailable"})`,
       current: now
         ? `${Math.round(now.customers).toLocaleString()} current customers`
         : "Current customers unavailable",
@@ -121,6 +121,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "decisions",
       label: "Meaningful decisions",
+      compact: `Decisions ≥ ${gate.count} (${game.meaningfulDecisions.length}) · Categories ≥ ${gate.categories} (${meaningfulDecisionCategoryCount(game.meaningfulDecisions)})`,
       current: `${game.meaningfulDecisions.length} retained decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
       target: `${gate.count} decisions across ${gate.categories} categories; reverting a decision removes it`,
       timing: "Required at term end",
@@ -131,7 +132,7 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "cash",
     label: "Keep the utility solvent",
-    compact: `Cash: ${now ? formatMoneyConcise(now.cash) : "unavailable"}`,
+    compact: `Cash ≥ $0 (${now ? formatMoneyConcise(now.cash) : "unavailable"})`,
     current: now
       ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
       : "Current cash unavailable",
@@ -151,6 +152,7 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "survival",
     label: "Avoid chronic blackouts",
+    compact: `Avoid 3 consecutive months < 90% served (${latest.length ? latest.map((row) => `${(demandServed(row) * 100).toFixed(1)}%`).join(", ") : "no completed months"})`,
     current: latest.length
       ? latest
           .map(

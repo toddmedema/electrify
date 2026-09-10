@@ -324,49 +324,46 @@ export function GameAppBar(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
-            {inBlackout && (
-              <span className="gameStatusBlackout">
-                <ConceptIcon concept="blackout" fontSize="small" />
-              </span>
-            )}
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      <div
-        className={`gridHealth gridHealth-${gridHealth.state}`}
-        aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
-      >
-        <div className="gridHealthSummary">
-          <span className="gridHealthState">
-            <span className="gridHealthIcon" aria-hidden="true">
-              <ConceptIcon
-                concept={
-                  inBlackout
-                    ? "blackout"
-                    : gridHealth.state === "stable"
-                      ? "supply"
-                      : "danger"
-                }
-                fontSize="small"
-              />
+      <div className="gameStatusBar">
+        <div
+          className={`gridHealth gridHealth-${gridHealth.state}`}
+          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
+        >
+          <div className="gridHealthSummary">
+            <span className="gridHealthState">
+              <span className="gridHealthIcon" aria-hidden="true">
+                <ConceptIcon
+                  concept={
+                    inBlackout
+                      ? "blackout"
+                      : gridHealth.state === "stable"
+                        ? "supply"
+                        : "danger"
+                  }
+                  fontSize="small"
+                />
+              </span>
+              {!inBlackout && <span>Now · </span>}
+              <strong>{gridHealth.label}</strong>
             </span>
-            {!inBlackout && <span>Now · </span>}
-            <strong>{gridHealth.label}</strong>
-          </span>
-          <span className="gridHealthSeparator" aria-hidden="true">
-            |
-          </span>
-          <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+            <span className="gridHealthSeparator" aria-hidden="true">
+              |
+            </span>
+            <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+          </div>
         </div>
+        <MissionSummary
+          game={game}
+          upcoming={props.upcomingEvents}
+          onEvidence={props.onEvidence}
+          onDetails={() => setScenarioDetailsOpen(true)}
+        />
       </div>
-      <MissionSummary
-        game={game}
-        upcoming={props.upcomingEvents}
-        onEvidence={props.onEvidence}
-        onDetails={() => setScenarioDetailsOpen(true)}
-      />
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>
