@@ -8,7 +8,7 @@ import {
   resumableSave,
   saveFilename,
 } from "./SaveFile";
-import { clearSave, SAVE_VERSION, serializeSave, writeSave } from "./SaveGame";
+import { clearSave, serializeSave, writeSave } from "./SaveGame";
 import { GameType, ScenarioType } from "./Types";
 
 // Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
@@ -56,7 +56,7 @@ describe("SaveFile", () => {
       expect(describeSave(resumableSave()!)).toBe("Rise of Renewables, 2035");
     });
 
-    it("ignores a save whose scenario this build no longer has", () => {
+    it("ignores a save with an unknown scenario", () => {
       writeSave(fakeGame({ scenarioId: 99999 }));
       expect(resumableSave()).toBeNull();
     });
@@ -185,15 +185,7 @@ describe("SaveFile", () => {
       expect(error).toMatch(/isn't an Electrify save/);
     });
 
-    it("rejects a save from a different schema", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/isn't a valid Electrify save/);
-    });
-
-    it("rejects a save whose scenario this build doesn't have", async () => {
+    it("rejects a save with an unknown scenario", async () => {
       const { save, error } = await readSaveFile(
         saveFile(serializeSave(fakeGame({ scenarioId: 99999 }))),
       );

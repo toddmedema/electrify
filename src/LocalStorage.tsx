@@ -94,11 +94,10 @@ export function getPlayedScenarioIds(): number[] {
 }
 
 // Counts completed plays without appending one entry per replay, which would grow this list
-// forever. Records written before counts were introduced represent one completed play.
+// forever.
 export function getScenarioPlayCounts(): Record<number, number> {
   return getPlays().reduce<Record<number, number>>((counts, play) => {
-    counts[play.scenarioId] =
-      (counts[play.scenarioId] ?? 0) + (play.timesPlayed ?? 1);
+    counts[play.scenarioId] = (counts[play.scenarioId] ?? 0) + play.timesPlayed;
     return counts;
   }, {});
 }
@@ -111,7 +110,7 @@ export function recordScenarioPlayed(scenarioId: number) {
     const updated = [...plays];
     updated[existingIndex] = {
       ...existing,
-      timesPlayed: (existing.timesPlayed ?? 1) + 1,
+      timesPlayed: existing.timesPlayed + 1,
     };
     setStorageKeyValue("plays", { plays: updated });
     return;

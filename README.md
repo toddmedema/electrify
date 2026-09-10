@@ -112,8 +112,8 @@ fully completed year. Use `npm run update-weather -- --through 2030` to choose a
 city ids and `--limit` work here too, and completed files are skipped when a rate-limited run is
 resumed.
 
-To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. An `id` ends up
-in save games and replays, so it can never be changed afterwards; everything else can.
+To add somewhere that isn't listed, add it to `scripts/cities.json` and fetch it. The `id` must match
+the generated weather filename and the location references in the game data.
 
 To enable offshore wind for a location, add a representative sea coordinate in its `offshore`
 field. Fetching a location that has no weather file downloads both points. If its onshore weather

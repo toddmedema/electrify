@@ -6,7 +6,7 @@ import userReducer, {
   logout,
   submitHighscore,
 } from "./User";
-import { MAX_REPLAY_BYTES, REPLAY_VERSION } from "../Replay";
+import { MAX_REPLAY_BYTES } from "../Replay";
 import { LOCATIONS } from "../Constants";
 import { ReplayType, UserType } from "../Types";
 
@@ -53,7 +53,6 @@ function makeStore(user: UserType = {}) {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    version: REPLAY_VERSION,
     appVersion: "0.1.0",
     scenarioId: 101,
     difficulty: "Employee",

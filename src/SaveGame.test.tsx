@@ -6,7 +6,6 @@ import {
   parseSave,
   readSave,
   SAVE_KEY,
-  SAVE_VERSION,
   serializeSave,
   startAutosave,
   writeSave,
@@ -40,7 +39,6 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save).not.toBeNull();
-    expect(save!.version).toBe(SAVE_VERSION);
     expect(save!.game.seed).toBe(game.seed);
     expect(save!.game.scenarioId).toBe(game.scenarioId);
     expect(save!.game.facilities).toEqual(game.facilities);
@@ -76,19 +74,13 @@ describe("SaveGame", () => {
     expect(readSave()).toBeNull();
   });
 
-  it("rejects a save from a different schema version", () => {
-    expect(
-      parseSave({ ...serializeSave(game), version: SAVE_VERSION + 1 }),
-    ).toBeNull();
-  });
-
-  it("rejects a save without current envelope metadata", () => {
+  it("rejects a save without envelope metadata", () => {
     const save = serializeSave(game);
     expect(parseSave({ ...save, savedAt: undefined })).toBeNull();
     expect(parseSave({ ...save, appVersion: undefined })).toBeNull();
   });
 
-  it("rejects a current-version save without customer-market state", () => {
+  it("rejects a save without customer-market state", () => {
     const save = serializeSave(game);
     const withoutMarket = { ...save.game } as Partial<GameType>;
     delete withoutMarket.customerMarketSize;
@@ -147,7 +139,7 @@ describe("SaveGame", () => {
     expect(parseSave(impossible)).toBeNull();
   });
 
-  it("rejects a current-version save without current runtime state", () => {
+  it("rejects a save without runtime state", () => {
     const save = serializeSave(game);
     for (const field of [
       "eventLog",
@@ -161,7 +153,7 @@ describe("SaveGame", () => {
     }
   });
 
-  it("rejects current-version monthly history without story simulation facts", () => {
+  it("rejects monthly history without story simulation facts", () => {
     const save = serializeSave(game);
     const month = { ...save.game.monthlyHistory[0] } as Partial<
       GameType["monthlyHistory"][number]
@@ -175,7 +167,7 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  it("rejects a current-version save with incomplete facility totals", () => {
+  it("rejects a save with incomplete facility totals", () => {
     const save = serializeSave(game);
     const facility = { ...save.game.facilities[0] } as Partial<
       GameType["facilities"][number]
@@ -212,7 +204,6 @@ describe("SaveGame", () => {
     expect(parseSave(null)).toBeNull();
     expect(parseSave("nope")).toBeNull();
     expect(parseSave({})).toBeNull();
-    expect(parseSave({ version: SAVE_VERSION })).toBeNull();
   });
 
   // An imported file is untrusted input, and a malformed facility would otherwise only surface as

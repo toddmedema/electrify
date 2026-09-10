@@ -5,7 +5,6 @@ import {
   recordReplayAction,
   recordedDelta,
   replayByteLength,
-  REPLAY_VERSION,
 } from "./Replay";
 import { LOCATIONS } from "./Constants";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
@@ -20,7 +19,6 @@ function aGame(minute: number, log?: ReplayActionType[]): GameType {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    version: REPLAY_VERSION,
     appVersion: "0.1.0",
     scenarioId: 101,
     difficulty: "Employee",
@@ -193,19 +191,13 @@ describe("decodeReplay", () => {
     expect(decodeReplay({})).toBeNull();
   });
 
-  it("rejects a replay from a different schema", () => {
-    expect(
-      decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
-    ).toBeNull();
-  });
-
   it("ignores a replay missing the fields the run is rebuilt from", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.seed;
     expect(decodeReplay(doc)).toBeNull();
   });
 
-  it("rejects a replay without current envelope metadata", () => {
+  it("rejects a replay without envelope metadata", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.appVersion;
     expect(decodeReplay(doc)).toBeNull();

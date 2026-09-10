@@ -28,10 +28,6 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// Version 2 changes authored starting fleets and their facility IDs, so older action streams can
-// no longer reproduce the run they recorded.
-export const REPLAY_VERSION = 2;
-
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
  * dozen builds and a handful of rate changes, so this sits far past normal play; it's here so
@@ -127,7 +123,6 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     return undefined;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: packageJson.version,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
@@ -204,9 +199,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (doc.version !== REPLAY_VERSION) {
-    return null;
-  }
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
@@ -223,7 +215,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: doc.appVersion,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],

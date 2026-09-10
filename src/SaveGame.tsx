@@ -25,11 +25,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Initial public schema. Increment this when a post-release change becomes incompatible.
-export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
-  version: number;
   savedAt: string; // ISO 8601
   appVersion: string; // For bug reports
   game: GameType;
@@ -43,7 +40,6 @@ let cached: SaveGameType | null | undefined;
 
 export function serializeSave(game: GameType): SaveGameType {
   return {
-    version: SAVE_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
@@ -60,11 +56,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (
-    save.version !== SAVE_VERSION ||
-    typeof save.savedAt !== "string" ||
-    typeof save.appVersion !== "string"
-  ) {
+  if (typeof save.savedAt !== "string" || typeof save.appVersion !== "string") {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
