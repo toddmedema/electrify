@@ -1,4 +1,5 @@
 import { chooseScenarioResponse } from "./GameActions";
+import { validBuildFacility } from "../helpers/BuildValidation";
 import {
   pendingScenarioChoice,
   validScenarioResponse,
@@ -1217,6 +1218,7 @@ function applyBuildFacility(
   state: GameType,
   payload: BuildFacilityAction,
 ): boolean {
+  if (!validBuildFacility(payload)) return false;
   const built = payload.facility;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const amountDue = payload.financed
@@ -1560,13 +1562,7 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
       applyPolicyEdit(state, payload, entry.type === "cancelPolicy");
       break;
     case "buildFacility": {
-      const build = payload as Partial<BuildFacilityAction>;
-      if (typeof build?.facility === "object" && build.facility !== null) {
-        applyBuildFacility(state, {
-          facility: build.facility,
-          financed: !!build.financed,
-        });
-      }
+      if (validBuildFacility(payload)) applyBuildFacility(state, payload);
       break;
     }
     case "buildTransmissionLine": {
@@ -3087,7 +3083,7 @@ function supplyForecastPass(
           t.customers = currentCustomers;
         }
         t.netWorth = getNetWorth(
-          newState.facilities,
+          state.facilities,
           t.cash,
           t.minute,
           // Just like currentCash, the live transmission balance already represents this tick.
@@ -3371,11 +3367,7 @@ function getNetWorth(
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
-    if (g.yearsToBuildLeft > 0) {
-      netWorth += g.buildCost * DOWNPAYMENT_PERCENT;
-    } else {
-      netWorth += facilityCashBack(g, currentMinute);
-    }
+    netWorth += facilityCashBack(g, currentMinute);
   });
   transmissionLines.forEach((line) => {
     // The project is worth what has been paid for it at every construction stage. At purchase,

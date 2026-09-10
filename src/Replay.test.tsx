@@ -9,6 +9,22 @@ import {
 } from "./Replay";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
 
+const generatorQuote = {
+  name: "Oil",
+  description: "Generator",
+  available: true,
+  buildCost: 1000000,
+  annualOperatingCost: 1000,
+  peakW: 100000,
+  lifespanYears: 30,
+  yearsToBuild: 1,
+  fuel: "Oil",
+  maxPeakW: 1000000,
+  capacityFactor: 0.9,
+  spinMinutes: 1,
+  btuPerWh: 0.01,
+};
+
 // Only the two fields the recorder touches, so these tests don't need a whole simulation to run
 function aGame(minute: number, log?: ReplayActionType[]): GameType {
   return {
@@ -53,6 +69,71 @@ describe("recordedDelta", () => {
 });
 
 describe("recordReplayAction", () => {
+  it.each([
+    null,
+    {},
+    { ...generatorQuote, buildCost: undefined },
+    { ...generatorQuote, spinMinutes: NaN },
+    { ...generatorQuote, peakW: -1 },
+    { ...generatorQuote, fuel: "unknown" },
+  ])("rejects a malformed replay facility %p", (facility) => {
+    expect(
+      decodeReplay(
+        aReplay({
+          actions: [
+            {
+              minute: 0,
+              type: "buildFacility",
+              payload: { facility, financed: false },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("round trips a complete storage quote", () => {
+    const facility = {
+      name: "Battery",
+      description: "Storage",
+      available: true,
+      buildCost: 1000000,
+      annualOperatingCost: 1000,
+      peakW: 250000,
+      lifespanYears: 15,
+      yearsToBuild: 1,
+      peakWh: 1000000,
+      maxPeakWh: 10000000,
+      roundTripEfficiency: 0.9,
+      hourlyLoss: 0.001,
+    };
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: { facility, financed: false },
+        },
+      ],
+    });
+    expect(decodeReplay(encodeReplay(replay))).toEqual(replay);
+    expect(
+      decodeReplay(
+        aReplay({
+          actions: [
+            {
+              minute: 0,
+              type: "buildFacility",
+              payload: {
+                facility: { ...facility, hourlyLoss: undefined },
+                financed: false,
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
   it("does nothing when the run isn't being recorded", () => {
     const game = aGame(60);
     recordReplayAction(game, "sellFacility", 1);
@@ -86,6 +167,7 @@ describe("recordReplayAction", () => {
           type: "buildFacility",
           payload: {
             facility: {
+              ...generatorQuote,
               name: "Airborne Wind",
               fuel: "Airborne Wind",
               peakW: 1200000,
@@ -108,6 +190,7 @@ describe("recordReplayAction", () => {
           type: "buildFacility",
           payload: {
             facility: {
+              ...generatorQuote,
               name: "Oil",
               fuel: "Oil",
               peakW: 100000000,

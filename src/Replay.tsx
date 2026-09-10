@@ -1,4 +1,5 @@
 import { validScenarioResponse } from "./helpers/ScenarioChoices";
+import { validBuildFacility } from "./helpers/BuildValidation";
 import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
@@ -206,6 +207,8 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
       action.type === "chooseScenarioResponse" &&
       !validScenarioResponse(action.payload)
     )
+      return null;
+    if (action.type === "buildFacility" && !validBuildFacility(action.payload))
       return null;
     actions.push({
       minute: action.minute,

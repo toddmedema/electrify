@@ -58,6 +58,45 @@ describe("SaveGame", () => {
     );
   });
 
+  it.each(["active", "occurrences"] as const)(
+    "validates every persisted world-event %s entry",
+    (field) => {
+      const event = {
+        key: "test:1",
+        definitionId: "test",
+        startsMinute: 0,
+        endsMinute: 1440,
+        attributes: { choice: "repair", cost: 10, ids: [1, 2] },
+        effects: {
+          temperatureOffsetC: -2,
+          facilityOutputMultipliersById: { "1": 0.8 },
+        },
+        title: "Repairs",
+        forecastable: false,
+      };
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.worldEvents[field] = [event];
+      expect(parseSave(raw)?.game.worldEvents[field]).toEqual([event]);
+      for (const malformed of [
+        null,
+        {},
+        { ...event, attributes: null },
+        { ...event, effects: null },
+        { ...event, startsMinute: "0" },
+        { ...event, endsMinute: -1 },
+        { ...event, attributes: { ids: [null] } },
+        { ...event, effects: { demandMultiplier: "bad" } },
+        { ...event, effects: { facilityOutputMultipliersById: { "1": null } } },
+      ]) {
+        raw.game.worldEvents[field] = [malformed];
+        expect(parseSave(raw)).toBeNull();
+      }
+      raw.game.worldEvents[field] = [event];
+      raw.game.worldEvents.checkedKeys = [null];
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
   it("round trips every monthly chart layer and rejects corrupt chart values", () => {
     const recorded = {
       ...game,
