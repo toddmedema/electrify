@@ -352,7 +352,7 @@ export function GameAppBar(props: Props) {
                 fontSize="small"
               />
             </span>
-            <span>Now · </span>
+            {!inBlackout && <span>Now · </span>}
             <strong>{gridHealth.label}</strong>
           </span>
           <span className="gridHealthSeparator" aria-hidden="true">
@@ -360,11 +360,6 @@ export function GameAppBar(props: Props) {
           </span>
           <strong className="gridHealthMetric">{gridHealth.metric}</strong>
         </div>
-        {inBlackout && (
-          <span className="gridHealthAdvice">
-            Resume generation or discharge storage now.
-          </span>
-        )}
       </div>
       <MissionSummary
         game={game}

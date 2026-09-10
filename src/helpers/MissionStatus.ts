@@ -194,6 +194,7 @@ export function getMissionStatus(game: GameType) {
 export interface MissionRisk {
   id: string;
   label: string;
+  shortLabel: string;
   target: EvidenceTargetType;
 }
 const scanCache = new WeakMap<
@@ -230,12 +231,14 @@ export function selectMissionRisk(
       return {
         id: "shortage",
         label: "Now: supply is below demand · View supply and demand",
+        shortLabel: "Supply & demand",
         target: "supply-demand",
       };
     if (now.cash < 0)
       return {
         id: "cash",
         label: "Now: cash is negative · Check finances before month end",
+        shortLabel: "Check finances",
         target: "finances",
       };
   }
@@ -247,6 +250,7 @@ export function selectMissionRisk(
     return {
       id: "reliability",
       label: "Required reliability window missed · All requirements",
+      shortLabel: "Reliability missed",
       target: "mission-details",
     };
   const projected = projectedShortfall(game.timeline, game.date.minute);
@@ -255,6 +259,7 @@ export function selectMissionRisk(
       id: `projection:${game.date.year}:${game.date.monthNumber}`,
       label:
         "Projected in this month's representative day: supply shortfall · View supply and demand",
+      shortLabel: "Projected shortfall",
       target: "supply-demand",
     };
   const event = upcoming
@@ -272,6 +277,7 @@ export function selectMissionRisk(
     return {
       id: `event:${event.key}`,
       label: `Announced event: ${event.title || event.label}`,
+      shortLabel: `Upcoming: ${event.title || event.label}`,
       target: event.actionTarget!,
     };
   return undefined;

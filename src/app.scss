@@ -703,15 +703,8 @@ $topbar_height: 56px;
 }
 
 .missionSummaryCopy {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 12px;
   min-width: 0;
-  flex: 1 1 360px;
   overflow-wrap: anywhere;
-  strong {
-    flex-basis: 100%;
-  }
 }
 
 .missionSummaryTutorial {
@@ -743,12 +736,8 @@ $topbar_height: 56px;
     padding: 4px 8px;
     gap: 0 8px;
   }
-  .missionSummaryCopy {
-    flex-basis: 200px;
-  }
   .missionSummary .missionRiskButton {
     margin-left: 0;
-    width: 100%;
     justify-content: flex-start;
   }
 }
@@ -885,11 +874,6 @@ $topbar_height: 56px;
     .gridHealthMetric {
       min-width: 0;
       text-align: right;
-    }
-
-    .gridHealthAdvice {
-      width: 100%;
-      text-align: left;
     }
   }
 }

@@ -37,7 +37,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.locator(".missionSummary:visible")).toContainText(
-      "144 simulation months remaining",
+      "144 months left",
     );
     await settle(page);
     const details = page.getByRole("button", {
@@ -54,7 +54,7 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
     await expect(page.locator(".missionRiskButton:visible")).toContainText(
-      "Now: supply is below demand",
+      "Supply & demand",
     );
     await page.getByRole("button", { name: "pause", exact: true }).click();
     await page.locator("#intertiesTab").click();
@@ -82,7 +82,7 @@ for (const theme of ["light", "dark"]) {
         await page.getByRole("button", { name: nav, exact: true }).click();
         await settle(page);
         await expect(page.locator(".missionSummary:visible")).toContainText(
-          "Carbon Fee",
+          "months left",
         );
       }
     }
@@ -174,7 +174,7 @@ test("cash evidence is temporary, explicit layer edits are configured, and reloa
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionRiskButton:visible")).toContainText(
-    "cash is negative",
+    "Check finances",
   );
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
@@ -281,7 +281,10 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
   await expect(page.locator(".missionRiskButton:visible")).toContainText(
-    "Projected in this month's representative day",
+    "Projected shortfall",
+  );
+  await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
+    /Projected in this month's representative day/,
   );
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();

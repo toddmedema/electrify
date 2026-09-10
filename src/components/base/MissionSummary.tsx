@@ -32,14 +32,9 @@ export default function MissionSummary({
     >
       {!tutorial && (
         <div className="missionSummaryCopy">
-          <strong>{mission.label}</strong>
-          <span>{mission.monthsRemaining} simulation months remaining</span>
-          {mission.prominent && (
-            <span>
-              {mission.prominent.label}: {mission.prominent.current}.{" "}
-              {mission.prominent.target}
-            </span>
-          )}
+          {mission.monthsRemaining === 0
+            ? "Term complete"
+            : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
         </div>
       )}
       <Button className="missionDetailsButton" onClick={onDetails}>
@@ -48,9 +43,11 @@ export default function MissionSummary({
       {!tutorial && risk && (
         <Button
           className="missionRiskButton"
+          aria-label={`${risk.shortLabel}. ${risk.label}`}
+          title={risk.label}
           onClick={() => onEvidence?.(risk.target)}
         >
-          {risk.label}
+          {risk.shortLabel}
         </Button>
       )}
       {!tutorial && (
