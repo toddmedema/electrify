@@ -48,6 +48,7 @@ for (const mission of [
       .click();
     const hud = page.locator(".tutorialHud");
     if (mission === "Generators" || mission === "Storage") {
+      await page.locator(".button-buildFacility").click();
       await page
         .locator(
           mission === "Generators"

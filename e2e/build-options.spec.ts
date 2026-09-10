@@ -22,6 +22,7 @@ for (const theme of ["light", "dark"] as const) {
         .click();
     }
     for (const kind of ["Generator", "Storage"]) {
+      await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
       const cards = page.locator(".buildOption");
       const first = cards.first();
@@ -120,6 +121,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Facilities", exact: true })
         .click();
     }
+    await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({
       has: page.getByRole("button", { name: /Battery details/ }),

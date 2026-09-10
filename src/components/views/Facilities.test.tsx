@@ -9,6 +9,7 @@ import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
+import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -327,7 +328,9 @@ describe("the interties view", () => {
   it("explains and offers California connection projects", async () => {
     const game = playedGame(0);
     renderFacilities(game, null);
-    await user.click(screen.getByRole("tab", { name: "Interties" }));
+    await user.click(screen.getByRole("button", { name: "Build" }));
+    if (screen.queryByRole("button", { name: "Intertie" }))
+      await user.click(screen.getByRole("button", { name: "Intertie" }));
     expect(
       screen.getByText("Share power with nearby grids"),
     ).toBeInTheDocument();
@@ -351,17 +354,16 @@ describe("the interties view", () => {
     }
   });
 
-  it("gives Mission 7 stable Plants and Interties tabs", () => {
+  it("shows one list and one build action in Mission 7", () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
-
-    expect(screen.getByRole("tab", { name: "Plants" })).toHaveAttribute(
-      "id",
-      "plantsTab",
-    );
-    expect(screen.getByRole("tab", { name: "Interties" })).toHaveAttribute(
-      "id",
-      "intertiesTab",
-    );
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Plants & storage · Dispatch order"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Interties · Automatic trading"),
+    ).toBeInTheDocument();
   });
 
   it("does not render an empty interties destination where no corridor exists", () => {
@@ -378,7 +380,9 @@ describe("the interties view", () => {
     game.location = { ...game.location, id: "Dublin", name: "Dublin" };
     renderFacilities(game, null);
 
-    await user.click(screen.getByRole("tab", { name: "Interties" }));
+    await user.click(screen.getByRole("button", { name: "Build" }));
+    if (screen.queryByRole("button", { name: "Intertie" }))
+      await user.click(screen.getByRole("button", { name: "Intertie" }));
 
     expect(screen.getByText("Great Britain")).toBeInTheDocument();
     expect(screen.getByText("Continental Europe")).toBeInTheDocument();
@@ -386,7 +390,9 @@ describe("the interties view", () => {
 
   it("gives the guided northern approval a stable target and specific name", async () => {
     renderFacilities(createGame({ scenarioId: 112 }), null);
-    await user.click(screen.getByRole("tab", { name: "Interties" }));
+    await user.click(screen.getByRole("button", { name: "Build" }));
+    if (screen.queryByRole("button", { name: "Intertie" }))
+      await user.click(screen.getByRole("button", { name: "Intertie" }));
 
     const approval = screen.getByRole("button", {
       name: "Approve Pacific Northwest intertie",
@@ -396,5 +402,60 @@ describe("the interties view", () => {
       screen.getByTestId("transmission-project-california-north"),
     ).toHaveAttribute("data-corridor-id", "california-north");
     expect(screen.queryByText("Desert Southwest")).toBeNull();
+  });
+});
+
+describe("unified connections", () => {
+  function connectedGame(): GameType {
+    const game = playedGame(0);
+    game.transmission!.lines = TRANSMISSION_CORRIDORS.filter((corridor) =>
+      corridor.id.startsWith("california-"),
+    ).map((corridor, i) => ({
+      id: i + 1,
+      corridorId: corridor.id,
+      name: corridor.name,
+      capacityW: corridor.capacityW,
+      buildCost: corridor.buildCost,
+      annualOperatingCost: corridor.annualOperatingCost,
+      yearsToBuildLeft: i,
+      minuteCreated: game.date.minute,
+      financed: true,
+      loanAmountLeft: 1000,
+      loanMonthlyPayment: 10,
+      interestRate: game.interestRate,
+    }));
+    return game;
+  }
+
+  it("keeps connections outside dispatch and reports network flow only once", async () => {
+    const game = connectedGame();
+    renderFacilities(game, null);
+    expect(rows()).toHaveLength(game.facilities.length);
+    // These assertions inspect the drag-library boundary, which has no accessible role.
+    /* eslint-disable testing-library/no-node-access */
+    const connections = document.querySelectorAll(".transmissionLine");
+    expect(connections).toHaveLength(2);
+    expect(document.querySelectorAll(".tradingSummary")).toHaveLength(1);
+    expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
+    /* eslint-enable testing-library/no-node-access */
+    expect(connections[0]).toHaveTextContent("Connected");
+    expect(connections[1]).toHaveTextContent("Building");
+    await user.click(screen.getByText(game.transmission!.lines[0].name));
+    expect(connections[0]).toHaveAttribute("open");
+    expect(connections[0]).toHaveTextContent("Loan balance");
+  });
+
+  it("permits inspecting replay connections but disables trading and building", async () => {
+    const game = connectedGame();
+    game.replayPlayback = {
+      actions: [],
+      index: 0,
+    } as GameType["replayPlayback"];
+    renderFacilities(game, null);
+    expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
+    await user.click(screen.getByText("No power flowing"));
+    expect(
+      screen.getByRole("combobox", { name: "Trading rule" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 });

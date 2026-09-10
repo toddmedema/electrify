@@ -51,7 +51,8 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Facilities", exact: true })
         .click();
-    await facilities.locator(".button-buildGenerator").click();
+    await page.locator(".button-buildFacility").click();
+    await page.locator(".button-buildGenerator").click();
     const first = page.locator(".buildOption").first();
     await first.getByRole("button", { name: /Show .* details/ }).click();
     await expect(first).toContainText("automatically retire at this age");
@@ -80,8 +81,10 @@ for (const theme of ["light", "dark"] as const) {
     await dialog.getByRole("button", { name: "close", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await page.getByRole("button", { name: "close", exact: true }).click();
-    await facilities.getByRole("tab", { name: "Interties" }).click();
-    const trade = facilities
+    await facilities.locator(".button-buildFacility").click();
+    await page.getByRole("button", { name: "Intertie", exact: true }).click();
+    const trade = page
+      .getByRole("dialog")
       .locator("details")
       .filter({ hasText: "How trading and purchased emissions are estimated" });
     expect(

@@ -405,8 +405,7 @@ test("compact facility build buttons stay above the chart", async ({
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
   }
   const buildButtons = [
-    facilities.getByRole("button", { name: "Generator" }),
-    facilities.getByRole("button", { name: "Storage" }),
+    facilities.getByRole("button", { name: "Build", exact: true }),
   ];
   const chart = facilities.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
@@ -417,12 +416,12 @@ test("compact facility build buttons stay above the chart", async ({
   expect(chartBox).not.toBeNull();
   expect(buttonBoxes.every(Boolean)).toBe(true);
   buttonBoxes.forEach((box) => {
-    expect(box!.height).toBeLessThanOrEqual(32);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y + 0.5);
   });
   expect(
     (await facilities.locator(".paneHeader").boundingBox())!.height,
-  ).toBeLessThanOrEqual(41); // 40px content plus the divider
+  ).toBeLessThanOrEqual(57); // Touch-sized Build action plus the divider
 });
 
 test("main-menu account actions follow the sound action", async ({

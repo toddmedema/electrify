@@ -943,7 +943,7 @@ $pane_header_height: 40px;
 .facilities .paneHeader {
   gap: 8px;
 
-  .button-buildGenerator {
+  .button-buildFacility {
     margin-left: auto;
   }
 }
@@ -4167,5 +4167,97 @@ $sizemap: (
   .manual-link-text,
   .manual-related-link.MuiButton-root {
     min-height: 44px;
+  }
+}
+
+// Plants and interties share one scroll region; only dispatchable rows can move.
+.facilitySectionLabel {
+  display: block;
+  padding: 8px 16px;
+  color: var(--font-color-faded);
+}
+.facilityBuildChoices {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+  .MuiButton-root {
+    min-height: 48px;
+    justify-content: flex-start;
+  }
+}
+.transmissionFleet {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 12px;
+}
+.tradingSummary {
+  margin: 0 16px 8px;
+  > summary {
+    min-height: 44px;
+    cursor: pointer;
+    padding: 8px 0;
+  }
+  .tradingSummaryRule {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--font-color-faded);
+    padding: 4px 0;
+  }
+  .tradingPolicy {
+    margin: 8px 0;
+  }
+}
+.transmissionLine {
+  border-top: 1px solid var(--border-subtle);
+  > summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    list-style: none;
+  }
+  > summary::-webkit-details-marker {
+    display: none;
+  }
+  > summary::after {
+    content: "+";
+    color: var(--font-color-faded);
+  }
+  &[open] > summary::after {
+    content: "−";
+  }
+  .transmissionLineText {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 4px;
+  }
+}
+.transmissionLineDetails {
+  padding: 0 16px 16px 68px;
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 599px) {
+  .transmissionLine > summary {
+    gap: 8px;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  .transmissionLine .transmissionLineText {
+    flex-basis: calc(100% - 64px);
+  }
+  .transmissionLine .MuiChip-root {
+    margin-left: 48px;
+  }
+  .transmissionLineDetails {
+    padding: 0 12px 12px;
+  }
+}
+@media (pointer: coarse) {
+  .base_main .facilities .MuiToolbar-root.paneHeader {
+    min-height: 52px !important;
   }
 }

@@ -300,7 +300,8 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.locator("#faciltiesNav:visible").scrollIntoViewIfNeeded();
     await page.locator("#faciltiesNav:visible").click();
     await settle(page);
-    await page.locator(".button-buildGenerator").scrollIntoViewIfNeeded();
+    await page.locator(".button-buildFacility").scrollIntoViewIfNeeded();
+    await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(page.locator(".buildOption").first()).toBeVisible();
     await page.getByRole("button", { name: "close", exact: true }).click();
@@ -343,12 +344,9 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Projected in this month's representative day/,
   );
-  await page.locator("#intertiesTab").click();
+  await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
   await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator("#plantsTab")).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page.locator("#chartSupplyDemand")).toBeVisible();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();

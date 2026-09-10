@@ -15,39 +15,45 @@ test("California players can build and understand an intertie", async ({
   if (!(await facilities.isVisible())) {
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
   }
-  await facilities.getByRole("tab", { name: "Interties" }).click();
+  await facilities.getByRole("button", { name: "Build", exact: true }).click();
+  await page.getByRole("button", { name: "Intertie", exact: true }).click();
+  const projects = page.getByRole("dialog");
   await expect(
-    facilities.getByRole("heading", { name: "Share power with nearby grids" }),
+    projects.getByRole("heading", { name: "Share power with nearby grids" }),
   ).toBeVisible();
   await expect(
-    facilities.getByRole("heading", { name: "Pacific Northwest", exact: true }),
+    projects.getByRole("heading", { name: "Pacific Northwest", exact: true }),
   ).toBeVisible();
-  await expect(facilities.getByLabel("Trading rule")).toHaveCount(0);
-  await expect(facilities.getByText("Total cost").first()).toBeVisible();
+  await expect(projects.getByLabel("Trading rule")).toHaveCount(0);
+  await expect(projects.getByText("Total cost").first()).toBeVisible();
   await expect(
-    facilities.getByText("Pay $36M now · finance $144M").first(),
+    projects.getByText("Pay $36M now · finance $144M").first(),
   ).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
-    const firstBuild = facilities
+    const firstBuild = projects
       .getByRole("button", { name: "Approve Pacific Northwest intertie" })
       .first();
     const box = await firstBuild.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.y + box!.height).toBeLessThanOrEqual(512);
+    await firstBuild.scrollIntoViewIfNeeded();
+    await expect(firstBuild).toBeInViewport();
   }
 
-  await facilities
+  await projects
     .getByRole("button", { name: "Approve Pacific Northwest intertie" })
     .first()
     .click();
-  await expect(facilities.getByText("Your interties")).toBeVisible();
-  await expect(facilities.getByText("Building")).toBeVisible();
-  await expect(facilities.getByLabel("Trading rule")).toContainText(
-    "Buy for shortages, sell extra",
-  );
   await expect(
     page.getByText("Intertie approved — power can flow in 1 year."),
   ).toBeVisible();
+  await expect(
+    facilities.getByText("Interties · Automatic trading"),
+  ).toBeVisible();
+  await expect(facilities.getByText("Building")).toBeVisible();
+  await facilities.locator(".tradingSummary > summary").click();
+  await expect(facilities.getByLabel("Trading rule")).toContainText(
+    "Buy for shortages, sell extra",
+  );
   await expect(facilities.getByText("Northern intertie upgrade")).toHaveCount(
     1,
   );
@@ -88,4 +94,41 @@ test("island grids do not offer interties or power exchange", async ({
   await expect(
     insights.getByRole("heading", { name: "Power exchange" }),
   ).toHaveCount(0);
+});
+
+test("unified facility rows support keyboard inspection and dispatch reordering", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium");
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const facilities = page.locator(".facilities:visible");
+  const rows = facilities.locator(".facilityRow");
+  await expect(rows).toHaveCount(2);
+  const originalFirstId = await rows
+    .first()
+    .getAttribute("data-rfd-draggable-id");
+  await expect(rows.first()).toHaveAttribute("role", "button");
+  await expect(rows.first()).toHaveAttribute("tabindex", "0");
+  await facilities.getByRole("button", { name: "Build", exact: true }).focus();
+  for (let step = 0; step < 12; step++) {
+    await page.keyboard.press("Tab");
+    if (await rows.first().evaluate((row) => row === document.activeElement))
+      break;
+  }
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Enter");
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect(rows.last()).toHaveAttribute(
+    "data-rfd-draggable-id",
+    originalFirstId!,
+  );
+  await expect(rows.last()).toBeFocused();
+  await expect(facilities.locator(".transmissionFleet")).toBeVisible();
 });
