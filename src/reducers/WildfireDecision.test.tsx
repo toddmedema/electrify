@@ -18,6 +18,7 @@ import {
   resolveStoryAtDate,
   WILDFIRE_DECISION_KEY,
   wildfirePreparationCost,
+  CALIFORNIA_WILDFIRE_BALANCE,
 } from "../data/WorldEvents";
 import { buildStorySnapshot } from "../helpers/Story";
 
@@ -216,4 +217,18 @@ test("an unanswered choice blocks ticks and speed changes and survives save/load
   );
   tickState(selected);
   expect(selected.date.minute).toBeGreaterThan(minute);
+});
+
+// Preparation is an advance resource package, independent of later damage/restoration.
+test.each(["Intern", "Employee", "Manager", "VP", "CEO"] as const)(
+  "wildfire preparation keeps the same municipal budget on %s",
+  (difficulty) => expect(wildfirePreparationCost(difficulty)).toBe(200000),
+);
+
+test("restoration scales with authored damage severity independently of advance preparation", () => {
+  expect(
+    Object.values(CALIFORNIA_WILDFIRE_BALANCE).map(
+      (b) => b.restorationCostPerMonth,
+    ),
+  ).toEqual([350000, 700000, 1000000, 1350000, 1700000]);
 });

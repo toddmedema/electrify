@@ -92,6 +92,8 @@ function scenarioLocation(scenario: ScenarioType): LocationType {
 }
 
 export interface SimOptionsType {
+  // Explicit branch coverage; unspecified decisions retain the baseline first-free response.
+  scenarioResponses?: Record<string, string>;
   initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   // A scenario that isn't in SCENARIOS - a custom game, or one being tried out. Its id wins over
@@ -110,6 +112,7 @@ export interface SimOptionsType {
 }
 
 export interface ResolvedSimOptionsType {
+  scenarioResponses: Record<string, string>;
   initialPrograms?: Partial<Record<PolicyId, PolicyTier>>;
   scenarioId: number;
   difficulty: DifficultyType;
@@ -345,6 +348,7 @@ function resolveOptions(
   options: SimOptionsType,
 ): ResolvedSimOptionsType {
   return {
+    scenarioResponses: options.scenarioResponses || {},
     initialPrograms: options.initialPrograms,
     scenarioId: scenario.id,
     difficulty: options.difficulty || "Employee",
@@ -531,11 +535,16 @@ export function runSimulation(options: SimOptionsType): SimResultType {
     const decision = pendingScenarioChoice(state);
     if (decision && !state.replayPlayback) {
       const choiceDifficulty = state.difficulty;
-      const option = decision.options.find(
-        (option) => option.cost(choiceDifficulty) === 0,
+      const requested = resolved.scenarioResponses[decision.id];
+      const option = decision.options.find((option) =>
+        requested !== undefined
+          ? option.id === requested
+          : option.cost(choiceDifficulty) === 0,
       );
       if (!option)
-        throw new Error("Simulation needs a choice policy for " + decision.id);
+        throw new Error(
+          `Simulation has no valid response for ${decision.id}${requested === undefined ? "" : `/${requested}`}`,
+        );
       state = cloneDeep(
         gameReducer(
           state,
@@ -545,6 +554,13 @@ export function runSimulation(options: SimOptionsType): SimResultType {
           }),
         ),
       );
+      if (pendingScenarioChoice(state)?.id === decision.id) {
+        throw new Error(
+          `Simulation response ${decision.id}/${option.id} was rejected at month ${state.date.monthsElapsed}`,
+        );
+      }
+      // Upfront response costs are explicit actions, not unexplained tick expenses.
+      prevTick = null;
     }
     tickState(state);
     ticks++;

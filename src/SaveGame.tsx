@@ -45,7 +45,8 @@ export const SAVE_KEY = "savedGame";
 // Version 7 adds mandatory scenario choices and operating tariffs/contracts.
 // Version 8 conserves deferred residential tariff energy until later in the day.
 // Version 9 retains configurable demand windows and cross-month recovery batches.
-export const SAVE_VERSION = 9;
+// Version 10 adds mandatory connection/winterization choices and their economic effects.
+export const SAVE_VERSION = 10;
 
 export interface SaveGameType {
   version: number;

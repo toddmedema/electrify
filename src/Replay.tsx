@@ -39,7 +39,8 @@ import {
 // Version 10 adds mandatory generic scenario choices and operating tariffs/contracts.
 // Version 11 shifts residential tariff energy to later hours instead of eliminating it.
 // Version 12 supports independently configurable four-hour customer demand windows.
-export const REPLAY_VERSION = 12;
+// Version 13 adds mandatory connection/winterization choices and their economic effects.
+export const REPLAY_VERSION = 13;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few

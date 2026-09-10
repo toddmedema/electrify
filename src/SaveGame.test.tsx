@@ -75,7 +75,7 @@ describe("SaveGame", () => {
     expect(parseSave(raw)).toBeNull();
   });
 
-  it.each([1, 2, 3, 4, 5, 6])(
+  it.each(Array.from({ length: SAVE_VERSION - 1 }, (_, index) => index + 1))(
     "rejects version %i calculated with older physics without modifying it",
     (version) => {
       const legacy = { ...serializeSave(game), version };

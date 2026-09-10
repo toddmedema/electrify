@@ -318,7 +318,7 @@ test("both offer actions cancel, save, resume and replay deterministically throu
   expect(
     decodeReplay({ ...serializeReplay(game), version: REPLAY_VERSION - 1 }),
   ).toBeNull();
-  expect(REPLAY_VERSION).toBe(12);
+  expect(REPLAY_VERSION).toBe(13);
   expect(decodeReplay(serializeReplay(game))).not.toBeNull();
 });
 

@@ -477,7 +477,7 @@ describe("California wildfire emergency", () => {
       effects: { demandMultiplier: 0.94 },
     });
     expect(january.effects.facilityOutputMultipliersById).toBeDefined();
-    expect(january.effects.operatingExpensePerMonth).toBe(2_000_000);
+    expect(january.effects.operatingExpensePerMonth).toBe(1_000_000);
     expect(february.effects).toEqual(january.effects);
     expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
     expect(

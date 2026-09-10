@@ -1076,6 +1076,34 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export const DEEP_FREEZE_DECISION_KEY =
+  "story:107:texas-deep-freeze:winterization";
+// Rounded 2020-dollar planning allowance: about $82M for the 3,827 MW resource
+// portfolio plus representative pre-freeze expansion, not a literal plant retrofit quote.
+// Observed thermal-fleet spending and a conservative wind allowance inform the scale;
+// see src/testing/SCENARIO_CHOICE_BALANCE.md. Difficulty changes risk, not service cost.
+export const WINTERIZATION_COST = {
+  Intern: 90000000,
+  Employee: 90000000,
+  Manager: 90000000,
+  VP: 90000000,
+  CEO: 90000000,
+};
+export function winterizationCost(difficulty: DifficultyType): number {
+  return WINTERIZATION_COST[difficulty];
+}
+export function deepFreezeWinterized(
+  occurrences?: ActiveWorldEventType[],
+): boolean {
+  return (
+    occurrences?.some(
+      (event) =>
+        event.key === DEEP_FREEZE_DECISION_KEY &&
+        event.attributes.choice === "winterize",
+    ) ?? false
+  );
+}
+
 export const TEXAS_DEEP_FREEZE_DEMAND: Record<DifficultyType, number> = {
   // The joint FERC/NERC report measured actual ERCOT peak load 20% above the normal-weather
   // forecast and estimated unconstrained demand 33% above it. Difficulty spans that observed
@@ -1102,11 +1130,14 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       // January 2017 is month zero, so February 2021 is month 49.
       schedule: { atMonth: 49 },
       durationMonths: 1,
-      describe: ({ difficulty }) => {
+      describe: ({ difficulty, occurrences }) => {
+        const winterized = deepFreezeWinterized(occurrences);
+        const protectedOutput = (normal: number) =>
+          winterized ? (1 + normal) / 2 : normal;
         const demandMultiplier = TEXAS_DEEP_FREEZE_DEMAND[difficulty];
         return {
           title: "The deep freeze",
-          message: `Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
+          message: `${winterized ? "Your funded winterization halves plant output losses. " : "Without funded winterization, the full plant output losses apply. "}Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
           concept: "blackout",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1118,10 +1149,10 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
             demandMultiplier,
             fuelPriceMultipliers: { "Natural Gas": 2.8 },
             facilityOutputMultipliersByFuel: {
-              "Natural Gas": 0.62,
-              Coal: 0.73,
-              Uranium: 0.77,
-              Wind: 0.44,
+              "Natural Gas": protectedOutput(0.62),
+              Coal: protectedOutput(0.73),
+              Uranium: protectedOutput(0.77),
+              Wind: protectedOutput(0.44),
             },
           },
           turningPointPriority: 110,
@@ -1131,17 +1162,20 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
     {
       id: "thaw",
       schedule: { atMonth: 50 },
-      describe: ({ periodSnapshots }) => {
+      describe: ({ periodSnapshots, occurrences }) => {
         const event = periodSnapshots?.[1];
         const unservedWh = event?.unservedWh || 0;
+        const preparation = deepFreezeWinterized(occurrences)
+          ? "Your funded winterization halved plant output losses. "
+          : "Your construction budget was preserved, with full plant output losses. ";
         return {
           title: "The thaw",
           message:
             event === undefined
               ? "The freeze ends next month, restoring normal plant output and gas prices."
               : unservedWh > 0
-                ? "The freeze has ended, leaving the grid with a difficult recovery after blackouts."
-                : "The freeze has ended, and your preparations kept every customer supplied.",
+                ? `${preparation}The freeze has ended, leaving the grid with a difficult recovery after blackouts.`
+                : `${preparation}The freeze has ended, and your preparations kept every customer supplied.`,
           concept: "weather",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1273,6 +1307,11 @@ export interface CaliforniaWildfireBalanceType {
   restorationCostPerMonth: number;
 }
 
+// Restoration is an inferred damage-severity proxy, not a validated cost curve:
+// LADWP's $78M electric restoration estimate × 1% municipal scale × 0.97436
+// (2025 to 2024 dollars) gives about $760k at 2.2375% disconnected customers.
+// Scale with the scenario's 2–10% severity, divide over January/February, and round.
+// See src/testing/SCENARIO_CHOICE_BALANCE.md; advance preparation remains separate.
 export const CALIFORNIA_WILDFIRE_BALANCE: Record<
   DifficultyType,
   CaliforniaWildfireBalanceType
@@ -1281,31 +1320,31 @@ export const CALIFORNIA_WILDFIRE_BALANCE: Record<
     disconnectedDemand: 0.02,
     targetCapacityShare: 0.3,
     outputMultiplier: 0.65,
-    restorationCostPerMonth: 1000000,
+    restorationCostPerMonth: 350000,
   },
   Employee: {
     disconnectedDemand: 0.04,
     targetCapacityShare: 0.4,
     outputMultiplier: 0.55,
-    restorationCostPerMonth: 1500000,
+    restorationCostPerMonth: 700000,
   },
   Manager: {
     disconnectedDemand: 0.06,
     targetCapacityShare: 0.5,
     outputMultiplier: 0.45,
-    restorationCostPerMonth: 2000000,
+    restorationCostPerMonth: 1000000,
   },
   VP: {
     disconnectedDemand: 0.08,
     targetCapacityShare: 0.6,
     outputMultiplier: 0.35,
-    restorationCostPerMonth: 2750000,
+    restorationCostPerMonth: 1350000,
   },
   CEO: {
     disconnectedDemand: 0.1,
     targetCapacityShare: 0.7,
     outputMultiplier: 0.25,
-    restorationCostPerMonth: 3500000,
+    restorationCostPerMonth: 1700000,
   },
 };
 
@@ -1322,8 +1361,10 @@ export function wildfirePrepared(
     ) ?? false
   );
 }
-export function wildfirePreparationCost(difficulty: DifficultyType): number {
-  return CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth * 2;
+// Advance inspection, staged backup equipment and response resources for the small
+// municipal system. This is separate from severity-dependent post-fire restoration.
+export function wildfirePreparationCost(_difficulty: DifficultyType): number {
+  return 200000;
 }
 
 const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
@@ -1337,7 +1378,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
       describe: () => ({
         title: "Red-flag warning",
         message:
-          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose whether to fund preparedness crews or preserve cash. The game is paused until you select.",
+          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose whether to fund advance inspections, staged backup equipment and response resources or preserve cash. The game is paused until you select.",
         concept: "forecast",
         kind: "WORLD_EVENT",
         importance: "CRITICAL",
@@ -1398,7 +1439,7 @@ const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
           : "No operating generators";
         return {
           title: "Wildfire emergency",
-          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${(balance.restorationCostPerMonth / 1000000).toFixed(1)}M per month through February.`,
+          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${balance.restorationCostPerMonth / 1000000}M per month through February.`,
           concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",

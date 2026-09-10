@@ -19,6 +19,7 @@ for (const theme of ["light", "dark"]) {
     const fund = region.getByRole("button", { name: "Fund preparedness" });
     await expect(fund).toBeEnabled();
     await expect(region).toContainText("Game paused");
+    await expect(region).toContainText("One-time cost: $0.2M");
     await expect(region).toContainText("Normal restoration costs still apply");
     const titleInset = await region
       .locator("#scenarioChoiceTitle")

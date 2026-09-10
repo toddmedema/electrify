@@ -1451,15 +1451,20 @@ function applyScenarioResponse(state: GameType, payload: unknown): boolean {
   const cost = option.cost(state.difficulty);
   if (!Number.isFinite(cost) || cost < 0 || (cost > 0 && now.cash < cost))
     return false;
-  now.cash -= cost;
-  now.netWorth -= cost;
+  const upfrontGrant = option.upfrontGrant?.(state.difficulty) ?? 0;
+  if (!Number.isFinite(upfrontGrant) || upfrontGrant < 0) return false;
+  now.cash += upfrontGrant - cost;
+  now.netWorth += upfrontGrant - cost;
+  now.revenue += upfrontGrant;
   now.expensesOM += cost;
+  if (option.loadAdditions)
+    state.loadAdditions = cloneDeep(option.loadAdditions);
   state.worldEvents.occurrences.push({
     key: decision.id,
     definitionId: decision.id,
     startsMinute: state.date.minute,
     endsMinute: state.date.minute,
-    attributes: { choice: option.id, cost, scenarioChoice: true },
+    attributes: { choice: option.id, cost, upfrontGrant, scenarioChoice: true },
     effects: {},
     title: decision.title,
     message: option.message,
@@ -2803,7 +2808,17 @@ function updateSupplyFacilitiesFinances(
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
   const revenueExports = (exportedWh / 1000000) * marketPricePerMWh;
-  const revenue = customerRevenue + revenueExports;
+  const choiceGrant = state.worldEvents.occurrences
+    .filter(
+      (event) =>
+        event.attributes.scenarioChoice === true &&
+        event.startsMinute === now.minute,
+    )
+    .reduce(
+      (total, event) => total + Number(event.attributes.upfrontGrant || 0),
+      0,
+    );
+  const revenue = customerRevenue + revenueExports + choiceGrant;
 
   // Facilities expenses
   let kgco2e = 0;
@@ -2828,7 +2843,8 @@ function updateSupplyFacilitiesFinances(
   // after charging or exports would credit local facilities with more than the company earned.
   // The imported share remains outside local facility lifetime revenue.
   const revenueBasisW = grossLocalSupplyW + importedW;
-  const revenuePerSuppliedW = revenueBasisW > 0 ? revenue / revenueBasisW : 0;
+  const revenuePerSuppliedW =
+    revenueBasisW > 0 ? (customerRevenue + revenueExports) / revenueBasisW : 0;
   facilities.forEach((g: FacilityOperatingType) => {
     // Everything this facility costs the company this tick, so it can be booked against the
     // facility as well as into the company's own totals below

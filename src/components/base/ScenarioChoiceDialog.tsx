@@ -66,6 +66,7 @@ export default function ScenarioChoiceDialog() {
         >
           {decision.options.map((option, index) => {
             const cost = option.cost(game.difficulty);
+            const grant = option.upfrontGrant?.(game.difficulty) || 0;
             const affordable = cost === 0 || cash >= cost;
             return (
               <Box key={option.id}>
@@ -74,6 +75,7 @@ export default function ScenarioChoiceDialog() {
                   autoFocus={index === 0 && affordable}
                   variant={index === 0 ? "contained" : "outlined"}
                   disabled={!affordable}
+                  aria-describedby={`scenarioChoiceOption-${option.id}`}
                   sx={{ minHeight: 44, whiteSpace: "normal" }}
                   onClick={() =>
                     dispatch(
@@ -87,13 +89,21 @@ export default function ScenarioChoiceDialog() {
                   {option.label}
                 </Button>
                 <Typography
+                  id={`scenarioChoiceOption-${option.id}`}
                   variant="body2"
                   sx={{ color: "text.secondary", mt: 0.5 }}
                 >
-                  {cost > 0
-                    ? `One-time cost: $${(cost / 1000000).toFixed(1)}M`
-                    : "No upfront cost"}
+                  {grant > 0
+                    ? `One-time funding: $${(grant / 1000000).toFixed(1)}M`
+                    : cost > 0
+                      ? `One-time cost: $${(cost / 1000000).toFixed(1)}M`
+                      : "No upfront cost"}
                   {!affordable && " · Insufficient cash"}
+                  {option.description && (
+                    <Box component="span" sx={{ display: "block", mt: 1 }}>
+                      {option.description}
+                    </Box>
+                  )}
                 </Typography>
               </Box>
             );
