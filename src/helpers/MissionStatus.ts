@@ -18,12 +18,14 @@ import {
 } from "./MeaningfulDecisions";
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
+import { formatMoneyConcise } from "./Format";
 
 export interface MissionRequirement {
   id: string;
   label: string;
   current: string;
   target: string;
+  compact?: string;
   timing: string;
   status:
     "pending" | "in-progress" | "completed" | "failed" | "unknown" | "waived";
@@ -69,6 +71,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
+      compact: `Reliability: ${minimum === undefined ? "pending" : `${(minimum * 100).toFixed(2)}% / ${Math.round(objective.minimumDemandServed * 100)}% served`}${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
@@ -103,6 +106,7 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "retention",
       label: "Retain the community",
+      compact: `Customers: ${now ? Math.round(now.customers).toLocaleString() : "unavailable"} / ${Math.ceil(threshold).toLocaleString()}`,
       current: now
         ? `${Math.round(now.customers).toLocaleString()} current customers`
         : "Current customers unavailable",
@@ -127,6 +131,7 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "cash",
     label: "Keep the utility solvent",
+    compact: `Cash: ${now ? formatMoneyConcise(now.cash) : "unavailable"}`,
     current: now
       ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
       : "Current cash unavailable",
@@ -181,6 +186,10 @@ export function getMissionStatus(game: GameType) {
     label: scenario?.name || "Custom game",
     requirements,
     prominent,
+    headline:
+      requirements.find((item) => item.id === "reliability") ||
+      requirements.find((item) => item.id === "retention") ||
+      prominent,
     monthsRemaining,
     finalNote:
       monthsRemaining === 0

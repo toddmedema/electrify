@@ -703,6 +703,9 @@ $topbar_height: 56px;
 }
 
 .missionSummaryCopy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   min-width: 0;
   overflow-wrap: anywhere;
 }

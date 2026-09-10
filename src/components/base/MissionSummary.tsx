@@ -32,15 +32,25 @@ export default function MissionSummary({
     >
       {!tutorial && (
         <div className="missionSummaryCopy">
-          {mission.monthsRemaining === 0
-            ? "Term complete"
-            : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+          <span>
+            {mission.monthsRemaining === 0
+              ? "Term complete"
+              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+          </span>
+          {mission.headline && (
+            <span
+              title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
+            >
+              {mission.headline.compact ||
+                `${mission.headline.label}: ${mission.headline.current}`}
+            </span>
+          )}
         </div>
       )}
       <Button className="missionDetailsButton" onClick={onDetails}>
         All requirements
       </Button>
-      {!tutorial && risk && (
+      {!tutorial && risk && risk.id !== "shortage" && (
         <Button
           className="missionRiskButton"
           aria-label={`${risk.shortLabel}. ${risk.label}`}

@@ -25,7 +25,7 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
-  test(`mission evidence reaches operating Plants and preserves details focus in ${theme}`, async ({
+  test(`compact mission tracker preserves details focus during blackouts in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
@@ -38,6 +38,9 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
+    );
+    await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
+      "Cash:",
     );
     await settle(page);
     const details = page.getByRole("button", {
@@ -53,29 +56,16 @@ for (const theme of ["light", "dark"]) {
     await page.locator(".facilityRow").filter({ hasText: "Coal" }).click();
     await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
-    await expect(page.locator(".missionRiskButton:visible")).toContainText(
-      "Supply & demand",
-    );
+    await expect(page.locator(".gridHealth-blackout:visible")).toBeVisible();
     await page.getByRole("button", { name: "pause", exact: true }).click();
-    await page.locator("#intertiesTab").click();
-    await page.locator(".missionRiskButton:visible").click();
-    await expect(page.locator("#plantsTab")).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await expect(page.locator("#chartSupplyDemand")).toBeVisible();
-    await expect(page.locator(".operatingEvidence")).toBeFocused();
+    await expect(page.locator(".missionRiskButton:visible")).toHaveCount(0);
     await expect(
-      page.getByText(/Supply — solid.*Demand.*dashed/),
-    ).toBeVisible();
-    // A repeated request to the already-mounted pane is still a deliberate focus request.
-    await page.locator(".missionRiskButton:visible").click();
-    await expect(page.locator(".operatingEvidence")).toBeFocused();
+      page.locator(".gridHealth-blackout:visible"),
+    ).not.toContainText("Now");
+    await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
       await page.getByRole("button", { name: speed, exact: true }).click();
-      await expect(
-        page.getByText(/Supply — solid.*Demand.*dashed/),
-      ).toBeVisible();
+      await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     }
     if (info.project.name.startsWith("mobile")) {
       for (const nav of ["Insights", "Events", "Facilities"]) {
@@ -286,6 +276,13 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Projected in this month's representative day/,
   );
+  await page.locator("#intertiesTab").click();
+  await page.locator(".missionRiskButton:visible").click();
+  await expect(page.locator("#plantsTab")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator(".operatingEvidence")).toBeFocused();
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator(".operatingEvidence")).toContainText(

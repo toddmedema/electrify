@@ -58,6 +58,7 @@ const requirement = (game: GameType, id: string) =>
   getMissionStatus(game).requirements.find((row) => row.id === id)!;
 
 test("wildfire window is pending, partial, complete or failed using completed months", () => {
+  expect(getMissionStatus(fixture(11)).headline?.id).toBe("reliability");
   expect(requirement(fixture(11), "reliability").status).toBe("pending");
   expect(requirement(fixture(12), "reliability").status).toBe("in-progress");
   const partial = createNextState(fixture(13), (g) => {
@@ -77,6 +78,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   });
   expect(requirement(failed, "reliability").status).toBe("failed");
   expect(getMissionStatus(failed).prominent?.id).toBe("reliability");
+  expect(getMissionStatus(failed).headline?.compact).toContain("99.00% /");
   expect(scenarioObjectiveFailure(wildfire, failed.monthlyHistory)).toContain(
     "99.00%",
   );
@@ -91,6 +93,9 @@ test("empty and partial required history stay unknown even at term end without c
       expect(requirement(game, "reliability").status).toBe("unknown");
       expect(requirement(game, "reliability").current).toContain(
         "not verifiable",
+      );
+      expect(getMissionStatus(game).headline?.compact).toContain(
+        "incomplete history",
       );
       expect(scenarioObjectiveFailure(wildfire, rows)).toBeUndefined();
     }
@@ -149,6 +154,8 @@ test("retention shows current customers against final target and remains recover
     g.timeline[0].customers = 1;
   });
   expect(requirement(low, "retention").status).toBe("in-progress");
+  expect(getMissionStatus(low).headline?.id).toBe("retention");
+  expect(getMissionStatus(low).headline?.compact).toMatch(/^Customers: 1 \/ /);
   expect(requirement(low, "retention").target).toContain("customers");
   expect(requirement(low, "retention").timing).toContain(
     "Required at term end",
