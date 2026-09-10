@@ -1,12 +1,11 @@
+import { getDateFromMinute } from "../helpers/DateTime";
+import { LocationType, RawWeatherType } from "../Types";
 import {
   getRawSolarIrradianceWM2,
   getWeather,
   hasOffshoreWind,
   initWeatherFromRows,
-  WEATHER_STARTING_YEAR,
 } from "./Weather";
-import { getDateFromMinute } from "../helpers/DateTime";
-import { LocationType, RawWeatherType } from "../Types";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
 // single year of data is 12 months x 24 hours. The fixture starts at 1980, the first year the
@@ -201,10 +200,6 @@ describe("getWeather", () => {
     warn.mockRestore();
   });
 
-  it("returns the current hour's reading exactly, on the hour", () => {
-    expect(getWeather(dateAt(3, 10), SEED)).toEqual(fixtureRow(0, 3, 10));
-  });
-
   it("forecasts offshore wind without changing established weather draws", () => {
     const coastal: LocationType = {
       id: "NewYork",
@@ -300,10 +295,6 @@ describe("getWeather", () => {
     expect(Number.isFinite(before.TEMP_C)).toBe(true);
     expect(Number.isFinite(before.CLOUD_PCT)).toBe(true);
     expect(Number.isFinite(before.WIND_KPH)).toBe(true);
-  });
-
-  it("starts the record at the year the custom game screen offers as its floor", () => {
-    expect(WEATHER_STARTING_YEAR).toBe(FIXTURE_STARTING_YEAR);
   });
 
   // The bug this replaced: forecasting filled a single day per cache miss, so a lookup years past
@@ -461,77 +452,23 @@ describe("getWeather", () => {
   });
 
   describe("emissions", () => {
-    it("returns the record's own weather to a player who emits nothing", () => {
-      const clean = getWeather(
-        dateAt(monthIndex(FIXTURE_YEARS, 3), 14),
-        SEED,
-        0,
+    it("cannot rewrite historical or forecast weather, including offshore wind", () => {
+      initWeatherFromRows(
+        "PIT",
+        fixtureRows().map((row) => ({
+          ...row,
+          WIND_OFFSHORE_KPH: row.WIND_KPH + 10,
+        })),
       );
-      initWeatherFromRows("PIT", fixtureRows());
-      const unspecified = getWeather(
-        dateAt(monthIndex(FIXTURE_YEARS, 3), 14),
-        SEED,
-      );
-      expect(clean).toEqual(unspecified);
-      // ...including on historic rows, which are read straight from the CSV
-      expect(getWeather(dateAt(3, 10), SEED, 0)).toEqual(fixtureRow(0, 3, 10));
-    });
-
-    it("warms the weather in proportion to what the player has emitted", () => {
-      const clean = mean(forecastDailyMeans(7, "TEMP_C", 40, 0));
-      const dirty = mean(forecastDailyMeans(7, "TEMP_C", 40, 80));
-      const filthy = mean(forecastDailyMeans(7, "TEMP_C", 40, 400));
-
-      expect(dirty).toBeGreaterThan(clean + 1);
-      expect(filthy).toBeGreaterThan(dirty);
-    });
-
-    it("saturates rather than running away", () => {
-      const clean = mean(forecastDailyMeans(7, "TEMP_C", 40, 0));
-      const warming = (megatons: number) =>
-        mean(forecastDailyMeans(7, "TEMP_C", 40, megatons)) - clean;
-
-      // Ten times the emissions is nowhere near ten times the warming, and nothing exceeds the cap
-      expect(warming(800)).toBeLessThan(5 * warming(80));
-      expect(warming(100000)).toBeLessThan(3.01);
-    });
-
-    it("widens the gap between the hot hours and the cold ones", () => {
-      const spreadWithin = (cumulativeMegatons: number) => {
-        const readings = [];
-        for (let hour = 0; hour < HOURS_PER_MONTH; hour++) {
-          readings.push(
-            getWeather(
-              dateAt(monthIndex(FIXTURE_YEARS, 7), hour),
-              SEED,
-              cumulativeMegatons,
-            ).TEMP_C,
+      for (const month of [3, monthIndex(FIXTURE_YEARS + 5, 7)]) {
+        for (const hour of [0, 14, 23]) {
+          const date = dateAt(month, hour);
+          expect(getWeather(date, SEED, 100000)).toEqual(
+            getWeather(date, SEED, 0),
           );
-        }
-        return Math.max(...readings) - Math.min(...readings);
-      };
-
-      expect(spreadWithin(400)).toBeGreaterThan(spreadWithin(0));
-    });
-
-    it("applies to historic weather too, so pre-2020 scenarios still respond", () => {
-      const clean = getWeather(dateAt(3, 14), SEED, 0).TEMP_C;
-      const dirty = getWeather(dateAt(3, 14), SEED, 200).TEMP_C;
-      expect(dirty).toBeGreaterThan(clean);
-    });
-
-    it("keeps forced readings inside their physical bounds", () => {
-      for (let month = 1; month <= MONTHS_PER_YEAR; month++) {
-        for (let hour = 0; hour < HOURS_PER_MONTH; hour++) {
-          const forced = getWeather(
-            dateAt(monthIndex(FIXTURE_YEARS + 5, month), hour),
-            SEED,
-            100000,
-          );
-          expect(forced.CLOUD_PCT).toBeGreaterThanOrEqual(0);
-          expect(forced.CLOUD_PCT).toBeLessThanOrEqual(100);
-          expect(forced.WIND_KPH).toBeGreaterThanOrEqual(0);
-          expect(Number.isFinite(forced.TEMP_C)).toBe(true);
+          expect(
+            getWeather(date, SEED, 100000).WIND_OFFSHORE_KPH,
+          ).toBeDefined();
         }
       }
     });

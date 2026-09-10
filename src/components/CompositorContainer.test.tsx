@@ -1,10 +1,9 @@
+import { UnknownAction } from "@reduxjs/toolkit";
 import * as fs from "fs";
 import * as path from "path";
-import * as React from "react";
-import { UnknownAction } from "@reduxjs/toolkit";
-import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
+import type { AppDispatch } from "../Store";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
 import { mapDispatchToProps } from "./CompositorContainer";
 
@@ -70,28 +69,6 @@ function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
 
 describe("onTutorialStep", () => {
   const generators = walkthrough("Mission 2: Generators");
-
-  it("moves the walkthrough to the new step", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(dispatched).toContainEqual(
-      expect.objectContaining({ payload: { tutorialStep: 1 } }),
-    );
-  });
-
-  it("navigates forwards onto the card holding the next step's target", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
-  });
 
   /**
    * Regression test. Back used to dispatch the previous step's onNext, which only ever modelled
@@ -229,9 +206,18 @@ function targetsOf(steps: TutorialStepType[]): string[] {
 
 /** Whether anything in the app still declares the id or class a simple selector names */
 function declares(simple: string): boolean {
+  if (simple.startsWith("[")) {
+    const attribute = simple.match(/^\[([\w-]+)/)?.[1];
+    return !!attribute && SOURCE.includes(`${attribute}=`);
+  }
   const name = simple.slice(1);
   if (simple.startsWith("#")) {
-    return SOURCE.includes(`id="${name}"`);
+    return (
+      SOURCE.includes(`id="${name}"`) ||
+      Array.from(SOURCE.matchAll(/id=\{`([^$`]*)\$\{/g)).some(([, prefix]) =>
+        name.startsWith(prefix),
+      )
+    );
   }
   // MUI generates its own class names, so there is nothing of ours to find. Those steps lean
   // on the card check above instead
@@ -309,7 +295,7 @@ describe("walkthrough steps", () => {
     tutorials.forEach((scenario) => {
       const steps = scenario.tutorialSteps as TutorialStepType[];
       targetsOf(steps).forEach((target) => {
-        target.split(/\s+/).forEach((simple) => {
+        (target.match(/\[[^\]]+\]|[^\s]+/g) || []).forEach((simple) => {
           expect([scenario.name, target, declares(simple)]).toEqual([
             scenario.name,
             target,

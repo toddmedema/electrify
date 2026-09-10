@@ -1,12 +1,12 @@
+import { LOCATIONS } from "./Constants";
 import {
   decodeReplay,
   encodeReplay,
   MAX_REPLAY_ACTIONS,
-  recordReplayAction,
   recordedDelta,
+  recordReplayAction,
   replayByteLength,
 } from "./Replay";
-import { LOCATIONS } from "./Constants";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
 
 // Only the two fields the recorder touches, so these tests don't need a whole simulation to run
@@ -183,6 +183,11 @@ describe("decodeReplay", () => {
     expect(
       decodeReplay(JSON.parse(JSON.stringify(encodeReplay(replay)))),
     ).toEqual(replay);
+  });
+
+  it("leaves current runs gated", () => {
+    const current = encodeReplay(aReplay());
+    expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
   });
 
   it("ignores anything that isn't a replay", () => {

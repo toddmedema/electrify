@@ -1,4 +1,3 @@
-import * as React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
@@ -41,7 +40,7 @@ describe("MainMenu", () => {
       screen.getByRole("navigation", { name: "Game resources" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
-      { gap: "10px" },
+      { gap: "12px" },
     );
   });
 });

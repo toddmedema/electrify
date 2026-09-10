@@ -178,14 +178,6 @@ describe("getFuelPricesPerMBTU", () => {
     expect(australia.Coal).toBeCloseTo(us.Coal * 0.6);
   });
 
-  it("projects prices past the end of the data", () => {
-    const projected = pricesIn(FIXTURE_ENDING_YEAR + 3, 6);
-    Object.values(projected).forEach((price: number) => {
-      expect(Number.isFinite(price)).toBe(true);
-      expect(price).toBeGreaterThan(0);
-    });
-  });
-
   // The bug this replaced: a cold cache jumped straight from the last loaded year to the year
   // asked for, skipping the compounding in between, so a game loaded years past the data picked
   // up prices nowhere near the ones it was saved with

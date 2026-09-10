@@ -103,7 +103,11 @@ function buildOptions(showXLabels: boolean) {
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
   const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
-  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const reserve =
+    d.reserveW === undefined
+      ? ""
+      : `\nReserve margin: ${formatWatts(d.reserveW)}`;
+  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -143,7 +147,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
     return (
       <UPlotChart<State>
         id="chartForecastSupplyDemand"
-        ariaLabel="Chart of predicted electricity supply and demand"
+        ariaLabel="Chart of estimated electricity supply and demand"
         formatSummaryValue={formatWatts}
         height={height}
         state={state}

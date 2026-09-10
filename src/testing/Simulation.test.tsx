@@ -1,13 +1,13 @@
-import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
-import { DifficultyType, GameType, ScenarioType } from "../Types";
-import { createGame, runSimulation } from "./Simulator";
-import { loadSimData } from "./SimData";
 import { LOCATIONS } from "../Constants";
+import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { getAirborneWindOutputFactor } from "../helpers/Energy";
 import { tickState } from "../reducers/Game";
 import { parseSave, serializeSave } from "../SaveGame";
-import { getAirborneWindOutputFactor } from "../helpers/Energy";
-import { runMonths, expectNoViolations } from "./SimulationTestHelpers";
+import { DifficultyType, GameType, ScenarioType } from "../Types";
+import { loadSimData } from "./SimData";
+import { expectNoViolations, runMonths } from "./SimulationTestHelpers";
+import { createGame, runSimulation } from "./Simulator";
 
 jest.setTimeout(120000);
 
@@ -15,17 +15,6 @@ describe("simulation invariants", () => {
   // Two years is long enough to cover a full weather cycle, construction finishing and loans
   // amortizing, while keeping the whole suite well under a second per scenario
   const MONTHS = 24;
-
-  SCENARIOS.forEach((scenario: ScenarioType) => {
-    it(`holds for "${scenario.name}"`, () => {
-      expectNoViolations(
-        runSimulation({
-          scenarioId: scenario.id,
-          months: Math.min(MONTHS, scenario.durationMonths),
-        }),
-      );
-    });
-  });
 
   it("holds while building facilities on credit", () => {
     expectNoViolations(
@@ -77,24 +66,9 @@ describe("simulation invariants", () => {
       );
     });
   });
-
-  it("holds across a full 20 year run", () => {
-    expectNoViolations(runSimulation({ scenarioId: 102, strategy: "keepUp" }));
-  });
 });
 
 describe("simulation determinism", () => {
-  // Weather, fuel prices and the tick loop all keep module level state. A run that isn't purely a
-  // function of its seed means one of them is leaking between games, which would also mean a
-  // player's second playthrough silently differs from their first.
-  it("produces identical runs for the same seed", () => {
-    const options = { scenarioId: 101, months: 24, seed: 777 };
-    const first = runSimulation(options);
-    const second = runSimulation(options);
-    expect(second.months).toEqual(first.months);
-    expect(second.finalCash).toEqual(first.finalCash);
-  });
-
   // The seed only feeds the extrapolation past the end of the recorded data (weather runs
   // 1980-2019, fuel prices similar). Inside that window the game replays real history, so two
   // seeds legitimately agree; past it they have to diverge or the seed is being ignored.

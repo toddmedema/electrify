@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Avatar,
+  Box,
   Button,
   Card,
   CardHeader,
@@ -38,6 +39,7 @@ import {
   getBuildAvailability,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
+import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import { GameType, StorageShoppingType } from "../../Types";
 
@@ -102,7 +104,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   };
 
   return (
-    <Card className="build-list-item">
+    <Card className="build-list-item buildOption">
       <CardHeader
         avatar={
           <Avatar
@@ -113,6 +115,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         action={
           <span>
             <Button
+              aria-label={`Review purchase of ${storage.name}`}
               size="small"
               variant="contained"
               color="primary"
@@ -120,30 +123,69 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               disabled={downpayment > cash || !buildable}
               startIcon={<ConceptIcon concept="buy" fontSize="small" />}
             >
-              {formatMoneyConcise(storage.buildCost)}
+              Review
             </Button>
-            <Typography variant="body2" color="textSecondary">
-              {Math.round(storage.yearsToBuild * 12)}mo to build
-              <br />
-              {formatWatts(storage.peakW)}
-            </Typography>
           </span>
         }
         title={storage.name}
-        subheader={buildSubtitle}
       />
-      <Button
-        color="primary"
-        className="expand-details"
-        size="small"
-        aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
-        aria-expanded={expanded}
-        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-        onClick={toggleExpand}
-      >
-        {expanded ? "Hide details" : "Show details"}
-      </Button>
+      {(!buildable || financingGap > 0) && (
+        <Typography
+          component="div"
+          className="buildOptionWarning"
+          color="textSecondary"
+        >
+          {buildSubtitle}
+        </Typography>
+      )}
+      <Box className="buildOptionMetrics">
+        <BuildMetric
+          label="Discharge power"
+          value={formatWatts(storage.peakW)}
+        />
+        <BuildMetric
+          label="Build cost"
+          value={formatMoneyConcise(storage.buildCost)}
+        />
+        <BuildMetric
+          label="Build time"
+          value={`${Math.round(storage.yearsToBuild * 12)} mo`}
+        />
+        <BuildMetric
+          label="Energy capacity"
+          value={formatWattHours(storage.peakWh)}
+        />
+        <BuildMetric
+          label="At full power"
+          value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} h`}
+        />
+        <BuildMetric
+          label="Round-trip efficiency"
+          value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
+        />
+      </Box>
+      <Box className="buildOptionFooter">
+        <Button
+          color="primary"
+          className="expand-details"
+          size="small"
+          aria-label={`${expanded ? "Hide" : "Show"} ${storage.name} details`}
+          aria-expanded={expanded}
+          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+          onClick={toggleExpand}
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </Button>
+      </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {storage.description} Full-power duration assumes a full charge;
+          actual output also depends on ramp time.
+        </Typography>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>
@@ -182,6 +224,20 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 </TableCell>
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
+              <TableRow>
+                <TableCell>
+                  Accounting lifetime (not automatic retirement)
+                </TableCell>
+                <TableCell align="right">
+                  {storage.lifespanYears} years
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Stored energy lost per hour</TableCell>
+                <TableCell align="right">
+                  {Number((storage.hourlyLoss * 100).toFixed(3))}%
+                </TableCell>
+              </TableRow>
               <ViableLocationsRow
                 remaining={storage.viableLocationsRemaining}
               />
@@ -211,6 +267,20 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - storage.buildCost)}`,
               },
               {
+                concept: "finances",
+                label: "Loan option",
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                detail:
+                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+              },
+              {
+                concept: "money",
+                label: "Estimated upkeep",
+                value: `${formatMoneyConcise(storage.annualOperatingCost / 12)}/mo`,
+                detail:
+                  "Maintenance estimate; charging electricity and loan payments are extra.",
+              },
+              {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
@@ -230,6 +300,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               },
             ]}
           />
+          <Box className="buildOptionHelp">
+            <ManualLink
+              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+              text="Power, energy & duration"
+            />
+            <ManualLink
+              entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+              text="Charging & losses"
+            />
+          </Box>
           <Button
             color="primary"
             size="small"
@@ -384,6 +464,16 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
         onSliderChange={setSliderTick}
         onSortChange={(value) => setSort(value as StorageSortKey)}
       />
+      <Box className="buildOptionHelp">
+        <ManualLink
+          entry={MANUAL_ENTRY.POWER_AND_ENERGY}
+          text="Power, energy & duration"
+        />
+        <ManualLink
+          entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
+          text="Charging & losses"
+        />
+      </Box>
       <List dense className="scrollable cardList">
         {storage.map((g: StorageShoppingType, i: number) => (
           <StorageBuildItem

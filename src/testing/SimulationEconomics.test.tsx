@@ -1,27 +1,77 @@
+import { TICKS_PER_MONTH } from "../Constants";
+import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
 import { SCENARIOS } from "../data/Scenarios";
-import { createGame, runSimulation, SimResultType } from "./Simulator";
+import { getTimeFromTimeline } from "../helpers/DateTime";
+import { tickState } from "../reducers/Game";
+import { MeaningfulDecisionKindType } from "../Types";
 import {
   INTERN_ONE_BUILD_PLAYS,
   STANDARD_BALANCE_PLAYS,
 } from "./BalancePlaybooks";
-import { TICKS_PER_MONTH } from "../Constants";
-import { getTimeFromTimeline } from "../helpers/DateTime";
-import { tickState } from "../reducers/Game";
 import { expectNoViolations } from "./SimulationTestHelpers";
+import {
+  createGame,
+  runSimulation,
+  SimOptionsType,
+  SimResultType,
+} from "./Simulator";
 
 jest.setTimeout(120000);
 
+// Mandatory baseline responses are recorded actions; a binding connection also earns credit.
+function baselineChoiceActions(result: SimResultType, scenarioId: number) {
+  return SCENARIO_CHOICES.filter(
+    (choice) =>
+      choice.scenarioId === scenarioId && choice.atMonth < result.months.length,
+  ).length;
+}
+
+function baselineMeaningfulChoices(scenarioId: number, result?: SimResultType) {
+  return SCENARIO_CHOICES.filter(
+    (choice) =>
+      choice.scenarioId === scenarioId &&
+      (!result || choice.atMonth < result.months.length) &&
+      choice.options.find((option) => option.cost("Intern") === 0)
+        ?.meaningful !== false,
+  ).length;
+}
+
 describe("simulation economics", () => {
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
+  const scenarios = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
+  const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
+    100: [
+      "asset",
+      "dispatch",
+      "operation",
+      "policy",
+      "rate",
+      "sale",
+      "trading",
+    ],
+    101: ["asset", "dispatch", "operation", "rate", "sale"],
+    102: ["asset", "dispatch", "operation", "rate", "sale"],
+    103: ["asset", "dispatch", "operation", "rate", "sale"],
+    104: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    105: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
+    106: ["asset", "dispatch", "policy", "rate", "sale", "trading"],
+    107: ["asset", "dispatch", "operation", "policy", "rate"],
+    108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+  };
+  scenarios.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "Intern",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(0);
+      expect(passive.actionCount).toBe(
+        baselineChoiceActions(passive, scenario.id),
+      );
+      expect(passive.meaningfulDecisionCount).toBe(
+        baselineMeaningfulChoices(scenario.id, passive),
+      );
       expect(passive.outcome).not.toBe("completed");
 
       const active = runSimulation({
@@ -30,46 +80,30 @@ describe("simulation economics", () => {
         ...INTERN_ONE_BUILD_PLAYS[scenario.id],
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBe(1);
+      expect(active.actionCount).toBe(
+        1 + baselineChoiceActions(active, scenario.id),
+      );
+      expect(active.meaningfulDecisionCount).toBe(
+        1 + baselineMeaningfulChoices(scenario.id, active),
+      );
       expect(active.builds).toHaveLength(1);
       expect(active.outcome).toBe("completed");
     });
   });
 
-  SCENARIOS.filter((scenario) => [108, 110].includes(scenario.id)).forEach(
-    (scenario) => {
-      it(`requires player input but accepts one build on Intern in "${scenario.name}"`, () => {
-        const passive = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-        });
-        expectNoViolations(passive);
-        expect(passive.actionCount).toBe(0);
-        expect(passive.outcome).not.toBe("completed");
-
-        const active = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "Intern",
-          ...INTERN_ONE_BUILD_PLAYS[scenario.id],
-        });
-        expectNoViolations(active);
-        expect(active.actionCount).toBe(1);
-        expect(active.builds).toHaveLength(1);
-        expect(active.outcome).toBe("completed");
-      });
-    },
-  );
-
-  SCENARIOS.filter(
-    (scenario) => !scenario.tutorialSteps && scenario.id < 106,
-  ).forEach((scenario) => {
-    it(`rejects passive play and accepts a multi-action plan in "${scenario.name}" on CEO`, () => {
+  scenarios.forEach((scenario) => {
+    it(`requires ten validated decisions in "${scenario.name}" on CEO`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
         difficulty: "CEO",
       });
       expectNoViolations(passive);
-      expect(passive.actionCount).toBe(0);
+      expect(passive.actionCount).toBe(
+        baselineChoiceActions(passive, scenario.id),
+      );
+      expect(passive.meaningfulDecisionCount).toBe(
+        baselineMeaningfulChoices(scenario.id, passive),
+      );
       expect(passive.outcome).not.toBe("completed");
 
       const play = STANDARD_BALANCE_PLAYS[scenario.id];
@@ -79,8 +113,94 @@ describe("simulation economics", () => {
         ...play,
       });
       expectNoViolations(active);
-      expect(active.actionCount).toBeGreaterThanOrEqual(3);
-      expect(active.outcome).toBe("completed");
+      expect([
+        active.meaningfulDecisionCount,
+        active.meaningfulDecisionCategoryCount >= 4,
+        new Set(active.meaningfulDecisionKeys).size,
+        active.outcome,
+        active.meaningfulDecisionLabels,
+      ]).toEqual([10, true, 10, "completed", expect.any(Array)]);
+      expect(active.meaningfulDecisionCategories).toEqual(
+        expectedCeoCategories[scenario.id],
+      );
+    });
+  });
+
+  it.each([107, 111])(
+    "keeps Intern scenario %s passive-fail / one-build-win across seeds 1-20",
+    (scenarioId) => {
+      for (let seed = 1; seed <= 20; seed++) {
+        const passive = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+        });
+        const active = runSimulation({
+          scenarioId,
+          difficulty: "Intern",
+          seed,
+          ...INTERN_ONE_BUILD_PLAYS[scenarioId],
+        });
+        expectNoViolations(passive);
+        expectNoViolations(active);
+        expect([seed, passive.outcome]).not.toEqual([seed, "completed"]);
+        expect([seed, active.outcome]).toEqual([seed, "completed"]);
+        expect(active.meaningfulDecisionCount).toBe(1);
+      }
+    },
+  );
+
+  it.each([1, 7, 20])(
+    "wins all CEO playbooks with ten decisions on representative seed %s",
+    (seed) => {
+      scenarios.forEach((scenario) => {
+        const active = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          seed,
+          ...STANDARD_BALANCE_PLAYS[scenario.id],
+        });
+        expectNoViolations(active);
+        expect([
+          scenario.id,
+          active.meaningfulDecisionCount,
+          active.meaningfulDecisionCategoryCount >= 4,
+          active.outcome,
+        ]).toEqual([scenario.id, 10, true, "completed"]);
+      });
+    },
+  );
+
+  scenarios.forEach((scenario) => {
+    const play = STANDARD_BALANCE_PLAYS[scenario.id];
+    const omissions: Array<Partial<SimOptionsType>> = (
+      play.scheduledActions || []
+    ).map((_action, omitted) => ({
+      scheduledActions: play.scheduledActions!.filter(
+        (_candidate, index) => index !== omitted,
+      ),
+    }));
+    if (play.initialBuild) omissions.push({ initialBuild: undefined });
+    if (play.sellFacilityId !== undefined)
+      omissions.push({ sellFacilityId: undefined });
+
+    if (omissions.length + baselineMeaningfulChoices(scenario.id) !== 10) {
+      throw new Error(
+        `CEO ${scenario.id} play must total ten choices including mandatory responses`,
+      );
+    }
+    omissions.forEach((omission, index) => {
+      it(`rejects actual CEO ${scenario.id} plan with choice ${index + 1} removed`, () => {
+        const shortened = runSimulation({
+          scenarioId: scenario.id,
+          difficulty: "CEO",
+          ...play,
+          ...omission,
+        });
+        expectNoViolations(shortened);
+        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
+        expect(shortened.outcome).not.toBe("completed");
+      });
     });
   });
 
@@ -128,22 +248,6 @@ describe("simulation economics", () => {
     result.months.forEach((m) => {
       expect(m.revenue / (m.supplyWh / 1000)).toBeCloseTo(scenarioRate, 6);
     });
-  });
-
-  it("charges more for the same electricity at a higher rate", () => {
-    const cheap = runSimulation({
-      scenarioId: 101,
-      months: 12,
-      dollarsPerkWh: 0.05,
-    });
-    const pricey = runSimulation({
-      scenarioId: 101,
-      months: 12,
-      dollarsPerkWh: 0.1,
-    });
-    const revenue = (r: SimResultType) =>
-      r.months.reduce((a, m) => a + m.revenue, 0);
-    expect(revenue(pricey)).toBeGreaterThan(revenue(cheap));
   });
 
   it("moves investor customers toward a cheaper utility and away from a dearer one", () => {

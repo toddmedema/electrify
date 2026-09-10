@@ -29,6 +29,7 @@ const MAX_VIOLATIONS_PER_RULE = 5;
 // Tick fields that should always hold a real, finite number
 const FINITE_TICK_FIELDS: TickFieldType[] = [
   "supplyW",
+  "reserveW",
   "demandW",
   "solarIrradianceWM2",
   "windKph",
@@ -43,6 +44,11 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "hydroSpillWh",
   "hydroMandatedReleaseW",
   "storageLossWh",
+  "storageChargeW",
+  "storageDischargeW",
+  "localKgco2e",
+  "importedKgco2e",
+  "importKgco2ePerMWh",
   "cash",
   "customers",
   "customerRate",
@@ -55,6 +61,12 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "kgco2e",
   "interestRate",
   "inflationRate",
+  "importedW",
+  "exportedW",
+  "transmissionCapacityW",
+  "marketPricePerMWh",
+  "revenueExports",
+  "expensesImports",
 ];
 
 // Tick fields that are physically incapable of going negative (cash and netWorth can, by design)
@@ -82,6 +94,12 @@ const NON_NEGATIVE_TICK_FIELDS: TickFieldType[] = [
   "kgco2e",
   // A lender can quote any rate it likes, but never a negative one
   "interestRate",
+  "importedW",
+  "exportedW",
+  "transmissionCapacityW",
+  "marketPricePerMWh",
+  "revenueExports",
+  "expensesImports",
 ];
 
 const FINITE_MONTH_FIELDS: MonthFieldType[] = [
@@ -98,6 +116,8 @@ const FINITE_MONTH_FIELDS: MonthFieldType[] = [
   "kgco2e",
   "interestRate",
   "inflationRate",
+  "revenueExports",
+  "expensesImports",
 ];
 
 /**
@@ -153,6 +173,31 @@ export function checkTick(
       collector.add("tick value is finite", when, `${field} = ${now[field]}`);
     }
   });
+  if (
+    !Number.isFinite(now.expensesPolicy ?? 0) ||
+    (now.expensesPolicy ?? 0) < 0
+  ) {
+    collector.add(
+      "policy spending is finite and non-negative",
+      when,
+      `${now.expensesPolicy}`,
+    );
+  }
+  if (state.policies) {
+    Object.values(state.policies.programs).forEach((program) => {
+      if (
+        program.adoption < 0 ||
+        program.adoption > 1 ||
+        !Number.isFinite(program.adoption)
+      ) {
+        collector.add(
+          "policy adoption is bounded",
+          when,
+          `${program.adoption}`,
+        );
+      }
+    });
+  }
 
   NON_NEGATIVE_TICK_FIELDS.forEach((field) => {
     const value = now[field];
@@ -169,8 +214,19 @@ export function checkTick(
     );
   }
 
-  // supplyByFuel only accounts for generators; supplyW also includes storage discharge,
-  // so the fuel breakdown can never exceed the total it is a breakdown of.
+  const emissionsTotal = (now.localKgco2e || 0) + (now.importedKgco2e || 0);
+  if (
+    Math.abs(now.kgco2e - emissionsTotal) >
+    Math.max(1, emissionsTotal) * RELATIVE_TOLERANCE
+  ) {
+    collector.add(
+      "local and purchased emissions sum to total",
+      when,
+      `${now.kgco2e} vs ${emissionsTotal}`,
+    );
+  }
+
+  // Fuel totals are gross generation; the local grid also includes storage and trade.
   let supplyByFuelTotal = 0;
   Object.keys(now.supplyByFuel || {}).forEach((fuel: string) => {
     const value = now.supplyByFuel[fuel];
@@ -184,15 +240,54 @@ export function checkTick(
     }
     supplyByFuelTotal += value;
   });
+  const storageGridW = state.facilities.reduce(
+    (sum, f) =>
+      sum +
+      (f.peakWh && !f.paused && f.yearsToBuildLeft === 0
+        ? f.currentW < 0
+          ? f.currentW / f.roundTripEfficiency
+          : f.currentW
+        : 0),
+    0,
+  );
+  const expectedSupplyW =
+    supplyByFuelTotal +
+    storageGridW +
+    (now.importedW || 0) -
+    (now.exportedW || 0);
   if (
     isFinite_(now.supplyW) &&
-    supplyByFuelTotal > now.supplyW * (1 + RELATIVE_TOLERANCE) + 1
+    Math.abs(expectedSupplyW - now.supplyW) >
+      Math.max(Math.abs(expectedSupplyW), Math.abs(now.supplyW)) *
+        RELATIVE_TOLERANCE +
+        1
   ) {
     collector.add(
-      "supplyByFuel sums to at most supplyW",
+      "generation, storage and trade balance supply",
       when,
-      `supplyByFuel totals ${Math.round(supplyByFuelTotal)}W but supplyW is ${Math.round(now.supplyW)}W`,
+      `expected ${Math.round(expectedSupplyW)}W but supplyW is ${Math.round(now.supplyW)}W`,
     );
+  }
+
+  if (now.customerBillingRate !== undefined) {
+    const billedRevenue =
+      (((Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) *
+        GAME_TO_REAL_YEARS) /
+        1000) *
+        now.customerBillingRate +
+      (now.revenueExports || 0);
+    if (
+      !isFinite_(now.customerBillingRate) ||
+      now.customerBillingRate < 0 ||
+      Math.abs(now.revenue - billedRevenue) >
+        Math.max(1, Math.abs(billedRevenue) * RELATIVE_TOLERANCE)
+    ) {
+      collector.add(
+        "revenue bills only delivered energy at the effective rate",
+        when,
+        `recorded revenue ${now.revenue}, delivered-energy bill ${billedRevenue}`,
+      );
+    }
   }
 
   // Cash moves only by the tick's own revenue and expenses. Loan principal is spent but not
@@ -202,13 +297,24 @@ export function checkTick(
       now.expensesFuel +
       now.expensesOM +
       now.expensesCarbonFee +
-      now.expensesInterest;
-    const maxPrincipal = state.facilities.reduce(
-      (acc: number, f: FacilityOperatingType) =>
-        acc +
-        (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
-      0,
-    );
+      now.expensesInterest +
+      (now.expensesImports || 0) +
+      (now.expensesPolicy || 0);
+    const maxPrincipal =
+      state.facilities.reduce(
+        (acc: number, f: FacilityOperatingType) =>
+          acc +
+          (f.loanAmountLeft > 0 ? f.loanMonthlyPayment / TICKS_PER_MONTH : 0),
+        0,
+      ) +
+      (state.transmission?.lines || []).reduce(
+        (acc, line) =>
+          acc +
+          (line.loanAmountLeft > 0
+            ? line.loanMonthlyPayment / TICKS_PER_MONTH
+            : 0),
+        0,
+      );
     const upperBound = prev.cash + now.revenue - expenses;
     const lowerBound = upperBound - maxPrincipal;
     if (
@@ -233,7 +339,9 @@ export function checkTick(
       );
     } else if (f.peakWh) {
       // Storage swings both ways: positive discharging, negative charging
-      if (Math.abs(f.currentW) > f.peakW * (1 + RELATIVE_TOLERANCE)) {
+      const gridW =
+        f.currentW < 0 ? f.currentW / f.roundTripEfficiency : f.currentW;
+      if (Math.abs(gridW) > f.peakW * (1 + RELATIVE_TOLERANCE)) {
         collector.add(
           "storage stays within its rated power",
           when,
@@ -314,6 +422,24 @@ export function checkTick(
     }
   });
 
+  (state.transmission?.lines || []).forEach((line) => {
+    const label = `${line.name} #${line.id}`;
+    if (!isFinite_(line.yearsToBuildLeft) || line.yearsToBuildLeft < 0) {
+      collector.add(
+        "transmission construction time remaining is non-negative",
+        when,
+        `${label} yearsToBuildLeft = ${line.yearsToBuildLeft}`,
+      );
+    }
+    if (!isFinite_(line.loanAmountLeft) || line.loanAmountLeft < 0) {
+      collector.add(
+        "transmission loan balance is finite and non-negative",
+        when,
+        `${label} loanAmountLeft = ${line.loanAmountLeft}`,
+      );
+    }
+  });
+
   if (prev) {
     checkStorageEnergyBalance(collector, state, prev, now, when);
     checkHydroEnergyBalance(collector, state, prev, now, when);
@@ -374,11 +500,20 @@ function checkStorageEnergyBalance(
   when: string,
 ) {
   let netChargedWh = 0;
-  let hasStorage = false;
+  const hasStorage = state.facilities.some(
+    (f) => f.peakWh && f.yearsToBuildLeft === 0,
+  );
   state.facilities.forEach((f: FacilityOperatingType) => {
-    if (f.peakWh && isFinite_(f.currentW)) {
-      hasStorage = true;
-      netChargedWh -= f.currentW / TICKS_PER_HOUR; // Negative output is charging
+    if (
+      f.peakWh &&
+      !f.paused &&
+      f.yearsToBuildLeft === 0 &&
+      isFinite_(f.currentW)
+    ) {
+      // Negative currentW is stored power; recover the grid draw before subtracting losses.
+      netChargedWh -=
+        (f.currentW < 0 ? f.currentW / f.roundTripEfficiency : f.currentW) /
+        TICKS_PER_HOUR;
     }
   });
   if (!hasStorage || !isFinite_(now.storedWh) || !isFinite_(prev.storedWh)) {

@@ -86,7 +86,16 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
         className="insightEventPopover"
       >
         {selected && (
-          <ClickAwayListener onClickAway={closeDetails}>
+          <ClickAwayListener
+            onClickAway={(event) => {
+              if (
+                event.target instanceof Node &&
+                anchor?.contains(event.target)
+              )
+                return;
+              closeDetails();
+            }}
+          >
             <Paper elevation={6}>
               <div
                 id={`insight-event-details-${events.indexOf(selected) + 1}`}
@@ -104,7 +113,10 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => onZoom(selected)}
+                  onClick={() => {
+                    onZoom(selected);
+                    closeDetails();
+                  }}
                 >
                   Zoom to event
                 </Button>

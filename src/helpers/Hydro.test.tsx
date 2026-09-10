@@ -69,7 +69,7 @@ describe("hydro watershed model", () => {
     expect(summer.snowpackMm).toBe(0);
   });
 
-  it("warms the same basin into a smaller snowpack", () => {
+  it("keeps basin snow and runoff independent of utility emissions", () => {
     initWeatherFromRows(
       "basin",
       rows(
@@ -79,8 +79,7 @@ describe("hydro watershed model", () => {
     );
     const clean = getHydroConditions(date(1983, 2), 9, 0, "basin");
     const dirty = getHydroConditions(date(1983, 2), 9, 200, "basin");
-    expect(dirty.snowpackMm).toBeLessThan(clean.snowpackMm);
-    expect(dirty.meltMm).toBeGreaterThan(clean.meltMm);
+    expect(dirty).toEqual(clean);
   });
 
   it("keeps tropical precipitation as rain and never invents snow", () => {

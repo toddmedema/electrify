@@ -56,22 +56,18 @@ describe("DisplayNameDialog", () => {
     expect(screen.getByText(/letters, numbers/)).toBeInTheDocument();
   });
 
-  /**
-   * Uniqueness can only be decided by the claim transaction, so a name that looked fine here can
-   * still come back taken. That has to leave the dialog open with the name still in the box -- a
-   * collision needs another try, not a dismissal.
-   */
-  it("stays open and explains itself when the name is already taken", async () => {
+  /** A failed profile write must leave the dialog open so the player can retry. */
+  it("stays open and explains itself when saving fails", async () => {
     const onClose = jest.fn();
     renderDialog({
-      onSave: async () => "That name is taken. Please pick another.",
+      onSave: async () => "Couldn't save that name. Please try again.",
       onClose,
     });
 
     await userEvent.type(nameField(), "Ada");
     await userEvent.click(screen.getByText("Save"));
 
-    expect(await screen.findByText(/taken/)).toBeInTheDocument();
+    expect(await screen.findByText(/try again/)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(nameField().value).toBe("Ada");
   });

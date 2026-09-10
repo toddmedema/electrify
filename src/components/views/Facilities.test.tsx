@@ -1,11 +1,14 @@
-import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import Facilities from "./Facilities";
+import * as React from "react";
+import { Provider } from "react-redux";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { tickState } from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import Facilities from "./Facilities";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -49,12 +52,15 @@ function renderFacilities(
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
   };
+  const store = configureStore({ reducer: { ui: uiReducer } });
   render(
     <Facilities
       game={game}
       selectedFacilityId={selectedFacilityId}
       onGeneratorBuild={() => undefined}
       onStorageBuild={() => undefined}
+      onTransmissionBuild={() => undefined}
+      onTradingPolicy={() => undefined}
       onSell={handlers.onSell}
       onTogglePause={() => undefined}
       onPause={handlers.onPause}
@@ -63,6 +69,9 @@ function renderFacilities(
       onFacilityDragEnd={() => undefined}
       onSelect={handlers.onSelect}
     />,
+    {
+      wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+    },
   );
   return handlers;
 }
@@ -235,6 +244,8 @@ describe("the fleet list", () => {
       selectedFacilityId: null,
       onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
+      onTransmissionBuild: () => undefined,
+      onTradingPolicy: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
       onPause: () => undefined,
@@ -301,5 +312,81 @@ describe("the fleet list", () => {
         screen.queryByLabelText(`Move ${f.name} earlier in the dispatch order`),
       ).toBeNull();
     });
+  });
+});
+
+describe("the interties view", () => {
+  it("explains and offers California connection projects", async () => {
+    const game = playedGame(0);
+    renderFacilities(game, null);
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+    expect(
+      screen.getByText("Share power with nearby grids"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Trading rule")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Approve .* intertie/ }),
+    ).not.toHaveLength(0);
+    expect(screen.getAllByText("Total cost")).toHaveLength(2);
+    expect(
+      screen.getByText(/Pay \$36M now · finance \$144M/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps every earlier tutorial focused on plants", () => {
+    for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
+      renderFacilities(createGame({ scenarioId }), null);
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(screen.queryByText("Interties")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("gives Mission 7 stable Plants and Interties tabs", () => {
+    renderFacilities(createGame({ scenarioId: 112 }), null);
+
+    expect(screen.getByRole("tab", { name: "Plants" })).toHaveAttribute(
+      "id",
+      "plantsTab",
+    );
+    expect(screen.getByRole("tab", { name: "Interties" })).toHaveAttribute(
+      "id",
+      "intertiesTab",
+    );
+  });
+
+  it("does not render an empty interties destination where no corridor exists", () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+    renderFacilities(game, null);
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByText(/Interties are coming/)).toBeNull();
+  });
+
+  it("shows researched local market names outside California", async () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "Dublin", name: "Dublin" };
+    renderFacilities(game, null);
+
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+
+    expect(screen.getByText("Great Britain")).toBeInTheDocument();
+    expect(screen.getByText("Continental Europe")).toBeInTheDocument();
+  });
+
+  it("gives the guided northern approval a stable target and specific name", async () => {
+    renderFacilities(createGame({ scenarioId: 112 }), null);
+    await user.click(screen.getByRole("tab", { name: "Interties" }));
+
+    const approval = screen.getByRole("button", {
+      name: "Approve Pacific Northwest intertie",
+    });
+    expect(approval).toHaveAttribute("id", "approve-intertie-california-north");
+    expect(
+      screen.getByTestId("transmission-project-california-north"),
+    ).toHaveAttribute("data-corridor-id", "california-north");
+    expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 });

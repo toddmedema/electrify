@@ -1,9 +1,8 @@
-import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import Manual, { clearManualMemory } from "./Manual";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
+import Manual, { clearManualMemory } from "./Manual";
 
 function renderManual(focusEntry?: string) {
   return render(<Manual onBack={() => undefined} focusEntry={focusEntry} />);
@@ -53,6 +52,18 @@ describe("Manual", () => {
     expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toBeInTheDocument();
   });
 
+  it.each([
+    ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
+    ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
+    ["meaningful decisions", MANUAL_ENTRY.SCORE],
+  ])("finds the right lesson when searching %s", (term, title) => {
+    renderManual();
+    search(term);
+    expect(
+      screen.getByRole("button", { name: title, expanded: true }),
+    ).toBeVisible();
+  });
+
   it("includes every shared game symbol in the symbol guide", async () => {
     renderManual();
     await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
@@ -77,7 +88,9 @@ describe("Manual", () => {
       "true",
     );
     // The phrase is mid-paragraph, so only the highlight wrapper matches it exactly
-    expect(screen.getByText("available supply").tagName).toBe("MARK");
+    screen.getAllByText("available supply").forEach((match) => {
+      expect(match.tagName).toBe("MARK");
+    });
   });
 
   it("lets the player collapse an auto-expanded result", async () => {
@@ -149,4 +162,55 @@ describe("Manual", () => {
     renderManual(MANUAL_ENTRY.RAMP_RATE);
     expect(screen.getByLabelText("Search the manual")).toHaveValue("");
   });
+});
+
+it("opens a related entry outside the search results and focuses its expanded heading", async () => {
+  clearManualMemory();
+  renderManual();
+  search("round-trip");
+  await userEvent.click(
+    within(
+      screen.getByRole("navigation", {
+        name: "Related to Round-trip Efficiency",
+      }),
+    ).getByRole("button", { name: "Power and Energy" }),
+  );
+  expect(screen.getByLabelText("Search the manual")).toHaveValue("");
+  const heading = screen.getByRole("button", {
+    name: "Power and Energy",
+    expanded: true,
+  });
+  expect(heading).toHaveAttribute("aria-expanded", "true");
+  expect(heading).toHaveFocus();
+  expect(
+    screen.getByText(/Holding 80 MWh does not let it supply 80 MW/),
+  ).toBeVisible();
+});
+
+it("refocuses and scrolls to the same related entry after search hid it", async () => {
+  clearManualMemory();
+  renderManual(MANUAL_ENTRY.POWER_AND_ENERGY);
+  search("round-trip");
+  const scrollIntoView = jest.fn();
+  const original = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scrollIntoView;
+  try {
+    await userEvent.click(
+      within(
+        screen.getByRole("navigation", {
+          name: "Related to Round-trip Efficiency",
+        }),
+      ).getByRole("button", { name: "Power and Energy" }),
+    );
+    expect(screen.getByLabelText("Search the manual")).toHaveValue("");
+    const heading = screen.getByRole("button", {
+      name: "Power and Energy",
+      expanded: true,
+    });
+    expect(heading).toHaveAttribute("aria-expanded", "true");
+    expect(heading).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  } finally {
+    HTMLElement.prototype.scrollIntoView = original;
+  }
 });

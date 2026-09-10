@@ -1,4 +1,7 @@
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
+import CustomerPrograms from "./CustomerPrograms";
 import {
   Button,
   Checkbox,
@@ -108,8 +111,11 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
+import ForecastScope from "../base/ForecastScope";
+import EconomicFutureComparison from "../base/EconomicFutureComparison";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
-import { formatCustomerChange } from "./Finances";
+import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
@@ -123,9 +129,12 @@ import {
   rangesEqual,
   zoomChartViewport,
 } from "../base/ChartViewportContext";
+import PowerExchangeSummary from "../base/PowerExchangeSummary";
+import { transmissionAvailable } from "../../data/AdjacentMarkets";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
   | "storage"
@@ -139,7 +148,8 @@ export type InsightLayerId =
   | "cash"
   | "customers"
   | "emissions"
-  | "financeDetails";
+  | "financeDetails"
+  | "inflationInterest";
 
 type LayerGroup = "Grid" | "Customers" | "Economics" | "Environment";
 
@@ -147,15 +157,21 @@ export interface InsightLayerDefinition {
   id: InsightLayerId;
   label: string;
   group: LayerGroup;
-  availability?: "storage" | "hydro";
+  availability?: "storage" | "hydro" | "transmission";
 }
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
   {
+    id: "powerExchange",
+    label: "Power exchange",
+    group: "Grid",
+    availability: "transmission",
+  },
+  {
     id: "demandByType",
     label: "Demand by use",
-    group: "Grid",
+    group: "Customers",
   },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
@@ -171,6 +187,11 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
+  {
+    id: "inflationInterest",
+    label: "Inflation & interest rate",
+    group: "Economics",
+  },
   {
     id: "emissions",
     label: "Emissions (CO2e)",
@@ -215,7 +236,14 @@ export const INSIGHT_PRESETS: Record<
   },
   reliability: {
     label: "Reliability",
-    layers: ["supplyDemand", "supplyByFuel", "storage", "weather", "water"],
+    layers: [
+      "supplyDemand",
+      "powerExchange",
+      "supplyByFuel",
+      "storage",
+      "weather",
+      "water",
+    ],
   },
   profitability: {
     label: "Profitability",
@@ -534,6 +562,8 @@ function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
       return ["customers"];
     case 5:
       return ["supplyDemand", "fuelPrices", "weather"];
+    case 112:
+      return ["powerExchange"];
     default:
       return [];
   }
@@ -543,6 +573,9 @@ export function withRequiredLayers(
   layers: InsightLayerId[],
   scenarioId: number,
 ): InsightLayerId[] {
+  if (scenarioId === 112) {
+    return ["powerExchange", ...layers.filter((id) => id !== "powerExchange")];
+  }
   const next = [...layers];
   for (const id of requiredTutorialLayers(scenarioId)) {
     if (!next.includes(id)) {
@@ -628,8 +661,31 @@ function financeSeries(
   return points.slice(first, Math.max(first + 1, Math.min(points.length, end)));
 }
 
+function policySignature(game: GameType): string {
+  const policies = game.policies;
+  if (!policies) return "";
+  return JSON.stringify([
+    policies.month,
+    ...Object.keys(policies.programs)
+      .sort()
+      .map((id) => {
+        const program = policies.programs[id as keyof typeof policies.programs];
+        return [
+          id,
+          program.tier,
+          program.adoption,
+          program.spending,
+          program.pending?.tier,
+          program.startHour,
+          program.pending?.startHour,
+          program.pending?.month,
+        ];
+      }),
+  ]);
+}
+
 function facilitySignature(game: GameType): string {
-  return game.facilities
+  const facilities = game.facilities
     .map((facility) =>
       [
         facility.id,
@@ -639,6 +695,10 @@ function facilitySignature(game: GameType): string {
       ].join(":"),
     )
     .join("|");
+  const transmission = (game.transmission?.lines || [])
+    .map((line) => [line.id, line.corridorId, line.yearsToBuildLeft].join(":"))
+    .join("|");
+  return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
 }
 
 export default class Insights extends React.Component<Props, State> {
@@ -689,18 +749,29 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
+      (this.state.layers.includes("powerExchange") &&
+        nextProps.game.date.minute !== this.props.game.date.minute) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.focusLayer !== this.props.focusLayer ||
       nextProps.upcomingEvents !== this.props.upcomingEvents ||
+      policySignature(nextProps.game) !== policySignature(this.props.game) ||
       facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
     );
   }
 
+  public componentDidMount() {
+    this.scrollTutorialPowerExchangeIntoView();
+  }
+
   public componentDidUpdate(previousProps: Props) {
+    if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
+      this.scrollTutorialPowerExchangeIntoView();
+    }
     if (
       this.props.game.date.monthsElapsed !==
       previousProps.game.date.monthsElapsed
@@ -738,6 +809,21 @@ export default class Insights extends React.Component<Props, State> {
     }
   }
 
+  private scrollTutorialPowerExchangeIntoView() {
+    if (
+      this.props.game.scenarioId !== 112 ||
+      this.props.game.tutorialStep !== 7 ||
+      window.innerWidth > 768
+    ) {
+      return;
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-layer="powerExchange"]')
+        ?.scrollIntoView?.({ block: "nearest" });
+    }, 0);
+  }
+
   private setLayers(
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
@@ -747,8 +833,12 @@ export default class Insights extends React.Component<Props, State> {
       preset,
       this.state.presetLibrary,
     )?.layers;
-    setStorageKeyValue(LAYERS_KEY, required);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    // Mission 7 temporarily puts its teaching track first. Keep that guided ordering out of the
+    // player's saved preset so finishing the mission does not rearrange their normal Insights.
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, required);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    }
     this.setState({
       layers: required,
       preset,
@@ -776,8 +866,10 @@ export default class Insights extends React.Component<Props, State> {
       preset.layers,
       this.props.game.scenarioId,
     );
-    setStorageKeyValue(LAYERS_KEY, layers);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, layers);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    }
     this.setState({ layers, preset: id, presetDirty: false });
   }
 
@@ -990,6 +1082,7 @@ export default class Insights extends React.Component<Props, State> {
       game.dollarsPerkWh,
       game.feePerKgCO2e,
       facilitySignature(game),
+      policySignature(game),
     ].join("|");
     if (this.projectionCache?.key === key) {
       return this.projectionCache.projection;
@@ -1005,14 +1098,24 @@ export default class Insights extends React.Component<Props, State> {
     const historicalSupplyDemand = [...game.monthlyHistory]
       .reverse()
       .map((month) => {
-        // Monthly history retains supply and demand but not the other forecast layers. Keep it
-        // on the supply/demand chart and let forecast-only charts begin at the current month.
         const tick = { ...now } as TickPresentFutureType;
         tick.minute = monthMinute(month, game.startingYear);
         tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
         tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
         return tick;
       });
+    const historicalCharts = [...game.monthlyHistory]
+      .reverse()
+      .flatMap((month) =>
+        month.chartAverage
+          ? [
+              {
+                ...month.chartAverage,
+                minute: monthMinute(month, game.startingYear),
+              } as TickPresentFutureType,
+            ]
+          : [],
+      );
     let domainMin = Number.POSITIVE_INFINITY;
     let domainMax = 0;
     for (const tick of [...historicalSupplyDemand, ...timeline]) {
@@ -1020,51 +1123,13 @@ export default class Insights extends React.Component<Props, State> {
       domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
     }
     const [rangeMin, rangeMax] = viewportBounds(game);
-    const forecastMin = timeline[0].minute;
-    const forecastMax = timeline[timeline.length - 1].minute;
 
-    let blackoutTotalWh = 0;
-    let current = { wh: 0, peakW: 0, start: forecastMin, end: forecastMin };
-    let largestBlackout = current;
-    let isBlackout = timeline[0].demandW > timeline[0].supplyW;
-    const blackouts: BlackoutEdges[] = [{ minute: rangeMin, value: 0 }];
-    if (isBlackout) {
-      blackouts.push({ minute: forecastMin, value: 0 });
-      blackouts.push({ minute: forecastMin, value: domainMax });
-    }
-    for (const tick of timeline) {
-      if (tick.demandW > tick.supplyW) {
-        if (!isBlackout) {
-          blackouts.push({ minute: tick.minute, value: 0 });
-          blackouts.push({ minute: tick.minute, value: domainMax });
-          isBlackout = true;
-          current = { wh: 0, peakW: 0, start: tick.minute, end: tick.minute };
-        }
-        const amount = tick.demandW - tick.supplyW;
-        const amountWh =
-          amount * (projectionStepMinutes / 60) * GAME_TO_REAL_YEARS;
-        blackoutTotalWh += amountWh;
-        current.wh += amountWh;
-        current.peakW = Math.max(current.peakW, amount);
-      } else if (isBlackout) {
-        blackouts.push({ minute: tick.minute, value: domainMax });
-        blackouts.push({ minute: tick.minute, value: 0 });
-        isBlackout = false;
-        current.end = tick.minute;
-        if (current.wh > largestBlackout.wh) {
-          largestBlackout = current;
-        }
-      }
-    }
-    blackouts.push({
-      minute: forecastMax,
-      value: isBlackout ? domainMax : 0,
-    });
-    blackouts.push({ minute: rangeMax, value: 0 });
-    if (current.wh > largestBlackout.wh) {
-      largestBlackout = { ...current, end: current.end || forecastMax };
-    }
-
+    const { blackouts, blackoutTotalWh, largestBlackout } = forecastShortfalls(
+      timeline,
+      projectionStepMinutes,
+      domainMax,
+    );
+    blackouts.unshift({ minute: rangeMin, value: 0 });
     const sampled = sampleForecastTimeline(
       timeline,
       240 * MAX_FORECAST_YEARS,
@@ -1077,15 +1142,19 @@ export default class Insights extends React.Component<Props, State> {
       game.startingYear,
     ).slice(1, 1 + monthsAhead);
     const projection: ProjectionView = {
-      timeline,
-      sampled,
+      timeline: [...historicalCharts, ...timeline],
+      sampled: [...historicalCharts, ...sampled],
       supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
       domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
       blackouts,
       blackoutTotalWh,
       largestBlackout,
-      hasStorage: timeline.some((tick) => tick.storedWh > 0),
-      hasHydro: game.facilities.some((facility) => facility.fuel === "Hydro"),
+      hasStorage: [...historicalCharts, ...timeline].some(
+        (tick) => tick.storedWh > 0,
+      ),
+      hasHydro:
+        game.facilities.some((facility) => facility.fuel === "Hydro") ||
+        historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
       financePast: game.monthlyHistory,
       financeProjected: [currentMonth, ...projectedMonths],
       projectionStepMinutes,
@@ -1098,7 +1167,12 @@ export default class Insights extends React.Component<Props, State> {
     return (
       !layer.availability ||
       (layer.availability === "storage" && projection.hasStorage) ||
-      (layer.availability === "hydro" && projection.hasHydro)
+      (layer.availability === "hydro" && projection.hasHydro) ||
+      (layer.availability === "transmission" &&
+        transmissionAvailable(this.props.game.location) &&
+        !!this.props.game.transmission?.lines.some(
+          ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+        ))
     );
   }
 
@@ -1166,7 +1240,7 @@ export default class Insights extends React.Component<Props, State> {
     const rateSummary =
       scenario.ownership === "Investor"
         ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year.`;
+        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market benchmark ${formatMoneyConcise(marketRate)}; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year. Public utility customers do not switch based on rates.`;
     return (
       <section className="insightsLevers" aria-label="Planning controls">
         <Button
@@ -1180,13 +1254,18 @@ export default class Insights extends React.Component<Props, State> {
         >
           <span className="insightsRateToggleLabel">Rate controls</span>
         </Button>
+        <CustomerPrograms
+          game={game}
+          onViewDemand={() => this.setLayers(["demandByType"])}
+        />
         <Typography
           className="insightsRateSummaryDesktop"
           variant="body2"
           color="textSecondary"
           aria-hidden="true"
         >
-          Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
+          Base rate{" "}
+          <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
           {scenario.ownership === "Investor" && (
             <>
               {" "}
@@ -1197,7 +1276,8 @@ export default class Insights extends React.Component<Props, State> {
           {scenario.ownership === "Public" && (
             <>
               {" "}
-              · customer growth{" "}
+              · market benchmark {formatMoneyConcise(marketRate)} · customer
+              growth{" "}
               <strong>
                 +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
               </strong>
@@ -1211,19 +1291,19 @@ export default class Insights extends React.Component<Props, State> {
           aria-hidden="true"
         >
           <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Rate</span>
+            <span className="insightsRateMetricLabel">Base rate</span>
             <strong className="insightsRateMetricValue">
               {formatRateCompact(game.dollarsPerkWh)}/kWh
             </strong>
           </span>
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Market</span>
+            <span className="insightsRateMetricValue">
+              {formatRateCompact(marketRate)}
+            </span>
+          </span>
           {scenario.ownership === "Investor" ? (
             <>
-              <span className="insightsRateMetric">
-                <span className="insightsRateMetricLabel">Market</span>
-                <span className="insightsRateMetricValue">
-                  {formatRateCompact(marketRate)}
-                </span>
-              </span>
               <span className="insightsRateMetric">
                 <span className="insightsRateMetricLabel">Customers / mo</span>
                 <strong className="insightsRateMetricValue">
@@ -1245,6 +1325,15 @@ export default class Insights extends React.Component<Props, State> {
         <span id="insightsRateSummary" className="srOnly">
           {rateSummary}
         </span>
+        {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
+          game.policies?.programs.curtailment?.tier !== "Off") &&
+          game.policies && (
+            <Typography variant="caption">
+              Tariffs and credits adjust this base rate. Customer estimates here
+              assume a flat rate; use Customer programs for demand and cash with
+              offers.
+            </Typography>
+          )}
         <div
           className={`budgetSlider flex-newline ${
             this.state.leversOpen ? "" : "insightsRateSliderCollapsed"
@@ -1347,22 +1436,26 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {[
-              ["Profit", formatMoneyConcise(summary.profit)],
-              ["Revenue", formatMoneyConcise(summary.revenue)],
-              ["Expenses", formatMoneyConcise(summary.expenses)],
-              ["Cash", formatMoneyConcise(summary.cash)],
-              ["Customers", new Intl.NumberFormat().format(summary.customers)],
-              [
-                "CO2e emitted",
-                `${formatLargeMassValueConcise(summary.kgco2e, units)} ${largeMassUnit(units)}`,
-              ],
-            ].map(([label, value]) => (
-              <TableRow key={label}>
-                <TableCell>{label}</TableCell>
-                <TableCell align="right">{value}</TableCell>
-              </TableRow>
-            ))}
+            {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
+              const value =
+                key === "interestRate"
+                  ? getTimeFromTimeline(game.date.minute, game.timeline)!
+                      .interestRate
+                  : summary[key as DerivedHistoryKeysType];
+              return (
+                <TableRow key={key}>
+                  <TableCell sx={{ pl: 2 + (metadata.nesting || 0) * 2 }}>
+                    {key === "interestRate"
+                      ? "Current interest rate"
+                      : metadata.label}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(metadata.formatTable || metadata.format)(value)}
+                    {metadata.suffix ? " " + metadata.suffix : ""}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </>
@@ -1512,25 +1605,64 @@ export default class Insights extends React.Component<Props, State> {
     let body: React.ReactNode;
     if (finance) {
       body = (
-        <ChartFinances
-          id={chartId}
-          height={140}
-          timeline={financeSeries(
-            finance.key,
-            projection.financePast,
-            projection.financeProjected,
-            projection.domain.x,
-            game.startingYear,
+        <>
+          <ChartFinances
+            id={chartId}
+            height={140}
+            timeline={financeSeries(
+              finance.key,
+              projection.financePast,
+              projection.financeProjected,
+              projection.domain.x,
+              game.startingYear,
+            )}
+            title={finance.label}
+            format={finance.format}
+            startingYear={game.startingYear}
+            domain={projection.domain.x}
+            syncKey={SYNC_KEY}
+          />
+          {id === "emissions" && (
+            <Typography variant="caption" color="textSecondary" component="p">
+              Total includes local plants and estimated emissions from purchased
+              electricity. Last completed month:{" "}
+              {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local +{" "}
+              {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
+              imported ({largeMassUnit(this.context as UnitSystemType)} CO2e).
+              Neighboring-grid assumptions are in Interties.
+            </Typography>
           )}
-          title={finance.label}
-          format={finance.format}
-          startingYear={game.startingYear}
-          domain={projection.domain.x}
-          syncKey={SYNC_KEY}
-        />
+        </>
       );
     } else {
       switch (id) {
+        case "inflationInterest":
+          body = (
+            <>
+              {(["inflationRate", "interestRate"] as const).map((key) => (
+                <ChartFinances
+                  key={key}
+                  id={chartId + key}
+                  height={140}
+                  timeline={financeSeries(
+                    key,
+                    projection.financePast,
+                    projection.financeProjected,
+                    projection.domain.x,
+                    game.startingYear,
+                  )}
+                  title={
+                    key === "inflationRate" ? "Inflation" : "Interest rate"
+                  }
+                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  startingYear={game.startingYear}
+                  domain={projection.domain.x}
+                  syncKey={SYNC_KEY}
+                />
+              ))}
+            </>
+          );
+          break;
         case "supplyDemand":
           body = (
             <>
@@ -1543,6 +1675,19 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <Typography
+                variant="caption"
+                component="p"
+                color="text.secondary"
+                sx={{ mx: 2 }}
+              >
+                Supply is dispatched electricity. Reserve shows how much more
+                demand the grid could cover within 15 minutes.
+                <ManualLink
+                  entry={MANUAL_ENTRY.RESERVE_CAPACITY}
+                  text="How reserve works"
+                />
+              </Typography>
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
                   Forecasted shortfall: ~
@@ -1552,6 +1697,14 @@ export default class Insights extends React.Component<Props, State> {
                 </Typography>
               )}
             </>
+          );
+          break;
+        case "powerExchange":
+          body = (
+            <PowerExchangeSummary
+              game={game}
+              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
+            />
           );
           break;
         case "demandByType": {
@@ -1643,6 +1796,7 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <EconomicFutureComparison game={game} />
             </>
           );
           break;
@@ -2151,8 +2305,17 @@ export default class Insights extends React.Component<Props, State> {
                 )}
             </Menu>
           </Toolbar>
+          <ForecastScope />
           {this.renderLayerPanel(projection)}
           {this.renderLevers(now)}
+          {game.monthlyHistory.length > 0 && (
+            <Typography variant="caption" color="textSecondary" sx={{ px: 2 }}>
+              Past charts show monthly averages; financial charts show monthly
+              totals or ending balances.
+              {game.monthlyHistory.some((month) => !month.chartAverage) &&
+                " Older saves have only financial and supply/demand history until new months are recorded."}
+            </Typography>
+          )}
           {this.renderViewportControls(
             viewportBounds,
             viewportRange,

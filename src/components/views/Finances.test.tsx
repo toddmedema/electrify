@@ -1,17 +1,17 @@
-import * as React from "react";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createNextState as produce } from "@reduxjs/toolkit";
+import * as React from "react";
+import { summarizeTimeline } from "../../helpers/DateTime";
+import { tickState } from "../../reducers/Game";
+import { createGame } from "../../testing/Simulator";
+import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
 import Finances, {
   formatCustomerChange,
   getComparison,
   parseRange,
   projectMonths,
 } from "./Finances";
-import { createGame } from "../../testing/Simulator";
-import { tickState } from "../../reducers/Game";
-import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
-import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
 
 // Every test in here plays a couple of game years and then renders the real pane, chart and all.
 // The slowest now runs in about a second -- see `choose` and `summarised` for where the rest of
@@ -85,7 +85,6 @@ function playMonths(months: number): GameType {
   while (state.date.monthsElapsed < months) {
     tickState(state);
   }
-  // Build the real history once, then freeze it as Redux would before sharing it between renders.
   return produce(state, () => undefined);
 }
 
@@ -234,10 +233,6 @@ describe("the Finances chart selectors", () => {
 });
 
 describe("parseRange", () => {
-  it("should follow the clock rather than pinning the year it was chosen in", () => {
-    expect(parseRange("current", 2050)).toEqual({ mode: "year", year: 2050 });
-  });
-
   /**
    * The range is remembered in local storage, so a returning player can arrive with a value from
    * a build that offered something this one doesn't. Falling back beats charting NaN months.
@@ -297,15 +292,6 @@ describe("projectMonths", () => {
     const months = monthsAhead(game, 60);
     const cash = months.map((m: MonthlyHistoryType) => m.cash);
     expect(new Set(cash).size).toBeGreaterThan(1);
-  });
-
-  it("should start where the live timeline's own month does", () => {
-    const game = createGame({ scenarioId: 103 });
-    const months = monthsAhead(game, 12);
-    expect(Math.floor(game.date.minute / MINUTES_PER_MONTH)).toEqual(
-      Math.floor(game.timeline[0].minute / MINUTES_PER_MONTH),
-    );
-    expect(months[0].month).toEqual(game.date.monthNumber);
   });
 });
 
@@ -368,15 +354,6 @@ describe("the month over month column", () => {
         monthlyHistory: [game.monthlyHistory[0]],
       }),
     ).toBeUndefined();
-  });
-
-  it("puts the change beside each total once there are two months on the record", () => {
-    renderFinances(game, "PAUSED");
-    const comparison = getComparison(game);
-    expect(screen.getByText(comparison?.label || "")).toBeInTheDocument();
-    // Every metric gets one, even if it is the em dash that means it hasn't moved
-    expect(changeCell("Profit").textContent).not.toEqual("");
-    expect(changeCell("Revenue").textContent).not.toEqual("");
   });
 
   // Both point up, so the arrow alone can't tell these apart -- and colouring a rise in

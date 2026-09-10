@@ -65,6 +65,7 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     await charts.first().getAttribute("data-viewport-max"),
   );
   await page.getByRole("button", { name: "Zoom to event" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect
     .poll(async () => {
       const min = Number(
@@ -129,9 +130,7 @@ test("upcoming scenario events stay usable across insight viewports", async ({
       expect(box!.width).toBeCloseTo(44, 0),
     );
   }
-  await expect(
-    viewportToolbar.locator(".insightsViewportDate"),
-  ).toBeVisible();
+  await expect(viewportToolbar.locator(".insightsViewportDate")).toBeVisible();
 
   const pageOverflow = await insights.evaluate((element) =>
     Math.max(0, element.scrollWidth - element.clientWidth),
@@ -248,6 +247,18 @@ test("insights header controls stay aligned in one compact row", async ({
       Math.max(0, element.scrollWidth - element.clientWidth),
     );
   expect(headerOverflow).toBeLessThanOrEqual(1);
+
+  if (testInfo.project.name === "desktop-chromium") {
+    const [group, layerButton] = await Promise.all([
+      page.locator(".insightsPresetControls").boundingBox(),
+      page.locator("#insightsLayersButton").boundingBox(),
+    ]);
+    expect(layerButton!.x - group!.x - group!.width).toBeCloseTo(8, 0);
+    await expect(page.locator(".insightsHeaderControls")).toHaveCSS(
+      "justify-content",
+      "flex-end",
+    );
+  }
 
   if (testInfo.project.name.startsWith("mobile-")) {
     const header = await page.locator(".insightsHeader").boundingBox();
@@ -430,4 +441,65 @@ test("main-menu account actions follow the sound action", async ({
   expect(soundBox).not.toBeNull();
   expect(accountBox).not.toBeNull();
   expect(accountBox!.y).toBeGreaterThanOrEqual(soundBox!.y + soundBox!.height);
+});
+
+test("expanded finance and economic rates remain readable", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !["desktop-chromium", "mobile-390px"].includes(testInfo.project.name),
+  );
+  await page.emulateMedia({
+    colorScheme: testInfo.project.name.startsWith("mobile") ? "dark" : "light",
+  });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["financeDetails", "inflationInterest"]),
+    );
+  });
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game" }).click();
+  const insights = page.locator(".insights:visible");
+  if (!(await insights.isVisible()))
+    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  await expect(
+    insights.getByText("Operations & maintenance", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    insights.getByText("Current interest rate", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    insights.locator("#chartInsightsInflationInterestPlotinflationRate"),
+  ).toHaveCount(1);
+  await expect(
+    insights.locator("#chartInsightsInflationInterestPlotinterestRate"),
+  ).toHaveCount(1);
+  expect(
+    await insights.evaluate(
+      (element) => element.scrollWidth - element.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (reviewDir) {
+    await insights
+      .getByText("Finance details", { exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: path.join(reviewDir, `finance-${testInfo.project.name}.png`),
+    });
+    if (testInfo.project.name === "desktop-chromium") {
+      await insights
+        .getByText("Inflation & interest rate", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(reviewDir, "economic-rates-desktop.png"),
+      });
+    }
+  }
+  await insights.getByRole("button", { name: /Layers/ }).click();
+  await expect(
+    insights.getByLabel("Inflation & interest rate", { exact: true }),
+  ).toBeChecked();
 });

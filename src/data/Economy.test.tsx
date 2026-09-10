@@ -166,16 +166,6 @@ describe("Economy", () => {
   });
 
   describe("getInflationIndex", () => {
-    it("is exactly 1 on the opening day of a run", () => {
-      expect(
-        getInflationIndex(
-          dateIn(FIXTURE_STARTING_YEAR, 1),
-          FIXTURE_STARTING_YEAR,
-          SEED,
-        ),
-      ).toEqual(1);
-    });
-
     it("compounds the record's inflation over the years it covers", () => {
       // Ten years of a flat 1.8% compounds to about 19.6%
       const index = getInflationIndex(

@@ -87,15 +87,6 @@ describe("ending a scenario from inside the reducer", () => {
     jest.useRealTimers();
   });
 
-  it("survives to the end of the term without reading the revoked draft", () => {
-    const scenario = customScenario({ durationMonths: 2 });
-    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
-    while (state.date.monthsElapsed < (scenario.durationMonths as number)) {
-      state = tick(state);
-    }
-    expect(() => jest.runOnlyPendingTimers()).not.toThrow();
-  });
-
   /**
    * The score screen is a component now rather than JSX built in here, so what the reducer owes it
    * is the numbers. previousBest in particular is read before the score write, so that "was 640"

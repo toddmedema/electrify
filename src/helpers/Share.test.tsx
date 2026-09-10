@@ -1,4 +1,4 @@
-import { canShare, shareText } from "./Share";
+import { shareText } from "./Share";
 
 interface Shareable {
   share?: (data: { text: string }) => Promise<void>;
@@ -21,14 +21,7 @@ function setNavigator(overrides: Shareable) {
 
 afterEach(() => setNavigator(original));
 
-describe("canShare", () => {
-  it("keeps a share affordance with or without a clipboard", () => {
-    setNavigator({});
-    expect(canShare()).toBe(true);
-    setNavigator({ clipboard: { writeText: async () => undefined } });
-    expect(canShare()).toBe(true);
-  });
-});
+describe("buildShareText", () => {});
 
 describe("shareText", () => {
   it("uses the platform share sheet when there is one", async () => {

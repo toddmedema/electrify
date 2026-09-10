@@ -23,6 +23,22 @@ They let mature markets flatten, high-growth markets expand, and industrial dema
 parts of the U.S. Midwest while growing in faster-growing states. Customer growth remains the
 common demographic baseline, so these rates represent changes in consumption per customer.
 
+## Weather response and small populations
+
+Temperature response now comes from four automatic location archetypes in `DemandProfiles.tsx`:
+cooling, mixed, electric heating and fuel heating. They use heating/cooling degrees around 18°C
+with rounded authored coefficients. These distinguish broad heating-fuel and cooling needs without
+claiming measured city load curves or exposing building-physics controls to students. Original
+annual-energy and peak-demand target tolerances remain; Austin uses `startingDemandScale: 7.75`
+and Manassas uses `7.7` after this adjustment.
+
+Customer counts retain fractional changes through growth, price switching and blackout attrition;
+only presentation rounds to whole customers. Small-utility regression tests guard against losing
+gradual change. A three-month price memory means customers do not immediately follow a rate cut.
+
+All demand still runs on one representative day per month. Matching published annual/peak targets
+does not establish measured hourly shape or consecutive-day reliability.
+
 ## Data centers
 
 The U.S. data-center curve is interpolated between published historical and projected anchors:

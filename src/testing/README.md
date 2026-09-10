@@ -1,5 +1,14 @@
 # Headless simulation
 
+Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
+`initialPrograms: { efficiency: "Small", solar: "Large" }` and schedules each through the real
+reducer for month two. The matrix compares Off, Small, Large, solar-only, and combined funding
+in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant.
+Program costs are authored game assumptions, scaled by initial customer market and demand
+scale, then inflated from the starting year. Adoption is allocated once at the month boundary;
+its actual cost is spread across that month's ticks. Installed upgrades persist within the run.
+These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
+
 Plays the game without a browser, then checks that the economy behaved lawfully. A 20 year
 scenario runs in about half a second, so a change to the simulation can be sanity checked in
 seconds instead of by clicking through the UI in real time.
@@ -82,7 +91,7 @@ code rather than a vibe.
 | Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                |
 | Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                    |
 | Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
-| Supply accounting   | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge                                                                                                              |
+| Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                       |
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
@@ -133,3 +142,32 @@ dispatch or Immer draft behavior must still exercise those paths.
   rollovers, which is why the cash and energy checks only run within a month.
 - **`getFuelPricesPerMBTU` loops forever if no prices are loaded**, and `getWeather` throws. Any
   non-browser entry point has to call `loadSimData` first.
+
+## Time-triggered scenario choices
+
+Add a definition to `src/data/ScenarioChoices.ts`: a unique persisted `id`, scenario ID,
+zero-based trigger month, prompt, and options with stable IDs, outcome copy and difficulty-based
+upfront costs. Include a free option so a player with no cash can still choose. Definitions are
+presented in array order when several are due. No UI or reducer wiring is needed.
+
+Use `description` for consequences shown before commitment, `upfrontGrant` for a one-time
+company contribution, and `loadAdditions` to replace an authored connection schedule. Grants
+are booked as company revenue, never as a plant's electricity sales. Multiple load additions
+with the same demand type should share a label because Insights groups them into one series.
+
+The shared modal blocks navigation and dismissal; the reducer blocks the clock until an explicit
+response is accepted. Selecting closes the prompt and leaves play paused so the player can inspect
+the result before resuming. Saves retain unanswered prompts and replay actions retain answers.
+
+Accepted choices are story occurrences with the definition ID as their key and
+`attributes.choice` as the option ID. Future `WorldEvents` phase descriptions and previews can
+read these through `context.occurrences` (see `wildfirePrepared`) to branch narrative and effects.
+The forecast cache includes occurrence attributes, so an answer refreshes future effects.
+Costs are charged once and retained as operating expenses through reforecasting.
+
+The headless baseline bot explicitly selects the first free option. Add focused reducer tests
+for each consequential branch, including future effects, save and replay parity.
+Pass `scenarioResponses: { [decisionId]: optionId }` to select a specific branch in a simulation;
+an invalid or unaffordable response throws instead of leaving the bot stuck at the prompt.
+See [the scenario choice balance report](SCENARIO_CHOICE_BALANCE.md) for the reproducible
+Data Center, Deep Freeze and Wildfire win/loss matrix and price rationale.

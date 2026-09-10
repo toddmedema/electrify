@@ -1,4 +1,3 @@
-import * as React from "react";
 import {
   fireEvent,
   render,
@@ -41,10 +40,10 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   );
 
   const row = screen.getByRole("row", {
-    name: /Suitable project sites remaining.*648/,
+    name: /Project sites available in this game.*648/,
   });
   expect(row).toHaveTextContent("648");
-  expect(row).toHaveTextContent("Each project uses one suitable site");
+  expect(row).toHaveTextContent("Each project uses one site");
 });
 
 it("submits a storage purchase only once on a double-click", () => {
@@ -58,7 +57,9 @@ it("submits a storage purchase only once on a double-click", () => {
   );
 
   // Pumped Hydro is the first shopping card, so its price is the first purchase button.
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   const takeLoan = screen.getByRole("button", { name: "Take loan" });
   fireEvent.click(takeLoan);
   fireEvent.click(takeLoan);
@@ -75,10 +76,14 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     />,
   );
 
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
@@ -102,7 +107,9 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   expect(
     screen.getByRole("button", { name: "Show financing terms" }),
   ).toHaveAttribute("aria-expanded", "false");

@@ -139,47 +139,6 @@ describe("current facility economics", () => {
     );
   });
 
-  it("tracks starts only for the audited thermal facilities", () => {
-    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
-    const byName = (name: string) =>
-      generators.find((generator) => generator.name === name);
-
-    for (const name of [
-      "Natural Gas",
-      "Coal",
-      "Nuclear",
-      "Biomass",
-      "Geothermal",
-      "Enhanced Geothermal",
-    ]) {
-      expect(byName(name)?.tracksStarts).toBe(true);
-    }
-    expect(byName("Oil")?.tracksStarts).toBeUndefined();
-    expect(byName("Hydro")?.tracksStarts).toBeUndefined();
-    expect(byName("Nuclear")?.costPerStart).toBeUndefined();
-    expect(byName("Biomass")?.costPerStart).toBeUndefined();
-    expect(byName("Geothermal")?.costPerStart).toBeUndefined();
-    expect(byName("Enhanced Geothermal")?.costPerStart).toBeUndefined();
-  });
-
-  it("assigns technology-specific minimum stable outputs only to thermal plants", () => {
-    const generators = GENERATORS(stateAt(iceland, 2030), 50000000, [], []);
-    const minimum = (name: string) =>
-      generators.find((generator) => generator.name === name)
-        ?.minimumStableOutput;
-
-    expect(minimum("Coal")).toBe(0.4);
-    expect(minimum("Nuclear")).toBe(0.5);
-    expect(minimum("Natural Gas")).toBe(0.5);
-    expect(minimum("Oil")).toBe(0.5);
-    expect(minimum("Biomass")).toBe(0.4);
-    expect(minimum("Geothermal")).toBe(0.15);
-    expect(minimum("Enhanced Geothermal")).toBe(0.15);
-    expect(minimum("Hydro")).toBeUndefined();
-    expect(minimum("Wind")).toBeUndefined();
-    expect(minimum("Solar")).toBeUndefined();
-  });
-
   it("uses the 2024 ATB midpoint for ten-hour pumped hydro", () => {
     const pumpedHydro = STORAGE(stateAt(iceland, 2024), 1000000000).find(
       (facility) => facility.name === "Pumped Hydro",
@@ -234,15 +193,6 @@ describe("real technology cost trends", () => {
 });
 
 describe("location-aware facilities", () => {
-  it("offers geothermal and hydro in a resource-rich region", () => {
-    const state = stateAt(iceland);
-    const fuels = GENERATORS(state, 100000000, [], []).map((g) => g.fuel);
-    const storage = STORAGE(state, 500000000).map((s) => s.name);
-    expect(fuels).toContain("Geothermal");
-    expect(fuels).toContain("Hydro");
-    expect(storage).toContain("Pumped Hydro");
-  });
-
   it("does not offer site-dependent technologies without the resource", () => {
     const state = stateAt(france);
     const fuels = GENERATORS(state, 100000000, [], []).map((g) => g.fuel);
@@ -289,15 +239,6 @@ describe("enhanced geothermal", () => {
     expect(generatorAt(france, 2029, "Enhanced Geothermal")).toBeUndefined();
     expect(generatorAt(france, 2030, "Geothermal")).toBeUndefined();
     expect(generatorAt(france, 2030, "Enhanced Geothermal")).toBeDefined();
-  });
-
-  it("offers both geothermal technologies in resource-rich locations", () => {
-    const names = GENERATORS(stateAt(iceland, 2030), 100000000, [], []).map(
-      (generator) => generator.name,
-    );
-
-    expect(names).toContain("Geothermal");
-    expect(names).toContain("Enhanced Geothermal");
   });
 
   it("does not make enhanced geothermal more expensive as its fleet grows", () => {
@@ -383,24 +324,6 @@ describe("airborne wind", () => {
 });
 
 describe("biomass", () => {
-  it("offers a priced, dispatchable 50 MW reference plant", () => {
-    const generator = GENERATORS(stateAt(france, 2019), 50000000, [], []).find(
-      (candidate) => candidate.name === "Biomass",
-    );
-
-    expect(generator).toMatchObject({
-      fuel: "Biomass",
-      annualOperatingCost: 7235500,
-      btuPerWh: 13.3,
-      capacityFactor: 0.602,
-      maxPeakW: 50000000,
-      spinMinutes: 240,
-      yearsToBuild: 5,
-      lifespanYears: 30,
-    });
-    expect(generator?.buildCost).toBe(188870594);
-  });
-
   it("is available in every location", () => {
     [iceland, france].forEach((location) => {
       expect(

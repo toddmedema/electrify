@@ -37,15 +37,15 @@ export function summarizeYearOneOutlook(
   timeline: readonly TickPresentFutureType[],
 ): YearOneOutlook {
   let demand = 0;
-  let served = 0;
+  let supply = 0;
   let worstShortfallW = 0;
   timeline.forEach((tick) => {
     demand += Math.max(0, tick.demandW);
-    served += Math.max(0, Math.min(tick.supplyW, tick.demandW));
+    supply += Math.max(0, tick.availableSupplyW ?? tick.supplyW);
     worstShortfallW = Math.max(worstShortfallW, tick.demandW - tick.supplyW);
   });
   return {
-    demandServed: demand > 0 ? Math.min(1, served / demand) : 1,
+    demandServed: demand > 0 ? supply / demand : 1,
     // Fractions of a watt are forecast arithmetic, not a meaningful shortage.
     worstShortfallW: worstShortfallW < 1 ? 0 : worstShortfallW,
   };
