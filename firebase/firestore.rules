@@ -49,16 +49,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // The uniqueness guarantee for display names, claimed by document id. `create` already fails
-    // on an existing document, so a name can only be taken once; a claim is never updated, only
-    // released by its owner when they move to a different name.
-    match /usernames/{nameLower} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
-      allow update: if false;
-    }
-
     // Publicly readable: hiding the board from logged-out players inverts the incentive to sign
     // up, since seeing named strangers above you is the reason to bother.
     match /scores/{scoreId} {

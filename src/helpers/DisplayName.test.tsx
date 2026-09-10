@@ -1,6 +1,5 @@
 import {
   DISPLAY_NAME_MAX_LENGTH,
-  displayNameKey,
   normalizeDisplayName,
   suggestDisplayName,
   validateDisplayName,
@@ -34,15 +33,6 @@ describe("validateDisplayName", () => {
     rejected.forEach(([name, message]) => {
       expect(validateDisplayName(name)).toMatch(message);
     });
-  });
-});
-
-describe("displayNameKey", () => {
-  // The claim document is what makes a name unique, so two names that differ only in case or
-  // padding have to land on the same key or both get claimed
-  it("folds case and padding together", () => {
-    expect(displayNameKey("  Ada  ")).toBe("ada");
-    expect(displayNameKey("ADA")).toBe(displayNameKey("ada"));
   });
 });
 
