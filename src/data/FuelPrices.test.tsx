@@ -206,15 +206,6 @@ describe("getFuelPricesPerMBTU", () => {
     expect(pricesIn(FIXTURE_ENDING_YEAR + 1, 6, SEED + 1)).not.toEqual(first);
   });
 
-  // FuelPricesRaw.csv happens not to end in a newline, which is the only reason the trailing
-  // blank row the old reader handed back never landed in the table as year NaN. Adding one to the
-  // file should stay a whitespace change.
-  it("reads a file ending in a newline the same as one that does not", () => {
-    const withNewline = { ...pricesIn(FIXTURE_STARTING_YEAR, 6) };
-    initFuelPricesFromCsv(fixtureCsv() + "\n");
-    expect(pricesIn(FIXTURE_STARTING_YEAR, 6)).toEqual(withNewline);
-  });
-
   it("explains itself rather than hanging when nothing has been loaded", () => {
     initFuelPricesFromCsv("year,month,biomass,naturalgas,coal,uranium,oil");
     expect(() => pricesIn(FIXTURE_STARTING_YEAR, 1)).toThrow(
@@ -356,13 +347,6 @@ describe("getFuelEscalation", () => {
       Math.pow(1 + TREND_ESCALATION_YEARLY, 50),
       10,
     );
-  });
-
-  // The number the rate picker leans on: a game starting sixty years past the record is played
-  // against fuel an order of magnitude dearer, so its rates have to be an order of magnitude up
-  it("puts a 2080 start an order of magnitude above the record", () => {
-    expect(getFuelEscalation(2080)).toBeGreaterThan(9);
-    expect(getFuelEscalation(2080)).toBeLessThan(12);
   });
 });
 

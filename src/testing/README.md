@@ -85,10 +85,10 @@ code rather than a vibe.
 | Supply accounting   | `supplyByFuel` sums to no more than `supplyW`, which also includes storage discharge                                                                                                              |
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
-`Simulation.test.tsx` asserts all of this as part of `npm test`, across every scenario, both ends
-of the difficulty range, customer price competition, and a run that builds on credit. It also pins down
-determinism and a few economic identities (revenue really is rate times kilowatt hours, the carbon
-fee really is proportional to emissions).
+`Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
+`SimulationEconomics.test.tsx` covers difficulty, player strategies, price competition, and
+economic identities. `PublicUtilitySimulation.test.tsx` covers the researched public utilities.
+Keeping these independent groups in separate files lets Jest run the long simulations in parallel.
 
 `createGame` is exported for tests that want a realistic mid-game state without running a whole
 simulation -- `reducers/BuildFacility.test.tsx` uses it to check what building actually does.
@@ -108,6 +108,12 @@ entire point.
 It runs under CRA's jest because the reducer needs TypeScript, JSX and a DOM. `npm run sim` shells
 out to jest pointed at `SimCli.tsx`, which is named so CRA's default `testMatch` ignores it and
 `npm test` stays free of simulation output.
+
+Jest injects `Math` into its module scope through `extraGlobals` to avoid repeated VM global
+lookups in the simulation loops. This uses the same Math object and leaves the seeded formulas,
+coverage instrumentation, and scenario sweep intact. UI tests that only need a played-game fixture
+can call the real `tickState` on a mutable state and freeze it once before rendering. Tests of Redux
+dispatch or Immer draft behavior must still exercise those paths.
 
 ## Things worth knowing before you change this
 

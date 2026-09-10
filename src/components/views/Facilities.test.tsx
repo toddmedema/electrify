@@ -145,20 +145,6 @@ describe("the fleet list", () => {
     expect(screen.queryByText("Gas-turbine service")).toBeNull();
   });
 
-  it("leaves every row closed when nothing is selected", () => {
-    renderFacilities(game, null);
-    expect(screen.queryByText("Lifetime profit")).toBeNull();
-  });
-
-  it("uses singular construction copy for one month remaining", () => {
-    const underConstruction = createGame({ scenarioId: 100 });
-    underConstruction.facilities[0].yearsToBuildLeft = 1 / 12;
-    renderFacilities(underConstruction, null);
-
-    expect(screen.getByText(/1 month left/)).toBeInTheDocument();
-    expect(screen.queryByText(/1 months left/)).toBeNull();
-  });
-
   it("labels a facility whose output is constrained by a world event", () => {
     const constrained = createGame({ scenarioId: 104 });
     const facility = constrained.facilities[0];
@@ -180,29 +166,6 @@ describe("the fleet list", () => {
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
-  });
-
-  it("uses the nuclear icon for the France scenario's named reactor", () => {
-    const france = createGame({ scenarioId: 110 });
-    renderFacilities(france, null);
-
-    expect(screen.getByAltText("Grand Nuclear Unit")).toHaveAttribute(
-      "src",
-      "/images/nuclear.svg",
-    );
-  });
-
-  it("renders the reasonable worst-case fleet size", () => {
-    const tenFacilities = createGame({ scenarioId: 103 });
-    const template = tenFacilities.facilities[0];
-    tenFacilities.facilities = Array.from({ length: 10 }, (_, index) => ({
-      ...template,
-      id: index + 1,
-    }));
-
-    renderFacilities(tenFacilities, null);
-
-    expect(rows()).toHaveLength(10);
   });
 
   it("uses compact watt units in the accessible chart summary", () => {

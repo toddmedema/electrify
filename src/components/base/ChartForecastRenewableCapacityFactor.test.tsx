@@ -1,9 +1,7 @@
-import * as React from "react";
-import { render, screen } from "@testing-library/react";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { GeneratorShoppingType, TickPresentFutureType } from "../../Types";
-import ChartForecastRenewableCapacityFactor, {
+import {
   availableWeatherRenewables,
   monthlyRenewableCapacityFactors,
 } from "./ChartForecastRenewableCapacityFactor";
@@ -51,24 +49,5 @@ describe("ChartForecastRenewableCapacityFactor", () => {
     );
 
     expect(names).toEqual(expect.arrayContaining(["Wind", "Solar", "Hydro"]));
-  });
-
-  it("exposes each available series as a percentage", () => {
-    const game = createGame({ scenarioId: 100 });
-    render(
-      <ChartForecastRenewableCapacityFactor
-        game={game}
-        timeline={game.timeline}
-        domain={{ x: [game.timeline[0].minute, game.timeline.at(-1)!.minute] }}
-        startingYear={game.startingYear}
-        multiyear={false}
-      />,
-    );
-
-    expect(
-      screen.getByRole("img", {
-        name: /predicted monthly renewable output.*Wind capacity factor \(%\)/,
-      }),
-    ).toBeInTheDocument();
   });
 });

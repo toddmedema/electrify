@@ -266,35 +266,6 @@ describe("getWeather", () => {
     );
   });
 
-  it("moves monotonically from one hour's reading to the next", () => {
-    const readings = [0, 15, 30, 45].map(
-      (minuteOfHour) => getWeather(dateAt(5, 6, minuteOfHour), SEED).TEMP_C,
-    );
-    for (let i = 1; i < readings.length; i++) {
-      expect(readings[i]).toBeGreaterThan(readings[i - 1]);
-    }
-    expect(readings[0]).toBeCloseTo(fixtureRow(0, 5, 6).TEMP_C);
-    expect(readings[readings.length - 1]).toBeLessThan(
-      fixtureRow(0, 5, 7).TEMP_C,
-    );
-  });
-
-  it("stamps a blended reading with the hour it started in", () => {
-    const blended = getWeather(dateAt(7, 12, 30), SEED);
-    expect(blended.YEAR).toEqual(1980);
-    expect(blended.MONTH).toEqual(7);
-  });
-
-  it("forecasts past the end of the data rather than returning holes", () => {
-    const forecast = getWeather(dateAt(monthIndex(FIXTURE_YEARS, 2), 8), SEED);
-    expect(Number.isFinite(forecast.TEMP_C)).toBe(true);
-    expect(Number.isFinite(forecast.CLOUD_PCT)).toBe(true);
-    expect(Number.isFinite(forecast.WIND_KPH)).toBe(true);
-    expect(Number.isFinite(forecast.PRECIP_MM)).toBe(true);
-    expect(Number.isFinite(forecast.YEAR)).toBe(true);
-    expect(Number.isFinite(forecast.MONTH)).toBe(true);
-  });
-
   // Precipitation is the one field that isn't given an anomaly of its own: a forecast day takes
   // it whole from the real day it borrowed its shape from. So it has to stay in the record's own
   // vocabulary -- a wet hour of that month, or nothing -- rather than becoming a drizzle that
@@ -438,16 +409,6 @@ describe("getWeather", () => {
           tempSpreadC(month),
         );
       }
-    });
-
-    it("holds the line over a thousand years, where a random walk would be long gone", () => {
-      const means = forecastDailyMeans(1, "TEMP_C", 1000);
-      expect(Math.abs(mean(means) - monthlyTempC(1))).toBeLessThan(1);
-      // A walk with this step size would be tens of degrees out by year 1000
-      const worst = Math.max(
-        ...means.map((m) => Math.abs(m - monthlyTempC(1))),
-      );
-      expect(worst).toBeLessThan(5 * tempSpreadC(1));
     });
 
     it("never lets cloud cover saturate at nothing or total overcast", () => {

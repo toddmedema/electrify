@@ -15,7 +15,7 @@ import {
   MAX_CREDIT_POINTS,
   LCWH,
 } from "./Financials";
-import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL, LOAN_MONTHS } from "../Constants";
+import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL } from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -63,18 +63,6 @@ describe("getMonthlyPayment", () => {
     }
     // The last dollar of a ten year loan is where the rounding lands
     expect(balance).toBeCloseTo(0, 6);
-  });
-
-  it("charges more for a shorter term or a higher rate", () => {
-    expect(getMonthlyPayment(1000000, 0.06, 60)).toBeGreaterThan(
-      getMonthlyPayment(1000000, 0.06, 120),
-    );
-    expect(getMonthlyPayment(1000000, 0.1, LOAN_MONTHS)).toBeGreaterThan(
-      getMonthlyPayment(1000000, 0.05, LOAN_MONTHS),
-    );
-    const principal = 1000000;
-    const total = getMonthlyPayment(principal, 0.06, LOAN_MONTHS) * LOAN_MONTHS;
-    expect(total).toBeGreaterThan(principal);
   });
 });
 

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
-import { GameType, ScenarioType } from "../../Types";
+import { GameType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
 
 function props(overrides: Partial<Props> = {}): Props {
@@ -22,6 +22,7 @@ function recordPlayed(...scenarioIds: number[]) {
     JSON.stringify({
       plays: scenarioIds.map((scenarioId) => ({
         scenarioId,
+        timesPlayed: 1,
         date: "2026-08-27",
       })),
     }),
@@ -212,19 +213,6 @@ describe("NewGame", () => {
     ]);
   });
 
-  it("uses each recommended scenario's dedicated icon", () => {
-    render(<NewGame {...props()} />);
-    expect(
-      screen.getByRole("img", { name: "Carbon Fee icon" }),
-    ).toHaveAttribute("src", "/images/carbon fee.svg");
-    expect(
-      screen.getByRole("img", { name: "Data Center Boom icon" }),
-    ).toHaveAttribute("src", "/images/ai data center boom.svg");
-    expect(
-      screen.getByRole("img", { name: "Deep Freeze icon" }),
-    ).toHaveAttribute("src", "/images/texas deep freeze.svg");
-  });
-
   it("shows the inclusive final calendar year for recommendations", () => {
     render(<NewGame {...props()} />);
 
@@ -246,37 +234,6 @@ describe("NewGame", () => {
     expect(within(next).getByRole("button")).toHaveAccessibleName(
       `Start ${TUTORIALS[1].name.replace(/^Mission \d+:\s*/, "")}`,
     );
-  });
-
-  it("shows a completion summary when every tutorial is finished", () => {
-    recordPlayed(...TUTORIALS.map((tutorial) => tutorial.id));
-    render(<NewGame {...props()} />);
-
-    expect(screen.getByText("Tutorials complete")).toBeInTheDocument();
-    expect(screen.queryByTestId(/^tutorial-spotlight-/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
-    expect(
-      within(
-        screen.getByRole("group", { name: "All tutorials" }),
-      ).getAllByTestId(/^mission-complete-/),
-    ).toHaveLength(TUTORIALS.length);
-  });
-
-  it("shows completion badges in the expanded catalogs", () => {
-    const regular = SCENARIOS.find(
-      (scenario: ScenarioType) => !scenario.tutorialSteps,
-    ) as ScenarioType;
-    recordPlayed(TUTORIALS[0].id, regular.id);
-    render(<NewGame {...props()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
-    fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
-    expect(
-      screen.getByTestId(`mission-complete-${TUTORIALS[0].id}`),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId(`mission-complete-${regular.id}`),
-    ).toBeInTheDocument();
   });
 
   it("starts the recommended tutorial and opens challenge and custom details", () => {

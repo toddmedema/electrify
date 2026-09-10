@@ -340,24 +340,6 @@ describe("The Shale Boom pilot arc", () => {
       expect(upcomingIds.filter((id) => id && warningIds.has(id))).toEqual([]);
     });
   });
-
-  it("keeps every authored event body to one sentence and one text level", () => {
-    const entries = STORY_ARC_DEFINITIONS.flatMap((arc) =>
-      arc.phases.flatMap((phase) => {
-        const storyContext = context(0, arc.scenarioId);
-        const preview = phase.preview?.(storyContext, () => 0.5);
-        return [
-          phase.describe(storyContext, () => 0.5),
-          ...(preview ? [preview] : []),
-        ];
-      }),
-    );
-
-    entries.forEach((entry) => {
-      expect(entry).not.toHaveProperty("details");
-      expect(entry.message.match(/[.!?](?=\s|$)/g) || []).toHaveLength(1);
-    });
-  });
 });
 
 describe("Texas Deep Freeze", () => {

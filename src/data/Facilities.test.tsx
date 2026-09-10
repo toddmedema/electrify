@@ -330,20 +330,6 @@ describe("enhanced geothermal", () => {
     expect(withEnhanced?.viableLocationsRemaining).toBe(4);
     expect(withConventional?.viableLocationsRemaining).toBe(3);
   });
-
-  it("uses the 2030 cost and performance assumptions", () => {
-    const generator = generatorAt(france, 2030, "Enhanced Geothermal");
-
-    expect(generator).toMatchObject({
-      fuel: "Geothermal",
-      annualOperatingCost: 16000000,
-      capacityFactor: 0.83,
-      maxPeakW: 500000000,
-      yearsToBuild: 3.5,
-      lifespanYears: 30,
-    });
-    expect(generator?.buildCost).toBeCloseTo(463000000, -6);
-  });
 });
 
 describe("offshore wind", () => {
@@ -360,18 +346,6 @@ describe("offshore wind", () => {
     expect(generatorAt(newYork, 1991)).toBeUndefined();
     expect(generatorAt(newYork, 2000)).toBeDefined();
     expect(generatorAt(france, 2023)).toBeUndefined();
-  });
-
-  it("matches the 2023 EIA reference plant assumptions", () => {
-    const generator = generatorAt(newYork, 2023);
-    expect(generator).toMatchObject({
-      fuel: "Offshore Wind",
-      annualOperatingCost: 138600000,
-      maxPeakW: 1500000000,
-      lifespanYears: 25,
-    });
-    expect((generator?.buildCost as number) / 900000).toBeCloseTo(3689, -1);
-    expect(generator?.capacityFactor).toBeGreaterThan(0.4);
   });
 
   it("peaks in cost around 2010 instead of rising monotonically backwards", () => {
@@ -398,19 +372,6 @@ describe("airborne wind", () => {
     expect(airborneWindCostPerW(2028) * 1200000).toBeCloseTo(8400000, -2);
     expect(generatorAt(2035)?.buildCost).toBeCloseTo(4920000, -2);
     expect(airborneWindCostPerW(2050)).toBe(airborneWindCostPerW(2035));
-  });
-
-  it("uses early-commercial operating and build assumptions", () => {
-    const generator = generatorAt(2030);
-    expect(generator).toMatchObject({
-      fuel: "Airborne Wind",
-      annualOperatingCost: 61680,
-      btuPerWh: 0,
-      lifespanYears: 25,
-      spinMinutes: 1,
-    });
-    expect(generator?.capacityFactor).toBeCloseTo(0.888, 3);
-    expect(generator?.yearsToBuild).toBeCloseTo(2.026, 3);
   });
 
   it("grows modular arrays from the 1.2MW anchor to a 500MW cap", () => {

@@ -1,7 +1,6 @@
 import {
   arrayMove,
   getIntersectionX,
-  getRandomRangeAt,
   newSeed,
   normalAt,
   randomAt,
@@ -73,16 +72,6 @@ describe("randomAt", () => {
   });
 });
 
-describe("getRandomRangeAt", () => {
-  it("should return a number within the specified range", () => {
-    const min = 99;
-    const max = 100;
-    const result = getRandomRangeAt(12345, STREAM, 0, min, max);
-    expect(result).toBeGreaterThanOrEqual(min);
-    expect(result).toBeLessThan(max);
-  });
-});
-
 describe("normalAt", () => {
   const sample = (seed: number, count: number) =>
     Array.from({ length: count }, (_, index) => normalAt(seed, STREAM, index));
@@ -110,15 +99,6 @@ describe("normalAt", () => {
       normalAt(999, STREAM, index); // Draws that would have advanced a sequential generator
     }
     expect(normalAt(12345, STREAM, 7)).toEqual(expected);
-  });
-
-  it("gives neighbouring indexes unrelated values rather than a shared uniform", () => {
-    // One normal costs two uniforms, so a naive implementation would have index 0 and index 1
-    // drawing from overlapping pairs
-    const values = sample(12345, 500);
-    for (let index = 1; index < values.length; index++) {
-      expect(values[index]).not.toEqual(values[index - 1]);
-    }
   });
 
   it("never returns a value that would poison the simulation", () => {

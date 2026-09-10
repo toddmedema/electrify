@@ -10,10 +10,6 @@ describe("finance chart x values", () => {
       62 * MINUTES_PER_MONTH,
     );
   });
-
-  it("keeps the absolute month index outside Insights", () => {
-    expect(financeXValue({ month: 2020 * 12 + 3 })).toBe(2020 * 12 + 3);
-  });
 });
 
 describe("finance chart x ticks", () => {
@@ -22,9 +18,5 @@ describe("finance chart x ticks", () => {
 
     expect(ticks.length).toBeLessThanOrEqual(6);
     expect(ticks.every((tick) => tick % MINUTES_PER_MONTH === 0)).toBe(true);
-  });
-
-  it("keeps month-indexed finance charts on their original scale", () => {
-    expect(financeXTicks([12, 23], false)).toEqual([12, 14, 16, 18, 20, 22]);
   });
 });

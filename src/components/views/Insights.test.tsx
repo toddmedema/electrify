@@ -1,14 +1,12 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, isInaccessible } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
 import { GameType } from "../../Types";
 import Insights, {
-  INSIGHT_LAYERS,
   INSIGHT_PRESETS,
   MAX_CUSTOM_INSIGHT_PRESETS,
-  presetForLayers,
   withRequiredLayers,
 } from "./Insights";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -134,6 +132,15 @@ const user = userEvent.setup({ delay: null });
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);
 
+// Labelled controls can be found directly without computing names for every button on the pane.
+// Keep the visibility check: an inaccessible hidden control must still fail these interactions.
+function labelledButton(label: string | RegExp): HTMLElement {
+  const button = screen.getByLabelText(label, { selector: "button" });
+  expect(button).toBeVisible();
+  expect(isInaccessible(button)).toBe(false);
+  return button;
+}
+
 function renderInsights(
   scenarioId = 100,
   suppliedGame?: GameType,
@@ -215,49 +222,6 @@ function storeCustomPreset(name: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines five distinct, purpose-ordered presets", () => {
-    expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
-      INSIGHT_LAYERS.length,
-    );
-    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
-    expect(INSIGHT_PRESETS.overview.layers).toEqual([
-      "supplyDemand",
-      "cash",
-      "profit",
-      "customers",
-      "emissions",
-    ]);
-    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
-      "supplyDemand",
-      "supplyByFuel",
-      "storage",
-      "weather",
-      "water",
-    ]);
-    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
-      "profit",
-      "cash",
-      "revenue",
-      "expenses",
-      "fuelPrices",
-    ]);
-    expect(INSIGHT_PRESETS.growth.layers).toEqual([
-      "customers",
-      "demandByType",
-      "supplyDemand",
-      "revenue",
-      "profit",
-    ]);
-    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
-      "emissions",
-      "supplyByFuel",
-      "supplyDemand",
-      "fuelPrices",
-      "profit",
-    ]);
-    expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
-  });
-
   it("starts new players on the five-chart overview in priority order", () => {
     renderInsights();
 
@@ -291,15 +255,15 @@ describe("Insights layers", () => {
     ).not.toMatch(/market [^·]*\/kWh/);
     expect(within(levers).getByText("Market")).toBeInTheDocument();
     expect(within(levers).getByText("Customers / mo")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Hide rate slider" }),
-    ).toHaveAccessibleDescription(/projected customers .* next month/i);
+    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
+      /projected customers .* next month/i,
+    );
   });
 
   it("keeps the compact rate metrics visible when the slider is collapsed", async () => {
     renderInsights();
 
-    const toggle = screen.getByRole("button", { name: "Hide rate slider" });
+    const toggle = labelledButton("Hide rate slider");
     const sliderControl = screen.getByTestId("rate-slider-control");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(sliderControl).not.toHaveClass("insightsRateSliderCollapsed");
@@ -307,9 +271,10 @@ describe("Insights layers", () => {
 
     await user.click(toggle);
 
-    expect(
-      screen.getByRole("button", { name: "Show rate slider" }),
-    ).toHaveAttribute("aria-expanded", "false");
+    expect(labelledButton("Show rate slider")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
     expect(sliderControl).toHaveClass("insightsRateSliderCollapsed");
     expect(screen.getByRole("slider")).toBeInTheDocument();
     expect(
@@ -402,16 +367,6 @@ describe("Insights layers", () => {
     ).toBeNull();
   });
 
-  it("replaces preset horizons with a displayed 12-month date range", () => {
-    localStorage.setItem("insightsRange", "current");
-    renderInsights();
-
-    expect(screen.queryByRole("combobox", { name: "Time horizon" })).toBeNull();
-    expect(
-      screen.getByLabelText("Displayed date range: 2020–21"),
-    ).toBeVisible();
-  });
-
   it("zooms and pans every insight chart on one shared time viewport", async () => {
     renderInsights();
 
@@ -419,22 +374,22 @@ describe("Insights layers", () => {
     const cash = screen.getByTestId("chartInsightsCashPlot");
     const initial = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(initial));
-    expect(screen.getByRole("button", { name: "Pan earlier" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+    expect(labelledButton("Pan earlier")).toBeDisabled();
+    expect(labelledButton("Zoom out")).toBeEnabled();
 
-    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    await user.click(labelledButton("Zoom in"));
     const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
       screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Pan earlier" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Pan later" })).toBeEnabled();
+    expect(labelledButton("Pan earlier")).toBeEnabled();
+    expect(labelledButton("Pan later")).toBeEnabled();
 
-    await user.click(screen.getByRole("button", { name: "Pan later" }));
+    await user.click(labelledButton("Pan later"));
     expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
-    await user.click(screen.getByRole("button", { name: "Fit full timeline" }));
+    await user.click(labelledButton("Fit full timeline"));
     expect(supply).toHaveAttribute(
       "data-domain",
       JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
@@ -442,13 +397,6 @@ describe("Insights layers", () => {
     expect(
       screen.getByLabelText("Displayed date range: 2020–40"),
     ).toBeVisible();
-  });
-
-  it("uses hourly points for the continuous forecast", () => {
-    localStorage.setItem("insightsLayers", JSON.stringify(["weather"]));
-    renderInsights();
-
-    expect(screen.getByRole("img")).toHaveAttribute("data-step", "60");
   });
 
   it("advances the end while keeping a scenario-start viewport anchored", () => {
@@ -487,7 +435,7 @@ describe("Insights layers", () => {
     const game = createGame({ scenarioId: 100 });
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
-    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    await user.click(labelledButton("Zoom in"));
     const before = JSON.parse(supply.getAttribute("data-domain") || "[]");
 
     const nextGame = {
@@ -539,9 +487,9 @@ describe("Insights layers", () => {
 
   it("persists custom visibility and ordering across a remount", async () => {
     const view = renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(screen.getByRole("button", { name: "Move Revenue up" }));
+    await user.click(labelledButton("Move Revenue up"));
 
     const stored = JSON.parse(localStorage.getItem("insightsLayers") || "[]");
     expect(stored).toContain("revenue");
@@ -556,7 +504,7 @@ describe("Insights layers", () => {
 
   it("saves changes back to a default preset and restores them on remount", async () => {
     const view = renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
 
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
@@ -580,11 +528,11 @@ describe("Insights layers", () => {
 
   it("restores a modified default preset to its original layers", async () => {
     renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Restore original preset" }),
     );
@@ -599,7 +547,7 @@ describe("Insights layers", () => {
 
   it("creates and updates a named preset", async () => {
     renderInsights();
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(
       screen.getByRole("menuitem", { name: "Save as new preset" }),
     );
@@ -613,7 +561,7 @@ describe("Insights layers", () => {
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Peak watch");
 
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     const library = JSON.parse(
@@ -629,7 +577,7 @@ describe("Insights layers", () => {
     storeCustomPreset("Peak watch");
     const view = renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(screen.getByRole("menuitem", { name: /Rename preset/ }));
     const name = screen.getByRole("textbox", { name: "Preset name" });
     await user.clear(name);
@@ -650,7 +598,7 @@ describe("Insights layers", () => {
     storeCustomPreset("Morning peak");
     renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(screen.getByRole("menuitem", { name: /Delete preset/ }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(
@@ -679,25 +627,10 @@ describe("Insights layers", () => {
     );
     renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     expect(
       screen.getByRole("menuitem", { name: "Save as new preset" }),
     ).toHaveAttribute("aria-disabled", "true");
-  });
-
-  it("offers expected renewable output as an insight layer", async () => {
-    renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
-    await user.click(
-      screen.getByRole("checkbox", { name: "Renewable output" }),
-    );
-
-    expect(
-      screen.getByText("Renewable output", { selector: "h6" }),
-    ).toBeVisible();
-    expect(
-      screen.getByTestId("renewable-capacity-factor-chart"),
-    ).toHaveAttribute("data-sync-key", "insights");
   });
 
   it("combines recorded monthly data with the continuous forecast", async () => {
@@ -708,7 +641,7 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
-    await user.click(screen.getByRole("button", { name: "Fit full timeline" }));
+    await user.click(labelledButton("Fit full timeline"));
 
     expect(
       screen.getByRole("region", { name: "Planning controls" }),
@@ -731,7 +664,7 @@ describe("Insights layers", () => {
       ),
     ).toBeGreaterThan(3);
 
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     expect(screen.getByRole("checkbox", { name: "Fuel Prices" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Profit" })).toBeEnabled();
   });

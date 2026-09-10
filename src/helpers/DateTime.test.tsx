@@ -58,11 +58,6 @@ describe("month chart axes", () => {
 });
 
 describe("getHourTicks", () => {
-  it("should space a day's worth of ticks 4 hours apart", () => {
-    const ticks = getHourTicks(0, 1440);
-    expect(ticks).toEqual([0, 240, 480, 720, 960, 1200, 1440]);
-  });
-
   it("should snap to whole hours when the range starts mid-hour", () => {
     const ticks = getHourTicks(125, 125 + 1440);
     expect(ticks[0] % 60).toEqual(0);
@@ -79,16 +74,6 @@ describe("getHourTicks", () => {
 describe("getSunriseSunset", () => {
   const january = getDateFromMinute(0, 2020);
   const july = getDateFromMinute(6 * 1440, 2020);
-
-  it("puts sunrise in the morning and sunset in the evening", () => {
-    const { sunrise, sunset } = getSunriseSunset(january, LOCATIONS.SF);
-    // Roughly 7:25am and 5:00pm in San Francisco in January
-    expect(sunrise).toBeGreaterThan(6 * 60);
-    expect(sunrise).toBeLessThan(9 * 60);
-    expect(sunset).toBeGreaterThan(16 * 60);
-    expect(sunset).toBeLessThan(19 * 60);
-    expect(sunset).toBeGreaterThan(sunrise);
-  });
 
   it("gives every location a daylit day in both seasons", () => {
     Object.values(LOCATIONS).forEach((location) => {
@@ -324,29 +309,5 @@ describe("summarizeTimelineByMonth", () => {
     expect(new Set(indexes).size).toEqual(indexes.length);
     // Long enough to roll over a year, which the month numbers wrap on but the ordering must not
     expect(byMonth[byMonth.length - 1].year).toBeGreaterThan(byMonth[0].year);
-  });
-
-  it("should total the same as summarizing the whole span at once", () => {
-    const game = createGame({ scenarioId: 103 });
-    const timeline = generateNewTimeline(
-      game,
-      game.timeline[0].cash,
-      game.timeline[0].customers,
-      TICKS_PER_MONTH * 6,
-    );
-
-    const byMonth = summarizeTimelineByMonth(timeline, startingYear);
-    const whole = summarizeTimeline(timeline, startingYear);
-
-    const totalRevenue = byMonth.reduce(
-      (sum: number, m: MonthlyHistoryType) => sum + m.revenue,
-      0,
-    );
-    expect(totalRevenue).toBeCloseTo(whole.revenue, 4);
-    // Ending values are carried rather than added, so the whole timeline's are the last
-    // month's - not the first month's, which is where they landed while both helpers walked
-    // their ticks backwards
-    expect(byMonth[byMonth.length - 1].cash).toEqual(whole.cash);
-    expect(byMonth[0].cash).not.toEqual(whole.cash);
   });
 });

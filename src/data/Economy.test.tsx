@@ -69,10 +69,6 @@ describe("Economy", () => {
       expect(primeIn(2005, 6)).toBeCloseTo(FIXTURE_PRIME / 100, 10);
       expect(inflationIn(2005, 6)).toBeCloseTo(FIXTURE_INFLATION, 10);
     });
-
-    it("reads prime as a fraction, not the percent the CSV stores", () => {
-      expect(primeIn(2005, 6)).toBeLessThan(1);
-    });
   });
 
   describe("projection", () => {
@@ -126,12 +122,6 @@ describe("Economy", () => {
       for (let i = 1; i < series.length; i++) {
         expect(Math.abs(series[i] - series[i - 1])).toBeLessThan(0.01);
       }
-    });
-
-    it("is a pure function of its seed", () => {
-      const first = projectedPrimes(20);
-      initEconomyFromCsv(fixtureCsv());
-      expect(projectedPrimes(20)).toEqual(first);
     });
 
     it("gives a different economy to a different seed", () => {

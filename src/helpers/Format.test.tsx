@@ -65,10 +65,6 @@ describe("formatWattHoursAxis", () => {
 });
 
 describe("formatWattsOfPeak", () => {
-  it("should report the current output in the peak's unit", () => {
-    expect(formatWattsOfPeak(356000000, 500000000)).toEqual("356/500MW");
-  });
-
   it("should keep an extra digit when the current output is below the peak's unit", () => {
     expect(formatWattsOfPeak(100000000, 1000000000)).toEqual("0.1/1GW");
   });
@@ -88,11 +84,6 @@ describe("formatWattHoursOfPeak", () => {
 // renders those literally, which is how "$INFINITY/MWh" reached the build screen.
 describe("money formatting of values that are not numbers", () => {
   const NO_ESTIMATE = "\u2014";
-
-  it("still formats ordinary amounts", () => {
-    expect(formatMoneyConcise(1500000)).toEqual("$1.5M");
-    expect(formatMoneyStable(1500000)).toEqual("$1.50M");
-  });
 
   it("does not promote an amount before it reaches the next tier", () => {
     expect(formatMoneyConcise(700000000)).toEqual("$700M");

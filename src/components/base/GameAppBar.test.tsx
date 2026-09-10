@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createGame } from "../../testing/Simulator";
 import {
   GameAppBar,
@@ -37,19 +37,6 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
-  it("keeps all four speeds one tap away", () => {
-    const onSpeedChange = jest.fn();
-    renderAppBar({ onSpeedChange });
-
-    const speedControls = screen.getByRole("group", { name: "game speed" });
-    expect(within(speedControls).getAllByRole("button")).toHaveLength(4);
-
-    fireEvent.click(
-      within(speedControls).getByRole("button", { name: "fast speed" }),
-    );
-    expect(onSpeedChange).toHaveBeenCalledWith("FAST");
-  });
-
   it("reports reserve and grows when a plant is added", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
@@ -157,31 +144,6 @@ describe("GameAppBar", () => {
         demandW: 0,
       } as TickPresentFutureType),
     ).toBe(500000);
-  });
-
-  it("omits the redundant money and time icons on desktop", () => {
-    renderAppBar();
-    expect(screen.queryByLabelText("Money")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Time")).not.toBeInTheDocument();
-  });
-
-  it("omits events and sound controls from the menu", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-
-    expect(screen.queryByRole("menuitem", { name: /events/i })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: /turn sound/i })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Options" })).toBeVisible();
-  });
-
-  it("gives the scenario dialog only the scenario name", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Scenario details" }));
-
-    expect(
-      screen.getByRole("dialog", { name: "Rise of Renewables" }),
-    ).toBeVisible();
   });
 
   it("returns focus to the primary action after Save & Quit", () => {

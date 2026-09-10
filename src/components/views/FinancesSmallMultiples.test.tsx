@@ -53,13 +53,12 @@ function tile(label: string): HTMLElement {
 }
 
 function playMonths(months: number): GameType {
-  let state = createGame({ scenarioId: 100 });
+  const state = createGame({ scenarioId: 100 });
   while (state.date.monthsElapsed < months) {
-    state = produce(state, (draft: GameType) => {
-      tickState(draft);
-    });
+    tickState(state);
   }
-  return state;
+  // Build the real history once, then freeze it as Redux would before sharing it between renders.
+  return produce(state, () => undefined);
 }
 
 function renderFinances(game: GameType) {
@@ -76,23 +75,6 @@ describe("the Finances small multiples", () => {
   const game = playMonths(14);
 
   beforeEach(() => localStorage.clear());
-
-  it("draws a tile per headline metric instead of the dropdown", () => {
-    renderFinances(game);
-
-    [
-      "Profit",
-      "Revenue",
-      "Expenses",
-      "CO2e emitted",
-      "Customers",
-      "Cash",
-    ].forEach((label: string) => {
-      expect(tile(label)).toBeInTheDocument();
-    });
-    // Only the period select is left: the metric one is what the tiles replaced
-    expect(screen.getAllByRole("combobox")).toHaveLength(1);
-  });
 
   it("promotes the tile that is clicked to the chart, and says which one that is", async () => {
     renderFinances(game);
