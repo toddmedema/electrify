@@ -70,6 +70,15 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".gridHealth-blackout:visible")).toBeVisible();
     await page.getByRole("button", { name: "pause", exact: true }).click();
     await expect(page.locator(".missionRiskButton:visible")).toHaveCount(0);
+    if (info.project.name.startsWith("mobile")) {
+      const heights = await page.evaluate(() =>
+        ["#topbar", ".gridHealth", ".missionSummary"].map(
+          (selector) =>
+            document.querySelector(selector)!.getBoundingClientRect().height,
+        ),
+      );
+      expect(heights).toEqual([56, 56, 56]);
+    }
     await expect(
       page.locator(".gridHealth-blackout:visible"),
     ).not.toContainText("Now");
@@ -108,6 +117,53 @@ for (const theme of ["light", "dark"]) {
     }
   });
 }
+
+test("status boundary follows the saved movable pane divider and window width", async ({
+  page,
+}, info) => {
+  test.skip(
+    !["desktop-chromium", "desktop-1440px"].includes(info.project.name),
+  );
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const splitter = page.getByRole("separator").first();
+  const aligned = async () => {
+    await expect(page.locator(".gridHealth:visible")).toHaveCount(1);
+    await expect
+      .poll(async () => {
+        const grid = await page.locator(".gridHealth:visible").boundingBox();
+        const divider = await splitter.boundingBox();
+        return Math.abs(grid!.x + grid!.width - divider!.x);
+      })
+      .toBeLessThanOrEqual(1);
+  };
+  await aligned();
+  await settle(page);
+  const before = (await splitter.boundingBox())!;
+  await page.mouse.move(before.x + before.width / 2, before.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 100, before.y + 20, { steps: 8 });
+  await page.mouse.up();
+  await aligned();
+  expect((await splitter.boundingBox())!.x).toBeGreaterThan(before.x + 80);
+  await splitter.focus();
+  await page.keyboard.press("ArrowRight");
+  await aligned();
+  const savedX = (await splitter.boundingBox())!.x;
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await page.reload();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await aligned();
+  expect(
+    Math.abs((await splitter.boundingBox())!.x - savedX),
+  ).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await aligned();
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await aligned();
+  await splitter.dblclick();
+  await aligned();
+});
 
 test("one Generator edge restores evidence range through Return and browser traversal", async ({
   page,

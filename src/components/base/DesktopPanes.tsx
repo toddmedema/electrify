@@ -195,6 +195,19 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
   const totalWeight = sized.reduce((sum, weight) => sum + weight, 0);
   const template = sized.map((w) => `${w}fr`).join(` ${SPLITTER_PX}px `);
 
+  // The status header is a sibling of this grid. Share the first track's exact weighted
+  // width, including splitter space, so it follows dragging, saved layouts and resizing.
+  const firstFraction = sized[0] / totalWeight;
+  const firstTrackWidth = `calc(${firstFraction * 100}% - ${SPLITTER_PX * (sized.length - 1) * firstFraction}px)`;
+  React.useLayoutEffect(() => {
+    const layout = containerRef.current?.parentElement;
+    if (!layout) return;
+    layout.style.setProperty("--facilities-pane-width", firstTrackWidth);
+    return () => {
+      layout.style.removeProperty("--facilities-pane-width");
+    };
+  }, [firstTrackWidth]);
+
   return (
     <div
       className="desktop-panes"
