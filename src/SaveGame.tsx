@@ -38,18 +38,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Version 5 corrects storage accounting, solar output, oil emissions and weather forcing.
-// Older snapshots contain forecasts and financial results calculated with different physics;
-// do not silently mix those results with the new simulation. Original files remain untouched.
-// Version 6 separates reachable reserve and local/purchased emissions and recalibrates resources.
-// Version 7 adds mandatory scenario choices and operating tariffs/contracts.
-// Version 8 conserves deferred residential tariff energy until later in the day.
-// Version 9 retains configurable demand windows and cross-month recovery batches.
-// Version 10 adds mandatory connection/winterization choices and their economic effects.
-export const SAVE_VERSION = 10;
 
 export interface SaveGameType {
-  version: number;
   savedAt: string; // ISO 8601
   appVersion: string; // For bug reports
   game: GameType;
@@ -128,7 +118,6 @@ function validEmissions(raw: unknown): boolean {
 
 export function serializeSave(game: GameType): SaveGameType {
   return {
-    version: SAVE_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
@@ -145,11 +134,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (
-    save.version !== SAVE_VERSION ||
-    typeof save.savedAt !== "string" ||
-    typeof save.appVersion !== "string"
-  ) {
+  if (typeof save.savedAt !== "string" || typeof save.appVersion !== "string") {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -413,7 +398,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       : undefined,
     meaningfulDecisions: game.meaningfulDecisions!,
     meaningfulDecisionGateWaived: game.meaningfulDecisionGateWaived ?? false,
-    timeline: game.timeline.map((t) => ({
+    timeline: (game as GameType).timeline.map((t) => ({
       ...t,
       expensesPolicy: t.expensesPolicy ?? 0,
       expensesImports: t.expensesImports ?? 0,
@@ -430,7 +415,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
       revenueExports: t.revenueExports ?? 0,
     })),
   };
-  return { ...save, game: normalized, version: SAVE_VERSION } as SaveGameType;
+  return { ...save, game: normalized } as SaveGameType;
 }
 
 export function readSave(): SaveGameType | null {

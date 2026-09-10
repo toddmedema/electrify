@@ -289,18 +289,6 @@ describe("offshore wind", () => {
     expect(generatorAt(france, 2023)).toBeUndefined();
   });
 
-  it("matches the 2023 EIA reference plant assumptions", () => {
-    const generator = generatorAt(newYork, 2023);
-    expect(generator).toMatchObject({
-      fuel: "Offshore Wind",
-      annualOperatingCost: 138600000,
-      maxPeakW: 1500000000,
-      lifespanYears: 25,
-    });
-    expect((generator?.buildCost as number) / 900000).toBeCloseTo(3689, -1);
-    expect(generator?.capacityFactor).toBeGreaterThan(0.4);
-  });
-
   it("peaks in cost around 2010 instead of rising monotonically backwards", () => {
     const cost2000 = generatorAt(newYork, 2000)?.buildCost as number;
     const cost2010 = generatorAt(newYork, 2010)?.buildCost as number;

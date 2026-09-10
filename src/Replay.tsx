@@ -30,18 +30,6 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// Version 2 changes authored starting fleets and their facility IDs, so older action streams can
-// no longer reproduce the run they recorded.
-// Version 4 adds customer program actions; version 5 adds transmission builds and trading policy.
-// Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
-// reproduce their recorded outcomes and must not be relabeled as current replays.
-// Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
-// Version 10 adds mandatory generic scenario choices and operating tariffs/contracts.
-// Version 11 shifts residential tariff energy to later hours instead of eliminating it.
-// Version 12 supports independently configurable four-hour customer demand windows.
-// Version 13 adds mandatory connection/winterization choices and their economic effects.
-export const REPLAY_VERSION = 13;
-
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
  * dozen builds and a handful of rate changes, so this sits far past normal play; it's here so
@@ -142,7 +130,6 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     return undefined;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: packageJson.version,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
@@ -246,9 +233,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (doc.version !== REPLAY_VERSION) {
-    return null;
-  }
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
@@ -267,7 +251,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: doc.appVersion,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],

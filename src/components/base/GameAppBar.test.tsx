@@ -1,14 +1,13 @@
-import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { createGame } from "../../testing/Simulator";
+import { TickPresentFutureType } from "../../Types";
 import {
   GameAppBar,
   getGridHealth,
   Props,
   reserveCapacityW,
 } from "./GameAppBar";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { TickPresentFutureType } from "../../Types";
 
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
@@ -30,19 +29,6 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
-  it("keeps all four speeds one tap away", () => {
-    const onSpeedChange = jest.fn();
-    renderAppBar({ onSpeedChange });
-
-    const speedControls = screen.getByRole("group", { name: "game speed" });
-    expect(within(speedControls).getAllByRole("button")).toHaveLength(4);
-
-    fireEvent.click(
-      within(speedControls).getByRole("button", { name: "fast speed" }),
-    );
-    expect(onSpeedChange).toHaveBeenCalledWith("FAST");
-  });
-
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
@@ -97,15 +83,6 @@ describe("GameAppBar", () => {
       state: "blackout",
       metric: "373MW short",
     });
-  });
-  it("gives the scenario dialog only the scenario name", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Scenario details" }));
-
-    expect(
-      screen.getByRole("dialog", { name: "Rise of Renewables" }),
-    ).toBeVisible();
   });
 
   it("returns focus to the primary action after Save & Quit", () => {

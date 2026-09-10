@@ -1,5 +1,4 @@
 import {
-  getPlayedScenarioIds,
   getScenarioPlayCounts,
   getStorageChoice,
   recordScenarioPlayed,
@@ -43,21 +42,6 @@ describe("getStorageChoice", () => {
 describe("scenario play history", () => {
   beforeEach(() => {
     getLocalStorage().removeItem("plays");
-  });
-
-  it("treats legacy records without counts as one play", () => {
-    setStorageKeyValue("plays", {
-      plays: [
-        { scenarioId: 100, date: "2026-08-27" },
-        { scenarioId: 101, date: "2026-08-28", timesPlayed: 3 },
-      ],
-    });
-
-    expect(getScenarioPlayCounts()).toEqual({ 100: 1, 101: 3 });
-    expect(getPlayedScenarioIds()).toEqual([100, 101]);
-
-    recordScenarioPlayed(100);
-    expect(getScenarioPlayCounts()).toEqual({ 100: 2, 101: 3 });
   });
 
   it("increments a compact count instead of appending repeat plays", () => {

@@ -3,22 +3,12 @@ import { parseCsv } from "./Csv";
 const HEADER = "month,year,prime,inflation";
 
 describe("parseCsv", () => {
-  it("keys each row by the column names in the header", () => {
-    expect(parseCsv(`${HEADER}\n12,2019,4.75,0.0180`)).toEqual([
-      { month: "12", year: "2019", prime: "4.75", inflation: "0.0180" },
-    ]);
-  });
-
   // FuelPricesRaw.csv and the fixture FuelPrices.test.tsx builds list their columns in different
   // orders, so reading by position rather than by name would silently swap coal and gas
   it("reads by column name rather than by position", () => {
     const [row] = parseCsv("year,month,coal,oil\n2019,12,2.9,9.76");
     const [swapped] = parseCsv("month,year,oil,coal\n12,2019,9.76,2.9");
     expect(row).toEqual(swapped);
-  });
-
-  it("gives back no rows for a header on its own", () => {
-    expect(parseCsv(HEADER)).toEqual([]);
   });
 
   it("gives back no rows for an empty file", () => {

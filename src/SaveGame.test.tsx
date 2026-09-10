@@ -1,4 +1,10 @@
 import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
+import { emptyPolicies } from "./helpers/Policies";
+import gameReducer, {
+  buildTransmissionLine,
+  delta,
+  tickState,
+} from "./reducers/Game";
 import {
   clearSave,
   clearSaveFor,
@@ -6,19 +12,12 @@ import {
   parseSave,
   readSave,
   SAVE_KEY,
-  SAVE_VERSION,
   serializeSave,
   startAutosave,
   writeSave,
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
-import gameReducer, {
-  buildTransmissionLine,
-  delta,
-  tickState,
-} from "./reducers/Game";
-import { emptyPolicies } from "./helpers/Policies";
 
 jest.setTimeout(60000);
 
@@ -45,7 +44,6 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save).not.toBeNull();
-    expect(save!.version).toBe(SAVE_VERSION);
     expect(save!.game.seed).toBe(game.seed);
     expect(save!.game.scenarioId).toBe(game.scenarioId);
     expect(save!.game.facilities).toEqual(game.facilities);
@@ -74,16 +72,6 @@ describe("SaveGame", () => {
     raw.game.monthlyHistory[0].chartAverage.demandByType.Residential = "bad";
     expect(parseSave(raw)).toBeNull();
   });
-
-  it.each(Array.from({ length: SAVE_VERSION - 1 }, (_, index) => index + 1))(
-    "rejects version %i calculated with older physics without modifying it",
-    (version) => {
-      const legacy = { ...serializeSave(game), version };
-      const before = JSON.stringify(legacy);
-      expect(parseSave(legacy)).toBeNull();
-      expect(JSON.stringify(legacy)).toBe(before);
-    },
-  );
 
   it("round-trips validated decision progress", () => {
     const missingCurrent = JSON.parse(JSON.stringify(serializeSave(game)));
@@ -216,19 +204,13 @@ describe("SaveGame", () => {
     expect(readSave()).toBeNull();
   });
 
-  it("rejects a save from a different schema version", () => {
-    expect(
-      parseSave({ ...serializeSave(game), version: SAVE_VERSION + 1 }),
-    ).toBeNull();
-  });
-
-  it("rejects a save without current envelope metadata", () => {
+  it("rejects a save without envelope metadata", () => {
     const save = serializeSave(game);
     expect(parseSave({ ...save, savedAt: undefined })).toBeNull();
     expect(parseSave({ ...save, appVersion: undefined })).toBeNull();
   });
 
-  it("rejects a current-version save without customer-market state", () => {
+  it("rejects a save without customer-market state", () => {
     const save = serializeSave(game);
     const withoutMarket = { ...save.game } as Partial<GameType>;
     delete withoutMarket.customerMarketSize;
@@ -287,7 +269,7 @@ describe("SaveGame", () => {
     expect(parseSave(impossible)).toBeNull();
   });
 
-  it("rejects a current-version save without current runtime state", () => {
+  it("rejects a save without runtime state", () => {
     const save = serializeSave(game);
     for (const field of [
       "eventLog",
@@ -301,7 +283,7 @@ describe("SaveGame", () => {
     }
   });
 
-  it("rejects current-version monthly history without story simulation facts", () => {
+  it("rejects monthly history without story simulation facts", () => {
     const save = serializeSave(game);
     const month = { ...save.game.monthlyHistory[0] } as Partial<
       GameType["monthlyHistory"][number]
@@ -315,7 +297,7 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  it("rejects a current-version save with incomplete facility totals", () => {
+  it("rejects a save with incomplete facility totals", () => {
     const save = serializeSave(game);
     const facility = { ...save.game.facilities[0] } as Partial<
       GameType["facilities"][number]
@@ -352,7 +334,6 @@ describe("SaveGame", () => {
     expect(parseSave(null)).toBeNull();
     expect(parseSave("nope")).toBeNull();
     expect(parseSave({})).toBeNull();
-    expect(parseSave({ version: SAVE_VERSION })).toBeNull();
   });
 
   // An imported file is untrusted input, and a malformed facility would otherwise only surface as

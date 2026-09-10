@@ -8,7 +8,7 @@ import {
   resumableSave,
   saveFilename,
 } from "./SaveFile";
-import { clearSave, SAVE_VERSION, serializeSave, writeSave } from "./SaveGame";
+import { clearSave, serializeSave, writeSave } from "./SaveGame";
 import { GameType, ScenarioType } from "./Types";
 
 // Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
@@ -56,11 +56,6 @@ describe("SaveFile", () => {
     it("resolves the scenario the save was played in", () => {
       writeSave(fakeGame());
       expect(describeSave(resumableSave()!)).toBe("Rise of Renewables, 2035");
-    });
-
-    it("ignores a save whose scenario this build no longer has", () => {
-      writeSave(fakeGame({ scenarioId: 99999 }));
-      expect(resumableSave()).toBeNull();
     });
 
     it("takes a custom game's scenario from the save itself", () => {
@@ -172,25 +167,6 @@ describe("SaveFile", () => {
       const { save, error } = await readSaveFile(saveFile("not json {"));
       expect(save).toBeUndefined();
       expect(error).toMatch(/isn't an Electrify save/);
-    });
-
-    it.each([SAVE_VERSION - 1, SAVE_VERSION + 1])(
-      "rejects a save from incompatible version %i",
-      async (version) => {
-        const { save, error } = await readSaveFile(
-          saveFile({ ...serializeSave(fakeGame()), version }),
-        );
-        expect(save).toBeUndefined();
-        expect(error).toMatch(/isn't a valid Electrify save/);
-      },
-    );
-
-    it("rejects a save whose scenario this build doesn't have", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile(serializeSave(fakeGame({ scenarioId: 99999 }))),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/scenario/);
     });
 
     // Whatever the player picked, it's read into memory before anything else looks at it

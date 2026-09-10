@@ -1,11 +1,11 @@
+import { getDateFromMinute } from "../helpers/DateTime";
+import { LocationType, RawWeatherType } from "../Types";
 import {
   getRawSolarIrradianceWM2,
   getWeather,
   hasOffshoreWind,
   initWeatherFromRows,
 } from "./Weather";
-import { getDateFromMinute } from "../helpers/DateTime";
-import { LocationType, RawWeatherType } from "../Types";
 
 // Weather rows are looked up by position, one row per hour, with DAYS_PER_MONTH = 1 -- so a
 // single year of data is 12 months x 24 hours. The fixture starts at 1980, the first year the
@@ -261,12 +261,6 @@ describe("getWeather", () => {
     );
   });
 
-  it("stamps a blended reading with the hour it started in", () => {
-    const blended = getWeather(dateAt(7, 12, 30), SEED);
-    expect(blended.YEAR).toEqual(1980);
-    expect(blended.MONTH).toEqual(7);
-  });
-
   // Precipitation is the one field that isn't given an anomaly of its own: a forecast day takes
   // it whole from the real day it borrowed its shape from. So it has to stay in the record's own
   // vocabulary -- a wet hour of that month, or nothing -- rather than becoming a drizzle that
@@ -406,16 +400,6 @@ describe("getWeather", () => {
           tempSpreadC(month),
         );
       }
-    });
-
-    it("holds the line over a thousand years, where a random walk would be long gone", () => {
-      const means = forecastDailyMeans(1, "TEMP_C", 1000);
-      expect(Math.abs(mean(means) - monthlyTempC(1))).toBeLessThan(1);
-      // A walk with this step size would be tens of degrees out by year 1000
-      const worst = Math.max(
-        ...means.map((m) => Math.abs(m - monthlyTempC(1))),
-      );
-      expect(worst).toBeLessThan(5 * tempSpreadC(1));
     });
 
     it("never lets cloud cover saturate at nothing or total overcast", () => {

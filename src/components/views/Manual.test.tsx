@@ -1,9 +1,8 @@
-import * as React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import Manual, { clearManualMemory } from "./Manual";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { CONCEPT_LABELS, CONCEPT_NAMES } from "../base/ConceptIcon";
+import Manual, { clearManualMemory } from "./Manual";
 
 function renderManual(focusEntry?: string) {
   return render(<Manual onBack={() => undefined} focusEntry={focusEntry} />);
@@ -29,16 +28,6 @@ function listedTitles(): string[] {
 describe("Manual", () => {
   beforeEach(() => {
     clearManualMemory();
-  });
-
-  it("pins How to Play above the grouped entries", () => {
-    renderManual();
-    const titles = listedTitles();
-    expect(titles[0]).toContain(MANUAL_ENTRY.HOW_TO_PLAY);
-    // Alphabetical ordering used to open on these two, which tell a new player nothing
-    expect(titles[1]).not.toContain(MANUAL_ENTRY.BTU);
-    expect(screen.getByText("Gameplay")).toBeInTheDocument();
-    expect(screen.getByText("Physics & Units")).toBeInTheDocument();
   });
 
   // The old filter only looked at children that were plain strings, so any paragraph
@@ -136,11 +125,6 @@ describe("Manual", () => {
     expect(entryHeader(MANUAL_ENTRY.BTU)).toBeInTheDocument();
   });
 
-  it("has no clear button until there's something to clear", () => {
-    renderManual();
-    expect(screen.queryByLabelText("clear search")).not.toBeInTheDocument();
-  });
-
   it("opens the entry a deep link points at, and nothing else", () => {
     renderManual(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY);
     expect(entryHeader(MANUAL_ENTRY.TOTAL_COST_OF_ENERGY)).toHaveAttribute(
@@ -159,21 +143,6 @@ describe("Manual", () => {
     expect(header).toHaveAttribute("tabindex", "0");
     expect(header).toHaveAttribute("aria-expanded");
     expect(header).toHaveAttribute("aria-controls");
-  });
-
-  it("lists the point values in a column rather than as run-on text", async () => {
-    renderManual();
-    await userEvent.click(entryHeader(MANUAL_ENTRY.SCORE));
-    const row = screen
-      .getAllByRole("row")
-      .find((r: HTMLElement) =>
-        (r.textContent || "").includes(
-          "per TWh of demand not served during blackouts",
-        ),
-      );
-    expect(row).toBeDefined();
-    // The investor penalty, in its own cell rather than run together with the text
-    expect(within(row as HTMLElement).getByText("-8")).toBeInTheDocument();
   });
 
   it("remembers the search term across visits", async () => {

@@ -1,13 +1,12 @@
+import { LOCATIONS } from "./Constants";
 import {
   decodeReplay,
   encodeReplay,
   MAX_REPLAY_ACTIONS,
-  recordReplayAction,
   recordedDelta,
+  recordReplayAction,
   replayByteLength,
-  REPLAY_VERSION,
 } from "./Replay";
-import { LOCATIONS } from "./Constants";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
 
 // Only the two fields the recorder touches, so these tests don't need a whole simulation to run
@@ -20,7 +19,6 @@ function aGame(minute: number, log?: ReplayActionType[]): GameType {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    version: REPLAY_VERSION,
     appVersion: "0.1.0",
     scenarioId: 101,
     difficulty: "Employee",
@@ -192,23 +190,10 @@ describe("decodeReplay", () => {
     expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
   });
 
-  it.each(Array.from({ length: REPLAY_VERSION - 1 }, (_, index) => index + 1))(
-    "rejects version %i recorded with older simulation rules",
-    (version) => {
-      expect(decodeReplay({ ...encodeReplay(aReplay()), version })).toBeNull();
-    },
-  );
-
   it("ignores anything that isn't a replay", () => {
     expect(decodeReplay(null)).toBeNull();
     expect(decodeReplay("nope")).toBeNull();
     expect(decodeReplay({})).toBeNull();
-  });
-
-  it("rejects a replay from a different schema", () => {
-    expect(
-      decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
-    ).toBeNull();
   });
 
   it("ignores a replay missing the fields the run is rebuilt from", () => {
@@ -217,7 +202,7 @@ describe("decodeReplay", () => {
     expect(decodeReplay(doc)).toBeNull();
   });
 
-  it("rejects a replay without current envelope metadata", () => {
+  it("rejects a replay without envelope metadata", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.appVersion;
     expect(decodeReplay(doc)).toBeNull();

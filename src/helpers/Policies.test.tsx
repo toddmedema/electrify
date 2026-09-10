@@ -214,11 +214,11 @@ test("Off preserves installed upgrades through save/load and actions replay dete
   expect(restored.policies!.programs.efficiency.adoption).toBe(stock);
 });
 
-test("neutral saves round-trip; malformed stocks and old replays are rejected", () => {
+test("neutral saves round-trip; malformed stocks and policy actions are rejected", () => {
   const game = createGame({ scenarioId: 106 });
-  const migrated = parseSave(serializeSave(game))!;
-  expect(migrated.game.policies!.programs.solar.adoption).toBe(0);
-  const bad = cloneDeep(migrated);
+  const restored = parseSave(serializeSave(game))!;
+  expect(restored.game.policies!.programs.solar.adoption).toBe(0);
+  const bad = cloneDeep(restored);
   bad.game.policies!.programs.solar.adoption = 2;
   expect(parseSave(bad)).toBeNull();
   const replay = serializeReplay(game)!;
@@ -234,5 +234,4 @@ test("neutral saves round-trip; malformed stocks and old replays are rejected", 
       ],
     }),
   ).toBeNull();
-  expect(decodeReplay({ ...replay, version: 3 })).toBeNull();
 });

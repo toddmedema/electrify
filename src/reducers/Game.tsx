@@ -2389,10 +2389,6 @@ function updateSupplyFacilitiesFinances(
           }, 0);
         }
       }
-    } else if (f.minuteOperational === undefined && !simulated) {
-      // A save from before depreciation has no commissioning timestamp. Start its clock now
-      // rather than guessing that every inherited plant is already worn out.
-      f.minuteOperational = now.minute;
     }
   });
 

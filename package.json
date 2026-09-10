@@ -112,9 +112,11 @@
     "node": ">= 24 < 25"
   },
   "jest": {
+    "extraGlobals": ["Math"],
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/**/*.test.{ts,tsx}",
+      "!src/testing/SimulationTestHelpers.ts",
       "!src/react-app-env.d.ts",
       "!src/helpers/CustomGameForecastClient.ts",
       "!src/helpers/PolicyPreviewClient.ts",

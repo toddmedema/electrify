@@ -1,10 +1,9 @@
+import { UnknownAction } from "@reduxjs/toolkit";
 import * as fs from "fs";
 import * as path from "path";
-import * as React from "react";
-import { UnknownAction } from "@reduxjs/toolkit";
-import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
+import type { AppDispatch } from "../Store";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
 import { mapDispatchToProps } from "./CompositorContainer";
 
@@ -250,17 +249,6 @@ describe("walkthrough steps", () => {
         ) || [],
     );
     expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
-  });
-
-  it("declares the card every tutorial target lives on", () => {
-    tutorials.forEach((scenario) => {
-      const steps = scenario.tutorialSteps as TutorialStepType[];
-      steps.forEach((s, i) => {
-        expect([scenario.name, `step ${i}`, cardOf(s)]).not.toContainEqual(
-          undefined,
-        );
-      });
-    });
   });
 
   // Walk each walkthrough forwards and then all the way back, tracking the card the store

@@ -67,8 +67,7 @@ The EIA AEO2025 reference designs also update:
   variable O&M is charged against actual representative-month generation. A 100 MW build at the
   modeled 20% capacity factor therefore quotes $3.085 million/year fixed plus $4.505 million/year
   variable, or $7.590 million/year before difficulty and later game inflation. Those multipliers
-  are persisted at construction. Legacy facilities recover the same multiplier from their former
-  `$0.05 × peakW` annual cost before adopting the split; prior expense history is unchanged.
+  are persisted at construction.
 - Onshore wind: $33.06/kW-year fixed O&M, 21-month reference lead time, and 25-year life.
 - Offshore wind, added on `master` while this refresh was in progress, already uses the same EIA
   AEO2025 study: $3,689/kW and $154/kW-year for its 900 MW fixed-bottom reference plant.
@@ -182,9 +181,7 @@ produced.
 
 Scenario starting ages are deliberately authored rather than inferred from technology or scenario
 year. The narrative scenarios now begin with mixed-age inherited fleets; tutorials keep new assets
-so their introductory economics and controls remain predictable. Existing saves without a
-commissioning timestamp still begin their age clock on the first real tick, and saves without a
-degradation field use the modern solar or wind default from the day they resume.
+so their introductory economics and controls remain predictable.
 
 The facility panel now reports equivalent operating hours for generators. It also reports
 equivalent starts for Natural Gas, Coal, Nuclear, Biomass, Geothermal, and Enhanced Geothermal.

@@ -294,7 +294,6 @@ export interface MeaningfulDecisionType {
 }
 
 export interface ReplayType {
-  version: number;
   appVersion: string; // For bug reports
   scenarioId: number;
   difficulty: DifficultyType;
@@ -325,8 +324,7 @@ export interface ReplayPlaybackType {
 export interface LocalStoragePlayedType {
   scenarioId: number;
   date: string; // Stringified new Date()
-  // Missing from older saves, where the presence of this record means one completed play.
-  timesPlayed?: number;
+  timesPlayed: number;
 }
 
 export interface DateType {

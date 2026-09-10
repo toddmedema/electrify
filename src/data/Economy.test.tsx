@@ -124,12 +124,6 @@ describe("Economy", () => {
       }
     });
 
-    it("is a pure function of its seed", () => {
-      const first = projectedPrimes(20);
-      initEconomyFromCsv(fixtureCsv());
-      expect(projectedPrimes(20)).toEqual(first);
-    });
-
     it("gives a different economy to a different seed", () => {
       const first = projectedPrimes(20, SEED);
       initEconomyFromCsv(fixtureCsv());

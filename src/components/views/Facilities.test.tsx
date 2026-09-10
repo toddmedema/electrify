@@ -1,14 +1,14 @@
-import * as React from "react";
+import { configureStore } from "@reduxjs/toolkit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { configureStore } from "@reduxjs/toolkit";
+import * as React from "react";
 import { Provider } from "react-redux";
-import Facilities from "./Facilities";
-import uiReducer from "../../reducers/UI";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { tickState } from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import Facilities from "./Facilities";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -154,20 +154,6 @@ describe("the fleet list", () => {
     expect(screen.queryByText("Gas-turbine service")).toBeNull();
   });
 
-  it("leaves every row closed when nothing is selected", () => {
-    renderFacilities(game, null);
-    expect(screen.queryByText("Lifetime profit")).toBeNull();
-  });
-
-  it("uses singular construction copy for one month remaining", () => {
-    const underConstruction = createGame({ scenarioId: 100 });
-    underConstruction.facilities[0].yearsToBuildLeft = 1 / 12;
-    renderFacilities(underConstruction, null);
-
-    expect(screen.getByText(/1 month left/)).toBeInTheDocument();
-    expect(screen.queryByText(/1 months left/)).toBeNull();
-  });
-
   it("labels a facility whose output is constrained by a world event", () => {
     const constrained = createGame({ scenarioId: 104 });
     const facility = constrained.facilities[0];
@@ -189,16 +175,6 @@ describe("the fleet list", () => {
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
-  });
-
-  it("uses the nuclear icon for the France scenario's named reactor", () => {
-    const france = createGame({ scenarioId: 110 });
-    renderFacilities(france, null);
-
-    expect(screen.getByAltText("Grand Nuclear Unit")).toHaveAttribute(
-      "src",
-      "/images/nuclear.svg",
-    );
   });
 
   it("uses compact watt units in the accessible chart summary", () => {

@@ -1,3 +1,6 @@
+import { AppStateType, ScenarioType } from "../Types";
+import { getScenarioLocation } from "../helpers/Locations";
+import { intertiesEnabledForScenario } from "./AdjacentMarkets";
 import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
@@ -6,9 +9,6 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
-import { AppStateType, ScenarioType } from "../Types";
-import { getScenarioLocation } from "../helpers/Locations";
-import { intertiesEnabledForScenario } from "./AdjacentMarkets";
 
 describe("getScenario", () => {
   it("returns the custom scenario for the custom id", () => {

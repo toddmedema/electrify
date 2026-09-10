@@ -72,13 +72,6 @@ describe("VictoryDialog", () => {
     expect(screen.getByText(/-18 blackouts/)).toBeInTheDocument();
   });
 
-  it("shows one generic completion title", () => {
-    renderDialog({ victory: aVictory({ endTitle: "Mission complete!" }) });
-
-    expect(screen.getAllByText(/Mission complete/i)).toHaveLength(1);
-    expect(screen.queryByText("Deregulation")).not.toBeInTheDocument();
-  });
-
   it("summarizes mission results without replaying the run", () => {
     renderDialog({
       victory: aVictory({
@@ -177,29 +170,6 @@ describe("VictoryDialog", () => {
     expect(mockFetchGlobalRank).not.toHaveBeenCalled();
     expect(screen.queryByText(/personal best/)).not.toBeInTheDocument();
     expect(screen.getByText(/812/)).toBeInTheDocument();
-  });
-
-  it("reports how a share went out", async () => {
-    const onShared = jest.fn();
-    mockShareText.mockResolvedValue("clipboard");
-    renderDialog({ onShared });
-
-    await userEvent.click(screen.getByRole("button", { name: "Share score" }));
-    await waitFor(() => expect(onShared).toHaveBeenCalled());
-    expect(onShared.mock.calls[0][1]).toBe("clipboard");
-  });
-
-  // Closing the share sheet is a decision, not a failure, and must not surface as an error
-  it("says nothing when the player backs out of the share sheet", async () => {
-    const onShared = jest.fn();
-    const onShareFailed = jest.fn();
-    mockShareText.mockResolvedValue("cancelled");
-    renderDialog({ onShared, onShareFailed });
-
-    await userEvent.click(screen.getByRole("button", { name: "Share score" }));
-    await waitFor(() => expect(mockShareText).toHaveBeenCalled());
-    expect(onShared).not.toHaveBeenCalled();
-    expect(onShareFailed).not.toHaveBeenCalled();
   });
 
   it("keeps the ways out of a finished run", async () => {

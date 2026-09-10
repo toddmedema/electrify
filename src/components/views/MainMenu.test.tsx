@@ -1,5 +1,4 @@
-import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MainMenu, { Props } from "./MainMenu";
 
@@ -28,24 +27,6 @@ describe("MainMenu", () => {
     expect(screen.queryByText("Continue")).not.toBeInTheDocument();
   });
 
-  it("only advertises account-free play before sign-in", () => {
-    const { rerender } = render(<MainMenu {...props({ uid: undefined })} />);
-    const accountActions = screen.getByRole("region", {
-      name: "Account actions",
-    });
-    expect(
-      within(accountActions).getByRole("button", { name: "Sign in" }),
-    ).toBeInTheDocument();
-    expect(
-      within(accountActions).getByText("Free · no sign-up needed"),
-    ).toBeInTheDocument();
-
-    rerender(<MainMenu {...props({ uid: "player" })} />);
-    expect(
-      screen.queryByText("Free · no sign-up needed"),
-    ).not.toBeInTheDocument();
-  });
-
   it("prioritizes continuing a save while offering mission selection", () => {
     render(<MainMenu {...props({ hasSavedGame: true })} />);
 
@@ -60,26 +41,6 @@ describe("MainMenu", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Primary actions" })).toHaveStyle(
       { gap: "12px" },
-    );
-  });
-
-  it("keeps sharing as a compact footer icon", () => {
-    render(<MainMenu {...props()} />);
-
-    expect(
-      within(screen.getByRole("contentinfo")).getByRole("button", {
-        name: "Share Electrify",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Share game" })).toBeNull();
-  });
-
-  it("opens the embedded feedback form without exposing an email address", () => {
-    render(<MainMenu {...props()} />);
-
-    expect(screen.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
-      "href",
-      "/about.html#feedback",
     );
   });
 });

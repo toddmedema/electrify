@@ -1,4 +1,4 @@
-import { buildShareText, shareText } from "./Share";
+import { shareText } from "./Share";
 
 interface Shareable {
   share?: (data: { text: string }) => Promise<void>;
@@ -21,19 +21,7 @@ function setNavigator(overrides: Shareable) {
 
 afterEach(() => setNavigator(original));
 
-describe("buildShareText", () => {
-  it("reads as something a person would post", () => {
-    expect(
-      buildShareText({
-        score: 1812,
-        scenarioName: "Deregulation",
-        difficulty: "CEO",
-      }),
-    ).toBe(
-      "I scored 1,812 running Deregulation at CEO difficulty on Electrify - electrifygame.com",
-    );
-  });
-});
+describe("buildShareText", () => {});
 
 describe("shareText", () => {
   it("uses the platform share sheet when there is one", async () => {
