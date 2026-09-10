@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer, {
-  claimDisplayName,
+  saveDisplayName,
   fetchGlobalRank,
   loadProfile,
   logout,
@@ -15,7 +15,6 @@ const mockGetDoc = jest.fn();
 const mockGetDocs = jest.fn();
 const mockSetDoc = jest.fn();
 const mockGetCount = jest.fn();
-const mockRunTransaction = jest.fn();
 const mockBatchUpdate = jest.fn();
 const mockBatchCommit = jest.fn();
 const mockSignOut = jest.fn();
@@ -30,7 +29,6 @@ jest.mock("firebase/firestore", () => ({
   limit: (n: number) => ({ limit: n }),
   orderBy: (field: string) => ({ orderBy: field }),
   query: (...parts: unknown[]) => ({ parts }),
-  runTransaction: (_db: unknown, fn: unknown) => mockRunTransaction(fn),
   serverTimestamp: () => "SERVER_TIMESTAMP",
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   where: (field: string, op: string, value: unknown) => ({ field, op, value }),
@@ -76,21 +74,6 @@ function aSubmission(replay?: ReplayType, score = 420) {
 
 function writesTo(name: string) {
   return mockAddDoc.mock.calls.filter((call) => call[0].name === name);
-}
-
-/** A transaction that finds the claim document already held by `uid`, or by nobody. */
-function transactionSeeing(holder?: string) {
-  const get = jest.fn().mockResolvedValue({
-    exists: () => holder !== undefined,
-    data: () => ({ uid: holder }),
-  });
-  const set = jest.fn();
-  const del = jest.fn();
-  mockRunTransaction.mockImplementation(
-    (fn: (t: unknown) => Promise<void>) =>
-      fn({ get, set, delete: del }) as Promise<void>,
-  );
-  return { get, set, delete: del };
 }
 
 function silenceWarnings() {
@@ -279,70 +262,63 @@ describe("loadProfile", () => {
   });
 });
 
-describe("claimDisplayName", () => {
-  it("claims a free name and writes it to the profile", async () => {
-    const transaction = transactionSeeing(undefined);
+describe("saveDisplayName", () => {
+  it("saves a normalized name only on the profile and merges other fields", async () => {
     const store = makeStore(SIGNED_IN);
-    await store.dispatch(claimDisplayName("  Ada Lovelace "));
-
+    await store.dispatch(saveDisplayName("  Ada Lovelace "));
+    expect(mockSetDoc).toHaveBeenCalledTimes(1);
+    expect(mockSetDoc).toHaveBeenCalledWith(
+      { path: "users/player-1" },
+      { displayName: "Ada Lovelace", updatedAt: "SERVER_TIMESTAMP" },
+      { merge: true },
+    );
+    expect(mockGetDoc).not.toHaveBeenCalled();
     expect(store.getState().user.displayName).toBe("Ada Lovelace");
     expect(store.getState().user.needsDisplayName).toBe(false);
-    // Claimed lowercased, so Ada and ada cannot both be taken
-    expect(transaction.set.mock.calls[0][0].path).toBe(
-      "usernames/ada lovelace",
-    );
-    expect(transaction.set.mock.calls[1][0].path).toBe("users/player-1");
   });
 
-  it("releases the old claim when renaming, in the same transaction", async () => {
-    const transaction = transactionSeeing(undefined);
-    await makeStore({ ...SIGNED_IN, displayName: "Ada" }).dispatch(
-      claimDisplayName("Grace"),
-    );
-    expect(transaction.delete).toHaveBeenCalledWith({ path: "usernames/ada" });
+  it("allows two players to save the same name", async () => {
+    const first = makeStore(SIGNED_IN);
+    const second = makeStore({ uid: "player-2" });
+    await first.dispatch(saveDisplayName("Ada"));
+    await second.dispatch(saveDisplayName("Ada"));
+    expect(first.getState().user.displayName).toBe("Ada");
+    expect(second.getState().user.displayName).toBe("Ada");
+    expect(mockSetDoc.mock.calls.map(([ref]) => ref.path)).toEqual([
+      "users/player-1",
+      "users/player-2",
+    ]);
   });
 
-  // Re-saving the same name is a no-op, not a self-collision that would release the claim the
-  // player is standing on
-  it("doesn't release the claim when the name hasn't changed", async () => {
-    const transaction = transactionSeeing("player-1");
+  it("renames a profile, including case-only changes", async () => {
     const store = makeStore({ ...SIGNED_IN, displayName: "Ada" });
-    await store.dispatch(claimDisplayName("ada"));
-
-    expect(transaction.delete).not.toHaveBeenCalled();
+    await store.dispatch(saveDisplayName("ada"));
     expect(store.getState().user.displayName).toBe("ada");
-  });
-
-  it("fails cleanly on a name someone else holds, leaving the old one in place", async () => {
-    transactionSeeing("someone-else");
-    const store = makeStore({ ...SIGNED_IN, displayName: "Ada" });
-    const result = await store.dispatch(claimDisplayName("Grace"));
-
-    expect(claimDisplayName.rejected.match(result)).toBe(true);
-    expect(result.payload).toMatch(/taken/);
-    expect(store.getState().user.displayName).toBe("Ada");
+    await store.dispatch(saveDisplayName("Grace"));
+    expect(store.getState().user.displayName).toBe("Grace");
   });
 
   it("rejects an invalid name without touching Firestore", async () => {
-    const result = await makeStore(SIGNED_IN).dispatch(claimDisplayName("!!"));
-    expect(claimDisplayName.rejected.match(result)).toBe(true);
-    expect(mockRunTransaction).not.toHaveBeenCalled();
+    const result = await makeStore(SIGNED_IN).dispatch(saveDisplayName("!!"));
+    expect(saveDisplayName.rejected.match(result)).toBe(true);
+    expect(mockSetDoc).not.toHaveBeenCalled();
   });
 
   it("rejects when nobody is logged in", async () => {
-    const result = await makeStore().dispatch(claimDisplayName("Ada"));
-    expect(claimDisplayName.rejected.match(result)).toBe(true);
+    const result = await makeStore().dispatch(saveDisplayName("Ada"));
+    expect(saveDisplayName.rejected.match(result)).toBe(true);
     expect(result.payload).toMatch(/logged in/);
   });
 
-  it("reports a failed write rather than pretending the name was claimed", async () => {
+  it("reports a failed write rather than changing the previous name", async () => {
     const warn = silenceWarnings();
-    mockRunTransaction.mockRejectedValue(new Error("unavailable"));
-    const store = makeStore(SIGNED_IN);
-    const result = await store.dispatch(claimDisplayName("Ada"));
+    mockSetDoc.mockRejectedValueOnce(new Error("unavailable"));
+    const store = makeStore({ ...SIGNED_IN, displayName: "Grace" });
+    const result = await store.dispatch(saveDisplayName("Ada"));
 
-    expect(claimDisplayName.rejected.match(result)).toBe(true);
-    expect(store.getState().user.displayName).toBeUndefined();
+    expect(saveDisplayName.rejected.match(result)).toBe(true);
+    expect(store.getState().user.displayName).toBe("Grace");
+    expect(mockGetDocs).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 
@@ -350,17 +326,15 @@ describe("claimDisplayName", () => {
   // refreshed
   it("keeps the name when backfilling old scores fails", async () => {
     const warn = silenceWarnings();
-    transactionSeeing(undefined);
     mockGetDocs.mockRejectedValue(new Error("permission-denied"));
     const store = makeStore(SIGNED_IN);
-    await store.dispatch(claimDisplayName("Ada"));
+    await store.dispatch(saveDisplayName("Ada"));
 
     expect(store.getState().user.displayName).toBe("Ada");
     warn.mockRestore();
   });
 
   it("rewrites the name on the player's own old scores", async () => {
-    transactionSeeing(undefined);
     mockGetDocs.mockResolvedValue({
       empty: false,
       docs: [],
@@ -369,7 +343,7 @@ describe("claimDisplayName", () => {
         fn({ ref: "scores/b" });
       },
     });
-    await makeStore(SIGNED_IN).dispatch(claimDisplayName("Ada"));
+    await makeStore(SIGNED_IN).dispatch(saveDisplayName("Ada"));
     // The backfill is deliberately not awaited by the thunk
     await new Promise((resolve) => setTimeout(resolve, 0));
 

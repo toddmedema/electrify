@@ -17,7 +17,6 @@ import {
   getDocs,
   limit,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -25,7 +24,6 @@ import {
 } from "firebase/firestore";
 import { getDb, logout as signOutOfFirebase } from "../Globals";
 import {
-  displayNameKey,
   normalizeDisplayName,
   validateDisplayName,
 } from "../helpers/DisplayName";
@@ -45,10 +43,6 @@ interface UserSliceStateType {
 // convenience, so the cost of keeping them fresh is capped rather than unbounded -- and a
 // Firestore batch tops out at 500 writes anyway
 const RENAME_BACKFILL_LIMIT = 100;
-
-// Thrown inside the claim transaction, which is the only place that can tell "someone else has
-// this name" apart from "the write failed"
-const NAME_TAKEN = "display-name-taken";
 
 export interface HighscoreSubmissionType {
   score: number;
@@ -189,8 +183,7 @@ export interface ProfileType {
 
 /**
  * Reads users/{uid} on login, creating it when it isn't there yet. A new profile is created empty
- * rather than with a guessed name: a name has to be unique, and only the claim transaction below
- * can make that true.
+ * so the player can choose their public name.
  */
 export const loadProfile = createAsyncThunk<
   ProfileType,
@@ -206,17 +199,13 @@ export const loadProfile = createAsyncThunk<
   return { displayName: data.displayName, bests: data.bests };
 });
 
-/**
- * Claims a name, or explains why it couldn't be. The document under `usernames` is what makes a
- * name unique -- created only when absent, inside a transaction, so two players racing for the
- * same name cannot both win it.
- */
-export const claimDisplayName = createAsyncThunk<
+/** Saves the public display name on the player profile. Names need not be unique. */
+export const saveDisplayName = createAsyncThunk<
   string,
   string,
   { state: UserSliceStateType; rejectValue: string }
->("user/claimDisplayName", async (requested, { getState, rejectWithValue }) => {
-  const { uid, displayName: previous } = getState().user;
+>("user/saveDisplayName", async (requested, { getState, rejectWithValue }) => {
+  const { uid } = getState().user;
   if (!uid) {
     return rejectWithValue("You need to be logged in to pick a name.");
   }
@@ -225,39 +214,18 @@ export const claimDisplayName = createAsyncThunk<
     return rejectWithValue(invalid);
   }
   const name = normalizeDisplayName(requested);
-  const key = displayNameKey(name);
   const db = getDb();
   try {
-    await runTransaction(db, async (transaction) => {
-      const claim = doc(db, "usernames", key);
-      const existing = await transaction.get(claim);
-      if (existing.exists() && existing.data().uid !== uid) {
-        throw new Error(NAME_TAKEN);
-      }
-      transaction.set(claim, { uid, createdAt: serverTimestamp() });
-      // The old claim is released in the same transaction, so a rename can never leave the player
-      // holding two names or -- worse -- none
-      if (previous && displayNameKey(previous) !== key) {
-        transaction.delete(doc(db, "usernames", displayNameKey(previous)));
-      }
-      transaction.set(
-        doc(db, "users", uid),
-        {
-          displayName: name,
-          displayNameLower: key,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-    });
+    await setDoc(
+      doc(db, "users", uid),
+      { displayName: name, updatedAt: serverTimestamp() },
+      { merge: true },
+    );
   } catch (err) {
-    if (err instanceof Error && err.message === NAME_TAKEN) {
-      return rejectWithValue("That name is taken. Please pick another.");
-    }
-    console.warn("Couldn't claim the name: ", err);
+    console.warn("Couldn't save the name: ", err);
     return rejectWithValue("Couldn't save that name. Please try again.");
   }
-  // Deliberately not awaited: the name is the player's the moment the transaction commits, and
+  // Deliberately not awaited: the name is the player's the moment the profile write completes, and
   // refreshing their old rows is cosmetic
   void backfillScoreNames(uid, name);
   return name;
@@ -325,7 +293,7 @@ export const userSlice = createSlice({
         console.warn("Couldn't load your profile: ", action.error.message);
         state.profileLoaded = true;
       })
-      .addCase(claimDisplayName.fulfilled, (state, action) => {
+      .addCase(saveDisplayName.fulfilled, (state, action) => {
         state.displayName = action.payload;
         state.needsDisplayName = false;
       })

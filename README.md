@@ -141,3 +141,16 @@ Once functionality is verified, you can deploy prod with the same script.
 The app supports the [Redux DevTools browser
 extension](https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd)
 for inspecting application state.
+
+### Display-name storage
+
+Player names live in `users/{uid}.displayName`. Display names are not unique;
+Firebase Auth UIDs identify accounts. Scores retain a display-name copy for efficient
+leaderboard reads, with best-effort backfilling when a player renames themselves.
+
+When deploying the removal of username reservations, deploy the new client before
+removing the `usernames` security-rule match. Older cached clients cannot save names
+after those rules are removed and must reload. Existing profiles already contain
+their names, so no data migration is needed. Legacy `usernames` documents and
+`displayNameLower` profile fields are unused and may be removed separately with
+admin tooling after rollout; deploying rules does not delete stored data.
