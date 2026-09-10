@@ -1,3 +1,5 @@
+import { validScenarioResponse } from "./helpers/ScenarioChoices";
+import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
 import { isValidLocation } from "./helpers/Locations";
@@ -30,7 +32,15 @@ import {
 
 // Version 2 changes authored starting fleets and their facility IDs, so older action streams can
 // no longer reproduce the run they recorded.
-export const REPLAY_VERSION = 2;
+// Version 4 adds customer program actions; version 5 adds transmission builds and trading policy.
+// Version 7 corrects storage, solar, emissions and weather physics. Earlier action streams cannot
+// reproduce their recorded outcomes and must not be relabeled as current replays.
+// Version 8 changes dispatch, neighboring emissions and resource/demand calibration.
+// Version 10 adds mandatory generic scenario choices and operating tariffs/contracts.
+// Version 11 shifts residential tariff energy to later hours instead of eliminating it.
+// Version 12 supports independently configurable four-hour customer demand windows.
+// Version 13 adds mandatory connection/winterization choices and their economic effects.
+export const REPLAY_VERSION = 13;
 
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
@@ -58,10 +68,15 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "chooseScenarioResponse",
+  "schedulePolicy",
+  "cancelPolicy",
   "buildFacility",
   "sellFacility",
   "togglePauseFacility",
   "reprioritizeFacility",
+  "buildTransmissionLine",
+  "setTradingPolicy",
   "delta",
 ];
 
@@ -134,6 +149,8 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     seed: game.seed,
     location: cloneDeep(game.location),
     actions: cloneDeep(game.replayLog),
+    meaningfulDecisionGateWaived:
+      game.meaningfulDecisionGateWaived || undefined,
   };
 }
 
@@ -178,6 +195,31 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     ) {
       return null;
     }
+    if (
+      (action.type === "schedulePolicy" || action.type === "cancelPolicy") &&
+      !validPolicyChange(action.payload)
+    )
+      return null;
+    if (
+      action.type === "buildTransmissionLine" &&
+      (typeof action.payload !== "object" ||
+        action.payload === null ||
+        typeof (action.payload as { corridorId?: unknown }).corridorId !==
+          "string")
+    )
+      return null;
+    if (
+      action.type === "setTradingPolicy" &&
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        action.payload as string,
+      )
+    )
+      return null;
+    if (
+      action.type === "chooseScenarioResponse" &&
+      !validScenarioResponse(action.payload)
+    )
+      return null;
     actions.push({
       minute: action.minute,
       type: action.type as ReplayActionNameType,
@@ -212,6 +254,8 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     !isFiniteNumber(doc.seed) ||
     typeof doc.appVersion !== "string" ||
     typeof doc.difficulty !== "string" ||
+    (doc.meaningfulDecisionGateWaived !== undefined &&
+      typeof doc.meaningfulDecisionGateWaived !== "boolean") ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
     !isValidLocation(doc.location)
@@ -230,5 +274,6 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     seed: doc.seed,
     location: doc.location,
     actions,
+    meaningfulDecisionGateWaived: doc.meaningfulDecisionGateWaived || undefined,
   };
 }

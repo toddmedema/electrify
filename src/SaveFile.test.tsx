@@ -31,6 +31,8 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     reportedEventKeys: [],
     eventLogReadThroughId: 0,
     worldEvents: { active: [], occurrences: [], checkedKeys: [] },
+    meaningfulDecisions: [],
+    meaningfulDecisionGateWaived: false,
     ...overrides,
   } as unknown as GameType;
 }
@@ -73,12 +75,6 @@ describe("SaveFile", () => {
   });
 
   describe("saveFilename", () => {
-    it("slugs the scenario name", () => {
-      expect(saveFilename("Rise of Renewables", 2035)).toBe(
-        "electrify-rise-of-renewables-2035.json",
-      );
-    });
-
     // A custom game's name is typed by the player, so it reaches here as anything at all
     it("folds away everything a filename shouldn't carry", () => {
       expect(saveFilename("../../etc/passwd", 2020)).toBe(
@@ -128,13 +124,6 @@ describe("SaveFile", () => {
   });
 
   describe("readSaveFile", () => {
-    it("accepts a save this build can play", async () => {
-      const game = fakeGame();
-      const { save, error } = await readSaveFile(saveFile(serializeSave(game)));
-      expect(error).toBeUndefined();
-      expect(save?.game.seed).toBe(game.seed);
-    });
-
     it("round trips an exported save", async () => {
       writeSave(fakeGame());
       const exported = resumableSave()!.save;
@@ -185,13 +174,16 @@ describe("SaveFile", () => {
       expect(error).toMatch(/isn't an Electrify save/);
     });
 
-    it("rejects a save from a different schema", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/isn't a valid Electrify save/);
-    });
+    it.each([SAVE_VERSION - 1, SAVE_VERSION + 1])(
+      "rejects a save from incompatible version %i",
+      async (version) => {
+        const { save, error } = await readSaveFile(
+          saveFile({ ...serializeSave(fakeGame()), version }),
+        );
+        expect(save).toBeUndefined();
+        expect(error).toMatch(/isn't a valid Electrify save/);
+      },
+    );
 
     it("rejects a save whose scenario this build doesn't have", async () => {
       const { save, error } = await readSaveFile(

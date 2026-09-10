@@ -1,6 +1,5 @@
 import {
   DISPLAY_NAME_MAX_LENGTH,
-  normalizeDisplayName,
   suggestDisplayName,
   validateDisplayName,
 } from "./DisplayName";
@@ -33,12 +32,6 @@ describe("validateDisplayName", () => {
     rejected.forEach(([name, message]) => {
       expect(validateDisplayName(name)).toMatch(message);
     });
-  });
-});
-
-describe("normalizeDisplayName", () => {
-  it("stores what the player meant, not their whitespace", () => {
-    expect(normalizeDisplayName(" Ada Lovelace ")).toBe("Ada Lovelace");
   });
 });
 

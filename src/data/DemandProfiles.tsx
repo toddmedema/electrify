@@ -257,6 +257,99 @@ function growthFor(location?: LocationType): GrowthProfile {
   return profile;
 }
 
+export type ClimateLoadArchetypeType =
+  "cooling" | "mixed" | "electric-heating" | "fuel-heating";
+
+// Heating/cooling degree approaches use a comfortable-weather reference rather than the old
+// minimum near 5 C. EIA commonly uses 65 F (18.3 C):
+// https://www.eia.gov/energyexplained/units-and-calculators/degree-days.php
+// Regional heating fuels matter: electric heating is more prevalent in the U.S. South;
+// cold northern states often heat with fuels rather than electricity:
+// https://www.eia.gov/todayinenergy/detail.php?id=55940
+// These four rounded response curves are authored archetypes, not measured city load models.
+// Location chooses automatically; a student does not need to specify heating equipment.
+const CLIMATE_LOAD_RESPONSES = {
+  cooling: { heating: 1.8, cooling: 7.4, coolingSquared: 0.22 },
+  mixed: { heating: 1, cooling: 7, coolingSquared: 0.2 },
+  "electric-heating": { heating: 2.5, cooling: 4, coolingSquared: 0.12 },
+  "fuel-heating": { heating: 0.8, cooling: 6, coolingSquared: 0.18 },
+} as const;
+
+// IEA describes substantial heat-pump use in these countries. This grouping is
+// intentionally coarse and fixed over game history, not a historical equipment census:
+// https://www.iea.org/reports/the-future-of-heat-pumps/executive-summary
+const ELECTRIC_HEATING_COUNTRIES = new Set([
+  "Norway",
+  "Sweden",
+  "Finland",
+  "France",
+]);
+const COOLING_US_STATES = new Set([
+  "AL",
+  "AR",
+  "AZ",
+  "FL",
+  "GA",
+  "HI",
+  "LA",
+  "MS",
+  "NM",
+  "SC",
+  "TX",
+]);
+const FUEL_HEATING_US_STATES = new Set([
+  "CT",
+  "IA",
+  "IL",
+  "IN",
+  "MA",
+  "ME",
+  "MI",
+  "MN",
+  "ND",
+  "NE",
+  "NH",
+  "NJ",
+  "NY",
+  "OH",
+  "PA",
+  "RI",
+  "SD",
+  "VT",
+  "WI",
+]);
+
+export function climateLoadArchetype(
+  location?: LocationType,
+): ClimateLoadArchetypeType {
+  if (!location) return "mixed";
+  if (location.country === "United States") {
+    if (COOLING_US_STATES.has(location.admin || "")) return "cooling";
+    if (FUEL_HEATING_US_STATES.has(location.admin || "")) return "fuel-heating";
+  }
+  if (Math.abs(location.lat) < 25 || location.region === "Middle East")
+    return "cooling";
+  if (ELECTRIC_HEATING_COUNTRIES.has(location.country || ""))
+    return "electric-heating";
+  return "mixed";
+}
+
+/** Weather-driven watts per customer; the other daily and sector patterns remain separate. */
+export function temperatureDemandWattsPerCustomer(
+  temperatureC: number,
+  location?: LocationType,
+): number {
+  const response = CLIMATE_LOAD_RESPONSES[climateLoadArchetype(location)];
+  const heatingDegrees = Math.max(0, 18 - temperatureC);
+  const coolingDegrees = Math.max(0, temperatureC - 18);
+  return (
+    20 +
+    response.heating * heatingDegrees +
+    response.cooling * coolingDegrees +
+    response.coolingSquared * coolingDegrees ** 2
+  );
+}
+
 function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
   const hour = minuteOfDay / 60;
   const peak = (at: number, width: number) =>

@@ -44,6 +44,7 @@ export const RANDOM_STREAM = {
   worldEvents: 5, // randomAt only -- discrete occurrences and each occurrence's attributes
   // normalAt only -- separate so adding offshore wind cannot shift any existing weather field
   weatherOffshore: 6,
+  transmissionMarkets: 7, // normalAt only -- neighbouring wholesale-price variation
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript

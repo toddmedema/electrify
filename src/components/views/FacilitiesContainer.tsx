@@ -6,6 +6,8 @@ import {
   setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
+  buildTransmissionLine,
+  setTradingPolicy,
 } from "../../reducers/Game";
 import {
   selectFacility,
@@ -14,6 +16,7 @@ import {
 } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
+import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
@@ -76,6 +79,22 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
     },
     onStorageBuild: () => {
       dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
+    },
+    onTransmissionBuild: (corridorId, financed) => {
+      dispatch(buildTransmissionLine({ corridorId, financed }));
+      const corridor = TRANSMISSION_CORRIDORS.find(
+        ({ id }) => id === corridorId,
+      );
+      if (corridor) {
+        dispatch(
+          snackbarOpen(
+            `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
+          ),
+        );
+      }
+    },
+    onTradingPolicy: (policy) => {
+      dispatch(setTradingPolicy(policy));
     },
   };
 };

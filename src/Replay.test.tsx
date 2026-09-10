@@ -187,6 +187,18 @@ describe("decodeReplay", () => {
     ).toEqual(replay);
   });
 
+  it("leaves current runs gated", () => {
+    const current = encodeReplay(aReplay());
+    expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
+  });
+
+  it.each(Array.from({ length: REPLAY_VERSION - 1 }, (_, index) => index + 1))(
+    "rejects version %i recorded with older simulation rules",
+    (version) => {
+      expect(decodeReplay({ ...encodeReplay(aReplay()), version })).toBeNull();
+    },
+  );
+
   it("ignores anything that isn't a replay", () => {
     expect(decodeReplay(null)).toBeNull();
     expect(decodeReplay("nope")).toBeNull();

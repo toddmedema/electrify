@@ -202,15 +202,17 @@ describe("LCWH", () => {
     );
   });
 
-  it("charges a carbon fee against a fuel's emissions", () => {
-    const gas = {
+  it("prices distillate oil carbon above gas for equal fuel energy", () => {
+    const oil = {
       ...generator,
-      fuel: "Natural Gas",
-      btuPerWh: 0.0035,
+      fuel: "Oil",
+      btuPerWh: 10,
     } as GeneratorShoppingType;
-    expect(LCWH(gas, date, 0.1, SEED)).toBeGreaterThan(
-      LCWH(gas, date, 0, SEED),
-    );
+    const gas = { ...oil, fuel: "Natural Gas" } as GeneratorShoppingType;
+    const oilCarbon = LCWH(oil, date, 0.1, SEED) - LCWH(oil, date, 0, SEED);
+    const gasCarbon = LCWH(gas, date, 0.1, SEED) - LCWH(gas, date, 0, SEED);
+    expect(oilCarbon).toBeCloseTo(0.00007414 * 10 * 0.1, 10);
+    expect(oilCarbon).toBeGreaterThan(gasCarbon);
   });
 
   it("integrates a known future carbon fee over the applicable operating years", () => {
@@ -367,6 +369,17 @@ describe("getCreditInputs", () => {
     const inputs = getCreditInputs([aMonth(100, 50)], 500, 1000, [
       aFacility({ loanAmountLeft: 1000 }),
     ]);
+    expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
+  });
+
+  it("counts financed interties in company debt", () => {
+    const inputs = getCreditInputs(
+      [aMonth(100, 50)],
+      500,
+      1000,
+      [],
+      [{ loanAmountLeft: 1000 }],
+    );
     expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
   });
 });

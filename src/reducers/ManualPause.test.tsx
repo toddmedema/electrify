@@ -1,5 +1,6 @@
 import gameReducer, { setSpeed } from "./Game";
 import cardReducer, { navigate, navigateBack } from "./Card";
+import { manualHelpOpen, manualHelpClose } from "./UI";
 import { quit } from "./GameActions";
 import { GameType } from "../Types";
 
@@ -86,5 +87,44 @@ describe("deep linking into a manual entry", () => {
     const back = cardReducer(deepLinked, navigateBack());
     expect(back.entry).toBeUndefined();
     expect(cardReducer(back, navigate("MANUAL")).entry).toBeUndefined();
+  });
+});
+
+describe("contextual manual help", () => {
+  beforeEach(() => {
+    gameReducer(undefined, quit());
+  });
+  it("keeps the catalog paused when help closes and restores speed only on leaving the catalog", () => {
+    const catalog = gameReducer(running("FAST"), navigate("BUILD_STORAGE"));
+    const reading = gameReducer(catalog, manualHelpOpen("Power and Energy"));
+    const related = gameReducer(
+      reading,
+      manualHelpOpen("Round-trip Efficiency"),
+    );
+    const returned = gameReducer(related, manualHelpClose());
+    expect(returned.speed).toBe("PAUSED");
+    expect(gameReducer(returned, navigateBack()).speed).toBe("FAST");
+  });
+  it("pauses running Insights, blocks speed changes, and restores its prior speed", () => {
+    const reading = gameReducer(
+      running("NORMAL"),
+      manualHelpOpen("Reserve Capacity"),
+    );
+    expect(reading.speed).toBe("PAUSED");
+    expect(gameReducer(reading, setSpeed("FAST")).speed).toBe("PAUSED");
+    expect(gameReducer(reading, manualHelpClose()).speed).toBe("NORMAL");
+  });
+  it("does not resume a deliberate pause or retain it after quitting", () => {
+    const paused = { ...running(), speed: "PAUSED" as const };
+    expect(
+      gameReducer(
+        gameReducer(paused, manualHelpOpen("Interties")),
+        manualHelpClose(),
+      ).speed,
+    ).toBe("PAUSED");
+    const reading = gameReducer(running("FAST"), manualHelpOpen("Interties"));
+    expect(
+      gameReducer(gameReducer(reading, quit()), manualHelpClose()).speed,
+    ).toBe("PAUSED");
   });
 });

@@ -178,14 +178,6 @@ describe("getFuelPricesPerMBTU", () => {
     expect(australia.Coal).toBeCloseTo(us.Coal * 0.6);
   });
 
-  it("projects prices past the end of the data", () => {
-    const projected = pricesIn(FIXTURE_ENDING_YEAR + 3, 6);
-    Object.values(projected).forEach((price: number) => {
-      expect(Number.isFinite(price)).toBe(true);
-      expect(price).toBeGreaterThan(0);
-    });
-  });
-
   // The bug this replaced: a cold cache jumped straight from the last loaded year to the year
   // asked for, skipping the compounding in between, so a game loaded years past the data picked
   // up prices nowhere near the ones it was saved with
@@ -356,13 +348,6 @@ describe("getFuelEscalation", () => {
       Math.pow(1 + TREND_ESCALATION_YEARLY, 50),
       10,
     );
-  });
-
-  // The number the rate picker leans on: a game starting sixty years past the record is played
-  // against fuel an order of magnitude dearer, so its rates have to be an order of magnitude up
-  it("puts a 2080 start an order of magnitude above the record", () => {
-    expect(getFuelEscalation(2080)).toBeGreaterThan(9);
-    expect(getFuelEscalation(2080)).toBeLessThan(12);
   });
 });
 

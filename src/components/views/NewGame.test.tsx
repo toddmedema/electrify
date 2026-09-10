@@ -34,6 +34,8 @@ function challengeRows(): HTMLElement[] {
   );
 }
 
+const viewAllTutorialsName = `View all ${TUTORIALS.length}`;
+
 describe("NewGame", () => {
   beforeEach(() => localStorage.clear());
 
@@ -42,7 +44,9 @@ describe("NewGame", () => {
 
     expect(
       screen.getByTestId(`tutorial-spotlight-${TUTORIALS[0].id}`),
-    ).toHaveTextContent("Continue learning · 0 of 6 complete");
+    ).toHaveTextContent(
+      `Continue learning · 0 of ${TUTORIALS.length} complete`,
+    );
     expect(screen.queryByTestId(`mission-row-${TUTORIALS[0].id}`)).toBeNull();
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Deep Freeze"),
@@ -54,10 +58,9 @@ describe("NewGame", () => {
       "true",
     );
     expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();
-    expect(screen.getByRole("button", { name: "View all 6" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    expect(
+      screen.getByRole("button", { name: viewAllTutorialsName }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(
       screen.getByTestId(`mission-row-${CUSTOM_SCENARIO_ID}`),
     ).toHaveTextContent("Custom Game");
@@ -66,7 +69,7 @@ describe("NewGame", () => {
   it("expands tutorials in authored order and shows all challenges by latest timeframe", () => {
     render(<NewGame {...props()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    fireEvent.click(screen.getByRole("button", { name: viewAllTutorialsName }));
     const tutorialCatalog = screen.getByRole("group", {
       name: "All tutorials",
     });
@@ -241,7 +244,9 @@ describe("NewGame", () => {
     render(<NewGame {...props()} />);
 
     const next = screen.getByTestId(`tutorial-spotlight-${TUTORIALS[1].id}`);
-    expect(next).toHaveTextContent("Continue learning · 1 of 6 complete");
+    expect(next).toHaveTextContent(
+      `Continue learning · 1 of ${TUTORIALS.length} complete`,
+    );
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
     expect(within(next).getByRole("button")).toHaveAccessibleName(
       `Start ${TUTORIALS[1].name.replace(/^Mission \d+:\s*/, "")}`,
@@ -254,7 +259,7 @@ describe("NewGame", () => {
 
     expect(screen.getByText("Tutorials complete")).toBeInTheDocument();
     expect(screen.queryByTestId(/^tutorial-spotlight-/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    fireEvent.click(screen.getByRole("button", { name: viewAllTutorialsName }));
     expect(
       within(
         screen.getByRole("group", { name: "All tutorials" }),
@@ -269,7 +274,7 @@ describe("NewGame", () => {
     recordPlayed(TUTORIALS[0].id, regular.id);
     render(<NewGame {...props()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "View all 6" }));
+    fireEvent.click(screen.getByRole("button", { name: viewAllTutorialsName }));
     fireEvent.click(screen.getByRole("button", { name: "All challenges" }));
     expect(
       screen.getByTestId(`mission-complete-${TUTORIALS[0].id}`),
