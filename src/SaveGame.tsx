@@ -4,6 +4,7 @@ import {
   validDeferredResidential,
 } from "./helpers/Policies";
 import packageJson from "../package.json";
+import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import {
@@ -318,7 +319,10 @@ export function parseSave(raw: unknown): SaveGameType | null {
     worldEvents === null ||
     !Array.isArray(worldEvents.active) ||
     !Array.isArray(worldEvents.occurrences) ||
-    !Array.isArray(worldEvents.checkedKeys)
+    !Array.isArray(worldEvents.checkedKeys) ||
+    !worldEvents.active.every(validWorldEvent) ||
+    !worldEvents.occurrences.every(validWorldEvent) ||
+    !worldEvents.checkedKeys.every((key) => typeof key === "string")
   ) {
     return null;
   }

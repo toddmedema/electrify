@@ -1,9 +1,16 @@
-import gameReducer, { buildFacility, generateNewTimeline } from "./Game";
-import { GENERATORS } from "../data/Facilities";
+import cloneDeep from "lodash.clonedeep";
+import gameReducer, {
+  buildFacility,
+  generateNewTimeline,
+  tickState,
+} from "./Game";
+import { GENERATORS, STORAGE } from "../data/Facilities";
+import { validBuildFacility } from "../helpers/BuildValidation";
+import { facilityCashBack } from "../helpers/Financials";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { GameType, GeneratorShoppingType } from "../Types";
 import { createGame } from "../testing/Simulator";
-import { TICKS_PER_MONTH } from "../Constants";
+import { LOCATIONS, TICKS_PER_MONTH } from "../Constants";
 
 function aGeneratorToBuild(state: GameType): GeneratorShoppingType {
   const generator = GENERATORS(state, 500000000, [20], [500]).find(
@@ -21,6 +28,62 @@ function futureTicks(state: GameType) {
 }
 
 describe("buildFacility", () => {
+  it("accepts all authored generator and storage shopping models", () => {
+    const state = createGame({ scenarioId: 103 });
+    state.date.year = 2035;
+    state.location = { ...LOCATIONS.SF, offshore: true };
+    const quotes = [
+      ...GENERATORS(state, 50000000, [20], [500]),
+      ...STORAGE(state, 50000000),
+    ];
+    expect(quotes.length).toBeGreaterThan(10);
+    for (const facility of quotes) {
+      expect({
+        name: facility.name,
+        valid: validBuildFacility({ facility, financed: true }),
+      }).toEqual({ name: facility.name, valid: true });
+    }
+  });
+
+  it.each([false, true])(
+    "preserves project equity during construction (financed: %s)",
+    (financed) => {
+      const before = createGame({ scenarioId: 103 });
+      const generator = { ...aGeneratorToBuild(before), buildCost: 1000000 };
+      const initial = getTimeFromTimeline(before.date.minute, before.timeline)!;
+      const after = cloneDeep(
+        gameReducer(before, buildFacility({ facility: generator, financed })),
+      );
+      const purchased = getTimeFromTimeline(after.date.minute, after.timeline)!;
+      expect(purchased.netWorth).toBeCloseTo(initial.netWorth, 4);
+      const built = after.facilities.find((f) => f.name === generator.name)!;
+      // A persisted project may already have repaid principal; equity follows its actual debt.
+      if (financed) {
+        built.loanAmountLeft -= 100000;
+        purchased.cash -= 100000;
+      }
+      for (let i = 0; i < 4; i++) tickState(after);
+      const now = getTimeFromTimeline(after.date.minute, after.timeline)!;
+      expect(built.yearsToBuildLeft).toBeGreaterThan(0);
+      expect(now.netWorth).toBeCloseTo(
+        now.cash +
+          after.facilities.reduce(
+            (value, facility) => value + facilityCashBack(facility, now.minute),
+            0,
+          ),
+        4,
+      );
+    },
+  );
+
+  it("ignores malformed build payloads before charging cash or recording an action", () => {
+    const before = createGame({ scenarioId: 103 });
+    const after = gameReducer(
+      before,
+      buildFacility({ facility: {} as GeneratorShoppingType, financed: false }),
+    );
+    expect(after).toEqual(before);
+  });
   it("adds the facility and charges the down payment", () => {
     const before = createGame({ scenarioId: 103 });
     const generator = aGeneratorToBuild(before);
