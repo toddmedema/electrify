@@ -610,6 +610,10 @@ export interface TutorialStepType {
   // cheap field reads. Tutorial scenarios have fixed authored starting states, so
   // predicates are absolute (e.g. facilities.length >= 2), never relative to step entry
   advanceOn?: (state: AppStateType) => boolean;
+  // Explanations still offer Next, but completed deeds can move them along too.
+  continueOn?: (state: AppStateType) => boolean;
+  // Presentation-only controls. Game mutations use predicates to exclude rejected actions.
+  continueOnClick?: string;
   // Gate for deeds that leave no distinguishable state behind (a drag re-order, a pause
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)

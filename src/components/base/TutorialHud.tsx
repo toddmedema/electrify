@@ -44,6 +44,36 @@ export default function TutorialHud({
   React.useEffect(() => setHintVisible(false), [stepIndex]);
 
   React.useEffect(() => {
+    if (!step.continueOnClick || isGatedStep(step)) {
+      return;
+    }
+    let active = true;
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const control = target.closest(step.continueOnClick!);
+      if (!control || control.matches(":disabled, [aria-disabled='true']")) {
+        return;
+      }
+      // Capture the current step before React handles the control. Cancel if its normal
+      // action already advanced the tutorial or unmounted this objective.
+      queueMicrotask(() => {
+        if (active && !event.defaultPrevented) {
+          active = false;
+          onNext();
+        }
+      });
+    };
+    document.addEventListener("click", onClick, true);
+    return () => {
+      active = false;
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [step, onNext]);
+
+  React.useEffect(() => {
     if (!target || step.capstone) {
       return;
     }

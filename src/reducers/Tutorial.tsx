@@ -151,7 +151,7 @@ export const tutorialGateMiddleware: Middleware =
         );
         const steps = scenario && scenario.tutorialSteps;
         const step = steps && steps[stepIndex];
-        if (!step || !isGatedStep(step)) {
+        if (!step || (!isGatedStep(step) && !step.continueOn)) {
           break;
         }
         const byAction = freshAction && matchesActionGate(step, actionType);
@@ -160,6 +160,7 @@ export const tutorialGateMiddleware: Middleware =
         try {
           byState = !!(
             (step.advanceOn && step.advanceOn(state)) ||
+            (step.continueOn && step.continueOn(state)) ||
             (step.capstone && step.capstone.success(state))
           );
           capstoneFailed = !!(

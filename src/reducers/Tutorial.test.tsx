@@ -133,6 +133,19 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
+  it("continues an explanation after a successful deed and skips its already-completed gate", () => {
+    const satisfied = (state: AppStateType) => state.game.dollarsPerkWh < 0.07;
+    const store = tutorialStore([
+      { ...informational(), continueOn: satisfied },
+      { ...informational(), advanceOn: satisfied },
+      informational(),
+    ]);
+    store.dispatch({ type: "test/rejected-purchase" });
+    expect(store.getState().game.tutorialStep).toBe(0);
+    store.dispatch({ type: "test/satisfy-predicate" });
+    expect(store.getState().game.tutorialStep).toBe(2);
+  });
+
   beforeEach(() => {
     window.localStorage.clear();
   });
