@@ -82,9 +82,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).not.toBeVisible();
     await page.getByRole("button", { name: "close", exact: true }).click();
     await facilities.locator(".button-buildFacility").click();
-    await page.getByRole("button", { name: "Intertie", exact: true }).click();
+    await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const trade = page
-      .getByRole("dialog")
+      .getByRole("tabpanel", { name: "Interties" })
       .locator("details")
       .filter({ hasText: "How trading and purchased emissions are estimated" });
     expect(
@@ -99,7 +99,9 @@ for (const theme of ["light", "dark"] as const) {
       trade.getByRole("link", { name: /Source for/ }).first(),
     ).toHaveAttribute("href", /https:\/\//);
     expect(
-      await facilities.evaluate((el) => el.scrollWidth - el.clientWidth),
+      await page
+        .getByRole("tabpanel", { name: "Interties" })
+        .evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
     if (
       reviewDir &&

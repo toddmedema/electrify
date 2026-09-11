@@ -165,6 +165,7 @@ export interface DifficultyMultipliersType {
 export type CardNameType =
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
+  | "BUILD_INTERTIES"
   | "FACILITIES"
   | "INSIGHTS"
   | "EVENTS"

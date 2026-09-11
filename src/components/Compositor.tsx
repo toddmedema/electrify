@@ -32,8 +32,7 @@ import EventLogContainer from "./views/EventLogContainer";
 import NavigationContainer from "./base/NavigationContainer";
 import GameAppBarContainer from "./base/GameAppBar";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
-import BuildGeneratorsContainer from "./views/BuildGeneratorsContainer";
-import BuildStorageContainer from "./views/BuildStorageContainer";
+import BuildFacilities from "./views/BuildFacilities";
 import CustomGameContainer from "./views/CustomGameContainer";
 import FacilitiesContainer from "./views/FacilitiesContainer";
 import InsightsContainer from "./views/InsightsContainer";
@@ -435,9 +434,9 @@ export default class Compositor extends React.Component<Props, {}> {
     }
     switch (this.props.card.name) {
       case "BUILD_GENERATORS":
-        return <BuildGeneratorsContainer />;
       case "BUILD_STORAGE":
-        return <BuildStorageContainer />;
+      case "BUILD_INTERTIES":
+        return <BuildFacilities />;
       case "INSIGHTS":
         return <InsightsContainer />;
       case "EVENTS":
@@ -511,13 +510,15 @@ export default class Compositor extends React.Component<Props, {}> {
     const transitionKey =
       this.props.card.name === "LOADING"
         ? `LOADING:${this.props.card.ts}`
-        : !isNavCard(this.props.card.name)
-          ? this.props.card.name
-          : isDesktopScreen()
-            ? DESKTOP_PANES_KEY
-            : isPaneLayout()
-              ? TABLET_PANES_KEY
-              : this.props.card.name;
+        : this.props.card.name.startsWith("BUILD_")
+          ? "BUILD_FACILITIES"
+          : !isNavCard(this.props.card.name)
+            ? this.props.card.name
+            : isDesktopScreen()
+              ? DESKTOP_PANES_KEY
+              : isPaneLayout()
+                ? TABLET_PANES_KEY
+                : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
