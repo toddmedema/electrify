@@ -2,9 +2,15 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   FormControl,
   InputLabel,
   MenuItem,
@@ -23,6 +29,7 @@ import { getMonthlyPayment } from "../../helpers/Financials";
 import { GameType, TradingPolicyType } from "../../Types";
 import { formatMass } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
+import DecisionImpactPreview from "../base/DecisionImpactPreview";
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -107,6 +114,7 @@ export default function TransmissionPanel({
 }: TransmissionPanelProps) {
   const units = useUnits();
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
+  const [reviewId, setReviewId] = React.useState<string | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -123,6 +131,14 @@ export default function TransmissionPanel({
     (corridor) =>
       !state.lines.some(({ corridorId }) => corridorId === corridor.id),
   );
+  const review = unbuiltCorridors.find(({ id }) => id === reviewId);
+  const reviewMarket = review && adjacentMarketForCorridor(review.id);
+  const reviewDownpayment = (review?.buildCost || 0) * DOWNPAYMENT_PERCENT;
+  const approve = (financed: boolean) => {
+    if (!review) return;
+    onBuild(review.id, financed);
+    setReviewId(null);
+  };
 
   if (!corridors.length) {
     return null;
@@ -312,14 +328,14 @@ export default function TransmissionPanel({
                   </dl>
                   {!readOnly && (
                     <Button
-                      id={`approve-intertie-${corridor.id}`}
-                      aria-label={`Approve ${market?.name} intertie`}
+                      id={`review-intertie-${corridor.id}`}
+                      aria-label={`Review purchase of ${market?.name} intertie`}
                       fullWidth
-                      variant="contained"
+                      variant="outlined"
                       disabled={!now || now.cash < downpayment}
-                      onClick={() => onBuild(corridor.id, true)}
+                      onClick={() => setReviewId(corridor.id)}
                     >
-                      Approve intertie
+                      Review
                     </Button>
                   )}
                   {!readOnly && (
@@ -376,6 +392,79 @@ export default function TransmissionPanel({
             )}
           </details>
         </>
+      )}
+      {review && (
+        <Dialog
+          open
+          onClose={() => setReviewId(null)}
+          fullWidth
+          maxWidth="sm"
+          aria-labelledby="intertie-review-title"
+        >
+          <DialogTitle id="intertie-review-title">
+            Build {reviewMarket?.name} intertie?
+            <IconButton
+              aria-label="close"
+              onClick={() => setReviewId(null)}
+              className="top-right"
+              size="large"
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent className="noPadding">
+            <DecisionImpactPreview
+              facts={[
+                {
+                  concept: "money",
+                  label: "Cash purchase",
+                  value: `${formatMoneyConcise(now?.cash || 0)} → ${formatMoneyConcise((now?.cash || 0) - review.buildCost)}`,
+                },
+                {
+                  concept: "finances",
+                  label: "Loan option",
+                  value: `${formatMoneyConcise(reviewDownpayment)} now + ${formatMoneyConcise(getMonthlyPayment(review.buildCost - reviewDownpayment, game.interestRate, LOAN_MONTHS))}/mo`,
+                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(game.interestRate * 100).toFixed(2)}%.`,
+                },
+                {
+                  concept: "money",
+                  label: "Estimated upkeep",
+                  value: `${formatMoneyConcise(review.annualOperatingCost / 12)}/mo`,
+                  detail: "Electricity purchases and loan payments are extra.",
+                },
+                {
+                  concept: "time",
+                  label: "Online in",
+                  value: `${Math.round(review.yearsToBuild * 12)} months`,
+                },
+                {
+                  concept: "supply",
+                  label: "Connection capacity",
+                  value: formatWatts(review.capacityW),
+                  detail:
+                    "Imports depend on neighboring supply and line conditions; backup is not guaranteed.",
+                },
+              ]}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="contained"
+              disabled={readOnly || !now || now.cash < review.buildCost}
+              onClick={() => approve(false)}
+            >
+              Pay cash
+            </Button>
+            <Button
+              id={`approve-intertie-${review.id}`}
+              variant="outlined"
+              disabled={readOnly || !now || now.cash < reviewDownpayment}
+              onClick={() => approve(true)}
+            >
+              Take loan
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </div>
   );

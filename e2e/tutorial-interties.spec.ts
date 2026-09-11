@@ -41,13 +41,23 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   // Opening the tab completes navigation without a redundant Next click.
   await page.locator(".button-buildFacility").click();
+  await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await expect(page.getByLabel("Objective 2 of 10")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Approve Pacific Northwest intertie" }),
+    page.getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    }),
   ).toBeVisible();
   await expect(page.getByText("Pay $36M now · finance $144M")).toBeVisible();
   await page
-    .getByRole("button", { name: "Approve Pacific Northwest intertie" })
+    .getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    })
+    .click();
+  await expect(page.getByLabel("Objective 2 of 10")).toBeVisible();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Take loan" })
     .click();
   await expect(page.getByText("Building")).toBeVisible();
   await expect(page.getByLabel("Objective 3 of 10")).toBeVisible();

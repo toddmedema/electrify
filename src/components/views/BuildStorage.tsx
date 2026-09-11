@@ -425,7 +425,9 @@ export interface DispatchProps {
   onBack: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  embedded?: boolean;
+}
 
 export default function StorageBuildDialog(props: Props): React.JSX.Element {
   const { game, onBack } = props;
@@ -449,8 +451,12 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   );
 
   return (
-    <div id="topbar" className="flexContainer screenCatalog">
+    <div
+      id={props.embedded ? undefined : "topbar"}
+      className="flexContainer screenCatalog"
+    >
       <ConstructionBuildHeader
+        hideTitle={props.embedded}
         concept="storage"
         title="Build Storage"
         cash={cash}

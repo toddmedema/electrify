@@ -24,7 +24,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   } else if (isNavCard(state.card.name)) {
     transition = "nav";
   } else if (
-    ["BUILD_GENERATORS", "BUILD_STORAGE"].indexOf(state.card.name) !== -1
+    ["BUILD_GENERATORS", "BUILD_STORAGE", "BUILD_INTERTIES"].indexOf(
+      state.card.name,
+    ) !== -1
   ) {
     // modals that should fade in / out instead of slide
     transition = "nav";

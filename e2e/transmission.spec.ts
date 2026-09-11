@@ -16,8 +16,8 @@ test("California players can build and understand an intertie", async ({
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
   }
   await facilities.getByRole("button", { name: "Build", exact: true }).click();
-  await page.getByRole("button", { name: "Intertie", exact: true }).click();
-  const projects = page.getByRole("dialog");
+  await page.getByRole("tab", { name: "Interties", exact: true }).click();
+  const projects = page.getByRole("tabpanel", { name: "Interties" });
   await expect(
     projects.getByRole("heading", { name: "Share power with nearby grids" }),
   ).toBeVisible();
@@ -31,7 +31,9 @@ test("California players can build and understand an intertie", async ({
   ).toBeVisible();
   if (testInfo.project.name === "mobile-320px") {
     const firstBuild = projects
-      .getByRole("button", { name: "Approve Pacific Northwest intertie" })
+      .getByRole("button", {
+        name: "Review purchase of Pacific Northwest intertie",
+      })
       .first();
     const box = await firstBuild.boundingBox();
     expect(box).not.toBeNull();
@@ -40,8 +42,14 @@ test("California players can build and understand an intertie", async ({
   }
 
   await projects
-    .getByRole("button", { name: "Approve Pacific Northwest intertie" })
+    .getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    })
     .first()
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Take loan" })
     .click();
   await expect(
     page.getByText("Intertie approved — power can flow in 1 year."),

@@ -9,6 +9,7 @@ import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
 import Facilities from "./Facilities";
+import TransmissionPanel from "./TransmissionPanel";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
@@ -345,20 +346,30 @@ describe("the fleet list", () => {
   });
 });
 
+function renderProjects(game: GameType, onBuild = jest.fn()) {
+  return render(
+    <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+      <TransmissionPanel
+        game={game}
+        projectsOnly
+        onBuild={onBuild}
+        onPolicy={jest.fn()}
+      />
+    </Provider>,
+  );
+}
+
 describe("the interties view", () => {
   it("explains and offers California connection projects", async () => {
     const game = playedGame(0);
-    renderFacilities(game, null);
-    await user.click(screen.getByRole("button", { name: "Build" }));
-    if (screen.queryByRole("button", { name: "Intertie" }))
-      await user.click(screen.getByRole("button", { name: "Intertie" }));
+    renderProjects(game);
     expect(
       screen.getByText("Share power with nearby grids"),
     ).toBeInTheDocument();
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
     expect(screen.queryByLabelText("Trading rule")).toBeNull();
     expect(
-      screen.getAllByRole("button", { name: /Approve .* intertie/ }),
+      screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
     ).not.toHaveLength(0);
     expect(screen.getAllByText("Total cost")).toHaveLength(2);
     expect(
@@ -395,30 +406,40 @@ describe("the interties view", () => {
   it("shows researched local market names outside California", async () => {
     const game = createGame({ scenarioId: 103 });
     game.location = { ...game.location, id: "Dublin", name: "Dublin" };
-    renderFacilities(game, null);
-
-    await user.click(screen.getByRole("button", { name: "Build" }));
-    if (screen.queryByRole("button", { name: "Intertie" }))
-      await user.click(screen.getByRole("button", { name: "Intertie" }));
+    renderProjects(game);
 
     expect(screen.getByText("Great Britain")).toBeInTheDocument();
     expect(screen.getByText("Continental Europe")).toBeInTheDocument();
   });
 
   it("gives the guided northern approval a stable target and specific name", async () => {
-    renderFacilities(createGame({ scenarioId: 112 }), null);
-    await user.click(screen.getByRole("button", { name: "Build" }));
-    if (screen.queryByRole("button", { name: "Intertie" }))
-      await user.click(screen.getByRole("button", { name: "Intertie" }));
+    renderProjects(createGame({ scenarioId: 112 }));
 
     const approval = screen.getByRole("button", {
-      name: "Approve Pacific Northwest intertie",
+      name: "Review purchase of Pacific Northwest intertie",
     });
-    expect(approval).toHaveAttribute("id", "approve-intertie-california-north");
+    expect(approval).toHaveAttribute("id", "review-intertie-california-north");
     expect(
       screen.getByTestId("transmission-project-california-north"),
     ).toHaveAttribute("data-corridor-id", "california-north");
     expect(screen.queryByText("Desert Southwest")).toBeNull();
+  });
+
+  it("reviews and cancels before committing a financed intertie", async () => {
+    const onBuild = jest.fn();
+    renderProjects(createGame({ scenarioId: 112 }), onBuild);
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    });
+    await user.click(review);
+    expect(onBuild).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveTextContent("Loan option");
+    await user.click(screen.getByRole("button", { name: "close" }));
+    expect(onBuild).not.toHaveBeenCalled();
+    await user.click(review);
+    await user.click(screen.getByRole("button", { name: "Take loan" }));
+    expect(onBuild).toHaveBeenCalledTimes(1);
+    expect(onBuild).toHaveBeenCalledWith("california-north", true);
   });
 });
 
