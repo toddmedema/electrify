@@ -57,8 +57,18 @@ test("chart-heavy controls remain responsive during pointer gestures", async ({
 
   // The expensive 20-year projection should retain its current preview during the drag and
   // commit exactly where the player releases, keeping the pointer path free of projection work.
-  await page.getByRole("combobox", { name: "Insight range" }).click();
-  await page.getByRole("option", { name: "Next 20 years" }).click();
+  await page
+    .getByRole("button", { name: "Fit full timeline", exact: true })
+    .click();
+  const firstChart = page
+    .locator(".insights .accessibleChart [role=img]")
+    .first();
+  await expect(firstChart).toHaveAttribute("data-viewport-min", "0");
+  // Each simulated day represents one month: the full forecast covers 240 months.
+  await expect(firstChart).toHaveAttribute(
+    "data-viewport-max",
+    String(20 * 12 * 24 * 60),
+  );
   const controls = page.getByRole("region", { name: "Planning controls" });
   const slider = controls.getByRole("slider");
   const sliderBox = await slider.boundingBox();
