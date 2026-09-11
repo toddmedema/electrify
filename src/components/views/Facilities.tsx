@@ -8,15 +8,13 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  IconButton,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
   Toolbar,
-  Tab,
-  Tabs,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
@@ -56,7 +54,10 @@ import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
-import TransmissionPanel from "./TransmissionPanel";
+import TransmissionPanel, {
+  TransmissionTradingSummary,
+} from "./TransmissionPanel";
+import { getScenario } from "../../data/Scenarios";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
@@ -160,84 +161,64 @@ function FacilityActions(props: {
     readOnly,
     spotInList,
   } = props;
+  if (readOnly) return null;
   const underConstruction = facility.yearsToBuildLeft > 0;
   return (
-    <span className="facilityActions">
-      {!readOnly && listLength > 1 && (
+    <div className="facilityActions">
+      {!underConstruction && (
+        <Button
+          startIcon={
+            <ConceptIcon concept={facility.paused ? "play" : "pause"} />
+          }
+          aria-label={
+            facility.paused
+              ? "Resume " + facility.name
+              : "Pause " + facility.name
+          }
+          onClick={() =>
+            facility.paused
+              ? onTogglePause(facility.id)
+              : onPause(facility.id, facility.name)
+          }
+        >
+          {facility.paused ? "Resume" : "Pause"}
+        </Button>
+      )}
+      <Button
+        startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
+        aria-label={
+          (underConstruction ? "Cancel construction of " : "Sell ") +
+          facility.name
+        }
+        onClick={onOpenSell}
+      >
+        {underConstruction ? "Cancel construction" : "Sell"}
+      </Button>
+      {listLength > 1 && (
         <>
-          <IconButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onReprioritize(spotInList, -1);
-            }}
-            aria-label={`Move ${facility.name} earlier in the dispatch order`}
-            className="facilityReorderButton"
+          <Button
+            startIcon={<KeyboardArrowUpIcon />}
+            aria-label={
+              "Move " + facility.name + " earlier in the dispatch order"
+            }
             disabled={spotInList === 0}
-            edge="end"
-            color="primary"
-            size="small"
+            onClick={() => onReprioritize(spotInList, -1)}
           >
-            <KeyboardArrowUpIcon />
-          </IconButton>
-          <IconButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onReprioritize(spotInList, 1);
-            }}
-            aria-label={`Move ${facility.name} later in the dispatch order`}
-            className="facilityReorderButton"
+            Move up
+          </Button>
+          <Button
+            startIcon={<KeyboardArrowDownIcon />}
+            aria-label={
+              "Move " + facility.name + " later in the dispatch order"
+            }
             disabled={spotInList === listLength - 1}
-            edge="end"
-            color="primary"
-            size="small"
+            onClick={() => onReprioritize(spotInList, 1)}
           >
-            <KeyboardArrowDownIcon />
-          </IconButton>
+            Move down
+          </Button>
         </>
       )}
-      {!readOnly && !underConstruction && !facility.paused && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onPause(facility.id, facility.name);
-          }}
-          aria-label={`Pause ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          <ConceptIcon concept="pause" />
-        </IconButton>
-      )}
-      {!readOnly && facility.paused && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePause(facility.id);
-          }}
-          aria-label={`Resume ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          <ConceptIcon concept="play" />
-        </IconButton>
-      )}
-      {!readOnly && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSell();
-          }}
-          aria-label={`${underConstruction ? "Cancel construction of" : "Sell"} ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          {underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
-        </IconButton>
-      )}
-    </span>
+    </div>
   );
 }
 
@@ -330,166 +311,178 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       draggableId={"f" + facility.id}
       index={props.spotInList}
       isDragDisabled={readOnly}
+      disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
-        // Selecting is on the row rather than on a control inside it: the icon buttons were
-        // the only thing a click did anything to, which is the opposite of what a list of
-        // rows leads a mouse to expect. dragHandleProps already makes this focusable and
-        // announces it as a button, so only a read-only row - which gets none of them - has
-        // to say so itself. dnd owns Space (lift) and the arrows (move), leaving Enter free
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
           className={selected ? "facilityRow selected" : "facilityRow"}
           data-fuel={fuel}
-          role={provided.dragHandleProps ? undefined : "button"}
-          tabIndex={provided.dragHandleProps ? undefined : 0}
-          aria-expanded={selected}
-          onClick={() => onSelect(selected ? null : facility.id)}
-          onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onSelect(selected ? null : facility.id);
-            }
-          }}
           style={getDraggableStyle(
             snapshot.isDragging,
             provided.draggableProps.style,
           )}
         >
-          {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
+          <div className="facilityRowHeader">
+            <button
+              type="button"
+              className="facilityDisclosure"
+              aria-label={"Inspect " + facility.name}
+              aria-expanded={selected}
+              onClick={() => onSelect(selected ? null : facility.id)}
+            >
+              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
               all under-construction facilities need here. */}
-          <ListItem
-            className="facility"
-            sx={
-              underConstruction
-                ? { opacity: (theme) => theme.palette.action.disabledOpacity }
-                : undefined
-            }
-            secondaryAction={
-              <MemoizedFacilityActions
-                facility={facility}
-                listLength={props.listLength}
-                readOnly={readOnly}
-                spotInList={spotInList}
-                onPause={onPause}
-                onReprioritize={onReprioritize}
-                onTogglePause={onTogglePause}
-                onOpenSell={toggleDialog}
-              />
-            }
-          >
-            {!readOnly && (
-              <DragIndicatorIcon
-                className="draggable-indicator"
-                color="primary"
-              />
-            )}
-            {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
-                chart draws, and transitioned in CSS so ramping is visible as movement */}
-            {!underConstruction && (
-              <div
-                className="outputProgressBar"
-                style={{
-                  transform: `scaleX(${outputFraction})`,
-                  background: withAlpha(accentColor, 0.18),
-                }}
-              />
-            )}
-            <ListItemAvatar>
-              <div>
-                <Avatar
-                  className={facility.currentWh === 0 ? "offline" : ""}
-                  alt={facility.name}
-                  src={`/images/${facilityIconName(facility)}.svg`}
-                />
-                {facility.peakWh > 0 && !underConstruction && (
-                  <div className="capacityProgressBar">
-                    <div
-                      className="capacityProgressBarFill"
-                      style={{
-                        transform: `scaleY(${facility.currentWh / facility.peakWh})`,
-                        backgroundColor:
-                          activity === "CHARGING"
-                            ? chartPalette().storage
-                            : undefined,
-                      }}
-                    />
-                  </div>
-                )}
-                <div
-                  className="facilityActivity"
-                  role="img"
-                  aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
-                >
-                  {activityIcon(activity, accentColor)}
-                </div>
-              </div>
-            </ListItemAvatar>
-            <ListItemText
-              primary={
-                <>
-                  {facility.name}
-                  {storyOutputMultiplier < 1 && (
-                    <Chip
-                      className="storyDerateBadge"
-                      color="warning"
-                      size="small"
-                      label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
-                      aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                    />
-                  )}
-                </>
-              }
-              secondary={secondaryText}
-            />
-            {open && (
-              // Inside the row, so without this every click in the confirmation dialog also
-              // lands on the row behind it and toggles the selection
-              <Dialog
-                open
-                onClose={toggleDialog}
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              <ListItem
+                className="facility"
+                sx={
+                  underConstruction
+                    ? {
+                        opacity: (theme) =>
+                          theme.palette.action.disabledOpacity,
+                      }
+                    : undefined
+                }
+                component="span"
               >
-                <DialogTitle>
-                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {facility.peakWh
-                    ? formatWattHours(facility.peakWh)
-                    : formatWatts(facility.peakW)}{" "}
-                  {facility.name.toLowerCase()} facility?
-                </DialogTitle>
-                <DialogContent>
-                  <DialogContentText>
-                    You will receive{" "}
-                    {formatMoneyConcise(
-                      facilityCashBack(facility, game.date.minute),
-                    )}
-                    {facility.loanAmountLeft > 0
-                      ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                      : ""}
-                    .
-                  </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                  <Button onClick={toggleDialog} color="primary">
-                    Nevermind
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      props.onSell(facility.id);
-                      toggleDialog();
+                {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
+                chart draws, and transitioned in CSS so ramping is visible as movement */}
+                {!underConstruction && (
+                  <div
+                    className="outputProgressBar"
+                    style={{
+                      transform: `scaleX(${outputFraction})`,
+                      background: withAlpha(accentColor, 0.18),
                     }}
-                    color="primary"
-                    variant="contained"
-                    autoFocus
-                  >
-                    {underConstruction ? "Cancel construction" : "Sell"}
-                  </Button>
-                </DialogActions>
-              </Dialog>
-            )}
-          </ListItem>
+                  />
+                )}
+                <ListItemAvatar>
+                  <div>
+                    <Avatar
+                      className={facility.currentWh === 0 ? "offline" : ""}
+                      alt={facility.name}
+                      src={`/images/${facilityIconName(facility)}.svg`}
+                    />
+                    {facility.peakWh > 0 && !underConstruction && (
+                      <div className="capacityProgressBar">
+                        <div
+                          className="capacityProgressBarFill"
+                          style={{
+                            transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                            backgroundColor:
+                              activity === "CHARGING"
+                                ? chartPalette().storage
+                                : undefined,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div
+                      className="facilityActivity"
+                      role="img"
+                      aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
+                    >
+                      {activityIcon(activity, accentColor)}
+                    </div>
+                  </div>
+                </ListItemAvatar>
+                <ListItemText
+                  slotProps={{
+                    primary: { component: "span" },
+                    secondary: { component: "span" },
+                  }}
+                  primary={
+                    <>
+                      {facility.name}
+                      {storyOutputMultiplier < 1 && (
+                        <Chip
+                          className="storyDerateBadge"
+                          color="warning"
+                          size="small"
+                          label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
+                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                        />
+                      )}
+                    </>
+                  }
+                  secondary={`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
+                />
+                <KeyboardArrowDownIcon
+                  className="facilityChevron"
+                  aria-hidden
+                />
+              </ListItem>
+            </button>
+          </div>
+          {open && (
+            // Inside the row, so without this every click in the confirmation dialog also
+            // lands on the row behind it and toggles the selection
+            <Dialog
+              open
+              onClose={toggleDialog}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            >
+              <DialogTitle>
+                {underConstruction ? "Cancel construction of" : "Sell"}{" "}
+                {facility.peakWh
+                  ? formatWattHours(facility.peakWh)
+                  : formatWatts(facility.peakW)}{" "}
+                {facility.name.toLowerCase()} facility?
+              </DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  You will receive{" "}
+                  {formatMoneyConcise(
+                    facilityCashBack(facility, game.date.minute),
+                  )}
+                  {facility.loanAmountLeft > 0
+                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                    : ""}
+                  .
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={toggleDialog} color="primary">
+                  Nevermind
+                </Button>
+                <Button
+                  onClick={() => {
+                    props.onSell(facility.id);
+                    toggleDialog();
+                  }}
+                  color="primary"
+                  variant="contained"
+                  autoFocus
+                >
+                  {underConstruction ? "Cancel construction" : "Sell"}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          )}
+          {!readOnly && (
+            <Button
+              style={{ display: selected ? undefined : "none" }}
+              {...provided.dragHandleProps}
+              className="facilityDragHandle"
+              aria-label={"Reorder " + facility.name}
+              startIcon={<DragIndicatorIcon />}
+            >
+              Drag to reorder
+            </Button>
+          )}
+          {selected && (
+            <MemoizedFacilityActions
+              facility={facility}
+              listLength={props.listLength}
+              readOnly={readOnly}
+              spotInList={spotInList}
+              onPause={onPause}
+              onReprioritize={onReprioritize}
+              onTogglePause={onTogglePause}
+              onOpenSell={toggleDialog}
+            />
+          )}
           {selected && (
             <FacilityDetails
               facility={facility}
@@ -501,6 +494,54 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         </div>
       )}
     </Draggable>
+  );
+}
+
+function FacilitySupplyChart({
+  game,
+  forceOpen,
+  anchor,
+}: {
+  game: GameType;
+  forceOpen: boolean;
+  anchor: React.RefObject<HTMLDivElement>;
+}) {
+  const phone = useMediaQuery("(max-width:599px)");
+  const [expanded, setExpanded] = React.useState(false);
+  React.useEffect(() => {
+    if (forceOpen) setExpanded(true);
+  }, [forceOpen]);
+  const open = !phone || expanded || forceOpen;
+  return (
+    <details className="facilitySupplyDisclosure" open={open}>
+      <summary
+        onClick={(event) => {
+          event.preventDefault();
+          setExpanded(!open);
+        }}
+      >
+        Supply & demand <KeyboardArrowDownIcon aria-hidden />
+      </summary>
+      <div
+        ref={anchor}
+        tabIndex={-1}
+        className="operatingEvidence"
+        aria-label="Supply and demand evidence: this month's representative day"
+      >
+        <div className="operatingSampleLabel">
+          This month's representative day · Supply — solid · Demand – – dashed ·
+          W
+        </div>
+        <ChartSupplyDemand
+          height={180}
+          timeline={game.timeline}
+          currentMinute={game.date.minute}
+          location={game.location}
+          legend
+          startingYear={game.startingYear}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -539,11 +580,15 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default class Facilities extends React.Component<
   Props,
-  { view: "PLANTS" | "INTERTIES" }
+  { buildOpen: boolean; buildInterties: boolean; revealChart: boolean }
 > {
   constructor(props: Props) {
     super(props);
-    this.state = { view: "PLANTS" };
+    this.state = {
+      buildOpen: false,
+      buildInterties: false,
+      revealChart: false,
+    };
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
@@ -560,7 +605,11 @@ export default class Facilities extends React.Component<
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
   public shouldComponentUpdate(
     nextProps: Props,
-    nextState: Readonly<{ view: "PLANTS" | "INTERTIES" }>,
+    nextState: Readonly<{
+      buildOpen: boolean;
+      buildInterties: boolean;
+      revealChart: boolean;
+    }>,
   ) {
     if (this.dragging) {
       return false;
@@ -583,18 +632,21 @@ export default class Facilities extends React.Component<
   }
 
   public componentDidUpdate(previousProps: Props) {
+    if (
+      !this.props.evidenceRequest &&
+      previousProps.evidenceRequest &&
+      this.state.revealChart
+    )
+      this.setState({ revealChart: false });
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
     if (
       this.props.game.scenarioId === 112 &&
       this.props.game.tutorialStep !== previousProps.game.tutorialStep &&
-      [1, 6].includes(this.props.game.tutorialStep) &&
-      this.state.view !== "INTERTIES"
+      this.props.game.tutorialStep === 1 &&
+      !this.props.game.transmission?.lines.length
     ) {
-      // If Next was tapped before opening the first tab, reveal the gated approval instead of
-      // stranding it off-screen. The same transition brings the live flow label into view after
-      // Natural Gas is paused, so "Importing" is something the learner can actually observe.
-      this.setState({ view: "INTERTIES" });
+      this.setState({ buildOpen: true, buildInterties: true });
     }
   }
 
@@ -616,8 +668,8 @@ export default class Facilities extends React.Component<
       )
     )
       return;
-    if (this.state.view !== "PLANTS") {
-      this.setState({ view: "PLANTS" });
+    if (!this.state.revealChart) {
+      this.setState({ revealChart: true });
       return;
     }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
@@ -657,7 +709,6 @@ export default class Facilities extends React.Component<
     const intertiesAvailable = !!(
       game.transmission && corridorsForLocation(game.location).length
     );
-    const activeView = intertiesAvailable ? this.state.view : "PLANTS";
     const storyEffects = combineStoryEffects(
       game.worldEvents.active.filter(
         (event) =>
@@ -673,118 +724,186 @@ export default class Facilities extends React.Component<
             other panes' headers and the build buttons stay put as the fleet scrolls */}
           <Toolbar className="paneHeader">
             <Typography variant="h6">Facilities</Typography>
-            {!readOnly && activeView === "PLANTS" && (
-              <>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={onGeneratorBuild}
-                  className="button-buildGenerator"
-                  startIcon={
-                    <ConceptIcon concept="generator" fontSize="small" />
-                  }
-                >
-                  Generator
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={onStorageBuild}
-                  className="button-buildStorage"
-                  startIcon={<ConceptIcon concept="storage" fontSize="small" />}
-                >
-                  Storage
-                </Button>
-              </>
+            {!readOnly && (
+              <Button
+                variant="contained"
+                color="primary"
+                className="button-buildFacility"
+                startIcon={<ConceptIcon concept="build" fontSize="small" />}
+                onClick={() =>
+                  this.setState({
+                    buildOpen: true,
+                    buildInterties:
+                      game.scenarioId === 112 &&
+                      game.tutorialStep <= 1 &&
+                      !game.transmission?.lines.length,
+                  })
+                }
+              >
+                Build
+              </Button>
             )}
           </Toolbar>
-          {intertiesAvailable && (
-            <Tabs
-              value={activeView}
-              onChange={(_event, view) => this.setState({ view })}
-              aria-label="Facility type"
-              className="facilityTabs"
-              variant="fullWidth"
-            >
-              <Tab id="plantsTab" value="PLANTS" label="Plants" />
-              <Tab id="intertiesTab" value="INTERTIES" label="Interties" />
-            </Tabs>
-          )}
-          {activeView === "PLANTS" ? (
-            <>
-              <div
-                ref={this.evidenceAnchor}
-                tabIndex={-1}
-                className="operatingEvidence"
-                aria-label="Supply and demand evidence: this month's representative day"
-              >
-                <div className="operatingSampleLabel">
-                  This month's representative day · Supply — solid · Demand – –
-                  dashed · W
-                </div>
-                <ChartSupplyDemand
-                  height={180}
-                  timeline={game.timeline}
-                  currentMinute={game.date.minute}
-                  location={game.location}
-                  legend
-                  startingYear={game.startingYear}
-                />
-              </div>
-              <List dense className="scrollable">
-                <DragDropContext
-                  onBeforeDragStart={this.onBeforeDragStart}
-                  onDragEnd={this.onDragEnd}
-                >
-                  <Droppable droppableId="droppable">
-                    {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef}>
-                        {game.facilities.map(
-                          (g: FacilityOperatingType, i: number) => (
-                            <FacilityListItem
-                              facility={g}
-                              game={game}
-                              key={g.id}
-                              onSell={onSell}
-                              onTogglePause={onTogglePause}
-                              onPause={onPause}
-                              onReprioritize={onReprioritize}
-                              onSelect={onSelect}
-                              selected={selectedFacilityId === g.id}
-                              storyOutputMultiplier={storyOutputMultiplierForFacility(
-                                g,
-                                storyEffects,
-                              )}
-                              spotInList={i}
-                              listLength={facilitiesCount}
-                              readOnly={readOnly}
-                            />
-                          ),
-                        )}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-                {facilitiesCount < 2 && !readOnly && (
-                  <Typography
-                    color="textSecondary"
-                    variant="body2"
-                    style={{ textAlign: "center", marginTop: "12px" }}
-                  >
-                    (click "Generator" or "Storage" to build more)
-                  </Typography>
-                )}
-              </List>
-            </>
-          ) : (
-            <TransmissionPanel
+          <>
+            <FacilitySupplyChart
               game={game}
-              onBuild={onTransmissionBuild}
-              onPolicy={onTradingPolicy}
+              anchor={this.evidenceAnchor}
+              forceOpen={
+                this.state.revealChart ||
+                getScenario(game.scenarioId)?.tutorialSteps?.[game.tutorialStep]
+                  ?.target === "#chartSupplyDemand"
+              }
             />
+            {intertiesAvailable && (
+              <TransmissionTradingSummary
+                game={game}
+                onPolicy={onTradingPolicy}
+              />
+            )}
+            <List dense className="scrollable unifiedFacilitiesList">
+              {intertiesAvailable && (
+                <Typography
+                  id="dispatch-order"
+                  className="facilitySectionLabel"
+                  variant="overline"
+                >
+                  Plants & storage <span>Dispatch order</span>
+                </Typography>
+              )}
+              <DragDropContext
+                onBeforeDragStart={this.onBeforeDragStart}
+                onDragEnd={this.onDragEnd}
+              >
+                <Droppable droppableId="droppable">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                      {game.facilities.map(
+                        (g: FacilityOperatingType, i: number) => (
+                          <FacilityListItem
+                            facility={g}
+                            game={game}
+                            key={g.id}
+                            onSell={onSell}
+                            onTogglePause={onTogglePause}
+                            onPause={onPause}
+                            onReprioritize={onReprioritize}
+                            onSelect={onSelect}
+                            selected={
+                              (game.scenarioId === 5 &&
+                                [0, 4].includes(game.tutorialStep)) ||
+                              selectedFacilityId === g.id ||
+                              (game.scenarioId === 112 &&
+                                game.tutorialStep === 5 &&
+                                "fuel" in g &&
+                                g.fuel === "Natural Gas")
+                            }
+                            storyOutputMultiplier={storyOutputMultiplierForFacility(
+                              g,
+                              storyEffects,
+                            )}
+                            spotInList={i}
+                            listLength={facilitiesCount}
+                            readOnly={readOnly}
+                          />
+                        ),
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+              {facilitiesCount < 2 && !readOnly && (
+                <Typography
+                  color="textSecondary"
+                  variant="body2"
+                  style={{ textAlign: "center", marginTop: "12px" }}
+                >
+                  Choose Build to add a generator or storage.
+                </Typography>
+              )}
+              {intertiesAvailable && (
+                <TransmissionPanel
+                  game={game}
+                  onBuild={onTransmissionBuild}
+                  onPolicy={onTradingPolicy}
+                />
+              )}
+            </List>
+          </>
+          {!readOnly && this.state.buildOpen && (
+            <Dialog
+              open
+              onClose={() => this.setState({ buildOpen: false })}
+              fullWidth
+              maxWidth="sm"
+            >
+              <DialogTitle>
+                {this.state.buildInterties
+                  ? "Build an intertie"
+                  : "Build a facility"}
+              </DialogTitle>
+              <DialogContent>
+                {this.state.buildInterties ? (
+                  <TransmissionPanel
+                    game={game}
+                    projectsOnly
+                    onPolicy={onTradingPolicy}
+                    onBuild={(id, financed) => {
+                      onTransmissionBuild(id, financed);
+                      this.setState({ buildOpen: false });
+                    }}
+                  />
+                ) : (
+                  <div className="facilityBuildChoices">
+                    <Button
+                      className="button-buildGenerator"
+                      variant="outlined"
+                      startIcon={<ConceptIcon concept="generator" />}
+                      onClick={onGeneratorBuild}
+                    >
+                      Generator
+                    </Button>
+                    <Button
+                      className="button-buildStorage"
+                      variant="outlined"
+                      startIcon={<ConceptIcon concept="storage" />}
+                      onClick={onStorageBuild}
+                    >
+                      Storage
+                    </Button>
+                    {intertiesAvailable && (
+                      <Button
+                        className="button-buildIntertie"
+                        variant="outlined"
+                        startIcon={
+                          <img
+                            src="/images/transmission.svg"
+                            width="24"
+                            height="24"
+                            alt=""
+                          />
+                        }
+                        onClick={() => this.setState({ buildInterties: true })}
+                      >
+                        Intertie
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+              <DialogActions>
+                {this.state.buildInterties && (
+                  <Button
+                    onClick={() => this.setState({ buildInterties: false })}
+                  >
+                    Back
+                  </Button>
+                )}
+                <Button onClick={() => this.setState({ buildOpen: false })}>
+                  Close
+                </Button>
+              </DialogActions>
+            </Dialog>
           )}
         </>
       </GameCard>

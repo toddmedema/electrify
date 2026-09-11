@@ -47,6 +47,7 @@ test("phone surfaces share stable gutters and compact chrome", async ({
   );
 
   await page.getByRole("button", { name: "Facilities", exact: true }).click();
+  await page.locator(".button-buildFacility").click();
   await page.getByRole("button", { name: "Storage" }).click();
   await expect(
     page.getByRole("heading", { name: "Build Storage" }),

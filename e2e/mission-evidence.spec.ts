@@ -42,11 +42,11 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
       "Cash ≥ $0 ($",
     );
-    const reorder = page.locator(".facilityReorderButton:visible");
+    const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
     } else {
-      await expect(reorder.first()).toBeVisible();
+      await expect(reorder).toHaveCount(0);
       const grid = await page.locator(".gridHealth:visible").boundingBox();
       const mission = await page
         .locator(".missionSummary:visible")
@@ -64,7 +64,9 @@ for (const theme of ["light", "dark"]) {
     await expect(dialog).toContainText("month-end");
     await page.keyboard.press("Escape");
     await expect(details).toBeFocused();
-    await page.locator(".facilityRow").filter({ hasText: "Coal" }).click();
+    await page
+      .getByRole("button", { name: "Inspect Coal", exact: true })
+      .click();
     await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
     await page.getByRole("button", { name: "fast speed", exact: true }).click();
     await expect(page.locator(".gridHealth-blackout:visible")).toBeVisible();
@@ -82,6 +84,8 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.locator(".gridHealth-blackout:visible"),
     ).not.toContainText("Now");
+    if (!(await page.locator("#chartSupplyDemand").isVisible()))
+      await page.locator(".facilitySupplyDisclosure > summary").click();
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
       await page.getByRole("button", { name: speed, exact: true }).click();
@@ -300,7 +304,8 @@ test("large text and landscape keep mission controls and navigation reachable", 
     await page.locator("#faciltiesNav:visible").scrollIntoViewIfNeeded();
     await page.locator("#faciltiesNav:visible").click();
     await settle(page);
-    await page.locator(".button-buildGenerator").scrollIntoViewIfNeeded();
+    await page.locator(".button-buildFacility").scrollIntoViewIfNeeded();
+    await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     await expect(page.locator(".buildOption").first()).toBeVisible();
     await page.getByRole("button", { name: "close", exact: true }).click();
@@ -334,7 +339,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
-  await page.locator(".facilityRow").filter({ hasText: "Coal" }).click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
   await expect(page.locator(".missionRiskButton:visible")).toContainText(
@@ -343,13 +348,16 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
     /Projected in this month's representative day/,
   );
-  await page.locator("#intertiesTab").click();
+  await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
   await page.locator(".missionRiskButton:visible").click();
-  await expect(page.locator("#plantsTab")).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page.locator("#chartSupplyDemand")).toBeVisible();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
+  if (info.project.name.startsWith("mobile-")) {
+    await page.locator(".facilitySupplyDisclosure > summary").click();
+    await expect(page.locator(".facilitySupplyDisclosure")).not.toHaveAttribute(
+      "open",
+    );
+  }
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator(".operatingEvidence")).toContainText(

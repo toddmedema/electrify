@@ -238,7 +238,10 @@ test("insights header controls stay aligned in one compact row", async ({
     controls.map((control) => control.boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
-  expect(boxes.every((box) => box!.height >= 36)).toBe(true);
+  const minimumControlHeight = testInfo.project.name.startsWith("mobile-")
+    ? 44
+    : 40;
+  expect(boxes.every((box) => box!.height >= minimumControlHeight)).toBe(true);
   expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
 
   const headerOverflow = await page
@@ -286,7 +289,7 @@ test("insights header controls stay aligned in one compact row", async ({
     expect(trackTitle).not.toBeNull();
     expect(leversBox!.height).toBeLessThanOrEqual(110);
     expect(metricsBox!.height).toBeGreaterThanOrEqual(44);
-    expect(metricsBox!.x - leversBox!.x).toBeCloseTo(12, 1);
+    expect(metricsBox!.x - leversBox!.x).toBeCloseTo(16, 1);
     expect(
       await levers.evaluate(
         (element) => element.scrollWidth - element.clientWidth,
@@ -405,10 +408,11 @@ test("compact facility build buttons stay above the chart", async ({
     await page.getByRole("button", { name: "Facilities", exact: true }).click();
   }
   const buildButtons = [
-    facilities.getByRole("button", { name: "Generator" }),
-    facilities.getByRole("button", { name: "Storage" }),
+    facilities.getByRole("button", { name: "Build", exact: true }),
   ];
   const chart = facilities.locator("#chartSupplyDemand");
+  if (!(await chart.isVisible()))
+    await facilities.locator(".facilitySupplyDisclosure > summary").click();
   await expect(chart).toBeVisible();
   const chartBox = await chart.boundingBox();
   const buttonBoxes = await Promise.all(
@@ -417,12 +421,12 @@ test("compact facility build buttons stay above the chart", async ({
   expect(chartBox).not.toBeNull();
   expect(buttonBoxes.every(Boolean)).toBe(true);
   buttonBoxes.forEach((box) => {
-    expect(box!.height).toBeLessThanOrEqual(32);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(box!.y + box!.height).toBeLessThanOrEqual(chartBox!.y + 0.5);
   });
   expect(
     (await facilities.locator(".paneHeader").boundingBox())!.height,
-  ).toBeLessThanOrEqual(41); // 40px content plus the divider
+  ).toBeLessThanOrEqual(57); // Touch-sized Build action plus the divider
 });
 
 test("main-menu account actions follow the sound action", async ({

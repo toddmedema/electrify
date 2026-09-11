@@ -31,16 +31,16 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.getByRole("button", { name: "Start Interties" }).click();
 
   await expect(page.getByLabel("Objective 1 of 10")).toBeVisible();
-  await expect(page.locator("#intertiesTab")).toBeVisible();
+  await expect(page.locator(".button-buildFacility")).toBeVisible();
   if (testInfo.project.name.startsWith("mobile-")) {
-    for (const selector of ["#plantsTab", "#intertiesTab"]) {
+    for (const selector of [".button-buildFacility"]) {
       const tabBox = await page.locator(selector).boundingBox();
       expect(tabBox?.height).toBeGreaterThanOrEqual(44);
     }
   }
 
   // Opening the tab completes navigation without a redundant Next click.
-  await page.locator("#intertiesTab").click();
+  await page.locator(".button-buildFacility").click();
   await expect(page.getByLabel("Objective 2 of 10")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Approve Pacific Northwest intertie" }),
@@ -58,22 +58,24 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.screenshot({ path: testInfo.outputPath("intertie-approved.png") });
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText(/Trading ·/)).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible({
+    timeout: 20000,
+  });
   // Construction alone is not enough: the objective advances only after this explicit pause.
   await expect(page.getByLabel("Objective 3 of 10")).toBeVisible();
-  await page.getByRole("button", { name: "pause" }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(page.getByLabel("Objective 4 of 10")).toBeVisible();
 
   await page.getByLabel("Trading rule").click();
   await page.getByRole("option", { name: "Buy for shortages only" }).click();
   await expect(page.getByLabel("Objective 5 of 10")).toBeVisible();
-  await page.locator("#plantsTab").click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByLabel("Objective 6 of 10")).toBeVisible();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await expect(page.getByLabel("Objective 7 of 10")).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText(/Trading · Importing/)).toBeVisible({
+  await expect(page.getByText(/Importing /)).toBeVisible({
     timeout: 10000,
   });
   // Wait for a full importing month to settle into history; seeing live flow alone must not
@@ -81,7 +83,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(page.locator(".gameStatus")).toContainText("Mar 2020", {
     timeout: 20000,
   });
-  await page.getByRole("button", { name: "pause" }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(page.getByLabel("Objective 8 of 10")).toBeVisible();
 
   const exchange = page.locator('[data-layer="powerExchange"]');
@@ -115,14 +117,13 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(page.getByLabel("Objective 10 of 10")).toBeVisible();
 
   const facilities = page.locator(".facilities:visible");
-  await facilities.getByRole("tab", { name: "Interties" }).click();
   await facilities.getByLabel("Trading rule").click();
   await page.getByRole("option", { name: "No trading" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(page.locator(".gameStatus")).toContainText("Apr 2020", {
     timeout: 15000,
   });
-  await page.getByRole("button", { name: "pause" }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(page.getByLabel("Objective 10 of 10")).toBeVisible();
 
   await facilities.getByLabel("Trading rule").click();

@@ -197,12 +197,12 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: ".button-buildGenerator",
+        target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
         content: (
           <TutorialPrompt
             concepts={["build", "generator"]}
-            text="Open the generator shop."
+            text="Choose Build, then Generator to open the shop."
           />
         ),
       },
@@ -291,12 +291,12 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: ".button-buildStorage",
+        target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_STORAGE",
         content: (
           <TutorialPrompt
             concepts={["build", "storage"]}
-            text="Store spare power for when you need it - open the storage shop."
+            text="Store spare power for later. Choose Build, then Storage."
           />
         ),
       },
@@ -722,12 +722,12 @@ export const SCENARIOS = [
       {
         skipBeacon: true,
         card: "FACILITIES",
-        target: "#intertiesTab",
-        continueOnClick: "#intertiesTab",
+        target: ".button-buildFacility",
+        continueOnClick: ".button-buildFacility",
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Tap Interties to see links to neighboring grids."
+            text="Choose Build to add a connection to a neighboring grid."
           />
         ),
       },
@@ -751,10 +751,10 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["construction", "time"]}
-            text="Run time until the line says Trading, then pause."
+            text="Run time until the line says Connected, then pause."
           />
         ),
-        hint: "Tap 1× or fast speed, watch Building change to Trading, then tap pause.",
+        hint: "Tap 1× or fast speed, watch Building change to Connected, then tap pause.",
       },
       {
         card: "FACILITIES",
@@ -770,12 +770,11 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: "#plantsTab",
-        continueOnClick: "#plantsTab",
+        target: "#dispatch-order",
         content: (
           <TutorialPrompt
             concepts={["generator", "pause"]}
-            text="Tap Plants to return to your power plants."
+            text="Plants and interties share one list. Plants run in dispatch order; interties trade automatically."
           />
         ),
       },
@@ -809,7 +808,7 @@ export const SCENARIOS = [
             text="Run until you see Importing, then pause; the line can cover only up to its available capacity."
           />
         ),
-        hint: "If time is paused, tap 1× or fast speed; the line must say Trading.",
+        hint: "If time is paused, tap 1× or fast speed; the line must say Connected.",
       },
       {
         card: "INSIGHTS",

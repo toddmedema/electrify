@@ -117,7 +117,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
             <Button
               aria-label={`Review purchase of ${storage.name}`}
               size="small"
-              variant="contained"
+              variant="outlined"
               color="primary"
               onClick={toggleOpen}
               disabled={downpayment > cash || !buildable}
@@ -378,7 +378,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           </Button>
           <Button
             color="primary"
-            variant="contained"
+            variant="outlined"
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(true, e)
             }
@@ -449,7 +449,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
   );
 
   return (
-    <div id="topbar" className="flexContainer">
+    <div id="topbar" className="flexContainer screenCatalog">
       <ConstructionBuildHeader
         concept="storage"
         title="Build Storage"

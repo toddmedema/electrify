@@ -19,7 +19,7 @@ export default function DecisionImpactPreview({
 }: DecisionImpactPreviewProps): React.JSX.Element {
   return (
     <section className="decisionImpact" aria-label="Expected impact">
-      <Typography variant="overline" component="h3">
+      <Typography variant="subtitle2" component="h3">
         What changes
       </Typography>
       <div className="decisionImpactFacts">

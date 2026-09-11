@@ -18,6 +18,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Facilities", exact: true })
         .click();
     }
+    await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const capacity = page.getByRole("slider", { name: /^Capacity/ });
     await capacity.focus();

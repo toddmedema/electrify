@@ -1,15 +1,12 @@
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import {
   Button,
   Chip,
   FormControl,
   InputLabel,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
   MenuItem,
   Select,
   Typography,
@@ -36,16 +33,80 @@ const POLICY_LABELS: Record<TradingPolicyType, string> = {
 
 export interface TransmissionPanelProps {
   game: GameType;
+  projectsOnly?: boolean;
   onBuild: (corridorId: string, financed: boolean) => void;
   onPolicy: (policy: TradingPolicyType) => void;
+}
+
+export function TransmissionTradingSummary({
+  game,
+  onPolicy,
+}: Pick<TransmissionPanelProps, "game" | "onPolicy">) {
+  const state = game.transmission;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const readOnly = !!game.replayPlayback;
+  if (!state?.lines.length) return null;
+  return (
+    <details
+      className="tradingSummary"
+      open={
+        game.scenarioId === 112 && [3, 9].includes(game.tutorialStep)
+          ? true
+          : undefined
+      }
+    >
+      <summary>
+        <span className="networkTradingCopy">
+          <span className="networkTradingHeading">
+            <strong>Network trading</strong>
+            <span className="networkTradingFlow">
+              {(now?.importedW || 0) > 0
+                ? "Importing " + formatWatts(now!.importedW || 0)
+                : (now?.exportedW || 0) > 0
+                  ? "Exporting " + formatWatts(now!.exportedW || 0)
+                  : "No power flowing"}
+            </span>
+          </span>
+          <span className="tradingSummaryRule">
+            {POLICY_LABELS[state.tradingPolicy]}
+          </span>
+        </span>
+        <KeyboardArrowDownIcon className="facilityChevron" aria-hidden />
+      </summary>
+      <FormControl fullWidth size="small" className="tradingPolicy">
+        <InputLabel id="trading-policy-label">Trading rule</InputLabel>
+        <Select
+          labelId="trading-policy-label"
+          label="Trading rule"
+          value={state.tradingPolicy}
+          disabled={readOnly}
+          onChange={(event) =>
+            onPolicy(event.target.value as TradingPolicyType)
+          }
+        >
+          {Object.entries(POLICY_LABELS).map(([value, label]) => (
+            <MenuItem key={value} value={value}>
+              {label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Typography variant="caption" color="textSecondary">
+        One rule for all connections. Imports depend on line capacity and
+        neighboring supply.
+      </Typography>
+      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
+    </details>
+  );
 }
 
 export default function TransmissionPanel({
   game,
   onBuild,
-  onPolicy,
+  projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
+  const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const state = game.transmission ?? { tradingPolicy: "BALANCED", lines: [] };
   const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
@@ -68,86 +129,121 @@ export default function TransmissionPanel({
   }
 
   return (
-    <div className="transmissionPanel scrollable">
-      <section className="transmissionIntro">
-        <img src="/images/transmission.svg" alt="Two grids exchanging power" />
-        <div>
-          <Typography variant="h6">Share power with nearby grids</Typography>
-          <Typography variant="body2" color="textSecondary">
-            Buy backup; sell extra. Imports are limited.
-          </Typography>
-        </div>
-      </section>
-
-      {!!state.lines.length && (
-        <section aria-labelledby="your-interties-title">
-          <Typography id="your-interties-title" variant="subtitle2">
-            Your interties
-          </Typography>
-          <List dense disablePadding>
-            {state.lines.map((line) => {
-              const market = adjacentMarketForCorridor(line.corridorId);
-              const rating = now
-                ? transmissionRatingW(line, now)
-                : line.capacityW;
-              const building = line.yearsToBuildLeft > 0;
-              const direction =
-                (now?.importedW || 0) > (now?.exportedW || 0)
-                  ? "Importing"
-                  : (now?.exportedW || 0) > (now?.importedW || 0)
-                    ? "Exporting"
-                    : "Standing by";
-              return (
-                <ListItem key={line.id} className="transmissionLine">
-                  <ListItemAvatar>
-                    <img
-                      className="transmissionListIcon"
-                      src="/images/transmission.svg"
-                      alt=""
-                    />
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={line.name}
-                    secondary={
-                      building
-                        ? `${line.yearsToBuildLeft.toFixed(1)} ${line.yearsToBuildLeft <= 1 ? "year" : "years"} until power can flow · Monthly loan payments`
-                        : `${formatWatts(rating)} available now · ${market?.name}`
-                    }
-                  />
-                  <Chip
-                    size="small"
-                    color={building ? "default" : "success"}
-                    label={building ? "Building" : `Trading · ${direction}`}
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
+    <div className={projectsOnly ? "transmissionPanel" : "transmissionFleet"}>
+      {projectsOnly && (
+        <section className="transmissionIntro">
+          <img
+            src="/images/transmission.svg"
+            alt="Two grids exchanging power"
+          />
+          <div>
+            <Typography variant="h6">Share power with nearby grids</Typography>
+            <Typography variant="body2" color="textSecondary">
+              Buy backup; sell extra. Imports are limited.
+            </Typography>
+          </div>
         </section>
       )}
 
-      {!!state.lines.length && (
-        <FormControl fullWidth size="small" className="tradingPolicy">
-          <InputLabel id="trading-policy-label">Trading rule</InputLabel>
-          <Select
-            labelId="trading-policy-label"
-            label="Trading rule"
-            value={state.tradingPolicy}
-            disabled={readOnly}
-            onChange={(event) =>
-              onPolicy(event.target.value as TradingPolicyType)
-            }
+      {!projectsOnly && (
+        <section aria-labelledby="your-interties-title">
+          <Typography
+            id="your-interties-title"
+            className="facilitySectionLabel"
+            variant="subtitle2"
           >
-            {Object.entries(POLICY_LABELS).map(([value, label]) => (
-              <MenuItem key={value} value={value}>
-                {label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+            Interties <span>Automatic trading</span>
+          </Typography>
+          {!state.lines.length && (
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{ px: 2, pb: 2 }}
+            >
+              No connections yet. Choose Build to connect a nearby grid.
+            </Typography>
+          )}
+          {state.lines.map((line) => {
+            const market = adjacentMarketForCorridor(line.corridorId);
+            const rating = now
+              ? transmissionRatingW(line, now)
+              : line.capacityW;
+            const building = line.yearsToBuildLeft > 0;
+            return (
+              <div key={line.id} className="transmissionLine">
+                <button
+                  type="button"
+                  className="facilityDisclosure"
+                  aria-label={"Inspect " + line.name}
+                  aria-expanded={selectedLine === line.id}
+                  onClick={() =>
+                    setSelectedLine(selectedLine === line.id ? null : line.id)
+                  }
+                >
+                  <img
+                    className="transmissionListIcon"
+                    src="/images/transmission.svg"
+                    alt=""
+                  />
+                  <span className="transmissionLineText">
+                    <span>{line.name}</span>
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      color="textSecondary"
+                    >
+                      {building
+                        ? line.yearsToBuildLeft.toFixed(1) +
+                          (line.yearsToBuildLeft <= 1 ? " year" : " years") +
+                          " remaining"
+                        : formatWatts(rating) + " available"}
+                      {" · "}
+                      <span className="transmissionLineStatus">
+                        {building ? "Building" : "Connected"}
+                      </span>
+                    </Typography>
+                  </span>
+                  <KeyboardArrowDownIcon
+                    className="facilityChevron"
+                    aria-hidden
+                  />
+                </button>
+                {selectedLine === line.id && (
+                  <div className="transmissionLineDetails">
+                    <Typography variant="body2">
+                      {market?.name} · {formatWatts(line.capacityW)} rated
+                      capacity
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {building
+                        ? "Power can flow when construction finishes."
+                        : "Available capacity changes with weather. Trading is automatic across the network."}
+                    </Typography>
+                    {line.loanAmountLeft > 0 && (
+                      <Typography variant="body2">
+                        Loan balance {formatMoneyConcise(line.loanAmountLeft)} ·
+                        Monthly payments during construction and operation
+                      </Typography>
+                    )}
+                    {market && (
+                      <Typography variant="caption" color="textSecondary">
+                        Purchased emissions:{" "}
+                        {formatMass(market.emissionsKgco2ePerMWh, units)}/MWh
+                        CO2e
+                      </Typography>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
       )}
 
-      {!!unbuiltCorridors.length && (
+      {projectsOnly && !unbuiltCorridors.length && (
+        <Typography>All available connections have been approved.</Typography>
+      )}
+      {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-labelledby="intertie-projects-title">
           <Typography id="intertie-projects-title" variant="subtitle2">
             Connection projects
@@ -240,39 +336,47 @@ export default function TransmissionPanel({
           </div>
         </section>
       )}
-      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
-      <details>
-        <summary style={{ minHeight: 44, cursor: "pointer" }}>
-          How trading and purchased emissions are estimated
-        </summary>
-        <Typography variant="body2" color="textSecondary" sx={{ my: 1 }}>
-          Buy backup during shortages; sell surplus after customers and storage.
-          Trading is automatic, limited by line capacity and neighboring supply;
-          imports are not guaranteed backup. Prices and flows are simplified
-          estimates, not a least-cost dispatch or a network engineering study.
-          Imported emissions count toward your total; the game's carbon fee
-          applies to your local plants.
-        </Typography>
-        {Array.from(new Set(corridors.map((corridor) => corridor.id))).map(
-          (id) => {
-            const market = adjacentMarketForCorridor(id);
-            return market ? (
-              <Typography key={id} variant="body2" sx={{ my: 1 }}>
-                {market.name}: {formatMass(market.emissionsKgco2ePerMWh, units)}
-                /MWh CO2e · {market.emissionsBasis}.{" "}
-                <a
-                  aria-label={`Source for ${market.name} emissions`}
-                  href={market.emissionsSource}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Source
-                </a>
-              </Typography>
-            ) : null;
-          },
-        )}
-      </details>
+      {projectsOnly && (
+        <>
+          <ManualLink
+            entry={MANUAL_ENTRY.INTERTIES}
+            text="How interties work"
+          />
+          <details>
+            <summary style={{ minHeight: 44, cursor: "pointer" }}>
+              How trading and purchased emissions are estimated
+            </summary>
+            <Typography variant="body2" color="textSecondary" sx={{ my: 1 }}>
+              Buy backup during shortages; sell surplus after customers and
+              storage. Trading is automatic, limited by line capacity and
+              neighboring supply; imports are not guaranteed backup. Prices and
+              flows are simplified estimates, not a least-cost dispatch or a
+              network engineering study. Imported emissions count toward your
+              total; the game's carbon fee applies to your local plants.
+            </Typography>
+            {Array.from(new Set(corridors.map((corridor) => corridor.id))).map(
+              (id) => {
+                const market = adjacentMarketForCorridor(id);
+                return market ? (
+                  <Typography key={id} variant="body2" sx={{ my: 1 }}>
+                    {market.name}:{" "}
+                    {formatMass(market.emissionsKgco2ePerMWh, units)}
+                    /MWh CO2e · {market.emissionsBasis}.{" "}
+                    <a
+                      aria-label={`Source for ${market.name} emissions`}
+                      href={market.emissionsSource}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Source
+                    </a>
+                  </Typography>
+                ) : null;
+              },
+            )}
+          </details>
+        </>
+      )}
     </div>
   );
 }

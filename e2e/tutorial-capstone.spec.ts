@@ -71,7 +71,9 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   // objective is docked outside the game surface, so the same control remains operable at every
   // viewport without a small-screen workaround.
   const naturalGas = page.locator(".facilityRow", { hasText: "Natural Gas" });
-  await naturalGas.click();
+  await naturalGas
+    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
+    .click();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
@@ -85,9 +87,15 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   await expect(
     page.getByText("Your turn: keep the lights on for a full day"),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Pause Natural Gas" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resume Natural Gas", exact: true }),
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
