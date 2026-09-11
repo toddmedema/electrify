@@ -34,9 +34,20 @@ for (const theme of ["light", "dark"] as const) {
     }
     const first = page.locator(".buildOption").first();
     const metrics = await first.locator(".buildOptionMetrics").innerText();
-    const help = page
-      .getByRole("button", { name: /power, energy & duration/i })
-      .first();
+    await expect(
+      page.getByRole("button", {
+        name: /power, energy & duration|charging & losses/i,
+      }),
+    ).toHaveCount(0);
+    await page
+      .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
+      .first()
+      .click();
+    const purchase = page.getByRole("dialog");
+    const help = purchase.getByRole("button", {
+      name: "Power, energy & duration",
+      exact: true,
+    });
     await expect(help).toBeVisible();
     expect((await help.boundingBox())!.height).toBeGreaterThanOrEqual(
       testInfo.project.use.hasTouch ? 44 : 40,
@@ -80,28 +91,11 @@ for (const theme of ["light", "dark"] as const) {
     await manual.getByRole("button", { name: "back", exact: true }).click();
     await expect(manual).not.toBeVisible();
     await expect(help).toBeFocused();
-    await expect(capacity).toHaveAttribute("aria-valuenow", selectedCapacity!);
-    await expect(first.locator(".buildOptionMetrics")).toHaveText(metrics, {
-      useInnerText: true,
-    });
-    if (await sort.isVisible()) {
-      await expect(sort).toContainText("Build Time");
-    } else {
-      await expect(
-        page.getByRole("button", { name: "Sort facilities: Build Time" }),
-      ).toBeVisible();
-    }
     // A second lookup must close to the same draft without creating a history loop.
     await help.click();
     await expect(manual).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(manual).not.toBeVisible();
-    await expect(capacity).toHaveAttribute("aria-valuenow", selectedCapacity!);
-    await page
-      .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
-      .first()
-      .click();
-    const purchase = page.getByRole("dialog");
     await expect(purchase).toContainText("Loan option");
     const purchaseHelp = purchase.getByRole("button", {
       name: "Power, energy & duration",
@@ -115,6 +109,18 @@ for (const theme of ["light", "dark"] as const) {
     await expect(purchase).toContainText("Loan option");
     await purchase.getByRole("button", { name: "close", exact: true }).click();
     await expect(purchase).not.toBeVisible();
+    await expect(capacity).toHaveAttribute("aria-valuenow", selectedCapacity!);
+    await expect(first.locator(".buildOptionMetrics")).toHaveText(metrics, {
+      useInnerText: true,
+    });
+    if (await sort.isVisible()) {
+      await expect(sort).toContainText("Build Time");
+    } else {
+      await expect(
+        page.getByRole("button", { name: "Sort facilities: Build Time" }),
+      ).toBeVisible();
+    }
+
     await page.getByRole("button", { name: "close", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   });

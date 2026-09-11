@@ -364,8 +364,9 @@ describe("the interties view", () => {
     const game = playedGame(0);
     renderProjects(game);
     expect(
-      screen.getByText("Share power with nearby grids"),
-    ).toBeInTheDocument();
+      screen.queryByText("Share power with nearby grids"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Connection projects")).not.toBeInTheDocument();
     expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
     expect(screen.queryByLabelText("Trading rule")).toBeNull();
     expect(

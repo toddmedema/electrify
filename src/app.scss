@@ -966,7 +966,6 @@ $pane_header_height: 40px;
   background: var(--bg-sunken);
 }
 
-.transmissionIntro,
 .powerExchangeHero {
   display: flex;
   align-items: center;
@@ -986,11 +985,6 @@ $pane_header_height: 40px;
   background: var(--bg-primary);
 }
 
-.transmissionPanel section > h6,
-.transmissionPanel section > .MuiTypography-subtitle2 {
-  margin-bottom: 8px;
-}
-
 .transmissionProjects {
   display: grid;
   gap: 12px;
@@ -1008,8 +1002,33 @@ $pane_header_height: 40px;
 .transmissionProjectHeading {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
+
+  .MuiTypography-root {
+    min-width: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .MuiButton-root {
+    flex-shrink: 0;
+    min-height: 40px;
+  }
+}
+
+.transmissionProjectMetadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (pointer: coarse) {
+  .transmissionProjectHeading .MuiButton-root {
+    min-height: 44px;
+  }
 }
 
 .transmissionMetrics,
@@ -1067,32 +1086,6 @@ $pane_header_height: 40px;
   .transmissionPanel {
     gap: 8px;
     padding: 12px;
-  }
-
-  .transmissionIntro {
-    img {
-      width: 40px;
-      height: 40px;
-      flex-basis: 40px;
-    }
-
-    h6 {
-      font-size: 1.125rem;
-      line-height: 1.35;
-    }
-  }
-
-  .transmissionProject {
-    gap: 8px;
-    padding: 8px;
-
-    // On the shortest supported phone, the intro teaches the decision and the market card keeps
-    // the identifying facts. Omitting this secondary flavor copy leaves the build decision and
-    // its financing above the persistent navigation instead of making the player hunt for it.
-    > .MuiTypography-body2,
-    .transmissionProjectHeading .MuiTypography-caption {
-      display: none;
-    }
   }
 
   .powerExchangeMetrics {
@@ -4405,9 +4398,6 @@ $sizemap: (
   padding: 16px;
   border-radius: 8px;
 }
-.transmissionIntro h6 {
-  font-size: 1rem;
-}
 .base_main #menuCard #logo {
   margin-top: auto;
   padding-top: 32px;
@@ -4779,10 +4769,4 @@ $sizemap: (
 
 .constructionInterties {
   padding: $space-4 $space-2;
-
-  .transmissionIntro,
-  #intertie-projects-title {
-    margin-left: $space-2;
-    margin-right: $space-2;
-  }
 }

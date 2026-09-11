@@ -29,6 +29,7 @@ import { getMonthlyPayment } from "../../helpers/Financials";
 import { GameType, TradingPolicyType } from "../../Types";
 import { formatMass } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
+import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
@@ -146,21 +147,6 @@ export default function TransmissionPanel({
 
   return (
     <div className={projectsOnly ? "transmissionPanel" : "transmissionFleet"}>
-      {projectsOnly && (
-        <section className="transmissionIntro">
-          <img
-            src="/images/transmission.svg"
-            alt="Two grids exchanging power"
-          />
-          <div>
-            <Typography variant="h6">Share power with nearby grids</Typography>
-            <Typography variant="body2" color="textSecondary">
-              Buy backup; sell extra. Imports are limited.
-            </Typography>
-          </div>
-        </section>
-      )}
-
       {!projectsOnly && (
         <section aria-labelledby="your-interties-title">
           <Typography
@@ -260,10 +246,7 @@ export default function TransmissionPanel({
         <Typography>All available connections have been approved.</Typography>
       )}
       {projectsOnly && !!unbuiltCorridors.length && (
-        <section aria-labelledby="intertie-projects-title">
-          <Typography id="intertie-projects-title" variant="subtitle2">
-            Connection projects
-          </Typography>
+        <section aria-label="Connection projects">
           <div className="transmissionProjects">
             {unbuiltCorridors.map((corridor) => {
               const market = adjacentMarketForCorridor(corridor.id);
@@ -277,14 +260,27 @@ export default function TransmissionPanel({
                   key={corridor.id}
                 >
                   <div className="transmissionProjectHeading">
-                    <div>
-                      <Typography variant="subtitle1">
-                        {market?.name}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {corridor.name}
-                      </Typography>
-                    </div>
+                    <Typography variant="subtitle1">{market?.name}</Typography>
+                    {!readOnly && (
+                      <Button
+                        id={`review-intertie-${corridor.id}`}
+                        aria-label={`Review purchase of ${market?.name} intertie`}
+                        size="small"
+                        startIcon={
+                          <ConceptIcon concept="buy" fontSize="small" />
+                        }
+                        variant="outlined"
+                        disabled={!now || now.cash < downpayment}
+                        onClick={() => setReviewId(corridor.id)}
+                      >
+                        Review
+                      </Button>
+                    )}
+                  </div>
+                  <div className="transmissionProjectMetadata">
+                    <Typography variant="caption" color="textSecondary">
+                      {corridor.name}
+                    </Typography>
                     <Chip
                       size="small"
                       variant="outlined"
@@ -326,18 +322,6 @@ export default function TransmissionPanel({
                       </dd>
                     </div>
                   </dl>
-                  {!readOnly && (
-                    <Button
-                      id={`review-intertie-${corridor.id}`}
-                      aria-label={`Review purchase of ${market?.name} intertie`}
-                      fullWidth
-                      variant="outlined"
-                      disabled={!now || now.cash < downpayment}
-                      onClick={() => setReviewId(corridor.id)}
-                    >
-                      Review
-                    </Button>
-                  )}
                   {!readOnly && (
                     <Typography variant="caption" color="textSecondary">
                       Pay {formatMoneyConcise(downpayment)} now · finance{" "}

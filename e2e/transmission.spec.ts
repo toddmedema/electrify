@@ -20,7 +20,10 @@ test("California players can build and understand an intertie", async ({
   const projects = page.getByRole("tabpanel", { name: "Interties" });
   await expect(
     projects.getByRole("heading", { name: "Share power with nearby grids" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(
+    projects.getByRole("heading", { name: "Connection projects" }),
+  ).toHaveCount(0);
   await expect(
     projects.getByRole("heading", { name: "Pacific Northwest", exact: true }),
   ).toBeVisible();
@@ -171,3 +174,58 @@ test("unified facility rows support keyboard inspection and dispatch reordering"
   await expect(rows.last().locator(".facilityDragHandle")).toBeFocused();
   await expect(facilities.locator(".transmissionFleet")).toBeVisible();
 });
+
+for (const theme of ["light", "dark"] as const) {
+  test(`intertie review stays at the top right in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
+    const facilities = page.locator(".facilities:visible");
+    if (!(await facilities.isVisible())) {
+      await page
+        .getByRole("button", { name: "Facilities", exact: true })
+        .click();
+    }
+    await facilities
+      .getByRole("button", { name: "Build", exact: true })
+      .click();
+    await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    for (const card of await page.locator(".transmissionProject").all()) {
+      const heading = card.locator(".transmissionProjectHeading");
+      const review = heading.getByRole("button", {
+        name: /Review purchase of/,
+      });
+      await expect(
+        review.locator('[data-testid="ShoppingCartIcon"]'),
+      ).toBeVisible();
+      const title = heading.getByRole("heading");
+      const titleBox = (await title.boundingBox())!;
+      const buttonBox = (await review.boundingBox())!;
+      const headerBox = (await heading.boundingBox())!;
+      const metadataBox = (await card
+        .locator(".transmissionProjectMetadata")
+        .boundingBox())!;
+      expect(buttonBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width);
+      expect(buttonBox.x + buttonBox.width).toBeCloseTo(
+        headerBox.x + headerBox.width,
+        0,
+      );
+      expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(metadataBox.y);
+      expect(buttonBox.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      expect(
+        await card.evaluate((el) => el.scrollWidth - el.clientWidth),
+      ).toBeLessThanOrEqual(1);
+      await expect(card.locator(".transmissionProjectMetadata")).toContainText(
+        /route/,
+      );
+    }
+  });
+}
