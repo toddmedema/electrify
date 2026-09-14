@@ -17,6 +17,7 @@ import { formatMoneyStable } from "../../helpers/Format";
 import ConceptIcon from "./ConceptIcon";
 
 interface Props {
+  hideTitle?: boolean;
   concept: ConceptNameType;
   title: string;
   cash: number;
@@ -58,29 +59,31 @@ export default function ConstructionBuildHeader(
 
   return (
     <header className="constructionHeader">
-      <Toolbar className="constructionTitleBar">
-        <Typography variant="h6" className="constructionTitle">
-          <span className="iconLabel">
-            <ConceptIcon concept={props.concept} fontSize="small" />
-            {props.title}
-          </span>
-          <span
-            className="weak constructionCash"
-            aria-label={`Available cash ${formatMoneyStable(props.cash)}`}
+      {!props.hideTitle && (
+        <Toolbar className="constructionTitleBar">
+          <Typography variant="h6" className="constructionTitle">
+            <span className="iconLabel">
+              <ConceptIcon concept={props.concept} fontSize="small" />
+              {props.title}
+            </span>
+            <span
+              className="weak constructionCash"
+              aria-label={`Available cash ${formatMoneyStable(props.cash)}`}
+            >
+              {formatMoneyStable(props.cash)} cash
+            </span>
+          </Typography>
+          <IconButton
+            id="close-button"
+            color="primary"
+            onClick={props.onClose}
+            aria-label="close"
+            size="large"
           >
-            {formatMoneyStable(props.cash)} cash
-          </span>
-        </Typography>
-        <IconButton
-          id="close-button"
-          color="primary"
-          onClick={props.onClose}
-          aria-label="close"
-          size="large"
-        >
-          <CloseIcon />
-        </IconButton>
-      </Toolbar>
+            <CloseIcon />
+          </IconButton>
+        </Toolbar>
+      )}
       <div className="constructionControls">
         <Typography
           id="construction-capacity"

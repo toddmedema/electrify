@@ -202,7 +202,7 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt
             concepts={["build", "generator"]}
-            text="Choose Build, then Generator to open the shop."
+            text="Choose Build to open the generator shop."
           />
         ),
       },
@@ -723,22 +723,22 @@ export const SCENARIOS = [
         skipBeacon: true,
         card: "FACILITIES",
         target: ".button-buildFacility",
-        continueOnClick: ".button-buildFacility",
+        advanceOn: (s: AppStateType) => s.card.name === "BUILD_INTERTIES",
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Choose Build to add a connection to a neighboring grid."
+            text="Choose Build, then Interties to connect to a neighboring grid."
           />
         ),
       },
       {
-        card: "FACILITIES",
-        target: "#approve-intertie-california-north",
+        card: { name: "BUILD_INTERTIES", dontRemember: true },
+        target: "#review-intertie-california-north",
         advanceOn: (s: AppStateType) => !!tutorialNorthernIntertie(s),
         content: (
           <TutorialPrompt
             concepts={["money", "construction"]}
-            text="Approve the Pacific Northwest intertie with financing."
+            text="Review the Pacific Northwest intertie, then choose Take loan."
           />
         ),
       },
@@ -1021,8 +1021,7 @@ export const SCENARIOS = [
       fantasy: "Guide a small city grid through explosive growth.",
       objective:
         "Build enough dependable generation and storage before data-center demand arrives.",
-      threat:
-        "New demand will overwhelm the grid if you build too late. In January 2024, choose funded full connections in 2026 or phased connections in 2026 and 2028.",
+      threat: "New demand will overwhelm the grid if you build too late.",
     },
     ownership: "Public",
     startingYear: 2020,

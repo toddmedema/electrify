@@ -693,7 +693,9 @@ export interface DispatchProps {
   onBack: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  embedded?: boolean;
+}
 
 export default function BuildGenerators(props: Props): React.JSX.Element {
   const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
@@ -789,7 +791,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
 
   return (
     <div
-      id="topbar"
+      id={props.embedded ? undefined : "topbar"}
       className="flexContainer screenCatalog"
       ref={evidenceAnchor}
       tabIndex={-1}
@@ -813,6 +815,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           </Typography>
         )}
       <ConstructionBuildHeader
+        hideTitle={props.embedded}
         concept="generator"
         title="Build Generator"
         cash={cash}

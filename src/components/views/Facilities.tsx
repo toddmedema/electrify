@@ -580,13 +580,11 @@ export interface Props extends StateProps, DispatchProps {}
 
 export default class Facilities extends React.Component<
   Props,
-  { buildOpen: boolean; buildInterties: boolean; revealChart: boolean }
+  { revealChart: boolean }
 > {
   constructor(props: Props) {
     super(props);
     this.state = {
-      buildOpen: false,
-      buildInterties: false,
       revealChart: false,
     };
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -606,8 +604,6 @@ export default class Facilities extends React.Component<
   public shouldComponentUpdate(
     nextProps: Props,
     nextState: Readonly<{
-      buildOpen: boolean;
-      buildInterties: boolean;
       revealChart: boolean;
     }>,
   ) {
@@ -640,14 +636,6 @@ export default class Facilities extends React.Component<
       this.setState({ revealChart: false });
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
-    if (
-      this.props.game.scenarioId === 112 &&
-      this.props.game.tutorialStep !== previousProps.game.tutorialStep &&
-      this.props.game.tutorialStep === 1 &&
-      !this.props.game.transmission?.lines.length
-    ) {
-      this.setState({ buildOpen: true, buildInterties: true });
-    }
   }
 
   public componentDidMount() {
@@ -699,7 +687,6 @@ export default class Facilities extends React.Component<
       onPause,
       onReprioritize,
       onSelect,
-      onStorageBuild,
       onTransmissionBuild,
       onTradingPolicy,
       selectedFacilityId,
@@ -730,15 +717,7 @@ export default class Facilities extends React.Component<
                 color="primary"
                 className="button-buildFacility"
                 startIcon={<ConceptIcon concept="build" fontSize="small" />}
-                onClick={() =>
-                  this.setState({
-                    buildOpen: true,
-                    buildInterties:
-                      game.scenarioId === 112 &&
-                      game.tutorialStep <= 1 &&
-                      !game.transmission?.lines.length,
-                  })
-                }
+                onClick={onGeneratorBuild}
               >
                 Build
               </Button>
@@ -830,81 +809,6 @@ export default class Facilities extends React.Component<
               )}
             </List>
           </>
-          {!readOnly && this.state.buildOpen && (
-            <Dialog
-              open
-              onClose={() => this.setState({ buildOpen: false })}
-              fullWidth
-              maxWidth="sm"
-            >
-              <DialogTitle>
-                {this.state.buildInterties
-                  ? "Build an intertie"
-                  : "Build a facility"}
-              </DialogTitle>
-              <DialogContent>
-                {this.state.buildInterties ? (
-                  <TransmissionPanel
-                    game={game}
-                    projectsOnly
-                    onPolicy={onTradingPolicy}
-                    onBuild={(id, financed) => {
-                      onTransmissionBuild(id, financed);
-                      this.setState({ buildOpen: false });
-                    }}
-                  />
-                ) : (
-                  <div className="facilityBuildChoices">
-                    <Button
-                      className="button-buildGenerator"
-                      variant="outlined"
-                      startIcon={<ConceptIcon concept="generator" />}
-                      onClick={onGeneratorBuild}
-                    >
-                      Generator
-                    </Button>
-                    <Button
-                      className="button-buildStorage"
-                      variant="outlined"
-                      startIcon={<ConceptIcon concept="storage" />}
-                      onClick={onStorageBuild}
-                    >
-                      Storage
-                    </Button>
-                    {intertiesAvailable && (
-                      <Button
-                        className="button-buildIntertie"
-                        variant="outlined"
-                        startIcon={
-                          <img
-                            src="/images/transmission.svg"
-                            width="24"
-                            height="24"
-                            alt=""
-                          />
-                        }
-                        onClick={() => this.setState({ buildInterties: true })}
-                      >
-                        Intertie
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </DialogContent>
-              <DialogActions>
-                {this.state.buildInterties && (
-                  <Button
-                    onClick={() => this.setState({ buildInterties: false })}
-                  >
-                    Back
-                  </Button>
-                )}
-                <Button onClick={() => this.setState({ buildOpen: false })}>
-                  Close
-                </Button>
-              </DialogActions>
-            </Dialog>
-          )}
         </>
       </GameCard>
     );

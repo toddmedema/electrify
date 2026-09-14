@@ -48,12 +48,14 @@ test("phone surfaces share stable gutters and compact chrome", async ({
 
   await page.getByRole("button", { name: "Facilities", exact: true }).click();
   await page.locator(".button-buildFacility").click();
-  await page.getByRole("button", { name: "Storage" }).click();
+  await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Build Storage" }),
+    page.getByRole("tab", { name: "Storage", selected: true }),
   ).toBeVisible();
   await page.waitForTimeout(400);
-  await expectNoHorizontalOverflow(page.locator(".constructionHeader"));
+  for (const header of await page.locator(".constructionHeader").all()) {
+    await expectNoHorizontalOverflow(header);
+  }
 
   const closeButton = await page
     .getByRole("button", { name: "close" })

@@ -49,13 +49,9 @@ for (const mission of [
     const hud = page.locator(".tutorialHud");
     if (mission === "Generators" || mission === "Storage") {
       await page.locator(".button-buildFacility").click();
-      await page
-        .locator(
-          mission === "Generators"
-            ? ".button-buildGenerator"
-            : ".button-buildStorage",
-        )
-        .click();
+      if (mission === "Storage") {
+        await page.getByRole("tab", { name: "Storage", exact: true }).click();
+      }
       await expect(hud).toContainText(
         mission === "Generators" ? "Compare cost" : "Choose storage",
       );
