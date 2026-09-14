@@ -71,8 +71,27 @@ const refs = {
   audioContext: null as AudioContext | null,
 };
 
+/**
+ * Logs a Google Analytics event, or does nothing when the page is offline.
+ *
+ * getAnalytics() initializes the analytics instance, which kicks off a background
+ * registration with Firebase Installations. While the page is offline that
+ * registration fails inside the SDK (installations/app-offline), and the SDK leaves
+ * the rejected promise without a handler, so it surfaces as an uncaught runtime
+ * error -- in the dev build a red error overlay over the whole game. The game must
+ * keep working while offline, including the manual, so skip the analytics
+ * initialization until the browser reports being online again; the first call after
+ * that resumes tracking and the SDK self-heals.
+ */
 export function logEvent(eventName: string, args?: object): void {
-  firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
+  try {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
+    firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
+  } catch {
+    // Analytics is telemetry, not gameplay: a failure here must never break the game.
+  }
 }
 
 export function getDb(): Firestore {
