@@ -1,4 +1,8 @@
-import { getAnalytics, logEvent as firebaseLogEvent } from "firebase/analytics";
+import {
+  Analytics,
+  getAnalytics,
+  logEvent as firebaseLogEvent,
+} from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -58,6 +62,7 @@ interface HistoryApi {
 }
 
 const refs = {
+  analytics: null as Analytics | null,
   db: null as Firestore | null,
   history:
     typeof window !== "undefined" && typeof window.history !== "undefined"
@@ -71,8 +76,38 @@ const refs = {
   audioContext: null as AudioContext | null,
 };
 
+/**
+ * Logs a Google Analytics event, initializing analytics on first use once the browser is online.
+ *
+ * getAnalytics() kicks off a background registration with Firebase Installations, and while the
+ * page is offline that registration fails inside the SDK (installations/app-offline). The SDK
+ * keeps the rejected promise without a handler, so it surfaces as an unhandled rejection, which
+ * the dev server's error overlay turns into a red screen over the whole game -- the manual
+ * included, even though nothing in it needs the network. So initialization waits until the
+ * browser reports being online, and the first event after that brings analytics up for good.
+ *
+ * Only the initialization is gated. Once the SDK is up, events keep being handed to it while
+ * offline: a player who started online stays measured across a dropout, and the SDK's own
+ * logEvent already catches its internal rejections. getAnalytics() is the only entry point that
+ * does not.
+ *
+ * The try/catch below covers synchronous throws only -- a rejection from inside the SDK cannot
+ * be caught here. A registration that fails while the browser still claims to be online (an ad
+ * blocker on the Google endpoints, a captive portal, DNS) rejects that way and is out of reach;
+ * outside the dev overlay it is a console line rather than anything the game reacts to.
+ */
 export function logEvent(eventName: string, args?: object): void {
-  firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
+  try {
+    if (!refs.analytics) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+      refs.analytics = getAnalytics(firebaseApp);
+    }
+    firebaseLogEvent(refs.analytics, eventName, args);
+  } catch {
+    // Analytics is telemetry, not gameplay: a failure here must never break the game.
+  }
 }
 
 export function getDb(): Firestore {

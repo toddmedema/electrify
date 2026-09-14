@@ -14,6 +14,8 @@ coverage
 .nyc_output
 playwright-report/
 test-results/
+# Screenshots captured for PR review, attached to the PR rather than committed
+pr-*.png
 
 # Compiled outputs & binary addons (http://nodejs.org/api/addons.html)
 build/Release
