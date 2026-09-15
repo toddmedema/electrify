@@ -178,6 +178,36 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
       ...programs(34),
     ],
   },
+  113: {
+    initialBuild: { name: "Natural Gas", peakW: 300000000, financed: true },
+    scheduledActions: [
+      rate(0.115),
+      ...line("south-africa-mozambique-upgrade", 8, 7),
+      ...dispatch([1, 2, 3]),
+      { month: 59, type: "toggle", facilityId: 1 },
+      ...programs(58),
+    ],
+  },
+  114: {
+    initialBuild: { name: "Natural Gas", peakW: 100000000, financed: true },
+    scheduledActions: [
+      rate(0.095),
+      ...line("zambia-zimbabwe-upgrade", 8, 7),
+      ...dispatch([1, 2, 3]),
+      { month: 47, type: "toggle", facilityId: 2 },
+      ...programs(46),
+    ],
+  },
+  115: {
+    initialBuild: { name: "Natural Gas", peakW: 700000000, financed: true },
+    scheduledActions: [
+      rate(0.095),
+      ...line("india-himalaya-upgrade", 8, 7),
+      ...dispatch([1, 2, 3]),
+      { month: 35, type: "toggle", facilityId: 1 },
+      ...programs(34),
+    ],
+  },
 };
 
 /** The single material commitment that teaches each Intern scenario's intended first lesson. */
@@ -217,5 +247,14 @@ export const INTERN_ONE_BUILD_PLAYS: Record<
   },
   111: {
     initialBuild: { name: "Natural Gas", peakW: 20000000, financed: true },
+  },
+  113: {
+    initialBuild: { name: "Natural Gas", peakW: 200000000, financed: true },
+  },
+  114: {
+    initialBuild: { name: "Natural Gas", peakW: 150000000, financed: true },
+  },
+  115: {
+    initialBuild: { name: "Natural Gas", peakW: 400000000, financed: true },
   },
 };

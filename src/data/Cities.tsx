@@ -30,6 +30,8 @@ export const REGION_ORDER = [
   "Europe",
   "Africa",
   "Middle East",
+  "Caucasus",
+  "Central Asia",
   "South Asia",
   "East Asia",
   "Southeast Asia",

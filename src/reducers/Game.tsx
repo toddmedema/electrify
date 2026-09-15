@@ -2432,7 +2432,10 @@ function updateSupplyFacilitiesFinances(
       const requiredReleaseWh = Math.min(
         g.reservoirWh,
         ((g.hydroMeanMonthlyInflowWh || 0) *
-          mandatedReleaseFraction(tickDate.monthNumber)) /
+          mandatedReleaseFraction(
+            tickDate.monthNumber,
+            state.location?.lat ?? 1,
+          )) /
           ticksPerMonth,
       );
       const deadpoolWh = capacityWh * HYDRO_DEADPOOL_FRACTION;

@@ -10,7 +10,7 @@ export const POLICY_TIERS: PolicyTier[] = ["Off", "Small", "Large"];
 // Explicit launch availability: modern, longer scenarios and custom games. Historical
 // scenarios and introductory tutorials deliberately have no program entry.
 export const POLICY_SCENARIOS = [
-  100, 101, 104, 105, 106, 107, 108, 110, 111, 999,
+  100, 101, 104, 105, 106, 107, 108, 110, 111, 113, 114, 115, 999,
 ];
 export const POLICIES = {
   timeOfUse: {
