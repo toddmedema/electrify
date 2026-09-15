@@ -109,7 +109,9 @@ describe("NewGame", () => {
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Heatwave + Drought"),
       expect.stringContaining("Wildfire Emergency"),
+      expect.stringContaining("Delhi Summer"),
       expect.stringContaining("Deep Freeze"),
+      expect.stringContaining("The River Runs Dry"),
       expect.stringContaining("Hurricane Season"),
     ]);
     expect(screen.queryByLabelText("Deep Freeze themes")).toBeNull();

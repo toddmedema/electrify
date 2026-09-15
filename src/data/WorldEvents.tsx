@@ -1546,6 +1546,288 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export interface LoadSheddingBalanceType {
+  /** Share of nominal coal output still available, year by year from 2019 to 2022. */
+  coalOutputMultipliers: [number, number, number, number];
+  /** Coal operating cost, which rises with the breakdowns and the running repairs. */
+  coalOperatingMultipliers: [number, number, number, number];
+  /** Diesel is what covers the gap, and it is bought at short notice. */
+  dieselPriceMultipliers: [number, number, number, number];
+}
+
+// Eskom's energy availability factor fell from 78% in 2018 to about 58% in 2022, with unplanned
+// outages roughly doubling over the same period. These four steps trace that decline; they are
+// authored game-scale derates rather than a reconstruction of any particular station's record.
+// https://www.eskom.co.za/dataportal/supply-side/eaf-weekly-data/
+export const LOAD_SHEDDING_BALANCE: Record<
+  DifficultyType,
+  LoadSheddingBalanceType
+> = {
+  Intern: {
+    coalOutputMultipliers: [0.95, 0.9, 0.85, 0.82],
+    coalOperatingMultipliers: [1.05, 1.1, 1.15, 1.2],
+    dieselPriceMultipliers: [1.05, 1.1, 1.15, 1.2],
+  },
+  Employee: {
+    coalOutputMultipliers: [0.92, 0.86, 0.8, 0.75],
+    coalOperatingMultipliers: [1.08, 1.16, 1.24, 1.32],
+    dieselPriceMultipliers: [1.1, 1.2, 1.3, 1.4],
+  },
+  Manager: {
+    coalOutputMultipliers: [0.9, 0.82, 0.75, 0.68],
+    coalOperatingMultipliers: [1.1, 1.2, 1.3, 1.45],
+    dieselPriceMultipliers: [1.15, 1.3, 1.45, 1.6],
+  },
+  VP: {
+    coalOutputMultipliers: [0.87, 0.78, 0.7, 0.62],
+    coalOperatingMultipliers: [1.12, 1.26, 1.4, 1.55],
+    dieselPriceMultipliers: [1.2, 1.4, 1.6, 1.8],
+  },
+  CEO: {
+    coalOutputMultipliers: [0.85, 0.74, 0.65, 0.56],
+    coalOperatingMultipliers: [1.15, 1.32, 1.5, 1.7],
+    dieselPriceMultipliers: [1.25, 1.5, 1.75, 2],
+  },
+};
+
+const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
+  id: "load-shedding",
+  scenarioId: 113,
+  phases: [
+    {
+      id: "maintenance-backlog",
+      schedule: { atMonth: 6 },
+      preview: () => null,
+      describe: () => ({
+        title: "The maintenance backlog is growing",
+        message:
+          "Unplanned breakdowns across the coal fleet are rising and the oldest stations are missing their scheduled outages. Expect less coal output every year from here, and build replacement capacity before the gap opens.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([12, 24, 36, 48] as const).map((atMonth, index) => ({
+      id: `availability-step-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: 12,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = LOAD_SHEDDING_BALANCE[difficulty];
+        const output = balance.coalOutputMultipliers[index];
+        const operating = balance.coalOperatingMultipliers[index];
+        const diesel = balance.dieselPriceMultipliers[index];
+        return {
+          title: [
+            "Breakdowns outpace repairs",
+            "Another station derated",
+            "The fleet is running on borrowed time",
+            "Availability at its lowest",
+          ][index],
+          message: `Coal output is down to ${Math.round(output * 100)}% of nominal for the year, coal running costs are ${Math.round((operating - 1) * 100)}% higher, and diesel for the peakers costs ${Math.round((diesel - 1) * 100)}% more than normal.`,
+          concept: "fuel" as const,
+          kind: "WORLD_EVENT" as const,
+          importance: index >= 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            facilityOutputMultipliersByFuel: { Coal: output },
+            operatingCostMultipliersByFuel: { Coal: operating },
+            fuelPriceMultipliers: { Oil: diesel },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
+export interface KaribaDroughtBalanceType {
+  /** Inflow to the reservoir across the four half-years of the drought. */
+  hydroRunoffMultipliers: [number, number, number, number];
+  /** What the remaining head can actually deliver as the lake falls. */
+  hydroOutputMultipliers: [number, number, number, number];
+}
+
+// Kariba's usable storage fell from full in early 2014 to about 12% by the end of 2015 and under
+// 5% in late 2016, taking Zambia's generation down with it. These steps are authored game-scale
+// derates that trace that decline rather than a reconstruction of the lake's level record.
+// https://www.zambezira.org/hydrology/lake-levels
+export const KARIBA_DROUGHT_BALANCE: Record<
+  DifficultyType,
+  KaribaDroughtBalanceType
+> = {
+  Intern: {
+    hydroRunoffMultipliers: [0.8, 0.6, 0.45, 0.6],
+    hydroOutputMultipliers: [0.9, 0.75, 0.6, 0.75],
+  },
+  Employee: {
+    hydroRunoffMultipliers: [0.7, 0.5, 0.33, 0.5],
+    hydroOutputMultipliers: [0.85, 0.66, 0.5, 0.68],
+  },
+  Manager: {
+    hydroRunoffMultipliers: [0.62, 0.4, 0.24, 0.45],
+    hydroOutputMultipliers: [0.8, 0.58, 0.42, 0.62],
+  },
+  VP: {
+    hydroRunoffMultipliers: [0.55, 0.32, 0.17, 0.4],
+    hydroOutputMultipliers: [0.75, 0.5, 0.34, 0.56],
+  },
+  CEO: {
+    hydroRunoffMultipliers: [0.48, 0.25, 0.1, 0.35],
+    hydroOutputMultipliers: [0.7, 0.42, 0.26, 0.5],
+  },
+};
+
+const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
+  id: "kariba-drought",
+  scenarioId: 114,
+  phases: [
+    {
+      id: "poor-rains-forecast",
+      schedule: { atMonth: 8 },
+      preview: () => null,
+      describe: () => ({
+        title: "A weak rainy season is forecast",
+        message:
+          "Forecasters expect El Nino to suppress the rains over the Zambezi catchment. Inflow to the reservoir will fall through 2015 and 2016, and almost every megawatt you own depends on it.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([12, 18, 24, 36] as const).map((atMonth, index) => ({
+      id: `reservoir-step-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: index === 3 ? 12 : 6,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = KARIBA_DROUGHT_BALANCE[difficulty];
+        const runoff = balance.hydroRunoffMultipliers[index];
+        const output = balance.hydroOutputMultipliers[index];
+        return {
+          title: [
+            "The rains came up short",
+            "The lake keeps dropping",
+            "Kariba near its minimum",
+            "The rains return",
+          ][index],
+          message:
+            index === 3
+              ? `A better season lifts inflow back to ${Math.round(runoff * 100)}% of normal, and the machines recover to ${Math.round(output * 100)}% as the lake refills.`
+              : `Inflow is ${Math.round(runoff * 100)}% of normal and the falling head limits hydro output to ${Math.round(output * 100)}% of nominal.`,
+          concept: "weather" as const,
+          kind: "WORLD_EVENT" as const,
+          importance:
+            index === 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            hydroRunoffMultiplier: runoff,
+            facilityOutputMultipliersByFuel: { Hydro: output },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
+export interface DelhiSummerBalanceType {
+  /** Peak-season demand across the summers of 2021 through 2024. */
+  demandMultipliers: [number, number, number, number];
+  /** Thermal output lost to intake and condenser temperatures in the same months. */
+  thermalOutputMultipliers: [number, number, number, number];
+  /** Degrees added to the record during each summer window. */
+  temperatureOffsetC: [number, number, number, number];
+}
+
+// Delhi's peak demand rose from 7,695MW in 2022 to 8,656MW on 19 June 2024, its all-time record,
+// after weeks above 45C. Thermal derating in extreme heat is an authored game-scale effect.
+// https://cea.nic.in/general-review-report/
+export const DELHI_SUMMER_BALANCE: Record<
+  DifficultyType,
+  DelhiSummerBalanceType
+> = {
+  Intern: {
+    demandMultipliers: [1.01, 1.02, 1.04, 1.06],
+    thermalOutputMultipliers: [0.99, 0.98, 0.96, 0.94],
+    temperatureOffsetC: [0.2, 0.4, 0.6, 0.9],
+  },
+  Employee: {
+    demandMultipliers: [1.02, 1.03, 1.05, 1.08],
+    thermalOutputMultipliers: [0.98, 0.97, 0.95, 0.92],
+    temperatureOffsetC: [0.3, 0.5, 0.8, 1.2],
+  },
+  Manager: {
+    demandMultipliers: [1.03, 1.04, 1.07, 1.1],
+    thermalOutputMultipliers: [0.97, 0.96, 0.93, 0.9],
+    temperatureOffsetC: [0.4, 0.6, 1, 1.5],
+  },
+  VP: {
+    demandMultipliers: [1.04, 1.05, 1.08, 1.12],
+    thermalOutputMultipliers: [0.96, 0.95, 0.92, 0.88],
+    temperatureOffsetC: [0.5, 0.7, 1.2, 1.8],
+  },
+  CEO: {
+    demandMultipliers: [1.05, 1.06, 1.1, 1.14],
+    thermalOutputMultipliers: [0.95, 0.94, 0.9, 0.86],
+    temperatureOffsetC: [0.6, 0.8, 1.4, 2.1],
+  },
+};
+
+const DELHI_SUMMER_ARC: StoryArcDefinitionType = {
+  id: "delhi-summer",
+  scenarioId: 115,
+  phases: [
+    {
+      id: "summer-outlook",
+      schedule: { atMonth: 2 },
+      preview: () => null,
+      describe: () => ({
+        title: "A hotter summer than the last",
+        message:
+          "Each pre-monsoon season is peaking higher than the one before, and the heat that drives the peak also takes output away from the coal and gas plants meeting it. Build for the peak, not the average.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([4, 16, 28, 40] as const).map((atMonth, index) => ({
+      id: `summer-peak-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: 3,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = DELHI_SUMMER_BALANCE[difficulty];
+        const demand = balance.demandMultipliers[index];
+        const thermal = balance.thermalOutputMultipliers[index];
+        return {
+          title: [
+            "The 2021 pre-monsoon heat",
+            "A longer, hotter 2022",
+            "2023 sets a new peak",
+            "The record summer",
+          ][index],
+          message: `Demand runs ${Math.round((demand - 1) * 100)}% above normal while heat holds coal and gas output to ${Math.round(thermal * 100)}% of nominal.${index === 3 ? " This is the summer the city sets its all-time peak." : ""}`,
+          concept: "weather" as const,
+          kind: "WORLD_EVENT" as const,
+          importance:
+            index === 3 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            temperatureOffsetC: balance.temperatureOffsetC[index],
+            demandMultiplier: demand,
+            facilityOutputMultipliersByFuel: {
+              Coal: thermal,
+              "Natural Gas": thermal,
+            },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
 export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   CARBON_FEE_ARC,
   RENEWABLES_ARC,
@@ -1557,6 +1839,9 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   HEATWAVE_DROUGHT_ARC,
   NUCLEAR_TRIP_ARC,
   CALIFORNIA_WILDFIRE_ARC,
+  LOAD_SHEDDING_ARC,
+  KARIBA_DROUGHT_ARC,
+  DELHI_SUMMER_ARC,
 ];
 
 /** Content-level difficulty scaling is centralized and mechanically checkable. */
@@ -1729,6 +2014,66 @@ export function validateStoryDifficultyMonotonicity(): string[] {
         CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
     ),
   );
+  ([0, 1, 2, 3] as const).forEach((step) => {
+    descending(
+      `Load shedding step ${step + 1} coal output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].coalOutputMultipliers[step],
+      ),
+    );
+    ascending(
+      `Load shedding step ${step + 1} coal operating cost`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].coalOperatingMultipliers[step],
+      ),
+    );
+    ascending(
+      `Load shedding step ${step + 1} diesel price`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].dieselPriceMultipliers[step],
+      ),
+    );
+    descending(
+      `Kariba step ${step + 1} runoff`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          KARIBA_DROUGHT_BALANCE[difficulty].hydroRunoffMultipliers[step],
+      ),
+    );
+    descending(
+      `Kariba step ${step + 1} hydro output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          KARIBA_DROUGHT_BALANCE[difficulty].hydroOutputMultipliers[step],
+      ),
+    );
+  });
+  ([0, 1, 2, 3] as const).forEach((summer) => {
+    ascending(
+      `Delhi summer ${summer + 1} demand`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].demandMultipliers[summer],
+      ),
+    );
+    descending(
+      `Delhi summer ${summer + 1} thermal output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].thermalOutputMultipliers[summer],
+      ),
+    );
+    ascending(
+      `Delhi summer ${summer + 1} temperature`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].temperatureOffsetC[summer],
+      ),
+    );
+  });
   return problems;
 }
 

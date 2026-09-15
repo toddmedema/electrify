@@ -183,6 +183,17 @@ const MANDATED_RELEASE_FRACTIONS = [
   0.12, 0.12, 0.15, 0.2, 0.3, 0.45, 0.55, 0.55, 0.4, 0.25, 0.15, 0.12,
 ];
 
-export function mandatedReleaseFraction(monthNumber: number): number {
-  return MANDATED_RELEASE_FRACTIONS[monthNumber - 1] || 0;
+/**
+ * Summer is six months apart in the two hemispheres, so a fixed calendar would put a Zambian or
+ * Chilean reservoir's heaviest irrigation draw in the middle of its wet season and leave the dry
+ * season unencumbered - exactly backwards, and the difference between a hard scenario and an
+ * impossible one. Latitude, not the calendar, decides which half of the year this curve sits in.
+ */
+export function mandatedReleaseFraction(
+  monthNumber: number,
+  latitude = 1,
+): number {
+  const shifted =
+    latitude < 0 ? ((monthNumber + 5) % MONTHS_PER_YEAR) + 1 : monthNumber;
+  return MANDATED_RELEASE_FRACTIONS[shifted - 1] || 0;
 }

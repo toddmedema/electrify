@@ -58,6 +58,9 @@ describe("simulation economics", () => {
     108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
     110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
     111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    113: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    114: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
+    115: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
   };
   scenarios.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {

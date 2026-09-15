@@ -24,6 +24,7 @@
  *   node scripts/fetch-weather.js --limit 10      # at most ten cities this run
  *   node scripts/fetch-weather.js --force PIT     # refetch one that already has data
  *   node scripts/fetch-weather.js --list          # what is fetched, what is missing
+ *   node scripts/fetch-weather.js --reindex       # rewrite index.json from the catalogue and disk
  *   node scripts/update-weather.js                 # extend existing files through last year
  *   node scripts/update-weather.js --through 2030  # extend through a fixed complete year
  */
@@ -99,6 +100,7 @@ const options = {
   limit: Infinity,
   ids: [],
   update: false,
+  reindex: false,
   through: ENDING_YEAR,
 };
 for (let i = 0; i < args.length; i++) {
@@ -110,6 +112,8 @@ for (let i = 0; i < args.length; i++) {
     options.force = true;
   } else if (arg === "--list") {
     options.list = true;
+  } else if (arg === "--reindex") {
+    options.reindex = true;
   } else if (arg === "--update") {
     options.update = true;
   } else if (arg === "--through") {
@@ -201,7 +205,11 @@ function writeIndex(fetched, endingYears = {}) {
       header.length === HEADER_BYTES && header.toString("ascii", 0, 4) === MAGIC
         ? header.readUInt16LE(8) + header.readUInt16LE(10) - 1
         : undefined;
+    // Both have to agree. The header alone would keep advertising offshore wind at a city the
+    // catalogue has since decided cannot reach it, because nothing refetches a city to take a
+    // column away; the catalogue alone would advertise a column the decoder cannot find.
     const fileHasOffshore =
+      !!city.offshore &&
       header.length === HEADER_BYTES &&
       header.readUInt8(4) >= 2 &&
       (header.readUInt8(15) & FLAG_OFFSHORE_WIND) !== 0;
@@ -860,6 +868,14 @@ async function main() {
 
   if (options.update) {
     await updateExisting(catalogue);
+    return;
+  }
+
+  if (options.reindex) {
+    // The catalogue can change without any weather changing - a city moving region, or losing an
+    // offshore point it can no longer justify - and the index has to be able to catch up without
+    // spending a day's API budget refetching everything.
+    log(`Rewrote the index: ${writeIndex({})} playable cities`);
     return;
   }
 

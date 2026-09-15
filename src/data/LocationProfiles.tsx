@@ -18,6 +18,14 @@ const REGION_FUEL_MULTIPLIERS: Record<string, FuelMultipliers> = {
   Europe: { Coal: 1.5, "Natural Gas": 3, Oil: 1.15, Uranium: 1.2 },
   Africa: { Coal: 1.05, "Natural Gas": 1.35, Oil: 1.2, Uranium: 1.2 },
   "Middle East": { Coal: 1.7, "Natural Gas": 0.6, Oil: 0.65, Uranium: 1.2 },
+  // Caspian gas and Kazakh coal are produced and burned inside the region at administered
+  // prices, so the level sits near or below the US series rather than at the Gulf's export
+  // discount. Coal is the outlier: Ekibastuz burns at the mine.
+  "Central Asia": { Coal: 0.5, "Natural Gas": 0.7, Oil: 0.9, Uranium: 1 },
+  // Georgia and Armenia buy gas from Russia and Azerbaijan on negotiated contracts, above the
+  // producers' domestic level and below Europe's marginal LNG. Azerbaijan is a producer and
+  // takes the override below.
+  Caucasus: { Coal: 1.5, "Natural Gas": 1.4, Oil: 1.1, Uranium: 1.2 },
   "South Asia": { Coal: 0.75, "Natural Gas": 1.7, Oil: 1.15, Uranium: 1.15 },
   "East Asia": { Coal: 1.05, "Natural Gas": 2.5, Oil: 1.15, Uranium: 1.1 },
   "Southeast Asia": { Coal: 0.8, "Natural Gas": 1.5, Oil: 1.05, Uranium: 1.15 },
@@ -30,6 +38,8 @@ const REGION_CUSTOMERS: Record<string, number> = {
   Europe: 900000,
   Africa: 350000,
   "Middle East": 700000,
+  "Central Asia": 600000,
+  Caucasus: 500000,
   "South Asia": 1500000,
   "East Asia": 1800000,
   "Southeast Asia": 1200000,
@@ -75,6 +85,10 @@ const HYDRO_COUNTRIES = new Set([
   "Switzerland",
   "Tajikistan",
   "Venezuela",
+  // The two halves of Kariba. Hydro is about 85% of Zambia's generation and the larger share of
+  // Zimbabwe's, which is the whole premise of the scenario set in Lusaka.
+  "Zambia",
+  "Zimbabwe",
 ]);
 
 // A country-wide US fallback would make hydro available almost everywhere. Use state profiles
@@ -132,16 +146,29 @@ function stateFor(location?: LocationType): string | undefined {
   return location?.admin;
 }
 
+// Countries that sit at a different level from the region around them, usually because they
+// produce what their neighbours import. Only the fuels named here move; the rest stay regional.
+const COUNTRY_FUEL_OVERRIDES: Record<string, Partial<FuelMultipliers>> = {
+  Japan: { "Natural Gas": 3 },
+  Australia: { Coal: 0.6 },
+  Indonesia: { Coal: 0.6 },
+  // Russia is split across Europe and East Asia in the catalogue and belongs to neither price
+  // level. Regulated domestic gas has long sold far below Henry Hub, and Kuzbass coal reaches
+  // domestic plants by rail well under the seaborne price, so Europe's import multipliers were
+  // inverting the real ordering: Moscow was paying triple for the gas it exports.
+  Russia: { Coal: 0.6, "Natural Gas": 0.5, Oil: 0.85, Uranium: 0.9 },
+  // Azerbaijan produces Caspian gas rather than buying it in like the rest of the Caucasus.
+  Azerbaijan: { "Natural Gas": 0.7, Oil: 0.8 },
+  // Afghanistan produces almost no fuel and trucks the rest in over long land routes.
+  Afghanistan: { Coal: 1.3, "Natural Gas": 2, Oil: 1.6 },
+};
+
 function multipliersFor(location?: LocationType): FuelMultipliers {
   const regional =
     (location?.region && REGION_FUEL_MULTIPLIERS[location.region]) || US_PRICES;
-  if (location?.country === "Japan") {
-    return { ...regional, "Natural Gas": 3 };
-  }
-  if (location?.country === "Australia" || location?.country === "Indonesia") {
-    return { ...regional, Coal: 0.6 };
-  }
-  return regional;
+  const override =
+    location?.country && COUNTRY_FUEL_OVERRIDES[location.country];
+  return override ? { ...regional, ...override } : regional;
 }
 
 const regionalPriceCache = new WeakMap<

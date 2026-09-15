@@ -55,6 +55,20 @@ const REGION_MIX: Record<string, SectorMix> = {
     Industrial: 0.31,
     Transportation: 0.01,
   },
+  // Soviet-era metals, mining and chemicals still anchor these grids, so industry takes a larger
+  // share than in the Gulf and the commercial sector a smaller one.
+  "Central Asia": {
+    Residential: 0.32,
+    Commercial: 0.21,
+    Industrial: 0.46,
+    Transportation: 0.01,
+  },
+  Caucasus: {
+    Residential: 0.4,
+    Commercial: 0.26,
+    Industrial: 0.32,
+    Transportation: 0.02,
+  },
   "South Asia": {
     Residential: 0.38,
     Commercial: 0.21,
@@ -115,6 +129,18 @@ const REGION_GROWTH: Record<string, GrowthProfile> = {
     Industrial: 0.009,
     Transportation: 0.025,
   },
+  "Central Asia": {
+    Residential: 0.009,
+    Commercial: 0.012,
+    Industrial: 0.01,
+    Transportation: 0.025,
+  },
+  Caucasus: {
+    Residential: 0.005,
+    Commercial: 0.008,
+    Industrial: 0.004,
+    Transportation: 0.025,
+  },
   "South Asia": {
     Residential: 0.012,
     Commercial: 0.014,
@@ -167,6 +193,8 @@ const REGION_DATA_CENTER_FACTOR: Record<string, number> = {
   Europe: 0.75,
   Africa: 0.2,
   "Middle East": 0.45,
+  "Central Asia": 0.2,
+  Caucasus: 0.2,
   "South Asia": 0.45,
   "East Asia": 0.9,
   "Southeast Asia": 0.65,
@@ -284,6 +312,23 @@ const ELECTRIC_HEATING_COUNTRIES = new Set([
   "Finland",
   "France",
 ]);
+// Countries whose winters are carried by district heat, gas stoves or coal rather than by the
+// grid. Their electric load still peaks in summer, so the cooling response stays high while the
+// heating one does not. Relevant to Central Asia and the Caucasus, which until this catalogue
+// were grouped with the Gulf and treated as cooling-only despite continental winters.
+const FUEL_HEATING_COUNTRIES = new Set([
+  "Armenia",
+  "Belarus",
+  "Georgia",
+  "Kazakhstan",
+  "Kyrgyzstan",
+  "Mongolia",
+  "Russia",
+  "Tajikistan",
+  "Turkmenistan",
+  "Ukraine",
+  "Uzbekistan",
+]);
 const COOLING_US_STATES = new Set([
   "AL",
   "AR",
@@ -331,6 +376,7 @@ export function climateLoadArchetype(
     return "cooling";
   if (ELECTRIC_HEATING_COUNTRIES.has(location.country || ""))
     return "electric-heating";
+  if (FUEL_HEATING_COUNTRIES.has(location.country || "")) return "fuel-heating";
   return "mixed";
 }
 
