@@ -3798,14 +3798,21 @@ html[data-theme="dark"] .uplot {
 }
 
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
-// surrounding choices. If the player has not acted after ten seconds, a short pulse repeats every
-// ten seconds. Capstones never receive either class.
-.tutorialTarget {
-  outline: 2px solid var(--interactive-blue) !important;
-  outline-offset: 3px;
+// surrounding choices. The cue is a ring overlay that TutorialHud positions on <body> around
+// the control, because an outline draws outside the element's box and any clipping ancestor --
+// a pane, a card, the viewport -- cut its sides wherever a control ran edge to edge. The ring
+// hugs the control instead, so all four sides stay visible. If the player has not acted after
+// ten seconds, a short pulse repeats every ten seconds. Capstones never receive either class;
+// the .tutorialTarget/.tutorialTargetReminder classes stay on the control as hooks.
+.tutorialTargetRing {
+  position: fixed;
+  z-index: 1240; // above the game, below the objective HUD (1250) and any dialog
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid var(--interactive-blue);
 }
 
-.tutorialTargetReminder {
+.tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
 
@@ -3821,12 +3828,13 @@ html[data-theme="dark"] .uplot {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTargetReminder {
+  .tutorialTargetRingPulse {
     animation: none;
   }
 
-  .tutorialTarget {
-    outline-width: 3px !important;
+  // Without the pulse, a slightly heavier line keeps the cue obvious.
+  .tutorialTargetRing {
+    border-width: 3px;
   }
 }
 
