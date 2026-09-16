@@ -125,7 +125,10 @@ function SettingRow({
       <Box
         sx={{
           minWidth: 0,
-          width: stackOnMobile ? "100%" : "auto",
+          // Hug the control's content so it sits flush with the row's right edge. Stacked phone
+          // rows stretch it full-width instead (justifySelf below); a fixed 100% width here left
+          // narrower controls stranded at the column's left edge on desktop.
+          width: "auto",
           justifySelf: { xs: stackOnMobile ? "stretch" : "end", sm: "end" },
         }}
       >
@@ -159,13 +162,13 @@ function VolumeSlider(props: {
         {props.label}
       </Typography>
       <Slider
+        className="settingsVolumeSlider"
         aria-label={`${props.label} volume`}
         getAriaValueText={(sliderValue: number) => `${sliderValue} percent`}
         value={value}
         onChange={(_e: Event, sliderValue: number | number[]) =>
           props.onChange((sliderValue as number) / 100)
         }
-        sx={{ width: "100% !important" }}
       />
       <Typography
         variant="body2"

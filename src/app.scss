@@ -564,6 +564,12 @@ $topbar_height: 56px;
   min-width: 80px;
 }
 
+// The global .MuiSlider-root rule below pins every slider to 50% of its container; the settings
+// volume sliders must span their grid cell instead, so they need the same escape hatch.
+.settingsVolumeSlider.MuiSlider-root {
+  width: 100% !important;
+}
+
 .constructionSortButton {
   margin-right: -8px !important;
 }
