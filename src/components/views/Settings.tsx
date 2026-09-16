@@ -100,7 +100,7 @@ function SettingRow({
         display: "grid",
         gridTemplateColumns: {
           xs: stackOnMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
-          sm: "minmax(180px, 1fr) minmax(260px, auto)",
+          sm: "minmax(180px, 1fr) auto",
         },
         alignItems: "center",
         gap: { xs: stackOnMobile ? 1.5 : 1, sm: 3 },
@@ -125,10 +125,7 @@ function SettingRow({
       <Box
         sx={{
           minWidth: 0,
-          // Hug the control's content so it sits flush with the row's right edge. Stacked phone
-          // rows stretch it full-width instead (justifySelf below); a fixed 100% width here left
-          // narrower controls stranded at the column's left edge on desktop.
-          width: "auto",
+          // Controls hug their content at the row's right edge; stacked phone rows stretch instead
           justifySelf: { xs: stackOnMobile ? "stretch" : "end", sm: "end" },
         }}
       >
@@ -162,7 +159,6 @@ function VolumeSlider(props: {
         {props.label}
       </Typography>
       <Slider
-        className="settingsVolumeSlider"
         aria-label={`${props.label} volume`}
         getAriaValueText={(sliderValue: number) => `${sliderValue} percent`}
         value={value}
