@@ -560,7 +560,6 @@ $topbar_height: 56px;
 }
 
 .constructionCapacitySlider.MuiSlider-root {
-  width: 100% !important;
   min-width: 80px;
 }
 
@@ -1727,11 +1726,6 @@ $pane_header_height: 40px;
 
 .flex-newline {
   flex-basis: 100%;
-}
-
-.MuiSlider-root {
-  width: 50% !important;
-  flex-grow: 1;
 }
 
 .MuiAvatar-root {
@@ -3367,10 +3361,6 @@ html[data-theme="dark"] .uplot {
   // off both ends of the pane
   .budgetSlider {
     padding: 0 20px;
-
-    .MuiSlider-root {
-      width: 100% !important;
-    }
 
     .MuiSlider-markLabel {
       font-size: 0.8125rem;
