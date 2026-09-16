@@ -12,12 +12,16 @@ export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
   "Commercial",
   "Industrial",
   "Transportation",
+  "Mining",
   "Data centers",
 ] as const;
 
-type NonDataCenterType = Exclude<DemandTypeNameType, "Data centers">;
-type SectorMix = Record<NonDataCenterType, number>;
-type GrowthProfile = Record<NonDataCenterType, number>;
+// The two authored end uses sit outside the regional mix. A region has no characteristic share
+// of either: a grid has the mine or the campus on it or it does not, and how big it is comes
+// from the scenario rather than from how many customers the utility serves.
+type OrganicDemandType = Exclude<DemandTypeNameType, "Data centers" | "Mining">;
+type SectorMix = Record<OrganicDemandType, number>;
+type GrowthProfile = Record<OrganicDemandType, number>;
 
 // EIA divides end-use demand into residential, commercial, industrial, and transportation.
 // These broad regional mixes preserve that standard while data centers are pulled out of the
@@ -411,6 +415,10 @@ function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
       return 0.55 + 0.8 * peak(1, 3) + 0.55 * peak(21, 2.5);
     case "Data centers":
       return 1;
+    // A concentrator or a hoist runs the shift it is given, and the large mines run all of
+    // them. Flat, for the same reason Industrial is.
+    case "Mining":
+      return 1;
   }
 }
 
@@ -453,6 +461,10 @@ export function demandByTypeAt(
     Industrial: nonDataCenterScale * mix.Industrial,
     Transportation: nonDataCenterScale * mix.Transportation,
     "Data centers": startDataCenters,
+    // There is no generic mining curve to open against, the way there is for data centers.
+    // A scenario that has mines on its grid says so with a schedule, and that load arrives
+    // below as an absolute addition rather than as a share of the customer baseline.
+    Mining: 0,
   } satisfies Record<DemandTypeNameType, number>;
   const shapedStartingTotal = DEMAND_TYPES.reduce(
     (sum, type) =>
@@ -473,6 +485,13 @@ export function demandByTypeAt(
       result[type] = (baselineDemandW * weight * shape) / shapedStartingTotal;
       return;
     }
+    if (type === "Mining") {
+      // Opens at nothing and has no regional trajectory to follow. A mine's load is whatever
+      // the scenario's schedule says it is, applied below, and it does not drift with the
+      // region's households in between.
+      result[type] = 0;
+      return;
+    }
     result[type] =
       (baselineDemandW *
         startingWeights[type] *
@@ -487,7 +506,8 @@ export function demandByTypeAt(
     );
     // Besides preserving authored balance conceptually, keep it bit-for-bit stable. A few UI
     // calculations compare the change in reserve capacity after adding a plant, and a residual
-    // fraction of a watt from summing five floating-point components should not leak into that.
+    // fraction of a watt from summing the components should not leak into that. Mining is never
+    // the sink: it opens at zero, and pushing the residual there would invent a mine.
     result[hasAuthoredDataCenters ? "Commercial" : "Data centers"] +=
       baselineDemandW - openingTotal;
   }

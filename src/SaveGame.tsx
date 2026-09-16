@@ -173,7 +173,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !Number.isFinite(addition.loadFactor) ||
         addition.loadFactor < 0 ||
         addition.loadFactor > 1 ||
-        addition.demandType !== "Data centers",
+        (addition.demandType !== "Data centers" &&
+          addition.demandType !== "Mining"),
     ) ||
     typeof game.customerRate !== "number" ||
     !Number.isFinite(game.customerRate) ||

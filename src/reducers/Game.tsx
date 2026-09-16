@@ -3142,6 +3142,7 @@ export function generateNewTimeline(
         Commercial: 0,
         Industrial: 0,
         Transportation: 0,
+        Mining: 0,
         "Data centers": 0,
       },
       solarIrradianceWM2: 0,

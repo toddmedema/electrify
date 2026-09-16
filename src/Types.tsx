@@ -150,7 +150,8 @@ export type DemandTypeNameType =
   | "Commercial"
   | "Industrial"
   | "Transportation"
-  | "Data centers";
+  | "Data centers"
+  | "Mining";
 
 export type DemandByTypeType = Record<DemandTypeNameType, number>;
 
@@ -765,7 +766,13 @@ export interface ScenarioLoadAdditionType {
   /** Maximum total load after the start date, never an annual increment. */
   peakW: number;
   loadFactor: number;
-  demandType: "Data centers";
+  /**
+   * The two end uses a scenario can own outright. Both sit outside the regional sector mix: a
+   * grid either has the mine or the campus on it or it does not, and neither scales with the
+   * customer count. "Data centers" replaces the generic regional curve when authored; "Mining"
+   * has no generic curve and is purely additive.
+   */
+  demandType: "Data centers" | "Mining";
 }
 
 /**
