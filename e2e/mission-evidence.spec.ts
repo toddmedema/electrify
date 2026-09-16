@@ -139,7 +139,12 @@ test("status boundary follows the saved movable pane divider and window width", 
     await expect(page.locator(".gridHealth:visible")).toHaveCount(1);
     await expect
       .poll(async () => {
-        const grid = await page.locator(".gridHealth:visible").boundingBox();
+        // The app bar can transiently double-mount while the layout branch switches after a
+        // reload; the count assertion above still fails on persistent duplicates.
+        const grid = await page
+          .locator(".gridHealth:visible")
+          .first()
+          .boundingBox();
         const divider = await splitter.boundingBox();
         return Math.abs(grid!.x + grid!.width - divider!.x);
       })
