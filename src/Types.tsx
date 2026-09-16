@@ -746,6 +746,12 @@ export interface ScenarioType {
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   initialAgeYears?: number;
+  /**
+   * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
+   * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose
+   * dry season arrives before its first wet one, has to be able to say so.
+   */
+  initialReservoirFraction?: number;
   /** Optional player-facing name for an authored aggregate or gameplay proxy. */
   label?: string;
 };

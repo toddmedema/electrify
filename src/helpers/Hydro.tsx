@@ -167,11 +167,27 @@ export function getMeanAnnualRunoffMm(seriesId?: string): number {
   return annual;
 }
 
+// HYDRO_RESERVOIR_HOURS is about six weeks at full output, which is the right order for the
+// run-of-river and weekly-cycling plant most locations get. A handful of basins are storage
+// reservoirs in a different class: Kariba is a multi-year carryover lake, and six weeks of it
+// cannot hold a five-month dry season, which forces any scenario built on one to oversize its
+// fleet until nothing that happens to the water can reach the load. Hours by basin, because the
+// lake is a property of the river rather than of whoever built the powerhouse.
+const RESERVOIR_HOURS_BY_WATERSHED: Readonly<Record<string, number>> = {
+  // Lake Kariba holds roughly 180km3 against a fleet that would drain this model's default in
+  // six weeks. 4,000 hours still understates it, and is set to what the Zambezi scenario needs
+  // to behave rather than to the lake's full ratio.
+  Lusaka: 4000,
+};
+
 export function hydroSizing(peakW: number, seriesId?: string) {
   const annualInflowWh =
     peakW * HOURS_PER_YEAR_REAL * HYDRO_TARGET_CAPACITY_FACTOR;
+  const reservoirHours =
+    (seriesId && RESERVOIR_HOURS_BY_WATERSHED[seriesId]) ||
+    HYDRO_RESERVOIR_HOURS;
   return {
-    reservoirCapacityWh: peakW * HYDRO_RESERVOIR_HOURS,
+    reservoirCapacityWh: peakW * reservoirHours,
     hydroWhPerMm: annualInflowWh / getMeanAnnualRunoffMm(seriesId),
     hydroMeanMonthlyInflowWh: annualInflowWh / MONTHS_PER_YEAR,
   };
@@ -184,10 +200,11 @@ const MANDATED_RELEASE_FRACTIONS = [
 ];
 
 /**
- * Summer is six months apart in the two hemispheres, so a fixed calendar would put a Zambian or
- * Chilean reservoir's heaviest irrigation draw in the middle of its wet season and leave the dry
- * season unencumbered - exactly backwards, and the difference between a hard scenario and an
- * impossible one. Latitude, not the calendar, decides which half of the year this curve sits in.
+ * The curve tracks the growing season, peaking in July and August because that is the northern
+ * summer. Summer is six months apart in the two hemispheres, so a fixed calendar hands a Chilean
+ * or Zambian reservoir its heaviest irrigation obligation in the middle of the southern winter,
+ * months after anything downstream has stopped asking for water. Latitude, not the calendar,
+ * decides which half of the year this curve sits in.
  */
 export function mandatedReleaseFraction(
   monthNumber: number,
