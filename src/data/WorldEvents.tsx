@@ -1556,35 +1556,37 @@ export interface LoadSheddingBalanceType {
 }
 
 // Eskom's energy availability factor fell from 78% in 2018 to about 58% in 2022, with unplanned
-// outages roughly doubling over the same period. These four steps trace that decline; they are
-// authored game-scale derates rather than a reconstruction of any particular station's record.
+// outages roughly doubling over the same period. These multiply nameplate output, so Employee is
+// set to the published EAF itself - 67, 65, 62 and 58 percent - and the other difficulties sit
+// either side of the record. Anything shallower leaves the fleet able to carry the load on its
+// own, which is the one thing the years these steps describe were not.
 // https://www.eskom.co.za/dataportal/supply-side/eaf-weekly-data/
 export const LOAD_SHEDDING_BALANCE: Record<
   DifficultyType,
   LoadSheddingBalanceType
 > = {
   Intern: {
-    coalOutputMultipliers: [0.95, 0.9, 0.85, 0.82],
+    coalOutputMultipliers: [0.74, 0.72, 0.7, 0.68],
     coalOperatingMultipliers: [1.05, 1.1, 1.15, 1.2],
     dieselPriceMultipliers: [1.05, 1.1, 1.15, 1.2],
   },
   Employee: {
-    coalOutputMultipliers: [0.92, 0.86, 0.8, 0.75],
+    coalOutputMultipliers: [0.67, 0.65, 0.62, 0.58],
     coalOperatingMultipliers: [1.08, 1.16, 1.24, 1.32],
     dieselPriceMultipliers: [1.1, 1.2, 1.3, 1.4],
   },
   Manager: {
-    coalOutputMultipliers: [0.9, 0.82, 0.75, 0.68],
+    coalOutputMultipliers: [0.64, 0.61, 0.57, 0.53],
     coalOperatingMultipliers: [1.1, 1.2, 1.3, 1.45],
     dieselPriceMultipliers: [1.15, 1.3, 1.45, 1.6],
   },
   VP: {
-    coalOutputMultipliers: [0.87, 0.78, 0.7, 0.62],
+    coalOutputMultipliers: [0.61, 0.57, 0.52, 0.47],
     coalOperatingMultipliers: [1.12, 1.26, 1.4, 1.55],
     dieselPriceMultipliers: [1.2, 1.4, 1.6, 1.8],
   },
   CEO: {
-    coalOutputMultipliers: [0.85, 0.74, 0.65, 0.56],
+    coalOutputMultipliers: [0.58, 0.53, 0.47, 0.42],
     coalOperatingMultipliers: [1.15, 1.32, 1.5, 1.7],
     dieselPriceMultipliers: [1.25, 1.5, 1.75, 2],
   },
@@ -1642,7 +1644,7 @@ const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
 };
 
 export interface KaribaDroughtBalanceType {
-  /** Inflow to the reservoir across the four half-years of the drought. */
+  /** Inflow to the reservoir across the four steps of the drought. */
   hydroRunoffMultipliers: [number, number, number, number];
   /** What the remaining head can actually deliver as the lake falls. */
   hydroOutputMultipliers: [number, number, number, number];
@@ -1696,10 +1698,13 @@ const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
         actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
       }),
     },
+    // Continuous cover from the first failed season to the end of the run. A gap here would hand
+    // the lake a spell of undiminished inflow in the middle of the drought - and, worse, leave
+    // the recovery step reading as a step down from the months before it.
     ...([12, 18, 24, 36] as const).map((atMonth, index) => ({
       id: `reservoir-step-${index + 1}`,
       schedule: { atMonth },
-      durationMonths: index === 3 ? 12 : 6,
+      durationMonths: index >= 2 ? 12 : 6,
       describe: ({ difficulty }: StoryContextType) => {
         const balance = KARIBA_DROUGHT_BALANCE[difficulty];
         const runoff = balance.hydroRunoffMultipliers[index];
