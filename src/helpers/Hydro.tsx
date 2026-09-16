@@ -175,9 +175,10 @@ export function getMeanAnnualRunoffMm(seriesId?: string): number {
 // lake is a property of the river rather than of whoever built the powerhouse.
 const RESERVOIR_HOURS_BY_WATERSHED: Readonly<Record<string, number>> = {
   // Lake Kariba holds roughly 180km3 against a fleet that would drain this model's default in
-  // six weeks. 4,000 hours still understates it, and is set to what the Zambezi scenario needs
-  // to behave rather than to the lake's full ratio.
-  Lusaka: 4000,
+  // six weeks. This still understates it by a wide margin, and is set to what the Zambezi
+  // scenario needs to behave - a lake that carries its grid through an ordinary dry season and
+  // reaches its minimum in the second year of a bad run - rather than to the lake's full ratio.
+  Lusaka: 2800,
 };
 
 export function hydroSizing(peakW: number, seriesId?: string) {

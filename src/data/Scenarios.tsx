@@ -1391,20 +1391,26 @@ export const SCENARIOS = [
     ownership: "Public",
     startingYear: 2014,
     durationMonths: 48,
-    // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 1.05TWh a year.
+    // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 0.55TWh a year,
+    // which is what a fifth of its metered household and commercial sales actually came to.
     // Zambia's whole system is smaller than one scenario at the 1% scale the larger grids use.
-    //
-    // The scale is set against the fleet's inflow rather than against ZESCO's metered sales,
-    // which at this customer count would imply about 0.55TWh. That figure leaves the fleet six
-    // times the power its load needs, and a fleet with that much headroom cannot be reached by
-    // a derate: the drought would show up only as an empty reservoir, and only after the first
-    // ordinary dry season had already emptied it. At 1.05TWh the load sits near four fifths of
-    // mean inflow, which is where a bad rainy season becomes a deficit the reservoir has to
-    // cover and a run of them becomes a shortage. It is still short of a true fifth of Zambian
-    // demand, roughly 2.2TWh, because the rest of that is Copperbelt mining load that a
-    // customer-count demand model has no way to carry.
     startingCustomers: 140000,
-    startingDemandScale: 2.9,
+    startingDemandScale: 1.4,
+    // The other half of the grid. Zambia's copper mines take roughly half of national
+    // electricity and take it flat, around the clock, and a scenario that leaves them out ends
+    // up with a fleet several times larger than anything its load can ask of it - which is a
+    // grid no drought can reach. A fifth of the Copperbelt's roughly 700MW, at the load factor
+    // a concentrator and a smelter actually run at.
+    loadAdditions: [
+      {
+        id: "copperbelt-mines",
+        label: "Copperbelt mines",
+        startsYear: 2014,
+        peakW: 65000000,
+        loadFactor: 0.95,
+        demandType: "Mining",
+      },
+    ],
     // Between ZESCO's 2014 residential tariff and the increases that followed the drought,
     // roughly K0.3/kWh at K6.2 to the dollar. Zambia's real 2014 tariff was about a third of
     // this and did not cover ZESCO's costs, which is a solvency story the game cannot model.
@@ -1419,8 +1425,8 @@ export const SCENARIOS = [
       // player to prevent a shortage; this one asks them to hold a grid together through one,
       // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
       // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
-      // that is grading the weather rather than the decisions. Passive play sheds 42% and more
-      // in these months, so this stays a long way from a formality.
+      // that is grading the weather rather than the decisions. Passive play sheds 86% in the
+      // October of this year, so this stays a long way from a formality.
       minimumDemandServed: 0.98,
       label: "2016, the year the reservoir bottomed out",
     },
