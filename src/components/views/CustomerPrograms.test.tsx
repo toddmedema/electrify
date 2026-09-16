@@ -96,7 +96,7 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   jest.useFakeTimers();
   const workers: Array<{
     onmessage: ((event: { data: unknown }) => void) | null;
-    onerror: (() => void) | null;
+    onerror: ((event: ErrorEvent) => void) | null;
     postMessage: jest.Mock;
     terminate: jest.Mock;
   }> = [];
@@ -146,9 +146,11 @@ test("stale and failed worker results cannot enable Apply, and closing terminate
   act(() => {
     jest.advanceTimersByTime(250);
   });
+  const failure = { preventDefault: jest.fn() } as unknown as ErrorEvent;
   act(() => {
-    workers[workers.length - 1].onerror!();
+    workers[workers.length - 1].onerror!(failure);
   });
+  expect(failure.preventDefault).toHaveBeenCalled();
   expect(screen.getByRole("alert")).toHaveTextContent("Could not estimate");
   expect(apply).toBeDisabled();
   fireEvent.click(screen.getByRole("radio", { name: /^Small/ }));
