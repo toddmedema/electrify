@@ -107,7 +107,10 @@ function Decision({
         worker.onmessage = (event) => {
           if (!cancelled) setPreview({ key, snapshot: game, ...event.data });
         };
-        worker.onerror = () => {
+        worker.onerror = (event: ErrorEvent) => {
+          // An unhandled worker error is re-raised on the window. The preview already shows its
+          // own failure, so the page must not also report it as an uncaught runtime error.
+          event.preventDefault();
           if (!cancelled)
             setPreview({
               key,

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openPane } from "./layout";
 
 test("paused insights refresh customer programs and keep chart zoom after a palette change", async ({
   page,
@@ -11,8 +12,10 @@ test("paused insights refresh customer programs and keep chart zoom after a pale
   await page.goto("/?scenario=106");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const insights = page.locator(".insights:visible");
-  if (!(await insights.isVisible()))
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   const chart = insights.locator(".accessibleChart [role=img]").first();
   const before = await chart.getAttribute("aria-label");
   await insights

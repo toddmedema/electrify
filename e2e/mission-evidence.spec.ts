@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
+import { openPane } from "./layout";
 
 const reviewProjects = new Set([
   "desktop-chromium",
@@ -10,8 +11,7 @@ async function settle(page: Page) {
   await page.waitForTimeout(400);
 }
 async function openInsights(page: Page) {
-  if (!(await page.locator(".insights:visible").isVisible())) {
-    await page.locator("#insightsNav:visible").click();
+  if (await openPane(page.locator(".insights"), page.locator("#insightsNav"))) {
     await settle(page);
   }
 }
@@ -132,12 +132,20 @@ test("status boundary follows the saved movable pane divider and window width", 
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const splitter = page.getByRole("separator").first();
   const aligned = async () => {
-    await expect(page.locator(".gridHealth:visible")).toHaveCount(1);
+    // Crossing the desktop breakpoint swaps the pane layout under a card transition, which
+    // keeps the outgoing layout -- app bar and splitters included -- mounted for its duration.
+    // Measure only once a single layout and a single app bar remain, so the check can never
+    // pass against the outgoing one, and a persistent duplicate app bar still fails it.
     await expect
       .poll(async () => {
-        const grid = await page.locator(".gridHealth:visible").boundingBox();
+        const layouts = page.locator(".cardTransitions > main");
+        if ((await layouts.count()) !== 1) return Infinity;
+        const grids = page.locator(".gridHealth:visible");
+        if ((await grids.count()) !== 1) return Infinity;
+        const grid = await grids.boundingBox();
         const divider = await splitter.boundingBox();
-        return Math.abs(grid!.x + grid!.width - divider!.x);
+        if (!grid || !divider) return Infinity;
+        return Math.abs(grid.x + grid.width - divider.x);
       })
       .toBeLessThanOrEqual(1);
   };

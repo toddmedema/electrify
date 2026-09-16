@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`unified facilities stay compact and disclose controls in ${theme}`, async ({
@@ -16,10 +17,10 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    if (!(await pane.isVisible()))
-      await page
-        .getByRole("button", { name: "Facilities", exact: true })
-        .click();
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     const rows = pane.locator(".facilityRow");
     const chart = pane.locator(".facilitySupplyDisclosure");
     const phone = testInfo.project.name.startsWith("mobile-");

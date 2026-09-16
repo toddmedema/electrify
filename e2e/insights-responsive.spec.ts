@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
+import { openPane } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([
   "mobile-320px",
@@ -30,9 +31,10 @@ test("upcoming scenario events stay usable across insight viewports", async ({
   await page.getByRole("button", { name: "Start game" }).click();
 
   const insights = page.locator(".insights:visible");
-  if (!(await insights.isVisible())) {
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
-  }
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   await expect(insights).toBeVisible();
   await insights.getByRole("button", { name: "Zoom out" }).click();
   await insights.getByRole("button", { name: "Zoom out" }).click();
@@ -207,9 +209,10 @@ test("insights header controls stay aligned in one compact row", async ({
   await dismissTutorial(page);
 
   const insights = page.locator(".insights");
-  if (!(await insights.isVisible())) {
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
-  }
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   await expect(insights).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
 
@@ -404,9 +407,10 @@ test("compact facility build buttons stay above the chart", async ({
   await dismissTutorial(page);
 
   const facilities = page.locator(".facilities");
-  if (!(await facilities.isVisible())) {
-    await page.getByRole("button", { name: "Facilities", exact: true }).click();
-  }
+  await openPane(
+    facilities,
+    page.getByRole("button", { name: "Facilities", exact: true }),
+  );
   const buildButtons = [
     facilities.getByRole("button", { name: "Build", exact: true }),
   ];
@@ -466,8 +470,10 @@ test("expanded finance and economic rates remain readable", async ({
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game" }).click();
   const insights = page.locator(".insights:visible");
-  if (!(await insights.isVisible()))
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   await expect(
     insights.getByText("Operations & maintenance", { exact: true }),
   ).toBeVisible();

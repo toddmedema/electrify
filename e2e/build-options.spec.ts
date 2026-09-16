@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`build options remain compact and usable in ${theme}`, async ({
@@ -10,17 +11,10 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(
-      page
-        .locator("#facilitiesPane:visible")
-        .or(page.getByRole("button", { name: "Facilities", exact: true }))
-        .first(),
-    ).toBeVisible();
-    if (!(await page.locator("#facilitiesPane").isVisible())) {
-      await page
-        .getByRole("button", { name: "Facilities", exact: true })
-        .click();
-    }
+    await openPane(
+      page.locator(".facilities"),
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     for (const kind of ["Generator", "Storage"]) {
       await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
@@ -110,17 +104,10 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(
-      page
-        .locator("#facilitiesPane:visible")
-        .or(page.getByRole("button", { name: "Facilities", exact: true }))
-        .first(),
-    ).toBeVisible();
-    if (!(await page.locator("#facilitiesPane").isVisible())) {
-      await page
-        .getByRole("button", { name: "Facilities", exact: true })
-        .click();
-    }
+    await openPane(
+      page.locator(".facilities"),
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({

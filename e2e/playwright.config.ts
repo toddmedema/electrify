@@ -1,6 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
-const port = process.env.E2E_PORT || "3000";
+// Not 3000: with reuseExistingServer, a local `npm start` there would be reused without the
+// e2e environment below.
+const port = process.env.E2E_PORT || "3100";
 const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
@@ -61,6 +63,8 @@ export default defineConfig({
       BROWSER: "none",
       HOST: "127.0.0.1",
       PORT: port,
+      // Hide only chunk-load failures from the dev runtime-error overlay (see scripts/start.js)
+      ELECTRIFY_E2E: "1",
     },
   },
 });
