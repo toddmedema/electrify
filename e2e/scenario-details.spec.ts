@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "@playwright/test";
-import { waitForPane } from "./layout";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`scenario details reflow and dismiss in ${theme} mode`, async ({
@@ -39,10 +39,10 @@ for (const theme of ["light", "dark"] as const) {
     await back.click();
     await expect(dialog).not.toBeVisible();
     // Wide desktops already show the event pane beside the grid.
-    const eventsPane = page.locator(".eventLog:visible");
-    const events = page.getByRole("button", { name: "Events", exact: true });
-    await waitForPane(page, eventsPane, events);
-    if (!(await eventsPane.isVisible())) await events.click();
+    await openPane(
+      page.locator(".eventLog"),
+      page.getByRole("button", { name: "Events", exact: true }),
+    );
     await page
       .locator("#appbar:visible")
       .getByRole("button", { name: "fast speed", exact: true })

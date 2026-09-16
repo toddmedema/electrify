@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "@playwright/test";
-import { waitForPane } from "./layout";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`contextual learning preserves a storage decision in ${theme}`, async ({
@@ -14,15 +14,11 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
-    const facilities = page.locator("#facilitiesPane");
-    const facilitiesNav = page.getByRole("button", {
-      name: "Facilities",
-      exact: true,
-    });
-    await waitForPane(page, facilities, facilitiesNav);
-    if (!(await facilities.isVisible())) {
-      await facilitiesNav.click();
-    }
+    const facilities = page.locator(".facilities");
+    await openPane(
+      facilities,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const capacity = page.getByRole("slider", { name: /^Capacity/ });
@@ -146,14 +142,10 @@ test("reading help preserves the current tutorial objective", async ({
   await expect(objective).toBeVisible();
   const before = await objective.innerText();
   const insights = page.locator(".insights:visible");
-  const insightsNav = page.getByRole("button", {
-    name: "Insights",
-    exact: true,
-  });
-  await waitForPane(page, insights, insightsNav);
-  if (!(await insights.isVisible())) {
-    await insightsNav.click();
-  }
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
   const help = page.getByRole("button", {
     name: "How reserve works",
     exact: true,

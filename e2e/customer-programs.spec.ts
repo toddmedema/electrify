@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForPane } from "./layout";
+import { openPane } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`customer programs can be explored, scheduled and cancelled in ${theme}`, async ({
@@ -12,12 +12,10 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const insights = page.locator(".insights:visible");
-    const insightsNav = page.getByRole("button", {
-      name: "Insights",
-      exact: true,
-    });
-    await waitForPane(page, insights, insightsNav);
-    if (!(await insights.isVisible())) await insightsNav.click();
+    await openPane(
+      insights,
+      page.getByRole("button", { name: "Insights", exact: true }),
+    );
     const entry = insights.getByRole("button", {
       name: "Customer programs",
       exact: true,

@@ -1,32 +1,45 @@
-import { expect, Locator, Page } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 
 /**
- * Wait for the game's layout to settle after a start or card transition.
+ * Wait until the game layout has rendered either a pane or its nav button.
  *
  * The layout renders its panes a moment after "Start game". A one-shot visibility probe in
  * that window cannot tell "not mounted yet" from "this width does not render the pane", and
- * wide layouts render no navigation button at all -- so the usual fallback click then waits
- * for a button that will never appear and burns the test's whole timeout. Wait for whichever
- * of the pane or its nav button this width renders; afterwards the caller's probe-and-click
- * is reliable.
+ * wide layouts render no navigation button at all -- so a fallback click then waits for a
+ * button that will never appear and burns the test's whole timeout.
  *
- * The pane and its nav button can both be visible at once (single-pane mode keeps the bottom
- * bar under an open pane, and mid-width layouts render both), so a strict-mode assertion on
- * the union would throw. Poll non-strictly instead: `count()` never enforces strict mode, and
- * a pane locator without `:visible` counts DOM presence, which is enough -- once the layout
- * has mounted, the caller's probe-and-click distinguishes "hidden" from "absent at this
- * width" on its own.
+ * Both locators are narrowed to visible matches here, so callers may pass either form. The
+ * pane and its nav button can be visible at once (single-pane mode keeps the bottom bar under
+ * an open pane, and mid-width layouts render both), and a card transition briefly mounts two
+ * of each, so nothing here asks a locator for a single element.
  */
-export async function waitForPane(
-  page: Page,
+export async function waitForPaneOrNav(
   pane: Locator,
   navButton: Locator,
 ): Promise<void> {
-  await expect
-    .poll(
-      async () =>
-        (await pane.count()) > 0 || (await navButton.first().isVisible()),
-      { timeout: 30_000 },
-    )
-    .toBe(true);
+  await expect(
+    pane
+      .filter({ visible: true })
+      .or(navButton.filter({ visible: true }))
+      .first(),
+    "the game layout should render the pane or its nav button",
+  ).toBeVisible({ timeout: 30_000 });
+}
+
+/**
+ * Show a game pane, opening it from the bottom navigation only when this width needs to.
+ * Returns whether the nav button was clicked.
+ */
+export async function openPane(
+  pane: Locator,
+  navButton: Locator,
+): Promise<boolean> {
+  await waitForPaneOrNav(pane, navButton);
+  const visiblePane = pane.filter({ visible: true });
+  if ((await visiblePane.count()) > 0) {
+    return false;
+  }
+  await navButton.filter({ visible: true }).first().click();
+  await expect(visiblePane.first()).toBeVisible();
+  return true;
 }

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPaneOrNav } from "./layout";
 
 for (const mission of [
   "Generators",
@@ -79,6 +80,7 @@ for (const mission of [
       await expect(page.getByLabel("Objective 2 of 9")).toBeVisible();
     } else {
       const nav = page.locator("#insightsNav");
+      await waitForPaneOrNav(page.locator(".insights"), nav);
       if (await nav.isVisible()) {
         await nav.click();
       } else {
