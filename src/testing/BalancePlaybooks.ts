@@ -189,7 +189,11 @@ export const STANDARD_BALANCE_PLAYS: Record<number, Partial<SimOptionsType>> = {
     ],
   },
   114: {
-    initialBuild: { name: "Natural Gas", peakW: 100000000, financed: true },
+    // Diesel, not gas. Gas takes over three years to build at CEO's full build time and the
+    // drought bottoms out at month 32, so a gas plant ordered on the opening tick arrives after
+    // the lake has already emptied. Diesel is a year and a half, which is in time, and it is
+    // what the utility being modelled actually ran - at a fuel cost the tariff rise has to cover.
+    initialBuild: { name: "Oil", peakW: 150000000, financed: true },
     scheduledActions: [
       rate(0.095),
       ...line("zambia-zimbabwe-upgrade", 8, 7),

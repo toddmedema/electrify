@@ -1391,13 +1391,20 @@ export const SCENARIOS = [
     ownership: "Public",
     startingYear: 2014,
     durationMonths: 48,
-    // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 0.55TWh a year.
+    // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 1.05TWh a year.
     // Zambia's whole system is smaller than one scenario at the 1% scale the larger grids use.
-    // The load deliberately sits well under what the authored fleet's inflow could generate:
-    // that headroom is the reservoir's dry-season buffer, and removing it is what the drought
-    // does. A grid run at its hydro fleet's annual average would already be failing in June.
+    //
+    // The scale is set against the fleet's inflow rather than against ZESCO's metered sales,
+    // which at this customer count would imply about 0.55TWh. That figure leaves the fleet six
+    // times the power its load needs, and a fleet with that much headroom cannot be reached by
+    // a derate: the drought would show up only as an empty reservoir, and only after the first
+    // ordinary dry season had already emptied it. At 1.05TWh the load sits near four fifths of
+    // mean inflow, which is where a bad rainy season becomes a deficit the reservoir has to
+    // cover and a run of them becomes a shortage. It is still short of a true fifth of Zambian
+    // demand, roughly 2.2TWh, because the rest of that is Copperbelt mining load that a
+    // customer-count demand model has no way to carry.
     startingCustomers: 140000,
-    startingDemandScale: 1.4,
+    startingDemandScale: 2.9,
     // Between ZESCO's 2014 residential tariff and the increases that followed the drought,
     // roughly K0.3/kWh at K6.2 to the dollar. Zambia's real 2014 tariff was about a third of
     // this and did not cover ZESCO's costs, which is a solvency story the game cannot model.
@@ -1408,7 +1415,13 @@ export const SCENARIOS = [
       year: 2016,
       month: 1,
       durationMonths: 12,
-      minimumDemandServed: 1,
+      // The only objective in the set that is not a flat 100%. Every other scenario asks the
+      // player to prevent a shortage; this one asks them to hold a grid together through one,
+      // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
+      // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
+      // that is grading the weather rather than the decisions. Passive play sheds 42% and more
+      // in these months, so this stays a long way from a formality.
+      minimumDemandServed: 0.98,
       label: "2016, the year the reservoir bottomed out",
     },
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
@@ -1416,7 +1429,15 @@ export const SCENARIOS = [
     // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
     // https://www.zesco.co.zm/aboutUs/powerStations
     facilities: [
-      { fuel: "Hydro", peakW: 435000000, initialAgeYears: 38 },
+      // Kariba was essentially full when 2014 opened, and saying so is what makes the drought
+      // the thing that empties it. On the default half-pool the lake cannot survive its first
+      // dry season at any load worth playing, and the customers are gone before the rains fail.
+      {
+        fuel: "Hydro",
+        peakW: 435000000,
+        initialAgeYears: 38,
+        initialReservoirFraction: 1,
+      },
       {
         fuel: "Oil",
         peakW: 16000000,
@@ -1452,7 +1473,7 @@ export const SCENARIOS = [
     briefing: {
       tone: "storm",
       fantasy:
-        "Supply one of the world's hottest large cities through three rising summers.",
+        "Supply one of the world's hottest large cities through four rising summers.",
       objective:
         "Meet four rising summer peaks, ending with the record heat of May and June 2024.",
       threat:
@@ -1490,7 +1511,7 @@ export const SCENARIOS = [
     ],
     endTitle: "The monsoon finally arrived",
     endMessage:
-      "Three summers tested whether a grid could grow fast enough to stay ahead of its own peak.",
+      "Four summers tested whether a grid could grow fast enough to stay ahead of its own peak.",
   },
 ] as ScenarioType[];
 
