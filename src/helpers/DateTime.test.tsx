@@ -200,6 +200,7 @@ describe("summarizeTimeline", () => {
         Commercial: 0,
         Industrial: 0,
         Transportation: 0,
+        Mining: 0,
         "Data centers": 100,
       };
       tick.windKph = index * 100;

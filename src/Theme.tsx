@@ -76,6 +76,7 @@ const DEMAND_TYPE_COLORS: Record<
     Commercial: "#6a1b9a",
     Industrial: "#8d4b20",
     Transportation: "#2e7d32",
+    Mining: "#00695c",
     "Data centers": "#c62828",
   },
   dark: {
@@ -83,6 +84,7 @@ const DEMAND_TYPE_COLORS: Record<
     Commercial: "#ce93d8",
     Industrial: "#d7a86e",
     Transportation: "#81c784",
+    Mining: "#4db6ac",
     "Data centers": "#ef9a9a",
   },
 };

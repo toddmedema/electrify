@@ -1286,6 +1286,239 @@ export const SCENARIOS = [
     endMessage:
       "The emergency tested whether backup power and financial reserves could carry Los Angeles through shutoffs and restoration.",
   },
+  {
+    id: 113, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "Load Shedding",
+    icon: "load shedding",
+    locationId: "Johannesburg",
+    location: {
+      id: "Johannesburg",
+      name: "Johannesburg, South Africa",
+      country: "South Africa",
+      region: "Africa",
+      lat: -26.2041,
+      long: 28.0473,
+      timeZone: "Africa/Johannesburg",
+      // The Highveld is 1,750m of inland plateau: no usable river for hydro, no volcanic heat.
+      resources: { hydro: false, geothermal: false },
+    },
+    summary: "An aging coal fleet is breaking down faster than you can fix it.",
+    themes: ["Energy transition"],
+    briefing: {
+      tone: "legacy",
+      fantasy:
+        "Run South Africa's coal-heavy grid as its oldest stations start failing.",
+      objective:
+        "Keep customers supplied through five years of falling coal availability.",
+      threat:
+        "Unplanned breakdowns take more of the coal fleet offline every year, and the diesel peakers that cover them burn cash.",
+    },
+    ownership: "Public",
+    startingYear: 2018,
+    durationMonths: 60,
+    // A 1%-scale model of Eskom's roughly 6.8 million direct and municipal customers, with the
+    // demand scale reconciling the account-based load model to about 2.2TWh a year, a hundredth
+    // of Eskom's roughly 208TWh of annual sales.
+    // https://www.eskom.co.za/wp-content/uploads/2023/07/2023IntegratedReport.pdf
+    startingCustomers: 68000,
+    startingDemandScale: 8.8,
+    // Eskom's 2018 standard tariff, about R0.89/kWh at roughly R13 to the dollar.
+    dollarsPerkWh: 0.07,
+    cash: 140000000,
+    feePerKgCO2e: 0,
+    reliabilityObjective: {
+      // The deepest stage of the real shortage. Requiring the whole of 2022 keeps the objective
+      // on the sustained problem rather than on any single bad week.
+      year: 2022,
+      month: 1,
+      durationMonths: 12,
+      minimumDemandServed: 1,
+      label: "2022, the worst year of the shortage",
+    },
+    // One percent of Eskom's 2018 nominal capacity: 38.5GW coal, 1.86GW nuclear at Koeberg,
+    // 2.4GW of open-cycle diesel peakers, and the wind and solar the renewable independent power
+    // producer programme had delivered by then. https://www.eskom.co.za/dataportal/supply-side/
+    // Eskom's 2.7GW of pumped storage at Drakensberg, Ingula and Palmiet is deliberately absent:
+    // PUMPED_HYDRO_SITES_BY_LOCATION has no researched site count for Johannesburg, so the game
+    // cannot place the plant, and inventing one from the map is what that table forbids.
+    facilities: [
+      { fuel: "Coal", peakW: 385000000, initialAgeYears: 37 },
+      {
+        fuel: "Oil",
+        peakW: 24000000,
+        initialAgeYears: 11,
+        label: "Diesel Peakers",
+      },
+      { fuel: "Uranium", peakW: 18600000, initialAgeYears: 34 },
+      { fuel: "Wind", peakW: 20000000, initialAgeYears: 4 },
+      { fuel: "Sun", peakW: 15000000, initialAgeYears: 3 },
+    ],
+    endTitle: "The lights stayed on, or they didn't",
+    endMessage:
+      "Five years of breakdowns tested whether new capacity could be built faster than the old fleet gave out.",
+  },
+  {
+    id: 114, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "The River Runs Dry",
+    icon: "river runs dry",
+    locationId: "Lusaka",
+    location: {
+      id: "Lusaka",
+      name: "Lusaka, Zambia",
+      country: "Zambia",
+      region: "Africa",
+      lat: -15.3875,
+      long: 28.3228,
+      timeZone: "Africa/Lusaka",
+      // Lusaka sits in the Zambezi basin and shares its rainy season, so the city's own record
+      // stands in for catchment inflow the same way Madrid's does for the Spanish basins.
+      watershedId: "Lusaka",
+      watershedName: "Zambezi basin",
+      resources: { hydro: true, geothermal: false },
+    },
+    summary:
+      "Nearly all your power comes from one river, and the rains failed.",
+    themes: ["Extreme weather"],
+    briefing: {
+      tone: "storm",
+      fantasy:
+        "Run a grid that is almost entirely hydro as an El Nino drought empties the reservoir.",
+      objective:
+        "Serve Zambia's customers through two years of collapsing inflow to Kariba.",
+      threat:
+        "Reservoir inflow falls year after year, and a fleet with no other firm generation has nothing to fall back on.",
+    },
+    ownership: "Public",
+    startingYear: 2014,
+    durationMonths: 48,
+    // A fifth of ZESCO's roughly 700,000 connections in 2014, drawing about 0.55TWh a year,
+    // which is what a fifth of its metered household and commercial sales actually came to.
+    // Zambia's whole system is smaller than one scenario at the 1% scale the larger grids use.
+    startingCustomers: 140000,
+    startingDemandScale: 1.4,
+    // The other half of the grid. Zambia's copper mines take roughly half of national
+    // electricity and take it flat, around the clock, and a scenario that leaves them out ends
+    // up with a fleet several times larger than anything its load can ask of it - which is a
+    // grid no drought can reach. A fifth of the Copperbelt's roughly 700MW, at the load factor
+    // a concentrator and a smelter actually run at.
+    loadAdditions: [
+      {
+        id: "copperbelt-mines",
+        label: "Copperbelt mines",
+        startsYear: 2014,
+        peakW: 65000000,
+        loadFactor: 0.95,
+        demandType: "Mining",
+      },
+    ],
+    // Between ZESCO's 2014 residential tariff and the increases that followed the drought,
+    // roughly K0.3/kWh at K6.2 to the dollar. Zambia's real 2014 tariff was about a third of
+    // this and did not cover ZESCO's costs, which is a solvency story the game cannot model.
+    dollarsPerkWh: 0.05,
+    cash: 90000000,
+    feePerKgCO2e: 0,
+    reliabilityObjective: {
+      year: 2016,
+      month: 1,
+      durationMonths: 12,
+      // The only objective in the set that is not a flat 100%. Every other scenario asks the
+      // player to prevent a shortage; this one asks them to hold a grid together through one,
+      // on a fleet whose fuel arrives as rain. A plan good enough to get through the worst of
+      // Kariba still trims a fraction of a percent in the pre-rains months, and failing it for
+      // that is grading the weather rather than the decisions. Passive play sheds 86% in the
+      // October of this year, so this stays a long way from a formality.
+      minimumDemandServed: 0.98,
+      label: "2016, the year the reservoir bottomed out",
+    },
+    // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
+    // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
+    // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
+    // https://www.zesco.co.zm/aboutUs/powerStations
+    facilities: [
+      // Kariba was essentially full when 2014 opened, and saying so is what makes the drought
+      // the thing that empties it. On the default half-pool the lake cannot survive its first
+      // dry season at any load worth playing, and the customers are gone before the rains fail.
+      {
+        fuel: "Hydro",
+        peakW: 435000000,
+        initialAgeYears: 38,
+        initialReservoirFraction: 1,
+      },
+      {
+        fuel: "Oil",
+        peakW: 16000000,
+        initialAgeYears: 15,
+        label: "Emergency Diesel",
+      },
+      { fuel: "Sun", peakW: 6000000, initialAgeYears: 1 },
+    ],
+    endTitle: "The rains returned",
+    endMessage:
+      "The drought tested whether a grid built on one river could find firm power anywhere else in time.",
+  },
+  {
+    id: 115, // Scenario IDs are persisted and shared; append rather than renumbering.
+    name: "Delhi Summer",
+    icon: "delhi summer",
+    locationId: "Delhi",
+    location: {
+      id: "Delhi",
+      name: "Delhi, India",
+      country: "India",
+      region: "South Asia",
+      lat: 28.6139,
+      long: 77.209,
+      timeZone: "Asia/Kolkata",
+      // Delhi's own territory is flat alluvial plain; its hydro arrives over the national grid
+      // rather than from anything the city utility could build.
+      resources: { hydro: false, geothermal: false },
+    },
+    summary:
+      "Each summer peaks higher than the last, and 2024 breaks the record.",
+    themes: ["Extreme weather", "Rapid growth"],
+    briefing: {
+      tone: "storm",
+      fantasy:
+        "Supply one of the world's hottest large cities through four rising summers.",
+      objective:
+        "Meet four rising summer peaks, ending with the record heat of May and June 2024.",
+      threat:
+        "Extreme heat lifts demand and derates thermal plants at the same moment, and a late monsoon extends the worst of it.",
+    },
+    ownership: "Public",
+    startingYear: 2021,
+    durationMonths: 48,
+    // A 10%-scale model of Delhi's roughly 5.8 million distribution connections, with the demand
+    // scale reconciling the account-based load model to about 3.5TWh a year, a tenth of the
+    // city's 36TWh. https://cea.nic.in/general-review-report/
+    startingCustomers: 580000,
+    startingDemandScale: 1.42,
+    // Delhi's 2021 domestic slab, about Rs 6.5/kWh at roughly Rs 79 to the dollar.
+    dollarsPerkWh: 0.08,
+    cash: 120000000,
+    feePerKgCO2e: 0,
+    reliabilityObjective: {
+      // Delhi set an all-time peak of 8,656MW on 19 June 2024 after weeks above 45C.
+      year: 2024,
+      month: 5,
+      durationMonths: 3,
+      minimumDemandServed: 1,
+      label: "the record summer of 2024",
+    },
+    // Ten percent of the capacity tied to Delhi in 2021: its share of central coal stations,
+    // the Bawana and Pragati gas plants, allocated Rajasthan and Gujarat wind, and the rooftop
+    // and allocated solar that had been built by then.
+    facilities: [
+      { fuel: "Coal", peakW: 300000000, initialAgeYears: 20 },
+      { fuel: "Natural Gas", peakW: 200000000, initialAgeYears: 15 },
+      { fuel: "Sun", peakW: 50000000, initialAgeYears: 4 },
+      { fuel: "Wind", peakW: 30000000, initialAgeYears: 7 },
+      { name: "Battery", peakWh: 40000000, initialAgeYears: 1 },
+    ],
+    endTitle: "The monsoon finally arrived",
+    endMessage:
+      "Four summers tested whether a grid could grow fast enough to stay ahead of its own peak.",
+  },
 ] as ScenarioType[];
 
 // The opening missions, in the order a new player should work through them

@@ -75,6 +75,7 @@ function demand(minute: number) {
     Residential: 100,
     Commercial: 100,
     Industrial: 100,
+    Mining: 0,
     "Data centers": 100,
     Transportation: 100,
   };
@@ -125,6 +126,7 @@ test("season/month windows repeat; no enrolled load means no effect; rebates com
     Residential: 0,
     Commercial: 0,
     Industrial: 0,
+    Mining: 0,
     "Data centers": 0,
     Transportation: 100,
   };

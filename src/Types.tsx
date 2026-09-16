@@ -150,7 +150,8 @@ export type DemandTypeNameType =
   | "Commercial"
   | "Industrial"
   | "Transportation"
-  | "Data centers";
+  | "Data centers"
+  | "Mining";
 
 export type DemandByTypeType = Record<DemandTypeNameType, number>;
 
@@ -746,6 +747,12 @@ export interface ScenarioType {
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   initialAgeYears?: number;
+  /**
+   * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
+   * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose
+   * dry season arrives before its first wet one, has to be able to say so.
+   */
+  initialReservoirFraction?: number;
   /** Optional player-facing name for an authored aggregate or gameplay proxy. */
   label?: string;
 };
@@ -759,7 +766,13 @@ export interface ScenarioLoadAdditionType {
   /** Maximum total load after the start date, never an annual increment. */
   peakW: number;
   loadFactor: number;
-  demandType: "Data centers";
+  /**
+   * The two end uses a scenario can own outright. Both sit outside the regional sector mix: a
+   * grid either has the mine or the campus on it or it does not, and neither scales with the
+   * customer count. "Data centers" replaces the generic regional curve when authored; "Mining"
+   * has no generic curve and is purely additive.
+   */
+  demandType: "Data centers" | "Mining";
 }
 
 /**

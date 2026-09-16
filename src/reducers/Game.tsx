@@ -846,7 +846,12 @@ export const gameSlice = createSlice({
       startingFacilities.forEach((search: ScenarioFacilityType) => {
         // Age is scenario metadata rather than a catalog property, so exclude it from the exact
         // technology match and pass it to the completed operating asset separately.
-        const { initialAgeYears = 0, label, ...facilitySearch } = search;
+        const {
+          initialAgeYears = 0,
+          initialReservoirFraction,
+          label,
+          ...facilitySearch
+        } = search;
         // Scenario research may carry more precision than is useful to a player. Resolve the
         // catalog quote from the rounded size so its costs and technology-derived fields agree
         // with the two-significant-digit nameplate the operating facility receives.
@@ -878,6 +883,7 @@ export const gameSlice = createSlice({
             false,
             true,
             initialAgeYears,
+            initialReservoirFraction,
           );
           if (label) {
             const built = state.facilities.find(
@@ -900,6 +906,7 @@ export const gameSlice = createSlice({
               false,
               true,
               initialAgeYears,
+              initialReservoirFraction,
             );
             if (label) {
               const built = state.facilities.find(
@@ -2432,7 +2439,10 @@ function updateSupplyFacilitiesFinances(
       const requiredReleaseWh = Math.min(
         g.reservoirWh,
         ((g.hydroMeanMonthlyInflowWh || 0) *
-          mandatedReleaseFraction(tickDate.monthNumber)) /
+          mandatedReleaseFraction(
+            tickDate.monthNumber,
+            state.location?.lat ?? 1,
+          )) /
           ticksPerMonth,
       );
       const deadpoolWh = capacityWh * HYDRO_DEADPOOL_FRACTION;
@@ -3132,6 +3142,7 @@ export function generateNewTimeline(
         Commercial: 0,
         Industrial: 0,
         Transportation: 0,
+        Mining: 0,
         "Data centers": 0,
       },
       solarIrradianceWM2: 0,
@@ -3213,6 +3224,7 @@ function buildFacilityHelper(
   financed: boolean,
   newGame = false,
   initialAgeYears = 0,
+  initialReservoirFraction = 0.5,
 ): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
@@ -3285,9 +3297,10 @@ function buildFacilityHelper(
         : undefined,
     } as FacilityOperatingType;
     if (g.fuel === "Hydro" && g.reservoirCapacityWh) {
-      // A completed dam starts at a neutral mid-pool. New construction carries this initial
-      // value until commissioning rather than conjuring five years of unobserved inflow.
-      facility.reservoirWh = g.reservoirCapacityWh / 2;
+      // A completed dam starts at a neutral mid-pool unless a scenario states the level it
+      // opens on. New construction carries this initial value until commissioning rather than
+      // conjuring five years of unobserved inflow.
+      facility.reservoirWh = g.reservoirCapacityWh * initialReservoirFraction;
       facility.hydroLastInflowWh = 0;
       facility.hydroLastSpillWh = 0;
       facility.hydroLastMandatedReleaseWh = 0;

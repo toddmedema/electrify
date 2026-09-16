@@ -54,6 +54,7 @@ test.each(Array.from({ length: 24 }, (_, hour) => hour))(
         Residential: watts,
         Commercial: 100,
         Industrial: 100,
+        Mining: 0,
         "Data centers": 100,
         Transportation: 100,
       };
@@ -95,6 +96,7 @@ test("independent windows bill recovered energy at a discount even during a new 
     Residential: 100,
     Commercial: 100,
     Industrial: 100,
+    Mining: 0,
     "Data centers": 100,
     Transportation: 100,
   };

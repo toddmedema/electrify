@@ -218,6 +218,9 @@ export function applyPeakDemand(
   if (policyPeakHour(tick.minute, policyStartHour(p?.curtailment))) {
     tick.demandByType.Industrial *= 1 - contract;
     tick.demandByType["Data centers"] *= 1 - contract;
+    // Smelters and concentrators are the original interruptible customer - a utility short of
+    // power calls the mine before it calls anyone else, which is exactly what ZESCO did.
+    tick.demandByType.Mining *= 1 - contract;
   }
   for (const batch of queue) {
     const start = Math.max(tick.minute, batch.recoveryStartMinute);
@@ -270,7 +273,9 @@ export function customerBillingRate(
     (tick.demandByType.Residential - returnedW) *
     fraction(enrolledTariff, tariffPeak);
   const industrial =
-    tick.demandByType.Industrial + tick.demandByType["Data centers"];
+    tick.demandByType.Industrial +
+    tick.demandByType["Data centers"] +
+    tick.demandByType.Mining;
   const total = Object.values(tick.demandByType).reduce(
     (sum, watts) => sum + watts,
     0,
