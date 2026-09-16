@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test } from "@playwright/test";
+import { waitForPane } from "./layout";
 
 test("public insights retain the benchmark and an absolute customer objective", async ({
   page,
@@ -20,8 +21,14 @@ test("public insights retain the benchmark and an absolute customer objective", 
   });
   await page.goto("/?scenario=106");
   await page.getByRole("button", { name: "Start game" }).click();
-  if (!(await page.locator(".insights").isVisible())) {
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
+  const insights = page.locator(".insights");
+  const insightsNav = page.getByRole("button", {
+    name: "Insights",
+    exact: true,
+  });
+  await waitForPane(page, insights, insightsNav);
+  if (!(await insights.isVisible())) {
+    await insightsNav.click();
   }
   await expect(page.locator(".insightsLevers")).toContainText(
     "market benchmark",

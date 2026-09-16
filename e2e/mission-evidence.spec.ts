@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test, type Page } from "@playwright/test";
+import { waitForPane } from "./layout";
 
 const reviewProjects = new Set([
   "desktop-chromium",
@@ -10,8 +11,11 @@ async function settle(page: Page) {
   await page.waitForTimeout(400);
 }
 async function openInsights(page: Page) {
-  if (!(await page.locator(".insights:visible").isVisible())) {
-    await page.locator("#insightsNav:visible").click();
+  const insights = page.locator(".insights:visible");
+  const nav = page.locator("#insightsNav:visible");
+  await waitForPane(page, insights, nav);
+  if (!(await insights.isVisible())) {
+    await nav.click();
     await settle(page);
   }
 }

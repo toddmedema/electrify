@@ -1,5 +1,6 @@
 import path from "path";
 import { expect, test } from "@playwright/test";
+import { waitForPane } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`simulation assumptions support decisions in ${theme}`, async ({
@@ -15,8 +16,12 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
     const insights = page.locator(".insights:visible");
-    if (!(await insights.isVisible()))
-      await page.getByRole("button", { name: "Insights", exact: true }).click();
+    const insightsNav = page.getByRole("button", {
+      name: "Insights",
+      exact: true,
+    });
+    await waitForPane(page, insights, insightsNav);
+    if (!(await insights.isVisible())) await insightsNav.click();
     const scope = insights
       .locator("details")
       .filter({ hasText: "Estimates · one representative day per month" });
@@ -47,10 +52,12 @@ for (const theme of ["light", "dark"] as const) {
       });
     }
     const facilities = page.locator(".facilities:visible");
-    if (!(await facilities.isVisible()))
-      await page
-        .getByRole("button", { name: "Facilities", exact: true })
-        .click();
+    const facilitiesNav = page.getByRole("button", {
+      name: "Facilities",
+      exact: true,
+    });
+    await waitForPane(page, facilities, facilitiesNav);
+    if (!(await facilities.isVisible())) await facilitiesNav.click();
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     const first = page.locator(".buildOption").first();

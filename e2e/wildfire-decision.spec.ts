@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPane } from "./layout";
 for (const theme of ["light", "dark"]) {
   test(`wildfire response is actionable and persistent in ${theme}`, async ({
     page,
@@ -90,8 +91,13 @@ for (const theme of ["light", "dark"]) {
     ).focus();
     await page.keyboard.press("Enter");
     await expect(region).not.toBeVisible();
-    if (!(await page.locator(".eventLog:visible").isVisible()))
-      await page.getByRole("button", { name: "Events", exact: true }).click();
+    const eventLog = page.locator(".eventLog:visible");
+    const eventLogNav = page.getByRole("button", {
+      name: "Events",
+      exact: true,
+    });
+    await waitForPane(page, eventLog, eventLogNav);
+    if (!(await eventLog.isVisible())) await eventLogNav.click();
     await fast.click();
     await expect(page.getByText("Through Feb 2025")).toBeVisible({
       timeout: 15000,

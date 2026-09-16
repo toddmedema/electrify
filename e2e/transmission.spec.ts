@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPane } from "./layout";
 
 test("California players can build and understand an intertie", async ({
   page,
@@ -12,8 +13,13 @@ test("California players can build and understand an intertie", async ({
 
   await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
+  const facilitiesNav = page.getByRole("button", {
+    name: "Facilities",
+    exact: true,
+  });
+  await waitForPane(page, facilities, facilitiesNav);
   if (!(await facilities.isVisible())) {
-    await page.getByRole("button", { name: "Facilities", exact: true }).click();
+    await facilitiesNav.click();
   }
   await facilities.getByRole("button", { name: "Build", exact: true }).click();
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
@@ -103,16 +109,26 @@ test("island grids do not offer interties or power exchange", async ({
 
   await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
+  const facilitiesNav = page.getByRole("button", {
+    name: "Facilities",
+    exact: true,
+  });
+  await waitForPane(page, facilities, facilitiesNav);
   if (!(await facilities.isVisible())) {
-    await page.getByRole("button", { name: "Facilities", exact: true }).click();
+    await facilitiesNav.click();
   }
   await expect(facilities.getByRole("tab", { name: "Interties" })).toHaveCount(
     0,
   );
 
   const insights = page.locator(".insights:visible");
+  const insightsNav = page.getByRole("button", {
+    name: "Insights",
+    exact: true,
+  });
+  await waitForPane(page, insights, insightsNav);
   if (!(await insights.isVisible())) {
-    await page.getByRole("button", { name: "Insights", exact: true }).click();
+    await insightsNav.click();
   }
   await insights.getByRole("button", { name: /Layers \(/ }).click();
   await expect(
@@ -187,10 +203,13 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
     const facilities = page.locator(".facilities:visible");
+    const facilitiesNav = page.getByRole("button", {
+      name: "Facilities",
+      exact: true,
+    });
+    await waitForPane(page, facilities, facilitiesNav);
     if (!(await facilities.isVisible())) {
-      await page
-        .getByRole("button", { name: "Facilities", exact: true })
-        .click();
+      await facilitiesNav.click();
     }
     await facilities
       .getByRole("button", { name: "Build", exact: true })
