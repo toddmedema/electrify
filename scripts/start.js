@@ -49,6 +49,17 @@ function adaptDevServerConfig(config) {
     ...middlewares,
     ...captureMiddlewares(onAfterSetupMiddleware, devServer),
   ];
+  // The e2e suite (ELECTRIFY_E2E=1, set by e2e/playwright.config.ts) must never be blocked by
+  // the dev error overlay. A runtime error in the app -- or in a worker whose lazy code chunk
+  // fails to load while the dev server is busy -- would otherwise cover every control with a
+  // red overlay and fail every test that clicks the page. Compilation errors still show;
+  // only the runtime-error overlay is suppressed for the suite.
+  if (process.env.ELECTRIFY_E2E) {
+    adapted.client = {
+      ...adapted.client,
+      overlay: { ...adapted.client?.overlay, runtimeErrors: false },
+    };
+  }
   return adapted;
 }
 

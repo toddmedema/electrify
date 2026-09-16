@@ -61,6 +61,9 @@ export default defineConfig({
       BROWSER: "none",
       HOST: "127.0.0.1",
       PORT: port,
+      // Suppress the dev runtime-error overlay for the suite: an app or worker runtime error
+      // must report as a test failure, not sit over the page and fail every click.
+      ELECTRIFY_E2E: "1",
     },
   },
 });
