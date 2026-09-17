@@ -466,15 +466,15 @@ export default class Compositor extends React.Component<Props, {}> {
           <GameAppBarContainer />
           <DesktopPanes>
             <FacilitiesContainer />
-            {this.props.card.name === "EVENTS" ? (
-              <EventLogContainer />
-            ) : (
-              <InsightsContainer />
-            )}
+            <div className="secondary-pane">
+              {this.props.card.name === "EVENTS" ? (
+                <EventLogContainer />
+              ) : (
+                <InsightsContainer />
+              )}
+              <NavigationContainer />
+            </div>
           </DesktopPanes>
-          {/* The panes supply no nav of their own in this layout, and it is still what
-              switches the second column */}
-          <NavigationContainer />
         </div>
       );
     }

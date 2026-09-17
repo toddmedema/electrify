@@ -1,5 +1,3 @@
-import ManualLink from "../base/ManualLink";
-import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import CustomerPrograms from "./CustomerPrograms";
 import {
@@ -1843,18 +1841,6 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
-              <Typography
-                variant="caption"
-                component="p"
-                color="text.secondary"
-                sx={{ mx: 2 }}
-              >
-                Reserve: extra demand you could cover within 15 min.
-                <ManualLink
-                  entry={MANUAL_ENTRY.RESERVE_CAPACITY}
-                  text="How reserve works"
-                />
-              </Typography>
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
                   Forecasted shortfall: ~
