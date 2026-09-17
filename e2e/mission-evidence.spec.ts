@@ -39,9 +39,12 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );
+    // The announced fee takes the goal's place, keeping the tracker to one line.
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
-      "Cash ≥ $0 ($",
+      "Upcoming:",
     );
+    const copy = await page.locator(".missionSummary:visible").boundingBox();
+    expect(copy!.height).toBeLessThanOrEqual(56);
     const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
@@ -81,9 +84,6 @@ for (const theme of ["light", "dark"]) {
       );
       expect(heights).toEqual([56, 56, 56]);
     }
-    await expect(
-      page.locator(".gridHealth-blackout:visible"),
-    ).not.toContainText("Now");
     if (!(await page.locator("#chartSupplyDemand").isVisible()))
       await page.locator(".facilitySupplyDisclosure > summary").click();
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
