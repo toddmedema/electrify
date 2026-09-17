@@ -39,9 +39,12 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );
+    // The announced fee takes the goal's place, keeping the tracker to one line.
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
-      "Cash ≥ $0 ($",
+      "Upcoming:",
     );
+    const copy = await page.locator(".missionSummary:visible").boundingBox();
+    expect(copy!.height).toBeLessThanOrEqual(56);
     const reorder = page.locator(".facilityActions:visible");
     if (info.project.name.startsWith("mobile")) {
       await expect(reorder).toHaveCount(0);
@@ -81,9 +84,6 @@ for (const theme of ["light", "dark"]) {
       );
       expect(heights).toEqual([56, 56, 56]);
     }
-    await expect(
-      page.locator(".gridHealth-blackout:visible"),
-    ).not.toContainText("Now");
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
       await page.getByRole("button", { name: speed, exact: true }).click();
@@ -352,7 +352,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
     "Projected shortfall",
   );
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
-    /Projected in this month's representative day/,
+    /Shortfall expected later today/,
   );
   await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
   await page.locator(".missionRiskButton:visible").click();
@@ -363,8 +363,8 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
   await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
-  await expect(page.locator(".operatingEvidence")).toContainText(
-    "This month's representative day",
+  await expect(page.locator(".operatingEvidence")).toHaveAccessibleName(
+    "Supply and demand",
   );
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom out", exact: true }).click();

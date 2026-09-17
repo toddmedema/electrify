@@ -286,22 +286,49 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
-  let secondaryText = "";
+  // The row's second line has to stay one line on a 320px phone, so it leads with the reading
+  // and the state and leaves anything else to a trailing detail that truncates first. Rated
+  // storage power and the reservoir's absolute size are both in the opened details.
+  const builtFraction = underConstruction
+    ? Math.max(
+        0,
+        Math.min(
+          1,
+          (facility.yearsToBuild - facility.yearsToBuildLeft) /
+            facility.yearsToBuild,
+        ),
+      )
+    : 1;
+  let reading = "";
+  let detail: React.ReactNode = null;
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
-    const percentBuilt = Math.round(
-      ((facility.yearsToBuild - facility.yearsToBuildLeft) /
-        facility.yearsToBuild) *
-        100,
-    );
-    secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    const percentBuilt = Math.round(builtFraction * 100);
+    reading = `Building ${percentBuilt}%`;
+    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
-    secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
-  } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)}, reservoir ${formatWattHoursOfPeak(facility.reservoirWh || 0, facility.reservoirCapacityWh)}`;
+    reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
+      const reservoirPercent = Math.round(
+        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
+      );
+      // Only one of these shows, picked by how wide the row is
+      detail = (
+        <>
+          <span className="facilityStatusLong">
+            reservoir {reservoirPercent}%
+          </span>
+          <span className="facilityStatusShort">{reservoirPercent}% full</span>
+        </>
+      );
+    }
   }
+  // "Building 40%" already says what the construction badge does
+  const status = underConstruction
+    ? reading
+    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -323,6 +350,28 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         >
           <div className="facilityRowHeader">
+            {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
+            fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
+            transitioned in CSS so ramping is visible as movement */}
+            {!underConstruction && (
+              <div
+                className="outputProgressBar"
+                style={{
+                  transform: `scaleX(${outputFraction})`,
+                  background: withAlpha(accentColor, 0.18),
+                }}
+              />
+            )}
+            {!readOnly && (
+              <button
+                type="button"
+                {...provided.dragHandleProps}
+                className="facilityDragHandle"
+                aria-label={"Reorder " + facility.name}
+              >
+                <DragIndicatorIcon aria-hidden />
+              </button>
+            )}
             <button
               type="button"
               className="facilityDisclosure"
@@ -337,24 +386,17 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 sx={
                   underConstruction
                     ? {
-                        opacity: (theme) =>
-                          theme.palette.action.disabledOpacity,
+                        // The progress bar stays at full strength so the build is legible
+                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
+                          {
+                            opacity: (theme) =>
+                              theme.palette.action.disabledOpacity,
+                          },
                       }
                     : undefined
                 }
                 component="span"
               >
-                {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
-                chart draws, and transitioned in CSS so ramping is visible as movement */}
-                {!underConstruction && (
-                  <div
-                    className="outputProgressBar"
-                    style={{
-                      transform: `scaleX(${outputFraction})`,
-                      background: withAlpha(accentColor, 0.18),
-                    }}
-                  />
-                )}
                 <ListItemAvatar>
                   <div>
                     <Avatar
@@ -385,27 +427,55 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </div>
                   </div>
                 </ListItemAvatar>
-                <ListItemText
-                  slotProps={{
-                    primary: { component: "span" },
-                    secondary: { component: "span" },
-                  }}
-                  primary={
-                    <>
-                      {facility.name}
-                      {storyOutputMultiplier < 1 && (
-                        <Chip
-                          className="storyDerateBadge"
-                          color="warning"
-                          size="small"
-                          label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
-                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                        />
-                      )}
-                    </>
-                  }
-                  secondary={`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
-                />
+                <span className="facilityText">
+                  <ListItemText
+                    slotProps={{
+                      primary: { component: "span" },
+                      secondary: { component: "span" },
+                    }}
+                    primary={
+                      <>
+                        <span className="facilityName">{facility.name}</span>
+                        {storyOutputMultiplier < 1 && (
+                          <Chip
+                            className="storyDerateBadge"
+                            color="warning"
+                            size="small"
+                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                          />
+                        )}
+                      </>
+                    }
+                    secondary={
+                      <>
+                        <span className="facilityStatus">{status}</span>
+                        {detail && (
+                          <span className="facilityStatusDetail">
+                            {" · "}
+                            {detail}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
+                  {/* The percentage is already in the text; this only makes it glanceable */}
+                  {underConstruction && (
+                    <span
+                      className="constructionProgress"
+                      aria-hidden
+                      style={{ background: withAlpha(accentColor, 0.24) }}
+                    >
+                      <span
+                        className="constructionProgressFill"
+                        style={{
+                          transform: `scaleX(${builtFraction})`,
+                          background: accentColor,
+                        }}
+                      />
+                    </span>
+                  )}
+                </span>
                 <KeyboardArrowDownIcon
                   className="facilityChevron"
                   aria-hidden
@@ -458,17 +528,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </DialogActions>
             </Dialog>
           )}
-          {!readOnly && (
-            <Button
-              style={{ display: selected ? undefined : "none" }}
-              {...provided.dragHandleProps}
-              className="facilityDragHandle"
-              aria-label={"Reorder " + facility.name}
-              startIcon={<DragIndicatorIcon />}
-            >
-              Drag to reorder
-            </Button>
-          )}
           {selected && (
             <MemoizedFacilityActions
               facility={facility}
@@ -510,11 +569,8 @@ function FacilitySupplyChart({
       ref={anchor}
       tabIndex={-1}
       className="operatingEvidence facilitySupplyChart"
-      aria-label="Supply and demand evidence: this month's representative day"
+      aria-label="Supply and demand"
     >
-      <div className="operatingSampleLabel">
-        This month's representative day · Supply — solid · Demand – – dashed · W
-      </div>
       <ChartSupplyDemand
         height={180}
         timeline={game.timeline}

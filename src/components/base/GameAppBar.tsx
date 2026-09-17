@@ -29,6 +29,7 @@ import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
+import { recordTutorialLeft } from "../../reducers/Tutorial";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -212,8 +213,8 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
-  // A tutorial's progress isn't worth resuming, so its menu item stays "Quit" - only a real run
-  // gets the "Save & Quit" reminder that leaving keeps it around to come back to
+  // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
+  // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
     ?.tutorialSteps;
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
@@ -285,7 +286,11 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={handleQuit}>
-            {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
+            {isReplay
+              ? "Exit replay"
+              : isTutorial
+                ? "Main menu"
+                : "Save & Quit"}
           </MenuItem>
         </Menu>
       </>
@@ -310,6 +315,8 @@ export function GameAppBar(props: Props) {
 
   const gridHealth = getGridHealth(game, now);
   const inBlackout = gridHealth.state === "blackout";
+  // Low reserve and at-limit share the mission tracker's goal-risk warning treatment.
+  const inWarning = !inBlackout && gridHealth.state !== "stable";
 
   return (
     <div id="appbar">
@@ -331,12 +338,12 @@ export function GameAppBar(props: Props) {
       </div>
       <div className="gameStatusBar">
         <div
-          className={`gridHealth gridHealth-${gridHealth.state}`}
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <div className="gridHealthSummary">
             <span className="gridHealthState">
-              <span className="gridHealthIcon" aria-hidden="true">
+              <span className="statusIcon" aria-hidden="true">
                 <ConceptIcon
                   concept={
                     inBlackout
@@ -348,8 +355,7 @@ export function GameAppBar(props: Props) {
                   fontSize="small"
                 />
               </span>
-              {!inBlackout && <span>Now · </span>}
-              <strong>{gridHealth.label}</strong>
+              <strong className="statusLabel">{gridHealth.label}</strong>
             </span>
             <span className="gridHealthSeparator" aria-hidden="true">
               |
@@ -357,12 +363,15 @@ export function GameAppBar(props: Props) {
             <strong className="gridHealthMetric">{gridHealth.metric}</strong>
           </div>
         </div>
-        <MissionSummary
-          game={game}
-          upcoming={props.upcomingEvents}
-          onEvidence={props.onEvidence}
-          onDetails={() => setScenarioDetailsOpen(true)}
-        />
+        {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
+        {!isTutorial && (
+          <MissionSummary
+            game={game}
+            upcoming={props.upcomingEvents}
+            onEvidence={props.onEvidence}
+            onDetails={() => setScenarioDetailsOpen(true)}
+          />
+        )}
       </div>
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
@@ -407,9 +416,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       dispatch(quit());
     },
   };

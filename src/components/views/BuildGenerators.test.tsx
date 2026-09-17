@@ -58,7 +58,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Non-fuel start cost.*Per equivalent start.*\$23\.1k\/start/,
+      name: /Non-fuel start cost.*\$23\.1k\/start/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -71,13 +71,13 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
     screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
   );
   const impact = screen.getByRole("region", { name: "Expected impact" });
-  expect(impact).toHaveTextContent("What changes");
+  expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).toHaveTextContent("Typical output");
-  expect(impact).toHaveTextContent("check availability during the shortage");
+  expect(impact).toHaveTextContent("weather may limit it");
   expect(impact).not.toHaveTextContent("largest forecast shortage");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
@@ -127,7 +127,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toHaveAttribute("aria-expanded", "false");
 }, 15000);
 
-it("shows Coal's physical and representative-day start charges", () => {
+it("shows Coal's start charge without the representative-day breakdown", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 650000000, [], []).find(
     (candidate) => candidate.name === "Coal",
@@ -149,14 +149,10 @@ it("shows Coal's physical and representative-day start charges", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Non-fuel start cost.*Per equivalent start.*\$52\.7k\/start/,
+      name: /Non-fuel start cost.*\$52\.7k\/start/,
     }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Representative-day charge.*365 \/ 12 equivalent starts.*\$1\.6M\/displayed start/,
-    }),
-  ).toBeInTheDocument();
+  expect(screen.queryByText(/Representative-day charge/)).toBeNull();
 });
 
 it("shows Oil's fixed, variable, and expected-output O&M", () => {
@@ -191,7 +187,7 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable operations & maintenance.*Per generated MWh.*\$25\.71\/MWh generated/,
+      name: /Variable operations & maintenance.*\$25\.71\/MWh generated/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -347,11 +343,7 @@ it("explains unavailable technologies and hides their comparison button", () => 
     />,
   );
 
-  expect(
-    screen.getByText(
-      "Not available in this game at this location or point in time.",
-    ),
-  ).toBeVisible();
+  expect(screen.getByText("Not available here yet.")).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Unavailable Solar/ }),
   ).toBeNull();

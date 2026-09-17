@@ -161,6 +161,22 @@ describe("onTutorialStep", () => {
     expect(dispatched[0].payload).toEqual({ tutorialStep: capstone });
   });
 
+  // Regression test. Tapping 1x is what finishes the step before this capstone, and rebuilding
+  // the scenario on entry reloaded the game and paused the clock the player had just started
+  it("keeps Mission 1's clock running into its capstone", () => {
+    const electricity = walkthrough("Mission 1: Electricity");
+    const capstone = electricity.findIndex((candidate) => candidate.capstone);
+
+    const dispatched = step({
+      steps: electricity,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
+    expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
+  });
+
   it("still rebuilds capstones that require an authored checkpoint", () => {
     const storage = walkthrough("Mission 3: Storage");
     const capstone = storage.findIndex((candidate) => candidate.capstone);

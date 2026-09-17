@@ -141,7 +141,9 @@ function clamp(v: number, min: number, max: number): number {
  * no answer rather than the programming error getEconomy otherwise throws over.
  */
 export function hasEconomy(): boolean {
-  return Object.keys(economy).length > 0;
+  // Asked on every tick, so this avoids listing every year. Only a CSV row starts filling
+  // `economy` -- projections are added after this is already true -- and both are reset together.
+  return recordedMonths.size > 0;
 }
 
 function resetEconomy() {

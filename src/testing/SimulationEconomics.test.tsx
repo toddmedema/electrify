@@ -1,68 +1,21 @@
 import { TICKS_PER_MONTH } from "../Constants";
-import { SCENARIO_CHOICES } from "../data/ScenarioChoices";
-import { SCENARIOS } from "../data/Scenarios";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { tickState } from "../reducers/Game";
-import { MeaningfulDecisionKindType } from "../Types";
+import { INTERN_ONE_BUILD_PLAYS } from "./BalancePlaybooks";
 import {
-  INTERN_ONE_BUILD_PLAYS,
-  STANDARD_BALANCE_PLAYS,
-} from "./BalancePlaybooks";
-import { expectNoViolations } from "./SimulationTestHelpers";
-import {
-  createGame,
-  runSimulation,
-  SimOptionsType,
-  SimResultType,
-} from "./Simulator";
+  baselineChoiceActions,
+  baselineMeaningfulChoices,
+  ECONOMICS_SCENARIOS,
+  expectNoViolations,
+} from "./SimulationTestHelpers";
+import { createGame, runSimulation } from "./Simulator";
 
 jest.setTimeout(120000);
 
-// Mandatory baseline responses are recorded actions; a binding connection also earns credit.
-function baselineChoiceActions(result: SimResultType, scenarioId: number) {
-  return SCENARIO_CHOICES.filter(
-    (choice) =>
-      choice.scenarioId === scenarioId && choice.atMonth < result.months.length,
-  ).length;
-}
-
-function baselineMeaningfulChoices(scenarioId: number, result?: SimResultType) {
-  return SCENARIO_CHOICES.filter(
-    (choice) =>
-      choice.scenarioId === scenarioId &&
-      (!result || choice.atMonth < result.months.length) &&
-      choice.options.find((option) => option.cost("Intern") === 0)
-        ?.meaningful !== false,
-  ).length;
-}
-
+// The economics matrix is split across SimulationEconomics*.test.tsx so that Jest, which runs
+// files rather than tests in parallel, can spread its long simulations over every CI core.
 describe("simulation economics", () => {
-  const scenarios = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
-  const expectedCeoCategories: Record<number, MeaningfulDecisionKindType[]> = {
-    100: [
-      "asset",
-      "dispatch",
-      "operation",
-      "policy",
-      "rate",
-      "sale",
-      "trading",
-    ],
-    101: ["asset", "dispatch", "operation", "rate", "sale"],
-    102: ["asset", "dispatch", "operation", "rate", "sale"],
-    103: ["asset", "dispatch", "operation", "rate", "sale"],
-    104: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
-    105: ["asset", "dispatch", "operation", "policy", "rate", "sale"],
-    106: ["asset", "dispatch", "policy", "rate", "sale", "trading"],
-    107: ["asset", "dispatch", "operation", "policy", "rate"],
-    108: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    110: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    111: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    113: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    114: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-    115: ["asset", "dispatch", "operation", "policy", "rate", "trading"],
-  };
-  scenarios.forEach((scenario) => {
+  ECONOMICS_SCENARIOS.forEach((scenario) => {
     it(`fails passively but needs only one build on Intern in "${scenario.name}"`, () => {
       const passive = runSimulation({
         scenarioId: scenario.id,
@@ -94,41 +47,6 @@ describe("simulation economics", () => {
     });
   });
 
-  scenarios.forEach((scenario) => {
-    it(`requires ten validated decisions in "${scenario.name}" on CEO`, () => {
-      const passive = runSimulation({
-        scenarioId: scenario.id,
-        difficulty: "CEO",
-      });
-      expectNoViolations(passive);
-      expect(passive.actionCount).toBe(
-        baselineChoiceActions(passive, scenario.id),
-      );
-      expect(passive.meaningfulDecisionCount).toBe(
-        baselineMeaningfulChoices(scenario.id, passive),
-      );
-      expect(passive.outcome).not.toBe("completed");
-
-      const play = STANDARD_BALANCE_PLAYS[scenario.id];
-      const active = runSimulation({
-        scenarioId: scenario.id,
-        difficulty: "CEO",
-        ...play,
-      });
-      expectNoViolations(active);
-      expect([
-        active.meaningfulDecisionCount,
-        active.meaningfulDecisionCategoryCount >= 4,
-        new Set(active.meaningfulDecisionKeys).size,
-        active.outcome,
-        active.meaningfulDecisionLabels,
-      ]).toEqual([10, true, 10, "completed", expect.any(Array)]);
-      expect(active.meaningfulDecisionCategories).toEqual(
-        expectedCeoCategories[scenario.id],
-      );
-    });
-  });
-
   it.each([107, 111])(
     "keeps Intern scenario %s passive-fail / one-build-win across seeds 1-20",
     (scenarioId) => {
@@ -152,60 +70,6 @@ describe("simulation economics", () => {
       }
     },
   );
-
-  it.each([1, 7, 20])(
-    "wins all CEO playbooks with ten decisions on representative seed %s",
-    (seed) => {
-      scenarios.forEach((scenario) => {
-        const active = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "CEO",
-          seed,
-          ...STANDARD_BALANCE_PLAYS[scenario.id],
-        });
-        expectNoViolations(active);
-        expect([
-          scenario.id,
-          active.meaningfulDecisionCount,
-          active.meaningfulDecisionCategoryCount >= 4,
-          active.outcome,
-        ]).toEqual([scenario.id, 10, true, "completed"]);
-      });
-    },
-  );
-
-  scenarios.forEach((scenario) => {
-    const play = STANDARD_BALANCE_PLAYS[scenario.id];
-    const omissions: Array<Partial<SimOptionsType>> = (
-      play.scheduledActions || []
-    ).map((_action, omitted) => ({
-      scheduledActions: play.scheduledActions!.filter(
-        (_candidate, index) => index !== omitted,
-      ),
-    }));
-    if (play.initialBuild) omissions.push({ initialBuild: undefined });
-    if (play.sellFacilityId !== undefined)
-      omissions.push({ sellFacilityId: undefined });
-
-    if (omissions.length + baselineMeaningfulChoices(scenario.id) !== 10) {
-      throw new Error(
-        `CEO ${scenario.id} play must total ten choices including mandatory responses`,
-      );
-    }
-    omissions.forEach((omission, index) => {
-      it(`rejects actual CEO ${scenario.id} plan with choice ${index + 1} removed`, () => {
-        const shortened = runSimulation({
-          scenarioId: scenario.id,
-          difficulty: "CEO",
-          ...play,
-          ...omission,
-        });
-        expectNoViolations(shortened);
-        expect(shortened.meaningfulDecisionCount).toBeLessThan(10);
-        expect(shortened.outcome).not.toBe("completed");
-      });
-    });
-  });
 
   it("makes a replacement build necessary at the End of an Era compliance deadline", () => {
     const shortcut = runSimulation({

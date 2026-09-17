@@ -37,6 +37,10 @@
   // message -- red/green alone would leave a colourblind reader with only the arrow
   --delta-good: #2e7d32; /* green800 */
   --delta-bad: #c62828; /* red800 */
+  // A warning fills its row rather than tinting text, so the label keeps full body contrast
+  // (16:1) and the glyph carries the amber: 6:1 on the fill, well past 3:1 for an icon
+  --warning-fill: #ffe082; /* amber200 */
+  --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   --capacity-bar: #212121; /* grey900 */
   --shadow-ring: rgba(0, 0, 0, 0.15);
@@ -71,6 +75,8 @@
   --blackout-tint: rgba(239, 83, 80, 0.16);
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
+  --warning-fill: #6d4c00; /* text 6.6:1 */
+  --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --capacity-bar: #e0e0e0;
   --shadow-ring: rgba(0, 0, 0, 0.72);
@@ -346,10 +352,10 @@ button,
   }
 }
 
+// Sits in the action row after the action button rather than over the corner, where it
+// covered the end of a label like Missions
 .snackbarClose {
-  position: absolute !important;
-  right: 2px;
-  top: 2px;
+  margin-left: 4px !important;
 }
 
 @media screen and (max-width: ($desktop_breakpoint - 1px)) {
@@ -718,41 +724,48 @@ $topbar_height: 56px;
     width: 40px;
     height: 40px;
   }
+  // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
+  // a plain headline and with the grid readout's icon when the two rows stack.
   .missionRiskButton {
-    margin-left: auto;
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: 4px;
+    margin-inline-start: -8px;
+    padding-inline: 8px;
+    white-space: nowrap;
   }
 }
 
 .missionSummaryHeader {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-  max-width: 100%;
+  width: 100%;
 }
 
+// One line at every width: months left, then the goal or the risk to it, which truncates first.
 .missionSummaryCopy {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
   flex: 1 1 auto;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
-
-.missionSummaryTutorial {
-  justify-content: flex-end;
-  padding-block: 0;
+.missionSummaryMonths {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.missionSummaryHeadline,
+.missionRiskText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .operatingEvidence,
 .insightsTrack {
   scroll-margin-block: 12px;
-}
-.operatingSampleLabel {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  line-height: 1.4;
 }
 .temporaryEvidence {
   padding: 4px 8px;
@@ -777,18 +790,14 @@ $topbar_height: 56px;
 
 @media (max-width: 768px) {
   .missionSummary {
-    padding: 4px 8px;
+    padding: 4px 8px 4px 16px;
     gap: 0 8px;
-  }
-  .missionSummary .missionRiskButton {
-    margin-left: 0;
-    justify-content: flex-start;
   }
 }
 
 @media (max-width: 599px) {
-  .missionSummaryHeader {
-    width: 100%;
+  .missionSummaryHeader,
+  .missionSummaryCopy {
     gap: 8px;
   }
 }
@@ -821,14 +830,12 @@ $topbar_height: 56px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-raised);
   color: $font_color_primary;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.25;
   text-align: center;
 
-  &.gridHealth-low-reserve,
-  &.gridHealth-at-limit {
-    border-color: var(--mark-bg);
-    background: var(--mark-bg);
+  &.statusWarning {
+    border-color: var(--warning-fill);
   }
 
   &.gridHealth-blackout {
@@ -852,13 +859,6 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 
-// Remove the inline SVG's baseline space so its visual center matches the adjacent label.
-.gridHealthIcon {
-  display: flex;
-  align-items: center;
-  line-height: 0;
-}
-
 .gridHealthMetric {
   min-width: 8.5rem;
   text-align: left;
@@ -868,6 +868,30 @@ $topbar_height: 56px;
 
 .gridHealth-stable .conceptIcon {
   color: $interactive_blue;
+}
+
+// One warning language for the grid readout and the mission tracker, so "Low reserve" and
+// "Cash out in ~5 mo" read as the same kind of alert. Comes after both rows' own backgrounds.
+.statusWarning {
+  background: var(--warning-fill);
+  color: $font_color_primary;
+
+  .conceptIcon {
+    color: var(--warning-icon);
+  }
+}
+
+// Remove the inline SVG's baseline space so its visual center matches the adjacent label.
+.statusIcon {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.statusLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
@@ -907,8 +931,8 @@ $topbar_height: 56px;
     min-height: $topbar_height;
     flex-direction: column;
     gap: 3px;
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding: 5px max(16px, env(safe-area-inset-right)) 5px
+      max(16px, env(safe-area-inset-left));
 
     .gridHealthSummary {
       display: grid;
@@ -925,9 +949,11 @@ $topbar_height: 56px;
       text-align: right;
     }
   }
+  // Same left inset as the grid readout above, so their warning icons stack in one column.
   .missionSummary {
     box-sizing: border-box;
     min-height: $topbar_height;
+    padding-left: max(16px, env(safe-area-inset-left));
   }
 }
 
@@ -945,8 +971,21 @@ $pane_header_height: 40px;
 .facilities .paneHeader {
   gap: 8px;
 
+  // Compact enough to leave 4px above and below inside the header, with the icon sized to the
+  // label rather than towering over it
   .button-buildFacility {
     margin-left: auto;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 12px;
+
+    .MuiButton-startIcon {
+      margin-right: 6px;
+    }
+
+    .MuiButton-startIcon > svg {
+      font-size: 1em;
+    }
   }
 }
 
@@ -1095,15 +1134,10 @@ $pane_header_height: 40px;
   }
 }
 
-// Keep the compact pane-header height on phones while preventing the global coarse-pointer
-// target size from making these two labeled controls spill into the chart below.
+// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
 @media (pointer: coarse) {
-  .facilities .paneHeader {
-    .button-buildGenerator,
-    .button-buildStorage {
-      height: 32px;
-      min-height: 32px !important;
-    }
+  .facilities .paneHeader .button-buildFacility {
+    height: 44px;
   }
 }
 
@@ -1571,7 +1605,8 @@ $pane_header_height: 40px;
     height: 52px;
     min-height: 52px;
     gap: 4px;
-    padding: 4px;
+    // The date lines up with the chart titles below; the icon buttons carry their own inset.
+    padding: 4px 4px 4px 16px;
   }
 
   .insightsViewportDate {
@@ -1988,25 +2023,6 @@ html[data-theme="dark"] .uplot {
   box-shadow:
     inset 0 0 0 1px var(--chart-edge),
     0 8px 22px -16px var(--chart-shadow);
-}
-
-.chartDataSummary {
-  margin: 4px 8px 10px;
-  font-size: 0.75rem;
-  overflow-x: auto;
-
-  summary {
-    width: fit-content;
-    color: $interactive_blue;
-    cursor: pointer;
-    font-weight: 700;
-  }
-
-  table {
-    width: 100%;
-    min-width: max-content;
-    margin-top: 6px;
-  }
 }
 
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
@@ -3918,8 +3934,28 @@ html[data-theme="dark"] .uplot {
   }
 }
 
+// Each new objective eases in so the change of step registers without pulling focus
+.tutorialHudStep {
+  animation: tutorialHudStepIn 240ms ease-out;
+}
+
+@keyframes tutorialHudStepIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tutorialTargetRingPulse {
+    animation: none;
+  }
+
+  .tutorialHudStep {
     animation: none;
   }
 
@@ -4336,7 +4372,7 @@ $sizemap: (
 }
 @media (pointer: coarse) {
   .base_main .facilities .MuiToolbar-root.paneHeader {
-    min-height: 52px !important;
+    min-height: 52px !important; // 44px Build button with 4px either side
   }
 }
 
@@ -4387,6 +4423,7 @@ $sizemap: (
   color: var(--font-color-faded);
 }
 .facilityRowHeader {
+  position: relative;
   display: flex;
   align-items: center;
 }
@@ -4422,6 +4459,10 @@ $sizemap: (
   padding: 12px 16px;
   gap: 8px;
 }
+// The grip already spaces the row from the edge
+.base_main .facilityDragHandle + .facilityDisclosure .facility {
+  padding-left: 8px;
+}
 .facilityDisclosure .MuiListItemAvatar-root {
   min-width: 48px;
 }
@@ -4429,17 +4470,55 @@ $sizemap: (
   margin: 0;
   min-width: 0;
 }
-.facilityDisclosure .MuiListItemText-primary {
-  display: block;
-  font-size: 1rem;
-  font-weight: 600;
+// A row is one line of name over one line of status at any pane width, down to a 320px phone.
+// Text that still doesn't fit truncates instead of wrapping, and the lower-priority part goes
+// first: the name before its derate badge, the trailing detail before the reading and state.
+.facilityDisclosure .MuiListItemText-primary,
+.facilityDisclosure .MuiListItemText-secondary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
   line-height: 1.4;
 }
+.facilityDisclosure .MuiListItemText-primary {
+  font-size: 1rem;
+  font-weight: 600;
+}
 .facilityDisclosure .MuiListItemText-secondary {
-  display: block;
   margin-top: 4px;
   font-size: 0.8125rem;
-  line-height: 1.4;
+}
+.facilityDisclosure .facilityName,
+.facilityDisclosure .facilityStatus,
+.facilityDisclosure .facilityStatusDetail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facilityDisclosure .facilityStatusDetail {
+  // Shrink is weighted by width, so a large factor is what makes the detail give way first
+  flex-shrink: 100;
+  // Keeps the leading space of " · " from collapsing at the flex item's edge
+  white-space: pre;
+}
+.facilityDisclosure .storyDerateBadge {
+  flex-shrink: 0;
+}
+.facilityDisclosure .MuiListItemText-root {
+  container-type: inline-size;
+}
+.facilityDisclosure .facilityStatusShort {
+  display: none;
+}
+// The longest hydro line, "999.9/999.9MW · running · reservoir 100%", needs about this much
+@container (max-width: 239px) {
+  .facilityDisclosure .facilityStatusLong {
+    display: none;
+  }
+  .facilityDisclosure .facilityStatusShort {
+    display: inline;
+  }
 }
 .base_main .facilityActions {
   display: flex;
@@ -4449,8 +4528,46 @@ $sizemap: (
   opacity: 1;
   visibility: visible;
 }
+// Every row carries its reorder grip on the leading edge, always visible, with no label
 .base_main .facilityDragHandle {
-  margin: 4px 16px;
+  position: relative; // over the row's output bar
+  appearance: none;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 28px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--font-color-faded);
+  cursor: grab;
+  touch-action: none;
+}
+.facilityDisclosure .facilityText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.facilityDisclosure .constructionProgress {
+  display: block;
+  position: relative;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border-subtle); /* fallback; the fuel tint is set inline */
+}
+.facilityDisclosure .constructionProgressFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+  transition: transform 200ms linear;
 }
 .base_main .facilityDetails {
   padding: 8px 16px 16px;
@@ -4578,9 +4695,6 @@ $sizemap: (
   padding: 16px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
-}
-.decisionImpact > h3 {
-  margin-bottom: 8px;
 }
 .decisionImpactFacts {
   display: grid;

@@ -62,10 +62,12 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     await expect(page.getByRole("button", { name: "Events" })).toBeVisible();
   }
 
-  await page.getByRole("button", { name: "fast speed" }).click();
+  await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
     page.getByText("Your turn: keep the lights on for a full day"),
   ).toBeVisible();
+  // The clock keeps running into the capstone, so stop it while the setup below is arranged
+  await page.getByRole("button", { name: "pause" }).click();
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
   // objective is docked outside the game surface, so the same control remains operable at every

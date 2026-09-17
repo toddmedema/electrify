@@ -21,6 +21,8 @@ export interface Props {
   difficulty?: DifficultyType;
   meaningfulDecisions?: MeaningfulDecisionType[];
   meaningfulDecisionGateWaived?: boolean;
+  /** Only the point rules; in play the requirements are already listed with live progress. */
+  scoringOnly?: boolean;
 }
 
 /**
@@ -42,47 +44,49 @@ export default function VictoryConditions(props: Props): React.JSX.Element {
   const requirement = props.difficulty
     ? meaningfulDecisionRequirement(props.difficulty)
     : null;
-  const decisionProgress = requirement ? (
-    <div data-testid="meaningful-decision-progress">
-      {props.meaningfulDecisionGateWaived ? (
-        <p>
-          This game began before decision tracking was added, so its original
-          victory rules still apply.
-        </p>
-      ) : (
-        <>
+  const decisionProgress =
+    requirement && !props.scoringOnly ? (
+      <div data-testid="meaningful-decision-progress">
+        {props.meaningfulDecisionGateWaived ? (
           <p>
-            Required: make {requirement.count} meaningful decision
-            {requirement.count === 1 ? "" : "s"} that change the grid or its
-            economics
-            {requirement.categories > 1
-              ? ` across at least ${requirement.categories} decision types`
-              : ""}
-            . Progress: {decisions.length} of {requirement.count}
-            {requirement.categories > 1
-              ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
-              : ""}
-            .
+            This game began before decision tracking was added, so its original
+            victory rules still apply.
           </p>
-          <p>
-            Decision counts are learning goals for this game, not a real utility
-            standard. Meeting a score target does not waive required objectives.
-          </p>
-          {decisions.length > 0 && (
-            <ul data-testid="meaningful-decision-history">
-              {decisions.map((decision) => (
-                <li key={decision.key}>
-                  {decision.label} —{" "}
-                  {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </div>
-  ) : null;
-  const requiredObjectives = (
+        ) : (
+          <>
+            <p>
+              Required: make {requirement.count} meaningful decision
+              {requirement.count === 1 ? "" : "s"} that change the grid or its
+              economics
+              {requirement.categories > 1
+                ? ` across at least ${requirement.categories} decision types`
+                : ""}
+              . Progress: {decisions.length} of {requirement.count}
+              {requirement.categories > 1
+                ? ` choices · ${meaningfulDecisionCategoryCount(decisions)} of ${requirement.categories} types`
+                : ""}
+              .
+            </p>
+            <p>
+              Decision counts are learning goals for this game, not a real
+              utility standard. Meeting a score target does not waive required
+              objectives.
+            </p>
+            {decisions.length > 0 && (
+              <ul data-testid="meaningful-decision-history">
+                {decisions.map((decision) => (
+                  <li key={decision.key}>
+                    {decision.label} —{" "}
+                    {MEANINGFUL_DECISION_CATEGORY_LABELS[decision.kind]}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    ) : null;
+  const requiredObjectives = props.scoringOnly ? null : (
     <>
       <p>
         Regular scenarios end early if cash is negative at a month-end check, or
