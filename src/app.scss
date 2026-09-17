@@ -3736,20 +3736,19 @@ html[data-theme="dark"] .uplot {
   width: 100%;
   max-height: min(42vh, 360px);
   overflow: auto;
-  padding: calc(6px + env(safe-area-inset-top))
-    max(10px, env(safe-area-inset-right)) 6px
-    max(10px, env(safe-area-inset-left));
+  padding: calc(8px + env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) 8px
+    max(16px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--tooltip-border);
-  background: var(--tooltip-bg);
-  box-shadow: 0 3px 12px var(--tooltip-shadow);
+  background: var(--bg-primary);
   color: $font_color_primary;
-  backdrop-filter: none;
 }
 
 // "Step" with the counter right beside it: one unit, so a wide layout never opens an awkward
 // gap. The counter shows "2/5" and speaks as "2 of 5". Phones move it into the button row.
 .tutorialHudHeader {
   display: flex;
+  align-items: center;
   min-width: 0;
 }
 
@@ -3767,50 +3766,175 @@ html[data-theme="dark"] .uplot {
   line-height: 1.4;
 }
 
+// Spoken-only text, such as the step counter's "2 of 5" behind its visible "2/5"
+.tutorialHudVisuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .tutorialHudContent {
   min-width: 0;
-  margin-top: 6px;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
-// The step's one deed, set apart from the explanation beside it so a glance finds what to do
+// The action, its explanation and the hint read as one calm block of text: weight and size set
+// them apart instead of tinted boxes, and the icon is the only color, so a glance still lands
+// on what to do.
 .tutorialHudAction {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  margin: 0 0 4px;
-  padding: 4px 8px;
-  border-left: 3px solid $interactive_blue;
-  border-radius: 4px;
-  background: var(--bg-selected);
+  margin: 0;
+  color: $font_color_primary;
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 20px;
 
   svg {
-    flex: 0 0 auto;
+    flex: none;
+    width: 20px;
+    height: 20px;
     color: var(--interactive-blue);
   }
 }
 
+// Scoped under the HUD so it outranks Typography's own single-class body1 styles
+.tutorialHud .tutorialPrompt {
+  margin: 4px 0 0;
+  color: $font_color_primary;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 20px;
+}
+
 .tutorialHudHint {
-  margin-top: 6px;
-  padding: 6px 8px;
-  border-left: 3px solid $interactive_blue;
-  border-radius: 4px;
-  background: var(--bg-selected);
-  font-size: 0.82rem;
-  line-height: 1.35;
+  margin-top: 4px;
+  color: $font_color_faded;
+  font-size: 0.8125rem;
+  line-height: 18px;
+
+  strong {
+    color: $font_color_primary;
+    font-weight: 600;
+  }
+}
+
+// Hang the explanation and hint off the action's text (20px icon + 8px gap) so every line starts
+// at one left edge, and keep lines to a readable length on wide screens.
+.tutorialHud .tutorialPrompt,
+.tutorialHudHint {
+  max-width: 72ch;
+  padding-left: 28px;
+}
+
+// Below 360px the indent costs more words per line than the alignment is worth
+@media screen and (max-width: 359.98px) {
+  .tutorialHud .tutorialPrompt,
+  .tutorialHudHint {
+    padding-left: 0;
+  }
 }
 
 .tutorialHudFooter {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 4px;
 }
 
 .tutorialHudFooterSpacer {
   flex: 1 1 auto;
+}
+
+// On a phone the step counter does not earn a row of its own: it joins the button row, just
+// before Back/Next, where it reads like pager controls. It stays there on gated steps, which
+// have no Next button to carry it. The header keeps its place first in the DOM, so the region
+// name and the tab order are unchanged; only the visual order moves.
+@media screen and (max-width: 699.98px) {
+  .tutorialHud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 4px;
+  }
+  .tutorialHudContent,
+  .tutorialHudHint {
+    flex: 0 0 100%;
+  }
+  // A full-width flex basis plus the hanging indent would otherwise run past the right edge
+  .tutorialHudHint {
+    box-sizing: border-box;
+    order: 1;
+  }
+  // A plain div with no role, so flattening it into the HUD's row loses no semantics
+  .tutorialHudFooter {
+    display: contents;
+  }
+  .tutorialHudFooter > * {
+    order: 2;
+    margin-top: 8px;
+  }
+  .tutorialHudHeader {
+    order: 3;
+    margin-top: 8px;
+  }
+  .tutorialHudFooter > .tutorialHudNav {
+    order: 4;
+  }
+  .tutorialHudHeader h2 {
+    color: $font_color_faded;
+    font-size: 0.8125rem;
+    font-weight: 400;
+  }
+}
+
+// Wider screens put the step name, the text and the buttons side by side. The header and footer
+// span both text rows and keep a fixed line at the top as tall as the theme's 40px buttons, so
+// they line up with the action and Next never moves as the text grows; a step without a hint
+// leaves the second row empty.
+@media screen and (min-width: 700px) {
+  .tutorialHud {
+    display: grid;
+    grid-template-areas:
+      "header content footer"
+      "header hint footer";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 0;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    padding-bottom: 12px;
+  }
+
+  .tutorialHudHeader,
+  .tutorialHudFooter {
+    align-self: start;
+    min-height: 40px;
+  }
+
+  .tutorialHudHeader {
+    grid-area: header;
+  }
+
+  // Centers the 20px action line in the header's and footer's 40px line
+  .tutorialHudContent {
+    grid-area: content;
+    padding-top: 10px;
+  }
+
+  .tutorialHudHint {
+    grid-area: hint;
+  }
+
+  .tutorialHudFooter {
+    grid-area: footer;
+  }
 }
 
 // Progressive reveal: a tutorial step names the chrome it doesn't need yet (see
@@ -3986,37 +4110,6 @@ html[data-theme="dark"] .uplot {
     &::after {
       display: none;
     }
-  }
-}
-
-@media screen and (min-width: 700px) {
-  .tutorialHud {
-    display: grid;
-    grid-template-areas:
-      "header content footer"
-      "hint hint hint";
-    grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1.6fr) auto;
-    align-items: center;
-    column-gap: 16px;
-    padding-top: calc(6px + env(safe-area-inset-top));
-  }
-
-  .tutorialHudHeader {
-    grid-area: header;
-  }
-
-  .tutorialHudContent {
-    grid-area: content;
-    margin-top: 0;
-  }
-
-  .tutorialHudHint {
-    grid-area: hint;
-  }
-
-  .tutorialHudFooter {
-    grid-area: footer;
-    margin-top: 0;
   }
 }
 
@@ -4853,72 +4946,6 @@ $sizemap: (
 .base_main .eventLogItem {
   border-style: solid;
   border-radius: 8px;
-}
-.tutorialHud {
-  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
-  background: var(--bg-primary);
-  box-shadow: none;
-  backdrop-filter: none;
-}
-.tutorialHudContent {
-  margin-top: 4px;
-}
-.tutorialHudFooter {
-  gap: 4px;
-}
-// Spoken-only text, such as the step counter's "2 of 5" behind its visible "2/5"
-.tutorialHudVisuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-// On a phone the step counter does not earn a row of its own: it joins the button row, just
-// before Back/Next, where it reads like pager controls. It stays there on gated steps, which
-// have no Next button to carry it. The header keeps its place first in the DOM, so the region
-// name and the tab order are unchanged; only the visual order moves.
-@media screen and (max-width: 699.98px) {
-  .tutorialHud {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 4px;
-  }
-  .tutorialHudContent,
-  .tutorialHudHint {
-    flex: 0 0 100%;
-  }
-  .tutorialHudContent {
-    order: 0;
-    margin-top: 0;
-  }
-  .tutorialHudHint {
-    order: 1;
-  }
-  // A plain div with no role, so flattening it into the HUD's row loses no semantics
-  .tutorialHudFooter {
-    display: contents;
-  }
-  .tutorialHudFooter > * {
-    order: 2;
-    margin-top: 4px;
-  }
-  .tutorialHudHeader {
-    order: 3;
-    margin-top: 4px;
-  }
-  .tutorialHudFooter > .tutorialHudNav {
-    order: 4;
-  }
-  .tutorialHudHeader h2 {
-    color: $font_color_faded;
-    font-size: 0.8125rem;
-    font-weight: 400;
-  }
 }
 .missionSummary {
   padding-top: 4px;

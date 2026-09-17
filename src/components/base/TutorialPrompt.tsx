@@ -9,5 +9,10 @@ export interface TutorialPromptProps {
 export default function TutorialPrompt({
   text,
 }: TutorialPromptProps): React.JSX.Element {
-  return <Typography variant="body1">{text}</Typography>;
+  // A stable hook for the HUD's type scale, which MUI's generated class names can't give
+  return (
+    <Typography className="tutorialPrompt" variant="body1">
+      {text}
+    </Typography>
+  );
 }
