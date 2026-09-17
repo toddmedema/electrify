@@ -2,10 +2,8 @@ import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { generateNewTimeline } from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { GeneratorShoppingType, TickPresentFutureType } from "../../Types";
-import {
-  availableWeatherRenewables,
-  monthlyRenewableCapacityFactors,
-} from "./ChartForecastRenewableCapacityFactor";
+import { monthlyRenewableCapacityFactors } from "../../helpers/ExpectedOutput";
+import { availableWeatherRenewables } from "./ChartForecastRenewableCapacityFactor";
 
 function tick(
   minute: number,
