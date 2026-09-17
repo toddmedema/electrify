@@ -273,12 +273,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
             )}
           />
         )}
-        {!isStorage && (
-          <Stat
-            label="Rated maximum output"
-            value={formatWatts(facility.peakW)}
-          />
-        )}
         {!isStorage && outputFactor < 1 && (
           <Stat
             label="Current maximum output"

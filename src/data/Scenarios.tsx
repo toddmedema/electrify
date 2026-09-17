@@ -30,8 +30,9 @@ const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
 
 const generatorCapstoneSucceeded = (state: AppStateType) => {
+  // Mission 2 starts with ID 1. Purchases go to the top and players can reorder.
   const playerBuiltGeneratorTypes = state.game.facilities
-    .slice(1)
+    .filter((facility) => facility.id > 1)
     .flatMap((facility) => ("fuel" in facility ? [facility.name] : []));
   return new Set(playerBuiltGeneratorTypes).size >= 2;
 };
@@ -265,18 +266,18 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        action: "Build a second generator with a different fuel",
+        action: "Order a second generator of a different type",
         content: (
-          <TutorialPrompt text="Build one more generator of a different type." />
+          <TutorialPrompt text="Compare when it can generate and what it costs to run. Choose a plant that adds a useful strength to your grid." />
         ),
-        hint: "Open the generator shop and choose a different fuel or technology from the generator you just bought.",
+        hint: "Your starting gas plant does not count. Open Build and order a different type from your first purchase; you do not need to wait for construction.",
         capstone: {
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
           successMessage:
-            "Final challenge complete—you built two different types of generator.",
+            "Final challenge complete—you ordered two different generator types. Their output and running costs will shape your grid.",
           failureMessage:
-            "Build another generator with a different fuel or technology from your first purchase.",
+            "Order a different generator type from your first purchase. Your starting gas plant does not count.",
         },
       },
     ],
