@@ -93,6 +93,7 @@ import {
   demandTypeColors,
   fuelColors,
   fuelDashArrays,
+  waterDashArrays,
 } from "../../Theme";
 import ChartForecastDemandByType, {
   demandTypesBySizeAtStart,
@@ -352,6 +353,7 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 interface State {
+  compact: boolean;
   temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
@@ -721,6 +723,9 @@ function facilitySignature(game: GameType): string {
 export default class Insights extends React.Component<Props, State> {
   static contextType = UnitsContext;
 
+  private paneRef = React.createRef<HTMLDivElement>();
+  private paneObserver?: ResizeObserver;
+
   private projectionCache:
     { key: string; projection: ProjectionView } | undefined;
 
@@ -734,6 +739,7 @@ export default class Insights extends React.Component<Props, State> {
       : matchingPreset(layers, presetLibrary);
     const savedLayers = presetDefinition(preset, presetLibrary)?.layers;
     this.state = {
+      compact: false,
       temporaryLayer: props.focusLayer,
       layers,
       preset,
@@ -785,7 +791,21 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  public componentWillUnmount() {
+    this.paneObserver?.disconnect();
+  }
+
   public componentDidMount() {
+    const pane = this.paneRef.current;
+    if (pane && typeof ResizeObserver !== "undefined") {
+      const measure = () => {
+        const compact = pane.getBoundingClientRect().width <= 700;
+        if (compact !== this.state.compact) this.setState({ compact });
+      };
+      measure();
+      this.paneObserver = new ResizeObserver(measure);
+      this.paneObserver.observe(pane);
+    }
     this.scrollTutorialPowerExchangeIntoView();
     this.resolveEvidence();
     this.restoreJourney();
@@ -1968,9 +1988,18 @@ export default class Insights extends React.Component<Props, State> {
                   {
                     name: "Precipitation",
                     color: chartPalette().precipitation,
+                    dash: waterDashArrays.precipitation,
                   },
-                  { name: "Snowpack", color: chartPalette().snowpack },
-                  { name: "Reservoir", color: chartPalette().reservoir },
+                  {
+                    name: "Snowpack",
+                    color: chartPalette().snowpack,
+                    dash: waterDashArrays.snowpack,
+                  },
+                  {
+                    name: "Reservoir",
+                    color: chartPalette().reservoir,
+                    dash: waterDashArrays.reservoir,
+                  },
                 ]}
               />
               <ChartForecastWater
@@ -2309,8 +2338,11 @@ export default class Insights extends React.Component<Props, State> {
     };
 
     return (
-      <GameCard className="insights" id="insightsPane">
-        <div className="scrollable">
+      <GameCard
+        className={"insights" + (this.state.compact ? " insightsCompact" : "")}
+        id="insightsPane"
+      >
+        <div className="scrollable" ref={this.paneRef}>
           <Toolbar className="paneHeader insightsHeader">
             <Typography variant="h6">Insights</Typography>
             <div className="insightsHeaderControls">
@@ -2453,35 +2485,41 @@ export default class Insights extends React.Component<Props, State> {
             </div>
             <Menu
               id="insightsPresetActionsMenu"
+              className={this.state.compact ? "insightsCompact" : undefined}
               anchorEl={this.state.presetMenuAnchor}
               open={!!this.state.presetMenuAnchor}
               onClose={() => this.setState({ presetMenuAnchor: null })}
             >
-              <MenuItem
-                className="insightsPresetSaveMenuItem"
-                disabled={
-                  !this.state.layers.length ||
-                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
-                  (this.state.preset === "custom" && customLimitReached)
-                }
-                onClick={() => {
-                  this.setState({ presetMenuAnchor: null }, () =>
-                    this.savePresetChanges(),
-                  );
-                }}
-              >
-                <SaveIcon fontSize="small" />
-                {this.state.preset === "custom"
-                  ? "Save as new preset"
-                  : "Save preset changes"}
-              </MenuItem>
-              <MenuItem
-                className="insightsPresetSaveAsMenuItem"
-                disabled={customLimitReached || !this.state.layers.length}
-                onClick={() => this.openPresetDialog("saveAs")}
-              >
-                Save as new preset
-              </MenuItem>
+              {this.state.compact && (
+                <MenuItem
+                  className="insightsPresetSaveMenuItem"
+                  disabled={
+                    !this.state.layers.length ||
+                    (this.state.preset !== "custom" &&
+                      !this.state.presetDirty) ||
+                    (this.state.preset === "custom" && customLimitReached)
+                  }
+                  onClick={() => {
+                    this.setState({ presetMenuAnchor: null }, () =>
+                      this.savePresetChanges(),
+                    );
+                  }}
+                >
+                  <SaveIcon fontSize="small" />
+                  {this.state.preset === "custom"
+                    ? "Save as new preset"
+                    : "Save preset changes"}
+                </MenuItem>
+              )}
+              {(!this.state.compact || this.state.preset !== "custom") && (
+                <MenuItem
+                  className="insightsPresetSaveAsMenuItem"
+                  disabled={customLimitReached || !this.state.layers.length}
+                  onClick={() => this.openPresetDialog("saveAs")}
+                >
+                  Save as new preset
+                </MenuItem>
+              )}
               {selectedCustom && (
                 <MenuItem onClick={() => this.openPresetDialog("rename")}>
                   Rename preset…

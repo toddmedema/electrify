@@ -452,7 +452,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                         <span className="facilityStatus">{status}</span>
                         {detail && (
                           <span className="facilityStatusDetail">
-                            {" · "}
+                            <span
+                              className="facilityStatusSeparator"
+                              aria-hidden="true"
+                            >
+                              {" · "}
+                            </span>
                             {detail}
                           </span>
                         )}

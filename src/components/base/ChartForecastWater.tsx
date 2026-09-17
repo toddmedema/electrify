@@ -19,7 +19,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import { formatWattHours, formatWattsInUnit } from "../../helpers/Format";
-import { chartPalette } from "../../Theme";
+import { waterDashArrays, chartPalette } from "../../Theme";
 
 export interface Props {
   height?: number;
@@ -103,6 +103,7 @@ function buildOptions(showXLabels: boolean) {
       },
       {
         stroke: chartPalette().snowpack,
+        dash: waterDashArrays.snowpack.split(",").map(Number),
         width: 1,
         points: { show: false },
         paths: SPLINE,
@@ -110,6 +111,7 @@ function buildOptions(showXLabels: boolean) {
       {
         scale: RESERVOIR_SCALE,
         stroke: chartPalette().reservoir,
+        dash: waterDashArrays.reservoir.split(",").map(Number),
         width: 2,
         points: { show: false },
         paths: SPLINE,

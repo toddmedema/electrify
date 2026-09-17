@@ -324,7 +324,7 @@ export function GeneratorBuildItem(
           {buildSubtitle}
         </Typography>
       )}
-      <Box className="buildOptionMetrics singleRow">
+      <Box className="buildOptionMetrics">
         <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}

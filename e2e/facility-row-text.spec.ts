@@ -3,7 +3,7 @@ import { openPane } from "./layout";
 
 // Heatwave + Drought starts with hydro, storage and a mixed fleet, and a new build adds a row
 // under construction, so every kind of status line the list can show is on screen at once.
-test("facility rows keep their name and status to one untruncated line", async ({
+test("facility rows keep readings untruncated when narrow details reflow", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -45,7 +45,7 @@ test("facility rows keep their name and status to one untruncated line", async (
 
   const lines = await rows
     .locator(
-      ".MuiListItemText-primary, .MuiListItemText-secondary, .facilityName, .facilityStatus, .facilityStatusDetail",
+      ".MuiListItemText-primary, .facilityName, .facilityStatus, .facilityStatusDetail",
     )
     .evaluateAll((elements) =>
       elements.map((el) => ({
@@ -59,4 +59,20 @@ test("facility rows keep their name and status to one untruncated line", async (
     );
   expect(lines.filter((line) => line.lines !== 1)).toEqual([]);
   expect(lines.filter((line) => line.truncated)).toEqual([]);
+  const statusRows = await rows
+    .locator(".MuiListItemText-secondary")
+    .evaluateAll((elements) =>
+      elements.map((el) => ({
+        overflow: el.scrollWidth > el.clientWidth + 1,
+        lines: Math.round(
+          el.getBoundingClientRect().height /
+            parseFloat(getComputedStyle(el).lineHeight),
+        ),
+      })),
+    );
+  expect(
+    statusRows.every(
+      (row) => !row.overflow && row.lines >= 1 && row.lines <= 2,
+    ),
+  ).toBe(true);
 });
