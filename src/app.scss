@@ -3820,8 +3820,28 @@ html[data-theme="dark"] .uplot {
   }
 }
 
+// Each new objective eases in so the change of step registers without pulling focus
+.tutorialHudStep {
+  animation: tutorialHudStepIn 240ms ease-out;
+}
+
+@keyframes tutorialHudStepIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tutorialTargetReminder {
+    animation: none;
+  }
+
+  .tutorialHudStep {
     animation: none;
   }
 
@@ -4351,6 +4371,40 @@ $sizemap: (
 }
 .base_main .facilityDragHandle {
   margin: 4px 16px;
+}
+// Phone rows put the reorder grip on their leading edge, always visible, with no label
+.base_main .facilityDragHandle.facilityDragGrip {
+  appearance: none;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 32px;
+  min-height: 44px;
+  margin: 0 -8px 0 0;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--font-color-faded);
+  cursor: grab;
+  touch-action: none;
+}
+.facilityDisclosure .constructionProgress {
+  display: block;
+  position: relative;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border-subtle); /* fallback; the fuel tint is set inline */
+}
+.facilityDisclosure .constructionProgressFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+  transition: transform 200ms linear;
 }
 .base_main .facilityDetails {
   padding: 8px 16px 16px;

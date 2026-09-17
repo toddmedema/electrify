@@ -125,7 +125,10 @@ export default function TutorialHud({
       </div>
 
       <div className="tutorialHudContent" aria-live="polite">
-        {content}
+        {/* Keyed inside the live region so the region itself persists and keeps announcing */}
+        <div key={stepIndex} className="tutorialHudStep">
+          {content}
+        </div>
       </div>
 
       {hintVisible && step.hint && (

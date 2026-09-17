@@ -263,6 +263,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
+  // Phones have no room for a labelled reorder button under an open row, so every row carries a
+  // bare grip on its leading edge instead
+  const phone = useMediaQuery("(max-width:599px)");
 
   // Storage is charging or discharging depending on which way its stored energy moved since the
   // last tick, which is only knowable by remembering the last one
@@ -289,13 +292,19 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   let secondaryText = "";
+  const builtFraction = underConstruction
+    ? Math.max(
+        0,
+        Math.min(
+          1,
+          (facility.yearsToBuild - facility.yearsToBuildLeft) /
+            facility.yearsToBuild,
+        ),
+      )
+    : 1;
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
-    const percentBuilt = Math.round(
-      ((facility.yearsToBuild - facility.yearsToBuildLeft) /
-        facility.yearsToBuild) *
-        100,
-    );
+    const percentBuilt = Math.round(builtFraction * 100);
     secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
     secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
@@ -325,6 +334,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         >
           <div className="facilityRowHeader">
+            {!readOnly && phone && (
+              <button
+                type="button"
+                {...provided.dragHandleProps}
+                className="facilityDragHandle facilityDragGrip"
+                aria-label={"Reorder " + facility.name}
+              >
+                <DragIndicatorIcon aria-hidden />
+              </button>
+            )}
             <button
               type="button"
               className="facilityDisclosure"
@@ -339,8 +358,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 sx={
                   underConstruction
                     ? {
-                        opacity: (theme) =>
-                          theme.palette.action.disabledOpacity,
+                        // The progress bar stays at full strength so the build is legible
+                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .facilitySecondaryText":
+                          {
+                            opacity: (theme) =>
+                              theme.palette.action.disabledOpacity,
+                          },
                       }
                     : undefined
                 }
@@ -406,7 +429,29 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       )}
                     </>
                   }
-                  secondary={`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
+                  secondary={
+                    <>
+                      <span className="facilitySecondaryText">
+                        {`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
+                      </span>
+                      {/* The percentage is already in the text; this only makes it glanceable */}
+                      {underConstruction && (
+                        <span
+                          className="constructionProgress"
+                          aria-hidden
+                          style={{ background: withAlpha(accentColor, 0.24) }}
+                        >
+                          <span
+                            className="constructionProgressFill"
+                            style={{
+                              transform: `scaleX(${builtFraction})`,
+                              background: accentColor,
+                            }}
+                          />
+                        </span>
+                      )}
+                    </>
+                  }
                 />
                 <KeyboardArrowDownIcon
                   className="facilityChevron"
@@ -460,7 +505,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
               </DialogActions>
             </Dialog>
           )}
-          {!readOnly && (
+          {!readOnly && !phone && (
             <Button
               style={{ display: selected ? undefined : "none" }}
               {...provided.dragHandleProps}
