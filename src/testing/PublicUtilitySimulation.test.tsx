@@ -5,7 +5,11 @@ import { scenarioObjectiveFailure } from "../reducers/Game";
 import { serializeReplay } from "../Replay";
 import { parseSave, serializeSave } from "../SaveGame";
 import { DifficultyType, ScenarioType } from "../Types";
-import { expectNoViolations, runMonths } from "./SimulationTestHelpers";
+import {
+  expectNoViolations,
+  runMonths,
+  runSimulationOnce,
+} from "./SimulationTestHelpers";
 import { createGame, createGameFromReplay, runSimulation } from "./Simulator";
 
 jest.setTimeout(120000);
@@ -69,8 +73,10 @@ describe("researched public-utility scenarios", () => {
     runMonths(replayed, 73);
     expect(replayed.monthlyHistory).toEqual(uninterrupted.monthlyHistory);
 
-    const full = runSimulation({
+    // The Employee run "completes Data Center Boom" below also asserts on, played once for both
+    const full = runSimulationOnce({
       scenarioId: 106,
+      difficulty: "Employee",
       initialBuild: {
         name: "Natural Gas",
         peakW: 50_000_000,
@@ -222,10 +228,13 @@ describe("researched public-utility scenarios", () => {
   const operatingDifficulties = difficulties.filter(
     (difficulty) => difficulty !== "CEO",
   );
-  it.each(operatingDifficulties)(
+  // Intern plays this exact build in SimulationEconomics.test.tsx, which asserts the same outcome
+  it.each(
+    operatingDifficulties.filter((difficulty) => difficulty !== "Intern"),
+  )(
     "completes Data Center Boom on %s with capacity planned before the arrival",
     (difficulty) => {
-      const result = runSimulation({
+      const result = runSimulationOnce({
         scenarioId: 106,
         difficulty,
         initialBuild: {
@@ -318,7 +327,8 @@ describe("researched public-utility scenarios", () => {
         financed: true,
       },
     });
-    const reservePlan = runSimulation({
+    // The same run "completes Data Center Boom on Manager" plays
+    const reservePlan = runSimulationOnce({
       scenarioId: 106,
       difficulty: "Manager",
       initialBuild: {

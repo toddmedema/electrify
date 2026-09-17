@@ -95,8 +95,10 @@ code rather than a vibe.
 | Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
 
 `Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
-`SimulationEconomics.test.tsx` covers difficulty, player strategies, price competition, and
-economic identities. `PublicUtilitySimulation.test.tsx` covers the researched public utilities.
+`SimulationEconomics*.test.tsx` cover difficulty, player strategies, price competition, and
+economic identities; the CEO matrix is split across several of these files only so it runs in
+parallel. Tests in one file that need the same playthrough can share it through
+`runSimulationOnce` in `SimulationTestHelpers.ts`. `PublicUtilitySimulation.test.tsx` covers the researched public utilities.
 Keeping these independent groups in separate files lets Jest run the long simulations in parallel.
 
 `createGame` is exported for tests that want a realistic mid-game state without running a whole
