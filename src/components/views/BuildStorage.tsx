@@ -183,30 +183,13 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           variant="body2"
           color="textSecondary"
         >
-          {storage.description} Full-power duration assumes a full charge;
-          actual output also depends on ramp time.
+          {storage.description}
         </Typography>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>
               <TableRow>
-                <TableCell>
-                  Peak output
-                  <Typography variant="body2" color="textSecondary">
-                    Increases with capacity
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  {formatWatts(storage.peakW)}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>
-                  Operating costs (/yr)
-                  <Typography variant="body2" color="textSecondary">
-                    Costs regardless of output
-                  </Typography>
-                </TableCell>
+                <TableCell>Operating costs (/yr)</TableCell>
                 <TableCell align="right">
                   {formatMoneyConcise(storage.annualOperatingCost)}
                 </TableCell>
@@ -225,9 +208,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 <TableCell align="right">{storage.spinMinutes} min</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>
-                  Accounting lifetime (not automatic retirement)
-                </TableCell>
+                <TableCell>Lifespan</TableCell>
                 <TableCell align="right">
                   {storage.lifespanYears} years
                 </TableCell>
@@ -270,22 +251,19 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 concept: "finances",
                 label: "Loan option",
                 value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
-                detail:
-                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+                detail: "Payments start now.",
               },
               {
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise(storage.annualOperatingCost / 12)}/mo`,
-                detail:
-                  "Maintenance estimate; charging electricity and loan payments are extra.",
+                detail: "Plus charging and loan payments.",
               },
               {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
-                detail:
-                  "Stored energy and discharge power do not increase until construction finishes.",
+                detail: "No storage until built.",
               },
               {
                 concept: "storage",

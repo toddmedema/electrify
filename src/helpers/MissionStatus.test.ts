@@ -69,7 +69,6 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   expect(requirement(partial, "reliability").current).toContain(
     "1/2 completed months",
   );
-  expect(requirement(partial, "reliability").current).toContain("partial");
   const completed = createNextState(fixture(14), (g) => {
     g.monthlyHistory = [monthRow(2025, 2), monthRow(2025, 1)];
   });

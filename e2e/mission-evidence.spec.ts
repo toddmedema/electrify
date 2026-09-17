@@ -354,7 +354,7 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
     "Projected shortfall",
   );
   await expect(page.locator(".missionRiskButton:visible")).toHaveAccessibleName(
-    /Projected in this month's representative day/,
+    /Shortfall expected later today/,
   );
   await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
   await page.locator(".missionRiskButton:visible").click();
@@ -368,8 +368,8 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   }
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
-  await expect(page.locator(".operatingEvidence")).toContainText(
-    "This month's representative day",
+  await expect(page.locator(".operatingEvidence")).toHaveAccessibleName(
+    "Supply and demand",
   );
   await openInsights(page);
   await page.getByRole("button", { name: "Zoom out", exact: true }).click();

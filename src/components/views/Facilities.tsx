@@ -557,12 +557,8 @@ function FacilitySupplyChart({
         ref={anchor}
         tabIndex={-1}
         className="operatingEvidence"
-        aria-label="Supply and demand evidence: this month's representative day"
+        aria-label="Supply and demand"
       >
-        <div className="operatingSampleLabel">
-          This month's representative day · Supply — solid · Demand – – dashed ·
-          W
-        </div>
         <ChartSupplyDemand
           height={180}
           timeline={game.timeline}

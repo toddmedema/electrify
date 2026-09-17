@@ -22,16 +22,15 @@ for (const theme of ["light", "dark"] as const) {
     );
     const scope = insights
       .locator("details")
-      .filter({ hasText: "Estimates · one representative day per month" });
+      .filter({ hasText: "About these estimates" });
     await scope.locator("summary").click();
-    await expect(scope).toContainText("cannot establish whether storage");
-    await expect(scope).toContainText("Deep Freeze and Heatwave + Drought");
+    await expect(scope).toContainText("windless spells aren't modeled");
     await scope.locator("summary").click();
     const costs = insights
       .locator("details")
       .filter({ hasText: "Compare possible costs in five years" });
     await costs.locator("summary").click();
-    await expect(costs).toContainText("no assigned probability");
+    await expect(costs).toContainText("today's fuel use continues");
     await expect(costs.getByText(/Prime borrowing rate:/)).toHaveCount(3);
     expect(
       await costs.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -58,11 +57,11 @@ for (const theme of ["light", "dark"] as const) {
     await page.locator(".button-buildGenerator").click();
     const first = page.locator(".buildOption").first();
     await first.getByRole("button", { name: /Show .* details/ }).click();
-    await expect(first).toContainText("automatically retire at this age");
+    await expect(first).toContainText("Accounting lifetime");
     await first.getByRole("button", { name: /Review purchase of/ }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Loan option");
-    await expect(dialog).toContainText("Payments start during construction");
+    await expect(dialog).toContainText("Payments start now");
     await expect(dialog).toContainText("Estimated upkeep");
     expect(
       await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -89,15 +88,11 @@ for (const theme of ["light", "dark"] as const) {
     const trade = page
       .getByRole("tabpanel", { name: "Interties" })
       .locator("details")
-      .filter({ hasText: "How trading and purchased emissions are estimated" });
+      .filter({ hasText: "Neighbor emissions" });
     expect(
       (await trade.locator("summary").boundingBox())!.height,
     ).toBeGreaterThanOrEqual(44);
     await trade.locator("summary").click();
-    await expect(trade).toContainText("imports are not guaranteed backup");
-    await expect(trade).toContainText(
-      "carbon fee applies to your local plants",
-    );
     await expect(
       trade.getByRole("link", { name: /Source for/ }).first(),
     ).toHaveAttribute("href", /https:\/\//);

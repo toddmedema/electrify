@@ -125,7 +125,7 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
     await battery.getByRole("button", { name: "Show Battery details" }).click();
-    await expect(battery).toContainText(
+    await expect(battery).not.toContainText(
       "Full-power duration assumes a full charge",
     );
     await expect(
