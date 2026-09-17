@@ -158,7 +158,7 @@ export default function TutorialHud({
 }: TutorialHudProps): React.JSX.Element {
   const [hintVisible, setHintVisible] = React.useState(false);
   const { content, target } = resolveStep(step, desktop);
-  const progressText = `Objective ${stepIndex + 1} of ${totalSteps}`;
+  const progressText = `${stepIndex + 1} of ${totalSteps}`;
 
   React.useEffect(() => setHintVisible(false), [stepIndex]);
 
@@ -293,25 +293,15 @@ export default function TutorialHud({
   return (
     <section
       className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}`}
-      aria-labelledby="tutorial-objective-title"
+      aria-labelledby="tutorial-step-title"
     >
       <div className="tutorialHudHeader">
-        <div className="tutorialHudHeading">
-          <Typography
-            id="tutorial-objective-title"
-            component="h2"
-            variant="subtitle2"
-          >
-            {step.capstone ? "Your turn" : "Mission objective"}
-          </Typography>
-          <Typography
-            variant="caption"
-            component="span"
-            aria-label={progressText}
-          >
-            {stepIndex + 1} / {totalSteps}
-          </Typography>
-        </div>
+        <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
+          {step.capstone ? "Your turn" : "Step"}{" "}
+          <span className="tutorialHudStepCount" aria-label={progressText}>
+            {stepIndex + 1}/{totalSteps}
+          </span>
+        </Typography>
       </div>
 
       <div className="tutorialHudContent" aria-live="polite">

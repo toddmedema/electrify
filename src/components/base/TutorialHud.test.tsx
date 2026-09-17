@@ -104,15 +104,16 @@ describe("TutorialHud", () => {
     expect(hudProps.onNext).not.toHaveBeenCalled();
   });
 
-  it("exposes the current objective, progress and ordinary navigation", async () => {
+  it("exposes the current step, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
     const hudProps = props({ canGoBack: true, stepIndex: 1 });
     render(<TutorialHud {...hudProps} />);
 
     expect(
-      screen.getByRole("region", { name: "Mission objective" }),
+      screen.getByRole("region", { name: "Step 2 of 3" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Objective 2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Step")).toBeInTheDocument();
+    expect(screen.getByLabelText("2 of 3")).toHaveTextContent("2/3");
     expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
@@ -181,7 +182,7 @@ describe("TutorialHud", () => {
     expect(target).not.toHaveClass("tutorialTarget");
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
     expect(
-      screen.getByRole("region", { name: "Your turn" }),
+      screen.getByRole("region", { name: /Your turn/ }),
     ).toBeInTheDocument();
 
     unmount();

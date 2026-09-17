@@ -1926,10 +1926,6 @@ $pane_header_height: 40px;
       }
     }
   }
-
-  .tutorialHudContent .tutorialPrompt {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 // Facility rows paint an .outputProgressBar behind their contents, so both the text and the
@@ -2497,23 +2493,6 @@ html[data-theme="dark"] .uplot {
     margin: 0 $space-4 $space-2;
     border-top: 1px solid var(--border-subtle);
     border-radius: 0;
-  }
-
-  // Icon-led step content: symbols on top and one confirming line of text
-  .tutorialPrompt {
-    text-align: center;
-
-    .tutorialPromptConcepts {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: size(small);
-      margin-bottom: size(small);
-    }
-
-    .tutorialPromptArrow {
-      opacity: 0.5;
-    }
   }
 
   // ===============================================
@@ -3742,7 +3721,7 @@ html[data-theme="dark"] .uplot {
   }
 }
 
-// A mission objective is game chrome, not a modal. It occupies its own row above the active card,
+// A tutorial step is game chrome, not a modal. It occupies its own row above the active card,
 // so its instructions never cover the control they name and the whole grid remains interactive.
 .tutorialHud {
   position: relative;
@@ -3762,50 +3741,31 @@ html[data-theme="dark"] .uplot {
   backdrop-filter: none;
 }
 
+// "Step" with the counter right beside it: one unit, so a wide layout never opens an awkward
+// gap and a narrow one never has to ellipsize the number. The counter speaks as "2 of 5".
 .tutorialHudHeader {
   display: flex;
   min-width: 0;
-  align-items: center;
-  gap: 8px;
 }
 
-.tutorialHudHeading {
-  display: flex;
+.tutorialHudHeader h2 {
   min-width: 0;
-  flex: 1 1 auto;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-  h2 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  span {
-    flex: 0 0 auto;
-    color: $font_color_faded;
-  }
+.tutorialHudStepCount {
+  color: $font_color_faded;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .tutorialHudContent {
   min-width: 0;
   margin-top: 6px;
   overflow-wrap: anywhere;
-
-  .tutorialPrompt {
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 4px !important;
-  }
-
-  .tutorialPromptConcepts {
-    min-height: 32px;
-    margin-bottom: 0;
-    padding: 4px 8px;
-  }
 }
 
 .tutorialHudHint {

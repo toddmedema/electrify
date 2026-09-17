@@ -10,7 +10,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Mission objective" }),
+    page.getByRole("heading", { name: "Step 1 of 5" }),
   ).toBeVisible();
   await expect(page.getByText("Your goal: keep the lights on")).toBeVisible();
 
