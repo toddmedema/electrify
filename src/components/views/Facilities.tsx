@@ -263,9 +263,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
-  // Phones have no room for a labelled reorder button under an open row, so every row carries a
-  // bare grip on its leading edge instead
-  const phone = useMediaQuery("(max-width:599px)");
 
   // Storage is charging or discharging depending on which way its stored energy moved since the
   // last tick, which is only knowable by remembering the last one
@@ -305,11 +302,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
     const percentBuilt = Math.round(builtFraction * 100);
-    secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    secondaryText = `Building ${percentBuilt}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
-    secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
+    // Rated power never changes, so it lives in the details rather than crowding the row
+    secondaryText = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)}, reservoir ${formatWattHoursOfPeak(facility.reservoirWh || 0, facility.reservoirCapacityWh)}`;
+    // The exact reservoir energy is in the details; the row only needs how full it is
+    const reservoirPercent = Math.round(
+      ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
+    );
+    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${reservoirPercent}% reservoir`;
   } else {
     secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
   }
@@ -334,11 +336,23 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         >
           <div className="facilityRowHeader">
-            {!readOnly && phone && (
+            {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
+            fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
+            transitioned in CSS so ramping is visible as movement */}
+            {!underConstruction && (
+              <div
+                className="outputProgressBar"
+                style={{
+                  transform: `scaleX(${outputFraction})`,
+                  background: withAlpha(accentColor, 0.18),
+                }}
+              />
+            )}
+            {!readOnly && (
               <button
                 type="button"
                 {...provided.dragHandleProps}
-                className="facilityDragHandle facilityDragGrip"
+                className="facilityDragHandle"
                 aria-label={"Reorder " + facility.name}
               >
                 <DragIndicatorIcon aria-hidden />
@@ -369,17 +383,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 }
                 component="span"
               >
-                {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
-                chart draws, and transitioned in CSS so ramping is visible as movement */}
-                {!underConstruction && (
-                  <div
-                    className="outputProgressBar"
-                    style={{
-                      transform: `scaleX(${outputFraction})`,
-                      background: withAlpha(accentColor, 0.18),
-                    }}
-                  />
-                )}
                 <ListItemAvatar>
                   <div>
                     <Avatar
@@ -432,7 +435,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   secondary={
                     <>
                       <span className="facilitySecondaryText">
-                        {`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
+                        {underConstruction
+                          ? secondaryText
+                          : `${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
                       </span>
                       {/* The percentage is already in the text; this only makes it glanceable */}
                       {underConstruction && (
@@ -504,17 +509,6 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 </Button>
               </DialogActions>
             </Dialog>
-          )}
-          {!readOnly && !phone && (
-            <Button
-              style={{ display: selected ? undefined : "none" }}
-              {...provided.dragHandleProps}
-              className="facilityDragHandle"
-              aria-label={"Reorder " + facility.name}
-              startIcon={<DragIndicatorIcon />}
-            >
-              Drag to reorder
-            </Button>
           )}
           {selected && (
             <MemoizedFacilityActions
