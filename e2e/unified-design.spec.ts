@@ -22,18 +22,21 @@ for (const theme of ["light", "dark"]) {
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
     const rows = pane.locator(".facilityRow");
-    const chart = pane.locator(".facilitySupplyDisclosure");
+    const chart = pane.locator("#chartSupplyDemand");
     const phone = testInfo.project.name.startsWith("mobile-");
+    await expect(chart).toBeVisible();
     if (phone) {
-      await expect(chart).not.toHaveAttribute("open");
-      await expect(rows.nth(1)).toBeInViewport();
+      // One scroll column: the chart scrolls away with the fleet instead of pinning above it
+      expect(
+        await pane
+          .locator(".unifiedFacilitiesList")
+          .evaluate((element) => getComputedStyle(element).overflowY),
+      ).toBe("visible");
+      await pane.locator(".transmissionFleet").scrollIntoViewIfNeeded();
       await expect(pane.locator(".transmissionFleet")).toBeInViewport();
-      await chart.locator(":scope > summary").click();
-      await expect(chart).toHaveAttribute("open");
-      await expect(pane.locator("#chartSupplyDemand")).toBeVisible();
-      await chart.locator(":scope > summary").click();
-      await expect(chart).not.toHaveAttribute("open");
-    } else await expect(chart).toHaveAttribute("open");
+      await chart.scrollIntoViewIfNeeded();
+      await expect(chart).toBeInViewport();
+    }
     const first = rows.first();
     const disclosure = first.locator(".facilityDisclosure");
     await expect(first.locator(".facilityActions")).toHaveCount(0);

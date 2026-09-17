@@ -84,8 +84,6 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.locator(".gridHealth-blackout:visible"),
     ).not.toContainText("Now");
-    if (!(await page.locator("#chartSupplyDemand").isVisible()))
-      await page.locator(".facilitySupplyDisclosure > summary").click();
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {
       await page.getByRole("button", { name: speed, exact: true }).click();
@@ -360,14 +358,11 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator("#chartSupplyDemand")).toBeVisible();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
-  if (info.project.name.startsWith("mobile-")) {
-    await page.locator(".facilitySupplyDisclosure > summary").click();
-    await expect(page.locator(".facilitySupplyDisclosure")).not.toHaveAttribute(
-      "open",
-    );
-  }
+  // Scroll the chart away so the second request has to bring it back
+  await page.locator(".transmissionFleet").scrollIntoViewIfNeeded();
   await page.locator(".missionRiskButton:visible").click();
   await expect(page.locator(".operatingEvidence")).toBeFocused();
+  await expect(page.locator("#chartSupplyDemand")).toBeInViewport();
   await expect(page.locator(".operatingEvidence")).toContainText(
     "This month's representative day",
   );

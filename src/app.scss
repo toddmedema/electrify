@@ -27,6 +27,8 @@
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
   --interactive-tint: rgba(21, 101, 192, 0.5);
+  // The bright head of the glint that circles the tutorial ring
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 70%, white);
   --focus-ring: #7b1fa2;
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
@@ -63,6 +65,7 @@
   --font-color-disabled: #627083;
   --interactive-blue: #6ab8f7;
   --interactive-tint: rgba(106, 184, 247, 0.42);
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 45%, white);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
@@ -3804,12 +3807,100 @@ html[data-theme="dark"] .uplot {
 // hugs the control instead, so all four sides stay visible. If the player has not acted after
 // ten seconds, a short pulse repeats every ten seconds. Capstones never receive either class;
 // the .tutorialTarget/.tutorialTargetReminder classes stay on the control as hooks.
+//
+// So the cue reads as live without flashing, a soft glint travels clockwise around the line,
+// one lap every six seconds. ::before brightens the 2px line along a ~60deg comet; ::after
+// bleeds the tint inward into the 3px gap, fading toward the control. Nothing draws outside
+// the ring's box. Both sweep the same registered angle; where @property is unsupported the
+// angle cannot animate, so --tutorial-glint-on stays unset and the plain ring shows alone.
+@property --tutorial-glint-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --tutorial-glint-on {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
 .tutorialTargetRing {
   position: fixed;
   z-index: 1240; // above the game, below the objective HUD (1250) and any dialog
   box-sizing: border-box;
   pointer-events: none;
   border: 2px solid var(--interactive-blue);
+
+  // Absolutely positioned children of a bordered box start at its padding edge, so pulling
+  // them out by the line width puts their outer edge exactly on the ring's outer edge.
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--tutorial-glint-on, 0);
+    animation: tutorialGlint 6s linear infinite;
+  }
+
+  // The line: an edge-only mask keeps just the 2px border.
+  &::before {
+    padding: 2px;
+    background: conic-gradient(
+      from var(--tutorial-glint-angle),
+      transparent 0deg,
+      var(--interactive-blue) 14deg,
+      var(--tutorial-glint) 36deg,
+      var(--tutorial-glint) 46deg,
+      var(--interactive-blue) 56deg,
+      transparent 60deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+
+  // The halo: four edge strips that skip the 2px line (so they do not dull its bright head)
+  // and fade across the 3px gap, cut off before the interior so the control is never tinted.
+  &::after {
+    background: conic-gradient(
+      from var(--tutorial-glint-angle),
+      transparent 0deg,
+      var(--interactive-tint) 30deg,
+      var(--interactive-tint) 42deg,
+      transparent 60deg
+    );
+    -webkit-mask:
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
+        top / 100% 5px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
+        bottom / 100% 5px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
+        left / 5px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
+        right / 5px 100% no-repeat;
+    mask:
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
+        top / 100% 5px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
+        bottom / 100% 5px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
+        left / 5px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
+        right / 5px 100% no-repeat;
+  }
+}
+
+@keyframes tutorialGlint {
+  to {
+    --tutorial-glint-angle: 360deg;
+  }
 }
 
 .tutorialTargetRingPulse {
@@ -3832,9 +3923,14 @@ html[data-theme="dark"] .uplot {
     animation: none;
   }
 
-  // Without the pulse, a slightly heavier line keeps the cue obvious.
+  // Without the pulse or glint, a slightly heavier line keeps the cue obvious.
   .tutorialTargetRing {
     border-width: 3px;
+
+    &::before,
+    &::after {
+      display: none;
+    }
   }
 }
 
@@ -4245,29 +4341,25 @@ $sizemap: (
 }
 
 // A shared solid, restrained presentation for the game and its standalone screens.
-.facilitySupplyDisclosure {
-  flex: 0 0 auto;
-  > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding: 0 16px;
-    cursor: pointer;
-    list-style: none;
-    border-bottom: 1px solid var(--border-subtle);
-    font-weight: 600;
-  }
-  > summary::-webkit-details-marker {
-    display: none;
-  }
-  &[open] > summary > svg {
-    transform: rotate(180deg);
-  }
+// Wider layouts pin the chart and trading summary above the fleet, which scrolls on its own.
+// A phone has no room to pin a 180px chart, so the whole body scrolls as one column instead,
+// like Insights -- the list gives up its own scroll so there is one scroll container for drag.
+.facilities .facilitiesBody {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
-@media (min-width: 600px) {
-  .facilitySupplyDisclosure > summary {
-    display: none;
+.facilitySupplyChart {
+  flex: 0 0 auto;
+}
+@media (max-width: 599px) {
+  .facilities .facilitiesBody {
+    display: block;
+    overflow-y: auto;
+  }
+  .facilities .facilitiesBody > .unifiedFacilitiesList {
+    overflow: visible;
   }
 }
 .facilities .tradingSummary {
