@@ -162,7 +162,13 @@ export function getMeanAnnualRunoffMm(seriesId?: string): number {
       countedMonths++;
     }
   }
-  const annual = Math.max(1, (runoffMm / countedMonths) * MONTHS_PER_YEAR);
+  // A record with no months past the spin-up window (the loader accepts anything from one year
+  // up) has nothing to average. Fall back the way the too-short early return does rather than
+  // dividing by zero months and handing a NaN into every hydro plant sized off this basin.
+  const annual =
+    countedMonths > 0
+      ? Math.max(1, (runoffMm / countedMonths) * MONTHS_PER_YEAR)
+      : 1;
   runoffCache.set(key, { signature, runoffMm: annual });
   return annual;
 }

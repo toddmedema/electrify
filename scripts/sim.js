@@ -44,7 +44,9 @@ Runs the game's simulation headlessly and reports what happened.
   npm run sim -- --matrix                 6 scenarios × 5 difficulties × 20 seeds, with/without stories
 
   --scenario <id>        Scenario to play (default 101). --list shows the ids
-  --year <n>             Override the scenario's starting year (1980 and up)
+  --year <n>             Override the scenario's starting year (1980 and up). The cash, rate
+                         and fee it opens with are re-quoted into that year's money, as the
+                         custom game screen does, because fuel is quoted at face value
   --location <id>        Override where it's played: any city with downloaded weather
                          (npm run fetch-weather -- --list)
   --difficulty <name>    Intern | Employee | Manager | VP | CEO (default Employee)

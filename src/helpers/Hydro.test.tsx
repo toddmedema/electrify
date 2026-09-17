@@ -8,15 +8,15 @@ import {
 import { initWeatherFromRows } from "../data/Weather";
 import { RawWeatherType } from "../Types";
 
-const YEARS = 4;
 const HOURS = 24;
 
 function rows(
   temperature: (month: number) => number,
   precipitationMmPerDay: (month: number) => number,
+  years = 4,
 ): RawWeatherType[] {
   const result: RawWeatherType[] = [];
-  for (let year = 0; year < YEARS; year++) {
+  for (let year = 0; year < years; year++) {
     for (let month = 1; month <= 12; month++) {
       for (let hour = 0; hour < HOURS; hour++) {
         result.push({
@@ -134,5 +134,25 @@ describe("hydro watershed model", () => {
         hydroMeanMonthlyInflowWh: expect.any(Number),
       }),
     );
+  });
+
+  it("keeps a record shorter than the snowpack lookback finite, not 0/0", () => {
+    // The loader accepts anything from a full year up and warns on the rest, so a two-year
+    // basin is a supported input. Fewer than 24 recorded months leaves zero months outside the
+    // spin-up window, and the annual mean must fall back rather than divide by zero of them.
+    initWeatherFromRows(
+      "shortbasin",
+      rows(
+        () => 12,
+        () => 2,
+        2,
+      ),
+    );
+    const runoff = getMeanAnnualRunoffMm("shortbasin");
+    expect(Number.isFinite(runoff)).toBe(true);
+    expect(runoff).toBeGreaterThan(0);
+    expect(
+      Number.isFinite(hydroSizing(100_000_000, "shortbasin").hydroWhPerMm),
+    ).toBe(true);
   });
 });
