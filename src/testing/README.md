@@ -110,6 +110,11 @@ parallel. Tests in one file that need the same playthrough can share it through
 `runSimulationOnce` in `SimulationTestHelpers.ts`. `PublicUtilitySimulation.test.tsx` covers the researched public utilities.
 Keeping these independent groups in separate files lets Jest run the long simulations in parallel.
 
+The CEO matrix retains complete winning playbooks and multiple seeds. The minimum decision-count
+gate is tested directly in `helpers/MeaningfulDecisions.test.ts`; replaying every playbook with
+each decision omitted only repeats that gate, without proving the omitted action matters to the
+economy. `ScenarioChoiceBalance.test.tsx` waives the gate when checking physical economic outcomes.
+
 `createGame` is exported for tests that want a realistic mid-game state without running a whole
 simulation -- `reducers/BuildFacility.test.tsx` uses it to check what building actually does.
 
