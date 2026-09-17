@@ -11,7 +11,11 @@ import { DEFAULT_CUSTOM_SCENARIO, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
-import { restartTutorialAtStep, tutorialGateMiddleware } from "./Tutorial";
+import {
+  recordTutorialLeft,
+  restartTutorialAtStep,
+  tutorialGateMiddleware,
+} from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
 
@@ -286,6 +290,41 @@ describe("tutorialGateMiddleware", () => {
         secondaryLabel: "Exit tutorial",
       }),
     );
+  });
+});
+
+describe("recordTutorialLeft", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  const steps = [informational(), informational()];
+
+  // Regression test. Start playing sends a player with no finished mission back into Mission 1,
+  // so leaving it unfinished used to make the rest of the missions unreachable
+  it("counts a walkthrough left partway as done", () => {
+    recordTutorialLeft(initialState(steps, { tutorialStep: 1 }).game);
+    expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
+  });
+
+  it("doesn't count a finished or closed walkthrough a second time", () => {
+    recordTutorialLeft(
+      initialState(steps, { tutorialStep: steps.length }).game,
+    );
+    expect(getPlayedScenarioIds()).toEqual([]);
+  });
+
+  it("ignores scenarios without a walkthrough, and replays", () => {
+    const game = initialState(steps, { tutorialStep: 0 }).game;
+    recordTutorialLeft({
+      ...game,
+      customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
+    });
+    recordTutorialLeft({
+      ...game,
+      replayPlayback: {} as GameType["replayPlayback"],
+    });
+    expect(getPlayedScenarioIds()).toEqual([]);
   });
 });
 

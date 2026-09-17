@@ -343,10 +343,10 @@ button,
   }
 }
 
+// Sits in the action row after the action button rather than over the corner, where it
+// covered the end of a label like Missions
 .snackbarClose {
-  position: absolute !important;
-  right: 2px;
-  top: 2px;
+  margin-left: 4px !important;
 }
 
 @media screen and (max-width: ($desktop_breakpoint - 1px)) {

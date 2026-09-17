@@ -164,6 +164,10 @@ export const SCENARIOS = [
         ),
         hint: "One simulated day represents a month. Keep supply at least equal to demand.",
         capstone: {
+          // The step before is tapping 1x, so the player arrives with the clock already running.
+          // Rebuilding the scenario here reloaded the game and paused it again under them, and the
+          // guided steps changed nothing that the day's check needs reset
+          preserveProgress: true,
           success: (s: AppStateType) =>
             s.game.date.minute >= 1440 && !hasBlackout(s),
           failure: hasBlackout,

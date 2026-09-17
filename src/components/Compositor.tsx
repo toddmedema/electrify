@@ -363,7 +363,10 @@ export default class Compositor extends React.Component<Props, {}> {
   };
 
   private snackbarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
+    // A press on Missions or the close button has to stay a click. Capturing the pointer
+    // retargets its pointerup to the snackbar itself, so the browser fires the click there
+    // instead of on the button and neither one ever did anything
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) {
       return;
     }
     this.snackbarDrag = {
