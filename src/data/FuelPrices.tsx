@@ -310,34 +310,26 @@ export function getFuelEscalation(year: number): number {
   );
 }
 
-// The era the cash, rates and fees are written in: amounts a player recognises, against the fuel
-// prices the data ends on.
+// Custom-game option amounts are written in this era.
 export const MONEY_BASE_YEAR = 2020;
 
 /**
- * A cash amount, rate or fee re-quoted into the money of the year the game starts in.
- *
- * Fuel is the one price the game reads at face value for the year it is in - build costs and O&M
- * are anchored on whatever year a game starts, so they always open at what the tables say. A 2080
- * game therefore opens against sixty years of escalated fuel, and offering it a literal seven
- * cents a kilowatt hour is offering a game that is bankrupt inside a quarter.
- *
- * Only forwards. A game starting before MONEY_BASE_YEAR is played against real recorded prices
- * rather than a projection, so there is no escalation to undo, and deflating those rates would
- * change every historical scenario's balance for no reason. Such a start returns the amount as
- * written: the factor is 1, and the two-significant-figure rounding below is only worth keeping
- * because it rounds the projected number into a round one.
- *
- * The custom game screen uses this for the options it offers and for re-quoting a scenario the
- * player moves to a new year, and the headless sim uses it for the same job behind --year.
+ * Re-quote money between starting eras using the projected fuel trend. Historical years share
+ * the base era: their recorded fuel prices are not a projection to inflate or undo. Authored
+ * scenarios supply their own starting year; custom-game options default to the base era.
+ * Preserve exact amounts when the eras agree, otherwise round to two significant figures.
  */
-export function inEraMoney(base: number, startingYear: number): number {
-  if (startingYear <= MONEY_BASE_YEAR) {
+export function inEraMoney(
+  base: number,
+  startingYear: number,
+  sourceYear = MONEY_BASE_YEAR,
+): number {
+  const targetEra = Math.max(startingYear, MONEY_BASE_YEAR);
+  const sourceEra = Math.max(sourceYear, MONEY_BASE_YEAR);
+  if (targetEra === sourceEra) {
     return base;
   }
-  const factor =
-    getFuelEscalation(startingYear) / getFuelEscalation(MONEY_BASE_YEAR);
-  // Two significant figures, so the offered numbers stay round enough to choose between
+  const factor = getFuelEscalation(targetEra) / getFuelEscalation(sourceEra);
   return Number((base * factor).toPrecision(2));
 }
 

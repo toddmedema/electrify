@@ -5,11 +5,10 @@
  * Output goes straight to stdout rather than through console.log, which jest decorates with a
  * stack trace after every call.
  */
-import { inEraMoney } from "../data/FuelPrices";
-import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
+import { SCENARIOS } from "../data/Scenarios";
 import { DifficultyType, GeneratorOperatingType, ScenarioType } from "../Types";
 import { formatReport } from "./Report";
-import { getSimLocation, simLocationIds } from "./SimData";
+import { withScenarioOverrides } from "./ScenarioOverrides";
 import { TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 import { generateNewTimeline } from "../reducers/Game";
@@ -42,54 +41,6 @@ function write(s: string) {
 function envNumber(name: string): number | undefined {
   const raw = process.env[name];
   return raw === undefined || raw === "" ? undefined : Number(raw);
-}
-
-/**
- * An authored scenario played somewhere or somewhen else, for --year and --location.
- *
- * Comes back under CUSTOM_SCENARIO_ID because that is what it now is. initGame resolves the
- * scenario it builds from through getScenario(), which reads an authored id straight back out of
- * SCENARIOS -- so an edited copy handed over under its original id has its edits silently thrown
- * away, and the run reports the year it was actually played rather than the one that was asked
- * for. The name is kept so the report still says which scenario it started from.
- *
- * Moving the year moves the era, so the cash, rate and fee it opens with are re-quoted into that
- * year's money the way the custom game screen does. This is load-bearing rather than cosmetic:
- * fuel is the one price the game reads at face value, so a 2080 run that kept the authored
- * numbers would spend sixty years of escalated fuel against an authored era's revenue and be
- * bankrupt in its first quarter. A --location-only override leaves the authored money as written
- * (the browser never re-quotes an authored scenario), and an explicit --rate is the caller's own
- * number, applied at face value after initGame, so it is not re-quoted either.
- */
-function withOverrides(scenario: ScenarioType): ScenarioType | undefined {
-  const year = envNumber("SIM_YEAR");
-  const locationId = process.env.SIM_LOCATION;
-  if (year === undefined && !locationId) {
-    return undefined;
-  }
-  if (locationId && !getSimLocation(locationId)) {
-    throw new Error(
-      `Unknown location "${locationId}". Downloaded: ${simLocationIds().join(", ")}`,
-    );
-  }
-  const rateIsExplicit = envNumber("SIM_RATE") !== undefined;
-  return {
-    ...scenario,
-    id: CUSTOM_SCENARIO_ID,
-    startingYear: year === undefined ? scenario.startingYear : year,
-    ...(year !== undefined
-      ? {
-          cash: inEraMoney(scenario.cash, year),
-          ...(rateIsExplicit
-            ? undefined
-            : { dollarsPerkWh: inEraMoney(scenario.dollarsPerkWh, year) }),
-          feePerKgCO2e: inEraMoney(scenario.feePerKgCO2e, year),
-        }
-      : undefined),
-    ...(locationId
-      ? { locationId, location: getSimLocation(locationId) }
-      : undefined),
-  };
 }
 
 function baseOptions(): Omit<SimOptionsType, "scenarioId"> {
@@ -131,7 +82,10 @@ function runSweep() {
     const result = runSimulation({
       ...options,
       scenarioId: scenario.id,
-      scenario: withOverrides(scenario),
+      scenario: withScenarioOverrides(scenario, {
+        year: envNumber("SIM_YEAR"),
+        locationId: process.env.SIM_LOCATION,
+      }),
     });
     totalViolations += result.violationCount;
     const demandWh = result.months.reduce((a, m) => a + m.demandWh, 0);
@@ -346,7 +300,12 @@ function runSingle() {
   const result = runSimulation({
     ...baseOptions(),
     scenarioId,
-    scenario: base && withOverrides(base),
+    scenario:
+      base &&
+      withScenarioOverrides(base, {
+        year: envNumber("SIM_YEAR"),
+        locationId: process.env.SIM_LOCATION,
+      }),
   });
   write(
     formatReport(result, {
