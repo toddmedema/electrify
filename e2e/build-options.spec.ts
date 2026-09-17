@@ -91,8 +91,15 @@ for (const theme of ["light", "dark"] as const) {
           await page.getByRole("menuitem", { name: "Cost per MWh" }).click();
         }
         await expect(first.locator(".buildOptionMetrics")).toContainText(
-          "Lifetime cost / MWh",
+          "Cost per MWh",
         );
+        const sortedCells = await first
+          .locator(".buildOptionMetric")
+          .evaluateAll((els) =>
+            els.map((el) => el.getBoundingClientRect().top),
+          );
+        expect(sortedCells).toHaveLength(4);
+        expect(new Set(sortedCells.map(Math.round)).size).toBe(1);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);

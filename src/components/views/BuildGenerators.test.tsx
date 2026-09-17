@@ -230,7 +230,7 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   expect(screen.getByText("Build cost")).toBeInTheDocument();
   expect(screen.getByText("Build time")).toBeInTheDocument();
   expect(screen.queryByText("Fastest online")).not.toBeInTheDocument();
-  expect(screen.queryByText("Lifetime cost / MWh")).not.toBeInTheDocument();
+  expect(screen.queryByText("Cost per MWh")).not.toBeInTheDocument();
   expect(screen.queryByText("Emissions")).not.toBeInTheDocument();
 
   fireEvent.click(
@@ -263,7 +263,7 @@ it("keeps the active lifetime-cost sort metric visible on collapsed cards", () =
     />,
   );
 
-  expect(screen.getByText("Lifetime cost / MWh")).toBeVisible();
+  expect(screen.getByText("Cost per MWh")).toBeVisible();
 });
 
 it("submits a generator purchase only once on a double-click", () => {

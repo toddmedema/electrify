@@ -324,7 +324,7 @@ export function GeneratorBuildItem(
           {buildSubtitle}
         </Typography>
       )}
-      <Box className="buildOptionMetrics">
+      <Box className="buildOptionMetrics singleRow">
         <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
@@ -339,8 +339,8 @@ export function GeneratorBuildItem(
         />
         {props.secondaryMetric === "lcWh" && (
           <BuildMetric
-            label="Lifetime cost / MWh"
-            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+            label="Cost per MWh"
+            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
           />
         )}
       </Box>

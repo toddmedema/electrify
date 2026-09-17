@@ -4241,6 +4241,14 @@ $sizemap: (
   .buildOptionMetric {
     min-width: 0;
   }
+  // Generator cards keep every figure on one row, however many there are, in equal shares
+  .buildOptionMetrics.singleRow {
+    display: flex;
+    .buildOptionMetric {
+      flex: 1 1 0;
+      overflow-wrap: anywhere;
+    }
+  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
@@ -4249,9 +4257,8 @@ $sizemap: (
     .sparkline {
       display: block;
       overflow: visible;
-      // Gives way on the narrowest cards rather than pushing the row wider than the screen
+      // Shrinks with its share of the row rather than pushing the card wider than the screen
       width: 100%;
-      min-width: 72px;
       max-width: 96px;
     }
     .sparklineLine,
