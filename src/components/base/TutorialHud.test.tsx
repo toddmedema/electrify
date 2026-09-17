@@ -157,11 +157,14 @@ describe("TutorialHud", () => {
     const { rerender, unmount } = render(<TutorialHud {...hudProps} />);
     expect(target).toHaveClass("tutorialTarget");
     expect(target).not.toHaveClass("tutorialTargetReminder");
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring).toBeInTheDocument();
 
     act(() => jest.advanceTimersByTime(9_999));
     expect(target).not.toHaveClass("tutorialTargetReminder");
     act(() => jest.advanceTimersByTime(1));
     expect(target).toHaveClass("tutorialTargetReminder");
+    expect(ring).toHaveClass("tutorialTargetRingPulse");
 
     rerender(
       <TutorialHud
@@ -176,6 +179,7 @@ describe("TutorialHud", () => {
       />,
     );
     expect(target).not.toHaveClass("tutorialTarget");
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
     expect(
       screen.getByRole("region", { name: "Your turn" }),
     ).toBeInTheDocument();
@@ -183,5 +187,141 @@ describe("TutorialHud", () => {
     unmount();
     target.remove();
     jest.useRealTimers();
+  });
+
+  // jsdom lays nothing out, so these tests stub the target's box. The viewport is 1024x768 and
+  // no ancestor clips, so the clipping bounds are the viewport itself.
+  function stubRect(
+    element: Element,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ) {
+    element.getBoundingClientRect = () =>
+      ({
+        left,
+        top,
+        right,
+        bottom,
+        width: right - left,
+        height: bottom - top,
+        x: left,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+  }
+
+  it("gives the ring a small gap when the control is not flush with a clipping edge", () => {
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 200, 150, 400, 250);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring).toBeInTheDocument();
+    // 3px gap plus the 2px line on every side.
+    expect(ring.style.left).toBe("195px");
+    expect(ring.style.top).toBe("145px");
+    expect(ring.style.width).toBe("210px");
+    expect(ring.style.height).toBe("110px");
+
+    unmount();
+    target.remove();
+  });
+
+  it("keeps every side of the ring visible when the control runs edge to edge", () => {
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    // Flush with the viewport's left and right, like the facilities chart on a phone or in a
+    // pane. An outline lost its sides here; the ring must not.
+    stubRect(target, 0, 150, 1024, 250);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring).toBeInTheDocument();
+    // Top and bottom keep the gap; left and right hug the viewport edge instead of being cut.
+    expect(ring.style.top).toBe("145px");
+    expect(ring.style.height).toBe("110px");
+    expect(ring.style.left).toBe("0px");
+    expect(ring.style.width).toBe("1024px");
+
+    unmount();
+    target.remove();
+  });
+
+  it("hides the ring while its target has no box", () => {
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 0, 0, 0, 0);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring).toBeInTheDocument();
+    expect(ring.style.display).toBe("none");
+
+    unmount();
+    target.remove();
+  });
+  it("follows a target that mounts late or is replaced during the step", () => {
+    jest.useFakeTimers();
+    const { unmount } = render(<TutorialHud {...props()} />);
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+
+    // The control mounts after the step starts, like a list that is still loading.
+    const first = document.createElement("div");
+    first.id = "tutorial-target";
+    stubRect(first, 200, 150, 400, 250);
+    document.body.appendChild(first);
+    act(() => jest.advanceTimersByTime(100));
+    expect(first).toHaveClass("tutorialTarget");
+    expect(screen.getAllByTestId("tutorial-target-ring")).toHaveLength(1);
+
+    // The layout swaps it for a new node after the reminder has started.
+    act(() => jest.advanceTimersByTime(10_000));
+    first.remove();
+    const second = document.createElement("div");
+    second.id = "tutorial-target";
+    stubRect(second, 0, 150, 1024, 250);
+    document.body.appendChild(second);
+    act(() => jest.advanceTimersByTime(100));
+    expect(second).toHaveClass("tutorialTarget", "tutorialTargetReminder");
+    expect(first).not.toHaveClass("tutorialTarget");
+    const rings = screen.getAllByTestId("tutorial-target-ring");
+    expect(rings).toHaveLength(1);
+    expect(rings[0]).toHaveClass("tutorialTargetRingPulse");
+    expect(rings[0].style.left).toBe("0px");
+
+    unmount();
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+    expect(second).not.toHaveClass("tutorialTarget");
+    second.remove();
+    jest.useRealTimers();
+  });
+
+  it("stops the ring above a sticky bar lying across the control", () => {
+    const scroller = document.createElement("div");
+    scroller.style.overflowY = "auto";
+    stubRect(scroller, 0, 0, 1024, 768);
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 0, 600, 1024, 900);
+    const footer = document.createElement("nav");
+    footer.style.position = "sticky";
+    footer.style.bottom = "0px";
+    stubRect(footer, 0, 700, 1024, 768);
+    scroller.append(target, footer);
+    document.body.appendChild(scroller);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring.style.top).toBe("595px");
+    expect(ring.style.height).toBe("105px");
+
+    unmount();
+    scroller.remove();
   });
 });

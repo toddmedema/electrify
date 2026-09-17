@@ -59,6 +59,23 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   const pointerTarget = map
     .locator(".worldMapMarker:not(.cluster)[aria-pressed='false']")
     .first();
+
+  // At the narrowest widths a 44px touch target can't fit every city at world zoom, so all
+  // unselected cities are clustered and a player taps a cluster to zoom in before picking. Do
+  // the same when no marker is tappable yet. Markers are computed in the same render as the map
+  // transform, so once the transform changes the markers shown are those of the new zoom level.
+  const land = map.locator(".worldMapLand > g");
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  while ((await pointerTarget.count()) === 0) {
+    expect(
+      await zoomIn.isEnabled(),
+      "a standalone city marker appears before the map reaches its closest zoom",
+    ).toBe(true);
+    const transform = await land.getAttribute("transform");
+    await map.locator(".worldMapMarker.cluster").first().click();
+    await expect(land).not.toHaveAttribute("transform", transform!);
+  }
+
   const pointerTargetLabel = await pointerTarget.getAttribute("aria-label");
   expect(pointerTargetLabel).not.toBeNull();
   await pointerTarget.click();
@@ -170,6 +187,14 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+
+  // The Year 1 outlook settles in a worker after mount; while it is still calculating, its
+  // height changes and shifts the rows below. Measure only once both are still.
+  // The forecast gets the same allowance as the outlook recalculation test below.
+  await expect(outlook).not.toHaveAttribute("aria-busy", "true", {
+    timeout: 20000,
+  });
+
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
   const removeBox = await row

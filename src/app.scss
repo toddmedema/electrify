@@ -3798,14 +3798,21 @@ html[data-theme="dark"] .uplot {
 }
 
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
-// surrounding choices. If the player has not acted after ten seconds, a short pulse repeats every
-// ten seconds. Capstones never receive either class.
-.tutorialTarget {
-  outline: 2px solid var(--interactive-blue) !important;
-  outline-offset: 3px;
+// surrounding choices. The cue is a ring overlay that TutorialHud positions on <body> around
+// the control, because an outline draws outside the element's box and any clipping ancestor --
+// a pane, a card, the viewport -- cut its sides wherever a control ran edge to edge. The ring
+// hugs the control instead, so all four sides stay visible. If the player has not acted after
+// ten seconds, a short pulse repeats every ten seconds. Capstones never receive either class;
+// the .tutorialTarget/.tutorialTargetReminder classes stay on the control as hooks.
+.tutorialTargetRing {
+  position: fixed;
+  z-index: 1240; // above the game, below the objective HUD (1250) and any dialog
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid var(--interactive-blue);
 }
 
-.tutorialTargetReminder {
+.tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
 }
 
@@ -3837,7 +3844,7 @@ html[data-theme="dark"] .uplot {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTargetReminder {
+  .tutorialTargetRingPulse {
     animation: none;
   }
 
@@ -3845,8 +3852,9 @@ html[data-theme="dark"] .uplot {
     animation: none;
   }
 
-  .tutorialTarget {
-    outline-width: 3px !important;
+  // Without the pulse, a slightly heavier line keeps the cue obvious.
+  .tutorialTargetRing {
+    border-width: 3px;
   }
 }
 
@@ -4354,24 +4362,55 @@ $sizemap: (
   margin: 0;
   min-width: 0;
 }
+// A row is one line of name over one line of status at any pane width, down to a 320px phone.
+// Text that still doesn't fit truncates instead of wrapping, and the lower-priority part goes
+// first: the name before its derate badge, the trailing detail before the reading and state.
+.facilityDisclosure .MuiListItemText-primary,
+.facilityDisclosure .MuiListItemText-secondary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+  line-height: 1.4;
+}
 .facilityDisclosure .MuiListItemText-primary {
-  display: block;
   font-size: 1rem;
   font-weight: 600;
-  line-height: 1.4;
-}
-// One line at any width; the row's details carry anything that doesn't fit
-.facilityDisclosure .facilitySecondaryText {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .facilityDisclosure .MuiListItemText-secondary {
-  display: block;
   margin-top: 4px;
   font-size: 0.8125rem;
-  line-height: 1.4;
+}
+.facilityDisclosure .facilityName,
+.facilityDisclosure .facilityStatus,
+.facilityDisclosure .facilityStatusDetail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facilityDisclosure .facilityStatusDetail {
+  // Shrink is weighted by width, so a large factor is what makes the detail give way first
+  flex-shrink: 100;
+  // Keeps the leading space of " · " from collapsing at the flex item's edge
+  white-space: pre;
+}
+.facilityDisclosure .storyDerateBadge {
+  flex-shrink: 0;
+}
+.facilityDisclosure .MuiListItemText-root {
+  container-type: inline-size;
+}
+.facilityDisclosure .facilityStatusShort {
+  display: none;
+}
+// The longest hydro line, "999.9/999.9MW · running · reservoir 100%", needs about this much
+@container (max-width: 239px) {
+  .facilityDisclosure .facilityStatusLong {
+    display: none;
+  }
+  .facilityDisclosure .facilityStatusShort {
+    display: inline;
+  }
 }
 .base_main .facilityActions {
   display: flex;
@@ -4399,6 +4438,12 @@ $sizemap: (
   color: var(--font-color-faded);
   cursor: grab;
   touch-action: none;
+}
+.facilityDisclosure .facilityText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
 }
 .facilityDisclosure .constructionProgress {
   display: block;

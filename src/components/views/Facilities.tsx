@@ -288,7 +288,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
-  let secondaryText = "";
+  // The row's second line has to stay one line on a 320px phone, so it leads with the reading
+  // and the state and leaves anything else to a trailing detail that truncates first. Rated
+  // storage power and the reservoir's absolute size are both in the opened details.
   const builtFraction = underConstruction
     ? Math.max(
         0,
@@ -299,22 +301,36 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         ),
       )
     : 1;
+  let reading = "";
+  let detail: React.ReactNode = null;
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
     const percentBuilt = Math.round(builtFraction * 100);
-    secondaryText = `Building ${percentBuilt}% · ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    reading = `Building ${percentBuilt}%`;
+    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
-    // Rated power never changes, so it lives in the details rather than crowding the row
-    secondaryText = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
-  } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-    // The exact reservoir energy is in the details; the row only needs how full it is
-    const reservoirPercent = Math.round(
-      ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
-    );
-    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${reservoirPercent}% reservoir`;
+    reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
+      const reservoirPercent = Math.round(
+        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
+      );
+      // Only one of these shows, picked by how wide the row is
+      detail = (
+        <>
+          <span className="facilityStatusLong">
+            reservoir {reservoirPercent}%
+          </span>
+          <span className="facilityStatusShort">{reservoirPercent}% full</span>
+        </>
+      );
+    }
   }
+  // "Building 40%" already says what the construction badge does
+  const status = underConstruction
+    ? reading
+    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -373,7 +389,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   underConstruction
                     ? {
                         // The progress bar stays at full strength so the build is legible
-                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .facilitySecondaryText":
+                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
                           {
                             opacity: (theme) =>
                               theme.palette.action.disabledOpacity,
@@ -413,51 +429,55 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     </div>
                   </div>
                 </ListItemAvatar>
-                <ListItemText
-                  slotProps={{
-                    primary: { component: "span" },
-                    secondary: { component: "span" },
-                  }}
-                  primary={
-                    <>
-                      {facility.name}
-                      {storyOutputMultiplier < 1 && (
-                        <Chip
-                          className="storyDerateBadge"
-                          color="warning"
-                          size="small"
-                          label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
-                          aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                        />
-                      )}
-                    </>
-                  }
-                  secondary={
-                    <>
-                      <span className="facilitySecondaryText">
-                        {underConstruction
-                          ? secondaryText
-                          : `${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
-                      </span>
-                      {/* The percentage is already in the text; this only makes it glanceable */}
-                      {underConstruction && (
-                        <span
-                          className="constructionProgress"
-                          aria-hidden
-                          style={{ background: withAlpha(accentColor, 0.24) }}
-                        >
-                          <span
-                            className="constructionProgressFill"
-                            style={{
-                              transform: `scaleX(${builtFraction})`,
-                              background: accentColor,
-                            }}
+                <span className="facilityText">
+                  <ListItemText
+                    slotProps={{
+                      primary: { component: "span" },
+                      secondary: { component: "span" },
+                    }}
+                    primary={
+                      <>
+                        <span className="facilityName">{facility.name}</span>
+                        {storyOutputMultiplier < 1 && (
+                          <Chip
+                            className="storyDerateBadge"
+                            color="warning"
+                            size="small"
+                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
                           />
-                        </span>
-                      )}
-                    </>
-                  }
-                />
+                        )}
+                      </>
+                    }
+                    secondary={
+                      <>
+                        <span className="facilityStatus">{status}</span>
+                        {detail && (
+                          <span className="facilityStatusDetail">
+                            {" · "}
+                            {detail}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
+                  {/* The percentage is already in the text; this only makes it glanceable */}
+                  {underConstruction && (
+                    <span
+                      className="constructionProgress"
+                      aria-hidden
+                      style={{ background: withAlpha(accentColor, 0.24) }}
+                    >
+                      <span
+                        className="constructionProgressFill"
+                        style={{
+                          transform: `scaleX(${builtFraction})`,
+                          background: accentColor,
+                        }}
+                      />
+                    </span>
+                  )}
+                </span>
                 <KeyboardArrowDownIcon
                   className="facilityChevron"
                   aria-hidden
