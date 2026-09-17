@@ -1822,9 +1822,13 @@ $pane_header_height: 48px;
 
   #yearProgressBar {
     margin-top: 0;
-    height: 2px;
-    background: $font_color_faded;
+    padding: 4px 0;
     z-index: 100;
+
+    .yearProgressFill {
+      height: 2px;
+      background: $font_color_faded;
+    }
   }
 }
 

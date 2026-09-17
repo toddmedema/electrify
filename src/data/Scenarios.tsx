@@ -259,9 +259,17 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to run the year",
+        action: "Tap 1× to start construction time",
         content: (
           <TutorialPrompt text="Construction only moves while time runs." />
+        ),
+      },
+      {
+        card: "FACILITIES",
+        target: "#yearProgressBar",
+        action: "Watch the year bar advance, then tap Next",
+        content: (
+          <TutorialPrompt text="This thin bar shows how far through the current year you are. Each simulated day represents one month. The bar starts over each January; construction continues across years." />
         ),
       },
       {

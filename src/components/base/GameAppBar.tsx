@@ -378,10 +378,17 @@ export function GameAppBar(props: Props) {
       </span>
       <div
         id="yearProgressBar"
-        style={{
-          width: `${date.percentOfYear * 100}%`,
-        }}
-      />
+        role="progressbar"
+        aria-label="Year progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(date.percentOfYear * 100)}
+      >
+        <div
+          className="yearProgressFill"
+          style={{ width: `${date.percentOfYear * 100}%` }}
+        />
+      </div>
       <ScenarioDetailsDialog
         open={scenarioDetailsOpen}
         game={game}

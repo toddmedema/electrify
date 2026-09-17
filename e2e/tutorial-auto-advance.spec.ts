@@ -117,5 +117,27 @@ for (const mission of [
     await page.screenshot({
       path: testInfo.outputPath(`${mission}-advanced.png`),
     });
+    if (mission === "Generators") {
+      const progress = page.getByRole("progressbar", { name: "Year progress" });
+      await expect(progress).toHaveAttribute("aria-valuenow", "0");
+      const initialBox = await progress.boundingBox();
+      expect(initialBox!.width).toBeGreaterThan(300);
+      await hud.getByRole("button", { name: "Next" }).click();
+      await expect(hud).toContainText("Tap 1× to start construction time");
+      await page
+        .getByRole("button", { name: "slow speed", exact: true })
+        .click();
+      await expect(hud).toContainText("Watch the year bar advance");
+      await expect(progress).toHaveClass(/tutorialTarget/);
+      await expect(page.locator(".tutorialTargetRing")).toBeVisible();
+      await expect(progress).not.toHaveAttribute("aria-valuenow", "0");
+      expect((await progress.boundingBox())!.width).toBe(initialBox!.width);
+      await page.screenshot({ path: testInfo.outputPath("year-progress.png") });
+      await hud.getByRole("button", { name: "Next" }).click();
+      await expect(hud).toContainText(
+        "Order a second generator of a different type",
+      );
+      await expect(progress).not.toHaveClass(/tutorialTarget/);
+    }
   });
 }
