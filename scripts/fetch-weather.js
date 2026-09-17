@@ -93,7 +93,7 @@ function usage() {
   );
 }
 
-const args = process.argv.slice(2);
+const args = require.main === module ? process.argv.slice(2) : [];
 const options = {
   force: false,
   list: false,
@@ -398,13 +398,12 @@ function clamp(value, min, max) {
  * steps and precipitation in fifths of a millimetre, both far finer than anything the simulation
  * can tell apart. 57-69KB a location, against 265KB of CSV, and no parser on the loading screen.
  */
-function encodeWeather(rows, endingYear = ENDING_YEAR) {
-  const offshore = rows.every((row) => typeof row.windOffshoreKph === "number");
-  if (
-    !offshore &&
-    rows.some((row) => typeof row.windOffshoreKph === "number")
-  ) {
-    throw new Error("Offshore wind is present for only part of a weather file");
+function encodeWeather(city, rows, endingYear = ENDING_YEAR) {
+  // The catalogue determines whether this location can use offshore wind. Ignore any stale
+  // offshore readings when a location no longer has an offshore sampling point.
+  const offshore = Boolean(city.offshore);
+  if (offshore && !rows.every((row) => Number.isFinite(row.windOffshoreKph))) {
+    throw new Error(city.id + ": offshore wind is missing or invalid");
   }
   const bytesPerRow = offshore ? OFFSHORE_BYTES_PER_ROW : BASE_BYTES_PER_ROW;
   const buffer = Buffer.alloc(HEADER_BYTES + rows.length * bytesPerRow);
@@ -703,7 +702,7 @@ function addOffshoreWeather(entry, offshoreRows) {
 }
 
 function extendPackedWeather(entry, newRows, endingYear) {
-  const encoded = encodeWeather(newRows, endingYear);
+  const encoded = encodeWeather(entry.city, newRows, endingYear);
   if (encoded.readUInt8(7) !== entry.bytesPerRow) {
     throw new Error("Fetched weather layout does not match the existing file");
   }
@@ -943,7 +942,7 @@ async function main() {
       const { rows, meta } = await fetchBatch(batch);
       for (const city of batch) {
         const cityRows = rows.get(city.id);
-        fs.writeFileSync(binaryPath(city.id), encodeWeather(cityRows));
+        fs.writeFileSync(binaryPath(city.id), encodeWeather(city, cityRows));
         fetched[city.id] = meta.get(city.id);
         done++;
         log(
@@ -966,4 +965,8 @@ async function main() {
   log(`\nWrote ${done} cities; ${total} of ${catalogue.length} now playable`);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { encodeWeather, extendPackedWeather };

@@ -210,7 +210,6 @@ describe("the shipped weather files", () => {
     "NewYork",
     "Philadelphia",
     "Boston",
-    "Baltimore",
     "Halifax",
     "RioDeJaneiro",
     "Fortaleza",
@@ -219,7 +218,6 @@ describe("the shipped weather files", () => {
     "Manchester",
     "Edinburgh",
     "Dublin",
-    "Paris",
     "Marseille",
     "Barcelona",
     "Seville",
@@ -234,11 +232,6 @@ describe("the shipped weather files", () => {
     .filter((file: string) => file.endsWith(".bin"))
     .map((file: string) => file.replace(".bin", ""));
 
-  // A file keeps its offshore column for good: nothing refetches a city to take one away. The
-  // index is the catalogue's view instead, so a city the catalogue has decided cannot reach open
-  // water stops being offered offshore wind while its column sits unread in the .bin.
-  const withdrawnOffshoreIds = ["Baltimore", "Paris"];
-
   it("keeps the catalogue flags in sync with the binary headers", () => {
     const index = JSON.parse(
       fs.readFileSync(path.join(DATA_DIR, "index.json"), "utf8"),
@@ -247,11 +240,7 @@ describe("the shipped weather files", () => {
       .filter((city) => (city as { offshore?: boolean }).offshore)
       .map((city) => (city as { id: string }).id)
       .sort();
-    expect(listed).toEqual(
-      offshoreIds
-        .filter((id: string) => !withdrawnOffshoreIds.includes(id))
-        .sort(),
-    );
+    expect(listed).toEqual([...offshoreIds].sort());
   });
 
   it("covers every shipped location through 2025 with readable weather", () => {
