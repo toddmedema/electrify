@@ -4337,17 +4337,55 @@ $sizemap: (
   margin: 0;
   min-width: 0;
 }
-.facilityDisclosure .MuiListItemText-primary {
-  display: block;
-  font-size: 1rem;
-  font-weight: 600;
+// A row is one line of name over one line of status at any pane width, down to a 320px phone.
+// Text that still doesn't fit truncates instead of wrapping, and the lower-priority part goes
+// first: the name before its derate badge, the trailing detail before the reading and state.
+.facilityDisclosure .MuiListItemText-primary,
+.facilityDisclosure .MuiListItemText-secondary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
   line-height: 1.4;
 }
+.facilityDisclosure .MuiListItemText-primary {
+  font-size: 1rem;
+  font-weight: 600;
+}
 .facilityDisclosure .MuiListItemText-secondary {
-  display: block;
   margin-top: 4px;
   font-size: 0.8125rem;
-  line-height: 1.4;
+}
+.facilityDisclosure .facilityName,
+.facilityDisclosure .facilityStatus,
+.facilityDisclosure .facilityStatusDetail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facilityDisclosure .facilityStatusDetail {
+  // Shrink is weighted by width, so a large factor is what makes the detail give way first
+  flex-shrink: 100;
+  // Keeps the leading space of " · " from collapsing at the flex item's edge
+  white-space: pre;
+}
+.facilityDisclosure .storyDerateBadge {
+  flex-shrink: 0;
+}
+.facilityDisclosure .MuiListItemText-root {
+  container-type: inline-size;
+}
+.facilityDisclosure .facilityStatusShort {
+  display: none;
+}
+// The longest hydro line, "999.9/999.9MW · running · reservoir 100%", needs about this much
+@container (max-width: 239px) {
+  .facilityDisclosure .facilityStatusLong {
+    display: none;
+  }
+  .facilityDisclosure .facilityStatusShort {
+    display: inline;
+  }
 }
 .base_main .facilityActions {
   display: flex;

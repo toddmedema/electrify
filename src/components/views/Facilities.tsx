@@ -288,7 +288,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
-  let secondaryText = "";
+  // The row's second line has to stay one line on a 320px phone, so it leads with the reading
+  // and the state and leaves anything else to a trailing detail that truncates first. Rated
+  // storage power and the reservoir's absolute size are both in the opened details.
+  let reading = "";
+  let detail: React.ReactNode = null;
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
     const percentBuilt = Math.round(
@@ -296,14 +300,31 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         facility.yearsToBuild) *
         100,
     );
-    secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    reading = `Building ${percentBuilt}%`;
+    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
-    secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
-  } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)}, reservoir ${formatWattHoursOfPeak(facility.reservoirWh || 0, facility.reservoirCapacityWh)}`;
+    reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
+      const reservoirPercent = Math.round(
+        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
+      );
+      // Only one of these shows, picked by how wide the row is
+      detail = (
+        <>
+          <span className="facilityStatusLong">
+            reservoir {reservoirPercent}%
+          </span>
+          <span className="facilityStatusShort">{reservoirPercent}% full</span>
+        </>
+      );
+    }
   }
+  // "Building 40%" already says what the construction badge does
+  const status = underConstruction
+    ? reading
+    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -394,19 +415,29 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                   }}
                   primary={
                     <>
-                      {facility.name}
+                      <span className="facilityName">{facility.name}</span>
                       {storyOutputMultiplier < 1 && (
                         <Chip
                           className="storyDerateBadge"
                           color="warning"
                           size="small"
-                          label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
+                          label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
                           aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
                         />
                       )}
                     </>
                   }
-                  secondary={`${secondaryText} · ${ACTIVITY_LABELS[activity]}`}
+                  secondary={
+                    <>
+                      <span className="facilityStatus">{status}</span>
+                      {detail && (
+                        <span className="facilityStatusDetail">
+                          {" · "}
+                          {detail}
+                        </span>
+                      )}
+                    </>
+                  }
                 />
                 <KeyboardArrowDownIcon
                   className="facilityChevron"
