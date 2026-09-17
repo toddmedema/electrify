@@ -77,6 +77,15 @@ Both come back as a custom game rather than the scenario they started from, beca
 they are: `initGame` resolves an authored id straight back out of `SCENARIOS`, so an edited copy
 handed over under its original id would have its edits silently dropped.
 
+`--year` re-quotes cash, the market's baseline rate, and the carbon fee from the scenario's
+starting era into the requested era using the projected fuel trend (`inEraMoney`). Years at
+or before 2020 share a base era; moving between them or keeping the same year preserves exact
+amounts. Moving forward or backward across projected eras uses their escalation ratio and
+rounds to two significant figures. This keeps future starts from paying escalated fuel prices
+against historical revenue, without escalating a recent scenario's money twice.
+`--location` alone leaves money unchanged. An explicit `--rate` is the player's rate, applied
+at face value after initialization; the competing market's baseline still follows the era.
+
 ## What it checks
 
 The point is not the numbers, it's the **invariants** -- rules the economy must obey no matter
@@ -136,14 +145,15 @@ dispatch or Immer draft behavior must still exercise those paths.
 - **The first month is recorded on the first tick.** `previousMonth` starts empty, so a rollover
   fires immediately and a 144 month run reports 145 months. That is the real game's behavior, and
   the extra entry summarizes a full generated day, not a single tick.
-- **The seed only matters past the recorded data.** Weather runs 1980-2025 (fuel prices have a
-  shorter record); inside the weather window every seed agrees. Weather in scenarios starting in
-  2026 diverges immediately.
+- **Weather and fuel projections use the seed beyond their recorded windows.** The calibrated
+  weather window is 1980-2019 and fuel prices cover 1975-2019. Newer weather rows remain on
+  disk but are outside that calibrated window. Recorded weather and fuel agree across seeds;
+  other seeded systems, including story scheduling, can differ during historical runs.
 - **A month rollover is not one simulation step.** It regenerates the timeline and pre-rolls four
   more frames against the same tick. Anything measured by diffing consecutive ticks has to skip
   rollovers, which is why the cash and energy checks only run within a month.
-- **`getFuelPricesPerMBTU` loops forever if no prices are loaded**, and `getWeather` throws. Any
-  non-browser entry point has to call `loadSimData` first.
+- **`getFuelPricesPerMBTU` throws a clear error if no prices are loaded**, and `getWeather`
+  throws. Any non-browser entry point has to call `loadSimData` first.
 
 ## Time-triggered scenario choices
 
