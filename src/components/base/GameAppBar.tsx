@@ -350,7 +350,6 @@ export function GameAppBar(props: Props) {
                   fontSize="small"
                 />
               </span>
-              {!inBlackout && <span>Now · </span>}
               <strong className="statusLabel">{gridHealth.label}</strong>
             </span>
             <span className="gridHealthSeparator" aria-hidden="true">

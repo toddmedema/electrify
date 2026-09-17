@@ -84,9 +84,6 @@ for (const theme of ["light", "dark"]) {
       );
       expect(heights).toEqual([56, 56, 56]);
     }
-    await expect(
-      page.locator(".gridHealth-blackout:visible"),
-    ).not.toContainText("Now");
     if (!(await page.locator("#chartSupplyDemand").isVisible()))
       await page.locator(".facilitySupplyDisclosure > summary").click();
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
