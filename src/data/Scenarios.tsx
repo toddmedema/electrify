@@ -257,9 +257,9 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: "#speedChangeButtons",
-        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to start construction time",
+        target: '#speedChangeButtons [aria-label="fast speed"]',
+        advanceOn: (s: AppStateType) => s.game.speed === "FAST",
+        action: "Tap 20× to start construction time",
         content: (
           <TutorialPrompt text="Construction only moves while time runs." />
         ),

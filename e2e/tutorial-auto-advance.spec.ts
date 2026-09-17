@@ -123,10 +123,17 @@ for (const mission of [
       const initialBox = await progress.boundingBox();
       expect(initialBox!.width).toBeGreaterThan(300);
       await hud.getByRole("button", { name: "Next" }).click();
-      await expect(hud).toContainText("Tap 1× to start construction time");
+      await expect(hud).toContainText("Tap 20× to start construction time");
       await page
         .getByRole("button", { name: "slow speed", exact: true })
         .click();
+      await expect(hud).toContainText("Tap 20× to start construction time");
+      const fastSpeed = page.getByRole("button", {
+        name: "fast speed",
+        exact: true,
+      });
+      await expect(fastSpeed).toHaveClass(/tutorialTarget/);
+      await fastSpeed.click();
       await expect(hud).toContainText("Watch the year bar advance");
       await expect(progress).toHaveClass(/tutorialTarget/);
       await expect(page.locator(".tutorialTargetRing")).toBeVisible();
