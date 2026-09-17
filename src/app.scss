@@ -4241,15 +4241,6 @@ $sizemap: (
   .buildOptionMetric {
     min-width: 0;
   }
-  .buildOptionMetrics.withOutput {
-    // Cost and time hug their figures so the output line gets whatever width is left
-    grid-template-columns: auto auto minmax(0, 1fr);
-    column-gap: 16px;
-    // The optional fourth figure takes a row of its own instead of widening the cost column
-    .buildOptionMetric:nth-child(n + 4) {
-      grid-column: 1 / -1;
-    }
-  }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
     // a line along the top edge from reading as an underline of the caption.
