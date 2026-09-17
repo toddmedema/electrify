@@ -310,6 +310,8 @@ export function GameAppBar(props: Props) {
 
   const gridHealth = getGridHealth(game, now);
   const inBlackout = gridHealth.state === "blackout";
+  // Low reserve and at-limit share the mission tracker's goal-risk warning treatment.
+  const inWarning = !inBlackout && gridHealth.state !== "stable";
 
   return (
     <div id="appbar">
@@ -331,12 +333,12 @@ export function GameAppBar(props: Props) {
       </div>
       <div className="gameStatusBar">
         <div
-          className={`gridHealth gridHealth-${gridHealth.state}`}
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
           aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
         >
           <div className="gridHealthSummary">
             <span className="gridHealthState">
-              <span className="gridHealthIcon" aria-hidden="true">
+              <span className="statusIcon" aria-hidden="true">
                 <ConceptIcon
                   concept={
                     inBlackout
@@ -349,7 +351,7 @@ export function GameAppBar(props: Props) {
                 />
               </span>
               {!inBlackout && <span>Now · </span>}
-              <strong>{gridHealth.label}</strong>
+              <strong className="statusLabel">{gridHealth.label}</strong>
             </span>
             <span className="gridHealthSeparator" aria-hidden="true">
               |

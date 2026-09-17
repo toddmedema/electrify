@@ -1,13 +1,13 @@
 import * as React from "react";
 import { Button, IconButton, Tooltip } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { EvidenceTargetType, GameType } from "../../Types";
 import {
   getMissionStatus,
   selectMissionRisk,
 } from "../../helpers/MissionStatus";
 import { UpcomingStoryEventType } from "../views/StoryEventSelectors";
+import ConceptIcon from "./ConceptIcon";
 
 export default function MissionSummary({
   game,
@@ -24,10 +24,15 @@ export default function MissionSummary({
   const risk = selectMissionRisk(game, upcoming);
   // The grid readout beside this already reports a shortage happening right now.
   const shownRisk = risk && risk.id !== "shortage" ? risk : undefined;
+  // Upcoming events are news to act on (blue); every other risk threatens the goal (amber).
+  const warning = shownRisk && !shownRisk.id.startsWith("event:");
   // The stable risk identity, not changing tick values, owns the polite announcement.
   const announcement = React.useMemo(() => risk?.label || "", [risk?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="missionSummary" aria-label="Mission progress">
+    <div
+      className={`missionSummary${warning ? " statusWarning" : ""}`}
+      aria-label="Mission progress"
+    >
       <div className="missionSummaryHeader">
         <div className="missionSummaryCopy">
           {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
@@ -35,17 +40,20 @@ export default function MissionSummary({
           {shownRisk ? (
             <Button
               className="missionRiskButton"
-              color={shownRisk.id.startsWith("event:") ? "primary" : "warning"}
+              color={warning ? "inherit" : "primary"}
               aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
               title={shownRisk.label}
-              startIcon={
-                shownRisk.id.startsWith("event:") ? undefined : (
-                  <WarningAmberIcon fontSize="small" aria-hidden="true" />
-                )
-              }
               onClick={() => onEvidence?.(shownRisk.target)}
             >
-              <span className="missionRiskText">{shownRisk.shortLabel}</span>
+              {/* Inline rather than startIcon, so it keeps the grid readout's exact size and inset. */}
+              {warning && (
+                <span className="statusIcon" aria-hidden="true">
+                  <ConceptIcon concept="danger" fontSize="small" />
+                </span>
+              )}
+              <span className="missionRiskText statusLabel">
+                {shownRisk.shortLabel}
+              </span>
             </Button>
           ) : (
             mission.headline && (

@@ -35,7 +35,10 @@
   // message -- red/green alone would leave a colourblind reader with only the arrow
   --delta-good: #2e7d32; /* green800 */
   --delta-bad: #c62828; /* red800 */
-  --warning-text: #a15c00; /* amber, 5:1 on white */
+  // A warning fills its row rather than tinting text, so the label keeps full body contrast
+  // (16:1) and the glyph carries the amber: 6:1 on the fill, well past 3:1 for an icon
+  --warning-fill: #ffe082; /* amber200 */
+  --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   --capacity-bar: #212121; /* grey900 */
   --shadow-ring: rgba(0, 0, 0, 0.15);
@@ -69,7 +72,8 @@
   --blackout-tint: rgba(239, 83, 80, 0.16);
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
-  --warning-text: #ffb74d; /* orange300 */
+  --warning-fill: #6d4c00; /* text 6.6:1 */
+  --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --capacity-bar: #e0e0e0;
   --shadow-ring: rgba(0, 0, 0, 0.72);
@@ -717,12 +721,13 @@ $topbar_height: 56px;
     width: 40px;
     height: 40px;
   }
-  .missionRiskButton.MuiButton-colorWarning {
-    color: var(--warning-text);
-  }
+  // Pulled out by its own padding so its icon or text starts on the row's inset, in line with
+  // a plain headline and with the grid readout's icon when the two rows stack.
   .missionRiskButton {
     min-width: 0;
     flex: 0 1 auto;
+    gap: 4px;
+    margin-inline-start: -8px;
     padding-inline: 8px;
     white-space: nowrap;
   }
@@ -827,14 +832,12 @@ $topbar_height: 56px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-raised);
   color: $font_color_primary;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.25;
   text-align: center;
 
-  &.gridHealth-low-reserve,
-  &.gridHealth-at-limit {
-    border-color: var(--mark-bg);
-    background: var(--mark-bg);
+  &.statusWarning {
+    border-color: var(--warning-fill);
   }
 
   &.gridHealth-blackout {
@@ -858,13 +861,6 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 
-// Remove the inline SVG's baseline space so its visual center matches the adjacent label.
-.gridHealthIcon {
-  display: flex;
-  align-items: center;
-  line-height: 0;
-}
-
 .gridHealthMetric {
   min-width: 8.5rem;
   text-align: left;
@@ -874,6 +870,30 @@ $topbar_height: 56px;
 
 .gridHealth-stable .conceptIcon {
   color: $interactive_blue;
+}
+
+// One warning language for the grid readout and the mission tracker, so "Low reserve" and
+// "Cash out in ~5 mo" read as the same kind of alert. Comes after both rows' own backgrounds.
+.statusWarning {
+  background: var(--warning-fill);
+  color: $font_color_primary;
+
+  .conceptIcon {
+    color: var(--warning-icon);
+  }
+}
+
+// Remove the inline SVG's baseline space so its visual center matches the adjacent label.
+.statusIcon {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.statusLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
@@ -913,8 +933,8 @@ $topbar_height: 56px;
     min-height: $topbar_height;
     flex-direction: column;
     gap: 3px;
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding: 5px max(16px, env(safe-area-inset-right)) 5px
+      max(16px, env(safe-area-inset-left));
 
     .gridHealthSummary {
       display: grid;
@@ -931,9 +951,11 @@ $topbar_height: 56px;
       text-align: right;
     }
   }
+  // Same left inset as the grid readout above, so their warning icons stack in one column.
   .missionSummary {
     box-sizing: border-box;
     min-height: $topbar_height;
+    padding-left: max(16px, env(safe-area-inset-left));
   }
 }
 
