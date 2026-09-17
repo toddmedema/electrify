@@ -11,6 +11,7 @@ function objective(
   return {
     card: "FACILITIES",
     target: "#tutorial-target",
+    action: "Tap the target",
     content: (
       <TutorialPrompt
         concepts={["supply", "demand"]}
@@ -54,6 +55,10 @@ describe("TutorialHud", () => {
     await user.keyboard("{Enter}");
     expect(hudProps.onNext).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "Next" })).toBeVisible();
+    // The deed is the step's main call to action; Next is only its quiet fallback
+    expect(screen.getByRole("button", { name: "Next" })).not.toHaveClass(
+      "MuiButton-contained",
+    );
     rerender(
       <>
         <button id="tab">Interties</button>
@@ -114,7 +119,11 @@ describe("TutorialHud", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Objective 2 of 3")).toBeInTheDocument();
     expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
+    expect(screen.getByText("Tap the target")).toBeInTheDocument();
 
+    expect(screen.getByRole("button", { name: "Next" })).toHaveClass(
+      "MuiButton-contained",
+    );
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Exit" }));
@@ -159,12 +168,15 @@ describe("TutorialHud", () => {
     expect(target).not.toHaveClass("tutorialTargetReminder");
     const ring = screen.getByTestId("tutorial-target-ring");
     expect(ring).toBeInTheDocument();
+    // One pulse right away points out where to act, before the slower reminder starts
+    expect(ring).toHaveClass("tutorialTargetRingIntro");
 
     act(() => jest.advanceTimersByTime(9_999));
     expect(target).not.toHaveClass("tutorialTargetReminder");
     act(() => jest.advanceTimersByTime(1));
     expect(target).toHaveClass("tutorialTargetReminder");
     expect(ring).toHaveClass("tutorialTargetRingPulse");
+    expect(ring).not.toHaveClass("tutorialTargetRingIntro");
 
     rerender(
       <TutorialHud

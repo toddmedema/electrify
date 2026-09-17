@@ -88,19 +88,21 @@ for (const mission of [
         await hud.getByRole("button", { name: "Next" }).click();
       }
       if (mission === "Pricing") {
-        await expect(hud).toContainText("Lower the rate");
+        await expect(hud).toContainText("Drag the rate slider");
         const rate = page.locator("#rateSlider input");
         await rate.focus();
         await rate.press("ArrowLeft");
-        await expect(hud).toContainText("Watch how customer growth");
+        await expect(hud).toContainText("Find customer growth");
       } else {
-        await expect(hud).toContainText("Choose a financial measure");
+        await expect(hud).toContainText("Choose a measure or time period");
         await page
           .getByRole("button", { name: "Zoom in", exact: true })
           .click();
-        await expect(hud).toContainText("Choose a preset question");
+        await expect(hud).toContainText(
+          "Tap Layers, or choose a preset question",
+        );
         await page.locator("#insightsLayersButton").click();
-        await expect(hud).toContainText("Tap 1× to run a month");
+        await expect(hud).toContainText("Tap 1× to run the month");
       }
     }
     await expect(page.locator(".buildOption")).toHaveCount(0);

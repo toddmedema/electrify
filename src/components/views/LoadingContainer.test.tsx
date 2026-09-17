@@ -30,15 +30,15 @@ it("restores a capstone's authored pane after rebuilding its scenario", () => {
 });
 
 it.each([
-  { inGame: false, tutorialStep: 4, scenarioId: 0, expectedActions: 0 },
-  { inGame: true, tutorialStep: 3, scenarioId: 0, expectedActions: 0 },
-  { inGame: true, tutorialStep: 4, scenarioId: 2, expectedActions: 0 },
-  { inGame: true, tutorialStep: 4, scenarioId: 0, expectedActions: 2 },
+  { inGame: false, tutorialStep: 3, scenarioId: 0, expectedActions: 0 },
+  { inGame: true, tutorialStep: 2, scenarioId: 0, expectedActions: 0 },
+  { inGame: true, tutorialStep: 3, scenarioId: 2, expectedActions: 0 },
+  { inGame: true, tutorialStep: 3, scenarioId: 0, expectedActions: 2 },
 ])(
   "only restores the loaded tutorial that requested the callback: %p",
   (current) => {
     const state = store.getState();
-    const requested = { ...state.game, scenarioId: 0, tutorialStep: 4 };
+    const requested = { ...state.game, scenarioId: 0, tutorialStep: 3 };
     const dispatch = jest.fn();
     restoreLoadedTutorial(
       requested,

@@ -2,8 +2,29 @@ import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
 
 import TutorialPrompt from "../components/base/TutorialPrompt";
-import { AppStateType, ScenarioType } from "../Types";
+import { selectFacility } from "../reducers/UI";
+import { AppStateType, ScenarioType, TutorialUiIdType } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+
+// Mission 1 is a new player's first minute in the game, so it opens on the fleet and the chart
+// alone and hands over controls only as the steps teach them. Navigation, building, the menu and
+// the Insights and Events panes belong to later missions; the objective's own Exit button is
+// always there to leave by.
+const MISSION_ONE_CAPSTONE: TutorialUiIdType[] = [
+  "nav",
+  "build",
+  "yearProgress",
+  "sidePanes",
+];
+const MISSION_ONE_CLOCK: TutorialUiIdType[] = [
+  ...MISSION_ONE_CAPSTONE,
+  "menu",
+  "facilityActions",
+];
+const MISSION_ONE_FIRST_LOOK: TutorialUiIdType[] = [
+  ...MISSION_ONE_CLOCK,
+  "speed",
+];
 
 const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
@@ -118,44 +139,56 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: "#topbar",
+        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        hideUi: MISSION_ONE_FIRST_LOOK,
+        advanceOn: (s: AppStateType) =>
+          s.ui.selectedFacilityId !== null &&
+          s.ui.selectedFacilityId ===
+            s.game.facilities.find(
+              (facility) =>
+                "fuel" in facility && facility.fuel === "Natural Gas",
+            )?.id,
+        // Selection only opens row actions this mission keeps hidden, so let it go rather
+        // than leave a lit row behind that the capstone's first tap would close
+        onNext: () => selectFacility(null),
+        action: "Tap your gas plant",
         content: (
           <TutorialPrompt
-            concepts={["money", "goal"]}
-            text="Your goal: keep the lights on, pay the bills, and compare emissions."
+            concepts={["generator", "demand"]}
+            text="These two plants keep San Francisco’s lights on. The bar shows how hard each is working."
           />
         ),
       },
       {
         card: "FACILITIES",
         target: "#chartSupplyDemand",
+        hideUi: MISSION_ONE_FIRST_LOOK,
+        action: "Find the supply and demand lines, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="The supply line must stay at or above the demand line. If demand rises above supply, the chart marks a blackout."
+            text="Supply must stay at or above demand. If demand climbs higher, the city goes dark."
           />
         ),
       },
       {
         card: "FACILITIES",
-        target: ".facility",
+        // Only 1× is ringed: a new player's first choice of speed is the gentle one
+        target: '#speedChangeButtons [aria-label="slow speed"]',
+        hideUi: MISSION_ONE_CLOCK,
+        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to start time",
         content: (
           <TutorialPrompt
-            concepts={["generator"]}
-            text="Your plants make electricity. 351/410 MW means 351 MW now, out of 410 MW max."
+            concepts={["play", "demand"]}
+            text="Demand rises as the city wakes up."
           />
         ),
       },
       {
         card: "FACILITIES",
-        target: "#speedChangeButtons",
-        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        content: (
-          <TutorialPrompt concepts={["play"]} text="Tap 1× to start time." />
-        ),
-      },
-      {
-        card: "FACILITIES",
+        hideUi: MISSION_ONE_CAPSTONE,
+        action: "Keep supply above demand until midnight",
         content: (
           <TutorialPrompt
             concepts={["goal", "supply", "time"]}
@@ -174,7 +207,7 @@ export const SCENARIOS = [
           successMessage:
             "You kept electricity supply above demand for the full day.",
           failureMessage:
-            "Demand exceeded available supply. Check the reserve and forecast before you retry.",
+            "Demand exceeded available supply. Check each plant’s output and the supply chart before you retry.",
         },
       },
     ],
@@ -203,10 +236,11 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
+        action: "Tap Build",
         content: (
           <TutorialPrompt
             concepts={["build", "generator"]}
-            text="Choose Build to open the generator shop."
+            text="Your grid needs more power. New plants come from the generator shop."
           />
         ),
       },
@@ -215,6 +249,7 @@ export const SCENARIOS = [
         target: ".build-list-item",
         continueOn: (s: AppStateType) => s.game.facilities.length >= 2,
         continueOnClick: ".buildOption .expand-details",
+        action: "Tap a generator to compare its details",
         content: (
           <TutorialPrompt
             concepts={["money", "time", "fuel"]}
@@ -226,6 +261,7 @@ export const SCENARIOS = [
         card: { name: "BUILD_GENERATORS", dontRemember: true },
         target: ".buy-button",
         advanceOn: (s: AppStateType) => s.game.facilities.length >= 2,
+        action: "Buy it with cash, or take a loan",
         content: (
           <TutorialPrompt
             concepts={["buy", "generator"]}
@@ -236,6 +272,7 @@ export const SCENARIOS = [
       {
         card: "FACILITIES",
         target: ".facility",
+        action: "Find the construction progress, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["construction", "time"]}
@@ -247,12 +284,17 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to run the year",
         content: (
-          <TutorialPrompt concepts={["play"]} text="Tap 1× to run the year." />
+          <TutorialPrompt
+            concepts={["play", "construction"]}
+            text="Construction only moves while time runs."
+          />
         ),
       },
       {
         card: "FACILITIES",
+        action: "Build a second generator with a different fuel",
         content: (
           <TutorialPrompt
             concepts={["build", "generator", "fuel"]}
@@ -297,10 +339,11 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_STORAGE",
+        action: "Tap Build, then Storage",
         content: (
           <TutorialPrompt
             concepts={["build", "storage"]}
-            text="Store spare power for later. Choose Build, then Storage."
+            text="Storage saves spare power for later."
           />
         ),
       },
@@ -308,6 +351,7 @@ export const SCENARIOS = [
         card: { name: "BUILD_STORAGE", dontRemember: true },
         target: ".build-list-item",
         advanceOn: (s: AppStateType) => s.game.facilities.length >= 3,
+        action: "Buy a storage facility",
         content: (
           <TutorialPrompt
             concepts={["buy", "storage"]}
@@ -318,6 +362,7 @@ export const SCENARIOS = [
       {
         card: "FACILITIES",
         target: ".capacityProgressBar",
+        action: "Check the storage bar, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["storage"]}
@@ -329,10 +374,11 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: ".facility",
         advanceOnAction: "game/reprioritizeFacility",
+        action: "Move your generator above storage",
         content: (
           <TutorialPrompt
             concepts={["reorder"]}
-            text="Move generation above storage in the list so spare power can charge it. Storage returns less energy than it takes in."
+            text="Spare power charges storage only when generation comes first. Storage returns less energy than it takes in."
           />
         ),
       },
@@ -340,12 +386,17 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to run it",
         content: (
-          <TutorialPrompt concepts={["play"]} text="Tap 1× to run it." />
+          <TutorialPrompt
+            concepts={["play"]}
+            text="Watch storage fill while demand is low."
+          />
         ),
       },
       {
         card: "FACILITIES",
+        action: "Charge storage when demand is low, use it at peak",
         content: (
           <TutorialPrompt
             concepts={["storage", "supply", "time"]}
@@ -401,6 +452,7 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: "#insightsNav",
         continueOn: (s: AppStateType) => s.card.name === "INSIGHTS",
+        action: "Tap Insights",
         content: (
           <TutorialPrompt
             concepts={["finances", "money"]}
@@ -409,6 +461,7 @@ export const SCENARIOS = [
         ),
         desktop: {
           target: "#insightsPane",
+          action: "Find the Insights pane, then tap Next",
           content: (
             <TutorialPrompt
               concepts={["finances", "money"]}
@@ -422,10 +475,11 @@ export const SCENARIOS = [
         target: "#chartFinances",
         continueOnClick:
           ".insightsViewportToolbar button, [data-insight-preset]",
+        action: "Choose a measure or time period",
         content: (
           <TutorialPrompt
             concepts={["forecast", "money"]}
-            text="Choose a financial measure and time period to see how it changes."
+            text="Each measure shows how your money changes over time."
           />
         ),
       },
@@ -433,10 +487,11 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: ".insightsLayerControls",
         continueOnClick: "#insightsLayersButton, [data-insight-preset]",
+        action: "Tap Layers, or choose a preset question",
         content: (
           <TutorialPrompt
             concepts={["finances"]}
-            text="Choose a preset question, or use Layers to select the information you want to compare."
+            text="Layers let you compare the information you care about."
           />
         ),
       },
@@ -444,15 +499,17 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to run the month",
         content: (
           <TutorialPrompt
             concepts={["play", "money"]}
-            text="Tap 1× to run a month and watch the numbers."
+            text="Watch the numbers change as the month runs."
           />
         ),
       },
       {
         card: "INSIGHTS",
+        action: "Set a rate that turns next month’s loss into profit",
         content: (
           <TutorialPrompt
             concepts={["finances", "rate", "money"]}
@@ -499,6 +556,7 @@ export const SCENARIOS = [
         target: "#insightsNav",
         continueOn: (s: AppStateType) =>
           s.card.name === "INSIGHTS" || s.game.dollarsPerkWh < 0.07,
+        action: "Tap Insights",
         content: (
           <TutorialPrompt
             concepts={["rate", "customers"]}
@@ -507,6 +565,7 @@ export const SCENARIOS = [
         ),
         desktop: {
           target: "#insightsPane",
+          action: "Find your rate in Insights, then tap Next",
           content: (
             <TutorialPrompt
               concepts={["rate", "customers"]}
@@ -519,16 +578,18 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: "#rateSlider",
         advanceOn: (s: AppStateType) => s.game.dollarsPerkWh < 0.07,
+        action: "Drag the rate slider below the market price",
         content: (
           <TutorialPrompt
             concepts={["rate", "customers"]}
-            text="Lower the rate below the market price so more customers choose your utility."
+            text="A rate below the market price wins more customers."
           />
         ),
       },
       {
         card: "INSIGHTS",
         target: "#chartInsightsCustomers",
+        action: "Find customer growth on the chart, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["customers", "forecast"]}
@@ -540,12 +601,17 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to run the year",
         content: (
-          <TutorialPrompt concepts={["play"]} text="Tap 1× to run the year." />
+          <TutorialPrompt
+            concepts={["play", "customers"]}
+            text="Watch customers respond to your new rate."
+          />
         ),
       },
       {
         card: "INSIGHTS",
+        action: "Grow customers 5% while staying profitable",
         content: <CustomerGrowthChallenge />,
         hint: "A modest discount below the market rate attracts customers. Check the financial forecast too: a rate that is too low can grow sales while losing money.",
         capstone: {
@@ -585,20 +651,22 @@ export const SCENARIOS = [
         target: ".facility",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some((facility) => facility.paused),
+        action: "Tap your plant, then tap Pause",
         content: (
           <TutorialPrompt
             concepts={["pause", "generator"]}
-            text="Pause your only plant and watch how the supply forecast changes."
+            text="Pausing a plant changes the supply forecast."
           />
         ),
       },
       {
         card: "INSIGHTS",
         target: "#chartForecastSupplyDemand",
+        action: "Find the predicted blackout, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["forecast", "blackout"]}
-            text="Find the predicted blackout on the chart. It shows one representative day per month, not every difficult day."
+            text="The chart shows one representative day per month, not every difficult day."
           />
         ),
       },
@@ -607,20 +675,22 @@ export const SCENARIOS = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) =>
           s.game.eventLog.some((event) => event.kind === "BLACKOUT"),
+        action: "Tap 1× and let the blackout begin",
         content: (
           <TutorialPrompt
             concepts={["play", "blackout"]}
-            text="Tap 1× and let the predicted blackout begin."
+            text="See what a forecast blackout looks like when it arrives."
           />
         ),
       },
       {
         card: "EVENTS",
         target: ".eventLogItem",
+        action: "Read the blackout event, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["time", "blackout"]}
-            text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
+            text="Each dated event explains what changed. Events also flag changes in which fuel is cheaper."
           />
         ),
         desktop: {
@@ -628,7 +698,7 @@ export const SCENARIOS = [
           content: (
             <TutorialPrompt
               concepts={["time", "blackout"]}
-              text="Read the dated event to see what changed. Events also flag changes in which fuel is cheaper."
+              text="Each dated event explains what changed. Events also flag changes in which fuel is cheaper."
             />
           ),
         },
@@ -638,30 +708,33 @@ export const SCENARIOS = [
         target: ".facility",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.every((f) => !f.paused),
+        action: "Tap your plant, then tap Resume",
         content: (
           <TutorialPrompt
             concepts={["play", "generator"]}
-            text="Turn it back on."
+            text="Bring your plant back online."
           />
         ),
       },
       {
         card: "INSIGHTS",
         target: "#chartForecastFuelPrices",
+        action: "Compare future fuel prices, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["fuel", "money"]}
-            text="Compare possible fuel costs in five years to explore price changes. These examples leave your game unchanged."
+            text="Possible fuel costs five years out show how prices could change. These examples leave your game unchanged."
           />
         ),
       },
       {
         card: "INSIGHTS",
         target: "#chartForecastWeather",
+        action: "Compare weather with demand, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["weather", "demand"]}
-            text="Compare weather with demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather."
+            text="Weather drives demand and renewable output. In this game, emissions affect your score and any carbon fee, not local weather."
           />
         ),
       },
@@ -669,15 +742,17 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
+        action: "Tap 1× to run the year",
         content: (
           <TutorialPrompt
             concepts={["play"]}
-            text="Tap 1× to run the year. The Manual has the deep dives."
+            text="The Manual has the deep dives."
           />
         ),
       },
       {
         card: "FACILITIES",
+        action: "Finish new generation before the summer shortage",
         content: (
           <TutorialPrompt
             concepts={["forecast", "build", "blackout"]}
@@ -728,10 +803,11 @@ export const SCENARIOS = [
         card: "FACILITIES",
         target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_INTERTIES",
+        action: "Tap Build, then Interties",
         content: (
           <TutorialPrompt
             concepts={["supply", "demand"]}
-            text="Choose Build, then Interties to connect to a neighboring grid."
+            text="An intertie connects you to a neighboring grid."
           />
         ),
       },
@@ -739,10 +815,11 @@ export const SCENARIOS = [
         card: { name: "BUILD_INTERTIES", dontRemember: true },
         target: "#review-intertie-california-north",
         advanceOn: (s: AppStateType) => !!tutorialNorthernIntertie(s),
+        action: "Review the Pacific Northwest line, then Take loan",
         content: (
           <TutorialPrompt
             concepts={["money", "construction"]}
-            text="Review the Pacific Northwest intertie, then choose Take loan."
+            text="A loan spreads the line’s cost over time."
           />
         ),
       },
@@ -752,10 +829,11 @@ export const SCENARIOS = [
         advanceOn: (s: AppStateType) =>
           tutorialNorthernIntertie(s)?.yearsToBuildLeft === 0 &&
           s.game.speed === "PAUSED",
+        action: "Tap 1×, then pause when it says Connected",
         content: (
           <TutorialPrompt
             concepts={["construction", "time"]}
-            text="Run time until the line says Connected, then pause."
+            text="The line can’t trade until construction finishes."
           />
         ),
         hint: "Tap 1× or fast speed, watch Building change to Connected, then tap pause.",
@@ -765,16 +843,18 @@ export const SCENARIOS = [
         target: ".tradingPolicy",
         advanceOn: (s: AppStateType) =>
           s.game.transmission?.tradingPolicy === "RELIABILITY_FIRST",
+        action: "Choose “Buy for shortages only”",
         content: (
           <TutorialPrompt
             concepts={["demand", "supply"]}
-            text="Choose “Buy for shortages only” to use the neighboring grid as backup."
+            text="This uses the neighboring grid as backup."
           />
         ),
       },
       {
         card: "FACILITIES",
         target: "#dispatch-order",
+        action: "Find the dispatch order, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["generator", "pause"]}
@@ -792,10 +872,11 @@ export const SCENARIOS = [
               facility.fuel === "Natural Gas" &&
               facility.paused,
           ),
+        action: "Tap the gas plant, then tap Pause",
         content: (
           <TutorialPrompt
             concepts={["pause", "demand"]}
-            text="Pause the natural-gas plant to create a shortage the intertie can cover."
+            text="A shortage lets you see the intertie cover it."
           />
         ),
       },
@@ -806,10 +887,11 @@ export const SCENARIOS = [
           s.game.date.monthsElapsed >= 13 &&
           tutorialSawImports(s) &&
           s.game.speed === "PAUSED",
+        action: "Tap 1×, then pause when you see Importing",
         content: (
           <TutorialPrompt
             concepts={["play", "supply"]}
-            text="Run until you see Importing, then pause; the line can cover only up to its available capacity."
+            text="The line can cover only up to its available capacity."
           />
         ),
         hint: "If time is paused, tap 1× or fast speed; the line must say Connected.",
@@ -817,16 +899,18 @@ export const SCENARIOS = [
       {
         card: "INSIGHTS",
         target: '[data-layer="powerExchange"]',
+        action: "Find imports on the chart, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["supply", "money"]}
-            text="Check imports alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total."
+            text="Imports appear alongside your shortage. Line and neighbor limits constrain backup; purchased emissions count in your total."
           />
         ),
       },
       {
         card: "INSIGHTS",
         target: ".powerExchangeSummary",
+        action: "Compare available capacity with 500 MW, then tap Next",
         content: (
           <TutorialPrompt
             concepts={["weather", "supply"]}
@@ -836,6 +920,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        action: "Choose “Buy for shortages, sell extra,” then run",
         content: (
           <TutorialPrompt
             concepts={["supply", "goal"]}
