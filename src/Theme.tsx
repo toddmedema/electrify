@@ -175,8 +175,9 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     demand: "#dce6f0",
     supply: "#6ab8f7",
     // Blue50 solid, as light uses, reads as a near-white glare on a near-black plot; a faint
-    // tint of the supply line itself keeps the wash subtle enough for both lines to read over it
-    historicFill: withAlpha("#6ab8f7", 0.12),
+    // tint of the supply line itself keeps the wash subtle enough for both lines to read over it,
+    // while staying visible in a bright room
+    historicFill: withAlpha("#6ab8f7", 0.16),
     blackout: "#ff6b6b",
     temperature: "#ff8a80",
     temperatureAxis: "#ff8a80",
