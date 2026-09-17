@@ -81,7 +81,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         );
       });
     },
-    // Mirrors Manual: Options can now be reached mid-game too, so back has to return wherever
+    // Mirrors Manual: Settings can now be reached mid-game too, so back has to return wherever
     // the player came from rather than always dropping them at the main menu
     onBack: () => {
       dispatch(navigateBack());

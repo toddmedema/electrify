@@ -42,7 +42,7 @@ export interface UPlotChartProps<S> {
   /** Everything the option callbacks and plugins need, recomputed every render */
   state: S;
   data: uPlot.AlignedData;
-  /** Optional unstacked values for the accessible summary when the canvas needs cumulative data. */
+  /** Optional unstacked values for the accessible label when the canvas needs cumulative data. */
   summaryData?: uPlot.AlignedData;
   /** Called once per plot. Width and height are filled in by this component. */
   buildOptions: (ctx: BuildContext<S>) => uPlot.Options;
@@ -56,9 +56,9 @@ export interface UPlotChartProps<S> {
    * with the pointer -- five tooltips at once would cover the data they are about.
    */
   syncKey?: string;
-  /** Human names for each y-series, used by the keyboard/screen-reader summary below. */
+  /** Human names for each y-series, used by the screen-reader label. */
   seriesLabels?: string[];
-  /** Formats summary values with the same compact units the visible chart uses. */
+  /** Formats label values with the same compact units the visible chart uses. */
   formatSummaryValue?: (value: number, seriesIndex: number) => string;
 }
 
@@ -543,31 +543,6 @@ export default function UPlotChart<S>(
           overflow: "hidden",
         }}
       />
-      <details className="chartDataSummary">
-        <summary>View chart summary</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Series</th>
-              <th>Latest</th>
-              <th>Minimum</th>
-              <th>Maximum</th>
-              <th>Trend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {seriesSummary.map((series) => (
-              <tr key={series.label}>
-                <th>{series.label}</th>
-                <td>{series.latest}</td>
-                <td>{series.minimum}</td>
-                <td>{series.maximum}</td>
-                <td>{series.trend}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
     </div>
   );
 }

@@ -35,9 +35,10 @@ test("public insights retain the benchmark and an absolute customer objective", 
     .getByRole("button", { name: "fast speed" })
     .first()
     .click();
+  // The first completed month records history
   await expect(
-    page.getByText(/Past charts show monthly averages/),
-  ).toBeVisible();
+    page.locator(".gameStatusValue.weak:visible").first(),
+  ).not.toContainText("January");
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "pause", exact: true })
@@ -75,7 +76,6 @@ test("public insights retain the benchmark and an absolute customer objective", 
     .click();
   await page.getByRole("menuitem", { name: "Scenario details" }).click();
   await expect(page.getByRole("dialog")).toContainText("14,850 customers");
-  await expect(page.getByRole("dialog")).toContainText("16,500 at the start");
   if (reviewDir && testInfo.project.name === "desktop-chromium") {
     await page.getByRole("menu").waitFor({ state: "hidden" });
     await page.waitForTimeout(400);

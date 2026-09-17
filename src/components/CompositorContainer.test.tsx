@@ -127,10 +127,16 @@ describe("onTutorialStep", () => {
       {
         card: "FACILITIES",
         target: "#first",
+        action: "Tap first",
         content: <span />,
         onNext: () => sideEffect,
       },
-      { card: "INSIGHTS", target: "#second", content: <span /> },
+      {
+        card: "INSIGHTS",
+        target: "#second",
+        action: "Tap second",
+        content: <span />,
+      },
     ];
 
     it("fires onNext when leaving a step forwards", () => {

@@ -30,9 +30,29 @@ for (const theme of ["light", "dark"] as const) {
       const metrics = first.locator(".buildOptionMetrics");
       await expect(metrics).toContainText("Build cost");
       await expect(metrics).toContainText("Build time");
-      await expect(metrics).toContainText(
-        kind === "Storage" ? "Round-trip efficiency" : "Typical output",
-      );
+      if (kind === "Storage") {
+        await expect(metrics).toContainText("Round-trip efficiency");
+      } else {
+        await expect(metrics).not.toContainText("Typical output");
+        const sparklines = page.locator(".buildOptionSparkline svg");
+        await expect(sparklines).toHaveCount(await cards.count());
+        const strokes = await sparklines.evaluateAll((lines) =>
+          lines.map(
+            (line) => getComputedStyle(line.querySelector("polyline")!).stroke,
+          ),
+        );
+        expect(strokes.every((stroke) => stroke === strokes[0])).toBe(true);
+        expect(strokes[0]).toBe(
+          theme === "light" ? "rgb(84, 110, 122)" : "rgb(154, 169, 186)",
+        );
+        // Cost, time and the output line share one row
+        const cells = await metrics
+          .locator(".buildOptionMetric")
+          .evaluateAll((els) =>
+            els.map((el) => el.getBoundingClientRect().top),
+          );
+        expect(new Set(cells.map(Math.round)).size).toBe(1);
+      }
       const review = first.getByRole("button", { name: /Review purchase of/ });
       const header = first.locator(".MuiCardHeader-root");
       const box = (await first.boundingBox())!;
@@ -71,8 +91,15 @@ for (const theme of ["light", "dark"] as const) {
           await page.getByRole("menuitem", { name: "Cost per MWh" }).click();
         }
         await expect(first.locator(".buildOptionMetrics")).toContainText(
-          "Lifetime cost / MWh",
+          "Cost per MWh",
         );
+        const sortedCells = await first
+          .locator(".buildOptionMetric")
+          .evaluateAll((els) =>
+            els.map((el) => el.getBoundingClientRect().top),
+          );
+        expect(sortedCells).toHaveLength(4);
+        expect(new Set(sortedCells.map(Math.round)).size).toBe(1);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
@@ -125,7 +152,7 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`Storage-modern-${theme}.png`),
     });
     await battery.getByRole("button", { name: "Show Battery details" }).click();
-    await expect(battery).toContainText(
+    await expect(battery).not.toContainText(
       "Full-power duration assumes a full charge",
     );
     await expect(

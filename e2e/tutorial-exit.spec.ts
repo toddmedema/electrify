@@ -6,9 +6,10 @@ async function reachStartTimeStep(page: Page) {
   await page
     .getByRole("button", { name: "Start playing", exact: true })
     .click();
-  for (let i = 0; i < 3; i++) {
-    await page.getByRole("button", { name: "Next" }).click();
-  }
+  await page
+    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
 }
 

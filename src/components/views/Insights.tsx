@@ -1471,9 +1471,7 @@ export default class Insights extends React.Component<Props, State> {
           game.policies?.programs.curtailment?.tier !== "Off") &&
           game.policies && (
             <Typography variant="caption">
-              Tariffs and credits adjust this base rate. Customer estimates here
-              assume a flat rate; use Customer programs for demand and cash with
-              offers.
+              Active programs adjust this rate.
             </Typography>
           )}
         <div
@@ -1773,16 +1771,15 @@ export default class Insights extends React.Component<Props, State> {
             domain={projection.domain.x}
             syncKey={SYNC_KEY}
           />
-          {id === "emissions" && (
-            <Typography variant="caption" color="textSecondary" component="p">
-              Total includes local plants and estimated emissions from purchased
-              electricity. Last completed month:{" "}
-              {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local +{" "}
-              {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
-              imported ({largeMassUnit(this.context as UnitSystemType)} CO2e).
-              Neighboring-grid assumptions are in Interties.
-            </Typography>
-          )}
+          {id === "emissions" &&
+            (game.monthlyHistory[0]?.importedKgco2e || 0) > 0 && (
+              <Typography variant="caption" color="textSecondary" component="p">
+                Last month:{" "}
+                {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local
+                + {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
+                imported ({largeMassUnit(this.context as UnitSystemType)} CO2e)
+              </Typography>
+            )}
         </>
       );
     } else {
@@ -1832,8 +1829,7 @@ export default class Insights extends React.Component<Props, State> {
                 color="text.secondary"
                 sx={{ mx: 2 }}
               >
-                Supply is dispatched electricity. Reserve shows how much more
-                demand the grid could cover within 15 minutes.
+                Reserve: extra demand you could cover within 15 min.
                 <ManualLink
                   entry={MANUAL_ENTRY.RESERVE_CAPACITY}
                   text="How reserve works"
@@ -2507,14 +2503,6 @@ export default class Insights extends React.Component<Props, State> {
           <ForecastScope />
           {this.renderLayerPanel(projection)}
           {this.renderLevers(now)}
-          {game.monthlyHistory.length > 0 && (
-            <Typography variant="caption" color="textSecondary" sx={{ px: 2 }}>
-              Past charts show monthly averages; financial charts show monthly
-              totals or ending balances.
-              {game.monthlyHistory.some((month) => !month.chartAverage) &&
-                " Older saves have only financial and supply/demand history until new months are recorded."}
-            </Typography>
-          )}
           {this.renderViewportControls(
             viewportBounds,
             viewportRange,

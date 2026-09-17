@@ -239,10 +239,7 @@ function Decision({
                 )}
               </Box>
             ))}
-            <Typography variant="body2">
-              Changes start next month. Rebates install lasting upgrades;
-              tariffs and contracts apply only while enabled.
-            </Typography>
+            <Typography variant="body2">Changes start next month.</Typography>
           </Box>
         ) : (
           <Box sx={{ display: "grid", gap: 2 }}>
@@ -260,8 +257,7 @@ function Decision({
                       ? "Installed upgrades retained"
                       : "Building up"
                     : "No funded upgrades yet"}{" "}
-                · {Math.round(current!.adoption * 100)}% of eligible potential
-                installed
+                · {Math.round(current!.adoption * 100)}% installed
               </Typography>
             )}
             <RadioGroup
@@ -312,18 +308,9 @@ function Decision({
               </TextField>
             )}
             {!operating && (
-              <>
-                <Typography variant="body2">
-                  Off stops new spending; installed upgrades remain.
-                </Typography>
-                <Typography variant="body2">
-                  Small installs upgrades at a lower cost per upgrade. Large
-                  installs them faster, at a higher cost per upgrade.
-                </Typography>
-                <Typography variant="body2">
-                  Rebates cost money and reduce electricity sales.
-                </Typography>
-              </>
+              <Typography variant="body2">
+                Larger funding installs faster but costs more per upgrade.
+              </Typography>
             )}
             {effective >= end ? (
               <Alert severity="info">

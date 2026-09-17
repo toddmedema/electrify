@@ -36,8 +36,8 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
-  GAME_TO_REAL_YEARS,
   LOAN_MONTHS,
+  MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
 import { GENERATORS } from "../../data/Facilities";
@@ -49,6 +49,10 @@ import {
   LocationType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
+import {
+  expectedMonthlyOutputShape,
+  ExpectedOutputShape,
+} from "../../helpers/ExpectedOutput";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
@@ -61,6 +65,98 @@ import {
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import Sparkline from "../base/Sparkline";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function percent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * Every card's line is drawn against the same ceiling, so a flat solar curve looks flat next to a
+ * wind curve rather than being stretched to fill its own box. Rounded up to a tenth so the scale
+ * doesn't wobble between forecasts. Hydro's inflow is left out: a wet month routinely tops its
+ * nameplate, and letting that set the scale would flatten every other line on the list, so hydro
+ * clips at the top edge instead and its caption carries the dry month.
+ */
+export function sharedOutputCeiling(
+  shapes: (ExpectedOutputShape | undefined)[],
+): number {
+  const highest = Math.max(
+    0,
+    ...shapes.flatMap((shape) =>
+      shape && shape.kind === "weather" ? shape.monthly : [],
+    ),
+  );
+  return Math.min(1, Math.max(0.1, Math.ceil(highest * 10 - 1e-9) / 10));
+}
+
+function ExpectedOutputMetric(props: {
+  shape?: ExpectedOutputShape;
+  ceiling: number;
+}): React.JSX.Element {
+  const { shape, ceiling } = props;
+  let caption = "";
+  let chart: React.ReactNode = null;
+  if (shape && shape.kind === "on-demand") {
+    caption = "Any month";
+    chart = (
+      <Sparkline
+        values={new Array(12).fill(ceiling)}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        dash
+        ariaLabel="Available in any month."
+      />
+    );
+  } else if (shape) {
+    const highMonth = shape.monthly.reduce(
+      (high, value, month) => (value > shape.monthly[high] ? month : high),
+      0,
+    );
+    const low = shape.monthly[shape.lowMonth];
+    const water = shape.kind === "water-inflow";
+    caption = `Low ${MONTHS[shape.lowMonth]} ${percent(low)}${water ? " water in" : ""}`;
+    chart = (
+      <Sparkline
+        values={shape.monthly}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        fill
+        lowMarker
+        ariaLabel={`Typical year${water ? " of water inflow" : ""}: highest in ${MONTH_NAMES[highMonth]} at ${percent(shape.monthly[highMonth])}, lowest in ${MONTH_NAMES[shape.lowMonth]} at ${percent(low)}.`}
+      />
+    );
+  }
+  return (
+    <div className="buildOptionMetric buildOptionOutput">
+      <Typography variant="caption" color="textSecondary" component="div">
+        {caption}
+      </Typography>
+      <div className="buildOptionSparkline">{chart}</div>
+    </div>
+  );
+}
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -72,6 +168,9 @@ interface GeneratorBuildItemProps {
   secondaryMetric?: string;
   forecastGapW?: number;
   advantages?: string[];
+  /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
+  outputShape?: ExpectedOutputShape;
+  outputCeiling?: number;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -124,6 +223,22 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
+  const outputShape =
+    props.outputShape || expectedMonthlyOutputShape(generator, []);
+  // A short role tag stays on the card; how to use it waits for the details
+  const [role, roleHint] =
+    generator.fuel === "Hydro"
+      ? [
+          "Flexible water supply",
+          "Rain and snow refill the reservoir; generation drains it.",
+        ]
+      : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
+            generator.fuel,
+          )
+        ? ["Weather-dependent supply", "Pair with backup or storage."]
+        : generator.spinMinutes > 60
+          ? ["Steady supply", "Best for demand that lasts for hours."]
+          : ["Fast response", "Can follow changing demand."];
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -168,7 +283,9 @@ export function GeneratorBuildItem(
   );
 
   return (
-    <Card className="build-list-item buildOption">
+    <Card
+      className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
+    >
       <CardHeader
         avatar={
           <Avatar
@@ -196,15 +313,7 @@ export function GeneratorBuildItem(
         title={generator.name}
       />
       <Typography className="buildOptionContext" variant="body2">
-        {generator.fuel === "Hydro"
-          ? "Flexible water supply · rain and snow refill the reservoir; generation drains it"
-          : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
-                generator.fuel,
-              )
-            ? "Weather-dependent supply · pair with backup or storage"
-            : generator.spinMinutes > 60
-              ? "Steady supply · best for demand that lasts for hours"
-              : "Fast response · can follow changing demand"}
+        {role}
       </Typography>
       {!canBuild && (
         <Typography
@@ -215,11 +324,7 @@ export function GeneratorBuildItem(
           {buildSubtitle}
         </Typography>
       )}
-      <Box className="buildOptionMetrics">
-        <BuildMetric
-          label="Typical output"
-          value={formatWatts(typicalOutputW)}
-        />
+      <Box className="buildOptionMetrics singleRow">
         <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
@@ -228,10 +333,14 @@ export function GeneratorBuildItem(
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
+        <ExpectedOutputMetric
+          shape={outputShape}
+          ceiling={props.outputCeiling || 1}
+        />
         {props.secondaryMetric === "lcWh" && (
           <BuildMetric
-            label="Lifetime cost / MWh"
-            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+            label="Cost per MWh"
+            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
           />
         )}
       </Box>
@@ -259,8 +368,7 @@ export function GeneratorBuildItem(
           variant="body2"
           color="textSecondary"
         >
-          {generator.description} Starts, minimum output, and ramping are
-          managed automatically.
+          {roleHint} {generator.description}
         </Typography>
         {(props.advantages || []).length > 0 && (
           <Box sx={{ px: 2, pb: 1 }}>
@@ -287,12 +395,8 @@ export function GeneratorBuildItem(
                     Estimated lifetime cost per MWh
                     <ManualLink entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY} />
                     <Typography variant="body2" color="textSecondary">
-                      Across its lifetime, assuming a{" "}
-                      {Math.round(generator.capacityFactor * 100)}% capacity
+                      At {Math.round(generator.capacityFactor * 100)}% capacity
                       factor
-                      {generator.costPerStart !== undefined
-                        ? " and one start/day"
-                        : ""}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -305,9 +409,6 @@ export function GeneratorBuildItem(
                   <TableCell>
                     Minimum stable output
                     <ManualLink entry={MANUAL_ENTRY.RAMP_RATE} />
-                    <Typography variant="body2" color="textSecondary">
-                      While the plant remains online
-                    </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {Math.round(generator.minimumStableOutput * 100)}% ·{" "}
@@ -334,12 +435,7 @@ export function GeneratorBuildItem(
               </TableRow>
               {hasVariableOM && (
                 <TableRow>
-                  <TableCell>
-                    Variable operations & maintenance
-                    <Typography variant="body2" color="textSecondary">
-                      Per generated MWh
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Variable operations & maintenance</TableCell>
                   <TableCell align="right">
                     ${(generator.variableOperatingCostPerMWh || 0).toFixed(2)}
                     /MWh generated
@@ -348,30 +444,9 @@ export function GeneratorBuildItem(
               )}
               {generator.costPerStart !== undefined && (
                 <TableRow>
-                  <TableCell>
-                    Non-fuel start cost
-                    <Typography variant="body2" color="textSecondary">
-                      Per equivalent start
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Non-fuel start cost</TableCell>
                   <TableCell align="right">
                     {formatMoneyConcise(generator.costPerStart)}/start
-                  </TableCell>
-                </TableRow>
-              )}
-              {generator.costPerStart !== undefined && (
-                <TableRow>
-                  <TableCell>
-                    Representative-day charge
-                    <Typography variant="body2" color="textSecondary">
-                      365 / 12 equivalent starts
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(
-                      generator.costPerStart * GAME_TO_REAL_YEARS,
-                    )}
-                    /displayed start
                   </TableCell>
                 </TableRow>
               )}
@@ -395,12 +470,7 @@ export function GeneratorBuildItem(
               )}
               {fuelPrices[generator.fuel] && (
                 <TableRow>
-                  <TableCell>
-                    Fuel costs
-                    <Typography variant="body2" color="textSecondary">
-                      Varies with fuel prices
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Fuel costs</TableCell>
                   <TableCell align="right">
                     {/* btuPerWh * 1M = BTU per MWh, and prices are per million BTU,
                         so the two factors of a million cancel out */}
@@ -429,13 +499,7 @@ export function GeneratorBuildItem(
                 </TableRow>
               )}
               <TableRow>
-                <TableCell>
-                  Accounting lifetime
-                  <Typography variant="body2" color="textSecondary">
-                    Used for asset value and cost estimates; plants do not
-                    automatically retire at this age.
-                  </Typography>
-                </TableCell>
+                <TableCell>Accounting lifetime</TableCell>
                 <TableCell align="right">
                   {generator.lifespanYears} years
                 </TableCell>
@@ -450,9 +514,6 @@ export function GeneratorBuildItem(
                     entry={MANUAL_ENTRY.EMISSIONS}
                     label="CO2e emissions"
                   />
-                  <Typography variant="body2" color="textSecondary">
-                    CO2e released at the plant for each MWh generated
-                  </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {kgCO2ePerMWh > 0
@@ -489,28 +550,25 @@ export function GeneratorBuildItem(
                 concept: "finances",
                 label: "Loan option",
                 value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
-                detail:
-                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+                detail: "Payments start now.",
               },
               {
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise(estimatedAnnualOperatingCost(generator) / 12)}/mo`,
-                detail:
-                  "Operations and maintenance at typical use; fuel, carbon fees, and loan payments are extra. Actual use changes costs.",
+                detail: "Plus fuel and loan payments.",
               },
               {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail:
-                  "Output and reserve do not increase until construction finishes.",
+                detail: "No output until built.",
               },
               {
                 concept: "supply",
                 label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail: `${formatWatts(generator.peakW)} maximum rated output; check availability during the shortage. Typical output is not guaranteed at that hour.`,
+                detail: `${formatWatts(generator.peakW)} max; weather may limit it.`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
@@ -763,6 +821,13 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     0,
     ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
   );
+  const outputShapes = new Map(
+    generators.map((generator) => [
+      generator.name,
+      expectedMonthlyOutputShape(generator, forecastedTimeline),
+    ]),
+  );
+  const outputCeiling = sharedOutputCeiling(Array.from(outputShapes.values()));
   const buildableGenerators = generators.filter(
     (generator) => generator.available && generator.peakW <= generator.maxPeakW,
   );
@@ -854,6 +919,8 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
               secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
               forecastGapW={forecastGapW}
               advantages={advantages.slice(0, 2)}
+              outputShape={outputShapes.get(g.name)}
+              outputCeiling={outputCeiling}
               compared={compared}
               compareDisabled={comparedNames.length >= 3}
               onCompare={() => toggleCompare(g.name)}

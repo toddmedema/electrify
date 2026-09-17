@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TableCell, TableRow, Typography } from "@mui/material";
+import { TableCell, TableRow } from "@mui/material";
 
 interface BuildAvailability {
   buildable: boolean;
@@ -17,8 +17,7 @@ export function getBuildAvailability(
   if (!available && viableLocationsRemaining !== 0) {
     return {
       buildable: false,
-      secondaryText:
-        "Not available in this game at this location or point in time.",
+      secondaryText: "Not available here yet.",
     };
   }
   const siteBuildable = viableLocationsRemaining !== 0;
@@ -52,13 +51,7 @@ export function ViableLocationsRow(props: {
   }
   return (
     <TableRow>
-      <TableCell>
-        Project sites available in this game
-        <Typography variant="body2" color="textSecondary">
-          Each project uses one site. These game limits are not a site survey;
-          zero does not prove the resource is impossible here.
-        </Typography>
-      </TableCell>
+      <TableCell>Sites left</TableCell>
       <TableCell align="right">{props.remaining}</TableCell>
     </TableRow>
   );

@@ -10,9 +10,15 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Step 1 of 5" }),
+    page.getByRole("heading", { name: "Step 1 of 4" }),
   ).toBeVisible();
-  await expect(page.getByText("Your goal: keep the lights on")).toBeVisible();
+  await expect(page.getByText("Tap your gas plant")).toBeVisible();
+  // The first step is a new player's first look at the game, so everything it doesn't use
+  // stays out of the way until a later step needs it
+  await expect(page.locator("#navfooter")).toBeHidden();
+  await expect(page.locator(".button-buildFacility")).toBeHidden();
+  await expect(page.locator(".gameMenuButton")).toBeHidden();
+  await expect(page.locator("#speedChangeButtons")).toBeHidden();
 
   const expectObjectiveDocked = async () => {
     const objective = page.locator(".tutorialHud");
@@ -37,16 +43,24 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   if (testInfo.project.name === "desktop-1440px") {
     await expect(page.locator(".desktop-layout")).toHaveCount(1);
     await expect(page.locator(".pane-layout")).toHaveCount(0);
+    // Mission 1 keeps Insights and Events for later: the fleet has the screen to itself, with
+    // no empty column or splitter left where they would be
+    await expect(page.locator("#facilitiesPane")).toBeVisible();
+    await expect(page.locator(".desktop-pane")).toHaveCount(1);
+    await expect(page.locator(".pane-splitter")).toHaveCount(0);
+    await expect(page.locator("#insightsPane")).toHaveCount(0);
+    await expect(page.locator("#eventsPane")).toHaveCount(0);
   }
 
-  await page.getByRole("button", { name: "Next" }).click();
+  await page
+    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
+    .click();
   await expect(
-    page.getByText(/supply line must stay at or above the demand line/i),
+    page.getByText(/Supply must stay at or above demand/i),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Your plants make electricity")).toBeVisible();
-  await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
+  await expect(page.locator("#speedChangeButtons")).toBeVisible();
 
   if (testInfo.project.name.startsWith("mobile-")) {
     const speedButtons = page.locator("#speedChangeButtons button");
@@ -57,10 +71,8 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     }
   }
 
-  if (testInfo.project.name === "mobile-390px") {
-    await expect(page.getByRole("button", { name: "Insights" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Events" })).toBeVisible();
-  }
+  // Navigation belongs to later missions
+  await expect(page.locator("#navfooter")).toBeHidden();
 
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(

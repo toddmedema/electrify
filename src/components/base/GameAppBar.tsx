@@ -266,7 +266,7 @@ export function GameAppBar(props: Props) {
           onClose={handleMenuClose}
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Options</MenuItem>
+          <MenuItem onClick={onSettings}>Settings</MenuItem>
           <MenuItem
             onClick={() => {
               setScenarioDetailsOpen(true);

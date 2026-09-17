@@ -40,10 +40,9 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   );
 
   const row = screen.getByRole("row", {
-    name: /Project sites available in this game.*648/,
+    name: /Sites left.*648/,
   });
   expect(row).toHaveTextContent("648");
-  expect(row).toHaveTextContent("Each project uses one site");
 });
 
 it("submits a storage purchase only once on a double-click", () => {

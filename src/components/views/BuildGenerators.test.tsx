@@ -18,6 +18,7 @@ import {
 } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
+import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
@@ -46,7 +47,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
+  expect(screen.queryByText(/Typical output/)).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
   );
@@ -58,7 +59,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Non-fuel start cost.*Per equivalent start.*\$23\.1k\/start/,
+      name: /Non-fuel start cost.*\$23\.1k\/start/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -71,13 +72,13 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
     screen.getByRole("button", { name: "Review purchase of Natural Gas" }),
   );
   const impact = screen.getByRole("region", { name: "Expected impact" });
-  expect(impact).toHaveTextContent("What changes");
+  expect(impact).not.toHaveTextContent("What changes");
   expect(impact).toHaveTextContent("Cash purchase");
   expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
   expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).toHaveTextContent("Typical output");
-  expect(impact).toHaveTextContent("check availability during the shortage");
+  expect(impact).toHaveTextContent("weather may limit it");
   expect(impact).not.toHaveTextContent("largest forecast shortage");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(
@@ -127,7 +128,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).toHaveAttribute("aria-expanded", "false");
 }, 15000);
 
-it("shows Coal's physical and representative-day start charges", () => {
+it("shows Coal's start charge without the representative-day breakdown", () => {
   const game = createGame({ scenarioId: 104, difficulty: "CEO" });
   const generator = GENERATORS(game, 650000000, [], []).find(
     (candidate) => candidate.name === "Coal",
@@ -149,14 +150,10 @@ it("shows Coal's physical and representative-day start charges", () => {
 
   expect(
     screen.getByRole("row", {
-      name: /Non-fuel start cost.*Per equivalent start.*\$52\.7k\/start/,
+      name: /Non-fuel start cost.*\$52\.7k\/start/,
     }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByRole("row", {
-      name: /Representative-day charge.*365 \/ 12 equivalent starts.*\$1\.6M\/displayed start/,
-    }),
-  ).toBeInTheDocument();
+  expect(screen.queryByText(/Representative-day charge/)).toBeNull();
 });
 
 it("shows Oil's fixed, variable, and expected-output O&M", () => {
@@ -191,7 +188,7 @@ it("shows Oil's fixed, variable, and expected-output O&M", () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("row", {
-      name: /Variable operations & maintenance.*Per generated MWh.*\$25\.71\/MWh generated/,
+      name: /Variable operations & maintenance.*\$25\.71\/MWh generated/,
     }),
   ).toBeInTheDocument();
   expect(
@@ -223,14 +220,17 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   );
 
   expect(screen.getByText("Natural Gas")).toBeInTheDocument();
-  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
+  expect(screen.getByText("Any month")).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Available in any month." }),
+  ).toBeInTheDocument();
   expect(
     screen.queryByText(/largest forecast shortage/),
   ).not.toBeInTheDocument();
   expect(screen.getByText("Build cost")).toBeInTheDocument();
   expect(screen.getByText("Build time")).toBeInTheDocument();
   expect(screen.queryByText("Fastest online")).not.toBeInTheDocument();
-  expect(screen.queryByText("Lifetime cost / MWh")).not.toBeInTheDocument();
+  expect(screen.queryByText("Cost per MWh")).not.toBeInTheDocument();
   expect(screen.queryByText("Emissions")).not.toBeInTheDocument();
 
   fireEvent.click(
@@ -263,7 +263,7 @@ it("keeps the active lifetime-cost sort metric visible on collapsed cards", () =
     />,
   );
 
-  expect(screen.getByText("Lifetime cost / MWh")).toBeVisible();
+  expect(screen.getByText("Cost per MWh")).toBeVisible();
 });
 
 it("submits a generator purchase only once on a double-click", () => {
@@ -347,11 +347,7 @@ it("explains unavailable technologies and hides their comparison button", () => 
     />,
   );
 
-  expect(
-    screen.getByText(
-      "Not available in this game at this location or point in time.",
-    ),
-  ).toBeVisible();
+  expect(screen.getByText("Not available here yet.")).toBeVisible();
   expect(
     screen.queryByRole("button", { name: /Compare Unavailable Solar/ }),
   ).toBeNull();
@@ -360,6 +356,40 @@ it("explains unavailable technologies and hides their comparison button", () => 
       name: "Review purchase of Unavailable Solar",
     }),
   ).toBeDisabled();
+});
+
+it("draws each generator's typical year against one shared scale", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+  const monthly = jest.spyOn(ExpectedOutput, "expectedMonthlyOutputShape");
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+    />,
+  );
+
+  const cards = screen.getAllByRole("button", {
+    name: /^Review purchase of/,
+  });
+  // Once per generator in the list, not again inside each card
+  expect(monthly).toHaveBeenCalledTimes(cards.length);
+  monthly.mockRestore();
+
+  expect(
+    screen.getAllByRole("img", { name: /^Typical year|any month/ }),
+  ).toHaveLength(cards.length);
+  expect(
+    screen.getAllByRole("img", { name: /^Typical year: .*lowest in/ }).length,
+  ).toBeGreaterThan(0);
+  expect(
+    screen.getAllByText(/^Low [A-Z][a-z]{2} \d+%$/).length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText("Any month").length).toBeGreaterThan(0);
+  expect(screen.getByText(/^Low [A-Z][a-z]{2} \d+% water in$/)).toBeVisible();
+  expect(
+    screen.getByRole("img", { name: /^Typical year of water inflow: / }),
+  ).toBeInTheDocument();
 });
 
 it("pins up to three current-grid choices into a comparison tray", () => {

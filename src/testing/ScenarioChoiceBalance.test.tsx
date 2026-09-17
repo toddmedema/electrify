@@ -5,7 +5,8 @@ import {
   INTERN_ONE_BUILD_PLAYS,
   STANDARD_BALANCE_PLAYS,
 } from "./BalancePlaybooks";
-import { runSimulation, SimResultType } from "./Simulator";
+import { runSimulationOnce } from "./SimulationTestHelpers";
+import { SimResultType } from "./Simulator";
 
 jest.setTimeout(120000);
 
@@ -36,7 +37,7 @@ describe("major scenario choice balance", () => {
           )!;
           expect(decision).toBeDefined();
           const scenarioResponses = { [decision.id]: optionId };
-          const winning = runSimulation({
+          const winning = runSimulationOnce({
             scenarioId,
             difficulty,
             scenarioResponses,
@@ -44,7 +45,7 @@ describe("major scenario choice balance", () => {
               ? INTERN_ONE_BUILD_PLAYS[scenarioId]
               : STANDARD_BALANCE_PLAYS[scenarioId]),
           });
-          const losing = runSimulation({
+          const losing = runSimulationOnce({
             scenarioId,
             difficulty,
             scenarioResponses,
@@ -104,7 +105,7 @@ describe("major scenario choice balance", () => {
       )!;
       const play = difficulty === "CEO" ? STANDARD_BALANCE_PLAYS[107] : {};
       const simulate = (peakW: number, optionId: string) =>
-        runSimulation({
+        runSimulationOnce({
           scenarioId: 107,
           difficulty,
           ...play,
@@ -139,7 +140,7 @@ describe("major scenario choice balance", () => {
       )!;
       const play = difficulty === "CEO" ? STANDARD_BALANCE_PLAYS[106] : {};
       const simulate = (optionId: string) =>
-        runSimulation({
+        runSimulationOnce({
           scenarioId: 106,
           difficulty,
           ...play,
@@ -179,6 +180,7 @@ describe("major scenario choice balance", () => {
   it.each(["Intern", "CEO"] as const)(
     "wildfire cash preservation remains useful with an adequate grid on %s",
     (difficulty) => {
+      // The same runs the choice matrix above plays, so this reuses them rather than repeating them
       const decision = SCENARIO_CHOICES.find(
         (choice) => choice.scenarioId === 111,
       )!;
@@ -187,7 +189,7 @@ describe("major scenario choice balance", () => {
           ? STANDARD_BALANCE_PLAYS[111]
           : INTERN_ONE_BUILD_PLAYS[111];
       const simulate = (optionId: string) =>
-        runSimulation({
+        runSimulationOnce({
           scenarioId: 111,
           difficulty,
           ...play,

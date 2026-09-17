@@ -78,9 +78,7 @@ export function getMissionStatus(game: GameType) {
           : `${(minimum * 100).toFixed(2)}% minimum served · ${observed}/${count} completed months`) +
         (missing || (monthsRemaining === 0 && observed < count)
           ? " · Missing required history: not verifiable"
-          : currentMonth >= first && currentMonth < first + count
-            ? " · Current month is partial and not evaluated"
-            : ""),
+          : ""),
       target: `Serve at least ${Math.round(objective.minimumDemandServed * 100)}% of demand in each required month`,
       timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; checked at term end`,
       status: missing
@@ -308,8 +306,7 @@ export function selectMissionRisk(
   if (projected)
     return {
       id: `projection:${game.date.year}:${game.date.monthNumber}`,
-      label:
-        "Projected in this month's representative day: supply shortfall · View supply and demand",
+      label: "Shortfall expected later today · View supply and demand",
       shortLabel: "Projected shortfall",
       target: "supply-demand",
     };

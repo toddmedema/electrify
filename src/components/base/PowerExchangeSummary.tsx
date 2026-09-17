@@ -27,10 +27,6 @@ export default function PowerExchangeSummary({
         <img src="/images/transmission.svg" alt="" />
         <div>
           <Typography variant="h6">{direction}</Typography>
-          <Typography color="textSecondary" variant="body2">
-            Power automatically follows your trading rule. Imports fill a
-            shortage; exports use only energy above demand and your reserve.
-          </Typography>
         </div>
       </div>
       <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
@@ -48,15 +44,16 @@ export default function PowerExchangeSummary({
           <dd>{formatMoneyConcise(now.marketPricePerMWh || 0)}/MWh</dd>
         </div>
       </dl>
-      <Typography
-        className={weatherLimited ? "transmissionWeatherWarning" : undefined}
-        variant="body2"
-        color={weatherLimited ? "warning.main" : "textSecondary"}
-      >
-        {weatherLimited
-          ? `Hot, sunny weather has reduced the lines from ${formatWatts(nameplate)} nameplate capacity.`
-          : "Cooler, cloudier weather lets the lines carry their full rating."}
-      </Typography>
+      {weatherLimited && (
+        <Typography
+          className="transmissionWeatherWarning"
+          variant="body2"
+          color="warning.main"
+        >
+          Hot, sunny weather has reduced the lines from {formatWatts(nameplate)}{" "}
+          nameplate capacity.
+        </Typography>
+      )}
     </div>
   );
 }

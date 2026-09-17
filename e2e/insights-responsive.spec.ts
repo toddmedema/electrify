@@ -415,8 +415,6 @@ test("compact facility build buttons stay above the chart", async ({
     facilities.getByRole("button", { name: "Build", exact: true }),
   ];
   const chart = facilities.locator("#chartSupplyDemand");
-  if (!(await chart.isVisible()))
-    await facilities.locator(".facilitySupplyDisclosure > summary").click();
   await expect(chart).toBeVisible();
   const chartBox = await chart.boundingBox();
   const buttonBoxes = await Promise.all(

@@ -7,11 +7,28 @@ import {
   GameType,
   TutorialStepChangeType,
   TutorialStepType,
+  TutorialUiIdType,
   isGatedStep,
 } from "../Types";
 import { navigate } from "./Card";
 import { delta, quit, setSpeed, start, tutorialCompleteDialog } from "./Game";
 import { dialogOpen } from "./UI";
+
+const NOTHING_HIDDEN: TutorialUiIdType[] = [];
+
+/** The game chrome the current tutorial step keeps out of the way; empty outside a walkthrough. */
+export function selectTutorialHiddenUi(
+  state: AppStateType,
+): TutorialUiIdType[] {
+  const steps = getScenario(
+    state.game.scenarioId,
+    state.game.customScenario,
+  )?.tutorialSteps;
+  return (
+    (state.game.inGame && steps?.[state.game.tutorialStep]?.hideUi) ||
+    NOTHING_HIDDEN
+  );
+}
 
 /**
  * Restores a capstone's authored state while keeping the player on the capstone objective.

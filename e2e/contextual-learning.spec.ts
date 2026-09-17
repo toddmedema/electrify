@@ -130,13 +130,21 @@ for (const theme of ["light", "dark"] as const) {
 test("reading help preserves the current tutorial objective", async ({
   page,
 }) => {
+  // Mission 2, since Mission 1 keeps the navigation to Insights hidden while it teaches
   await page.addInitScript(() => {
     localStorage.clear();
     localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem(
+      "plays",
+      JSON.stringify({ plays: [{ scenarioId: 0, date: "2026-09-10" }] }),
+    );
   });
   await page.goto("/");
   await page
     .getByRole("button", { name: "Start playing", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start Generators", exact: true })
     .click();
   const objective = page.locator(".tutorialHud");
   await expect(objective).toBeVisible();

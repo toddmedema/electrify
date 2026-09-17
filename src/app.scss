@@ -26,7 +26,14 @@
   --font-color-faded: #666666;
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
+  // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
+  --spark-stroke: #546e7a; /* blueGray600 */
+  --spark-fill: rgba(84, 110, 122, 0.12);
+  --spark-baseline: #90a4ae; /* blueGray300 */
+  --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
   --interactive-tint: rgba(21, 101, 192, 0.5);
+  // The bright head of the glint that circles the tutorial ring
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 70%, white);
   --focus-ring: #7b1fa2;
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
@@ -66,7 +73,12 @@
   --font-color-faded: #9aa9ba;
   --font-color-disabled: #627083;
   --interactive-blue: #6ab8f7;
+  --spark-stroke: #9aa9ba;
+  --spark-fill: rgba(154, 169, 186, 0.16);
+  --spark-baseline: rgba(148, 163, 184, 0.34);
+  --spark-marker-fill: #111820;
   --interactive-tint: rgba(106, 184, 247, 0.42);
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 45%, white);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
@@ -193,6 +205,13 @@ $desktop_breakpoint: 1300px;
 // Below this, the default two-pane split makes a facility row narrower than its data and controls.
 // Keep in sync with isPaneLayout() in Globals.tsx.
 $pane_breakpoint: 1024px;
+// Unfolded foldables (Galaxy Z Fold ~707x823, Pixel Fold ~841x701) are narrower than that but
+// nearly square, so each pane still gets a phone's width. The aspect ratio window leaves out
+// portrait tablets (3:4 and taller) and landscape phones. Keep in sync with isPaneLayout().
+$fold_pane_min_width: 700px;
+$fold_pane_min_height: 600px;
+$pane_media: "screen and (min-width: #{$pane_breakpoint}), screen and (min-width: #{$fold_pane_min_width}) and (min-height: #{$fold_pane_min_height}) and (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4)";
+$single_pane_media: "screen and (max-width: #{$fold_pane_min_width - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-height: #{$fold_pane_min_height - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-aspect-ratio: 799/1000), screen and (max-width: #{$pane_breakpoint - 1px}) and (min-aspect-ratio: 1251/1000)";
 
 $sizemap: (
   large: 6vmin,
@@ -287,7 +306,9 @@ button,
 }
 
 @media (pointer: coarse) {
-  .MuiButtonBase-root,
+  // A Switch's thumb sits in its own button base sized to the track; stretching that base drops
+  // the thumb below the track's centre, and the row around the switch already gives a big target
+  .MuiButtonBase-root:not(.MuiSwitch-switchBase),
   .MuiButton-root,
   .MuiIconButton-root,
   .MuiToggleButton-root {
@@ -764,11 +785,6 @@ $topbar_height: 56px;
 .insightsTrack {
   scroll-margin-block: 12px;
 }
-.operatingSampleLabel {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
 .temporaryEvidence {
   padding: 4px 8px;
   font-size: 0.75rem;
@@ -898,7 +914,7 @@ $topbar_height: 56px;
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
-@media screen and (min-width: $pane_breakpoint) {
+@media #{$pane_media} {
   .gameStatusBar {
     display: flex;
     align-items: stretch;
@@ -927,7 +943,7 @@ $topbar_height: 56px;
 
 // Phones and narrow tablets keep the readout in its own intentional row: state on the left,
 // operational cushion on the right.
-@media screen and (max-width: ($pane_breakpoint - 1px)) {
+@media #{$single_pane_media} {
   .gridHealth {
     box-sizing: border-box;
     min-height: $topbar_height;
@@ -973,8 +989,21 @@ $pane_header_height: 40px;
 .facilities .paneHeader {
   gap: 8px;
 
+  // Compact enough to leave 4px above and below inside the header, with the icon sized to the
+  // label rather than towering over it
   .button-buildFacility {
     margin-left: auto;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 12px;
+
+    .MuiButton-startIcon {
+      margin-right: 6px;
+    }
+
+    .MuiButton-startIcon > svg {
+      font-size: 1em;
+    }
   }
 }
 
@@ -1123,15 +1152,10 @@ $pane_header_height: 40px;
   }
 }
 
-// Keep the compact pane-header height on phones while preventing the global coarse-pointer
-// target size from making these two labeled controls spill into the chart below.
+// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
 @media (pointer: coarse) {
-  .facilities .paneHeader {
-    .button-buildGenerator,
-    .button-buildStorage {
-      height: 32px;
-      min-height: 32px !important;
-    }
+  .facilities .paneHeader .button-buildFacility {
+    height: 44px;
   }
 }
 
@@ -2015,25 +2039,6 @@ html[data-theme="dark"] .uplot {
     0 8px 22px -16px var(--chart-shadow);
 }
 
-.chartDataSummary {
-  margin: 4px 8px 10px;
-  font-size: 0.75rem;
-  overflow-x: auto;
-
-  summary {
-    width: fit-content;
-    color: $interactive_blue;
-    cursor: pointer;
-    font-weight: 700;
-  }
-
-  table {
-    width: 100%;
-    min-width: max-content;
-    margin-top: 6px;
-  }
-}
-
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
 .uplot .u-cursor-x {
   border-right: 1px solid var(--cursor-line);
@@ -2794,7 +2799,7 @@ html[data-theme="dark"] .uplot {
     text-align: center;
   }
 
-  @media screen and (min-width: $pane_breakpoint) {
+  @media #{$pane_media} {
     .customSetupColumns {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3768,6 +3773,25 @@ html[data-theme="dark"] .uplot {
   overflow-wrap: anywhere;
 }
 
+// The step's one deed, set apart from the explanation beside it so a glance finds what to do
+.tutorialHudAction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  border-left: 3px solid $interactive_blue;
+  border-radius: 4px;
+  background: var(--bg-selected);
+  font-weight: 600;
+  line-height: 1.3;
+
+  svg {
+    flex: 0 0 auto;
+    color: var(--interactive-blue);
+  }
+}
+
 .tutorialHudHint {
   margin-top: 6px;
   padding: 6px 8px;
@@ -3789,6 +3813,22 @@ html[data-theme="dark"] .uplot {
   flex: 1 1 auto;
 }
 
+// Progressive reveal: a tutorial step names the chrome it doesn't need yet (see
+// TUTORIAL_UI_SELECTORS in Types). Speed keeps its space so the cash and date beside it don't
+// jump when it arrives; everything else gives its room back to the game.
+[data-tutorial-hide~="nav"] #navfooter,
+[data-tutorial-hide~="build"] .button-buildFacility,
+[data-tutorial-hide~="menu"] .gameMenuButton,
+[data-tutorial-hide~="facilityActions"] .facilityActions,
+[data-tutorial-hide~="facilityActions"] .facilityDragHandle,
+[data-tutorial-hide~="yearProgress"] #yearProgressBar {
+  display: none !important;
+}
+
+[data-tutorial-hide~="speed"] #speedChangeButtons {
+  visibility: hidden;
+}
+
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
 // surrounding choices. The cue is a ring overlay that TutorialHud positions on <body> around
 // the control, because an outline draws outside the element's box and any clipping ancestor --
@@ -3796,16 +3836,109 @@ html[data-theme="dark"] .uplot {
 // hugs the control instead, so all four sides stay visible. If the player has not acted after
 // ten seconds, a short pulse repeats every ten seconds. Capstones never receive either class;
 // the .tutorialTarget/.tutorialTargetReminder classes stay on the control as hooks.
+//
+// So the cue reads as live without flashing, a soft glint travels clockwise around the line,
+// one lap every six seconds. ::before brightens the 2px line along a ~60deg comet; ::after
+// bleeds the tint inward into the 3px gap, fading toward the control. Nothing draws outside
+// the ring's box. Both sweep the same registered angle; where @property is unsupported the
+// angle cannot animate, so --tutorial-glint-on stays unset and the plain ring shows alone.
+@property --tutorial-glint-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --tutorial-glint-on {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
 .tutorialTargetRing {
   position: fixed;
   z-index: 1240; // above the game, below the objective HUD (1250) and any dialog
   box-sizing: border-box;
   pointer-events: none;
   border: 2px solid var(--interactive-blue);
+
+  // Absolutely positioned children of a bordered box start at its padding edge, so pulling
+  // them out by the line width puts their outer edge exactly on the ring's outer edge.
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--tutorial-glint-on, 0);
+    animation: tutorialGlint 6s linear infinite;
+  }
+
+  // The line: an edge-only mask keeps just the 2px border.
+  &::before {
+    padding: 2px;
+    background: conic-gradient(
+      from var(--tutorial-glint-angle),
+      transparent 0deg,
+      var(--interactive-blue) 14deg,
+      var(--tutorial-glint) 36deg,
+      var(--tutorial-glint) 46deg,
+      var(--interactive-blue) 56deg,
+      transparent 60deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+
+  // The halo: four edge strips that skip the 2px line (so they do not dull its bright head)
+  // and fade across the 3px gap, cut off before the interior so the control is never tinted.
+  &::after {
+    background: conic-gradient(
+      from var(--tutorial-glint-angle),
+      transparent 0deg,
+      var(--interactive-tint) 30deg,
+      var(--interactive-tint) 42deg,
+      transparent 60deg
+    );
+    -webkit-mask:
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
+        top / 100% 5px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
+        bottom / 100% 5px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
+        left / 5px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
+        right / 5px 100% no-repeat;
+    mask:
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
+        top / 100% 5px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
+        bottom / 100% 5px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
+        left / 5px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
+        right / 5px 100% no-repeat;
+  }
+}
+
+@keyframes tutorialGlint {
+  to {
+    --tutorial-glint-angle: 360deg;
+  }
 }
 
 .tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
+}
+
+// A single pulse as each step begins, before the slower reminder takes over
+.tutorialTargetRingIntro {
+  animation: tutorialTargetPulse 5s ease-in-out 1;
 }
 
 @keyframes tutorialTargetPulse {
@@ -3836,7 +3969,8 @@ html[data-theme="dark"] .uplot {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTargetRingPulse {
+  .tutorialTargetRingPulse,
+  .tutorialTargetRingIntro {
     animation: none;
   }
 
@@ -3844,9 +3978,14 @@ html[data-theme="dark"] .uplot {
     animation: none;
   }
 
-  // Without the pulse, a slightly heavier line keeps the cue obvious.
+  // Without the pulse or glint, a slightly heavier line keeps the cue obvious.
   .tutorialTargetRing {
     border-width: 3px;
+
+    &::before,
+    &::after {
+      display: none;
+    }
   }
 }
 
@@ -3926,7 +4065,7 @@ $sizemap: (
 // destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
 // ===============================================
 
-@media screen and (min-width: $pane_breakpoint) {
+@media #{$pane_media} {
   .desktop-layout,
   .pane-layout {
     height: 100%;
@@ -4112,6 +4251,46 @@ $sizemap: (
   .buildOptionMetric {
     min-width: 0;
   }
+  // Generator cards keep every figure on one row, however many there are, in equal shares
+  .buildOptionMetrics.singleRow {
+    display: flex;
+    .buildOptionMetric {
+      flex: 1 1 0;
+      overflow-wrap: anywhere;
+    }
+  }
+  .buildOptionSparkline {
+    // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
+    // a line along the top edge from reading as an underline of the caption.
+    height: 24px;
+    margin-top: 4px;
+    .sparkline {
+      display: block;
+      overflow: visible;
+      // Shrinks with its share of the row rather than pushing the card wider than the screen
+      width: 100%;
+      max-width: 96px;
+    }
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--spark-stroke);
+    }
+    .sparklineFill {
+      fill: var(--spark-fill);
+    }
+    .sparklineBaseline {
+      stroke: var(--spark-baseline);
+    }
+    .sparklineMarker {
+      fill: var(--spark-marker-fill);
+    }
+  }
+  &.compared .buildOptionSparkline {
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--interactive-blue);
+    }
+  }
   .buildOptionContext {
     display: block;
     padding: 0 12px 8px;
@@ -4252,34 +4431,30 @@ $sizemap: (
 }
 @media (pointer: coarse) {
   .base_main .facilities .MuiToolbar-root.paneHeader {
-    min-height: 52px !important;
+    min-height: 52px !important; // 44px Build button with 4px either side
   }
 }
 
 // A shared solid, restrained presentation for the game and its standalone screens.
-.facilitySupplyDisclosure {
-  flex: 0 0 auto;
-  > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding: 0 16px;
-    cursor: pointer;
-    list-style: none;
-    border-bottom: 1px solid var(--border-subtle);
-    font-weight: 600;
-  }
-  > summary::-webkit-details-marker {
-    display: none;
-  }
-  &[open] > summary > svg {
-    transform: rotate(180deg);
-  }
+// Wider layouts pin the chart and trading summary above the fleet, which scrolls on its own.
+// A phone has no room to pin a 180px chart, so the whole body scrolls as one column instead,
+// like Insights -- the list gives up its own scroll so there is one scroll container for drag.
+.facilities .facilitiesBody {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
-@media (min-width: 600px) {
-  .facilitySupplyDisclosure > summary {
-    display: none;
+.facilitySupplyChart {
+  flex: 0 0 auto;
+}
+@media (max-width: 599px) {
+  .facilities .facilitiesBody {
+    display: block;
+    overflow-y: auto;
+  }
+  .facilities .facilitiesBody > .unifiedFacilitiesList {
+    overflow: visible;
   }
 }
 .facilities .tradingSummary {
@@ -4579,9 +4754,6 @@ $sizemap: (
   padding: 16px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
-}
-.decisionImpact > h3 {
-  margin-bottom: 8px;
 }
 .decisionImpactFacts {
   display: grid;

@@ -1,3 +1,4 @@
+import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
 import { Button, Typography } from "@mui/material";
 import * as React from "react";
 import { TutorialStepType, isGatedStep } from "../../Types";
@@ -17,55 +18,57 @@ export interface TutorialHudProps {
 function resolveStep(step: TutorialStepType, desktop: boolean) {
   const override = desktop ? step.desktop : undefined;
   return {
+    action: override?.action || step.action,
     content: override?.content || step.content,
     target: override?.target || step.target,
   };
 }
 
-// The ring's line sits this far outside the control when there is room; where a clipping edge
-// leaves less, positionTargetRing slides it onto the control instead of losing the side.
+// The gap between the control and the ring's line when there is room for it on every side.
 const RING_GAP_PX = 3;
 
+type Bounds = { left: number; top: number; right: number; bottom: number };
+
 /**
- * The smallest rectangle the control can be drawn in: the viewport, narrowed by every ancestor
- * whose overflow clips and by any sticky bar covering it. A highlight that draws outside this
- * rectangle is cut away, which is how an outline on a full-bleed chart lost its left and right
- * sides.
+ * Two rectangles around the control. `visible` is the viewport narrowed by every ancestor whose
+ * overflow clips and by any sticky bar lying across the control: whatever the control has
+ * outside it is out of sight. `room` is how far a ring may reach past the control before it
+ * lands on something it would misrepresent: off the screen, across a sticky bar, or sideways
+ * out of a pane into the one beside it. Above and below a pane sits the game's own chrome, so a
+ * clipping ancestor narrows `room` only at its sides -- a control flush with the top of its pane,
+ * like the Build button filling the pane header, still gets its gap there.
  */
-function targetClipBounds(element: Element): {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-} {
-  let left = 0;
-  let top = 0;
-  let right = window.innerWidth;
-  let bottom = window.innerHeight;
+function targetBounds(element: Element): { visible: Bounds; room: Bounds } {
+  const viewport = {
+    left: 0,
+    top: 0,
+    right: window.innerWidth,
+    bottom: window.innerHeight,
+  };
+  const visible = { ...viewport };
+  const room = { ...viewport };
   const target = element.getBoundingClientRect();
   for (
     let ancestor = element.parentElement;
-    ancestor && left < right && top < bottom;
+    ancestor && visible.left < visible.right && visible.top < visible.bottom;
     ancestor = ancestor.parentElement
   ) {
     const style = window.getComputedStyle(ancestor);
     // Browsers always resolve these; an empty value (jsdom) means "no clipping".
-    if (
-      (!style.overflowX || style.overflowX === "visible") &&
-      (!style.overflowY || style.overflowY === "visible")
-    ) {
+    const overflows = [style.overflowX, style.overflowY];
+    if (overflows.every((overflow) => !overflow || overflow === "visible")) {
       continue;
     }
     const box = ancestor.getBoundingClientRect();
-    left = Math.max(left, box.left);
-    top = Math.max(top, box.top);
-    right = Math.min(right, box.right);
-    bottom = Math.min(bottom, box.bottom);
+    visible.left = Math.max(visible.left, box.left);
+    visible.top = Math.max(visible.top, box.top);
+    visible.right = Math.min(visible.right, box.right);
+    visible.bottom = Math.min(visible.bottom, box.bottom);
+    room.left = Math.max(room.left, box.left);
+    room.right = Math.min(room.right, box.right);
     // A bar stuck to the edge of this scroller (the nav footer in short phone windows) covers
-    // the content scrolling beneath it. An outline was painted under the bar; the ring sits on
-    // <body>, so without this it would draw across the bar and make it look highlighted.
-    // Only a bar lying across the control counts, so one resting elsewhere in the flow does not
-    // clip anything.
+    // the content scrolling beneath it, so the ring must not draw across it either. Only a bar
+    // lying across the control counts, so one resting elsewhere in the flow does not clip.
     for (const child of Array.from(ancestor.children)) {
       const childStyle = window.getComputedStyle(child);
       if (childStyle.position !== "sticky" || child.contains(element)) {
@@ -76,13 +79,21 @@ function targetClipBounds(element: Element): {
         continue;
       }
       if (childStyle.bottom !== "auto" && childStyle.bottom !== "") {
-        bottom = Math.max(top, Math.min(bottom, bar.top));
+        visible.bottom = Math.max(
+          visible.top,
+          Math.min(visible.bottom, bar.top),
+        );
+        room.bottom = Math.min(room.bottom, bar.top);
       } else if (childStyle.top !== "auto" && childStyle.top !== "") {
-        top = Math.min(bottom, Math.max(top, bar.bottom));
+        visible.top = Math.min(
+          visible.bottom,
+          Math.max(visible.top, bar.bottom),
+        );
+        room.top = Math.max(room.top, bar.bottom);
       }
     }
   }
-  return { left, top, right, bottom };
+  return { visible, room };
 }
 
 type RingBox = {
@@ -93,39 +104,114 @@ type RingBox = {
   borderRadius: string;
 };
 
+// Sub-pixel slack for comparing edges that layout rounds differently.
+const EDGE_EPSILON = 0.5;
+
 /**
- * Measures where the ring around `element` goes so all four sides stay visible, or null when
- * the control has no visible box. Each side prefers a small gap outside the control; where the
- * clipping bounds leave less room than that, the side hugs the control's edge (or the clipping
- * boundary) instead of being cut away. Only reads layout, so every ring can be measured before
- * any is moved.
+ * Measures where the ring around a group of controls goes, or null when nothing of them is
+ * visible. The ring keeps one gap on every side -- as wide as the tightest side allows -- so it
+ * never sits outside the control on some sides and on top of it on others. A control flush
+ * with the screen or its scroller has no room outside, so its ring frames it from just inside
+ * its edge instead. Where the control runs out of sight (scrolled under a pane's edge), that
+ * side of the ring follows the visible edge. Only reads layout, so every ring can be measured
+ * before any is moved.
  */
-function measureTargetRing(element: Element, line: number): RingBox | null {
-  const rect = element.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) {
+function measureTargetRing(elements: Element[], line: number): RingBox | null {
+  const rect = elements
+    .map((element): Bounds => element.getBoundingClientRect())
+    .reduce((union, next) => ({
+      left: Math.min(union.left, next.left),
+      top: Math.min(union.top, next.top),
+      right: Math.max(union.right, next.right),
+      bottom: Math.max(union.bottom, next.bottom),
+    }));
+  if (rect.right - rect.left <= 0 || rect.bottom - rect.top <= 0) {
     return null;
   }
-  const outset = RING_GAP_PX + line;
-  const clip = targetClipBounds(element);
-  const left = Math.max(clip.left, rect.left - outset);
-  const top = Math.max(clip.top, rect.top - outset);
-  const right = Math.min(clip.right, rect.right + outset);
-  const bottom = Math.min(clip.bottom, rect.bottom + outset);
-  if (right - left < line || bottom - top < line) {
+  const { visible, room } = targetBounds(elements[0]);
+  const edges = {
+    left: Math.max(rect.left, visible.left),
+    top: Math.max(rect.top, visible.top),
+    right: Math.min(rect.right, visible.right),
+    bottom: Math.min(rect.bottom, visible.bottom),
+  };
+  if (edges.right - edges.left < line || edges.bottom - edges.top < line) {
     return null;
   }
-  // Follow the control's own corners so a rounded button does not get a square frame. The ring
-  // sits outside the control, so its corners need the gap added to stay concentric.
-  const radius = window.getComputedStyle(element).borderTopLeftRadius;
+  const cut = {
+    left: edges.left > rect.left + EDGE_EPSILON,
+    top: edges.top > rect.top + EDGE_EPSILON,
+    right: edges.right < rect.right - EDGE_EPSILON,
+    bottom: edges.bottom < rect.bottom - EDGE_EPSILON,
+  };
+  const space = [
+    !cut.left && rect.left - room.left,
+    !cut.top && rect.top - room.top,
+    !cut.right && room.right - rect.right,
+    !cut.bottom && room.bottom - rect.bottom,
+  ].filter((value): value is number => value !== false);
+  // Less room than the line plus a sliver of gap would put the line across the control's edge,
+  // which reads as a mistake; frame it from inside instead.
+  const available = Math.min(RING_GAP_PX + line, ...space);
+  const outset = available >= line + 1 ? available : 0;
+  const left = cut.left ? edges.left : rect.left - outset;
+  const top = cut.top ? edges.top : rect.top - outset;
+  const right = cut.right ? edges.right : rect.right + outset;
+  const bottom = cut.bottom ? edges.bottom : rect.bottom + outset;
+  // Follow the control's own corners so a rounded button does not get a square frame. A ring
+  // outside the control needs the gap added to its radius to stay concentric.
+  const radius = window.getComputedStyle(elements[0]).borderTopLeftRadius;
   const radiusPx = parseFloat(radius);
   return {
-    left: Math.round(left),
-    top: Math.round(top),
-    width: Math.round(right - left),
-    height: Math.round(bottom - top),
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
     borderRadius:
       radius.endsWith("px") && radiusPx > 0 ? `${radiusPx + outset}px` : radius,
   };
+}
+
+/**
+ * Groups targets whose boxes touch edge to edge, like consecutive facility rows, so they share
+ * one ring. Separate rings would stack two lines, and their gaps, across the seam between them.
+ */
+function groupTouchingTargets(elements: Element[]): Element[][] {
+  const groups: { elements: Element[]; box: Bounds }[] = [];
+  elements.forEach((element) => {
+    const rect = element.getBoundingClientRect();
+    const touching = groups.find(
+      ({ box }) =>
+        (Math.abs(box.left - rect.left) <= EDGE_EPSILON &&
+          Math.abs(box.right - rect.right) <= EDGE_EPSILON &&
+          rect.top <= box.bottom + EDGE_EPSILON &&
+          rect.bottom >= box.top - EDGE_EPSILON) ||
+        (Math.abs(box.top - rect.top) <= EDGE_EPSILON &&
+          Math.abs(box.bottom - rect.bottom) <= EDGE_EPSILON &&
+          rect.left <= box.right + EDGE_EPSILON &&
+          rect.right >= box.left - EDGE_EPSILON),
+    );
+    if (touching && rect.width > 0 && rect.height > 0) {
+      touching.elements.push(element);
+      touching.box = {
+        left: Math.min(touching.box.left, rect.left),
+        top: Math.min(touching.box.top, rect.top),
+        right: Math.max(touching.box.right, rect.right),
+        bottom: Math.max(touching.box.bottom, rect.bottom),
+      };
+    } else {
+      groups.push({
+        elements: [element],
+        box: {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        },
+      });
+    }
+  });
+  return groups.map((group) => group.elements);
 }
 
 function applyTargetRing(ring: HTMLElement, box: RingBox | null) {
@@ -156,7 +242,11 @@ export default function TutorialHud({
   totalSteps,
   canGoBack,
 }: TutorialHudProps): React.JSX.Element {
-  const { content, target } = resolveStep(step, desktop);
+  const { action, content, target } = resolveStep(step, desktop);
+  // Next is the step's main button only when it's the only way forward. A step that also
+  // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
+  // thing on screen asking to be tapped
+  const nextIsPrimary = !step.continueOn && !step.continueOnClick;
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
 
   React.useEffect(() => {
@@ -234,22 +324,28 @@ export default function TutorialHud({
         if (reminding) {
           element.classList.add("tutorialTargetReminder");
           ring.classList.add("tutorialTargetRingPulse");
+        } else {
+          // One pulse the moment the step starts draws the eye to where the action is
+          ring.classList.add("tutorialTargetRingIntro");
         }
         document.body.appendChild(ring);
         rings.set(element, ring);
       });
       // Measure every ring before moving any, so one ring's write does not force a fresh
-      // layout for the next one's read.
+      // layout for the next one's read. Touching targets share the first one's ring.
       const first = rings.values().next();
       if (first.done) {
         return;
       }
       const line =
         parseFloat(window.getComputedStyle(first.value).borderTopWidth) || 2;
-      const boxes = Array.from(rings, ([element, ring]) => ({
-        ring,
-        box: measureTargetRing(element, line),
-      }));
+      const boxes = groupTouchingTargets(Array.from(rings.keys())).flatMap(
+        (group) =>
+          group.map((element, index) => ({
+            ring: rings.get(element)!,
+            box: index === 0 ? measureTargetRing(group, line) : null,
+          })),
+      );
       boxes.forEach(({ ring, box }) => applyTargetRing(ring, box));
     };
 
@@ -274,6 +370,7 @@ export default function TutorialHud({
       reminding = true;
       rings.forEach((ring, element) => {
         element.classList.add("tutorialTargetReminder");
+        ring.classList.remove("tutorialTargetRingIntro");
         ring.classList.add("tutorialTargetRingPulse");
       });
     }, 10_000);
@@ -308,6 +405,10 @@ export default function TutorialHud({
       <div className="tutorialHudContent" aria-live="polite">
         {/* Keyed inside the live region so the region itself persists and keeps announcing */}
         <div key={stepIndex} className="tutorialHudStep">
+          <p className="tutorialHudAction">
+            <TouchAppOutlinedIcon fontSize="small" aria-hidden />
+            <span>{action}</span>
+          </p>
           {content}
         </div>
       </div>
@@ -338,7 +439,7 @@ export default function TutorialHud({
             className="tutorialHudNav"
             color="primary"
             size="small"
-            variant="contained"
+            variant={nextIsPrimary ? "contained" : "text"}
             onClick={onNext}
           >
             Next
