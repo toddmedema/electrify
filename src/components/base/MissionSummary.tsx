@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Button, IconButton, Tooltip } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { EvidenceTargetType, GameType } from "../../Types";
-import { getScenario } from "../../data/Scenarios";
 import {
   getMissionStatus,
   selectMissionRisk,
@@ -21,33 +21,48 @@ export default function MissionSummary({
   onEvidence?: (target: EvidenceTargetType) => void;
 }) {
   const mission = getMissionStatus(game);
-  const tutorial = !!getScenario(game.scenarioId, game.customScenario)
-    ?.tutorialSteps;
   const risk = selectMissionRisk(game, upcoming);
+  // The grid readout beside this already reports a shortage happening right now.
+  const shownRisk = risk && risk.id !== "shortage" ? risk : undefined;
   // The stable risk identity, not changing tick values, owns the polite announcement.
   const announcement = React.useMemo(() => risk?.label || "", [risk?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div
-      className={`missionSummary${tutorial ? " missionSummaryTutorial" : ""}`}
-      aria-label="Mission progress"
-    >
+    <div className="missionSummary" aria-label="Mission progress">
       <div className="missionSummaryHeader">
-        {!tutorial && (
-          <div className="missionSummaryCopy">
-            <span>
-              {mission.monthsRemaining === 0
-                ? "Term complete"
-                : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
-            </span>
-            {mission.headline && (
+        <div className="missionSummaryCopy">
+          <span className="missionSummaryMonths">
+            {mission.monthsRemaining === 0
+              ? "Term complete"
+              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+          </span>
+          {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
+              itself is always one tap away in All requirements. */}
+          {shownRisk ? (
+            <Button
+              className="missionRiskButton"
+              color={shownRisk.id.startsWith("event:") ? "primary" : "warning"}
+              aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
+              title={shownRisk.label}
+              startIcon={
+                shownRisk.id.startsWith("event:") ? undefined : (
+                  <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                )
+              }
+              onClick={() => onEvidence?.(shownRisk.target)}
+            >
+              <span className="missionRiskText">{shownRisk.shortLabel}</span>
+            </Button>
+          ) : (
+            mission.headline && (
               <span
+                className="missionSummaryHeadline"
                 title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
               >
                 {mission.headline.compact}
               </span>
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
         <Tooltip title="All requirements">
           <IconButton
             className="missionDetailsButton"
@@ -58,21 +73,9 @@ export default function MissionSummary({
           </IconButton>
         </Tooltip>
       </div>
-      {!tutorial && risk && risk.id !== "shortage" && (
-        <Button
-          className="missionRiskButton"
-          aria-label={`${risk.shortLabel}. ${risk.label}`}
-          title={risk.label}
-          onClick={() => onEvidence?.(risk.target)}
-        >
-          {risk.shortLabel}
-        </Button>
-      )}
-      {!tutorial && (
-        <span className="srOnly" aria-live="polite">
-          {announcement}
-        </span>
-      )}
+      <span className="srOnly" aria-live="polite">
+        {announcement}
+      </span>
     </div>
   );
 }

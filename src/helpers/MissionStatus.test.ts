@@ -8,6 +8,7 @@ import {
   MINUTES_PER_MONTH,
 } from "./DateTime";
 import {
+  cashRunwayMonths,
   getMissionStatus,
   projectedShortfall,
   selectMissionRisk,
@@ -250,6 +251,33 @@ test("risk precedence distinguishes actual shortage, cash, required failure, sam
     selectMissionRisk(fixture(), [event, { ...event, key: "a" }])?.id,
   ).toBe("event:a");
   expect(selectMissionRisk(fixture())).toBeUndefined(); // zero reserve is not shortage
+});
+
+test("cash runway warns when the recent pace would run out of cash before the term ends", () => {
+  const withCash = (cashByMonth: number[], nowCash: number) =>
+    createNextState(fixture(cashByMonth.length), (g) => {
+      g.monthlyHistory = cashByMonth.map((cash, month) => ({
+        ...monthRow(g.startingYear, month + 1),
+        cash,
+      }));
+      g.timeline[0].cash = nowCash;
+    });
+  // Losing $100 a month with $400 left: about four months.
+  const burning = withCash([1000, 900, 800, 700], 400);
+  expect(cashRunwayMonths(burning)).toBe(4);
+  expect(selectMissionRisk(burning)).toMatchObject({
+    id: "cash-runway",
+    shortLabel: "Cash out in ~4 mo",
+    target: "finances",
+  });
+  // Only the latest three months of change count, so an old windfall doesn't hide a burn.
+  expect(cashRunwayMonths(withCash([0, 1000, 900, 800, 700], 400))).toBe(4);
+  expect(cashRunwayMonths(withCash([700, 800, 900], 400))).toBeUndefined();
+  expect(cashRunwayMonths(withCash([900], 400))).toBeUndefined();
+  // A slow burn far beyond the warning horizon stays quiet.
+  expect(selectMissionRisk(withCash([1000, 999, 998], 900))).toBeUndefined();
+  // Negative cash now is the more urgent warning.
+  expect(selectMissionRisk(withCash([1000, 900, 800], -1))?.id).toBe("cash");
 });
 
 test("scan excludes current/past ticks and next month, invalidates after plans and rollover", () => {

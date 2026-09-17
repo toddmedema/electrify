@@ -26,12 +26,17 @@ export default function BuildFacilities(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const game = useAppSelector((state) => state.game);
   const card = useAppSelector((state) => state.card.name);
-  const active =
-    categories.find(([name]) => name === card)?.[0] || "BUILD_GENERATORS";
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
-  const close = () => dispatch(navigate("FACILITIES"));
   const intertiesAvailable =
     !!game.transmission && corridorsForLocation(game.location).length > 0;
+  // Isolated grids have nothing to connect to, so the tab would only ever be empty.
+  const visibleCategories = categories.filter(
+    ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",
+  );
+  const active =
+    visibleCategories.find(([name]) => name === card)?.[0] ||
+    "BUILD_GENERATORS";
+  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
+  const close = () => dispatch(navigate("FACILITIES"));
 
   return (
     <div id="topbar" className="flexContainer screenCatalog buildFacilities">
@@ -75,7 +80,7 @@ export default function BuildFacilities(): React.JSX.Element {
             )
           }
         >
-          {categories.map(([name, label, className]) => (
+          {visibleCategories.map(([name, label, className]) => (
             <Tab
               key={name}
               id={`tab-${name}`}
@@ -97,30 +102,24 @@ export default function BuildFacilities(): React.JSX.Element {
         {active === "BUILD_STORAGE" && <BuildStorageContainer embedded />}
         {active === "BUILD_INTERTIES" && (
           <div className="scrollable constructionInterties">
-            {intertiesAvailable ? (
-              <TransmissionPanel
-                game={game}
-                projectsOnly
-                onPolicy={(policy) => dispatch(setTradingPolicy(policy))}
-                onBuild={(corridorId, financed) => {
-                  dispatch(buildTransmissionLine({ corridorId, financed }));
-                  const corridor = TRANSMISSION_CORRIDORS.find(
-                    ({ id }) => id === corridorId,
+            <TransmissionPanel
+              game={game}
+              projectsOnly
+              onPolicy={(policy) => dispatch(setTradingPolicy(policy))}
+              onBuild={(corridorId, financed) => {
+                dispatch(buildTransmissionLine({ corridorId, financed }));
+                const corridor = TRANSMISSION_CORRIDORS.find(
+                  ({ id }) => id === corridorId,
+                );
+                if (corridor)
+                  dispatch(
+                    snackbarOpen(
+                      `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
+                    ),
                   );
-                  if (corridor)
-                    dispatch(
-                      snackbarOpen(
-                        `Intertie approved — power can flow in ${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}.`,
-                      ),
-                    );
-                  close();
-                }}
-              />
-            ) : (
-              <Typography color="textSecondary">
-                No intertie projects are available in this region.
-              </Typography>
-            )}
+                close();
+              }}
+            />
           </div>
         )}
       </div>

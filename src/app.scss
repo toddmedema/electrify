@@ -35,6 +35,7 @@
   // message -- red/green alone would leave a colourblind reader with only the arrow
   --delta-good: #2e7d32; /* green800 */
   --delta-bad: #c62828; /* red800 */
+  --warning-text: #a15c00; /* amber, 5:1 on white */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   --capacity-bar: #212121; /* grey900 */
   --shadow-ring: rgba(0, 0, 0, 0.15);
@@ -68,6 +69,7 @@
   --blackout-tint: rgba(239, 83, 80, 0.16);
   --delta-good: #66bb6a; /* green400 */
   --delta-bad: #ef5350; /* red400 */
+  --warning-text: #ffb74d; /* orange300 */
   --mark-bg: #6d4c00;
   --capacity-bar: #e0e0e0;
   --shadow-ring: rgba(0, 0, 0, 0.72);
@@ -715,32 +717,42 @@ $topbar_height: 56px;
     width: 40px;
     height: 40px;
   }
+  .missionRiskButton.MuiButton-colorWarning {
+    color: var(--warning-text);
+  }
   .missionRiskButton {
-    margin-left: auto;
+    min-width: 0;
+    flex: 0 1 auto;
+    padding-inline: 8px;
+    white-space: nowrap;
   }
 }
 
 .missionSummaryHeader {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-  max-width: 100%;
+  width: 100%;
 }
 
+// One line at every width: months left, then the goal or the risk to it, which truncates first.
 .missionSummaryCopy {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
   flex: 1 1 auto;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
-
-.missionSummaryTutorial {
-  justify-content: flex-end;
-  padding-block: 0;
+.missionSummaryMonths {
+  flex: 0 0 auto;
+}
+.missionSummaryHeadline,
+.missionRiskText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .operatingEvidence,
 .insightsTrack {
@@ -774,18 +786,14 @@ $topbar_height: 56px;
 
 @media (max-width: 768px) {
   .missionSummary {
-    padding: 4px 8px;
+    padding: 4px 8px 4px 16px;
     gap: 0 8px;
-  }
-  .missionSummary .missionRiskButton {
-    margin-left: 0;
-    justify-content: flex-start;
   }
 }
 
 @media (max-width: 599px) {
-  .missionSummaryHeader {
-    width: 100%;
+  .missionSummaryHeader,
+  .missionSummaryCopy {
     gap: 8px;
   }
 }
@@ -1568,7 +1576,8 @@ $pane_header_height: 40px;
     height: 52px;
     min-height: 52px;
     gap: 4px;
-    padding: 4px;
+    // The date lines up with the chart titles below; the icon buttons carry their own inset.
+    padding: 4px 4px 4px 16px;
   }
 
   .insightsViewportDate {

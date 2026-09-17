@@ -228,6 +228,31 @@ export function projectedShortfall(
   return result;
 }
 
+// Warn about insolvency this far ahead, from the average cash change over this many recent months.
+const CASH_RUNWAY_WARNING_MONTHS = 12;
+const CASH_RUNWAY_TREND_MONTHS = 3;
+
+/** Months until cash reaches zero at the recent completed-month pace; undefined when not burning. */
+export function cashRunwayMonths(game: GameType): number | undefined {
+  const current = absoluteMonth(game.date.year, game.date.monthNumber);
+  const history = completedMissionHistory(game);
+  const recent: MonthlyHistoryType[] = [];
+  for (const row of history) {
+    if (absoluteMonth(row.year, row.month) !== current - recent.length - 1)
+      break;
+    recent.push(row);
+    if (recent.length > CASH_RUNWAY_TREND_MONTHS) break;
+  }
+  if (recent.length < 2) return undefined;
+  const burn =
+    (recent[recent.length - 1].cash - recent[0].cash) / (recent.length - 1);
+  if (burn <= 0) return undefined;
+  const cash =
+    getTimeFromTimeline(game.date.minute, game.timeline)?.cash ??
+    recent[0].cash;
+  return cash < 0 ? undefined : cash / burn;
+}
+
 export function selectMissionRisk(
   game: GameType,
   upcoming: UpcomingStoryEventType[] = [],
@@ -253,8 +278,9 @@ export function selectMissionRisk(
         target: "finances",
       };
   }
+  const mission = getMissionStatus(game);
   if (
-    getMissionStatus(game).requirements.some(
+    mission.requirements.some(
       (row) => row.id === "reliability" && row.status === "failed",
     )
   )
@@ -264,6 +290,20 @@ export function selectMissionRisk(
       shortLabel: "Reliability missed",
       target: "mission-details",
     };
+  const runway = cashRunwayMonths(game);
+  if (
+    runway !== undefined &&
+    runway <= CASH_RUNWAY_WARNING_MONTHS &&
+    runway < mission.monthsRemaining
+  ) {
+    const months = Math.max(1, Math.round(runway));
+    return {
+      id: "cash-runway",
+      label: `At the recent pace, cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
+      shortLabel: `Cash out in ~${months} mo`,
+      target: "finances",
+    };
+  }
   const projected = projectedShortfall(game.timeline, game.date.minute);
   if (projected)
     return {

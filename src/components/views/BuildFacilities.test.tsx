@@ -48,10 +48,8 @@ it("shares one build screen, defaults to generators and keeps tab changes out of
   expect(screen.getByRole("tabpanel", { name: "Storage" })).toHaveTextContent(
     "Storage catalog",
   );
-  fireEvent.click(screen.getByRole("tab", { name: "Interties" }));
-  expect(screen.getByRole("tabpanel", { name: "Interties" })).toHaveTextContent(
-    "No intertie projects are available in this region.",
-  );
+  // Honolulu has no neighboring markets, so there is no empty Interties tab to visit.
+  expect(screen.queryByRole("tab", { name: "Interties" })).toBeNull();
   expect(store.getState().card.history).toHaveLength(1);
   expect(window.history.length).toBe(browserHistoryLength);
   fireEvent.click(screen.getByRole("button", { name: "close" }));

@@ -357,12 +357,15 @@ export function GameAppBar(props: Props) {
             <strong className="gridHealthMetric">{gridHealth.metric}</strong>
           </div>
         </div>
-        <MissionSummary
-          game={game}
-          upcoming={props.upcomingEvents}
-          onEvidence={props.onEvidence}
-          onDetails={() => setScenarioDetailsOpen(true)}
-        />
+        {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
+        {!isTutorial && (
+          <MissionSummary
+            game={game}
+            upcoming={props.upcomingEvents}
+            onEvidence={props.onEvidence}
+            onDetails={() => setScenarioDetailsOpen(true)}
+          />
+        )}
       </div>
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
