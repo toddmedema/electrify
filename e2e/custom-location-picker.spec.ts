@@ -59,6 +59,22 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   const pointerTarget = map
     .locator(".worldMapMarker:not(.cluster)[aria-pressed='false']")
     .first();
+
+  // At the narrowest widths a 44px touch target can't fit every city at world zoom, so all
+  // unselected cities are clustered and a player taps a cluster to zoom in before picking. Do
+  // the same when no marker is tappable yet; each tap zooms one level, and there are five.
+  for (let level = 0; level < 4; level++) {
+    const tappable = await expect
+      .poll(async () => (await pointerTarget.count()) > 0, { timeout: 1500 })
+      .toBe(true)
+      .then(
+        () => true,
+        () => false,
+      );
+    if (tappable) break;
+    await map.locator(".worldMapMarker.cluster").first().click();
+  }
+
   const pointerTargetLabel = await pointerTarget.getAttribute("aria-label");
   expect(pointerTargetLabel).not.toBeNull();
   await pointerTarget.click();
@@ -170,6 +186,11 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
   const settings = page.getByRole("region", { name: "Game setup" });
   const facilities = page.getByRole("region", { name: "Facilities" });
   const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+
+  // The Year 1 outlook settles in a worker after mount; while it is still calculating, its
+  // height changes and shifts the rows below. Measure only once both are still.
+  await expect(outlook).not.toHaveAttribute("aria-busy", "true");
+
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
   const removeBox = await row
