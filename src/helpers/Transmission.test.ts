@@ -1,0 +1,98 @@
+import {
+  adjacentMarketPricePerMWh,
+  clearTransmissionMarket,
+  transmissionRatingW,
+} from "./Transmission";
+
+const line = { corridorId: "california-north", capacityW: 500000000 };
+
+describe("transmission ratings", () => {
+  it("uses full nameplate in cool shade and derates in hot sun", () => {
+    expect(
+      transmissionRatingW(line, {
+        temperatureC: 20,
+        solarIrradianceWM2: 0,
+      }),
+    ).toBe(500000000);
+    expect(
+      transmissionRatingW(line, {
+        temperatureC: 42,
+        solarIrradianceWM2: 1000,
+      }),
+    ).toBe(408000000);
+  });
+
+  it("produces a deterministic offline market price", () => {
+    const conditions = { temperatureC: 35, solarIrradianceWM2: 700 };
+    const first = adjacentMarketPricePerMWh(
+      "california-north",
+      1234,
+      600,
+      conditions,
+    );
+    expect(
+      adjacentMarketPricePerMWh("california-north", 1234, 600, conditions),
+    ).toBe(first);
+    expect(first).toBeGreaterThan(0);
+  });
+});
+
+describe("market clearing", () => {
+  it("imports only the shortage and respects line capacity", () => {
+    expect(
+      clearTransmissionMarket({
+        localSupplyW: 700,
+        demandW: 1000,
+        capacityW: 200,
+        importLimitW: 500,
+        exportLimitW: 500,
+        policy: "BALANCED",
+      }),
+    ).toEqual({ importedW: 200, exportedW: 0, localAvailableSupplyW: 900 });
+  });
+
+  it("exports actual surplus without burning an energy reserve", () => {
+    expect(
+      clearTransmissionMarket({
+        localSupplyW: 1400,
+        demandW: 1000,
+        capacityW: 500,
+        importLimitW: 500,
+        exportLimitW: 500,
+        policy: "SURPLUS_ONLY",
+      }),
+    ).toEqual({ importedW: 0, exportedW: 400, localAvailableSupplyW: 1000 });
+  });
+
+  it("keeps the line idle when trading is closed", () => {
+    expect(
+      clearTransmissionMarket({
+        localSupplyW: 500,
+        demandW: 1000,
+        capacityW: 500,
+        importLimitW: 500,
+        exportLimitW: 500,
+        policy: "CLOSED",
+      }),
+    ).toEqual({ importedW: 0, exportedW: 0, localAvailableSupplyW: 500 });
+  });
+  it("covers the exact demand when fractional imports completely fill a shortage", () => {
+    const request = {
+      localSupplyW: 27297688.384615093,
+      demandW: 355728534.5312337,
+      capacityW: 500000000,
+      importLimitW: 500000000,
+      exportLimitW: 500000000,
+      policy: "RELIABILITY_FIRST" as const,
+    };
+    expect(clearTransmissionMarket(request).localAvailableSupplyW).toBe(
+      request.demandW,
+    );
+    const capped = clearTransmissionMarket({
+      ...request,
+      importLimitW: 300000000,
+    });
+    expect(capped.localAvailableSupplyW).toBe(request.localSupplyW + 300000000);
+    expect(capped.localAvailableSupplyW).toBeLessThan(request.demandW);
+  });
+});

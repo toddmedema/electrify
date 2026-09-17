@@ -1,0 +1,57 @@
+import { expect, test } from "@playwright/test";
+import { openPane } from "./layout";
+
+for (const theme of ["light", "dark"]) {
+  test(`unified facilities stay compact and disclose controls in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      !["desktop-chromium", "mobile-390px", "mobile-320px"].includes(
+        testInfo.project.name,
+      ),
+    );
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+    }, theme);
+    await page.goto("/?scenario=100");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    const rows = pane.locator(".facilityRow");
+    const chart = pane.locator("#chartSupplyDemand");
+    const phone = testInfo.project.name.startsWith("mobile-");
+    await expect(chart).toBeVisible();
+    if (phone) {
+      // One scroll column: the chart scrolls away with the fleet instead of pinning above it
+      expect(
+        await pane
+          .locator(".unifiedFacilitiesList")
+          .evaluate((element) => getComputedStyle(element).overflowY),
+      ).toBe("visible");
+      await pane.locator(".transmissionFleet").scrollIntoViewIfNeeded();
+      await expect(pane.locator(".transmissionFleet")).toBeInViewport();
+      await chart.scrollIntoViewIfNeeded();
+      await expect(chart).toBeInViewport();
+    }
+    const first = rows.first();
+    const disclosure = first.locator(".facilityDisclosure");
+    await expect(first.locator(".facilityActions")).toHaveCount(0);
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    await expect(first.getByRole("button", { name: /^Pause / })).toBeVisible();
+    expect(await disclosure.locator("button").count()).toBe(0);
+    const bounds = await first
+      .getByRole("button", { name: /^Pause / })
+      .boundingBox();
+    expect(bounds!.height).toBeGreaterThanOrEqual(phone ? 44 : 40);
+    await disclosure.click();
+    await expect(first.locator(".facilityActions")).toHaveCount(0);
+    expect(
+      await pane.evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+  });
+}

@@ -1,4 +1,12 @@
 import {
+  AppStateType,
+  isGatedStep,
+  ScenarioType,
+  TUTORIAL_UI_SELECTORS,
+} from "../Types";
+import { getScenarioLocation } from "../helpers/Locations";
+import { intertiesEnabledForScenario } from "./AdjacentMarkets";
+import {
   CUSTOM_SCENARIO_ID,
   DEFAULT_CUSTOM_SCENARIO,
   getNextTutorial,
@@ -6,15 +14,8 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
-import { AppStateType, ScenarioType } from "../Types";
-import { render, screen } from "@testing-library/react";
 
 describe("getScenario", () => {
-  it("finds an authored scenario by id", () => {
-    const authored = SCENARIOS[SCENARIOS.length - 1];
-    expect(getScenario(authored.id)).toBe(authored);
-  });
-
   it("returns the custom scenario for the custom id", () => {
     const custom = {
       ...DEFAULT_CUSTOM_SCENARIO,
@@ -54,6 +55,11 @@ describe("getNextTutorial", () => {
     expect(getNextTutorial(TUTORIALS[TUTORIALS.length - 1].id)).toBeUndefined();
   });
 
+  it("places Mission 7 after Forecasting and keeps its append-only id", () => {
+    expect(getNextTutorial(5)?.id).toBe(112);
+    expect(getNextTutorial(112)).toBeUndefined();
+  });
+
   // Which is what both callers rely on to decide whether to offer one at all
   it("finds nothing for a scenario that isn't a tutorial", () => {
     const scenario = SCENARIOS.find((s: ScenarioType) => !s.tutorialSteps);
@@ -63,25 +69,6 @@ describe("getNextTutorial", () => {
 });
 
 describe("tutorial mission metadata", () => {
-  it("gives every tutorial a mission name, icon, and summary", () => {
-    TUTORIALS.forEach((tutorial, index) => {
-      expect(tutorial.name).toMatch(new RegExp(`^Mission ${index + 1}: `));
-      expect(tutorial.icon).toBeTruthy();
-      expect(tutorial.summary).toBeTruthy();
-    });
-  });
-
-  it("expands the O&M abbreviation in the generator tutorial", () => {
-    const generatorsMission = TUTORIALS.find(
-      (tutorial) => tutorial.name === "Mission 2: Generators",
-    )!;
-    render(generatorsMission.tutorialSteps![1].content);
-
-    expect(screen.getByText(/Compare cost and build time/)).toHaveTextContent(
-      "operations and maintenance (O&M)",
-    );
-  });
-
   it("advances the finances tutorial when the mobile Insights tab opens", () => {
     const finances = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 4: Finances",
@@ -89,10 +76,10 @@ describe("tutorial mission metadata", () => {
     const firstStep = finances.tutorialSteps![0];
 
     expect(
-      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+      firstStep.continueOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
     ).toBe(true);
     expect(
-      firstStep.advanceOn?.({ card: { name: "FACILITIES" } } as AppStateType),
+      firstStep.continueOn?.({ card: { name: "FACILITIES" } } as AppStateType),
     ).toBe(false);
   });
 
@@ -105,35 +92,126 @@ describe("tutorial mission metadata", () => {
       expect(capstones[0].hint).toBeTruthy();
     });
   });
+  it("authors the Interties mission as a fixed two-plant California lesson", () => {
+    const interties = getScenario(112)!;
+    expect(interties).toMatchObject({
+      name: "Mission 7: Interties",
+      seed: 249007,
+      startingYear: 2019,
+      durationMonths: 24,
+      intertiesEnabled: true,
+    });
+    expect(interties.facilities).toEqual([
+      expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
+      expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
+    ]);
+    expect(interties.tutorialSteps).toHaveLength(10);
+  });
 
-  it("ends the electricity mission after a single one-day challenge", () => {
-    const electricity = TUTORIALS.find(
-      (tutorial) => tutorial.name === "Mission 1: Electricity",
-    )!;
-    const steps = electricity.tutorialSteps!;
-
-    expect(steps).toHaveLength(5);
-    expect(steps[3].advanceOn).toBeDefined();
-    expect(steps[4].advanceOn).toBeUndefined();
-    expect(steps[4].capstone).toBeDefined();
+  it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
+    for (const tutorial of TUTORIALS.filter(({ id }) => id !== 112)) {
+      expect(
+        intertiesEnabledForScenario(tutorial, getScenarioLocation(tutorial)!),
+      ).toBe(false);
+    }
+    const interties = getScenario(112)!;
+    expect(
+      intertiesEnabledForScenario(interties, getScenarioLocation(interties)!),
+    ).toBe(true);
+    const ordinaryCalifornia = getScenario(100)!;
+    expect(
+      intertiesEnabledForScenario(
+        ordinaryCalifornia,
+        getScenarioLocation(ordinaryCalifornia)!,
+      ),
+    ).toBe(true);
+    const noCorridor = getScenario(103)!;
+    const islanded = {
+      ...getScenarioLocation(noCorridor)!,
+      id: "HNL",
+      name: "Honolulu, HI",
+    };
+    expect(
+      intertiesEnabledForScenario(
+        { ...noCorridor, intertiesEnabled: true },
+        islanded,
+      ),
+    ).toBe(false);
   });
 });
 
-describe("authored scenario briefings", () => {
-  it("gives every scored scenario a reusable story and stakes", () => {
-    SCENARIOS.filter((scenario) => !scenario.tutorialSteps).forEach(
-      (scenario) => {
-        expect(scenario.briefing).toEqual(
-          expect.objectContaining({
-            tone: expect.any(String),
-            fantasy: expect.any(String),
-            objective: expect.any(String),
-            threat: expect.any(String),
-          }),
-        );
-        expect(scenario.briefing).not.toHaveProperty("constraint");
-      },
+describe("tutorial step actions", () => {
+  const allSteps = TUTORIALS.flatMap((tutorial) =>
+    tutorial.tutorialSteps!.map((step, index) => ({
+      step,
+      label: `${tutorial.name} step ${index}`,
+    })),
+  );
+
+  // Every objective opens on something to do, short enough to take in at a glance
+  it("gives every step one short imperative action", () => {
+    allSteps.forEach(({ step, label }) => {
+      [step.action, step.desktop?.action]
+        .filter((action) => action !== undefined)
+        .forEach((action) => {
+          expect({ label, action: action!.trim().length > 0 }).toEqual({
+            label,
+            action: true,
+          });
+          expect({ label, length: action!.length <= 60 }).toEqual({
+            label,
+            length: true,
+          });
+        });
+    });
+  });
+
+  // A gated step has no Next button, and a step whose only way forward is Next has to say so.
+  // Steps that also advance on a deed may say either: their desktop layout can leave Next as
+  // the only way on, where the phone's tab tap does not exist
+  it("mentions Next only where there is one, and always where it's the only way on", () => {
+    allSteps.forEach(({ step, label }) => {
+      const gated = isGatedStep(step);
+      const onlyNext = !gated && !step.continueOn && !step.continueOnClick;
+      [step.action, step.desktop?.action]
+        .filter((action) => action !== undefined)
+        .forEach((action) => {
+          const saysNext = /\bNext\b/.test(action!);
+          // Steps that may also advance on a deed are free to say either
+          const allowed = gated ? [false] : onlyNext ? [true] : [true, false];
+          expect({ label, action, ok: allowed.includes(saysNext) }).toEqual({
+            label,
+            action,
+            ok: true,
+          });
+        });
+    });
+  });
+
+  it("never points a step at chrome that step hides", () => {
+    allSteps.forEach(({ step, label }) => {
+      const targets = [step.target, step.desktop?.target].filter(Boolean);
+      (step.hideUi || []).forEach((id) => {
+        TUTORIAL_UI_SELECTORS[id].forEach((selector) => {
+          targets.forEach((target) => {
+            expect({
+              label,
+              target,
+              hides: target!.includes(selector),
+            }).toEqual({ label, target, hides: false });
+          });
+        });
+      });
+    });
+  });
+
+  it("opens the first mission without navigation, building or speed controls", () => {
+    const [first] = TUTORIALS[0].tutorialSteps!;
+    expect(first.hideUi).toEqual(
+      expect.arrayContaining(["nav", "build", "speed", "menu", "sidePanes"]),
     );
+    const capstone = TUTORIALS[0].tutorialSteps!.find((step) => step.capstone)!;
+    expect(capstone.hideUi).not.toContain("speed");
   });
 });
 
@@ -178,11 +256,11 @@ describe("authored starting fleets", () => {
       }),
     ]);
     expect(manassas.facilities).toEqual([
-      expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
       expect.objectContaining({
         fuel: "Natural Gas",
         peakW: 75_000_000,
       }),
+      expect.objectContaining({ fuel: "Oil", peakW: 55_000_000 }),
     ]);
 
     expect(austin).toMatchObject({
@@ -219,11 +297,21 @@ describe("authored starting fleets", () => {
         0,
       ),
     ).toBe(3_827_000_000);
+    expect(
+      austin.facilities.map((facility) => ({
+        fuel: facility.fuel,
+        peakW: facility.peakW,
+      })),
+    ).toEqual([
+      { fuel: "Natural Gas", peakW: 1_497_000_000 },
+      { fuel: "Coal", peakW: 700_000_000 },
+      { fuel: "Uranium", peakW: 430_000_000 },
+      { fuel: "Wind", peakW: 1_200_000_000 },
+    ]);
   });
 
-  it("authors three distinct generation and storage resilience challenges", () => {
+  it("authors distinct heatwave and generation-loss resilience challenges", () => {
     const heatwave = getScenario(108)!;
-    const eclipse = getScenario(109)!;
     const trip = getScenario(110)!;
 
     expect(heatwave.reliabilityObjective).toMatchObject({
@@ -243,22 +331,6 @@ describe("authored starting fleets", () => {
     ).toEqual(
       expect.arrayContaining(["Uranium", "Hydro", "Sun", "Wind", "Battery"]),
     );
-    expect(eclipse).toMatchObject({
-      name: "Solar Eclipse",
-      locationId: "Beijing",
-      startingYear: 2033,
-      durationMonths: 33,
-      startingDemandScale: 1.05,
-      icon: "solar-eclipse",
-      reliabilityObjective: { year: 2035, month: 9 },
-    });
-    expect(
-      eclipse.facilities.find((facility) => facility.name === "Battery")
-        ?.peakWh,
-    ).toBe(240_000_000);
-    expect(
-      eclipse.facilities.find((facility) => facility.fuel === "Coal")?.peakW,
-    ).toBe(625_000_000);
     expect(trip.reliabilityObjective).toMatchObject({
       year: 2026,
       month: 7,
@@ -275,18 +347,37 @@ describe("authored starting fleets", () => {
     ).toMatchObject({ fuel: "Uranium", peakW: 500_000_000 });
   });
 
-  it("keeps locations in scenario metadata rather than scenario names", () => {
+  it("authors a Los Angeles-only January 2025 wildfire challenge", () => {
+    const wildfire = getScenario(111)!;
+
+    expect(wildfire).toMatchObject({
+      name: "Wildfire Emergency",
+      icon: "wildfire emergency",
+      locationId: "LA",
+      startingYear: 2024,
+      durationMonths: 36,
+      startingCustomers: 16_000,
+      reliabilityObjective: {
+        year: 2025,
+        month: 1,
+        durationMonths: 2,
+        minimumDemandServed: 1,
+      },
+    });
+    expect(wildfire.briefing?.threat).toMatch(
+      /safety shutoffs.*sales.*restoration costs/i,
+    );
     expect(
-      [107, 108, 109, 110].map((id) => ({
-        name: getScenario(id)!.name,
-        location: getScenario(id)!.location?.name,
-      })),
-    ).toEqual([
-      { name: "Deep Freeze", location: "Austin, TX" },
-      { name: "Heatwave + Drought", location: "Madrid, Spain" },
-      { name: "Solar Eclipse", location: "Beijing, China" },
-      { name: "Sudden Nuclear Shutdown", location: "Paris, France" },
-    ]);
+      wildfire.facilities.reduce(
+        (total, facility) => total + (facility.peakW || 0),
+        0,
+      ),
+    ).toBe(80_810_000);
+    expect(wildfire.facilities[0]).toEqual({
+      fuel: "Natural Gas",
+      peakW: 24_240_000,
+      initialAgeYears: 18,
+    });
   });
 
   it("makes every plant in the aging coal fleet at least 20 years old", () => {

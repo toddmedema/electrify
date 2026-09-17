@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  IconButton,
   List,
   ListItem,
   ListItemAvatar,
@@ -39,6 +38,7 @@ import {
   GameType,
   GeneratorOperatingType,
   WorldEventEffectsType,
+  EvidenceRequestType,
 } from "../../Types";
 import { facilityCashBack } from "../../helpers/Financials";
 import {
@@ -53,6 +53,11 @@ import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
+import TransmissionPanel, {
+  TransmissionTradingSummary,
+} from "./TransmissionPanel";
+import { TradingPolicyType } from "../../Types";
+import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
 interface FacilityListItemProps {
   facility: FacilityOperatingType;
@@ -154,82 +159,64 @@ function FacilityActions(props: {
     readOnly,
     spotInList,
   } = props;
+  if (readOnly) return null;
   const underConstruction = facility.yearsToBuildLeft > 0;
   return (
-    <span className="facilityActions">
-      {!readOnly && listLength > 1 && (
+    <div className="facilityActions">
+      {!underConstruction && (
+        <Button
+          startIcon={
+            <ConceptIcon concept={facility.paused ? "play" : "pause"} />
+          }
+          aria-label={
+            facility.paused
+              ? "Resume " + facility.name
+              : "Pause " + facility.name
+          }
+          onClick={() =>
+            facility.paused
+              ? onTogglePause(facility.id)
+              : onPause(facility.id, facility.name)
+          }
+        >
+          {facility.paused ? "Resume" : "Pause"}
+        </Button>
+      )}
+      <Button
+        startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
+        aria-label={
+          (underConstruction ? "Cancel construction of " : "Sell ") +
+          facility.name
+        }
+        onClick={onOpenSell}
+      >
+        {underConstruction ? "Cancel construction" : "Sell"}
+      </Button>
+      {listLength > 1 && (
         <>
-          <IconButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onReprioritize(spotInList, -1);
-            }}
-            aria-label={`Move ${facility.name} earlier in the dispatch order`}
+          <Button
+            startIcon={<KeyboardArrowUpIcon />}
+            aria-label={
+              "Move " + facility.name + " earlier in the dispatch order"
+            }
             disabled={spotInList === 0}
-            edge="end"
-            color="primary"
-            size="small"
+            onClick={() => onReprioritize(spotInList, -1)}
           >
-            <KeyboardArrowUpIcon />
-          </IconButton>
-          <IconButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onReprioritize(spotInList, 1);
-            }}
-            aria-label={`Move ${facility.name} later in the dispatch order`}
+            Move up
+          </Button>
+          <Button
+            startIcon={<KeyboardArrowDownIcon />}
+            aria-label={
+              "Move " + facility.name + " later in the dispatch order"
+            }
             disabled={spotInList === listLength - 1}
-            edge="end"
-            color="primary"
-            size="small"
+            onClick={() => onReprioritize(spotInList, 1)}
           >
-            <KeyboardArrowDownIcon />
-          </IconButton>
+            Move down
+          </Button>
         </>
       )}
-      {!readOnly && !underConstruction && !facility.paused && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onPause(facility.id, facility.name);
-          }}
-          aria-label={`Pause ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          <ConceptIcon concept="pause" />
-        </IconButton>
-      )}
-      {!readOnly && facility.paused && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePause(facility.id);
-          }}
-          aria-label={`Resume ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          <ConceptIcon concept="play" />
-        </IconButton>
-      )}
-      {!readOnly && (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSell();
-          }}
-          aria-label={`${underConstruction ? "Cancel construction of" : "Sell"} ${facility.name}`}
-          edge="end"
-          color="primary"
-          size="small"
-        >
-          {underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
-        </IconButton>
-      )}
-    </span>
+    </div>
   );
 }
 
@@ -299,22 +286,49 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const accentColor = facilityColor(fuel);
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
-  let secondaryText = "";
+  // The row's second line has to stay one line on a 320px phone, so it leads with the reading
+  // and the state and leaves anything else to a trailing detail that truncates first. Rated
+  // storage power and the reservoir's absolute size are both in the opened details.
+  const builtFraction = underConstruction
+    ? Math.max(
+        0,
+        Math.min(
+          1,
+          (facility.yearsToBuild - facility.yearsToBuildLeft) /
+            facility.yearsToBuild,
+        ),
+      )
+    : 1;
+  let reading = "";
+  let detail: React.ReactNode = null;
   if (underConstruction) {
     const monthsLeft = Math.ceil(props.facility.yearsToBuildLeft * 12);
-    const percentBuilt = Math.round(
-      ((facility.yearsToBuild - facility.yearsToBuildLeft) /
-        facility.yearsToBuild) *
-        100,
-    );
-    secondaryText = `Building: ${percentBuilt}%, ${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
+    const percentBuilt = Math.round(builtFraction * 100);
+    reading = `Building ${percentBuilt}%`;
+    detail = `${monthsLeft} ${monthsLeft === 1 ? "month" : "months"} left`;
   } else if (facility.peakWh) {
-    secondaryText = `${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}, ${formatWatts(facility.peakW)}`;
-  } else if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-    secondaryText = `${formatWattsOfPeak(facility.currentW, facility.peakW)}, reservoir ${formatWattHoursOfPeak(facility.reservoirWh || 0, facility.reservoirCapacityWh)}`;
+    reading = formatWattHoursOfPeak(facility.currentWh, facility.peakWh);
   } else {
-    secondaryText = formatWattsOfPeak(facility.currentW, facility.peakW);
+    reading = formatWattsOfPeak(facility.currentW, facility.peakW);
+    if (fuel === "Hydro" && facility.reservoirCapacityWh) {
+      const reservoirPercent = Math.round(
+        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
+      );
+      // Only one of these shows, picked by how wide the row is
+      detail = (
+        <>
+          <span className="facilityStatusLong">
+            reservoir {reservoirPercent}%
+          </span>
+          <span className="facilityStatusShort">{reservoirPercent}% full</span>
+        </>
+      );
+    }
   }
+  // "Building 40%" already says what the construction badge does
+  const status = underConstruction
+    ? reading
+    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -322,63 +336,23 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       draggableId={"f" + facility.id}
       index={props.spotInList}
       isDragDisabled={readOnly}
+      disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
-        // Selecting is on the row rather than on a control inside it: the icon buttons were
-        // the only thing a click did anything to, which is the opposite of what a list of
-        // rows leads a mouse to expect. dragHandleProps already makes this focusable and
-        // announces it as a button, so only a read-only row - which gets none of them - has
-        // to say so itself. dnd owns Space (lift) and the arrows (move), leaving Enter free
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
           className={selected ? "facilityRow selected" : "facilityRow"}
-          role={provided.dragHandleProps ? undefined : "button"}
-          tabIndex={provided.dragHandleProps ? undefined : 0}
-          aria-expanded={selected}
-          onClick={() => onSelect(selected ? null : facility.id)}
-          onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onSelect(selected ? null : facility.id);
-            }
-          }}
+          data-fuel={fuel}
           style={getDraggableStyle(
             snapshot.isDragging,
             provided.draggableProps.style,
           )}
         >
-          {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
-              all under-construction facilities need here. */}
-          <ListItem
-            className="facility"
-            sx={
-              underConstruction
-                ? { opacity: (theme) => theme.palette.action.disabledOpacity }
-                : undefined
-            }
-            secondaryAction={
-              <MemoizedFacilityActions
-                facility={facility}
-                listLength={props.listLength}
-                readOnly={readOnly}
-                spotInList={spotInList}
-                onPause={onPause}
-                onReprioritize={onReprioritize}
-                onTogglePause={onTogglePause}
-                onOpenSell={toggleDialog}
-              />
-            }
-          >
-            {!readOnly && (
-              <DragIndicatorIcon
-                className="draggable-indicator"
-                color="primary"
-              />
-            )}
-            {/* Tinted by fuel so the list reads as the same dispatch stack the supply-by-fuel
-                chart draws, and transitioned in CSS so ramping is visible as movement */}
+          <div className="facilityRowHeader">
+            {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
+            fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
+            transitioned in CSS so ramping is visible as movement */}
             {!underConstruction && (
               <div
                 className="outputProgressBar"
@@ -388,99 +362,184 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 }}
               />
             )}
-            <ListItemAvatar>
-              <div>
-                <Avatar
-                  className={facility.currentWh === 0 ? "offline" : ""}
-                  alt={facility.name}
-                  src={`/images/${facilityIconName(facility)}.svg`}
-                />
-                {facility.peakWh > 0 && !underConstruction && (
-                  <div className="capacityProgressBar">
-                    <div
-                      className="capacityProgressBarFill"
-                      style={{
-                        transform: `scaleY(${facility.currentWh / facility.peakWh})`,
-                        backgroundColor:
-                          activity === "CHARGING"
-                            ? chartPalette().storage
-                            : undefined,
-                      }}
-                    />
-                  </div>
-                )}
-                <div
-                  className="facilityActivity"
-                  role="img"
-                  aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
-                >
-                  {activityIcon(activity, accentColor)}
-                </div>
-              </div>
-            </ListItemAvatar>
-            <ListItemText
-              primary={
-                <>
-                  {facility.name}
-                  {storyOutputMultiplier < 1 && (
-                    <Chip
-                      className="storyDerateBadge"
-                      color="warning"
-                      size="small"
-                      label={`Limited to ${Math.round(storyOutputMultiplier * 100)}%`}
-                      aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
-                    />
-                  )}
-                </>
-              }
-              secondary={secondaryText}
-            />
-            {open && (
-              // Inside the row, so without this every click in the confirmation dialog also
-              // lands on the row behind it and toggles the selection
-              <Dialog
-                open
-                onClose={toggleDialog}
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            {!readOnly && (
+              <button
+                type="button"
+                {...provided.dragHandleProps}
+                className="facilityDragHandle"
+                aria-label={"Reorder " + facility.name}
               >
-                <DialogTitle>
-                  {underConstruction ? "Cancel construction of" : "Sell"}{" "}
-                  {facility.peakWh
-                    ? formatWattHours(facility.peakWh)
-                    : formatWatts(facility.peakW)}{" "}
-                  {facility.name.toLowerCase()} facility?
-                </DialogTitle>
-                <DialogContent>
-                  <DialogContentText>
-                    You will receive{" "}
-                    {formatMoneyConcise(
-                      facilityCashBack(facility, game.date.minute),
-                    )}
-                    {facility.loanAmountLeft > 0
-                      ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
-                      : ""}
-                    .
-                  </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                  <Button onClick={toggleDialog} color="primary">
-                    Nevermind
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      props.onSell(facility.id);
-                      toggleDialog();
-                    }}
-                    color="primary"
-                    variant="contained"
-                    autoFocus
-                  >
-                    {underConstruction ? "Cancel construction" : "Sell"}
-                  </Button>
-                </DialogActions>
-              </Dialog>
+                <DragIndicatorIcon aria-hidden />
+              </button>
             )}
-          </ListItem>
+            <button
+              type="button"
+              className="facilityDisclosure"
+              aria-label={"Inspect " + facility.name}
+              aria-expanded={selected}
+              onClick={() => onSelect(selected ? null : facility.id)}
+            >
+              {/* v9 dropped ListItem's `disabled` prop; it only ever dimmed the row, which is
+              all under-construction facilities need here. */}
+              <ListItem
+                className="facility"
+                sx={
+                  underConstruction
+                    ? {
+                        // The progress bar stays at full strength so the build is legible
+                        "& .MuiListItemAvatar-root, & .MuiListItemText-primary, & .MuiListItemText-secondary":
+                          {
+                            opacity: (theme) =>
+                              theme.palette.action.disabledOpacity,
+                          },
+                      }
+                    : undefined
+                }
+                component="span"
+              >
+                <ListItemAvatar>
+                  <div>
+                    <Avatar
+                      className={facility.currentWh === 0 ? "offline" : ""}
+                      alt={facility.name}
+                      src={`/images/${facilityIconName(facility)}.svg`}
+                    />
+                    {facility.peakWh > 0 && !underConstruction && (
+                      <div className="capacityProgressBar">
+                        <div
+                          className="capacityProgressBarFill"
+                          style={{
+                            transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                            backgroundColor:
+                              activity === "CHARGING"
+                                ? chartPalette().storage
+                                : undefined,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div
+                      className="facilityActivity"
+                      role="img"
+                      aria-label={`${facility.name} ${ACTIVITY_LABELS[activity]}`}
+                    >
+                      {activityIcon(activity, accentColor)}
+                    </div>
+                  </div>
+                </ListItemAvatar>
+                <span className="facilityText">
+                  <ListItemText
+                    slotProps={{
+                      primary: { component: "span" },
+                      secondary: { component: "span" },
+                    }}
+                    primary={
+                      <>
+                        <span className="facilityName">{facility.name}</span>
+                        {storyOutputMultiplier < 1 && (
+                          <Chip
+                            className="storyDerateBadge"
+                            color="warning"
+                            size="small"
+                            label={`${Math.round(storyOutputMultiplier * 100)}% limit`}
+                            aria-label={`Temporarily limited to ${Math.round(storyOutputMultiplier * 100)}% of rated output`}
+                          />
+                        )}
+                      </>
+                    }
+                    secondary={
+                      <>
+                        <span className="facilityStatus">{status}</span>
+                        {detail && (
+                          <span className="facilityStatusDetail">
+                            {" · "}
+                            {detail}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
+                  {/* The percentage is already in the text; this only makes it glanceable */}
+                  {underConstruction && (
+                    <span
+                      className="constructionProgress"
+                      aria-hidden
+                      style={{ background: withAlpha(accentColor, 0.24) }}
+                    >
+                      <span
+                        className="constructionProgressFill"
+                        style={{
+                          transform: `scaleX(${builtFraction})`,
+                          background: accentColor,
+                        }}
+                      />
+                    </span>
+                  )}
+                </span>
+                <KeyboardArrowDownIcon
+                  className="facilityChevron"
+                  aria-hidden
+                />
+              </ListItem>
+            </button>
+          </div>
+          {open && (
+            // Inside the row, so without this every click in the confirmation dialog also
+            // lands on the row behind it and toggles the selection
+            <Dialog
+              open
+              onClose={toggleDialog}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            >
+              <DialogTitle>
+                {underConstruction ? "Cancel construction of" : "Sell"}{" "}
+                {facility.peakWh
+                  ? formatWattHours(facility.peakWh)
+                  : formatWatts(facility.peakW)}{" "}
+                {facility.name.toLowerCase()} facility?
+              </DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  You will receive{" "}
+                  {formatMoneyConcise(
+                    facilityCashBack(facility, game.date.minute),
+                  )}
+                  {facility.loanAmountLeft > 0
+                    ? ` and the rest will go towards paying off the remaining loan balance of ${formatMoneyConcise(facility.loanAmountLeft)}`
+                    : ""}
+                  .
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={toggleDialog} color="primary">
+                  Nevermind
+                </Button>
+                <Button
+                  onClick={() => {
+                    props.onSell(facility.id);
+                    toggleDialog();
+                  }}
+                  color="primary"
+                  variant="contained"
+                  autoFocus
+                >
+                  {underConstruction ? "Cancel construction" : "Sell"}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          )}
+          {selected && (
+            <MemoizedFacilityActions
+              facility={facility}
+              listLength={props.listLength}
+              readOnly={readOnly}
+              spotInList={spotInList}
+              onPause={onPause}
+              onReprioritize={onReprioritize}
+              onTogglePause={onTogglePause}
+              onOpenSell={toggleDialog}
+            />
+          )}
           {selected && (
             <FacilityDetails
               facility={facility}
@@ -495,7 +554,38 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   );
 }
 
+// Always drawn rather than behind a phone-only disclosure: on a phone the chart scrolls away
+// with the rest of the pane (see .facilitiesBody), the way Insights does, instead of pinning
+// 180px above the fleet or making the player open it first
+function FacilitySupplyChart({
+  game,
+  anchor,
+}: {
+  game: GameType;
+  anchor: React.RefObject<HTMLDivElement>;
+}) {
+  return (
+    <div
+      ref={anchor}
+      tabIndex={-1}
+      className="operatingEvidence facilitySupplyChart"
+      aria-label="Supply and demand"
+    >
+      <ChartSupplyDemand
+        height={180}
+        timeline={game.timeline}
+        currentMinute={game.date.minute}
+        location={game.location}
+        legend
+        startingYear={game.startingYear}
+      />
+    </div>
+  );
+}
+
 export interface StateProps {
+  evidenceRequest?: EvidenceRequestType;
+  facilityDragActive?: boolean;
   game: GameType;
   // The row the player has open, from the UI slice rather than this component's own state:
   // Finances and Forecasts read it too, and building a facility unmounts this pane
@@ -503,6 +593,10 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onEvidenceReady?: (
+    request: EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onGeneratorBuild: () => void;
   onSell: (id: FacilityOperatingType["id"]) => void;
   onTogglePause: (id: FacilityOperatingType["id"]) => void;
@@ -516,11 +610,13 @@ export interface DispatchProps {
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
+  onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<Props, {}> {
+export default class Facilities extends React.Component<Props> {
   constructor(props: Props) {
     super(props);
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
@@ -545,6 +641,8 @@ export default class Facilities extends React.Component<Props, {}> {
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
+      nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.facilityDragActive !== this.props.facilityDragActive ||
       nextProps.game.speed !== "FAST" ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.game.facilities.map((facility) => facility.id).join("|") !==
@@ -556,7 +654,29 @@ export default class Facilities extends React.Component<Props, {}> {
   }
 
   public componentDidUpdate() {
+    this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
+  }
+
+  public componentDidMount() {
+    this.resolveEvidence();
+  }
+
+  private evidenceAnchor = React.createRef<HTMLDivElement>();
+
+  private resolveEvidence() {
+    const request = this.props.evidenceRequest;
+    if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (
+      request.target !== "supply-demand" &&
+      !(
+        typeof request.target === "object" &&
+        request.target.card === "FACILITIES" &&
+        request.target.view !== "BUILD_GENERATORS"
+      )
+    )
+      return;
+    this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
   public onBeforeDragStart() {
@@ -583,11 +703,15 @@ export default class Facilities extends React.Component<Props, {}> {
       onPause,
       onReprioritize,
       onSelect,
-      onStorageBuild,
+      onTransmissionBuild,
+      onTradingPolicy,
       selectedFacilityId,
     } = this.props;
     const facilitiesCount = game.facilities.length;
     const readOnly = !!game.replayPlayback;
+    const intertiesAvailable = !!(
+      game.transmission && corridorsForLocation(game.location).length
+    );
     const storyEffects = combineStoryEffects(
       game.worldEvents.active.filter(
         (event) =>
@@ -598,88 +722,102 @@ export default class Facilities extends React.Component<Props, {}> {
 
     return (
       <GameCard className="facilities" id="facilitiesPane">
-        {/* The pane's own header rather than a row inside the list, so it lines up with the
+        <>
+          {/* The pane's own header rather than a row inside the list, so it lines up with the
             other panes' headers and the build buttons stay put as the fleet scrolls */}
-        <Toolbar className="paneHeader">
-          <Typography variant="h6">Facilities</Typography>
-          {!readOnly && (
-            <>
+          <Toolbar className="paneHeader">
+            <Typography variant="h6">Facilities</Typography>
+            {!readOnly && (
               <Button
-                size="small"
-                variant="outlined"
+                variant="contained"
                 color="primary"
+                className="button-buildFacility"
+                startIcon={<ConceptIcon concept="build" fontSize="small" />}
                 onClick={onGeneratorBuild}
-                className="button-buildGenerator"
-                startIcon={<ConceptIcon concept="generator" fontSize="small" />}
               >
-                Generator
+                Build
               </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                onClick={onStorageBuild}
-                className="button-buildStorage"
-                startIcon={<ConceptIcon concept="storage" fontSize="small" />}
-              >
-                Storage
-              </Button>
-            </>
-          )}
-        </Toolbar>
-        <ChartSupplyDemand
-          height={180}
-          timeline={game.timeline}
-          currentMinute={game.date.minute}
-          location={game.location}
-          legend={game.speed === "PAUSED"}
-          startingYear={game.startingYear}
-        />
-        <List dense className="scrollable">
-          <DragDropContext
-            onBeforeDragStart={this.onBeforeDragStart}
-            onDragEnd={this.onDragEnd}
-          >
-            <Droppable droppableId="droppable">
-              {(provided) => (
-                <div {...provided.droppableProps} ref={provided.innerRef}>
-                  {game.facilities.map(
-                    (g: FacilityOperatingType, i: number) => (
-                      <FacilityListItem
-                        facility={g}
-                        game={game}
-                        key={g.id}
-                        onSell={onSell}
-                        onTogglePause={onTogglePause}
-                        onPause={onPause}
-                        onReprioritize={onReprioritize}
-                        onSelect={onSelect}
-                        selected={selectedFacilityId === g.id}
-                        storyOutputMultiplier={storyOutputMultiplierForFacility(
-                          g,
-                          storyEffects,
-                        )}
-                        spotInList={i}
-                        listLength={facilitiesCount}
-                        readOnly={readOnly}
-                      />
-                    ),
-                  )}
-                  {provided.placeholder}
-                </div>
+            )}
+          </Toolbar>
+          <div className="scrollable facilitiesBody">
+            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
+            {intertiesAvailable && (
+              <TransmissionTradingSummary
+                game={game}
+                onPolicy={onTradingPolicy}
+              />
+            )}
+            <List dense className="scrollable unifiedFacilitiesList">
+              {intertiesAvailable && (
+                <Typography
+                  id="dispatch-order"
+                  className="facilitySectionLabel"
+                  variant="overline"
+                >
+                  Plants & storage <span>Dispatch order</span>
+                </Typography>
               )}
-            </Droppable>
-          </DragDropContext>
-          {facilitiesCount < 2 && !readOnly && (
-            <Typography
-              color="textSecondary"
-              variant="body2"
-              style={{ textAlign: "center", marginTop: "12px" }}
-            >
-              (click "Generator" or "Storage" to build more)
-            </Typography>
-          )}
-        </List>
+              <DragDropContext
+                onBeforeDragStart={this.onBeforeDragStart}
+                onDragEnd={this.onDragEnd}
+              >
+                <Droppable droppableId="droppable">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef}>
+                      {game.facilities.map(
+                        (g: FacilityOperatingType, i: number) => (
+                          <FacilityListItem
+                            facility={g}
+                            game={game}
+                            key={g.id}
+                            onSell={onSell}
+                            onTogglePause={onTogglePause}
+                            onPause={onPause}
+                            onReprioritize={onReprioritize}
+                            onSelect={onSelect}
+                            selected={
+                              (game.scenarioId === 5 &&
+                                [0, 4].includes(game.tutorialStep)) ||
+                              selectedFacilityId === g.id ||
+                              (game.scenarioId === 112 &&
+                                game.tutorialStep === 5 &&
+                                "fuel" in g &&
+                                g.fuel === "Natural Gas")
+                            }
+                            storyOutputMultiplier={storyOutputMultiplierForFacility(
+                              g,
+                              storyEffects,
+                            )}
+                            spotInList={i}
+                            listLength={facilitiesCount}
+                            readOnly={readOnly}
+                          />
+                        ),
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+              {facilitiesCount < 2 && !readOnly && (
+                <Typography
+                  color="textSecondary"
+                  variant="body2"
+                  style={{ textAlign: "center", marginTop: "12px" }}
+                >
+                  Choose Build to add a generator or storage.
+                </Typography>
+              )}
+              {intertiesAvailable && (
+                <TransmissionPanel
+                  game={game}
+                  onBuild={onTransmissionBuild}
+                  onPolicy={onTradingPolicy}
+                />
+              )}
+            </List>
+          </div>
+        </>
       </GameCard>
     );
   }

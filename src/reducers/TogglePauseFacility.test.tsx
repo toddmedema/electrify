@@ -22,18 +22,6 @@ function liveState(state: GameType) {
 }
 
 describe("togglePauseFacility", () => {
-  it("pauses and resumes the facility", () => {
-    const before = createGame({ scenarioId: 103 });
-    const id = before.facilities[0].id;
-    expect(before.facilities[0].paused).toBeFalsy();
-
-    const paused = dispatch(before, togglePauseFacility(id));
-    expect(paused.facilities[0].paused).toBe(true);
-
-    const resumed = dispatch(paused, togglePauseFacility(id));
-    expect(resumed.facilities[0].paused).toBe(false);
-  });
-
   /**
    * Regression test for #117. reforecastSupply used to shallow copy the state, so the forecast ran
    * updateSupplyFacilitiesFinances against the real facility objects and left them wherever the

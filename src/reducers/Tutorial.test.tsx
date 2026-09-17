@@ -11,7 +11,12 @@ import { DEFAULT_CUSTOM_SCENARIO, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
-import { restartTutorialAtStep, tutorialGateMiddleware } from "./Tutorial";
+import {
+  recordTutorialLeft,
+  restartTutorialAtStep,
+  selectTutorialHiddenUi,
+  tutorialGateMiddleware,
+} from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
 
@@ -133,6 +138,19 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
+  it("continues an explanation after a successful deed and skips its already-completed gate", () => {
+    const satisfied = (state: AppStateType) => state.game.dollarsPerkWh < 0.07;
+    const store = tutorialStore([
+      { ...informational(), continueOn: satisfied },
+      { ...informational(), advanceOn: satisfied },
+      informational(),
+    ]);
+    store.dispatch({ type: "test/rejected-purchase" });
+    expect(store.getState().game.tutorialStep).toBe(0);
+    store.dispatch({ type: "test/satisfy-predicate" });
+    expect(store.getState().game.tutorialStep).toBe(2);
+  });
+
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -276,6 +294,41 @@ describe("tutorialGateMiddleware", () => {
   });
 });
 
+describe("recordTutorialLeft", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  const steps = [informational(), informational()];
+
+  // Regression test. Start playing sends a player with no finished mission back into Mission 1,
+  // so leaving it unfinished used to make the rest of the missions unreachable
+  it("counts a walkthrough left partway as done", () => {
+    recordTutorialLeft(initialState(steps, { tutorialStep: 1 }).game);
+    expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
+  });
+
+  it("doesn't count a finished or closed walkthrough a second time", () => {
+    recordTutorialLeft(
+      initialState(steps, { tutorialStep: steps.length }).game,
+    );
+    expect(getPlayedScenarioIds()).toEqual([]);
+  });
+
+  it("ignores scenarios without a walkthrough, and replays", () => {
+    const game = initialState(steps, { tutorialStep: 0 }).game;
+    recordTutorialLeft({
+      ...game,
+      customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
+    });
+    recordTutorialLeft({
+      ...game,
+      replayPlayback: {} as GameType["replayPlayback"],
+    });
+    expect(getPlayedScenarioIds()).toEqual([]);
+  });
+});
+
 describe("restartTutorialAtStep", () => {
   it("rebuilds the authored scenario and preserves the capstone objective", () => {
     const dispatched: UnknownAction[] = [];
@@ -295,5 +348,30 @@ describe("restartTutorialAtStep", () => {
     ]);
     expect(dispatched[1].payload).toBe(1);
     expect(dispatched[2].payload).toEqual({ tutorialStep: 5 });
+  });
+});
+
+describe("selectTutorialHiddenUi", () => {
+  const bare = {
+    ...informational(),
+    hideUi: ["nav", "speed"],
+  } as TutorialStepType;
+
+  it("hides what the current step asks for, and nothing once the walkthrough ends", () => {
+    const state = initialState([bare, informational()]);
+    state.game.inGame = true;
+    expect(selectTutorialHiddenUi(state)).toEqual(["nav", "speed"]);
+
+    state.game.tutorialStep = 1;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
+
+    state.game.tutorialStep = 2;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
+  });
+
+  it("hides nothing outside a game", () => {
+    const state = initialState([bare]);
+    state.game.inGame = false;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
   });
 });

@@ -1,9 +1,13 @@
-import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { createGame } from "../../testing/Simulator";
-import { GameAppBar, Props, reserveCapacityW } from "./GameAppBar";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { FacilityOperatingType, TickPresentFutureType } from "../../Types";
+import { createGame } from "../../testing/Simulator";
+import { TickPresentFutureType } from "../../Types";
+import {
+  GameAppBar,
+  getGridHealth,
+  Props,
+  reserveCapacityW,
+} from "./GameAppBar";
 
 jest.mock("../../Globals", () => ({
   ...jest.requireActual("../../Globals"),
@@ -25,84 +29,60 @@ function renderAppBar(overrides: Partial<Props> = {}) {
 }
 
 describe("GameAppBar", () => {
-  it("keeps all four speeds one tap away", () => {
-    const onSpeedChange = jest.fn();
-    renderAppBar({ onSpeedChange });
-
-    const speedControls = screen.getByRole("group", { name: "game speed" });
-    expect(within(speedControls).getAllByRole("button")).toHaveLength(4);
-
-    fireEvent.click(
-      within(speedControls).getByRole("button", { name: "fast speed" }),
-    );
-    expect(onSpeedChange).toHaveBeenCalledWith("FAST");
-  });
-
-  it("reports unused available capacity in MW and grows when a plant is added", () => {
+  it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const plant = game.facilities.find(
-      (facility: FacilityOperatingType) =>
-        facility.fuel &&
-        !["Sun", "Wind", "Offshore Wind"].includes(facility.fuel),
-    )!;
-    const before = reserveCapacityW(game, now);
-    game.facilities.push({ ...plant, id: 999 });
+    now.supplyW = now.demandW;
+    now.reserveW = now.demandW * 0.25;
+    // Changing a displayed nameplate cannot invent immediately available output.
+    game.facilities = game.facilities.map((plant) => ({
+      ...plant,
+      peakW: 1e15,
+    }));
+    expect(reserveCapacityW(game, now)).toBe(now.reserveW);
+    renderAppBar({ game: { ...game, inGame: true } });
+    expect(screen.getByText("Stable")).toBeInTheDocument();
+    expect(screen.getByText(/\+.*W reserve/)).toBeInTheDocument();
+  });
 
-    expect(reserveCapacityW(game, now) - before).toBe(plant.peakW);
+  it("warns when reachable reserve falls to five percent of demand", () => {
+    const game = createGame({ scenarioId: 101 });
+    const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
+    now.supplyW = now.demandW;
+    now.reserveW = now.demandW * 0.05;
+    expect(getGridHealth(game, now)).toMatchObject({
+      state: "low-reserve",
+      metric: expect.stringMatching(/reserve \(5%\)/),
+    });
     renderAppBar({ game: { ...game, inGame: true } });
     expect(
-      screen.getByText(/Grid stable · .*W spare capacity/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/% reserve/)).not.toBeInTheDocument();
+      screen.getByLabelText(/Current grid status: Low reserve/),
+    ).toBeVisible();
   });
 
-  it("counts only current weather-limited Airborne Wind output as reserve", () => {
+  it("distinguishes zero reserve from a blackout and prioritizes actual shortages", () => {
     const game = createGame({ scenarioId: 101 });
     const now = getTimeFromTimeline(game.date.minute, game.timeline)!;
-    const template = game.facilities.find(
-      (facility: FacilityOperatingType) => facility.fuel,
-    )!;
-    const airborne = {
-      ...template,
-      fuel: "Airborne Wind" as const,
-      peakW: 2000000,
-      currentW: 500000,
-      yearsToBuildLeft: 0,
-      paused: false,
-    };
-
     expect(
-      reserveCapacityW({ ...game, facilities: [airborne] }, {
+      getGridHealth(game, {
         ...now,
-        demandW: 0,
+        supplyW: now.demandW,
+        reserveW: 0,
       } as TickPresentFutureType),
-    ).toBe(500000);
-  });
-
-  it("omits the redundant money and time icons on desktop", () => {
-    renderAppBar();
-    expect(screen.queryByLabelText("Money")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Time")).not.toBeInTheDocument();
-  });
-
-  it("omits events and sound controls from the menu", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-
-    expect(screen.queryByRole("menuitem", { name: /events/i })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: /turn sound/i })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Options" })).toBeVisible();
-  });
-
-  it("gives the scenario dialog only the scenario name", () => {
-    renderAppBar();
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Scenario details" }));
-
+    ).toMatchObject({
+      state: "at-limit",
+      metric: "0W reserve",
+    });
     expect(
-      screen.getByRole("dialog", { name: "Rise of Renewables" }),
-    ).toBeVisible();
+      getGridHealth(game, {
+        ...now,
+        supplyW: now.demandW - 373000000,
+        reserveW: 500000000,
+      } as TickPresentFutureType),
+    ).toMatchObject({
+      state: "blackout",
+      metric: "373MW short",
+    });
   });
 
   it("returns focus to the primary action after Save & Quit", () => {

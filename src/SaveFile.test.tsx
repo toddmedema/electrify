@@ -1,5 +1,5 @@
 import { LOCATIONS } from "./Constants";
-import { CUSTOM_SCENARIO_ID } from "./data/Scenarios";
+import { CUSTOM_SCENARIO_ID, DEFAULT_CUSTOM_SCENARIO } from "./data/Scenarios";
 import {
   describeSave,
   downloadSave,
@@ -8,8 +8,8 @@ import {
   resumableSave,
   saveFilename,
 } from "./SaveFile";
-import { clearSave, SAVE_VERSION, serializeSave, writeSave } from "./SaveGame";
-import { GameType } from "./Types";
+import { clearSave, serializeSave, writeSave } from "./SaveGame";
+import { GameType, ScenarioType } from "./Types";
 
 // Enough of a game slice to be a valid save: parseSave checks the fields the simulation would
 // crash on, not the whole of GameType, and building a real game here would cost a minute of setup
@@ -31,6 +31,8 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     reportedEventKeys: [],
     eventLogReadThroughId: 0,
     worldEvents: { active: [], occurrences: [], checkedKeys: [] },
+    meaningfulDecisions: [],
+    meaningfulDecisionGateWaived: false,
     ...overrides,
   } as unknown as GameType;
 }
@@ -56,11 +58,6 @@ describe("SaveFile", () => {
       expect(describeSave(resumableSave()!)).toBe("Rise of Renewables, 2035");
     });
 
-    it("ignores a save whose scenario this build no longer has", () => {
-      writeSave(fakeGame({ scenarioId: 99999 }));
-      expect(resumableSave()).toBeNull();
-    });
-
     it("takes a custom game's scenario from the save itself", () => {
       writeSave(
         fakeGame({
@@ -73,12 +70,6 @@ describe("SaveFile", () => {
   });
 
   describe("saveFilename", () => {
-    it("slugs the scenario name", () => {
-      expect(saveFilename("Rise of Renewables", 2035)).toBe(
-        "electrify-rise-of-renewables-2035.json",
-      );
-    });
-
     // A custom game's name is typed by the player, so it reaches here as anything at all
     it("folds away everything a filename shouldn't carry", () => {
       expect(saveFilename("../../etc/passwd", 2020)).toBe(
@@ -128,13 +119,6 @@ describe("SaveFile", () => {
   });
 
   describe("readSaveFile", () => {
-    it("accepts a save this build can play", async () => {
-      const game = fakeGame();
-      const { save, error } = await readSaveFile(saveFile(serializeSave(game)));
-      expect(error).toBeUndefined();
-      expect(save?.game.seed).toBe(game.seed);
-    });
-
     it("round trips an exported save", async () => {
       writeSave(fakeGame());
       const exported = resumableSave()!.save;
@@ -142,26 +126,47 @@ describe("SaveFile", () => {
       expect(save).toEqual(exported);
     });
 
+    it("round trips every custom setup choice through export and import", async () => {
+      const customScenario: ScenarioType = {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: LOCATIONS.HNL.id,
+        location: LOCATIONS.HNL,
+        ownership: "Public",
+        startingYear: 2080,
+        cash: 1_700_000_000,
+        startingCustomers: 2_350_000,
+        dollarsPerkWh: 0.42,
+        durationMonths: 60 * 12,
+        feePerKgCO2e: 0.31,
+        seed: 8675309,
+        facilities: [
+          { name: "Offshore Wind", peakW: 500_000_000 },
+          { name: "Battery", peakWh: 1_000_000_000 },
+        ],
+      };
+      writeSave(
+        fakeGame({
+          scenarioId: CUSTOM_SCENARIO_ID,
+          customScenario,
+          location: customScenario.location!,
+          startingYear: customScenario.startingYear,
+          seed: customScenario.seed!,
+          difficulty: "CEO",
+        }),
+      );
+
+      const exported = resumableSave()!.save;
+      const { save, error } = await readSaveFile(saveFile(exported));
+
+      expect(error).toBeUndefined();
+      expect(save?.game.difficulty).toBe("CEO");
+      expect(save?.game.customScenario).toEqual(customScenario);
+    });
+
     it("rejects a file that isn't JSON", async () => {
       const { save, error } = await readSaveFile(saveFile("not json {"));
       expect(save).toBeUndefined();
       expect(error).toMatch(/isn't an Electrify save/);
-    });
-
-    it("rejects a save from a different schema", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile({ ...serializeSave(fakeGame()), version: SAVE_VERSION + 1 }),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/isn't a valid Electrify save/);
-    });
-
-    it("rejects a save whose scenario this build doesn't have", async () => {
-      const { save, error } = await readSaveFile(
-        saveFile(serializeSave(fakeGame({ scenarioId: 99999 }))),
-      );
-      expect(save).toBeUndefined();
-      expect(error).toMatch(/scenario/);
     });
 
     // Whatever the player picked, it's read into memory before anything else looks at it

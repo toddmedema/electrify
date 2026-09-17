@@ -34,7 +34,7 @@ export interface Props extends StateProps, DispatchProps {}
  * Picks the name that shows up on the leaderboard.
  *
  * Its own dialog rather than the shared ui.dialog, which only carries a title and a message: this
- * one has a text field whose error comes back from a Firestore transaction, so it has to be able
+ * one has a text field whose error comes back from a Firestore write, so it has to be able
  * to fail and stay open.
  */
 export default function DisplayNameDialog(props: Props): React.JSX.Element {
@@ -61,7 +61,7 @@ export default function DisplayNameDialog(props: Props): React.JSX.Element {
     setSaving(true);
     onSave(name).then((failure) => {
       setSaving(false);
-      // Left open on failure: a taken name needs another try, not a dismissal
+      // Left open on failure: a failed save needs another try, not a dismissal
       setError(failure);
       if (!failure) {
         onClose();

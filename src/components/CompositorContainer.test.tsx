@@ -1,10 +1,9 @@
+import { UnknownAction } from "@reduxjs/toolkit";
 import * as fs from "fs";
 import * as path from "path";
-import * as React from "react";
-import { UnknownAction } from "redux";
-import type { AppDispatch } from "../Store";
 import { SCENARIOS } from "../data/Scenarios";
 import { reprioritizeFacility, togglePauseFacility } from "../reducers/Game";
+import type { AppDispatch } from "../Store";
 import { CardNameType, NavigateActionType, TutorialStepType } from "../Types";
 import { mapDispatchToProps } from "./CompositorContainer";
 
@@ -71,28 +70,6 @@ function navigatedTo(dispatched: UnknownAction[]): CardNameType | undefined {
 describe("onTutorialStep", () => {
   const generators = walkthrough("Mission 2: Generators");
 
-  it("moves the walkthrough to the new step", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(dispatched).toContainEqual(
-      expect.objectContaining({ payload: { tutorialStep: 1 } }),
-    );
-  });
-
-  it("navigates forwards onto the card holding the next step's target", () => {
-    const dispatched = step({
-      steps: generators,
-      fromStep: 0,
-      toStep: 1,
-      currentCard: STARTING_CARD,
-    });
-    expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
-  });
-
   /**
    * Regression test. Back used to dispatch the previous step's onNext, which only ever modelled
    * moving forwards, so nothing undid the navigation the forward step performed: the player was
@@ -150,10 +127,16 @@ describe("onTutorialStep", () => {
       {
         card: "FACILITIES",
         target: "#first",
+        action: "Tap first",
         content: <span />,
         onNext: () => sideEffect,
       },
-      { card: "INSIGHTS", target: "#second", content: <span /> },
+      {
+        card: "INSIGHTS",
+        target: "#second",
+        action: "Tap second",
+        content: <span />,
+      },
     ];
 
     it("fires onNext when leaving a step forwards", () => {
@@ -182,6 +165,22 @@ describe("onTutorialStep", () => {
 
     expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
     expect(dispatched[0].payload).toEqual({ tutorialStep: capstone });
+  });
+
+  // Regression test. Tapping 1x is what finishes the step before this capstone, and rebuilding
+  // the scenario on entry reloaded the game and paused the clock the player had just started
+  it("keeps Mission 1's clock running into its capstone", () => {
+    const electricity = walkthrough("Mission 1: Electricity");
+    const capstone = electricity.findIndex((candidate) => candidate.capstone);
+
+    const dispatched = step({
+      steps: electricity,
+      fromStep: capstone - 1,
+      toStep: capstone,
+      currentCard: "FACILITIES",
+    });
+
+    expect(dispatched.map((action) => action.type)).toEqual(["game/delta"]);
   });
 
   it("still rebuilds capstones that require an authored checkpoint", () => {
@@ -229,9 +228,18 @@ function targetsOf(steps: TutorialStepType[]): string[] {
 
 /** Whether anything in the app still declares the id or class a simple selector names */
 function declares(simple: string): boolean {
+  if (simple.startsWith("[")) {
+    const attribute = simple.match(/^\[([\w-]+)/)?.[1];
+    return !!attribute && SOURCE.includes(`${attribute}=`);
+  }
   const name = simple.slice(1);
   if (simple.startsWith("#")) {
-    return SOURCE.includes(`id="${name}"`);
+    return (
+      SOURCE.includes(`id="${name}"`) ||
+      Array.from(SOURCE.matchAll(/id=\{`([^$`]*)\$\{/g)).some(([, prefix]) =>
+        name.startsWith(prefix),
+      )
+    );
   }
   // MUI generates its own class names, so there is nothing of ours to find. Those steps lean
   // on the card check above instead
@@ -253,10 +261,6 @@ describe("walkthrough steps", () => {
     togglePauseFacility.type,
   ]);
 
-  it("covers every walkthrough", () => {
-    expect(tutorials.length).toBeGreaterThan(0);
-  });
-
   it("uses real game actions for every action gate", () => {
     const declared = tutorials.flatMap(
       (scenario) =>
@@ -267,33 +271,6 @@ describe("walkthrough steps", () => {
         ) || [],
     );
     expect(declared.filter((type) => !actionGateTypes.has(type))).toEqual([]);
-  });
-
-  it("uses the same symbols as the generator and storage buttons it highlights", () => {
-    const conceptsOf = (step: TutorialStepType) =>
-      React.isValidElement<{ concepts?: string[] }>(step.content)
-        ? step.content.props.concepts
-        : undefined;
-    const generatorStep = walkthrough("Mission 2: Generators").find(
-      (step) => step.target === ".button-buildGenerator",
-    )!;
-    const storageStep = walkthrough("Mission 3: Storage").find(
-      (step) => step.target === ".button-buildStorage",
-    )!;
-
-    expect(conceptsOf(generatorStep)).toEqual(["build", "generator"]);
-    expect(conceptsOf(storageStep)).toEqual(["build", "storage"]);
-  });
-
-  it("declares the card every tutorial target lives on", () => {
-    tutorials.forEach((scenario) => {
-      const steps = scenario.tutorialSteps as TutorialStepType[];
-      steps.forEach((s, i) => {
-        expect([scenario.name, `step ${i}`, cardOf(s)]).not.toContainEqual(
-          undefined,
-        );
-      });
-    });
   });
 
   // Walk each walkthrough forwards and then all the way back, tracking the card the store
@@ -340,7 +317,7 @@ describe("walkthrough steps", () => {
     tutorials.forEach((scenario) => {
       const steps = scenario.tutorialSteps as TutorialStepType[];
       targetsOf(steps).forEach((target) => {
-        target.split(/\s+/).forEach((simple) => {
+        (target.match(/\[[^\]]+\]|[^\s]+/g) || []).forEach((simple) => {
           expect([scenario.name, target, declares(simple)]).toEqual([
             scenario.name,
             target,

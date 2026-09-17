@@ -27,6 +27,15 @@ const EARLIEST_DATA_YEAR = 1975;
 // with it closely enough to quote a retail rate in the right ballpark.
 export const LATEST_DATA_YEAR = 2019;
 
+/** Provenance of the underlying national series; regional prices are estimates in every year. */
+export function getFuelPriceProvenance(
+  date: Pick<DateType, "year" | "monthNumber">,
+): "historical" | "modeled" {
+  return recordedMonths.has(absoluteMonth(date.year, date.monthNumber))
+    ? "historical"
+    : "modeled";
+}
+
 // Fixed so that each fuel always draws from the same slot of the fuel stream, whatever order
 // the CSV's columns happen to arrive in. New fuels belong at the end so adding one cannot shift
 // the established simulations for every fuel before it.
@@ -85,11 +94,9 @@ const BIOMASS_PRICES_PER_MBTU: Record<number, number> = {
   2019: 2.28,
 };
 
-// How fast the trend a projected price is tied to climbs, in that year's dollars. The recorded
-// series run between 1.8%/yr (natural gas) and 3.6%/yr (oil) across 1975-2019, so this sits just
-// above the top of the range the data supports: fuel gets steadily dearer in real terms against
-// the ~2.5-3% the economy inflates build and O&M costs at, and a long game is a slow squeeze on
-// anything that burns something rather than a coin flip about whether fuel ends up free.
+// Authored nominal-price trend for the reference game future, not an economic prediction.
+// Its 4%/year assumption is exposed alongside 2% and 6% price-only sensitivities in Insights.
+// Historical observations remain unchanged; inflation and fuel prices are separate models.
 export const TREND_ESCALATION_YEARLY = 0.04;
 
 // How much of last month's departure from that trend carries into this month's, and how far it is
@@ -139,6 +146,7 @@ type RawFuelPricesType = {
 // and the run stops being a function of its seed.
 // year -> month (1-12) -> price per MBTU by fuel
 const fuelPrices: Record<number, Record<number, FuelPricesType>> = {};
+const recordedMonths = new Set<number>();
 
 /**
  * Whether any prices have been loaded yet. The game screens all run after the loading screen has
@@ -164,6 +172,7 @@ function absoluteMonth(year: number, month: number): number {
 // Emptied in place rather than reassigned so that the closure in projectYear keeps referring to
 // a const, which no-loop-func requires
 function resetFuelPrices() {
+  recordedMonths.clear();
   Object.keys(fuelPrices).forEach((year: string) => {
     delete fuelPrices[+year];
   });
@@ -316,6 +325,7 @@ function collectFuelPriceRow(data: RawFuelPricesType) {
     return;
   }
   fuelPrices[+data.year] = fuelPrices[+data.year] || {};
+  recordedMonths.add(absoluteMonth(+data.year, +data.month));
   // Frozen because getFuelPricesPerMBTU hands the cached object straight to its callers rather
   // than copying it per tick, and a caller that wrote to one would be rewriting the record
   fuelPrices[+data.year][+data.month] = Object.freeze({

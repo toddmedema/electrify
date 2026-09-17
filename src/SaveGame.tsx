@@ -1,4 +1,10 @@
+import {
+  emptyPolicies,
+  validPolicies,
+  validDeferredResidential,
+} from "./helpers/Policies";
 import packageJson from "../package.json";
+import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
 import {
@@ -7,7 +13,15 @@ import {
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { GameType } from "./Types";
+import { GameType, TransmissionLineOperatingType } from "./Types";
+import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
+import {
+  emptyTransmissionState,
+  intertiesEnabledForScenario,
+  corridorsForLocation,
+  TRANSMISSION_CORRIDORS,
+} from "./data/AdjacentMarkets";
+import { getScenario } from "./data/Scenarios";
 import type { AppStore } from "./Store";
 
 /**
@@ -25,11 +39,8 @@ import type { AppStore } from "./Store";
  */
 
 export const SAVE_KEY = "savedGame";
-// Initial public schema. Increment this when a post-release change becomes incompatible.
-export const SAVE_VERSION = 1;
 
 export interface SaveGameType {
-  version: number;
   savedAt: string; // ISO 8601
   appVersion: string; // For bug reports
   game: GameType;
@@ -41,9 +52,73 @@ export interface SaveGameType {
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
 
+function validTransmissionLine(
+  raw: unknown,
+): raw is TransmissionLineOperatingType {
+  if (typeof raw !== "object" || raw === null) return false;
+  const line = raw as Partial<TransmissionLineOperatingType>;
+  const corridor = TRANSMISSION_CORRIDORS.find(
+    ({ id }) => id === line.corridorId,
+  );
+  if (!corridor) return false;
+  const nonNegative = [
+    line.capacityW,
+    line.buildCost,
+    line.annualOperatingCost,
+    line.yearsToBuildLeft,
+    line.minuteCreated,
+    line.loanAmountLeft,
+    line.loanMonthlyPayment,
+    line.interestRate,
+  ];
+  return (
+    typeof line.name === "string" &&
+    line.name.length > 0 &&
+    Number.isInteger(line.id) &&
+    line.id! > 0 &&
+    nonNegative.every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    ) &&
+    line.capacityW === corridor.capacityW &&
+    line.buildCost === corridor.buildCost &&
+    line.annualOperatingCost === corridor.annualOperatingCost &&
+    line.yearsToBuildLeft! <= corridor.yearsToBuild &&
+    Number.isInteger(line.minuteCreated) &&
+    line.interestRate! <= 1 &&
+    line.loanAmountLeft! <= corridor.buildCost &&
+    line.loanMonthlyPayment! <= corridor.buildCost &&
+    typeof line.financed === "boolean" &&
+    (line.financed
+      ? line.loanMonthlyPayment! > 0
+      : line.loanAmountLeft === 0 &&
+        line.loanMonthlyPayment === 0 &&
+        line.interestRate === 0)
+  );
+}
+
+function validEmissions(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const record = raw as {
+    kgco2e?: number;
+    localKgco2e?: number;
+    importedKgco2e?: number;
+  };
+  if (
+    ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    )
+  )
+    return false;
+  return (
+    Math.abs(record.kgco2e! - record.localKgco2e! - record.importedKgco2e!) <=
+    Math.max(1, record.kgco2e!) * 1e-9
+  );
+}
+
 export function serializeSave(game: GameType): SaveGameType {
   return {
-    version: SAVE_VERSION,
     savedAt: new Date().toISOString(),
     appVersion: packageJson.version,
     game,
@@ -60,11 +135,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   const save = raw as Partial<SaveGameType>;
-  if (
-    save.version !== SAVE_VERSION ||
-    typeof save.savedAt !== "string" ||
-    typeof save.appVersion !== "string"
-  ) {
+  if (typeof save.savedAt !== "string" || typeof save.appVersion !== "string") {
     return null;
   }
   const game = save.game as Partial<GameType> | undefined;
@@ -102,7 +173,8 @@ export function parseSave(raw: unknown): SaveGameType | null {
         !Number.isFinite(addition.loadFactor) ||
         addition.loadFactor < 0 ||
         addition.loadFactor > 1 ||
-        addition.demandType !== "Data centers",
+        (addition.demandType !== "Data centers" &&
+          addition.demandType !== "Mining"),
     ) ||
     typeof game.customerRate !== "number" ||
     !Number.isFinite(game.customerRate) ||
@@ -163,14 +235,56 @@ export function parseSave(raw: unknown): SaveGameType | null {
       );
     }) ||
     !Array.isArray(game.timeline) ||
+    game.timeline.some(
+      (tick) =>
+        !validEmissions(tick) ||
+        typeof tick.reserveW !== "number" ||
+        !Number.isFinite(tick.reserveW) ||
+        [
+          tick.storageChargeW,
+          tick.storageDischargeW,
+          tick.importKgco2ePerMWh,
+        ].some(
+          (value) =>
+            typeof value !== "number" || !Number.isFinite(value) || value < 0,
+        ),
+    ) ||
     !Array.isArray(game.monthlyHistory) ||
     game.monthlyHistory.length >
       Math.floor(game.date.minute / MINUTES_PER_MONTH) ||
     game.monthlyHistory.some((month) => {
-      if (typeof month !== "object" || month === null) {
+      if (
+        typeof month !== "object" ||
+        month === null ||
+        !validEmissions(month)
+      ) {
         return true;
       }
       const record = month as Partial<GameType["monthlyHistory"][number]>;
+      const chart = record.chartAverage;
+      if (
+        chart !== undefined &&
+        (typeof chart !== "object" ||
+          chart === null ||
+          !chart.demandByType ||
+          !chart.supplyByFuel ||
+          !chart.renewableCapacityFactors ||
+          Object.values(chart).some((value) =>
+            typeof value === "number"
+              ? !Number.isFinite(value)
+              : typeof value !== "object" ||
+                value === null ||
+                Object.values(value).some(
+                  (entry) =>
+                    typeof entry !== "number" || !Number.isFinite(entry),
+                ),
+          ) ||
+          typeof record.chartTickWeight !== "number" ||
+          !Number.isFinite(record.chartTickWeight) ||
+          record.chartTickWeight <= 0)
+      ) {
+        return true;
+      }
       return (
         typeof record.deliveredWhByFuel !== "object" ||
         record.deliveredWhByFuel === null ||
@@ -192,6 +306,13 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
+  const currentMonth = Math.floor(game.date.minute / MINUTES_PER_MONTH);
+  if (
+    !validMeaningfulDecisions(game.meaningfulDecisions, currentMonth) ||
+    (game.meaningfulDecisionGateWaived !== undefined &&
+      typeof game.meaningfulDecisionGateWaived !== "boolean")
+  )
+    return null;
   const worldEvents = game.worldEvents as
     Partial<GameType["worldEvents"]> | undefined;
   if (
@@ -199,11 +320,107 @@ export function parseSave(raw: unknown): SaveGameType | null {
     worldEvents === null ||
     !Array.isArray(worldEvents.active) ||
     !Array.isArray(worldEvents.occurrences) ||
-    !Array.isArray(worldEvents.checkedKeys)
+    !Array.isArray(worldEvents.checkedKeys) ||
+    !worldEvents.active.every(validWorldEvent) ||
+    !worldEvents.occurrences.every(validWorldEvent) ||
+    !worldEvents.checkedKeys.every((key) => typeof key === "string")
   ) {
     return null;
   }
-  return save as SaveGameType;
+  if (
+    game.policies !== undefined &&
+    !validPolicies(
+      game.policies,
+      Math.floor(game.date.minute / MINUTES_PER_MONTH),
+    )
+  )
+    return null;
+  const transmission = game.transmission;
+  const scenario = getScenario(game.scenarioId, game.customScenario);
+  const transmissionEnabled = !!(
+    scenario && intertiesEnabledForScenario(scenario, game.location)
+  );
+  if (
+    transmission !== undefined &&
+    (typeof transmission !== "object" ||
+      transmission === null ||
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        transmission.tradingPolicy,
+      ) ||
+      !Array.isArray(transmission.lines) ||
+      transmission.lines.some((line) => !validTransmissionLine(line)) ||
+      new Set(transmission.lines.map(({ id }) => id)).size !==
+        transmission.lines.length ||
+      new Set(transmission.lines.map(({ corridorId }) => corridorId)).size !==
+        transmission.lines.length)
+  )
+    return null;
+  if (!transmissionEnabled && transmission?.lines.length) return null;
+  const locationCorridors = game.location
+    ? corridorsForLocation(game.location)
+    : [];
+  if (
+    transmissionEnabled &&
+    transmission?.lines.some(
+      ({ corridorId }) =>
+        !locationCorridors.some(({ id }) => id === corridorId),
+    )
+  )
+    return null;
+  if (
+    game.timeline.some(
+      (t) =>
+        !validDeferredResidential(t.deferredResidential) ||
+        !validDeferredResidential(t.deferredResidentialStart) ||
+        [
+          t.customerBillingRate,
+          t.deferredResidentialWh,
+          t.deferredResidentialWhStart,
+          t.shiftedResidentialW,
+        ].some(
+          (value) =>
+            value !== undefined && (!Number.isFinite(value) || value < 0),
+        ),
+    )
+  )
+    return null;
+  if (
+    [...game.timeline, ...game.monthlyHistory].some(
+      (t) =>
+        t.expensesPolicy !== undefined &&
+        (!Number.isFinite(t.expensesPolicy) || t.expensesPolicy < 0),
+    )
+  )
+    return null;
+  const normalized = {
+    ...game,
+    policyPause: undefined,
+    policies:
+      game.policies ??
+      emptyPolicies(Math.floor(game.date.minute / MINUTES_PER_MONTH)),
+    transmission: transmissionEnabled
+      ? (game.transmission ?? emptyTransmissionState())
+      : undefined,
+    meaningfulDecisions: game.meaningfulDecisions!,
+    meaningfulDecisionGateWaived: game.meaningfulDecisionGateWaived ?? false,
+    timeline: (game as GameType).timeline.map((t) => ({
+      ...t,
+      expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
+      importedW: t.importedW ?? 0,
+      exportedW: t.exportedW ?? 0,
+      transmissionCapacityW: t.transmissionCapacityW ?? 0,
+      marketPricePerMWh: t.marketPricePerMWh ?? 0,
+    })),
+    monthlyHistory: game.monthlyHistory.map((t) => ({
+      ...t,
+      expensesPolicy: t.expensesPolicy ?? 0,
+      expensesImports: t.expensesImports ?? 0,
+      revenueExports: t.revenueExports ?? 0,
+    })),
+  };
+  return { ...save, game: normalized } as SaveGameType;
 }
 
 export function readSave(): SaveGameType | null {

@@ -6,6 +6,8 @@ import {
   DEMAND_TYPES,
   demandByTypeAt,
   scheduledLoadAdditionWAt,
+  climateLoadArchetype,
+  temperatureDemandWattsPerCustomer,
 } from "./DemandProfiles";
 import { ScenarioLoadAdditionType } from "../Types";
 
@@ -24,13 +26,65 @@ function total(values: ReturnType<typeof demandByTypeAt>) {
 }
 
 describe("demand profiles", () => {
-  it("preserves an authored scenario's opening demand while exposing five components", () => {
+  it("uses a comfortable-weather minimum and different heating and cooling responses", () => {
+    const texas = { ...location("TX"), lat: 30 };
+    const michigan = { ...location("MI"), lat: 43 };
+    const norway = { ...location(""), country: "Norway", lat: 60 };
+    expect(climateLoadArchetype(texas)).toBe("cooling");
+    expect(climateLoadArchetype(michigan)).toBe("fuel-heating");
+    expect(climateLoadArchetype(norway)).toBe("electric-heating");
+    expect(temperatureDemandWattsPerCustomer(35, texas)).toBeGreaterThan(
+      temperatureDemandWattsPerCustomer(35, michigan),
+    );
+    expect(temperatureDemandWattsPerCustomer(-10, norway)).toBeGreaterThan(
+      temperatureDemandWattsPerCustomer(-10, michigan),
+    );
+    for (const city of [texas, michigan, norway, undefined]) {
+      expect(temperatureDemandWattsPerCustomer(0, city)).toBeGreaterThan(
+        temperatureDemandWattsPerCustomer(18, city),
+      );
+      expect(temperatureDemandWattsPerCustomer(35, city)).toBeGreaterThan(
+        temperatureDemandWattsPerCustomer(18, city),
+      );
+    }
+  });
+  it("preserves an authored scenario's opening demand while exposing its components", () => {
     const date = getDateFromMinute(0, 2019);
     const breakdown = demandByTypeAt(1_000_000, date, 2019, location("CA"));
 
     expect(Object.keys(breakdown)).toEqual(DEMAND_TYPES);
     expect(total(breakdown)).toBeCloseTo(1_000_000);
-    DEMAND_TYPES.forEach((type) => expect(breakdown[type]).toBeGreaterThan(0));
+    // Everything the region itself supplies is present from the first instant. Mining is not:
+    // there is no regional mining share to open against, so a grid has it only if a scenario
+    // put a mine on it.
+    DEMAND_TYPES.filter((type) => type !== "Mining").forEach((type) =>
+      expect(breakdown[type]).toBeGreaterThan(0),
+    );
+    expect(breakdown.Mining).toBe(0);
+  });
+
+  it("adds an authored mine on top of the customer baseline", () => {
+    const mine: ScenarioLoadAdditionType = {
+      id: "copperbelt",
+      label: "Copperbelt mines",
+      startsYear: 2019,
+      peakW: 400_000,
+      loadFactor: 0.9,
+      demandType: "Mining",
+    };
+    const date = getDateFromMinute(0, 2019);
+    const withoutMine = demandByTypeAt(1_000_000, date, 2019, location("CA"));
+    const withMine = demandByTypeAt(1_000_000, date, 2019, location("CA"), [
+      mine,
+    ]);
+
+    // A mine is load the utility has to serve in addition to its customers, not a slice taken
+    // out of them: every other component is untouched and the total rises by the schedule.
+    expect(withMine.Mining).toBeGreaterThan(0);
+    DEMAND_TYPES.filter((type) => type !== "Mining").forEach((type) =>
+      expect(withMine[type]).toBeCloseTo(withoutMine[type]),
+    );
+    expect(total(withMine) - total(withoutMine)).toBeCloseTo(withMine.Mining);
   });
 
   it("introduces data centers around 2000 and accelerates them after 2025", () => {

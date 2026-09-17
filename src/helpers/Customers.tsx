@@ -96,10 +96,9 @@ export function nextCustomerCount({
         : Math.max(0, customers);
     change += (switchingBase * switchingRate * tickScale) / TICKS_PER_YEAR;
   }
-  const next = Math.max(0, Math.round(customers + change));
-  return ownership === "Investor"
-    ? Math.min(Math.round(marketSize), next)
-    : next;
+  // Preserve fractional customers between ticks: rounding here erases small utilities' growth.
+  const next = Math.max(0, customers + change);
+  return ownership === "Investor" ? Math.min(marketSize, next) : next;
 }
 
 /** The addressable market grows with the same underlying population trend as neutral customers. */

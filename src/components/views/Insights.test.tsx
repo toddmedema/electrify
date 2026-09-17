@@ -1,16 +1,26 @@
-import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import {
+  isInaccessible,
+  render as renderUI,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EMPTY_HISTORY } from "../../helpers/DateTime";
+import cloneDeep from "lodash.clonedeep";
+import * as React from "react";
+import { Provider } from "react-redux";
+import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
+import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
+import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
-import { GameType } from "../../Types";
+import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
-  INSIGHT_LAYERS,
   INSIGHT_PRESETS,
   MAX_CUSTOM_INSIGHT_PRESETS,
-  presetForLayers,
   withRequiredLayers,
 } from "./Insights";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 jest.mock("../base/GameCard", () => ({
   __esModule: true,
@@ -20,22 +30,99 @@ jest.mock("../base/GameCard", () => ({
 }));
 
 interface ChartMockProps {
+  title?: string;
+  hideTitle?: boolean;
   id?: string;
   syncKey?: string;
   timeline?: unknown[];
+  domain?: [number, number] | { x: [number, number] };
 }
+
+const domainValue = (domain?: ChartMockProps["domain"]) =>
+  JSON.stringify(Array.isArray(domain) ? domain : domain?.x);
 
 let mockSupplyDemandPaints = 0;
 
+it("refreshes paused projections when a customer program is scheduled, replaced, or cancelled", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    props: typeof props;
+    getProjection: (now: TickPresentFutureType) => {
+      timeline: TickPresentFutureType[];
+    };
+  };
+  const before = internals.getProjection(game.timeline[0]);
+  const change = {
+    id: "efficiency" as const,
+    tier: "Large" as const,
+    month: 1,
+  };
+  const project = (nextGame: GameType) => {
+    const nextProps = { ...props, game: nextGame };
+    expect(insights.shouldComponentUpdate(nextProps, insights.state)).toBe(
+      true,
+    );
+    internals.props = nextProps;
+    return internals.getProjection(nextGame.timeline[0]);
+  };
+  const scheduledGame = gameReducer(game, schedulePolicy(change));
+  const scheduled = project(scheduledGame);
+  const replacedGame = gameReducer(
+    scheduledGame,
+    schedulePolicy({ ...change, tier: "Small" }),
+  );
+  const replaced = project(replacedGame);
+  const cancelled = project(
+    gameReducer(replacedGame, cancelPolicy({ ...change, tier: "Small" })),
+  );
+  const future = (projection: typeof before) =>
+    projection.timeline.find((tick) => tick.minute >= 3 * MINUTES_PER_MONTH)!;
+  expect(future(scheduled).demandW).toBeLessThan(future(replaced).demandW);
+  expect(future(replaced).demandW).toBeLessThan(future(before).demandW);
+  expect(future(scheduled).expensesPolicy).toBeGreaterThan(
+    future(replaced).expensesPolicy!,
+  );
+  expect(future(replaced).expensesPolicy).toBeGreaterThan(0);
+  expect(cancelled.timeline).toEqual(before.timeline);
+  expect(
+    insights.shouldComponentUpdate(
+      {
+        ...internals.props,
+        game: {
+          ...internals.props.game,
+          policies: JSON.parse(JSON.stringify(internals.props.game.policies)),
+        },
+      },
+      insights.state,
+    ),
+  ).toBe(false);
+});
+
 jest.mock("../base/ChartFinances", () => ({
   __esModule: true,
-  default: ({ id, syncKey, timeline }: ChartMockProps) => (
+  default: ({
+    id,
+    syncKey,
+    timeline,
+    domain,
+    title,
+    hideTitle,
+  }: ChartMockProps) => (
     <div
       role="img"
       id={id}
       data-testid={id}
+      data-visible-title={hideTitle ? "" : title}
       data-sync-key={syncKey}
       data-points={timeline?.length}
+      data-domain={domainValue(domain)}
     />
   ),
 }));
@@ -69,7 +156,7 @@ jest.mock("../base/ChartForecastSupplyByFuel", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline }: ChartMockProps) => {
+  default: ({ syncKey, timeline, domain }: ChartMockProps) => {
     mockSupplyDemandPaints++;
     return (
       <div
@@ -78,6 +165,7 @@ jest.mock("../base/ChartForecastSupplyDemand", () => ({
         data-testid="supply-demand-chart"
         data-sync-key={syncKey}
         data-points={timeline?.length}
+        data-domain={domainValue(domain)}
       />
     );
   },
@@ -123,16 +211,110 @@ jest.mock("../base/ChartForecastWeather", () => ({
 }));
 
 const user = userEvent.setup({ delay: null });
+
+it("reveals finance evidence temporarily and lets explicit selection own saved layers", async () => {
+  localStorage.clear();
+  const configured = ["supplyDemand"];
+  localStorage.setItem("insightsLayers", JSON.stringify(configured));
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+    onEvidenceReady: jest.fn(),
+  };
+  const request = { id: 1, runId: 0, target: "finances" as const };
+  const { rerender } = render(
+    <Insights {...props} evidenceRequest={request} />,
+  );
+  expect(screen.getByLabelText("Finance details evidence")).toBeInTheDocument();
+  expect(props.onEvidenceReady).toHaveBeenCalledWith(
+    request,
+    screen.getByLabelText("Finance details evidence"),
+  );
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual(
+    configured,
+  );
+  rerender(<Insights {...props} />);
+  await choosePreset("Reliability");
+  expect(
+    screen.queryByLabelText("Finance details evidence"),
+  ).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).not.toContain(
+    "financeDetails",
+  );
+  rerender(<Insights {...props} evidenceRequest={{ ...request, id: 2 }} />);
+  expect(screen.getByText(/Temporary evidence/)).toBeInTheDocument();
+  rerender(<Insights {...props} />);
+  await user.click(
+    screen.getByRole("button", { name: "Keep Finance details" }),
+  );
+  expect(screen.queryByText(/Temporary evidence/)).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toContain(
+    "financeDetails",
+  );
+});
+
+function render(element: React.ReactElement) {
+  const store = configureStore({ reducer: { ui: uiReducer } });
+  return renderUI(element, {
+    wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+  });
+}
+
+it("reorders configured charts while ending temporary reveal without saving it", async () => {
+  localStorage.clear();
+  localStorage.setItem(
+    "insightsLayers",
+    JSON.stringify(["supplyDemand", "cash"]),
+  );
+  const props = {
+    game: createGame({ scenarioId: 101 }),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+    onEvidenceReady: jest.fn(),
+  };
+  const { rerender } = render(
+    <Insights
+      {...props}
+      evidenceRequest={{ id: 1, runId: 0, target: "finances" }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Move Finance details up" }),
+  ).toBeDisabled();
+  expect(
+    within(
+      screen.getByRole("button", { name: "Keep Finance details" }),
+    ).getByTestId("AddIcon"),
+  ).toBeInTheDocument();
+  rerender(<Insights {...props} />);
+  await user.click(screen.getByRole("button", { name: "Move Cash up" }));
+  expect(screen.queryByText(/Temporary evidence/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Finance details evidence"),
+  ).not.toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem("insightsLayers")!)).toEqual([
+    "cash",
+    "supplyDemand",
+  ]);
+});
 // MUI interaction tests share the coverage runner with the simulation suite in CI, where opening
 // and clicking several portal-backed controls can legitimately exceed Jest's 5 second default.
 jest.setTimeout(15_000);
 
-function renderInsights(scenarioId = 100, suppliedGame?: GameType) {
+function renderInsights(
+  scenarioId = 100,
+  suppliedGame?: GameType,
+  upcomingEvents?: UpcomingStoryEventType[],
+) {
   return render(
     <Insights
       game={suppliedGame || createGame({ scenarioId })}
       selectedFacilityId={null}
       facilityDragActive={false}
+      upcomingEvents={upcomingEvents}
       onDelta={() => undefined}
     />,
   );
@@ -140,7 +322,13 @@ function renderInsights(scenarioId = 100, suppliedGame?: GameType) {
 
 function gameWithHistory(): GameType {
   const game = createGame({ scenarioId: 100 });
-  game.date.year = game.startingYear + 2;
+  game.date = {
+    ...game.date,
+    minute: 24 * MINUTES_PER_MONTH,
+    monthsElapsed: 24,
+    monthNumber: 1,
+    year: game.startingYear + 2,
+  };
   game.monthlyHistory = [
     {
       ...EMPTY_HISTORY,
@@ -197,47 +385,36 @@ function storeCustomPreset(name: string) {
 describe("Insights layers", () => {
   beforeEach(() => localStorage.clear());
 
-  it("defines five distinct, purpose-ordered presets", () => {
-    expect(new Set(INSIGHT_LAYERS.map((layer) => layer.id)).size).toBe(
-      INSIGHT_LAYERS.length,
+  it("shows expanded finance rows and both rate graphs", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["financeDetails", "inflationInterest"]),
     );
-    expect(Object.keys(INSIGHT_PRESETS)).toHaveLength(5);
-    expect(INSIGHT_PRESETS.overview.layers).toEqual([
-      "supplyDemand",
-      "cash",
-      "profit",
-      "customers",
-      "emissions",
-    ]);
-    expect(INSIGHT_PRESETS.reliability.layers).toEqual([
-      "supplyDemand",
-      "supplyByFuel",
-      "storage",
-      "weather",
-      "water",
-    ]);
-    expect(INSIGHT_PRESETS.profitability.layers).toEqual([
-      "profit",
-      "cash",
-      "revenue",
-      "expenses",
-      "fuelPrices",
-    ]);
-    expect(INSIGHT_PRESETS.growth.layers).toEqual([
-      "customers",
-      "demandByType",
-      "supplyDemand",
-      "revenue",
-      "profit",
-    ]);
-    expect(INSIGHT_PRESETS.decarbonization.layers).toEqual([
-      "emissions",
-      "supplyByFuel",
-      "supplyDemand",
-      "fuelPrices",
-      "profit",
-    ]);
-    expect(presetForLayers(INSIGHT_PRESETS.growth.layers)).toBe("growth");
+    const game = createGame({ scenarioId: 100 });
+    renderInsights(100, game);
+    for (const label of [
+      "Fuel",
+      "Operations & maintenance",
+      "Loan interest",
+      "Carbon fees",
+      "Profit per kWh",
+      "Net worth",
+      "Current interest rate",
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    const interestRow = screen.getByRole("row", {
+      name: /Current interest rate/,
+    });
+    expect(interestRow).toHaveTextContent(
+      (game.timeline[0].interestRate * 100).toFixed(2) + "%",
+    );
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinflationRate"),
+    ).toHaveAttribute("data-visible-title", "Inflation");
+    expect(
+      screen.getByTestId("chartInsightsInflationInterestPlotinterestRate"),
+    ).toHaveAttribute("data-visible-title", "Interest rate");
   });
 
   it("starts new players on the five-chart overview in priority order", () => {
@@ -266,7 +443,40 @@ describe("Insights layers", () => {
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/Rate .*\/kWh/);
-    expect(levers.textContent).not.toMatch(/market [^·]*\/kWh/);
+    expect(
+      within(levers).getByText(/market \$/, {
+        selector: ".insightsRateSummaryDesktop",
+      }).textContent,
+    ).not.toMatch(/market [^·]*\/kWh/);
+    expect(within(levers).getByText("Market")).toBeInTheDocument();
+    expect(within(levers).getByText("Customers / mo")).toBeInTheDocument();
+    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
+      /projected customers .* next month/i,
+    );
+  });
+
+  it("keeps the compact rate metrics visible when the slider is collapsed", async () => {
+    renderInsights();
+
+    const toggle = labelledButton("Hide rate slider");
+    const sliderControl = screen.getByTestId("rate-slider-control");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(sliderControl).not.toHaveClass("insightsRateSliderCollapsed");
+    expect(screen.getByRole("slider")).toBeVisible();
+
+    await user.click(toggle);
+
+    expect(labelledButton("Show rate slider")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(sliderControl).toHaveClass("insightsRateSliderCollapsed");
+    expect(screen.getByRole("slider")).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("region", { name: "Planning controls" }),
+      ).getByText("Customers / mo"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the customer growth rate visible for public utilities", () => {
@@ -274,36 +484,177 @@ describe("Insights layers", () => {
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
     expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr/i);
-    expect(levers).not.toHaveTextContent(/market/i);
+    expect(levers).toHaveTextContent(/market benchmark/i);
+    expect(
+      within(levers).getByText("Customer growth / yr"),
+    ).toBeInTheDocument();
+    expect(
+      within(levers).getByText("+1.5%", { selector: "strong" }),
+    ).toBeVisible();
   });
 
-  it("offers one rolling 12-month range instead of separate calendar years", async () => {
-    localStorage.setItem("insightsRange", "current");
-    renderInsights();
+  it("shows in-range scenario events and reveals their forecast details", async () => {
+    localStorage.setItem("insightsRange", "next1");
+    renderInsights(100, undefined, [
+      {
+        key: "fee-onset",
+        startsMinute: 6 * MINUTES_PER_MONTH,
+        endsMinute: 7 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2023",
+        title: "Higher pollution fee begins",
+        message: "Polluting plants become more expensive to run.",
+      },
+      {
+        key: "later-event",
+        startsMinute: 18 * MINUTES_PER_MONTH,
+        endsMinute: 19 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2024",
+        title: "Outside range",
+        message: "This should not be shown.",
+      },
+    ]);
 
-    const range = screen.getByRole("combobox", { name: "Insight range" });
-    expect(range).toHaveTextContent("Next 12 months");
-    await user.click(range);
-
-    const options = within(await screen.findByRole("listbox"));
-    expect(options.getByText("Next 12 months")).toBeVisible();
-    expect(options.queryByText("Current year")).toBeNull();
-    expect(options.queryByText("Next year")).toBeNull();
-  });
-
-  it.each([
-    ["next10", "2880"],
-    ["next20", "5760"],
-  ])("uses hourly points for the %s forecast", (range, expectedPoints) => {
-    localStorage.setItem("insightsRange", range);
-    localStorage.setItem("insightsLayers", JSON.stringify(["weather"]));
-    renderInsights();
-
-    expect(screen.getByRole("img")).toHaveAttribute(
-      "data-points",
-      expectedPoints,
+    const region = screen.getByRole("region", {
+      name: "Upcoming scenario events",
+    });
+    expect(region).toHaveTextContent("Upcoming");
+    expect(region).toHaveTextContent("Jul 2023");
+    expect(region).not.toHaveTextContent("Higher pollution fee begins");
+    const event = within(region).getByRole("button", {
+      name: "Expected Jul 2023: Higher pollution fee begins",
+    });
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    await user.click(event);
+    expect(event).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "Polluting plants become more expensive to run.",
     );
-    expect(screen.getByRole("img")).toHaveAttribute("data-step", "60");
+    await user.click(event);
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(event);
+    await user.click(screen.getByRole("button", { name: "Zoom to event" }));
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([5.9 * MINUTES_PER_MONTH, 7.1 * MINUTES_PER_MONTH]),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(event).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(region).not.toHaveTextContent("Outside range");
+  });
+
+  it("ignores the removed stored horizon and shows only events in the viewport", () => {
+    localStorage.setItem("insightsRange", "all");
+    renderInsights(100, gameWithHistory(), [
+      {
+        key: "future",
+        startsMinute: 48 * MINUTES_PER_MONTH,
+        endsMinute: 49 * MINUTES_PER_MONTH,
+        label: "Expected Jan 2027",
+        title: "Future event",
+        message: "Forecast only.",
+      },
+    ]);
+
+    expect(
+      screen.queryByRole("region", { name: "Upcoming scenario events" }),
+    ).toBeNull();
+  });
+
+  it("zooms and pans every insight chart on one shared time viewport", async () => {
+    renderInsights();
+
+    const supply = screen.getByTestId("supply-demand-chart");
+    const cash = screen.getByTestId("chartInsightsCashPlot");
+    const initial = JSON.parse(supply.getAttribute("data-domain") || "[]");
+    expect(cash).toHaveAttribute("data-domain", JSON.stringify(initial));
+    expect(labelledButton("Pan earlier")).toBeDisabled();
+    expect(labelledButton("Zoom out")).toBeEnabled();
+
+    await user.click(labelledButton("Zoom in"));
+    const zoomed = JSON.parse(supply.getAttribute("data-domain") || "[]");
+    expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
+    expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
+    expect(
+      screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
+    ).toBeVisible();
+    expect(labelledButton("Pan earlier")).toBeEnabled();
+    expect(labelledButton("Pan later")).toBeEnabled();
+
+    await user.click(labelledButton("Pan later"));
+    expect(supply.getAttribute("data-domain")).not.toBe(JSON.stringify(zoomed));
+    await user.click(labelledButton("Fit full timeline"));
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
+    );
+    expect(
+      screen.getByLabelText("Displayed date range: 2020–40"),
+    ).toBeVisible();
+  });
+
+  it("advances the end while keeping a scenario-start viewport anchored", () => {
+    const game = createGame({ scenarioId: 100 });
+    const view = renderInsights(100, game);
+    const supply = screen.getByTestId("supply-demand-chart");
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+    );
+
+    const nextGame = {
+      ...game,
+      date: {
+        ...game.date,
+        minute: game.date.minute + MINUTES_PER_MONTH,
+        monthsElapsed: game.date.monthsElapsed + 1,
+      },
+    };
+    view.rerender(
+      <Insights
+        game={nextGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+      />,
+    );
+
+    expect(supply).toHaveAttribute(
+      "data-domain",
+      JSON.stringify([0, 13 * MINUTES_PER_MONTH]),
+    );
+  });
+
+  it("slides both ends of an unanchored viewport as the game advances", async () => {
+    const game = createGame({ scenarioId: 100 });
+    const view = renderInsights(100, game);
+    const supply = screen.getByTestId("supply-demand-chart");
+    await user.click(labelledButton("Zoom in"));
+    const before = JSON.parse(supply.getAttribute("data-domain") || "[]");
+
+    const nextGame = {
+      ...game,
+      date: {
+        ...game.date,
+        minute: game.date.minute + MINUTES_PER_MONTH,
+        monthsElapsed: game.date.monthsElapsed + 1,
+      },
+    };
+    view.rerender(
+      <Insights
+        game={nextGame}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+      />,
+    );
+    const after = JSON.parse(supply.getAttribute("data-domain") || "[]");
+
+    expect(after).toEqual(
+      before.map((minute: number) => minute + MINUTES_PER_MONTH),
+    );
   });
 
   it("keeps tutorial targets visible without duplicating stored layers", () => {
@@ -315,6 +666,36 @@ describe("Insights layers", () => {
       "profit",
       "financeDetails",
     ]);
+    expect(withRequiredLayers(["cash", "powerExchange"], 112)).toEqual([
+      "powerExchange",
+      "cash",
+    ]);
+  });
+
+  it("puts Mission 7's required exchange track first once its line opens", () => {
+    localStorage.setItem(
+      "insightsLayers",
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 112 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+
+    renderInsights(112, game);
+
+    expect(screen.getAllByRole("heading", { level: 6 })[1]).toHaveTextContent(
+      "Power exchange",
+    );
+    expect(localStorage.getItem("insightsLayers")).toBe(
+      JSON.stringify(["cash", "supplyDemand"]),
+    );
   });
 
   it("applies presets and gives every chart the shared cursor key", async () => {
@@ -332,9 +713,9 @@ describe("Insights layers", () => {
 
   it("persists custom visibility and ordering across a remount", async () => {
     const view = renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
-    await user.click(screen.getByRole("button", { name: "Move Revenue up" }));
+    await user.click(labelledButton("Move Revenue up"));
 
     const stored = JSON.parse(localStorage.getItem("insightsLayers") || "[]");
     expect(stored).toContain("revenue");
@@ -349,7 +730,7 @@ describe("Insights layers", () => {
 
   it("saves changes back to a default preset and restores them on remount", async () => {
     const view = renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
 
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
@@ -373,13 +754,13 @@ describe("Insights layers", () => {
 
   it("restores a modified default preset to its original layers", async () => {
     renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(
-      screen.getByRole("menuitem", { name: /Restore original preset/ }),
+      screen.getByRole("menuitem", { name: "Restore original preset" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 
@@ -392,9 +773,9 @@ describe("Insights layers", () => {
 
   it("creates and updates a named preset", async () => {
     renderInsights();
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(
-      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+      screen.getByRole("menuitem", { name: "Save as new preset" }),
     );
     await user.type(
       screen.getByRole("textbox", { name: "Preset name" }),
@@ -406,7 +787,7 @@ describe("Insights layers", () => {
       screen.getByRole("combobox", { name: "Insight preset" }),
     ).toHaveTextContent("Peak watch");
 
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    await user.click(labelledButton(/Layers/));
     await user.click(screen.getByRole("checkbox", { name: "Revenue" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     const library = JSON.parse(
@@ -422,7 +803,7 @@ describe("Insights layers", () => {
     storeCustomPreset("Peak watch");
     const view = renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(screen.getByRole("menuitem", { name: /Rename preset/ }));
     const name = screen.getByRole("textbox", { name: "Preset name" });
     await user.clear(name);
@@ -443,7 +824,7 @@ describe("Insights layers", () => {
     storeCustomPreset("Morning peak");
     renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     await user.click(screen.getByRole("menuitem", { name: /Delete preset/ }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(
@@ -472,28 +853,13 @@ describe("Insights layers", () => {
     );
     renderInsights();
 
-    await user.click(screen.getByRole("button", { name: "Preset actions" }));
+    await user.click(labelledButton("Preset actions"));
     expect(
-      screen.getByRole("menuitem", { name: /Save as new preset/ }),
+      screen.getByRole("menuitem", { name: "Save as new preset" }),
     ).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("offers expected renewable output as an insight layer", async () => {
-    renderInsights();
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
-    await user.click(
-      screen.getByRole("checkbox", { name: "Renewable output" }),
-    );
-
-    expect(
-      screen.getByText("Renewable output", { selector: "h6" }),
-    ).toBeVisible();
-    expect(
-      screen.getByTestId("renewable-capacity-factor-chart"),
-    ).toHaveAttribute("data-sync-key", "insights");
-  });
-
-  it("charts recorded monthly data and disables forecast-only layers", async () => {
+  it("combines recorded monthly data with the continuous forecast", async () => {
     localStorage.setItem(
       "insightsLayers",
       JSON.stringify(["supplyDemand", "profit", "fuelPrices"]),
@@ -501,49 +867,31 @@ describe("Insights layers", () => {
     const game = gameWithHistory();
     renderInsights(100, game);
 
-    await user.click(screen.getByRole("combobox", { name: "Insight range" }));
-    const ranges = within(await screen.findByRole("listbox"));
-    expect(ranges.getByText(String(game.startingYear))).toBeVisible();
-    await user.click(ranges.getByText("All recorded"));
+    await user.click(labelledButton("Fit full timeline"));
 
     expect(
-      screen.queryByRole("region", { name: "Planning controls" }),
-    ).toBeNull();
-    expect(
-      screen.getByText(
-        "Monthly records · forecast-only layers are unavailable",
-      ),
+      screen.getByRole("region", { name: "Planning controls" }),
     ).toBeVisible();
     expect(
       screen.getByText("Supply & Demand", { selector: "h6" }),
     ).toBeVisible();
     expect(screen.getByText("Profit", { selector: "h6" })).toBeVisible();
-    expect(screen.queryByText("Fuel Prices", { selector: "h6" })).toBeNull();
-    expect(screen.getByTestId("chartInsightsProfitPlot")).toHaveAttribute(
-      "data-points",
-      "3",
-    );
-    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
-      "data-points",
-      "3",
-    );
-    expect(screen.getByText(/Energy not served:/)).toBeVisible();
-
-    await user.click(screen.getByRole("combobox", { name: "Insight range" }));
-    await user.click(
-      within(await screen.findByRole("listbox")).getByText(
-        String(game.startingYear),
-      ),
-    );
-    expect(screen.getByTestId("chartInsightsProfitPlot")).toHaveAttribute(
-      "data-points",
-      "2",
-    );
-
-    await user.click(screen.getByRole("button", { name: /Layers/ }));
+    expect(screen.getByText("Fuel Prices", { selector: "h6" })).toBeVisible();
     expect(
-      screen.getByRole("checkbox", { name: "Fuel Prices" }),
-    ).toBeDisabled();
+      Number(
+        screen
+          .getByTestId("chartInsightsProfitPlot")
+          .getAttribute("data-points"),
+      ),
+    ).toBeGreaterThan(240);
+    expect(
+      Number(
+        screen.getByTestId("supply-demand-chart").getAttribute("data-points"),
+      ),
+    ).toBeGreaterThan(3);
+
+    await user.click(labelledButton(/Layers/));
+    expect(screen.getByRole("checkbox", { name: "Fuel Prices" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Profit" })).toBeEnabled();
   });
 
@@ -573,4 +921,134 @@ describe("Insights layers", () => {
     );
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
   });
+
+  it("refreshes a visible power exchange on every simulation tick", () => {
+    localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    const props: React.ComponentProps<typeof Insights> = {
+      game,
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const ref = React.createRef<Insights>();
+    render(<Insights {...props} ref={ref} />);
+
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            date: { ...game.date, minute: game.date.minute + 600 },
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not offer the power-exchange layer for an explicitly islanded grid", async () => {
+    const game = cloneDeep(
+      gameReducer(
+        createGame({ scenarioId: 100, seed: 61 }),
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: true,
+        }),
+      ),
+    );
+    game.transmission!.lines[0].yearsToBuildLeft = 0;
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+
+    renderInsights(100, game);
+    await user.click(labelledButton(/Layers/));
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Power exchange" }),
+    ).toBeNull();
+    expect(screen.queryByText("Power exchange", { selector: "h6" })).toBeNull();
+  });
+});
+
+function labelledButton(label: string | RegExp): HTMLElement {
+  const button = screen.getByLabelText(label, { selector: "button" });
+  expect(button).toBeVisible();
+  expect(isInaccessible(button)).toBe(false);
+  return button;
+}
+
+it("restores the investigation range against the live period and keeps newer layer configuration", () => {
+  const game = createGame({ scenarioId: 106, seed: 4 });
+  const origin = {
+    viewport: [0, 48 * MINUTES_PER_MONTH] as [number, number],
+    month: 0,
+    layers: ["supplyDemand"],
+    preset: "grid",
+    revision: 0,
+    temporaryLayer: "financeDetails",
+    anchor: "financeDetails",
+    scrollTop: 100,
+  };
+  const props = {
+    game,
+    onDelta: jest.fn(),
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    journeyRestore: origin,
+    configurationRevision: 1,
+    onJourneyRestored: jest.fn(() => true),
+  };
+  const insights = new Insights(props);
+  const internals = insights as unknown as {
+    restoreJourney: () => void;
+    restoredViewport: (value: typeof origin) => [number, number];
+  };
+  const setState = jest
+    .spyOn(insights, "setState")
+    .mockImplementation(() => undefined);
+  internals.restoreJourney();
+  expect(props.onJourneyRestored).toHaveBeenCalledTimes(1);
+  expect(setState).toHaveBeenCalledWith(
+    expect.objectContaining({
+      layers: insights.state.layers,
+      preset: insights.state.preset,
+      temporaryLayer: "financeDetails",
+      viewport: origin.viewport,
+    }),
+    expect.any(Function),
+  );
+  game.date.monthsElapsed = 2;
+  game.date.minute = 2 * MINUTES_PER_MONTH;
+  expect(internals.restoredViewport(origin)).toEqual([
+    0,
+    50 * MINUTES_PER_MONTH,
+  ]);
+  const moved = {
+    ...origin,
+    viewport: [MINUTES_PER_MONTH, 3 * MINUTES_PER_MONTH] as [number, number],
+  };
+  expect(internals.restoredViewport(moved)).toEqual([
+    3 * MINUTES_PER_MONTH,
+    5 * MINUTES_PER_MONTH,
+  ]);
+  const beyond = {
+    ...origin,
+    viewport: [1000 * MINUTES_PER_MONTH, 1002 * MINUTES_PER_MONTH] as [
+      number,
+      number,
+    ],
+  };
+  expect(internals.restoredViewport(beyond)[1]).toBeLessThanOrEqual(
+    game.date.minute + 240 * MINUTES_PER_MONTH,
+  );
 });

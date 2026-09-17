@@ -1,12 +1,9 @@
-import * as React from "react";
-import { render, screen } from "@testing-library/react";
 import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import { generateNewTimeline } from "../../reducers/Game";
 import { createGame } from "../../testing/Simulator";
 import { GeneratorShoppingType, TickPresentFutureType } from "../../Types";
-import ChartForecastRenewableCapacityFactor, {
-  availableWeatherRenewables,
-  monthlyRenewableCapacityFactors,
-} from "./ChartForecastRenewableCapacityFactor";
+import { monthlyRenewableCapacityFactors } from "../../helpers/ExpectedOutput";
+import { availableWeatherRenewables } from "./ChartForecastRenewableCapacityFactor";
 
 function tick(
   minute: number,
@@ -53,22 +50,22 @@ describe("ChartForecastRenewableCapacityFactor", () => {
     expect(names).toEqual(expect.arrayContaining(["Wind", "Solar", "Hydro"]));
   });
 
-  it("exposes each available series as a percentage", () => {
-    const game = createGame({ scenarioId: 100 });
-    render(
-      <ChartForecastRenewableCapacityFactor
-        game={game}
-        timeline={game.timeline}
-        domain={{ x: [game.timeline[0].minute, game.timeline.at(-1)!.minute] }}
-        startingYear={game.startingYear}
-        multiyear={false}
-      />,
+  it("forecasts hydro resources in Los Angeles without a built hydro plant", () => {
+    const game = createGame({ scenarioId: 111 });
+    expect(game.facilities.some((facility) => facility.fuel === "Hydro")).toBe(
+      false,
     );
-
-    expect(
-      screen.getByRole("img", {
-        name: /predicted monthly renewable output.*Wind capacity factor \(%\)/,
-      }),
-    ).toBeInTheDocument();
+    const timeline = generateNewTimeline(
+      game,
+      game.timeline[0].cash,
+      game.timeline[0].customers,
+      (12 * MINUTES_PER_MONTH) / 60,
+      60,
+    );
+    const points = monthlyRenewableCapacityFactors(
+      timeline,
+      availableWeatherRenewables(game, timeline),
+    );
+    expect(points.some((point) => point.factors.Hydro > 0.005)).toBe(true);
   });
 });

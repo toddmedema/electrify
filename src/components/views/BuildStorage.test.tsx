@@ -1,4 +1,3 @@
-import * as React from "react";
 import {
   fireEvent,
   render,
@@ -41,73 +40,9 @@ it("shows remaining pumped-hydro locations in the expanded build view", () => {
   );
 
   const row = screen.getByRole("row", {
-    name: /Suitable project sites remaining.*648/,
+    name: /Sites left.*648/,
   });
   expect(row).toHaveTextContent("648");
-  expect(row).toHaveTextContent("Each project uses one suitable site");
-});
-
-it("keeps toolbar actions inside compact viewport gutters", () => {
-  render(
-    <BuildStorage
-      game={game()}
-      onBuildStorage={jest.fn()}
-      onBack={jest.fn()}
-    />,
-  );
-
-  expect(screen.getByRole("button", { name: "close" })).not.toHaveClass(
-    "MuiIconButton-edgeEnd",
-  );
-  expect(
-    screen.getByRole("button", { name: "Sort facilities: Build Cost" }),
-  ).not.toHaveClass("MuiIconButton-edgeEnd");
-});
-
-it("shows decision context without live-time controls", () => {
-  render(
-    <BuildStorage
-      game={game()}
-      onBuildStorage={jest.fn()}
-      onBack={jest.fn()}
-    />,
-  );
-
-  expect(screen.getByText("Build Storage")).toBeInTheDocument();
-  expect(screen.getByLabelText(/Available cash/)).toHaveTextContent("cash");
-  expect(screen.getByText("Capacity")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "pause" })).toBeNull();
-});
-
-it("shows the current sort text when the controls have enough width", () => {
-  const originalMatchMedia = window.matchMedia;
-  window.matchMedia = (query: string) =>
-    ({
-      matches: query === "(min-width:600px)",
-      media: query,
-      onchange: null,
-      addListener: () => undefined,
-      removeListener: () => undefined,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-      dispatchEvent: () => false,
-    }) as MediaQueryList;
-
-  try {
-    render(
-      <BuildStorage
-        game={game()}
-        onBuildStorage={jest.fn()}
-        onBack={jest.fn()}
-      />,
-    );
-
-    expect(
-      screen.getByRole("combobox", { name: "Sort facilities" }),
-    ).toHaveTextContent("Sort: Build Cost");
-  } finally {
-    window.matchMedia = originalMatchMedia;
-  }
 });
 
 it("submits a storage purchase only once on a double-click", () => {
@@ -121,7 +56,9 @@ it("submits a storage purchase only once on a double-click", () => {
   );
 
   // Pumped Hydro is the first shopping card, so its price is the first purchase button.
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   const takeLoan = screen.getByRole("button", { name: "Take loan" });
   fireEvent.click(takeLoan);
   fireEvent.click(takeLoan);
@@ -138,10 +75,14 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     />,
   );
 
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
 
   const impact = screen.getByRole("region", { name: "Expected impact" });
   expect(impact).toHaveTextContent("Cash purchase");
+  expect(impact).toHaveTextContent(/Loan option.*now \+.*\/mo/);
+  expect(impact).toHaveTextContent("Estimated upkeep");
   expect(impact).toHaveTextContent("Online in");
   expect(impact).not.toHaveTextContent("Loan:");
   expect(screen.queryByText("Cash cost")).not.toBeInTheDocument();
@@ -165,7 +106,9 @@ it("deduplicates storage purchase impact and discloses financing terms", async (
     within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(screen.getAllByRole("button", { name: /^\$/ })[0]);
+  fireEvent.click(
+    screen.getAllByRole("button", { name: /^Review purchase of/ })[0],
+  );
   expect(
     screen.getByRole("button", { name: "Show financing terms" }),
   ).toHaveAttribute("aria-expanded", "false");

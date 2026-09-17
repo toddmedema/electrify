@@ -13,12 +13,12 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import GameCard from "../base/GameCard";
 import {
   ConceptNameType,
-  GameEventImportanceType,
   GameEventKindType,
   GameEventType,
   StoryActionTargetType,
 } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
 
 /**
  * What has happened to the company, in the order it happened.
@@ -77,22 +77,19 @@ const EVENT_HISTORY_FILTERS: {
   },
 ];
 
-export interface UpcomingStoryEventType {
-  key: string;
-  label: string;
-  title?: string;
-  message: string;
-  concept?: ConceptNameType;
-  importance?: GameEventImportanceType;
-  actionTarget?: StoryActionTargetType;
-}
-
 export interface StateProps {
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  facilityDragActive?: boolean;
   events: GameEventType[];
   upcoming?: UpcomingStoryEventType[];
+  ongoing?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onOpen: () => void;
   onSelect: (target?: StoryActionTargetType) => void;
 }
@@ -100,7 +97,21 @@ export interface DispatchProps {
 export interface Props extends StateProps, DispatchProps {}
 
 export default function EventLog(props: Props): React.JSX.Element {
-  const { events, onOpen, onSelect, upcoming = [] } = props;
+  const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
+  const openedForEvidence = React.useRef(!!evidenceRequest);
+  const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const request = evidenceRequest;
+    if (
+      request &&
+      typeof request.target === "object" &&
+      request.target.card === "EVENTS" &&
+      !facilityDragActive
+    ) {
+      onEvidenceReady?.(request, evidenceAnchor.current);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
+  const { events, onOpen, onSelect, upcoming = [], ongoing = [] } = props;
   const [historyFilter, setHistoryFilter] =
     React.useState<EventHistoryFilterType>("ALL");
   const [filterAnchor, setFilterAnchor] = React.useState<HTMLElement | null>(
@@ -116,11 +127,77 @@ export default function EventLog(props: Props): React.JSX.Element {
   // so the expression-bodied form returned an object here; React later tried to call that object
   // while unmounting this phone-only pane and crashed the app to a blank screen.
   React.useEffect(() => {
-    onOpen();
+    // A semantic evidence request changes presentation only. Ordinary visits retain the
+    // existing mark-read action; resolving or acknowledging a request must not dispatch it.
+    if (!openedForEvidence.current) onOpen();
   }, [onOpen]);
   return (
     <GameCard className="eventLog" title="Events" id="eventsPane">
-      <div className="scrollable">
+      <div
+        className="scrollable"
+        ref={evidenceAnchor}
+        tabIndex={-1}
+        aria-label="Announced events and event history evidence"
+      >
+        {ongoing.length > 0 && (
+          <section
+            className="eventLogSection ongoingEvents"
+            aria-labelledby="ongoingEventsTitle"
+          >
+            <header className="eventLogSectionHeader">
+              <Typography id="ongoingEventsTitle" variant="subtitle2">
+                Ongoing events
+              </Typography>
+            </header>
+            <ul className="eventLogList">
+              {ongoing.map((event) => (
+                <li
+                  className={`eventLogItem ongoing importance-${event.importance || "ROUTINE"}${event.actionTarget ? " actionable" : ""}`}
+                  key={event.key}
+                  onClick={() => onSelect(event.actionTarget)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) => {
+                    if (
+                      event.actionTarget &&
+                      (e.key === "Enter" || e.key === " ")
+                    ) {
+                      e.preventDefault();
+                      onSelect(event.actionTarget);
+                    }
+                  }}
+                  role={event.actionTarget ? "button" : undefined}
+                  tabIndex={event.actionTarget ? 0 : undefined}
+                >
+                  <span className="eventLogIcon">
+                    <ConceptIcon
+                      concept={event.concept || "forecast"}
+                      fontSize="small"
+                    />
+                  </span>
+                  <span>
+                    {event.title && <strong>{event.title}</strong>}
+                    <span className="eventLogCopy">
+                      <Typography
+                        variant="body2"
+                        component="span"
+                        sx={{ display: "block" }}
+                      >
+                        {event.message}
+                      </Typography>
+                    </span>
+                  </span>
+                  <Typography
+                    className="eventLogWhen"
+                    variant="body2"
+                    color="textSecondary"
+                    component="span"
+                  >
+                    {event.label}
+                  </Typography>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {upcoming.length > 0 && (
           <section
             className="eventLogSection upcomingEvents"

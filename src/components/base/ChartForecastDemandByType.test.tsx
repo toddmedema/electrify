@@ -22,6 +22,7 @@ it("makes every demand category readable without the canvas", () => {
           Commercial: 340,
           Industrial: 220,
           Transportation: 10,
+          Mining: 0,
           "Data centers": 40,
         }),
         tick(1440, {
@@ -29,6 +30,7 @@ it("makes every demand category readable without the canvas", () => {
           Commercial: 345,
           Industrial: 220,
           Transportation: 12,
+          Mining: 0,
           "Data centers": 55,
         }),
       ]}
@@ -54,6 +56,7 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
     Commercial: 40,
     Industrial: 30,
     Transportation: 20,
+    Mining: 0,
     "Data centers": 10,
   };
   const atStart = {
@@ -61,6 +64,7 @@ it("orders the legend and tooltip by demand at the start of the plotted range", 
     Commercial: 500,
     Industrial: 300,
     Transportation: 100,
+    Mining: 0,
     "Data centers": 400,
   };
   const timeline = [
@@ -91,6 +95,7 @@ it("shows an authored load label without changing its demand category", () => {
     Commercial: 100,
     Industrial: 50,
     Transportation: 25,
+    Mining: 0,
     "Data centers": 100,
   };
   expect(

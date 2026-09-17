@@ -1,4 +1,8 @@
-import { getAnalytics, logEvent as firebaseLogEvent } from "firebase/analytics";
+import {
+  Analytics,
+  getAnalytics,
+  logEvent as firebaseLogEvent,
+} from "firebase/analytics";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -53,20 +57,57 @@ export function logout(): Promise<void> {
 // non-browser hosts) gets a no-op.
 interface HistoryApi {
   pushState: History["pushState"];
+  replaceState: History["replaceState"];
+  back: History["back"];
 }
 
 const refs = {
+  analytics: null as Analytics | null,
   db: null as Firestore | null,
   history:
-    typeof window.history !== "undefined"
+    typeof window !== "undefined" && typeof window.history !== "undefined"
       ? (window.history as HistoryApi)
-      : { pushState: () => undefined },
+      : {
+          pushState: () => undefined,
+          replaceState: () => undefined,
+          back: () => undefined,
+        },
   localStorage: null as Storage | null,
   audioContext: null as AudioContext | null,
 };
 
+/**
+ * Logs a Google Analytics event, initializing analytics on first use once the browser is online.
+ *
+ * getAnalytics() kicks off a background registration with Firebase Installations, and while the
+ * page is offline that registration fails inside the SDK (installations/app-offline). The SDK
+ * keeps the rejected promise without a handler, so it surfaces as an unhandled rejection, which
+ * the dev server's error overlay turns into a red screen over the whole game -- the manual
+ * included, even though nothing in it needs the network. So initialization waits until the
+ * browser reports being online, and the first event after that brings analytics up for good.
+ *
+ * Only the initialization is gated. Once the SDK is up, events keep being handed to it while
+ * offline: a player who started online stays measured across a dropout, and the SDK's own
+ * logEvent already catches its internal rejections. getAnalytics() is the only entry point that
+ * does not.
+ *
+ * The try/catch below covers synchronous throws only -- a rejection from inside the SDK cannot
+ * be caught here. A registration that fails while the browser still claims to be online (an ad
+ * blocker on the Google endpoints, a captive portal, DNS) rejects that way and is out of reach;
+ * outside the dev overlay it is a console line rather than anything the game reacts to.
+ */
 export function logEvent(eventName: string, args?: object): void {
-  firebaseLogEvent(getAnalytics(firebaseApp), eventName, args);
+  try {
+    if (!refs.analytics) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+      refs.analytics = getAnalytics(firebaseApp);
+    }
+    firebaseLogEvent(refs.analytics, eventName, args);
+  } catch {
+    // Analytics is telemetry, not gameplay: a failure here must never break the game.
+  }
 }
 
 export function getDb(): Firestore {
@@ -88,6 +129,7 @@ export function getDevicePlatform(): "web" {
  * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
  */
 let cachedViewportWidth: number | null = null;
+let cachedViewportHeight: number | null = null;
 
 function getViewportWidth(): number {
   if (cachedViewportWidth === null) {
@@ -102,9 +144,18 @@ function getViewportWidth(): number {
   return cachedViewportWidth;
 }
 
+function getViewportHeight(): number {
+  if (cachedViewportHeight === null) {
+    cachedViewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+  }
+  return cachedViewportHeight;
+}
+
 if (typeof window !== "undefined") {
   const invalidate = () => {
     cachedViewportWidth = null;
+    cachedViewportHeight = null;
   };
   window.addEventListener("resize", invalidate);
   window.addEventListener("orientationchange", invalidate);
@@ -147,12 +198,25 @@ export function isDesktopScreen(): boolean {
  *
  * True from $pane_breakpoint up: between there and the desktop breakpoint the layout is
  * Facilities pinned beside Insights or Events. Narrower portrait tablets keep the single-pane
- * navigation because a facility row and its controls do not fit in the default split.
+ * navigation because a facility row and its controls do not fit in the default split. Unfolded
+ * foldables are the exception: at least 700x600 and near-square, each pane still gets about a
+ * phone's width. Keep in sync with $pane_media in app.scss.
  *
- * @returns {boolean} - Returns true if the screen is at least 1024px wide, otherwise false.
+ * @returns {boolean} - Returns true for the two-pane layout, otherwise false.
  */
 export function isPaneLayout(): boolean {
-  return getViewportWidth() >= 1024;
+  const width = getViewportWidth();
+  if (width >= 1024) {
+    return true;
+  }
+  const height = getViewportHeight();
+  const aspectRatio = width / height;
+  return (
+    width >= 700 &&
+    height >= 600 &&
+    aspectRatio >= 4 / 5 &&
+    aspectRatio <= 5 / 4
+  );
 }
 
 export function getHistoryApi(): HistoryApi {

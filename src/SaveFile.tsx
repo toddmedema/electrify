@@ -18,9 +18,8 @@ export interface ResumableSaveType {
 }
 
 /**
- * The saved game, if there is one and this build still has the scenario it was played in. A save
- * whose scenario has since been removed can't be resumed, so it may as well not be offered; a
- * custom game carries its own scenario in the save, so it resolves the same way any other does.
+ * The saved game, if it names a valid scenario. A custom game carries its own scenario in
+ * the save, so it resolves the same way any other does.
  */
 export function resumableSave(): ResumableSaveType | null {
   const save = readSave();

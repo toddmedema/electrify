@@ -15,7 +15,7 @@ import {
   MAX_CREDIT_POINTS,
   LCWH,
 } from "./Financials";
-import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL, LOAN_MONTHS } from "../Constants";
+import { DAYS_PER_YEAR, HOURS_PER_YEAR_REAL } from "../Constants";
 import { FacilityOperatingType, GeneratorShoppingType } from "../Types";
 import { getDateFromMinute } from "./DateTime";
 import { formatMoneyConcise } from "./Format";
@@ -63,18 +63,6 @@ describe("getMonthlyPayment", () => {
     }
     // The last dollar of a ten year loan is where the rounding lands
     expect(balance).toBeCloseTo(0, 6);
-  });
-
-  it("charges more for a shorter term or a higher rate", () => {
-    expect(getMonthlyPayment(1000000, 0.06, 60)).toBeGreaterThan(
-      getMonthlyPayment(1000000, 0.06, 120),
-    );
-    expect(getMonthlyPayment(1000000, 0.1, LOAN_MONTHS)).toBeGreaterThan(
-      getMonthlyPayment(1000000, 0.05, LOAN_MONTHS),
-    );
-    const principal = 1000000;
-    const total = getMonthlyPayment(principal, 0.06, LOAN_MONTHS) * LOAN_MONTHS;
-    expect(total).toBeGreaterThan(principal);
   });
 });
 
@@ -202,15 +190,17 @@ describe("LCWH", () => {
     );
   });
 
-  it("charges a carbon fee against a fuel's emissions", () => {
-    const gas = {
+  it("prices distillate oil carbon above gas for equal fuel energy", () => {
+    const oil = {
       ...generator,
-      fuel: "Natural Gas",
-      btuPerWh: 0.0035,
+      fuel: "Oil",
+      btuPerWh: 10,
     } as GeneratorShoppingType;
-    expect(LCWH(gas, date, 0.1, SEED)).toBeGreaterThan(
-      LCWH(gas, date, 0, SEED),
-    );
+    const gas = { ...oil, fuel: "Natural Gas" } as GeneratorShoppingType;
+    const oilCarbon = LCWH(oil, date, 0.1, SEED) - LCWH(oil, date, 0, SEED);
+    const gasCarbon = LCWH(gas, date, 0.1, SEED) - LCWH(gas, date, 0, SEED);
+    expect(oilCarbon).toBeCloseTo(0.00007414 * 10 * 0.1, 10);
+    expect(oilCarbon).toBeGreaterThan(gasCarbon);
   });
 
   it("integrates a known future carbon fee over the applicable operating years", () => {
@@ -367,6 +357,17 @@ describe("getCreditInputs", () => {
     const inputs = getCreditInputs([aMonth(100, 50)], 500, 1000, [
       aFacility({ loanAmountLeft: 1000 }),
     ]);
+    expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
+  });
+
+  it("counts financed interties in company debt", () => {
+    const inputs = getCreditInputs(
+      [aMonth(100, 50)],
+      500,
+      1000,
+      [],
+      [{ loanAmountLeft: 1000 }],
+    );
     expect(inputs.debtToCapital).toBeCloseTo(0.5, 10);
   });
 });

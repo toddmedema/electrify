@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Locator, Page, test } from "@playwright/test";
 
 async function openCustomSetup(page: Page) {
   await page.addInitScript(() => {
@@ -20,6 +20,28 @@ async function openCustomSetup(page: Page) {
   ).toBeVisible();
 }
 
+async function activateFocusedNeighbor(
+  page: Page,
+  search: Locator,
+  previousLabel: string,
+  previousSelection: string,
+  key: " " | "Enter",
+) {
+  const focusedMarker = page.locator(":focus");
+  await expect(focusedMarker).not.toHaveAttribute("aria-label", previousLabel);
+  const focusedCluster = await focusedMarker.evaluate((element) =>
+    element.classList.contains("cluster"),
+  );
+  await focusedMarker.press(key);
+  if (focusedCluster) {
+    await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+    await expect(search).toHaveValue(previousSelection);
+  } else {
+    await expect(focusedMarker).toHaveAttribute("aria-pressed", "true");
+    await expect(search).not.toHaveValue(previousSelection);
+  }
+}
+
 test("world map location picker works with pointer, touch, search, and keyboard", async ({
   page,
 }, testInfo) => {
@@ -34,10 +56,33 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   await expect(map).toBeVisible();
   await expect(selectedSanFrancisco).toHaveAttribute("aria-pressed", "true");
 
-  await page
-    .getByRole("button", { name: "Select Honolulu, HI, United States" })
-    .click();
-  await expect(search).toHaveValue("Honolulu, HI");
+  const pointerTarget = map
+    .locator(".worldMapMarker:not(.cluster)[aria-pressed='false']")
+    .first();
+
+  // At the narrowest widths a 44px touch target can't fit every city at world zoom, so all
+  // unselected cities are clustered and a player taps a cluster to zoom in before picking. Do
+  // the same when no marker is tappable yet. Markers are computed in the same render as the map
+  // transform, so once the transform changes the markers shown are those of the new zoom level.
+  const land = map.locator(".worldMapLand > g");
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  while ((await pointerTarget.count()) === 0) {
+    expect(
+      await zoomIn.isEnabled(),
+      "a standalone city marker appears before the map reaches its closest zoom",
+    ).toBe(true);
+    const transform = await land.getAttribute("transform");
+    await map.locator(".worldMapMarker.cluster").first().click();
+    await expect(land).not.toHaveAttribute("transform", transform!);
+  }
+
+  const pointerTargetLabel = await pointerTarget.getAttribute("aria-label");
+  expect(pointerTargetLabel).not.toBeNull();
+  await pointerTarget.click();
+  await expect(
+    page.getByRole("button", { name: pointerTargetLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue("San Francisco, CA");
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await expect(search).toHaveValue("San Francisco, CA");
@@ -57,13 +102,13 @@ test("world map location picker works with pointer, touch, search, and keyboard"
 
   await selectedSanFrancisco.focus();
   await selectedSanFrancisco.press("ArrowLeft");
-  const focusedLabel = await page.evaluate(
-    () => document.activeElement?.getAttribute("aria-label") || "",
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    startingSelection,
+    "Enter",
   );
-  expect(focusedLabel).not.toBe("Select San Francisco, CA, United States");
-  await page.keyboard.press("Enter");
-  await expect(search).toHaveValue("Honolulu, HI");
-
   await expect(page.locator(".locationPickerCount")).toHaveText(
     /\d+ playable locations/,
   );
@@ -103,6 +148,145 @@ test("world map location picker works with pointer, touch, search, and keyboard"
   }
 });
 
+test("a city marker still selects after the map has zoomed", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("desktop"));
+  await openCustomSetup(page);
+
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await expect(page.locator(".locationPickerCount")).toHaveText(
+    /\d{3} playable locations/,
+  );
+  const map = page.getByRole("group", { name: "Playable locations map" });
+  const startingSelection = await search.inputValue();
+  await map.locator(".worldMapMarker.cluster").first().click();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
+  const zoomedMarker = map
+    .locator(".worldMapMarker.marker:not(.selected)")
+    .first();
+  const zoomedMarkerLabel = await zoomedMarker.getAttribute("aria-label");
+  expect(zoomedMarkerLabel).not.toBeNull();
+  await zoomedMarker.click();
+
+  await expect(
+    page.getByRole("button", { name: zoomedMarkerLabel! }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).not.toHaveValue(startingSelection);
+});
+
+test("custom setup uses side-by-side settings and facilities only at desktop widths", async ({
+  page,
+}, testInfo) => {
+  await openCustomSetup(page);
+  // Measure the settled setup, not its translated position during the outgoing card transition.
+  await expect(page.getByRole("list", { name: "Available games" })).toHaveCount(
+    0,
+  );
+
+  const settings = page.getByRole("region", { name: "Game setup" });
+  const facilities = page.getByRole("region", { name: "Facilities" });
+  const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+
+  // The Year 1 outlook settles in a worker after mount; while it is still calculating, its
+  // height changes and shifts the rows below. Measure only once both are still.
+  // The forecast gets the same allowance as the outlook recalculation test below.
+  await expect(outlook).not.toHaveAttribute("aria-busy", "true", {
+    timeout: 20000,
+  });
+
+  const row = facilities.locator(".build-list-item").first();
+  const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
+  const removeBox = await row
+    .getByRole("button", { name: "Remove Natural Gas" })
+    .boundingBox();
+  expect(contentBox).not.toBeNull();
+  expect(removeBox).not.toBeNull();
+  expect(removeBox!.x).toBeGreaterThanOrEqual(
+    contentBox!.x + contentBox!.width,
+  );
+  expect(
+    Math.abs(
+      removeBox!.y +
+        removeBox!.height / 2 -
+        (contentBox!.y + contentBox!.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(removeBox!.height).toBeGreaterThanOrEqual(44);
+  const settingsBox = await settings.boundingBox();
+  const facilitiesBox = await facilities.boundingBox();
+  const outlookBox = await outlook.boundingBox();
+  expect(settingsBox).not.toBeNull();
+  expect(facilitiesBox).not.toBeNull();
+  expect(outlookBox).not.toBeNull();
+  expect(outlookBox!.x).toBeGreaterThanOrEqual(facilitiesBox!.x);
+  expect(outlookBox!.x + outlookBox!.width).toBeLessThanOrEqual(
+    facilitiesBox!.x + facilitiesBox!.width,
+  );
+
+  if (testInfo.project.name.startsWith("desktop")) {
+    expect(Math.abs(settingsBox!.y - facilitiesBox!.y)).toBeLessThanOrEqual(1);
+    expect(settingsBox!.x + settingsBox!.width).toBeLessThan(facilitiesBox!.x);
+  } else {
+    expect(facilitiesBox!.y).toBeGreaterThanOrEqual(
+      settingsBox!.y + settingsBox!.height,
+    );
+  }
+
+  const overflow = await page
+    .locator(".scrollable")
+    .evaluate((element) =>
+      Math.max(0, element.scrollWidth - element.clientWidth),
+    );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("Year 1 outlook recalculates from the selected facilities", async ({
+  page,
+}) => {
+  await openCustomSetup(page);
+
+  const outlook = page.getByRole("region", { name: "Year 1 outlook" });
+  await expect(outlook).toContainText(/Demand covered|Deficit forecast/, {
+    timeout: 20000,
+  });
+
+  await page
+    .getByRole("button", { name: "Remove Natural Gas", exact: true })
+    .click();
+  await expect(outlook).toContainText("Calculating Year 1 outlook…");
+  await expect(outlook).toContainText("0%", { timeout: 20000 });
+  await expect(outlook).toContainText("Deficit forecast");
+
+  await page.getByRole("combobox", { name: "Facility type" }).click();
+  await page.getByRole("option", { name: "Natural Gas" }).click();
+  await page.getByRole("combobox", { name: "Facility size" }).click();
+  await page.getByRole("option", { name: "2GW" }).click();
+  await page.getByRole("button", { name: "Add facility" }).click();
+  await expect(outlook).toContainText("Calculating Year 1 outlook…");
+  await expect(outlook).toContainText("Demand covered", { timeout: 20000 });
+  await expect
+    .poll(async () =>
+      Number(
+        (
+          await outlook
+            .locator(".customSetupOutlookMetrics strong")
+            .first()
+            .innerText()
+        ).replace("%", ""),
+      ),
+    )
+    .toBeGreaterThan(300);
+  const icon = page
+    .getByRole("region", { name: "Facilities", exact: true })
+    .locator(".MuiCardHeader-avatar img");
+  await expect(icon).toHaveAttribute("src", "/images/natural gas.svg");
+  await expect
+    .poll(() => icon.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(outlook).toContainText("No forecast shortfall");
+});
+
 test("keyboard navigation retains one map stop and honors activation and zoom bounds", async ({
   page,
 }) => {
@@ -113,25 +297,33 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   const sanFrancisco = page.getByRole("button", {
     name: "Select San Francisco, CA, United States",
   });
-  const honolulu = page.getByRole("button", {
-    name: "Select Honolulu, HI, United States",
-  });
-
+  await expect(page.locator(".locationPickerCount")).toHaveText(
+    /\d{3} playable locations/,
+  );
   await sanFrancisco.focus();
   await sanFrancisco.press("ArrowLeft");
-  await expect(honolulu).toBeFocused();
-  await honolulu.press(" ");
-  await expect(search).toHaveValue("Honolulu, HI");
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    "San Francisco, CA",
+    " ",
+  );
 
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await page.getByRole("button", { name: "Show world" }).click();
   await sanFrancisco.focus();
   await sanFrancisco.press("ArrowLeft");
-  await expect(honolulu).toBeFocused();
-  await honolulu.press("Enter");
-  await expect(search).toHaveValue("Honolulu, HI");
+  await activateFocusedNeighbor(
+    page,
+    search,
+    "Select San Francisco, CA, United States",
+    "San Francisco, CA",
+    "Enter",
+  );
 
+  await page.getByRole("button", { name: "Show world" }).click();
   const cluster = map.locator(".worldMapMarker.cluster").first();
   await cluster.focus();
   await cluster.press("Enter");
@@ -151,7 +343,14 @@ test("keyboard navigation retains one map stop and honors activation and zoom bo
   await zoomIn.click();
   await zoomIn.click();
   await zoomIn.click();
+  await expect(zoomIn).toBeEnabled();
+  await zoomIn.click();
+  await expect(map.locator(".worldMapLand > g")).toHaveAttribute(
+    "transform",
+    /scale\(16\)/,
+  );
   await expect(zoomIn).toBeDisabled();
+  await zoomOut.click();
   await zoomOut.click();
   await zoomOut.click();
   await zoomOut.click();
@@ -211,16 +410,22 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   }
 
   await map.scrollIntoViewIfNeeded();
+  const touchMapBox = await map.boundingBox();
+  expect(touchMapBox).not.toBeNull();
+  // Start over the open ocean in the lower-left. Coarse-pointer marker hit areas deliberately
+  // reach 44px, so the geometric center can belong to a marker on a 320px map.
+  const panStart = {
+    x: Math.round(touchMapBox!.x + 24),
+    y: Math.round(touchMapBox!.y + touchMapBox!.height - 24),
+  };
   const session = await page.context().newCDPSession(page);
-  const panStartX = Math.round(mapBox!.x + mapBox!.width / 2);
-  const panStartY = Math.round(mapBox!.y + mapBox!.height / 2);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: panStartX, y: panStartY }],
+    touchPoints: [panStart],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchMove",
-    touchPoints: [{ x: panStartX - 60, y: panStartY - 30 }],
+    touchPoints: [{ x: panStart.x - 20, y: panStart.y - 20 }],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
@@ -233,20 +438,21 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
 
   await page.getByRole("button", { name: "Show world" }).click();
   const beforePinch = await land.getAttribute("transform");
-  const pinchY = Math.round(mapBox!.y + mapBox!.height / 2);
-  const pinchCenterX = Math.round(mapBox!.x + mapBox!.width / 2);
+  const pinchY = Math.round(touchMapBox!.y + touchMapBox!.height - 20);
+  const pinchLeftX = Math.round(touchMapBox!.x + 25);
+  const pinchRightX = Math.round(touchMapBox!.x + 75);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [
-      { x: pinchCenterX - 40, y: pinchY },
-      { x: pinchCenterX + 40, y: pinchY },
+      { x: pinchLeftX, y: pinchY },
+      { x: pinchRightX, y: pinchY },
     ],
   });
   await session.send("Input.dispatchTouchEvent", {
     type: "touchMove",
     touchPoints: [
-      { x: pinchCenterX - 70, y: pinchY },
-      { x: pinchCenterX + 70, y: pinchY },
+      { x: pinchLeftX - 20, y: pinchY },
+      { x: pinchRightX + 20, y: pinchY },
     ],
   });
   await session.send("Input.dispatchTouchEvent", {

@@ -1,7 +1,7 @@
 import type { AppDispatch } from "../Store";
 import { connect } from "react-redux";
 import { delta, quit } from "../reducers/Game";
-import { changeTutorialStep } from "../reducers/Tutorial";
+import { changeTutorialStep, recordTutorialLeft } from "../reducers/Tutorial";
 import { dialogClose, snackbarClose, snackbarOpen } from "../reducers/UI";
 import { getScenario } from "../data/Scenarios";
 import {
@@ -24,7 +24,9 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   } else if (isNavCard(state.card.name)) {
     transition = "nav";
   } else if (
-    ["BUILD_GENERATORS", "BUILD_STORAGE"].indexOf(state.card.name) !== -1
+    ["BUILD_GENERATORS", "BUILD_STORAGE", "BUILD_INTERTIES"].indexOf(
+      state.card.name,
+    ) !== -1
   ) {
     // modals that should fade in / out instead of slide
     transition = "nav";
@@ -58,6 +60,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       changeTutorialStep(dispatch, change);
     },
     onTutorialEnd(tutorialSteps: TutorialStepType[] | undefined): void {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       // Past the last step, which is how a finished walkthrough is represented too
       dispatch(delta({ tutorialStep: (tutorialSteps || []).length }));
       // On its own, closing just makes the overlay vanish and leaves the player sitting in

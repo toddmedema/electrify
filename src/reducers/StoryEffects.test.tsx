@@ -108,43 +108,6 @@ describe("story effects in dispatch", () => {
     expect(story.demandW / baseline.demandW).toBeCloseTo(1.06, 6);
   });
 
-  it("records a known eclipse in forecast irradiance and applies it once to supply", () => {
-    const game = createGame({ scenarioId: 109, difficulty: "Manager" });
-    game.date = getDateFromMinute(32 * MINUTES_PER_MONTH, game.startingYear);
-    const solar = game.facilities.find((facility) => facility.fuel === "Sun")!;
-    game.facilities = [solar];
-    const baselineGame = cloneDeep(game);
-    baselineGame.storyEffectsDisabled = true;
-
-    const story = generateNewTimeline(
-      game,
-      1_000_000_000,
-      20_000_000,
-      TICKS_PER_DAY,
-    );
-    const baseline = generateNewTimeline(
-      baselineGame,
-      1_000_000_000,
-      20_000_000,
-      TICKS_PER_DAY,
-    );
-    const totalityIndex = story.findIndex(
-      (tick) =>
-        getDateFromMinute(tick.minute, game.startingYear).minuteOfDay === 600,
-    );
-
-    expect(totalityIndex).toBeGreaterThanOrEqual(0);
-    expect(baseline[totalityIndex].solarIrradianceWM2).toBeGreaterThan(0);
-    expect(
-      story[totalityIndex].solarIrradianceWM2 /
-        baseline[totalityIndex].solarIrradianceWM2,
-    ).toBeCloseTo(0.08, 6);
-    expect(
-      story[totalityIndex].supplyByFuel.Sun! /
-        baseline[totalityIndex].supplyByFuel.Sun!,
-    ).toBeCloseTo(0.08, 6);
-  });
-
   it("pauses exactly once at freeze onset and logs the authored price change once", () => {
     const game = createGame({
       scenarioId: 103,

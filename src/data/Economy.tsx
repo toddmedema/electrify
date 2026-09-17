@@ -10,6 +10,15 @@ export interface MonthRefType {
   monthNumber: number; // 1-12
 }
 
+/** Historical national rates versus the game's authored cyclical extrapolation. */
+export function getEconomyProvenance(
+  date: MonthRefType,
+): "historical" | "modeled" {
+  return recordedMonths.has(absoluteMonth(date.year, date.monthNumber))
+    ? "historical"
+    : "modeled";
+}
+
 // GOOGLE SHEET: none - built by scripts from the two sources below
 // Sources:
 
@@ -93,6 +102,7 @@ export interface MonthEconomyType {
 // stops being a function of its seed.
 // year -> month (1-12)
 const economy: Record<number, Record<number, MonthEconomyType>> = {};
+const recordedMonths = new Set<number>();
 
 // The last month the CSV actually had, as an absolute month index. Everything after it is
 // projected, and the blend that keeps the seam smooth is measured from here.
@@ -131,10 +141,13 @@ function clamp(v: number, min: number, max: number): number {
  * no answer rather than the programming error getEconomy otherwise throws over.
  */
 export function hasEconomy(): boolean {
-  return Object.keys(economy).length > 0;
+  // Asked on every tick, so this avoids listing every year. Only a CSV row starts filling
+  // `economy` -- projections are added after this is already true -- and both are reset together.
+  return recordedMonths.size > 0;
 }
 
 function resetEconomy() {
+  recordedMonths.clear();
   Object.keys(economy).forEach((year: string) => {
     delete economy[+year];
   });
@@ -159,6 +172,7 @@ function collectEconomyRow(data: RawEconomyType) {
     inflation: +data.inflation,
   });
   const month = absoluteMonth(+data.year, +data.month);
+  recordedMonths.add(month);
   if (month > seamMonth) {
     seamMonth = month;
     seamRates = economy[+data.year][+data.month];

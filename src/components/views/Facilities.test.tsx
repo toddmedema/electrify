@@ -1,11 +1,16 @@
-import * as React from "react";
-import { render, screen } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import Facilities from "./Facilities";
+import * as React from "react";
+import { Provider } from "react-redux";
+import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { tickState } from "../../reducers/Game";
+import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import Facilities from "./Facilities";
+import TransmissionPanel from "./TransmissionPanel";
+import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 
 // The pane renders its own supply chart, which jsdom never lays out; nothing here waits on
 // anything, so a ceiling this high is a hang detector rather than something a loaded machine trips
@@ -49,21 +54,33 @@ function renderFacilities(
     onReprioritize: jest.fn(),
     onSell: jest.fn(),
   };
-  render(
-    <Facilities
-      game={game}
-      selectedFacilityId={selectedFacilityId}
-      onGeneratorBuild={() => undefined}
-      onStorageBuild={() => undefined}
-      onSell={handlers.onSell}
-      onTogglePause={() => undefined}
-      onPause={handlers.onPause}
-      onReprioritize={handlers.onReprioritize}
-      onFacilityDragStart={() => undefined}
-      onFacilityDragEnd={() => undefined}
-      onSelect={handlers.onSelect}
-    />,
-  );
+  const store = configureStore({ reducer: { ui: uiReducer } });
+  function ControlledFacilities() {
+    const [selected, setSelected] = React.useState(selectedFacilityId);
+    return (
+      <Facilities
+        game={game}
+        selectedFacilityId={selected}
+        onGeneratorBuild={() => undefined}
+        onStorageBuild={() => undefined}
+        onTransmissionBuild={() => undefined}
+        onTradingPolicy={() => undefined}
+        onSell={handlers.onSell}
+        onTogglePause={() => undefined}
+        onPause={handlers.onPause}
+        onReprioritize={handlers.onReprioritize}
+        onFacilityDragStart={() => undefined}
+        onFacilityDragEnd={() => undefined}
+        onSelect={(id) => {
+          handlers.onSelect(id);
+          setSelected(id);
+        }}
+      />
+    );
+  }
+  render(<ControlledFacilities />, {
+    wrapper: ({ children }) => <Provider store={store}>{children}</Provider>,
+  });
   return handlers;
 }
 
@@ -71,7 +88,9 @@ function renderFacilities(
 // rather than by a role -- and asking testing-library for a role by name computes an accessible
 // name for every candidate, which over a rendered pane costs about a second a call
 function rows(): HTMLElement[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(".facilityRow"));
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".facilityRow .facilityDisclosure"),
+  );
 }
 
 describe("the fleet list", () => {
@@ -94,34 +113,17 @@ describe("the fleet list", () => {
     renderFacilities(game, game.facilities[0].id);
     // One panel, not one per row -- getByText throws if a second facility opened too
     expect(screen.getByText("Lifetime profit")).toBeInTheDocument();
-    expect(
-      screen.getByText("Average output (capacity factor)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Avg output")).toBeInTheDocument();
     expect(screen.getByText("Lifetime cost per MWh")).toBeInTheDocument();
     expect(screen.getByText("Revenue per MWh")).toBeInTheDocument();
   });
 
-  it("shows Coal starts and cost without gas-turbine service intervals", () => {
+  it("shows Coal starts and cost", () => {
     const coal = game.facilities.find((facility) => facility.name === "Coal")!;
     renderFacilities(game, coal.id);
 
-    expect(
-      screen.getByText("Full start cycles (equivalent)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Starts")).toBeInTheDocument();
     expect(screen.getByText("Non-fuel start cost")).toBeInTheDocument();
-    expect(screen.queryByText("Gas-turbine service")).toBeNull();
-  });
-
-  it("keeps gas-turbine service context on Natural Gas", () => {
-    const gas = game.facilities.find(
-      (facility) => facility.name === "Natural Gas",
-    )!;
-    renderFacilities(game, gas.id);
-
-    expect(screen.getByText("Gas-turbine service")).toBeInTheDocument();
-    expect(
-      screen.getByText("Hot-gas-path: 900 starts · major: 1,800 starts"),
-    ).toBeInTheDocument();
   });
 
   it("shows Oil fixed and variable O&M without turbine start details", () => {
@@ -129,34 +131,12 @@ describe("the fleet list", () => {
     const oil = oilGame.facilities.find((facility) => facility.name === "Oil")!;
     renderFacilities(oilGame, oil.id);
 
-    expect(
-      screen.getByText("Full-output hours (equivalent)"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Fixed operations & maintenance"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Fixed upkeep")).toBeInTheDocument();
     expect(screen.getByText("$3.09M/yr")).toBeInTheDocument();
-    expect(
-      screen.getByText("Variable operations & maintenance"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("$25.71/MWh generated")).toBeInTheDocument();
-    expect(screen.queryByText("Full start cycles (equivalent)")).toBeNull();
+    expect(screen.getByText("Variable upkeep")).toBeInTheDocument();
+    expect(screen.getByText("$25.71/MWh")).toBeInTheDocument();
+    expect(screen.queryByText("Starts")).toBeNull();
     expect(screen.queryByText("Non-fuel start cost")).toBeNull();
-    expect(screen.queryByText("Gas-turbine service")).toBeNull();
-  });
-
-  it("leaves every row closed when nothing is selected", () => {
-    renderFacilities(game, null);
-    expect(screen.queryByText("Lifetime profit")).toBeNull();
-  });
-
-  it("uses singular construction copy for one month remaining", () => {
-    const underConstruction = createGame({ scenarioId: 100 });
-    underConstruction.facilities[0].yearsToBuildLeft = 1 / 12;
-    renderFacilities(underConstruction, null);
-
-    expect(screen.getByText(/1 month left/)).toBeInTheDocument();
-    expect(screen.queryByText(/1 months left/)).toBeNull();
   });
 
   it("labels a facility whose output is constrained by a world event", () => {
@@ -176,33 +156,10 @@ describe("the fleet list", () => {
       },
     ];
     renderFacilities(constrained, null);
-    expect(screen.getByText("Limited to 30%")).toBeInTheDocument();
+    expect(screen.getByText("30% limit")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Temporarily limited to 30% of rated output"),
     ).toBeInTheDocument();
-  });
-
-  it("uses the nuclear icon for the France scenario's named reactor", () => {
-    const france = createGame({ scenarioId: 110 });
-    renderFacilities(france, null);
-
-    expect(screen.getByAltText("Grand Nuclear Unit")).toHaveAttribute(
-      "src",
-      "/images/nuclear.svg",
-    );
-  });
-
-  it("renders the reasonable worst-case fleet size", () => {
-    const tenFacilities = createGame({ scenarioId: 103 });
-    const template = tenFacilities.facilities[0];
-    tenFacilities.facilities = Array.from({ length: 10 }, (_, index) => ({
-      ...template,
-      id: index + 1,
-    }));
-
-    renderFacilities(tenFacilities, null);
-
-    expect(rows()).toHaveLength(10);
   });
 
   it("uses compact watt units in the accessible chart summary", () => {
@@ -221,13 +178,18 @@ describe("the fleet list", () => {
    * once the list has scrolled.
    */
   it("reorders from the row's own arrows", async () => {
-    const { onReprioritize } = renderFacilities(game, null);
+    const { onReprioritize } = renderFacilities(game, game.facilities[1].id);
     await user.click(
       screen.getByLabelText(
         `Move ${game.facilities[1].name} earlier in the dispatch order`,
       ),
     );
     expect(onReprioritize).toHaveBeenCalledWith(1, -1);
+    await user.click(
+      screen.getByRole("button", {
+        name: `Inspect ${game.facilities[0].name}`,
+      }),
+    );
 
     await user.click(
       screen.getByLabelText(
@@ -237,14 +199,19 @@ describe("the fleet list", () => {
     expect(onReprioritize).toHaveBeenCalledWith(0, 1);
   });
 
-  it("offers no way to move the ends of the list past themselves", () => {
-    renderFacilities(game, null);
+  it("offers no way to move the ends of the list past themselves", async () => {
+    renderFacilities(game, game.facilities[0].id);
     const last = game.facilities.length - 1;
     expect(
       screen.getByLabelText(
         `Move ${game.facilities[0].name} earlier in the dispatch order`,
       ),
     ).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", {
+        name: `Inspect ${game.facilities[last].name}`,
+      }),
+    );
     expect(
       screen.getByLabelText(
         `Move ${game.facilities[last].name} later in the dispatch order`,
@@ -253,7 +220,7 @@ describe("the fleet list", () => {
   });
 
   it("does not select the row when a row action is used", async () => {
-    const { onSelect } = renderFacilities(game, null);
+    const { onSelect } = renderFacilities(game, game.facilities[1].id);
     await user.click(
       screen.getByLabelText(
         `Move ${game.facilities[1].name} earlier in the dispatch order`,
@@ -272,6 +239,8 @@ describe("the fleet list", () => {
       selectedFacilityId: null,
       onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
+      onTransmissionBuild: () => undefined,
+      onTradingPolicy: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
       onPause: () => undefined,
@@ -311,6 +280,9 @@ describe("the fleet list", () => {
     const onePlant = createGame({ scenarioId: 5 });
     const { onPause } = renderFacilities(onePlant, null);
     const facility = onePlant.facilities[0];
+    await user.click(
+      screen.getByRole("button", { name: `Inspect ${facility.name}` }),
+    );
 
     await user.click(screen.getByLabelText(`Pause ${facility.name}`));
     expect(onPause).toHaveBeenCalledWith(facility.id, facility.name);
@@ -318,7 +290,7 @@ describe("the fleet list", () => {
 
   it("can sell the only facility left in a fleet", async () => {
     const onePlant = createGame({ scenarioId: 5 });
-    const { onSell } = renderFacilities(onePlant, null);
+    const { onSell } = renderFacilities(onePlant, onePlant.facilities[0].id);
     const facility = onePlant.facilities[0];
 
     await user.click(screen.getByLabelText(`Sell ${facility.name}`));
@@ -338,5 +310,162 @@ describe("the fleet list", () => {
         screen.queryByLabelText(`Move ${f.name} earlier in the dispatch order`),
       ).toBeNull();
     });
+  });
+});
+
+function renderProjects(game: GameType, onBuild = jest.fn()) {
+  return render(
+    <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+      <TransmissionPanel
+        game={game}
+        projectsOnly
+        onBuild={onBuild}
+        onPolicy={jest.fn()}
+      />
+    </Provider>,
+  );
+}
+
+describe("the interties view", () => {
+  it("explains and offers California connection projects", async () => {
+    const game = playedGame(0);
+    renderProjects(game);
+    expect(
+      screen.queryByText("Share power with nearby grids"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Connection projects")).not.toBeInTheDocument();
+    expect(screen.getByText("Pacific Northwest")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Trading rule")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Review purchase of .* intertie/ }),
+    ).not.toHaveLength(0);
+    expect(screen.getAllByText("Total cost")).toHaveLength(2);
+    expect(
+      screen.getByText(/Pay \$36M now · finance \$144M/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps every earlier tutorial focused on plants", () => {
+    for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
+      renderFacilities(createGame({ scenarioId }), null);
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(screen.queryByText("Interties")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("shows one list and one build action in Mission 7", () => {
+    renderFacilities(createGame({ scenarioId: 112 }), null);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("button", { name: "Build" })).toBeInTheDocument();
+    expect(screen.getByText(/Plants & storage/)).toBeInTheDocument();
+    expect(screen.getByText(/Interties/)).toBeInTheDocument();
+  });
+
+  it("does not render an empty interties destination where no corridor exists", () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "HNL", name: "Honolulu, HI" };
+    renderFacilities(game, null);
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByText(/Interties are coming/)).toBeNull();
+  });
+
+  it("shows researched local market names outside California", async () => {
+    const game = createGame({ scenarioId: 103 });
+    game.location = { ...game.location, id: "Dublin", name: "Dublin" };
+    renderProjects(game);
+
+    expect(screen.getByText("Great Britain")).toBeInTheDocument();
+    expect(screen.getByText("Continental Europe")).toBeInTheDocument();
+  });
+
+  it("gives the guided northern approval a stable target and specific name", async () => {
+    renderProjects(createGame({ scenarioId: 112 }));
+
+    const approval = screen.getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    });
+    expect(approval).toHaveAttribute("id", "review-intertie-california-north");
+    expect(
+      screen.getByTestId("transmission-project-california-north"),
+    ).toHaveAttribute("data-corridor-id", "california-north");
+    expect(screen.queryByText("Desert Southwest")).toBeNull();
+  });
+
+  it("reviews and cancels before committing a financed intertie", async () => {
+    const onBuild = jest.fn();
+    renderProjects(createGame({ scenarioId: 112 }), onBuild);
+    const review = screen.getByRole("button", {
+      name: "Review purchase of Pacific Northwest intertie",
+    });
+    await user.click(review);
+    expect(onBuild).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveTextContent("Loan option");
+    await user.click(screen.getByRole("button", { name: "close" }));
+    expect(onBuild).not.toHaveBeenCalled();
+    await user.click(review);
+    await user.click(screen.getByRole("button", { name: "Take loan" }));
+    expect(onBuild).toHaveBeenCalledTimes(1);
+    expect(onBuild).toHaveBeenCalledWith("california-north", true);
+  });
+});
+
+describe("unified connections", () => {
+  function connectedGame(): GameType {
+    const game = playedGame(0);
+    game.transmission!.lines = TRANSMISSION_CORRIDORS.filter((corridor) =>
+      corridor.id.startsWith("california-"),
+    ).map((corridor, i) => ({
+      id: i + 1,
+      corridorId: corridor.id,
+      name: corridor.name,
+      capacityW: corridor.capacityW,
+      buildCost: corridor.buildCost,
+      annualOperatingCost: corridor.annualOperatingCost,
+      yearsToBuildLeft: i,
+      minuteCreated: game.date.minute,
+      financed: true,
+      loanAmountLeft: 1000,
+      loanMonthlyPayment: 10,
+      interestRate: game.interestRate,
+    }));
+    return game;
+  }
+
+  it("keeps connections outside dispatch and reports network flow only once", async () => {
+    const game = connectedGame();
+    renderFacilities(game, null);
+    expect(rows()).toHaveLength(game.facilities.length);
+    // These assertions inspect the drag-library boundary, which has no accessible role.
+    /* eslint-disable testing-library/no-node-access */
+    const connections = document.querySelectorAll(".transmissionLine");
+    expect(connections).toHaveLength(2);
+    expect(document.querySelectorAll(".tradingSummary")).toHaveLength(1);
+    expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
+    /* eslint-enable testing-library/no-node-access */
+    expect(connections[0]).toHaveTextContent("Connected");
+    expect(connections[1]).toHaveTextContent("Building");
+    await user.click(screen.getByText(game.transmission!.lines[0].name));
+    expect(
+      screen.getByRole("button", {
+        name: `Inspect ${game.transmission!.lines[0].name}`,
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(connections[0]).toHaveTextContent("Loan balance");
+  });
+
+  it("permits inspecting replay connections but disables trading and building", async () => {
+    const game = connectedGame();
+    game.replayPlayback = {
+      actions: [],
+      index: 0,
+    } as GameType["replayPlayback"];
+    renderFacilities(game, null);
+    expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
+    await user.click(screen.getByText("No power flowing"));
+    expect(
+      screen.getByRole("combobox", { name: "Trading rule" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 });

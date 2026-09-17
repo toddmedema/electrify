@@ -4,7 +4,6 @@ import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   bandsPlugin,
   FORECAST_AXIS_LEFT,
-  FORECAST_AXIS_RIGHT,
   padRange,
   spansFromEdges,
   stepTicks,
@@ -13,6 +12,7 @@ import {
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -50,9 +50,9 @@ function buildOptions(showXLabels: boolean) {
   return ({ getState, scale }: BuildContext<State>): uPlot.Options => ({
     width: 0, // set by UPlotChart
     height: 0,
-    // Right gutter reserved rather than used, so this plot ends where the weather chart's
-    // second axis makes that one end -- see FORECAST_AXIS_RIGHT
-    padding: [5 * scale, FORECAST_AXIS_RIGHT * scale, 0, 0],
+    // Keep only enough trailing room for a centred x-axis label. This chart has no right axis,
+    // so reserving the weather chart's gutter made its plot visibly narrower than its peers.
+    padding: [5 * scale, 24 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -78,8 +78,9 @@ function buildOptions(showXLabels: boolean) {
         },
         values: (_u, splits) => {
           const s = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear),
+            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
           );
         },
       }),
@@ -102,7 +103,11 @@ function buildOptions(showXLabels: boolean) {
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
   const header = formatMinuteAsTooltipHeader(d.minute, state.startingYear);
-  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}`;
+  const reserve =
+    d.reserveW === undefined
+      ? ""
+      : `\nReserve margin: ${formatWatts(d.reserveW)}`;
+  return `${header}\nSupply: ${formatWatts(d.supplyW)}\nDemand: ${formatWatts(d.demandW)}${reserve}`;
 }
 
 // This is a pureComponent because its props should change much less frequently than it renders
@@ -142,7 +147,7 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
     return (
       <UPlotChart<State>
         id="chartForecastSupplyDemand"
-        ariaLabel="Chart of predicted electricity supply and demand"
+        ariaLabel="Chart of estimated electricity supply and demand"
         formatSummaryValue={formatWatts}
         height={height}
         state={state}

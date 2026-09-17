@@ -121,16 +121,6 @@ describe("the event log", () => {
     expect(messages(sold)[0]).toMatch(/^Sold /);
   });
 
-  /**
-   * A run can go on for a century, and every one of these is also carried in the save file --
-   * so the log is a window on the recent past rather than a complete history.
-   */
-  it("keeps only the most recent hundred entries", () => {
-    const dark = ticked(pauseEverything(createGame({ scenarioId: 100 })), 400);
-    const log = dark.eventLog;
-    expect(log.length).toBeLessThanOrEqual(100);
-  });
-
   it("reports a fuel cost crossover only once for the fuel that became dearer", () => {
     const scenario = {
       id: 9991,

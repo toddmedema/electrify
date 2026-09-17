@@ -141,6 +141,7 @@
     },
     "Philadelphia": {
       "id": "Philadelphia",
+      "offshore": true,
       "name": "Philadelphia, PA",
       "region": "North America",
       "country": "United States",
@@ -297,6 +298,7 @@
     },
     "Boston": {
       "id": "Boston",
+      "offshore": true,
       "name": "Boston, MA",
       "region": "North America",
       "country": "United States",
@@ -661,6 +663,7 @@
     },
     "Halifax": {
       "id": "Halifax",
+      "offshore": true,
       "name": "Halifax, NS",
       "region": "North America",
       "country": "Canada",
@@ -1084,6 +1087,7 @@
     },
     "RioDeJaneiro": {
       "id": "RioDeJaneiro",
+      "offshore": true,
       "name": "Rio de Janeiro, Brazil",
       "region": "South America",
       "country": "Brazil",
@@ -1120,6 +1124,7 @@
     },
     "Fortaleza": {
       "id": "Fortaleza",
+      "offshore": true,
       "name": "Fortaleza, Brazil",
       "region": "South America",
       "country": "Brazil",
@@ -1144,6 +1149,7 @@
     },
     "PortoAlegre": {
       "id": "PortoAlegre",
+      "offshore": true,
       "name": "Porto Alegre, Brazil",
       "region": "South America",
       "country": "Brazil",
@@ -1217,6 +1223,7 @@
     },
     "Manchester": {
       "id": "Manchester",
+      "offshore": true,
       "name": "Manchester, United Kingdom",
       "region": "Europe",
       "country": "United Kingdom",
@@ -1229,6 +1236,7 @@
     },
     "Edinburgh": {
       "id": "Edinburgh",
+      "offshore": true,
       "name": "Edinburgh, United Kingdom",
       "region": "Europe",
       "country": "United Kingdom",
@@ -1241,6 +1249,7 @@
     },
     "Dublin": {
       "id": "Dublin",
+      "offshore": true,
       "name": "Dublin, Ireland",
       "region": "Europe",
       "country": "Ireland",
@@ -1265,6 +1274,7 @@
     },
     "Marseille": {
       "id": "Marseille",
+      "offshore": true,
       "name": "Marseille, France",
       "region": "Europe",
       "country": "France",
@@ -1301,6 +1311,7 @@
     },
     "Barcelona": {
       "id": "Barcelona",
+      "offshore": true,
       "name": "Barcelona, Spain",
       "region": "Europe",
       "country": "Spain",
@@ -1313,6 +1324,7 @@
     },
     "Seville": {
       "id": "Seville",
+      "offshore": true,
       "name": "Seville, Spain",
       "region": "Europe",
       "country": "Spain",
@@ -1325,6 +1337,7 @@
     },
     "Lisbon": {
       "id": "Lisbon",
+      "offshore": true,
       "name": "Lisbon, Portugal",
       "region": "Europe",
       "country": "Portugal",
@@ -1337,6 +1350,7 @@
     },
     "Porto": {
       "id": "Porto",
+      "offshore": true,
       "name": "Porto, Portugal",
       "region": "Europe",
       "country": "Portugal",
@@ -1349,6 +1363,7 @@
     },
     "Rome": {
       "id": "Rome",
+      "offshore": true,
       "name": "Rome, Italy",
       "region": "Europe",
       "country": "Italy",
@@ -1373,6 +1388,7 @@
     },
     "Naples": {
       "id": "Naples",
+      "offshore": true,
       "name": "Naples, Italy",
       "region": "Europe",
       "country": "Italy",
@@ -2485,6 +2501,18 @@
       "long": 28.0473,
       "timeZone": "Africa/Johannesburg",
       "elevation": 1749,
+      "startingYear": 1980,
+      "endingYear": 2025
+    },
+    "Delhi": {
+      "id": "Delhi",
+      "name": "Delhi, India",
+      "region": "South Asia",
+      "country": "India",
+      "lat": 28.6139,
+      "long": 77.209,
+      "timeZone": "Asia/Kolkata",
+      "elevation": 214,
       "startingYear": 1980,
       "endingYear": 2025
     },

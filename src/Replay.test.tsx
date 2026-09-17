@@ -1,14 +1,29 @@
+import { LOCATIONS } from "./Constants";
 import {
   decodeReplay,
   encodeReplay,
   MAX_REPLAY_ACTIONS,
-  recordReplayAction,
   recordedDelta,
+  recordReplayAction,
   replayByteLength,
-  REPLAY_VERSION,
 } from "./Replay";
-import { LOCATIONS } from "./Constants";
 import { GameType, ReplayActionType, ReplayType } from "./Types";
+
+const generatorQuote = {
+  name: "Oil",
+  description: "Generator",
+  available: true,
+  buildCost: 1000000,
+  annualOperatingCost: 1000,
+  peakW: 100000,
+  lifespanYears: 30,
+  yearsToBuild: 1,
+  fuel: "Oil",
+  maxPeakW: 1000000,
+  capacityFactor: 0.9,
+  spinMinutes: 1,
+  btuPerWh: 0.01,
+};
 
 // Only the two fields the recorder touches, so these tests don't need a whole simulation to run
 function aGame(minute: number, log?: ReplayActionType[]): GameType {
@@ -20,7 +35,6 @@ function aGame(minute: number, log?: ReplayActionType[]): GameType {
 
 function aReplay(overrides: Partial<ReplayType> = {}): ReplayType {
   return {
-    version: REPLAY_VERSION,
     appVersion: "0.1.0",
     scenarioId: 101,
     difficulty: "Employee",
@@ -55,6 +69,71 @@ describe("recordedDelta", () => {
 });
 
 describe("recordReplayAction", () => {
+  it.each([
+    null,
+    {},
+    { ...generatorQuote, buildCost: undefined },
+    { ...generatorQuote, spinMinutes: NaN },
+    { ...generatorQuote, peakW: -1 },
+    { ...generatorQuote, fuel: "unknown" },
+  ])("rejects a malformed replay facility %p", (facility) => {
+    expect(
+      decodeReplay(
+        aReplay({
+          actions: [
+            {
+              minute: 0,
+              type: "buildFacility",
+              payload: { facility, financed: false },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("round trips a complete storage quote", () => {
+    const facility = {
+      name: "Battery",
+      description: "Storage",
+      available: true,
+      buildCost: 1000000,
+      annualOperatingCost: 1000,
+      peakW: 250000,
+      lifespanYears: 15,
+      yearsToBuild: 1,
+      peakWh: 1000000,
+      maxPeakWh: 10000000,
+      roundTripEfficiency: 0.9,
+      hourlyLoss: 0.001,
+    };
+    const replay = aReplay({
+      actions: [
+        {
+          minute: 0,
+          type: "buildFacility",
+          payload: { facility, financed: false },
+        },
+      ],
+    });
+    expect(decodeReplay(encodeReplay(replay))).toEqual(replay);
+    expect(
+      decodeReplay(
+        aReplay({
+          actions: [
+            {
+              minute: 0,
+              type: "buildFacility",
+              payload: {
+                facility: { ...facility, hourlyLoss: undefined },
+                financed: false,
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
   it("does nothing when the run isn't being recorded", () => {
     const game = aGame(60);
     recordReplayAction(game, "sellFacility", 1);
@@ -88,6 +167,7 @@ describe("recordReplayAction", () => {
           type: "buildFacility",
           payload: {
             facility: {
+              ...generatorQuote,
               name: "Airborne Wind",
               fuel: "Airborne Wind",
               peakW: 1200000,
@@ -110,6 +190,7 @@ describe("recordReplayAction", () => {
           type: "buildFacility",
           payload: {
             facility: {
+              ...generatorQuote,
               name: "Oil",
               fuel: "Oil",
               peakW: 100000000,
@@ -187,16 +268,15 @@ describe("decodeReplay", () => {
     ).toEqual(replay);
   });
 
+  it("leaves current runs gated", () => {
+    const current = encodeReplay(aReplay());
+    expect(decodeReplay(current)?.meaningfulDecisionGateWaived).toBeUndefined();
+  });
+
   it("ignores anything that isn't a replay", () => {
     expect(decodeReplay(null)).toBeNull();
     expect(decodeReplay("nope")).toBeNull();
     expect(decodeReplay({})).toBeNull();
-  });
-
-  it("rejects a replay from a different schema", () => {
-    expect(
-      decodeReplay(encodeReplay(aReplay({ version: REPLAY_VERSION + 1 }))),
-    ).toBeNull();
   });
 
   it("ignores a replay missing the fields the run is rebuilt from", () => {
@@ -205,7 +285,7 @@ describe("decodeReplay", () => {
     expect(decodeReplay(doc)).toBeNull();
   });
 
-  it("rejects a replay without current envelope metadata", () => {
+  it("rejects a replay without envelope metadata", () => {
     const doc = encodeReplay(aReplay()) as unknown as Record<string, unknown>;
     delete doc.appVersion;
     expect(decodeReplay(doc)).toBeNull();

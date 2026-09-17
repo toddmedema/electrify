@@ -1,4 +1,7 @@
+import ManualLink from "../base/ManualLink";
+import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
+import CustomerPrograms from "./CustomerPrograms";
 import {
   Button,
   Checkbox,
@@ -26,11 +29,16 @@ import {
 } from "@mui/material";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
-import LayersIcon from "@mui/icons-material/Layers";
+import AddIcon from "@mui/icons-material/Add";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import TuneIcon from "@mui/icons-material/Tune";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
   GAME_TO_REAL_YEARS,
   ORGANIC_GROWTH_MAX_ANNUAL,
@@ -74,7 +82,6 @@ import {
   largeMassUnit,
 } from "../../helpers/Units";
 import {
-  getStorageChoice,
   getStorageJson,
   getStorageString,
   setStorageKeyValue,
@@ -104,15 +111,30 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
+import ForecastScope from "../base/ForecastScope";
+import EconomicFutureComparison from "../base/EconomicFutureComparison";
+import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
-import { formatCustomerChange } from "./Finances";
+import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
-
-export type InsightRange =
-  "all" | "next1" | "next5" | "next10" | "next20" | `year:${number}`;
+import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
+import InsightEventRail from "../base/InsightEventRail";
+import { UpcomingStoryEventType } from "./StoryEventSelectors";
+import {
+  ChartViewportContext,
+  ChartViewportRange,
+  clampChartViewport,
+  eventChartViewport,
+  panChartViewport,
+  rangesEqual,
+  zoomChartViewport,
+} from "../base/ChartViewportContext";
+import PowerExchangeSummary from "../base/PowerExchangeSummary";
+import { transmissionAvailable } from "../../data/AdjacentMarkets";
 
 export type InsightLayerId =
   | "supplyDemand"
+  | "powerExchange"
   | "demandByType"
   | "supplyByFuel"
   | "storage"
@@ -126,7 +148,8 @@ export type InsightLayerId =
   | "cash"
   | "customers"
   | "emissions"
-  | "financeDetails";
+  | "financeDetails"
+  | "inflationInterest";
 
 type LayerGroup = "Grid" | "Customers" | "Economics" | "Environment";
 
@@ -134,15 +157,21 @@ export interface InsightLayerDefinition {
   id: InsightLayerId;
   label: string;
   group: LayerGroup;
-  availability?: "storage" | "hydro";
+  availability?: "storage" | "hydro" | "transmission";
 }
 
 export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "supplyDemand", label: "Supply & Demand", group: "Grid" },
   {
+    id: "powerExchange",
+    label: "Power exchange",
+    group: "Grid",
+    availability: "transmission",
+  },
+  {
     id: "demandByType",
     label: "Demand by use",
-    group: "Grid",
+    group: "Customers",
   },
   { id: "supplyByFuel", label: "Supply by Fuel", group: "Grid" },
   {
@@ -158,6 +187,11 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "cash", label: "Cash", group: "Economics" },
   { id: "financeDetails", label: "Finance details", group: "Economics" },
   { id: "fuelPrices", label: "Fuel Prices", group: "Economics" },
+  {
+    id: "inflationInterest",
+    label: "Inflation & interest rate",
+    group: "Economics",
+  },
   {
     id: "emissions",
     label: "Emissions (CO2e)",
@@ -202,7 +236,14 @@ export const INSIGHT_PRESETS: Record<
   },
   reliability: {
     label: "Reliability",
-    layers: ["supplyDemand", "supplyByFuel", "storage", "weather", "water"],
+    layers: [
+      "supplyDemand",
+      "powerExchange",
+      "supplyByFuel",
+      "storage",
+      "weather",
+      "water",
+    ],
   },
   profitability: {
     label: "Profitability",
@@ -224,36 +265,40 @@ export const INSIGHT_PRESETS: Record<
   },
 };
 
-const RANGE_KEY = "insightsRange";
 const LAYERS_KEY = "insightsLayers";
 const ACTIVE_PRESET_KEY = "insightsActivePreset";
 const PRESET_LIBRARY_KEY = "insightsPresetLibrary";
 export const MAX_CUSTOM_INSIGHT_PRESETS = 10;
 const MAX_PRESET_NAME_LENGTH = 40;
-const FORECAST_RANGE_OPTIONS: readonly InsightRange[] = [
-  "next1",
-  "next5",
-  "next10",
-  "next20",
-];
 const SYNC_KEY = "insights";
 const GROUPS: LayerGroup[] = ["Grid", "Customers", "Economics", "Environment"];
 const ALL_LAYER_IDS = new Set(INSIGHT_LAYERS.map((layer) => layer.id));
-const HISTORICAL_LAYER_IDS = new Set<InsightLayerId>([
-  "supplyDemand",
-  "profit",
-  "revenue",
-  "expenses",
-  "cash",
-  "customers",
-  "emissions",
-  "financeDetails",
-]);
 const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
+
+function formatRateCompact(rate: number): string {
+  return `${Number((rate * 100).toFixed(1))}¢`;
+}
+
+function rateMarkLabel(
+  rate: number,
+  desktopLabel = formatMoneyConcise(rate),
+  mobileLabel = "",
+) {
+  return (
+    <>
+      <span className="insightsRateMarkDesktop">{desktopLabel}</span>
+      <span className="insightsRateMarkMobile">{mobileLabel}</span>
+    </>
+  );
+}
 
 const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate) => ({
   value: rate,
-  label: formatMoneyConcise(rate),
+  label: rateMarkLabel(
+    rate,
+    formatMoneyConcise(rate),
+    [0, 0.15, 0.3].includes(rate) ? formatRateCompact(rate) : "",
+  ),
 }));
 
 interface BlackoutEdges {
@@ -262,9 +307,9 @@ interface BlackoutEdges {
 }
 
 interface ProjectionView {
-  historical: boolean;
   timeline: TickPresentFutureType[];
   sampled: TickPresentFutureType[];
+  supplyDemandTimeline: TickPresentFutureType[];
   domain: { x: [number, number]; y: [number, number] };
   blackouts: BlackoutEdges[];
   blackoutTotalWh: number;
@@ -273,23 +318,41 @@ interface ProjectionView {
   hasHydro: boolean;
   financePast: MonthlyHistoryType[];
   financeProjected: MonthlyHistoryType[];
+  projectionStepMinutes: number;
 }
 
 export interface StateProps {
+  journeyRestore?: import("../../Types").InsightsOriginType;
+  configurationRevision?: number;
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  evidenceRunId?: number;
+  activeCard?: import("../../Types").CardNameType;
   game: GameType;
   selectedFacilityId: number | null;
   facilityDragActive: boolean;
   focusLayer?: InsightLayerId;
+  upcomingEvents?: UpcomingStoryEventType[];
 }
 
 export interface DispatchProps {
+  onGeneratorJourney?: (
+    origin: import("../../Types").InsightsOriginType,
+  ) => void;
+  onConfigurationEdit?: () => void;
+  onJourneyRestored?: (
+    origin: import("../../Types").InsightsOriginType,
+  ) => boolean;
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onDelta: (delta: Partial<GameType>) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
 
 interface State {
-  range: InsightRange;
+  temporaryLayer?: InsightLayerId;
   layers: InsightLayerId[];
   preset: InsightPresetId;
   presetDirty: boolean;
@@ -300,6 +363,76 @@ interface State {
   presetNameError: string;
   layersOpen: boolean;
   leversOpen: boolean;
+  activeEventKey?: string;
+  viewport: ChartViewportRange;
+  viewportAnnouncement: string;
+}
+
+const VIEWPORT_ZOOM_FACTOR = 0.5;
+const VIEWPORT_PAN_FRACTION = 0.25;
+const DEFAULT_VIEWPORT_MONTHS = 12;
+const MAX_FORECAST_YEARS = 20;
+
+function viewportBounds(game: GameType): ChartViewportRange {
+  return [0, game.date.minute + MAX_FORECAST_YEARS * 12 * MINUTES_PER_MONTH];
+}
+
+function initialViewport(game: GameType): ChartViewportRange {
+  const bounds = viewportBounds(game);
+  return clampChartViewport(
+    bounds,
+    [
+      game.date.minute,
+      game.date.minute + DEFAULT_VIEWPORT_MONTHS * MINUTES_PER_MONTH,
+    ],
+    MINUTES_PER_MONTH,
+  );
+}
+
+function viewportLabel(
+  range: ChartViewportRange,
+  startingYear: number,
+): string {
+  const start = getDateFromMinute(range[0], startingYear);
+  const end = getDateFromMinute(range[1], startingYear);
+  if (start.year !== end.year) {
+    const sameCentury =
+      Math.floor(start.year / 100) === Math.floor(end.year / 100);
+    const endYear = sameCentury ? String(end.year).slice(-2) : end.year;
+    return `${start.year}–${endYear}`;
+  }
+  if (start.month === end.month) return `${start.month} ${start.year}`;
+  return `${start.month}–${end.month} ${start.year}`;
+}
+
+function viewportAnnouncement(
+  range: ChartViewportRange,
+  startingYear: number,
+): string {
+  return `Showing ${viewportLabel(range, startingYear)}`;
+}
+
+function timelineWithin(
+  timeline: TickPresentFutureType[],
+  range: ChartViewportRange,
+): TickPresentFutureType[] {
+  if (timeline.length <= 2) return timeline;
+  let first = 0;
+  let last = timeline.length;
+  while (first < last) {
+    const middle = Math.floor((first + last) / 2);
+    if (timeline[middle].minute < range[0]) first = middle + 1;
+    else last = middle;
+  }
+  const from = Math.max(0, first - 1);
+  first = from;
+  last = timeline.length;
+  while (first < last) {
+    const middle = Math.floor((first + last) / 2);
+    if (timeline[middle].minute <= range[1]) first = middle + 1;
+    else last = middle;
+  }
+  return timeline.slice(from, Math.min(timeline.length, first + 1));
 }
 
 function sameLayers(left: InsightLayerId[], right: InsightLayerId[]): boolean {
@@ -446,6 +579,8 @@ function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
       return ["customers"];
     case 5:
       return ["supplyDemand", "fuelPrices", "weather"];
+    case 112:
+      return ["powerExchange"];
     default:
       return [];
   }
@@ -455,6 +590,9 @@ export function withRequiredLayers(
   layers: InsightLayerId[],
   scenarioId: number,
 ): InsightLayerId[] {
+  if (scenarioId === 112) {
+    return ["powerExchange", ...layers.filter((id) => id !== "powerExchange")];
+  }
   const next = [...layers];
   for (const id of requiredTutorialLayers(scenarioId)) {
     if (!next.includes(id)) {
@@ -462,39 +600,6 @@ export function withRequiredLayers(
     }
   }
   return next;
-}
-
-function rangeYears(range: InsightRange): number {
-  return range.startsWith("next") ? Number(range.slice(4)) : 0;
-}
-
-function historicalYear(range: InsightRange): number | null {
-  return range.startsWith("year:") ? Number(range.slice(5)) : null;
-}
-
-function isHistoricalRange(range: InsightRange): boolean {
-  return range === "all" || historicalYear(range) !== null;
-}
-
-function historyRange(year: number): InsightRange {
-  return `year:${year}`;
-}
-
-function playedHistoryYears(game: GameType): number[] {
-  return [...new Set(game.monthlyHistory.map((month) => month.year))].sort(
-    (a, b) => b - a,
-  );
-}
-
-function rangeOptions(game: GameType): InsightRange[] {
-  if (!game.monthlyHistory.length) {
-    return [...FORECAST_RANGE_OPTIONS];
-  }
-  return [
-    ...FORECAST_RANGE_OPTIONS,
-    "all",
-    ...playedHistoryYears(game).map(historyRange),
-  ];
 }
 
 function monthMinute(month: MonthlyHistoryType, startingYear: number): number {
@@ -544,6 +649,8 @@ function financeSeries(
   key: DerivedHistoryKeysType,
   past: MonthlyHistoryType[],
   projected: MonthlyHistoryType[],
+  domain?: ChartViewportRange,
+  startingYear?: number,
 ) {
   const point = (month: MonthlyHistoryType, isProjected: boolean) => {
     const summary = deriveExpandedSummary(month);
@@ -554,14 +661,48 @@ function financeSeries(
       projected: isProjected,
     };
   };
-  return [
+  const points = [
     ...[...past].reverse().map((month) => point(month, false)),
     ...projected.map((month) => point(month, true)),
   ];
+  if (!domain || startingYear === undefined || points.length <= 2)
+    return points;
+  const minutes = points.map(
+    (value) => (value.month - startingYear * 12 - 1) * MINUTES_PER_MONTH,
+  );
+  const firstInside = minutes.findIndex((minute) => minute >= domain[0]);
+  const first =
+    firstInside < 0 ? points.length - 1 : Math.max(0, firstInside - 1);
+  const firstAfter = minutes.findIndex((minute) => minute > domain[1]);
+  const end = firstAfter < 0 ? points.length : firstAfter + 1;
+  return points.slice(first, Math.max(first + 1, Math.min(points.length, end)));
+}
+
+function policySignature(game: GameType): string {
+  const policies = game.policies;
+  if (!policies) return "";
+  return JSON.stringify([
+    policies.month,
+    ...Object.keys(policies.programs)
+      .sort()
+      .map((id) => {
+        const program = policies.programs[id as keyof typeof policies.programs];
+        return [
+          id,
+          program.tier,
+          program.adoption,
+          program.spending,
+          program.pending?.tier,
+          program.startHour,
+          program.pending?.startHour,
+          program.pending?.month,
+        ];
+      }),
+  ]);
 }
 
 function facilitySignature(game: GameType): string {
-  return game.facilities
+  const facilities = game.facilities
     .map((facility) =>
       [
         facility.id,
@@ -571,6 +712,10 @@ function facilitySignature(game: GameType): string {
       ].join(":"),
     )
     .join("|");
+  const transmission = (game.transmission?.lines || [])
+    .map((line) => [line.id, line.corridorId, line.yearsToBuildLeft].join(":"))
+    .join("|");
+  return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
 }
 
 export default class Insights extends React.Component<Props, State> {
@@ -582,17 +727,14 @@ export default class Insights extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     const presetLibrary = storedPresetLibrary();
-    const layers = withRequiredLayers(storedLayers(), props.game.scenarioId);
-    if (props.focusLayer && !layers.includes(props.focusLayer)) {
-      layers.push(props.focusLayer);
-    }
+    const layers = storedLayers();
     const storedPreset = getStorageString(ACTIVE_PRESET_KEY, "");
     const preset = isStoredPreset(storedPreset, presetLibrary)
       ? storedPreset
       : matchingPreset(layers, presetLibrary);
     const savedLayers = presetDefinition(preset, presetLibrary)?.layers;
     this.state = {
-      range: getStorageChoice(RANGE_KEY, rangeOptions(props.game), "next1"),
+      temporaryLayer: props.focusLayer,
       layers,
       preset,
       presetDirty: !savedLayers || !sameLayers(layers, savedLayers),
@@ -603,6 +745,11 @@ export default class Insights extends React.Component<Props, State> {
       presetNameError: "",
       layersOpen: false,
       leversOpen: true,
+      activeEventKey: undefined,
+      viewport: props.journeyRestore
+        ? this.restoredViewport(props.journeyRestore)
+        : initialViewport(props.game),
+      viewportAnnouncement: "",
     };
   }
 
@@ -619,43 +766,219 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
+      nextProps.journeyRestore !== this.props.journeyRestore ||
+      nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.evidenceRunId !== this.props.evidenceRunId ||
+      nextProps.activeCard !== this.props.activeCard ||
+      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
+      (this.state.layers.includes("powerExchange") &&
+        nextProps.game.date.minute !== this.props.game.date.minute) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
       nextProps.focusLayer !== this.props.focusLayer ||
+      nextProps.upcomingEvents !== this.props.upcomingEvents ||
+      policySignature(nextProps.game) !== policySignature(this.props.game) ||
       facilitySignature(nextProps.game) !== facilitySignature(this.props.game)
     );
   }
 
+  public componentDidMount() {
+    this.scrollTutorialPowerExchangeIntoView();
+    this.resolveEvidence();
+    this.restoreJourney();
+  }
+
   public componentDidUpdate(previousProps: Props) {
+    if (
+      this.props.evidenceRunId !== previousProps.evidenceRunId ||
+      (this.props.activeCard !== previousProps.activeCard &&
+        !this.props.evidenceRequest)
+    ) {
+      if (this.state.temporaryLayer)
+        this.setState({ temporaryLayer: undefined });
+    }
+    this.resolveEvidence();
+    if (this.props.journeyRestore) this.restoreJourney();
+    if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
+      this.scrollTutorialPowerExchangeIntoView();
+    }
+    if (
+      this.props.game.date.monthsElapsed !==
+      previousProps.game.date.monthsElapsed
+    ) {
+      const elapsedMonths =
+        this.props.game.date.monthsElapsed -
+        previousProps.game.date.monthsElapsed;
+      const delta = elapsedMonths * MINUTES_PER_MONTH;
+      const bounds = viewportBounds(this.props.game);
+      this.setState((state) => {
+        const anchoredAtScenarioStart = state.viewport[0] === bounds[0];
+        const viewport = clampChartViewport(
+          bounds,
+          [
+            anchoredAtScenarioStart ? bounds[0] : state.viewport[0] + delta,
+            state.viewport[1] + delta,
+          ],
+          MINUTES_PER_MONTH,
+        );
+        return {
+          viewport,
+          viewportAnnouncement: viewportAnnouncement(
+            viewport,
+            this.props.game.startingYear,
+          ),
+        };
+      });
+    }
     if (
       this.props.focusLayer &&
       this.props.focusLayer !== previousProps.focusLayer &&
       !this.state.layers.includes(this.props.focusLayer)
     ) {
-      this.setLayers([...this.state.layers, this.props.focusLayer]);
+      this.setState({ temporaryLayer: this.props.focusLayer });
     }
   }
 
-  private setRange(range: InsightRange) {
-    setStorageKeyValue(RANGE_KEY, range);
-    this.setState({ range });
+  private restoredViewport(
+    origin: import("../../Types").InsightsOriginType,
+  ): ChartViewportRange {
+    const bounds = viewportBounds(this.props.game);
+    const delta =
+      (this.props.game.date.monthsElapsed - origin.month) * MINUTES_PER_MONTH;
+    return clampChartViewport(
+      bounds,
+      [
+        origin.viewport[0] === 0 ? 0 : origin.viewport[0] + delta,
+        origin.viewport[1] + delta,
+      ],
+      MINUTES_PER_MONTH,
+    );
+  }
+
+  private beginJourney(sourceLayer?: InsightLayerId) {
+    const pane = document.querySelector<HTMLElement>(".insights .scrollable");
+    const anchor = Array.from(
+      document.querySelectorAll<HTMLElement>(".insights [data-layer]"),
+    ).find(
+      (element) =>
+        element.getBoundingClientRect().bottom >
+        (pane?.getBoundingClientRect().top ?? 0),
+    );
+    this.props.onGeneratorJourney?.({
+      viewport: [...this.state.viewport],
+      month: this.props.game.date.monthsElapsed,
+      layers: [...this.state.layers],
+      preset: this.state.preset,
+      revision: this.props.configurationRevision ?? 0,
+      temporaryLayer: this.state.temporaryLayer,
+      anchor: sourceLayer ?? anchor?.dataset.layer,
+      scrollTop: pane?.scrollTop ?? 0,
+    });
+  }
+
+  private restoreJourney() {
+    const origin = this.props.journeyRestore;
+    if (!origin || this.props.facilityDragActive) return;
+    if (this.props.onJourneyRestored && !this.props.onJourneyRestored(origin))
+      return;
+    const unchanged =
+      origin.revision === (this.props.configurationRevision ?? 0);
+    const viewport = this.restoredViewport(origin);
+    this.setState(
+      {
+        viewport,
+        viewportAnnouncement: viewportAnnouncement(
+          viewport,
+          this.props.game.startingYear,
+        ),
+        layers: unchanged
+          ? (origin.layers as InsightLayerId[])
+          : this.state.layers,
+        preset: unchanged
+          ? (origin.preset as InsightPresetId)
+          : this.state.preset,
+        temporaryLayer: (unchanged ? origin.temporaryLayer : origin.anchor) as
+          InsightLayerId | undefined,
+      },
+      () => {
+        const pane = document.querySelector<HTMLElement>(
+          ".insights .scrollable",
+        );
+        if (pane) pane.scrollTop = origin.scrollTop;
+        const anchor = document.querySelector<HTMLElement>(
+          origin.anchor
+            ? '.insights [data-layer="' + origin.anchor + '"]'
+            : "#insightsGeneratorJourney",
+        );
+        anchor?.focus({ preventScroll: true });
+      },
+    );
+  }
+
+  private resolveEvidence() {
+    const request = this.props.evidenceRequest;
+    if (!request || this.props.facilityDragActive) return;
+    const target = request.target;
+    let layer: InsightLayerId | undefined;
+    if (target === "finances") layer = "financeDetails";
+    else if (typeof target === "object" && target.card === "INSIGHTS") {
+      layer =
+        target.layer === "FINANCES"
+          ? "financeDetails"
+          : target.layer === "FUEL_PRICES"
+            ? "fuelPrices"
+            : "supplyDemand";
+    }
+    if (!layer) return;
+    if (
+      !this.state.layers.includes(layer) &&
+      this.state.temporaryLayer !== layer
+    ) {
+      this.setState({ temporaryLayer: layer });
+      return;
+    }
+    this.props.onEvidenceReady?.(
+      request,
+      document.querySelector<HTMLElement>(`[data-layer="${layer}"]`),
+    );
+  }
+
+  private scrollTutorialPowerExchangeIntoView() {
+    if (
+      this.props.game.scenarioId !== 112 ||
+      this.props.game.tutorialStep !== 7 ||
+      window.innerWidth > 768
+    ) {
+      return;
+    }
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-layer="powerExchange"]')
+        ?.scrollIntoView?.({ block: "nearest" });
+    }, 0);
   }
 
   private setLayers(
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
   ) {
-    const required = withRequiredLayers(layers, this.props.game.scenarioId);
+    this.props.onConfigurationEdit?.();
+    const required = layers;
     const savedLayers = presetDefinition(
       preset,
       this.state.presetLibrary,
     )?.layers;
-    setStorageKeyValue(LAYERS_KEY, required);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    // Mission 7 temporarily puts its teaching track first. Keep that guided ordering out of the
+    // player's saved preset so finishing the mission does not rearrange their normal Insights.
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, required);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
+    }
     this.setState({
+      temporaryLayer: undefined,
       layers: required,
       preset,
       presetDirty: !savedLayers || !sameLayers(required, savedLayers),
@@ -678,13 +1001,18 @@ export default class Insights extends React.Component<Props, State> {
     if (!preset) {
       return;
     }
-    const layers = withRequiredLayers(
-      preset.layers,
-      this.props.game.scenarioId,
-    );
-    setStorageKeyValue(LAYERS_KEY, layers);
-    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
-    this.setState({ layers, preset: id, presetDirty: false });
+    this.props.onConfigurationEdit?.();
+    const layers = [...preset.layers];
+    if (this.props.game.scenarioId !== 112) {
+      setStorageKeyValue(LAYERS_KEY, layers);
+      setStorageKeyValue(ACTIVE_PRESET_KEY, id);
+    }
+    this.setState({
+      layers,
+      preset: id,
+      presetDirty: false,
+      temporaryLayer: undefined,
+    });
   }
 
   private moveLayer(id: InsightLayerId, neighbour: InsightLayerId) {
@@ -692,6 +1020,8 @@ export default class Insights extends React.Component<Props, State> {
     const from = layers.indexOf(id);
     const to = layers.indexOf(neighbour);
     if (from < 0 || to < 0) {
+      // An explicit edit ends temporary evidence, but never adds an unconfigured chart.
+      this.setLayers(layers);
       return;
     }
     [layers[from], layers[to]] = [layers[to], layers[from]];
@@ -869,109 +1199,35 @@ export default class Insights extends React.Component<Props, State> {
     const defaults = { ...presetLibrary.defaults };
     delete defaults[defaultId];
     const library = { ...presetLibrary, defaults };
-    const layers = withRequiredLayers(
-      INSIGHT_PRESETS[defaultId].layers,
-      this.props.game.scenarioId,
-    );
+    const layers = [...INSIGHT_PRESETS[defaultId].layers];
     this.savePresetLibrary(library);
     setStorageKeyValue(LAYERS_KEY, layers);
     setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
     this.setState({
       presetLibrary: library,
+      temporaryLayer: undefined,
       layers,
       presetDirty: false,
       presetDialog: null,
     });
   }
 
-  private getHistoricalProjection(now: TickPresentFutureType): ProjectionView {
-    const { game } = this.props;
-    const year = historicalYear(this.state.range);
-    const financePast = game.monthlyHistory.filter(
-      (month) => year === null || month.year === year,
-    );
-    const months = [...financePast].reverse();
-    const timeline = months.map((month) => {
-      // The historical supply chart reads these three fields only. Cloning a real tick keeps the
-      // shared chart contract intact without pretending monthlyHistory retained the other layers.
-      const tick = { ...now } as TickPresentFutureType;
-      tick.minute = monthMinute(month, game.startingYear);
-      tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
-      tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
-      return tick;
-    });
-    const rangeMin = timeline[0].minute;
-    const rangeMax = timeline[timeline.length - 1].minute + MINUTES_PER_MONTH;
-    let domainMin = Number.POSITIVE_INFINITY;
-    let domainMax = 0;
-    let blackoutTotalWh = 0;
-    for (let i = 0; i < timeline.length; i++) {
-      const tick = timeline[i];
-      const month = months[i];
-      domainMin = Math.min(domainMin, tick.supplyW, tick.demandW);
-      domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
-      blackoutTotalWh += Math.max(0, month.demandWh - month.supplyWh);
-    }
-
-    return {
-      historical: true,
-      timeline,
-      sampled: timeline,
-      domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
-      // The monthly record knows how much energy went unserved, but not when. Drawing a blackout
-      // band across the whole month would imply precision the saved data does not have.
-      blackouts: [
-        { minute: rangeMin, value: 0 },
-        { minute: rangeMax, value: 0 },
-      ],
-      blackoutTotalWh,
-      largestBlackout: {
-        wh: 0,
-        peakW: 0,
-        start: rangeMin,
-        end: rangeMin,
-      },
-      hasStorage: false,
-      hasHydro: false,
-      financePast,
-      financeProjected: [],
-    };
-  }
-
   private getProjection(now: TickPresentFutureType): ProjectionView {
     const { game } = this.props;
-    const years = rangeYears(this.state.range);
-    const nextYearMinute =
-      (game.date.year - game.startingYear + 1) * 12 * MINUTES_PER_MONTH;
-    const projectionStepMinutes =
-      this.state.range === "next10" || this.state.range === "next20"
-        ? 60
-        : TICK_MINUTES;
+    const projectionStepMinutes = 60;
     const tickScale = projectionStepMinutes / TICK_MINUTES;
-    const ticks =
-      years > 0
-        ? (TICKS_PER_YEAR * years) / tickScale
-        : Math.max(
-            1,
-            Math.ceil((nextYearMinute - game.date.minute) / TICK_MINUTES),
-          );
-    const monthsAhead =
-      years > 0 ? years * 12 : Math.max(0, 12 - game.date.monthNumber);
+    const ticks = (TICKS_PER_YEAR * MAX_FORECAST_YEARS) / tickScale;
+    const monthsAhead = MAX_FORECAST_YEARS * 12;
     const key = [
-      this.state.range,
       game.date.monthsElapsed,
       game.monthlyHistory.length,
       game.dollarsPerkWh,
       game.feePerKgCO2e,
       facilitySignature(game),
+      policySignature(game),
     ].join("|");
     if (this.projectionCache?.key === key) {
       return this.projectionCache.projection;
-    }
-    if (isHistoricalRange(this.state.range)) {
-      const projection = this.getHistoricalProjection(now);
-      this.projectionCache = { key, projection };
-      return projection;
     }
 
     const timeline = generateNewTimeline(
@@ -981,56 +1237,44 @@ export default class Insights extends React.Component<Props, State> {
       ticks,
       projectionStepMinutes,
     );
+    const historicalSupplyDemand = [...game.monthlyHistory]
+      .reverse()
+      .map((month) => {
+        const tick = { ...now } as TickPresentFutureType;
+        tick.minute = monthMinute(month, game.startingYear);
+        tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
+        tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
+        return tick;
+      });
+    const historicalCharts = [...game.monthlyHistory]
+      .reverse()
+      .flatMap((month) =>
+        month.chartAverage
+          ? [
+              {
+                ...month.chartAverage,
+                minute: monthMinute(month, game.startingYear),
+              } as TickPresentFutureType,
+            ]
+          : [],
+      );
     let domainMin = Number.POSITIVE_INFINITY;
     let domainMax = 0;
-    for (const tick of timeline) {
+    for (const tick of [...historicalSupplyDemand, ...timeline]) {
       domainMin = Math.min(domainMin, tick.supplyW, tick.demandW);
       domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
     }
-    const rangeMin = timeline[0].minute;
-    const rangeMax = timeline[timeline.length - 1].minute;
+    const [rangeMin, rangeMax] = viewportBounds(game);
 
-    let blackoutTotalWh = 0;
-    let current = { wh: 0, peakW: 0, start: rangeMin, end: rangeMin };
-    let largestBlackout = current;
-    let isBlackout = timeline[0].demandW > timeline[0].supplyW;
-    const blackouts: BlackoutEdges[] = [{ minute: rangeMin, value: 0 }];
-    if (isBlackout) {
-      blackouts.push({ minute: rangeMin, value: domainMax });
-    }
-    for (const tick of timeline) {
-      if (tick.demandW > tick.supplyW) {
-        if (!isBlackout) {
-          blackouts.push({ minute: tick.minute, value: 0 });
-          blackouts.push({ minute: tick.minute, value: domainMax });
-          isBlackout = true;
-          current = { wh: 0, peakW: 0, start: tick.minute, end: tick.minute };
-        }
-        const amount = tick.demandW - tick.supplyW;
-        const amountWh =
-          amount * (projectionStepMinutes / 60) * GAME_TO_REAL_YEARS;
-        blackoutTotalWh += amountWh;
-        current.wh += amountWh;
-        current.peakW = Math.max(current.peakW, amount);
-      } else if (isBlackout) {
-        blackouts.push({ minute: tick.minute, value: domainMax });
-        blackouts.push({ minute: tick.minute, value: 0 });
-        isBlackout = false;
-        current.end = tick.minute;
-        if (current.wh > largestBlackout.wh) {
-          largestBlackout = current;
-        }
-      }
-    }
-    blackouts.push({ minute: rangeMax, value: isBlackout ? domainMax : 0 });
-    if (current.wh > largestBlackout.wh) {
-      largestBlackout = { ...current, end: current.end || rangeMax };
-    }
-
-    const sampleYears = Math.max(1, years);
+    const { blackouts, blackoutTotalWh, largestBlackout } = forecastShortfalls(
+      timeline,
+      projectionStepMinutes,
+      domainMax,
+    );
+    blackouts.unshift({ minute: rangeMin, value: 0 });
     const sampled = sampleForecastTimeline(
       timeline,
-      240 * sampleYears,
+      240 * MAX_FORECAST_YEARS,
       projectionStepMinutes,
     );
 
@@ -1040,30 +1284,37 @@ export default class Insights extends React.Component<Props, State> {
       game.startingYear,
     ).slice(1, 1 + monthsAhead);
     const projection: ProjectionView = {
-      historical: false,
-      timeline,
-      sampled,
+      timeline: [...historicalCharts, ...timeline],
+      sampled: [...historicalCharts, ...sampled],
+      supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
       domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
       blackouts,
       blackoutTotalWh,
       largestBlackout,
-      hasStorage: timeline.some((tick) => tick.storedWh > 0),
-      hasHydro: game.facilities.some((facility) => facility.fuel === "Hydro"),
-      financePast: [],
+      hasStorage: [...historicalCharts, ...timeline].some(
+        (tick) => tick.storedWh > 0,
+      ),
+      hasHydro:
+        game.facilities.some((facility) => facility.fuel === "Hydro") ||
+        historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
+      financePast: game.monthlyHistory,
       financeProjected: [currentMonth, ...projectedMonths],
+      projectionStepMinutes,
     };
     this.projectionCache = { key, projection };
     return projection;
   }
 
   private available(layer: InsightLayerDefinition, projection: ProjectionView) {
-    if (projection.historical) {
-      return HISTORICAL_LAYER_IDS.has(layer.id);
-    }
     return (
       !layer.availability ||
       (layer.availability === "storage" && projection.hasStorage) ||
-      (layer.availability === "hydro" && projection.hasHydro)
+      (layer.availability === "hydro" && projection.hasHydro) ||
+      (layer.availability === "transmission" &&
+        transmissionAvailable(this.props.game.location) &&
+        !!this.props.game.transmission?.lines.some(
+          ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+        ))
     );
   }
 
@@ -1105,66 +1356,157 @@ export default class Insights extends React.Component<Props, State> {
     const marks =
       scenario.ownership === "Investor"
         ? [
-            { value: 0, label: "$0" },
+            { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
             {
               value: marketRate,
-              label: `${formatMoneyConcise(marketRate)} market`,
+              label: rateMarkLabel(
+                marketRate,
+                `${formatMoneyConcise(marketRate)} market`,
+                `market ${formatRateCompact(marketRate)}`,
+              ),
             },
-            { value: max, label: formatMoneyConcise(max) },
+            {
+              value: max,
+              label: rateMarkLabel(
+                max,
+                formatMoneyConcise(max),
+                formatRateCompact(max),
+              ),
+            },
           ]
         : RATE_MARKS;
+    const formattedCustomerChange = formatCustomerChange(
+      customerChange,
+      now.customers,
+    );
+    const rateSummary =
+      scenario.ownership === "Investor"
+        ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
+        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market benchmark ${formatMoneyConcise(marketRate)}; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year. Public utility customers do not switch based on rates.`;
     return (
       <section className="insightsLevers" aria-label="Planning controls">
         <Button
+          className="insightsRateToggle"
           startIcon={<TuneIcon />}
           onClick={() => this.setState({ leversOpen: !this.state.leversOpen })}
           aria-expanded={this.state.leversOpen}
+          aria-controls="rateSliderControl"
+          aria-label={`${this.state.leversOpen ? "Hide" : "Show"} rate slider`}
+          aria-describedby="insightsRateSummary"
         >
-          Rate controls
+          <span className="insightsRateToggleLabel">Rate controls</span>
         </Button>
-        <Typography variant="body2" color="textSecondary">
-          Rate <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
+        <CustomerPrograms
+          game={game}
+          onViewDemand={() => this.setLayers(["demandByType"])}
+        />
+        <Typography
+          className="insightsRateSummaryDesktop"
+          variant="body2"
+          color="textSecondary"
+          aria-hidden="true"
+        >
+          Base rate{" "}
+          <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
           {scenario.ownership === "Investor" && (
             <>
               {" "}
               · market {formatMoneyConcise(marketRate)} · projected customers{" "}
-              <strong>
-                {formatCustomerChange(customerChange, now.customers)}
-              </strong>{" "}
-              next month
+              <strong>{formattedCustomerChange}</strong> next month
             </>
           )}
           {scenario.ownership === "Public" && (
             <>
               {" "}
-              · customer growth{" "}
+              · market benchmark {formatMoneyConcise(marketRate)} · customer
+              growth{" "}
               <strong>
                 +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
               </strong>
             </>
           )}
         </Typography>
-        {this.state.leversOpen && (
-          <div className="budgetSlider flex-newline">
-            <Slider
-              id="rateSlider"
-              disabled={!!game.replayPlayback}
-              value={game.dollarsPerkWh}
-              aria-label="The rate you charge for electricity generation"
-              valueLabelDisplay="auto"
-              valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
-              marks={marks}
-              min={0}
-              step={scenario.ownership === "Investor" ? 0.001 : 0.01}
-              max={max}
-              onChange={(_event, value) =>
-                onDelta({
-                  dollarsPerkWh: Array.isArray(value) ? value[0] : value,
-                })
-              }
-            />
-          </div>
-        )}
+        <div
+          className={`insightsRateMetrics ${
+            scenario.ownership === "Public" ? "insightsRateMetricsPublic" : ""
+          }`}
+          aria-hidden="true"
+        >
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Base rate</span>
+            <strong className="insightsRateMetricValue">
+              {formatRateCompact(game.dollarsPerkWh)}/kWh
+            </strong>
+          </span>
+          <span className="insightsRateMetric">
+            <span className="insightsRateMetricLabel">Market</span>
+            <span className="insightsRateMetricValue">
+              {formatRateCompact(marketRate)}
+            </span>
+          </span>
+          {scenario.ownership === "Investor" ? (
+            <>
+              <span className="insightsRateMetric">
+                <span className="insightsRateMetricLabel">Customers / mo</span>
+                <strong className="insightsRateMetricValue">
+                  {formattedCustomerChange}
+                </strong>
+              </span>
+            </>
+          ) : (
+            <span className="insightsRateMetric insightsRateMetricGrowth">
+              <span className="insightsRateMetricLabel">
+                Customer growth / yr
+              </span>
+              <strong className="insightsRateMetricValue">
+                +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%
+              </strong>
+            </span>
+          )}
+        </div>
+        <span id="insightsRateSummary" className="srOnly">
+          {rateSummary}
+        </span>
+        {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
+          game.policies?.programs.curtailment?.tier !== "Off") &&
+          game.policies && (
+            <Typography variant="caption">
+              Active programs adjust this rate.
+            </Typography>
+          )}
+        <div
+          className={`budgetSlider flex-newline ${
+            this.state.leversOpen ? "" : "insightsRateSliderCollapsed"
+          }`}
+          id="rateSliderControl"
+          data-testid="rate-slider-control"
+        >
+          <Slider
+            // Keep the thumb local while it is moving. Dispatching every pointer step makes
+            // the entire workbench reconcile and regenerate its long-range projection before
+            // the browser can paint the next thumb position. The committed rate remounts this
+            // uncontrolled slider through its key, so external changes still stay in sync.
+            key={game.dollarsPerkWh}
+            id="rateSlider"
+            disabled={!!game.replayPlayback}
+            defaultValue={game.dollarsPerkWh}
+            aria-label="The rate you charge for electricity generation"
+            valueLabelDisplay="auto"
+            valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
+            getAriaValueText={(rate) =>
+              `${formatMoneyConcise(rate)} per kilowatt hour`
+            }
+            marks={marks}
+            min={0}
+            step={scenario.ownership === "Investor" ? 0.001 : 0.01}
+            max={max}
+            onChangeCommitted={(_event, value) =>
+              onDelta({
+                dollarsPerkWh: Array.isArray(value) ? value[0] : value,
+              })
+            }
+          />
+        </div>
       </section>
     );
   }
@@ -1183,8 +1525,7 @@ export default class Insights extends React.Component<Props, State> {
         {GROUPS.map((group) => {
           const layers = INSIGHT_LAYERS.filter(
             (layer) =>
-              layer.group === group &&
-              (projection.historical || this.available(layer, projection)),
+              layer.group === group && this.available(layer, projection),
           );
           return (
             <div className="insightsLayerGroup" key={group}>
@@ -1196,11 +1537,7 @@ export default class Insights extends React.Component<Props, State> {
                     <Checkbox
                       id={`insightsLayer${layer.id[0].toUpperCase()}${layer.id.slice(1)}`}
                       checked={this.state.layers.includes(layer.id)}
-                      disabled={
-                        required.includes(layer.id) ||
-                        (projection.historical &&
-                          !HISTORICAL_LAYER_IDS.has(layer.id))
-                      }
+                      disabled={required.includes(layer.id)}
                       onChange={() => this.toggleLayer(layer.id)}
                     />
                   }
@@ -1231,7 +1568,7 @@ export default class Insights extends React.Component<Props, State> {
       selected && facilityLifetime(selected as FacilityOperatingType);
     return (
       <>
-        {!projection.historical && selected && lifetime && (
+        {selected && lifetime && (
           <div className="selectedFacilitySummary">
             <strong>{selected.name}</strong>: {formatWattHours(lifetime.wh)}{" "}
             delivered · {formatMoneyConcise(lifetime.profit)} profit
@@ -1239,25 +1576,145 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {[
-              ["Profit", formatMoneyConcise(summary.profit)],
-              ["Revenue", formatMoneyConcise(summary.revenue)],
-              ["Expenses", formatMoneyConcise(summary.expenses)],
-              ["Cash", formatMoneyConcise(summary.cash)],
-              ["Customers", new Intl.NumberFormat().format(summary.customers)],
-              [
-                "CO2e emitted",
-                `${formatLargeMassValueConcise(summary.kgco2e, units)} ${largeMassUnit(units)}`,
-              ],
-            ].map(([label, value]) => (
-              <TableRow key={label}>
-                <TableCell>{label}</TableCell>
-                <TableCell align="right">{value}</TableCell>
-              </TableRow>
-            ))}
+            {Object.entries(buildChartKeys(units)).map(([key, metadata]) => {
+              const value =
+                key === "interestRate"
+                  ? getTimeFromTimeline(game.date.minute, game.timeline)!
+                      .interestRate
+                  : summary[key as DerivedHistoryKeysType];
+              return (
+                <TableRow key={key}>
+                  <TableCell sx={{ pl: 2 + (metadata.nesting || 0) * 2 }}>
+                    {key === "interestRate"
+                      ? "Current interest rate"
+                      : metadata.label}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(metadata.formatTable || metadata.format)(value)}
+                    {metadata.suffix ? " " + metadata.suffix : ""}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </>
+    );
+  }
+
+  private setViewport(
+    bounds: ChartViewportRange,
+    minSpan: number,
+    next: ChartViewportRange,
+    announce = true,
+  ) {
+    const clamped = clampChartViewport(bounds, next, minSpan);
+    this.setState({
+      viewport: clamped,
+      viewportAnnouncement: announce
+        ? viewportAnnouncement(clamped, this.props.game.startingYear)
+        : this.state.viewportAnnouncement,
+    });
+  }
+
+  private renderViewportControls(
+    bounds: ChartViewportRange,
+    range: ChartViewportRange,
+    minSpan: number,
+  ) {
+    const full = rangesEqual(bounds, range);
+    const span = range[1] - range[0];
+    const rangeLabel = viewportLabel(range, this.props.game.startingYear);
+    const setRange = (next: ChartViewportRange) =>
+      this.setViewport(bounds, minSpan, next);
+    const iconButton = (
+      label: string,
+      icon: React.ReactNode,
+      disabled: boolean,
+      onClick: () => void,
+    ) => (
+      <Tooltip title={label}>
+        <span className="insightsViewportButton">
+          <IconButton
+            size="small"
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+          >
+            {icon}
+          </IconButton>
+        </span>
+      </Tooltip>
+    );
+    return (
+      <section
+        className="insightsViewportToolbar"
+        aria-label="Chart time navigation"
+        aria-describedby="insightsViewportHint"
+      >
+        <Typography
+          className="insightsViewportDate"
+          variant="body2"
+          aria-label={`Displayed date range: ${rangeLabel}`}
+        >
+          {rangeLabel}
+        </Typography>
+        <div className="insightsViewportButtons">
+          {iconButton(
+            "Pan earlier",
+            <ChevronLeftIcon />,
+            full || range[0] <= bounds[0],
+            () =>
+              setRange(
+                panChartViewport(
+                  bounds,
+                  range,
+                  minSpan,
+                  -span * VIEWPORT_PAN_FRACTION,
+                ),
+              ),
+          )}
+          {iconButton("Zoom out", <ZoomOutIcon />, full, () =>
+            setRange(
+              zoomChartViewport(
+                bounds,
+                range,
+                minSpan,
+                1 / VIEWPORT_ZOOM_FACTOR,
+              ),
+            ),
+          )}
+          {iconButton("Fit full timeline", <FitScreenIcon />, full, () =>
+            setRange(bounds),
+          )}
+          {iconButton("Zoom in", <ZoomInIcon />, span <= minSpan, () =>
+            setRange(
+              zoomChartViewport(bounds, range, minSpan, VIEWPORT_ZOOM_FACTOR),
+            ),
+          )}
+          {iconButton(
+            "Pan later",
+            <ChevronRightIcon />,
+            full || range[1] >= bounds[1],
+            () =>
+              setRange(
+                panChartViewport(
+                  bounds,
+                  range,
+                  minSpan,
+                  span * VIEWPORT_PAN_FRACTION,
+                ),
+              ),
+          )}
+        </div>
+        <span id="insightsViewportHint" className="srOnly">
+          Pinch or use the zoom controls to zoom. Swipe, drag, or use the pan
+          controls to move through time.
+        </span>
+        <span className="srOnly" aria-live="polite">
+          {this.state.viewportAnnouncement}
+        </span>
+      </section>
     );
   }
 
@@ -1269,6 +1726,14 @@ export default class Insights extends React.Component<Props, State> {
   ) {
     const { game, selectedFacilityId } = this.props;
     const definition = INSIGHT_LAYERS.find((layer) => layer.id === id)!;
+    const configured = this.state.layers.includes(id);
+    const previousConfigured = visible
+      .slice(0, index)
+      .reverse()
+      .find((layer) => this.state.layers.includes(layer));
+    const nextConfigured = visible
+      .slice(index + 1)
+      .find((layer) => this.state.layers.includes(layer));
     const multiyear =
       projection.domain.x[1] - projection.domain.x[0] > 12 * MINUTES_PER_MONTH;
     const fuels = forecastFuels(
@@ -1288,53 +1753,105 @@ export default class Insights extends React.Component<Props, State> {
     let body: React.ReactNode;
     if (finance) {
       body = (
-        <ChartFinances
-          id={chartId}
-          height={140}
-          timeline={financeSeries(
-            finance.key,
-            projection.financePast,
-            projection.financeProjected,
-          )}
-          title={finance.label}
-          format={finance.format}
-          startingYear={game.startingYear}
-          domain={projection.domain.x}
-          syncKey={SYNC_KEY}
-        />
+        <>
+          <ChartFinances
+            hideTitle
+            id={chartId}
+            height={140}
+            timeline={financeSeries(
+              finance.key,
+              projection.financePast,
+              projection.financeProjected,
+              projection.domain.x,
+              game.startingYear,
+            )}
+            title={finance.label}
+            format={finance.format}
+            startingYear={game.startingYear}
+            domain={projection.domain.x}
+            syncKey={SYNC_KEY}
+          />
+          {id === "emissions" &&
+            (game.monthlyHistory[0]?.importedKgco2e || 0) > 0 && (
+              <Typography variant="caption" color="textSecondary" component="p">
+                Last month:{" "}
+                {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local
+                + {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
+                imported ({largeMassUnit(this.context as UnitSystemType)} CO2e)
+              </Typography>
+            )}
+        </>
       );
     } else {
       switch (id) {
+        case "inflationInterest":
+          body = (
+            <>
+              {(["inflationRate", "interestRate"] as const).map((key) => (
+                <ChartFinances
+                  key={key}
+                  id={chartId + key}
+                  height={140}
+                  timeline={financeSeries(
+                    key,
+                    projection.financePast,
+                    projection.financeProjected,
+                    projection.domain.x,
+                    game.startingYear,
+                  )}
+                  title={
+                    key === "inflationRate" ? "Inflation" : "Interest rate"
+                  }
+                  format={(value) => (value * 100).toFixed(2) + "%"}
+                  startingYear={game.startingYear}
+                  domain={projection.domain.x}
+                  syncKey={SYNC_KEY}
+                />
+              ))}
+            </>
+          );
+          break;
         case "supplyDemand":
           body = (
             <>
               <ChartForecastSupplyDemand
                 height={140}
-                timeline={projection.sampled}
+                timeline={projection.supplyDemandTimeline}
                 blackouts={projection.blackouts}
                 domain={projection.domain}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <Typography
+                variant="caption"
+                component="p"
+                color="text.secondary"
+                sx={{ mx: 2 }}
+              >
+                Reserve: extra demand you could cover within 15 min.
+                <ManualLink
+                  entry={MANUAL_ENTRY.RESERVE_CAPACITY}
+                  text="How reserve works"
+                />
+              </Typography>
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
-                  {projection.historical ? (
-                    <>
-                      Energy not served:{" "}
-                      {formatWattHours(projection.blackoutTotalWh)}
-                    </>
-                  ) : (
-                    <>
-                      Forecast electricity shortfall: ~
-                      {formatWattHours(projection.blackoutTotalWh)} of demand
-                      not met · largest shortage{" "}
-                      {formatWatts(projection.largestBlackout.peakW)}
-                    </>
-                  )}
+                  Forecasted shortfall: ~
+                  {formatWattHours(projection.blackoutTotalWh)} of demand not
+                  met · largest shortage{" "}
+                  {formatWatts(projection.largestBlackout.peakW)}
                 </Typography>
               )}
             </>
+          );
+          break;
+        case "powerExchange":
+          body = (
+            <PowerExchangeSummary
+              game={game}
+              now={getTimeFromTimeline(game.date.minute, game.timeline)!}
+            />
           );
           break;
         case "demandByType": {
@@ -1426,6 +1943,7 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
+              <EconomicFutureComparison game={game} />
             </>
           );
           break;
@@ -1495,37 +2013,71 @@ export default class Insights extends React.Component<Props, State> {
     }
 
     return (
-      <section className="insightsTrack" key={id} data-layer={id}>
+      <section
+        className="insightsTrack"
+        key={id}
+        data-layer={id}
+        tabIndex={-1}
+        aria-label={`${definition.label} evidence`}
+      >
         <Toolbar className="insightsTrackHeader">
           <Typography variant="h6">{definition.label}</Typography>
           <span className="insightsTrackActions">
             <IconButton
               size="small"
               aria-label={`Move ${definition.label} up`}
-              disabled={index === 0}
-              onClick={() => this.moveLayer(id, visible[index - 1])}
+              disabled={!configured || !previousConfigured}
+              onClick={() =>
+                previousConfigured && this.moveLayer(id, previousConfigured)
+              }
             >
               <ArrowUpwardIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
               aria-label={`Move ${definition.label} down`}
-              disabled={index === visible.length - 1}
-              onClick={() => this.moveLayer(id, visible[index + 1])}
+              disabled={!configured || !nextConfigured}
+              onClick={() =>
+                nextConfigured && this.moveLayer(id, nextConfigured)
+              }
             >
               <ArrowDownwardIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
-              aria-label={`Remove ${definition.label}`}
+              aria-label={
+                this.state.temporaryLayer === id &&
+                !this.state.layers.includes(id)
+                  ? `Keep ${definition.label}`
+                  : `Remove ${definition.label}`
+              }
               disabled={requiredTutorialLayers(game.scenarioId).includes(id)}
               onClick={() => this.toggleLayer(id)}
             >
-              <CloseIcon fontSize="small" />
+              {this.state.temporaryLayer === id && !configured ? (
+                <AddIcon fontSize="small" />
+              ) : (
+                <CloseIcon fontSize="small" />
+              )}
             </IconButton>
           </span>
         </Toolbar>
+        {this.state.temporaryLayer === id &&
+          !this.state.layers.includes(id) && (
+            <div className="temporaryEvidence">
+              Temporary evidence · not saved with preset
+            </div>
+          )}
         {body}
+        {id === "supplyDemand" && (
+          <Button
+            id="insightsGeneratorJourney"
+            onClick={() => this.beginJourney("supplyDemand")}
+            sx={{ minHeight: 44, mx: 1, mb: 1 }}
+          >
+            Generator
+          </Button>
+        )}
       </section>
     );
   }
@@ -1641,8 +2193,88 @@ export default class Insights extends React.Component<Props, State> {
       return <span />;
     }
     const projection = this.getProjection(now);
-    const years = playedHistoryYears(game);
-    const visible = this.state.layers.filter((id) => {
+    const viewportBounds = projection.domain.x;
+    const minViewportSpan = Math.min(
+      viewportBounds[1] - viewportBounds[0],
+      MINUTES_PER_MONTH,
+    );
+    const viewportRange = clampChartViewport(
+      viewportBounds,
+      this.state.viewport,
+      minViewportSpan,
+    );
+    const viewportTimeline = timelineWithin(projection.timeline, viewportRange);
+    const viewportSupplyDemand = timelineWithin(
+      projection.supplyDemandTimeline,
+      viewportRange,
+    );
+    const viewportSampleInterval = Math.max(
+      projection.projectionStepMinutes,
+      Math.ceil(
+        (viewportRange[1] - viewportRange[0]) /
+          1600 /
+          projection.projectionStepMinutes,
+      ) * projection.projectionStepMinutes,
+    );
+    const sampled = sampleForecastTimeline(
+      viewportTimeline,
+      viewportSampleInterval,
+      projection.projectionStepMinutes,
+    );
+    const supplyDemandTimeline = sampleForecastTimeline(
+      viewportSupplyDemand,
+      viewportSampleInterval,
+      projection.projectionStepMinutes,
+    );
+    let viewportDomainMin = Number.POSITIVE_INFINITY;
+    let viewportDomainMax = Number.NEGATIVE_INFINITY;
+    for (const tick of supplyDemandTimeline) {
+      viewportDomainMin = Math.min(
+        viewportDomainMin,
+        tick.supplyW,
+        tick.demandW,
+      );
+      viewportDomainMax = Math.max(
+        viewportDomainMax,
+        tick.supplyW,
+        tick.demandW,
+      );
+    }
+    const viewportProjection: ProjectionView = {
+      ...projection,
+      domain: {
+        x: viewportRange,
+        y:
+          Number.isFinite(viewportDomainMin) &&
+          Number.isFinite(viewportDomainMax)
+            ? [viewportDomainMin, viewportDomainMax]
+            : projection.domain.y,
+      },
+      timeline: viewportTimeline,
+      sampled,
+      supplyDemandTimeline,
+    };
+    const viewportContext = {
+      bounds: viewportBounds,
+      range: viewportRange,
+      minSpan: minViewportSpan,
+      onRangeChange: (range: ChartViewportRange, announce = false) =>
+        this.setViewport(viewportBounds, minViewportSpan, range, announce),
+      onReset: (announce = false) =>
+        this.setViewport(
+          viewportBounds,
+          minViewportSpan,
+          viewportBounds,
+          announce,
+        ),
+    };
+    const visible = withRequiredLayers(
+      this.state.temporaryLayer &&
+        !this.state.layers.includes(this.state.temporaryLayer)
+        ? [...this.state.layers, this.state.temporaryLayer]
+        : this.state.layers,
+      game.scenarioId,
+    ).filter((id) => {
       const definition = INSIGHT_LAYERS.find((layer) => layer.id === id);
       return !!definition && this.available(definition, projection);
     });
@@ -1661,6 +2293,20 @@ export default class Insights extends React.Component<Props, State> {
       !!selectedDefault &&
       !!this.state.presetLibrary.defaults[selectedDefault] &&
       !this.state.presetDirty;
+    const upcomingEvents = (this.props.upcomingEvents || []).filter(
+      (event) =>
+        event.startsMinute !== undefined &&
+        event.startsMinute >= viewportRange[0] &&
+        event.startsMinute <= viewportRange[1],
+    );
+    const annotations = {
+      events: upcomingEvents.map((event, index) => ({
+        key: event.key,
+        x: event.startsMinute!,
+        number: index + 1,
+      })),
+      activeEventKey: this.state.activeEventKey,
+    };
 
     return (
       <GameCard className="insights" id="insightsPane">
@@ -1668,28 +2314,6 @@ export default class Insights extends React.Component<Props, State> {
           <Toolbar className="paneHeader insightsHeader">
             <Typography variant="h6">Insights</Typography>
             <div className="insightsHeaderControls">
-              <Select
-                id="insightsRange"
-                value={this.state.range}
-                onChange={(event: SelectChangeEvent<InsightRange>) =>
-                  this.setRange(event.target.value as InsightRange)
-                }
-                className="headerControl insightsRange"
-                aria-label="Insight range"
-              >
-                <MenuItem value="next1">Next 12 months</MenuItem>
-                <MenuItem value="next5">Next 5 years</MenuItem>
-                <MenuItem value="next10">Next 10 years</MenuItem>
-                <MenuItem value="next20">Next 20 years</MenuItem>
-                {!!game.monthlyHistory.length && (
-                  <MenuItem value="all">All recorded</MenuItem>
-                )}
-                {years.map((year) => (
-                  <MenuItem value={historyRange(year)} key={year}>
-                    {year}
-                  </MenuItem>
-                ))}
-              </Select>
               <div
                 className="insightsPresetControls"
                 role="group"
@@ -1735,7 +2359,7 @@ export default class Insights extends React.Component<Props, State> {
                         id as DefaultInsightPresetId
                       ];
                     return (
-                      <MenuItem key={id} value={id}>
+                      <MenuItem key={id} value={id} data-insight-preset={id}>
                         <span>{preset.label}</span>
                         {modified && (
                           <span className="insightsPresetMenuHint">
@@ -1752,7 +2376,11 @@ export default class Insights extends React.Component<Props, State> {
                     </ListSubheader>
                   )}
                   {this.state.presetLibrary.custom.map((preset) => (
-                    <MenuItem key={preset.id} value={`saved:${preset.id}`}>
+                    <MenuItem
+                      key={preset.id}
+                      value={`saved:${preset.id}`}
+                      data-insight-preset={preset.id}
+                    >
                       <span className="insightsPresetMenuName">
                         {preset.name}
                       </span>
@@ -1803,18 +2431,25 @@ export default class Insights extends React.Component<Props, State> {
                   </IconButton>
                 </Tooltip>
               </div>
-              <Button
-                id="insightsLayersButton"
-                className="insightsLayerControls"
-                startIcon={<LayersIcon />}
-                onClick={() =>
-                  this.setState({ layersOpen: !this.state.layersOpen })
-                }
-                aria-expanded={this.state.layersOpen}
-                aria-controls="insightsLayerPanel"
-              >
-                Layers ({visible.length})
-              </Button>
+              <Tooltip title={`Choose layers (${visible.length} shown)`}>
+                <Button
+                  id="insightsLayersButton"
+                  className="insightsLayerControls"
+                  size="small"
+                  onClick={() =>
+                    this.setState({ layersOpen: !this.state.layersOpen })
+                  }
+                  aria-label={
+                    this.state.layersOpen
+                      ? "Done choosing layers"
+                      : `Layers (${visible.length} shown)`
+                  }
+                  aria-expanded={this.state.layersOpen}
+                  aria-controls="insightsLayerPanel"
+                >
+                  {this.state.layersOpen ? "Done" : "Layers"}
+                </Button>
+              </Tooltip>
             </div>
             <Menu
               id="insightsPresetActionsMenu"
@@ -1823,10 +2458,29 @@ export default class Insights extends React.Component<Props, State> {
               onClose={() => this.setState({ presetMenuAnchor: null })}
             >
               <MenuItem
+                className="insightsPresetSaveMenuItem"
+                disabled={
+                  !this.state.layers.length ||
+                  (this.state.preset !== "custom" && !this.state.presetDirty) ||
+                  (this.state.preset === "custom" && customLimitReached)
+                }
+                onClick={() => {
+                  this.setState({ presetMenuAnchor: null }, () =>
+                    this.savePresetChanges(),
+                  );
+                }}
+              >
+                <SaveIcon fontSize="small" />
+                {this.state.preset === "custom"
+                  ? "Save as new preset"
+                  : "Save preset changes"}
+              </MenuItem>
+              <MenuItem
+                className="insightsPresetSaveAsMenuItem"
                 disabled={customLimitReached || !this.state.layers.length}
                 onClick={() => this.openPresetDialog("saveAs")}
               >
-                Save as new preset…
+                Save as new preset
               </MenuItem>
               {selectedCustom && (
                 <MenuItem onClick={() => this.openPresetDialog("rename")}>
@@ -1841,29 +2495,54 @@ export default class Insights extends React.Component<Props, State> {
               {selectedDefault &&
                 this.state.presetLibrary.defaults[selectedDefault] && (
                   <MenuItem onClick={() => this.openPresetDialog("restore")}>
-                    Restore original preset…
+                    Restore original preset
                   </MenuItem>
                 )}
             </Menu>
           </Toolbar>
+          <ForecastScope />
           {this.renderLayerPanel(projection)}
-          {projection.historical ? (
-            <Typography className="insightsHistoryNotice" color="textSecondary">
-              Monthly records · forecast-only layers are unavailable
-            </Typography>
-          ) : (
-            this.renderLevers(now)
+          {this.renderLevers(now)}
+          {this.renderViewportControls(
+            viewportBounds,
+            viewportRange,
+            minViewportSpan,
           )}
-          <div className="insightsTracks">
-            {visible.map((id, index) =>
-              this.renderTrack(id, index, visible, projection),
-            )}
-            {!visible.length && (
-              <Typography className="insightsEmpty" color="textSecondary">
-                Choose Layers to build this view.
-              </Typography>
-            )}
-          </div>
+          {!!upcomingEvents.length && (
+            <InsightEventRail
+              events={upcomingEvents}
+              activeKey={this.state.activeEventKey}
+              onActiveChange={(activeEventKey) =>
+                this.setState({ activeEventKey })
+              }
+              onZoom={(event) =>
+                this.setViewport(
+                  viewportBounds,
+                  minViewportSpan,
+                  eventChartViewport(
+                    viewportBounds,
+                    event.startsMinute!,
+                    event.endsMinute,
+                    minViewportSpan,
+                  ),
+                )
+              }
+            />
+          )}
+          <ChartViewportContext.Provider value={viewportContext}>
+            <ChartAnnotationsContext.Provider value={annotations}>
+              <div className="insightsTracks">
+                {visible.map((id, index) =>
+                  this.renderTrack(id, index, visible, viewportProjection),
+                )}
+                {!visible.length && (
+                  <Typography className="insightsEmpty" color="textSecondary">
+                    Choose Layers to build this view.
+                  </Typography>
+                )}
+              </div>
+            </ChartAnnotationsContext.Provider>
+          </ChartViewportContext.Provider>
         </div>
         {this.renderPresetDialogs()}
       </GameCard>

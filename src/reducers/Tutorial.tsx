@@ -4,13 +4,31 @@ import { getNextTutorial, getScenario } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
+  GameType,
   TutorialStepChangeType,
   TutorialStepType,
+  TutorialUiIdType,
   isGatedStep,
 } from "../Types";
 import { navigate } from "./Card";
 import { delta, quit, setSpeed, start, tutorialCompleteDialog } from "./Game";
 import { dialogOpen } from "./UI";
+
+const NOTHING_HIDDEN: TutorialUiIdType[] = [];
+
+/** The game chrome the current tutorial step keeps out of the way; empty outside a walkthrough. */
+export function selectTutorialHiddenUi(
+  state: AppStateType,
+): TutorialUiIdType[] {
+  const steps = getScenario(
+    state.game.scenarioId,
+    state.game.customScenario,
+  )?.tutorialSteps;
+  return (
+    (state.game.inGame && steps?.[state.game.tutorialStep]?.hideUi) ||
+    NOTHING_HIDDEN
+  );
+}
 
 /**
  * Restores a capstone's authored state while keeping the player on the capstone objective.
@@ -29,6 +47,26 @@ export function restartTutorialAtStep(
   dispatch(quit());
   dispatch(start(scenarioId));
   dispatch(delta({ tutorialStep }));
+}
+
+/**
+ * Counts a tutorial the player walks away from as done, the same as one they finish.
+ *
+ * The missions are a sequence, and Start playing sends anyone with no finished mission straight
+ * back into Mission 1 - so a player who closed or quit it without reaching the end could never get
+ * past it. Only an unfinished walkthrough is recorded: finishing or closing one already recorded
+ * it, and recording again on the way out would count one attempt twice. Replays are someone
+ * else's run.
+ */
+export function recordTutorialLeft(game: GameType): void {
+  const steps = getScenario(
+    game.scenarioId,
+    game.customScenario,
+  )?.tutorialSteps;
+  if (!steps || game.replayPlayback || game.tutorialStep >= steps.length) {
+    return;
+  }
+  recordScenarioPlayed(game.scenarioId);
 }
 
 // Moves a live walkthrough between two steps, whether a HUD button or a satisfied gate
@@ -151,7 +189,7 @@ export const tutorialGateMiddleware: Middleware =
         );
         const steps = scenario && scenario.tutorialSteps;
         const step = steps && steps[stepIndex];
-        if (!step || !isGatedStep(step)) {
+        if (!step || (!isGatedStep(step) && !step.continueOn)) {
           break;
         }
         const byAction = freshAction && matchesActionGate(step, actionType);
@@ -160,6 +198,7 @@ export const tutorialGateMiddleware: Middleware =
         try {
           byState = !!(
             (step.advanceOn && step.advanceOn(state)) ||
+            (step.continueOn && step.continueOn(state)) ||
             (step.capstone && step.capstone.success(state))
           );
           capstoneFailed = !!(

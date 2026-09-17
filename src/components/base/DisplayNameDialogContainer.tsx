@@ -1,6 +1,6 @@
 import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
-import { claimDisplayName, delta } from "../../reducers/User";
+import { saveDisplayName, delta } from "../../reducers/User";
 import { snackbarOpen } from "../../reducers/UI";
 import { AppStateType } from "../../Types";
 import DisplayNameDialog, {
@@ -19,8 +19,8 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onSave: async (name: string) => {
-      const result = await dispatch(claimDisplayName(name));
-      if (claimDisplayName.rejected.match(result)) {
+      const result = await dispatch(saveDisplayName(name));
+      if (saveDisplayName.rejected.match(result)) {
         // rejectWithValue carries the reason the player can act on; anything else means the thunk
         // itself threw, which it is not supposed to
         return result.payload || "Couldn't save that name. Please try again.";

@@ -1,4 +1,9 @@
-import { getStorageChoice, setStorageKeyValue } from "./LocalStorage";
+import {
+  getScenarioPlayCounts,
+  getStorageChoice,
+  recordScenarioPlayed,
+  setStorageKeyValue,
+} from "./LocalStorage";
 import { getLocalStorage } from "./Globals";
 
 const KEY = "testChoice";
@@ -31,5 +36,22 @@ describe("getStorageChoice", () => {
   it("keeps negative and zero choices distinct from the fallback", () => {
     setStorageKeyValue(KEY, 0);
     expect(getStorageChoice(KEY, [0, -1, 2020], -1)).toBe(0);
+  });
+});
+
+describe("scenario play history", () => {
+  beforeEach(() => {
+    getLocalStorage().removeItem("plays");
+  });
+
+  it("increments a compact count instead of appending repeat plays", () => {
+    recordScenarioPlayed(100);
+    recordScenarioPlayed(100);
+    recordScenarioPlayed(100);
+
+    expect(getScenarioPlayCounts()).toEqual({ 100: 3 });
+    expect(
+      JSON.parse(getLocalStorage().getItem("plays") as string).plays,
+    ).toEqual([expect.objectContaining({ scenarioId: 100, timesPlayed: 3 })]);
   });
 });

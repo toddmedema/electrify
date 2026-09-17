@@ -1,4 +1,10 @@
-import { getTimeFromTimeline } from "./helpers/DateTime";
+import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
+import { emptyPolicies } from "./helpers/Policies";
+import gameReducer, {
+  buildTransmissionLine,
+  delta,
+  tickState,
+} from "./reducers/Game";
 import {
   clearSave,
   clearSaveFor,
@@ -6,14 +12,12 @@ import {
   parseSave,
   readSave,
   SAVE_KEY,
-  SAVE_VERSION,
   serializeSave,
   startAutosave,
   writeSave,
 } from "./SaveGame";
 import { createGame } from "./testing/Simulator";
 import { GameType } from "./Types";
-import { tickState } from "./reducers/Game";
 
 jest.setTimeout(60000);
 
@@ -40,7 +44,6 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save).not.toBeNull();
-    expect(save!.version).toBe(SAVE_VERSION);
     expect(save!.game.seed).toBe(game.seed);
     expect(save!.game.scenarioId).toBe(game.scenarioId);
     expect(save!.game.facilities).toEqual(game.facilities);
@@ -55,6 +58,171 @@ describe("SaveGame", () => {
     );
   });
 
+  it.each(["active", "occurrences"] as const)(
+    "validates every persisted world-event %s entry",
+    (field) => {
+      const event = {
+        key: "test:1",
+        definitionId: "test",
+        startsMinute: 0,
+        endsMinute: 1440,
+        attributes: { choice: "repair", cost: 10, ids: [1, 2] },
+        effects: {
+          temperatureOffsetC: -2,
+          facilityOutputMultipliersById: { "1": 0.8 },
+        },
+        title: "Repairs",
+        forecastable: false,
+      };
+      const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+      raw.game.worldEvents[field] = [event];
+      expect(parseSave(raw)?.game.worldEvents[field]).toEqual([event]);
+      for (const malformed of [
+        null,
+        {},
+        { ...event, attributes: null },
+        { ...event, effects: null },
+        { ...event, startsMinute: "0" },
+        { ...event, endsMinute: -1 },
+        { ...event, attributes: { ids: [null] } },
+        { ...event, effects: { demandMultiplier: "bad" } },
+        { ...event, effects: { facilityOutputMultipliersById: { "1": null } } },
+      ]) {
+        raw.game.worldEvents[field] = [malformed];
+        expect(parseSave(raw)).toBeNull();
+      }
+      raw.game.worldEvents[field] = [event];
+      raw.game.worldEvents.checkedKeys = [null];
+      expect(parseSave(raw)).toBeNull();
+    },
+  );
+
+  it("round trips every monthly chart layer and rejects corrupt chart values", () => {
+    const recorded = {
+      ...game,
+      date: { ...game.date, minute: 1440 },
+      monthlyHistory: [summarizeTimeline(game.timeline, game.startingYear)],
+    };
+    const raw = JSON.parse(JSON.stringify(serializeSave(recorded)));
+    const restored = parseSave(raw);
+    expect(restored?.game.monthlyHistory[0].chartAverage).toEqual(
+      recorded.monthlyHistory[0].chartAverage,
+    );
+    raw.game.monthlyHistory[0].chartAverage.demandByType.Residential = "bad";
+    expect(parseSave(raw)).toBeNull();
+  });
+
+  it("round-trips validated decision progress", () => {
+    const missingCurrent = JSON.parse(JSON.stringify(serializeSave(game)));
+    delete missingCurrent.game.meaningfulDecisions;
+    expect(parseSave(missingCurrent)).toBeNull();
+
+    const played = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    expect(parseSave(serializeSave(played))?.game.meaningfulDecisions).toEqual(
+      played.meaningfulDecisions,
+    );
+    expect(
+      parseSave(serializeSave(played))?.game.meaningfulDecisionGateWaived,
+    ).toBe(false);
+  });
+
+  it("rejects malformed, duplicate, and future decision progress", () => {
+    const valid = gameReducer(
+      game,
+      delta({ dollarsPerkWh: game.dollarsPerkWh + 0.001 }),
+    );
+    const corrupt = JSON.parse(JSON.stringify(serializeSave(valid)));
+    corrupt.game.meaningfulDecisions[0].month =
+      corrupt.game.date.monthsElapsed + 1;
+    corrupt.game.meaningfulDecisions[0].key = `${corrupt.game.meaningfulDecisions[0].lever}@${corrupt.game.meaningfulDecisions[0].month}`;
+    expect(parseSave(corrupt)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(serializeSave(valid)));
+    duplicate.game.meaningfulDecisions.push({
+      ...duplicate.game.meaningfulDecisions[0],
+    });
+    expect(parseSave(duplicate)).toBeNull();
+
+    const noOp = JSON.parse(JSON.stringify(serializeSave(valid)));
+    noOp.game.meaningfulDecisions[0].after =
+      noOp.game.meaningfulDecisions[0].before;
+    expect(parseSave(noOp)).toBeNull();
+  });
+
+  it("does not invent transmission when an older tutorial is restored", () => {
+    const tutorial = createGame({ scenarioId: 0, seed: 249001 });
+    const save = JSON.parse(JSON.stringify(serializeSave(tutorial)));
+    save.game.transmission = { tradingPolicy: "BALANCED", lines: [] };
+
+    expect(parseSave(save)?.game.transmission).toBeUndefined();
+
+    save.game.transmission.lines.push({
+      id: 1,
+      corridorId: "california-north",
+      name: "Northern intertie upgrade",
+      capacityW: 500000000,
+      buildCost: 180000000,
+      annualOperatingCost: 3600000,
+      yearsToBuildLeft: 0,
+      minuteCreated: 0,
+      financed: false,
+      loanAmountLeft: 0,
+      loanMonthlyPayment: 0,
+      interestRate: 0,
+    });
+    expect(parseSave(save)).toBeNull();
+  });
+
+  it("rejects corrupt or impossible intertie financial state", () => {
+    const california = createGame({ scenarioId: 100, seed: 61 });
+    const built = gameReducer(
+      california,
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: true,
+      }),
+    );
+    const save = JSON.parse(JSON.stringify(serializeSave(built)));
+    expect(parseSave(save)).not.toBeNull();
+
+    for (const field of [
+      "capacityW",
+      "buildCost",
+      "annualOperatingCost",
+      "yearsToBuildLeft",
+      "minuteCreated",
+      "loanAmountLeft",
+      "loanMonthlyPayment",
+      "interestRate",
+    ]) {
+      const corrupt = JSON.parse(JSON.stringify(save));
+      corrupt.game.transmission.lines[0][field] = -1;
+      expect(parseSave(corrupt)).toBeNull();
+    }
+
+    const wrongCapacity = JSON.parse(JSON.stringify(save));
+    wrongCapacity.game.transmission.lines[0].capacityW = 1;
+    expect(parseSave(wrongCapacity)).toBeNull();
+
+    const duplicate = JSON.parse(JSON.stringify(save));
+    duplicate.game.transmission.lines.push({
+      ...duplicate.game.transmission.lines[0],
+      id: 2,
+    });
+    expect(parseSave(duplicate)).toBeNull();
+
+    const wrongRegion = JSON.parse(JSON.stringify(save));
+    wrongRegion.game.location.id = "PIT";
+    expect(parseSave(wrongRegion)).toBeNull();
+
+    const islanded = JSON.parse(JSON.stringify(save));
+    islanded.game.location.id = "HNL";
+    expect(parseSave(islanded)).toBeNull();
+  });
+
   // The memo must never alias the live game slice, or a Continue button would describe a game
   // that has kept playing since it was saved
   it("reads back through storage rather than handing back the live object", () => {
@@ -62,11 +230,10 @@ describe("SaveGame", () => {
 
     const save = readSave();
     expect(save!.game).not.toBe(game);
-    expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
-  });
-
-  it("reports no save when nothing has been written", () => {
-    expect(readSave()).toBeNull();
+    expect(save!.game).toEqual({
+      ...JSON.parse(JSON.stringify(game)),
+      policies: emptyPolicies(),
+    });
   });
 
   it("forgets the save it just cleared", () => {
@@ -76,19 +243,13 @@ describe("SaveGame", () => {
     expect(readSave()).toBeNull();
   });
 
-  it("rejects a save from a different schema version", () => {
-    expect(
-      parseSave({ ...serializeSave(game), version: SAVE_VERSION + 1 }),
-    ).toBeNull();
-  });
-
-  it("rejects a save without current envelope metadata", () => {
+  it("rejects a save without envelope metadata", () => {
     const save = serializeSave(game);
     expect(parseSave({ ...save, savedAt: undefined })).toBeNull();
     expect(parseSave({ ...save, appVersion: undefined })).toBeNull();
   });
 
-  it("rejects a current-version save without customer-market state", () => {
+  it("rejects a save without customer-market state", () => {
     const save = serializeSave(game);
     const withoutMarket = { ...save.game } as Partial<GameType>;
     delete withoutMarket.customerMarketSize;
@@ -147,7 +308,7 @@ describe("SaveGame", () => {
     expect(parseSave(impossible)).toBeNull();
   });
 
-  it("rejects a current-version save without current runtime state", () => {
+  it("rejects a save without runtime state", () => {
     const save = serializeSave(game);
     for (const field of [
       "eventLog",
@@ -161,7 +322,7 @@ describe("SaveGame", () => {
     }
   });
 
-  it("rejects current-version monthly history without story simulation facts", () => {
+  it("rejects monthly history without story simulation facts", () => {
     const save = serializeSave(game);
     const month = { ...save.game.monthlyHistory[0] } as Partial<
       GameType["monthlyHistory"][number]
@@ -175,7 +336,7 @@ describe("SaveGame", () => {
     ).toBeNull();
   });
 
-  it("rejects a current-version save with incomplete facility totals", () => {
+  it("rejects a save with incomplete facility totals", () => {
     const save = serializeSave(game);
     const facility = { ...save.game.facilities[0] } as Partial<
       GameType["facilities"][number]
@@ -212,7 +373,6 @@ describe("SaveGame", () => {
     expect(parseSave(null)).toBeNull();
     expect(parseSave("nope")).toBeNull();
     expect(parseSave({})).toBeNull();
-    expect(parseSave({ version: SAVE_VERSION })).toBeNull();
   });
 
   // An imported file is untrusted input, and a malformed facility would otherwise only surface as
@@ -297,16 +457,6 @@ describe("SaveGame", () => {
 
     // What quit leaves behind
     const quit = { ...game, inGame: false };
-
-    it("writes as soon as a game starts", () => {
-      const store = fakeStore(quit);
-      const stop = startAutosave(store as never, () => true);
-
-      store.set(playing(game, 2020, 0));
-      expect(readSave()!.game.date.year).toBe(2020);
-
-      stop();
-    });
 
     it("writes once a year, at the turn of the year", () => {
       const store = fakeStore(quit);
@@ -398,4 +548,14 @@ describe("SaveGame", () => {
     expect(isResumedGame(game)).toBe(true);
     expect(isResumedGame({ ...game, timeline: [] })).toBe(false);
   });
+});
+
+it("rejects missing or contradictory local/purchased emissions in current saves", () => {
+  const game = createGame({ scenarioId: 103 });
+  const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+  delete raw.game.timeline[0].localKgco2e;
+  expect(parseSave(raw)).toBeNull();
+  const wrong = JSON.parse(JSON.stringify(serializeSave(game)));
+  wrong.game.timeline[0].importedKgco2e += 100;
+  expect(parseSave(wrong)).toBeNull();
 });

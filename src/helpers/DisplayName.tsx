@@ -26,11 +26,6 @@ export function normalizeDisplayName(raw: string): string {
   return raw.trim();
 }
 
-/** The key a name is claimed under, so that Ada and ada cannot both exist. */
-export function displayNameKey(name: string): string {
-  return normalizeDisplayName(name).toLowerCase();
-}
-
 /**
  * Why a name cannot be used, or undefined when it can. A message rather than a boolean, because
  * every caller has to tell the player what to change.

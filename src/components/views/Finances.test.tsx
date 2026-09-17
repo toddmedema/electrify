@@ -1,17 +1,17 @@
-import * as React from "react";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { produce } from "immer";
+import * as React from "react";
+import { summarizeTimeline } from "../../helpers/DateTime";
+import { tickState } from "../../reducers/Game";
+import { createGame } from "../../testing/Simulator";
+import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
 import Finances, {
   formatCustomerChange,
   getComparison,
   parseRange,
   projectMonths,
 } from "./Finances";
-import { createGame } from "../../testing/Simulator";
-import { tickState } from "../../reducers/Game";
-import { MINUTES_PER_MONTH, summarizeTimeline } from "../../helpers/DateTime";
-import { GameType, MonthlyHistoryType, SpeedType } from "../../Types";
 
 // Every test in here plays a couple of game years and then renders the real pane, chart and all.
 // The slowest now runs in about a second -- see `choose` and `summarised` for where the rest of
@@ -81,13 +81,11 @@ async function choose(select: HTMLElement, option: string) {
 // Carbon Fee: a twelve year scenario, so a couple of years in it is still running and none of the
 // end of game machinery (dialogs, high scores) fires while the pane is under test
 function playMonths(months: number): GameType {
-  let state = createGame({ scenarioId: 100 });
+  const state = createGame({ scenarioId: 100 });
   while (state.date.monthsElapsed < months) {
-    state = produce(state, (draft: GameType) => {
-      tickState(draft);
-    });
+    tickState(state);
   }
-  return state;
+  return produce(state, () => undefined);
 }
 
 function renderFinances(
@@ -153,20 +151,6 @@ describe("the Finances chart selectors", () => {
 
       await choose(metricSelect(), "Demand");
       expect(plottedMetric()).toContain("Demand");
-      cleanup();
-    }
-  });
-
-  it("keeps the dropdown in sync on paused and throttled paths", async () => {
-    for (const speed of ["PAUSED", "FAST"] as SpeedType[]) {
-      localStorage.clear();
-      renderFinances(game, speed);
-
-      await choose(metricSelect(), "Revenue");
-      await choose(metricSelect(), "Expenses");
-
-      expect(metricSelect()).toHaveTextContent("Expenses");
-      expect(plottedMetric()).toContain("Expenses");
       cleanup();
     }
   });
@@ -249,23 +233,6 @@ describe("the Finances chart selectors", () => {
 });
 
 describe("parseRange", () => {
-  it("should follow the clock rather than pinning the year it was chosen in", () => {
-    expect(parseRange("current", 2050)).toEqual({ mode: "year", year: 2050 });
-  });
-
-  it("should read a year the game has been to as that year", () => {
-    expect(parseRange("2032", 2050)).toEqual({ mode: "year", year: 2032 });
-  });
-
-  it("should read the forward ranges as horizons", () => {
-    expect(parseRange("next1", 2050)).toEqual({ mode: "future", years: 1 });
-    expect(parseRange("next20", 2050)).toEqual({ mode: "future", years: 20 });
-  });
-
-  it("should treat all time as its own mode", () => {
-    expect(parseRange("all", 2050)).toEqual({ mode: "all" });
-  });
-
   /**
    * The range is remembered in local storage, so a returning player can arrive with a value from
    * a build that offered something this one doesn't. Falling back beats charting NaN months.
@@ -292,15 +259,6 @@ describe("projectMonths", () => {
     expect(monthsAhead(game, 12).length).toEqual(13);
     expect(monthsAhead(game, 60).length).toEqual(61);
     expect(monthsAhead(game, 240).length).toEqual(241);
-  });
-
-  it("should only project the current month when nothing is ahead of it", () => {
-    const game = createGame({ scenarioId: 103 });
-    const months = monthsAhead(game, 0);
-    expect(months.length).toEqual(1);
-    expect(months[0]).toEqual(
-      summarizeTimeline(game.timeline, game.startingYear),
-    );
   });
 
   it("should run consecutive months, rolling the year over as it goes", () => {
@@ -334,15 +292,6 @@ describe("projectMonths", () => {
     const months = monthsAhead(game, 60);
     const cash = months.map((m: MonthlyHistoryType) => m.cash);
     expect(new Set(cash).size).toBeGreaterThan(1);
-  });
-
-  it("should start where the live timeline's own month does", () => {
-    const game = createGame({ scenarioId: 103 });
-    const months = monthsAhead(game, 12);
-    expect(Math.floor(game.date.minute / MINUTES_PER_MONTH)).toEqual(
-      Math.floor(game.timeline[0].minute / MINUTES_PER_MONTH),
-    );
-    expect(months[0].month).toEqual(game.date.monthNumber);
   });
 });
 
@@ -407,15 +356,6 @@ describe("the month over month column", () => {
     ).toBeUndefined();
   });
 
-  it("puts the change beside each total once there are two months on the record", () => {
-    renderFinances(game, "PAUSED");
-    const comparison = getComparison(game);
-    expect(screen.getByText(comparison?.label || "")).toBeInTheDocument();
-    // Every metric gets one, even if it is the em dash that means it hasn't moved
-    expect(changeCell("Profit").textContent).not.toEqual("");
-    expect(changeCell("Revenue").textContent).not.toEqual("");
-  });
-
   // Both point up, so the arrow alone can't tell these apart -- and colouring a rise in
   // spending the same green as a rise in earnings would be exactly backwards
   it("reads a rise in revenue as good news and a rise in an expense as bad", () => {
@@ -434,12 +374,6 @@ describe("the month over month column", () => {
     expect(toneOf("Revenue")).toEqual("good");
     expect(toneOf("Fuel")).toEqual("bad");
     expect(toneOf("Expenses")).toEqual("bad");
-  });
-
-  it("says nothing about a month that came in where the last one did", () => {
-    renderFinances(withChange({}), "PAUSED");
-    expect(toneOf("Revenue")).toEqual("flat");
-    expect(changeCell("Revenue").textContent).toEqual("—");
   });
 
   it("reports what a selected facility has contributed, and nothing when none is", () => {

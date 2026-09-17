@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import PauseIcon from "@mui/icons-material/Pause";
-import { TICKS_PER_HOUR, TICK_MS } from "../../Constants";
+import { TICK_MS } from "../../Constants";
 import { formatHour, getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyStable, formatWatts } from "../../helpers/Format";
 import { navigate } from "../../reducers/Card";
@@ -21,13 +21,21 @@ import { getNextTutorial, getScenario } from "../../data/Scenarios";
 import { quit, setSpeed, startTutorial } from "../../reducers/Game";
 import {
   AppStateType,
-  FacilityOperatingType,
   GameType,
   SpeedType,
   TickPresentFutureType,
 } from "../../Types";
 import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
+import MissionSummary from "./MissionSummary";
+import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
+import { recordTutorialLeft } from "../../reducers/Tutorial";
+import { acknowledgeEvidence } from "../../reducers/UI";
+import { openEvidence } from "../../helpers/Evidence";
+import {
+  selectUpcomingStoryEvents,
+  UpcomingStoryEventType,
+} from "../views/StoryEventSelectors";
 
 /**
  * The game's global state: cash, the date, how fast time is running, how far through the year it
@@ -40,10 +48,15 @@ import ConceptIcon from "./ConceptIcon";
  */
 
 export interface StateProps {
+  upcomingEvents?: UpcomingStoryEventType[];
   game: GameType;
+  evidenceRequest?: EvidenceRequestType;
+  facilityDragActive?: boolean;
 }
 
 export interface DispatchProps {
+  onEvidence?: (target: EvidenceTargetType) => void;
+  onEvidenceAcknowledged?: (request: EvidenceRequestType) => void;
   onManual: () => void;
   onSettings: () => void;
   onSpeedChange: (speed: SpeedType) => void;
@@ -70,42 +83,66 @@ function speedMultiplier(speed: SpeedType): string {
   return Math.round(TICK_MS.SLOW / TICK_MS[speed]) + "×";
 }
 
-const WEATHER_DRIVEN_FUELS = new Set([
-  "Sun",
-  "Wind",
-  "Offshore Wind",
-  "Airborne Wind",
-]);
+const LOW_RESERVE_RATIO = 0.1;
 
-/** Capacity that could serve demand now, rather than the deliberately dispatched output. */
+type GridHealthState = "stable" | "low-reserve" | "at-limit" | "blackout";
+
+interface GridHealth {
+  state: GridHealthState;
+  label: string;
+  metric: string;
+  announcement: string;
+}
+
+/** The reducer includes ramp, water and storage limits in this available cushion. */
 export function reserveCapacityW(
-  game: GameType,
+  _game: GameType,
   now: TickPresentFutureType,
 ): number {
-  const available = game.facilities.reduce(
-    (total: number, facility: FacilityOperatingType) => {
-      if (facility.paused || facility.yearsToBuildLeft > 0) {
-        return total;
-      }
-      if (facility.peakWh) {
-        return (
-          total +
-          Math.min(
-            facility.peakW,
-            Math.max(0, facility.currentWh) * TICKS_PER_HOUR,
-          )
-        );
-      }
-      return (
-        total +
-        (WEATHER_DRIVEN_FUELS.has(facility.fuel)
-          ? Math.max(0, facility.currentW)
-          : facility.peakW)
-      );
-    },
-    0,
-  );
-  return available - now.demandW;
+  return now.reserveW ?? now.supplyW - now.demandW;
+}
+
+/** Turns the live supply margin into the few states a player can act on at a glance. */
+export function getGridHealth(
+  game: GameType,
+  now: TickPresentFutureType,
+): GridHealth {
+  if (now.supplyW < now.demandW) {
+    return {
+      state: "blackout",
+      label: "Blackout",
+      metric: `${formatWatts(now.demandW - now.supplyW)} short`,
+      announcement: "Blackout. Demand is higher than supply.",
+    };
+  }
+
+  const reserveW = Math.max(0, reserveCapacityW(game, now));
+  if (reserveW === 0) {
+    return {
+      state: "at-limit",
+      label: "At limit",
+      metric: "0W reserve",
+      announcement: "Grid at limit. No reserve remains.",
+    };
+  }
+
+  const reserveRatio = now.demandW > 0 ? reserveW / now.demandW : Infinity;
+  if (reserveRatio <= LOW_RESERVE_RATIO) {
+    const reservePercent = Math.round(reserveRatio * 100);
+    return {
+      state: "low-reserve",
+      label: "Low reserve",
+      metric: `+${formatWatts(reserveW)} reserve (${reservePercent}%)`,
+      announcement: "Low reserve.",
+    };
+  }
+
+  return {
+    state: "stable",
+    label: "Stable",
+    metric: `+${formatWatts(reserveW)} reserve`,
+    announcement: "Grid stable.",
+  };
 }
 
 const SPEED_ARIA_LABELS: { [k in SpeedType]: string } = {
@@ -151,6 +188,7 @@ function buildSpeedOptions({
 }
 
 export function GameAppBar(props: Props) {
+  const { evidenceRequest, facilityDragActive, onEvidenceAcknowledged } = props;
   const { game, onManual, onNextTutorial, onQuit, onSettings, onSpeedChange } =
     props;
   const date = game.date;
@@ -159,6 +197,12 @@ export function GameAppBar(props: Props) {
     null,
   );
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (evidenceRequest?.target === "mission-details" && !facilityDragActive) {
+      onEvidenceAcknowledged?.(evidenceRequest);
+      setScenarioDetailsOpen(true);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceAcknowledged]);
 
   const bigScreen = isBigScreen();
   const speed = game.speed;
@@ -169,8 +213,8 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
-  // A tutorial's progress isn't worth resuming, so its menu item stays "Quit" - only a real run
-  // gets the "Save & Quit" reminder that leaving keeps it around to come back to
+  // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
+  // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
     ?.tutorialSteps;
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
@@ -222,7 +266,7 @@ export function GameAppBar(props: Props) {
           onClose={handleMenuClose}
         >
           <MenuItem onClick={onManual}>Manual</MenuItem>
-          <MenuItem onClick={onSettings}>Options</MenuItem>
+          <MenuItem onClick={onSettings}>Settings</MenuItem>
           <MenuItem
             onClick={() => {
               setScenarioDetailsOpen(true);
@@ -242,7 +286,11 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={handleQuit}>
-            {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
+            {isReplay
+              ? "Exit replay"
+              : isTutorial
+                ? "Main menu"
+                : "Save & Quit"}
           </MenuItem>
         </Menu>
       </>
@@ -265,11 +313,10 @@ export function GameAppBar(props: Props) {
     return <span />;
   }
 
-  const inBlackout = now.supplyW < now.demandW;
-  const reserveW = Math.max(0, reserveCapacityW(game, now));
-  const gridHealth = inBlackout
-    ? `Blackout · ${formatWatts(now.demandW - now.supplyW)} short`
-    : `Grid stable · ${formatWatts(reserveW)} spare capacity`;
+  const gridHealth = getGridHealth(game, now);
+  const inBlackout = gridHealth.state === "blackout";
+  // Low reserve and at-limit share the mission tracker's goal-risk warning treatment.
+  const inWarning = !inBlackout && gridHealth.state !== "stable";
 
   return (
     <div id="appbar">
@@ -284,32 +331,50 @@ export function GameAppBar(props: Props) {
               {date.month} {date.year}
               {bigScreen ? `, ${formatHour(date)}` : ""}
             </span>
-            {inBlackout && (
-              <span className="gameStatusBlackout">
-                <ConceptIcon concept="blackout" fontSize="small" />
-              </span>
-            )}
             {isReplay && <span className="replayBadge">REPLAY</span>}
           </Typography>
           <div id="speedChangeButtons">{speedOptions}</div>
         </Toolbar>
       </div>
-      <div
-        className={`gridHealth ${inBlackout ? "gridHealth-blackout" : ""}`}
-        aria-label={`Current grid status: ${gridHealth}`}
-      >
-        <strong>{gridHealth}</strong>
-        {inBlackout && (
-          <span>
-            Resume available resources, discharge storage, or plan more
-            capacity.
-          </span>
+      <div className="gameStatusBar">
+        <div
+          className={`gridHealth gridHealth-${gridHealth.state}${inWarning ? " statusWarning" : ""}`}
+          aria-label={`Current grid status: ${gridHealth.label}, ${gridHealth.metric}`}
+        >
+          <div className="gridHealthSummary">
+            <span className="gridHealthState">
+              <span className="statusIcon" aria-hidden="true">
+                <ConceptIcon
+                  concept={
+                    inBlackout
+                      ? "blackout"
+                      : gridHealth.state === "stable"
+                        ? "supply"
+                        : "danger"
+                  }
+                  fontSize="small"
+                />
+              </span>
+              <strong className="statusLabel">{gridHealth.label}</strong>
+            </span>
+            <span className="gridHealthSeparator" aria-hidden="true">
+              |
+            </span>
+            <strong className="gridHealthMetric">{gridHealth.metric}</strong>
+          </div>
+        </div>
+        {/* Tutorials have no term goal to track; their own HUD carries the objective. */}
+        {!isTutorial && (
+          <MissionSummary
+            game={game}
+            upcoming={props.upcomingEvents}
+            onEvidence={props.onEvidence}
+            onDetails={() => setScenarioDetailsOpen(true)}
+          />
         )}
       </div>
       <span className="srOnly" aria-live="polite">
-        {inBlackout
-          ? "Blackout. Demand is higher than supply."
-          : `Grid stable. Game speed ${speed.toLowerCase()}.`}
+        {gridHealth.announcement}
       </span>
       <div
         id="yearProgressBar"
@@ -327,11 +392,20 @@ export function GameAppBar(props: Props) {
 }
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
+  upcomingEvents: selectUpcomingStoryEvents(state),
   game: state.game,
+  evidenceRequest: state.ui.evidenceRequest,
+  facilityDragActive: state.ui.facilityDragActive,
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onEvidence: (target) => {
+      dispatch(openEvidence(target));
+    },
+    onEvidenceAcknowledged: (request) => {
+      dispatch(acknowledgeEvidence(request));
+    },
     onManual: () => {
       dispatch(navigate("MANUAL"));
     },
@@ -342,9 +416,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       dispatch(quit());
     },
   };

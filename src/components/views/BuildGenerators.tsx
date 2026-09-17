@@ -20,6 +20,7 @@ import {
   TableContainer,
   TableRow,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
@@ -35,8 +36,8 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
-  GAME_TO_REAL_YEARS,
   LOAN_MONTHS,
+  MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
 import { GENERATORS } from "../../data/Facilities";
@@ -48,6 +49,10 @@ import {
   LocationType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
+import {
+  expectedMonthlyOutputShape,
+  ExpectedOutputShape,
+} from "../../helpers/ExpectedOutput";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
@@ -58,7 +63,100 @@ import {
   getBuildAvailability,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
+import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import Sparkline from "../base/Sparkline";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function percent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * Every card's line is drawn against the same ceiling, so a flat solar curve looks flat next to a
+ * wind curve rather than being stretched to fill its own box. Rounded up to a tenth so the scale
+ * doesn't wobble between forecasts. Hydro's inflow is left out: a wet month routinely tops its
+ * nameplate, and letting that set the scale would flatten every other line on the list, so hydro
+ * clips at the top edge instead and its caption carries the dry month.
+ */
+export function sharedOutputCeiling(
+  shapes: (ExpectedOutputShape | undefined)[],
+): number {
+  const highest = Math.max(
+    0,
+    ...shapes.flatMap((shape) =>
+      shape && shape.kind === "weather" ? shape.monthly : [],
+    ),
+  );
+  return Math.min(1, Math.max(0.1, Math.ceil(highest * 10 - 1e-9) / 10));
+}
+
+function ExpectedOutputMetric(props: {
+  shape?: ExpectedOutputShape;
+  ceiling: number;
+}): React.JSX.Element {
+  const { shape, ceiling } = props;
+  let caption = "";
+  let chart: React.ReactNode = null;
+  if (shape && shape.kind === "on-demand") {
+    caption = "Any month";
+    chart = (
+      <Sparkline
+        values={new Array(12).fill(ceiling)}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        dash
+        ariaLabel="Available in any month."
+      />
+    );
+  } else if (shape) {
+    const highMonth = shape.monthly.reduce(
+      (high, value, month) => (value > shape.monthly[high] ? month : high),
+      0,
+    );
+    const low = shape.monthly[shape.lowMonth];
+    const water = shape.kind === "water-inflow";
+    caption = `Low ${MONTHS[shape.lowMonth]} ${percent(low)}${water ? " water in" : ""}`;
+    chart = (
+      <Sparkline
+        values={shape.monthly}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        fill
+        lowMarker
+        ariaLabel={`Typical year${water ? " of water inflow" : ""}: highest in ${MONTH_NAMES[highMonth]} at ${percent(shape.monthly[highMonth])}, lowest in ${MONTH_NAMES[shape.lowMonth]} at ${percent(low)}.`}
+      />
+    );
+  }
+  return (
+    <div className="buildOptionMetric buildOptionOutput">
+      <Typography variant="caption" color="textSecondary" component="div">
+        {caption}
+      </Typography>
+      <div className="buildOptionSparkline">{chart}</div>
+    </div>
+  );
+}
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -70,6 +168,9 @@ interface GeneratorBuildItemProps {
   secondaryMetric?: string;
   forecastGapW?: number;
   advantages?: string[];
+  /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
+  outputShape?: ExpectedOutputShape;
+  outputCeiling?: number;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -81,6 +182,7 @@ export function GeneratorBuildItem(
 ): React.JSX.Element {
   const { generator, cash } = props;
   const units = useUnits();
+  const wideLayout = useMediaQuery("(min-width:600px)");
   const fuel = FUELS[generator.fuel] || {};
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
@@ -121,10 +223,22 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
-  const gapCoverage =
-    props.forecastGapW && props.forecastGapW > 0
-      ? Math.round((typicalOutputW / props.forecastGapW) * 100)
-      : undefined;
+  const outputShape =
+    props.outputShape || expectedMonthlyOutputShape(generator, []);
+  // A short role tag stays on the card; how to use it waits for the details
+  const [role, roleHint] =
+    generator.fuel === "Hydro"
+      ? [
+          "Flexible water supply",
+          "Rain and snow refill the reservoir; generation drains it.",
+        ]
+      : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
+            generator.fuel,
+          )
+        ? ["Weather-dependent supply", "Pair with backup or storage."]
+        : generator.spinMinutes > 60
+          ? ["Steady supply", "Best for demand that lasts for hours."]
+          : ["Fast response", "Can follow changing demand."];
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -152,8 +266,26 @@ export function GeneratorBuildItem(
     toggleOpen(e);
   };
 
+  const compareAction = props.onCompare && canBuild && (
+    <Button
+      size="small"
+      variant={props.compared ? "contained" : "text"}
+      aria-pressed={props.compared}
+      aria-label={`Compare ${generator.name}`}
+      disabled={props.compareDisabled && !props.compared}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onCompare?.();
+      }}
+    >
+      Compare
+    </Button>
+  );
+
   return (
-    <Card className="build-list-item">
+    <Card
+      className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
+    >
       <CardHeader
         avatar={
           <Avatar
@@ -163,25 +295,11 @@ export function GeneratorBuildItem(
         }
         action={
           <Stack direction="row" spacing={0.5}>
-            {props.onCompare && canBuild && (
-              <Button
-                size="small"
-                variant={props.compared ? "contained" : "outlined"}
-                aria-pressed={props.compared}
-                aria-label={`Compare ${generator.name}`}
-                disabled={props.compareDisabled && !props.compared}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onCompare?.();
-                }}
-              >
-                Compare
-              </Button>
-            )}
+            {wideLayout && compareAction}
             <Button
               className="buy-button"
               size="small"
-              variant="contained"
+              variant="outlined"
               color="primary"
               onClick={toggleOpen}
               disabled={!canBuild}
@@ -193,79 +311,65 @@ export function GeneratorBuildItem(
           </Stack>
         }
         title={generator.name}
-        subheader={
-          <span
-            className={
-              buildable && financingGap === 0
-                ? "generatorBuildSubtitle"
-                : undefined
-            }
-          >
-            {buildSubtitle}
-          </span>
-        }
       />
-      <Box className="generatorDecisionLead">
-        <Stack
-          direction="row"
-          spacing={0.75}
-          useFlexGap
-          sx={{ flexWrap: "wrap" }}
+      <Typography className="buildOptionContext" variant="body2">
+        {role}
+      </Typography>
+      {!canBuild && (
+        <Typography
+          component="div"
+          className="buildOptionWarning"
+          color="textSecondary"
         >
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${formatWatts(typicalOutputW)} typical output`}
-          />
-          {gapCoverage !== undefined && (
-            <Chip
-              size="small"
-              color={gapCoverage >= 100 ? "success" : "default"}
-              label={`~${gapCoverage}% of largest forecast shortage`}
-            />
-          )}
-        </Stack>
-      </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
-          gap: 1,
-          px: 2,
-          pb: 1.5,
-        }}
-      >
-        <GeneratorMetric
+          {buildSubtitle}
+        </Typography>
+      )}
+      <Box className="buildOptionMetrics singleRow">
+        <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
         />
-        <GeneratorMetric
+        <BuildMetric
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
+        <ExpectedOutputMetric
+          shape={outputShape}
+          ceiling={props.outputCeiling || 1}
+        />
         {props.secondaryMetric === "lcWh" && (
-          <GeneratorMetric
-            label="Lifetime cost / MWh"
-            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}/MWh`}
+          <BuildMetric
+            label="Cost per MWh"
+            value={`${fuelPrices[generator.fuel] ? "~" : ""}${formatMoneyConcise(generator.lcWh * 1000000)}`}
           />
         )}
       </Box>
-      <Button
-        color="primary"
-        className="expand-details"
-        size="small"
-        aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
-        aria-expanded={expanded}
-        endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
-        onClick={(event) => {
-          event.stopPropagation();
-          toggleExpand();
-        }}
-      >
-        {expanded ? "Hide details" : "Show details"}
-      </Button>
+      <Box className="buildOptionFooter">
+        <Button
+          color="primary"
+          className="expand-details"
+          size="small"
+          aria-label={`${expanded ? "Hide" : "Show"} ${generator.name} details`}
+          aria-expanded={expanded}
+          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleExpand();
+          }}
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </Button>
 
+        {!wideLayout && compareAction}
+      </Box>
       <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Typography
+          className="buildOptionDescription"
+          variant="body2"
+          color="textSecondary"
+        >
+          {roleHint} {generator.description}
+        </Typography>
         {(props.advantages || []).length > 0 && (
           <Box sx={{ px: 2, pb: 1 }}>
             <Stack
@@ -291,12 +395,8 @@ export function GeneratorBuildItem(
                     Estimated lifetime cost per MWh
                     <ManualLink entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY} />
                     <Typography variant="body2" color="textSecondary">
-                      Across its lifetime, assuming a{" "}
-                      {Math.round(generator.capacityFactor * 100)}% capacity
+                      At {Math.round(generator.capacityFactor * 100)}% capacity
                       factor
-                      {generator.costPerStart !== undefined
-                        ? " and one start/day"
-                        : ""}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -309,9 +409,6 @@ export function GeneratorBuildItem(
                   <TableCell>
                     Minimum stable output
                     <ManualLink entry={MANUAL_ENTRY.RAMP_RATE} />
-                    <Typography variant="body2" color="textSecondary">
-                      While the plant remains online
-                    </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {Math.round(generator.minimumStableOutput * 100)}% ·{" "}
@@ -338,12 +435,7 @@ export function GeneratorBuildItem(
               </TableRow>
               {hasVariableOM && (
                 <TableRow>
-                  <TableCell>
-                    Variable operations & maintenance
-                    <Typography variant="body2" color="textSecondary">
-                      Per generated MWh
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Variable operations & maintenance</TableCell>
                   <TableCell align="right">
                     ${(generator.variableOperatingCostPerMWh || 0).toFixed(2)}
                     /MWh generated
@@ -352,30 +444,9 @@ export function GeneratorBuildItem(
               )}
               {generator.costPerStart !== undefined && (
                 <TableRow>
-                  <TableCell>
-                    Non-fuel start cost
-                    <Typography variant="body2" color="textSecondary">
-                      Per equivalent start
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Non-fuel start cost</TableCell>
                   <TableCell align="right">
                     {formatMoneyConcise(generator.costPerStart)}/start
-                  </TableCell>
-                </TableRow>
-              )}
-              {generator.costPerStart !== undefined && (
-                <TableRow>
-                  <TableCell>
-                    Representative-day charge
-                    <Typography variant="body2" color="textSecondary">
-                      365 / 12 equivalent starts
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(
-                      generator.costPerStart * GAME_TO_REAL_YEARS,
-                    )}
-                    /displayed start
                   </TableCell>
                 </TableRow>
               )}
@@ -399,12 +470,7 @@ export function GeneratorBuildItem(
               )}
               {fuelPrices[generator.fuel] && (
                 <TableRow>
-                  <TableCell>
-                    Fuel costs
-                    <Typography variant="body2" color="textSecondary">
-                      Varies with fuel prices
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Fuel costs</TableCell>
                   <TableCell align="right">
                     {/* btuPerWh * 1M = BTU per MWh, and prices are per million BTU,
                         so the two factors of a million cancel out */}
@@ -433,7 +499,7 @@ export function GeneratorBuildItem(
                 </TableRow>
               )}
               <TableRow>
-                <TableCell>Expected lifespan</TableCell>
+                <TableCell>Accounting lifetime</TableCell>
                 <TableCell align="right">
                   {generator.lifespanYears} years
                 </TableCell>
@@ -448,9 +514,6 @@ export function GeneratorBuildItem(
                     entry={MANUAL_ENTRY.EMISSIONS}
                     label="CO2e emissions"
                   />
-                  <Typography variant="body2" color="textSecondary">
-                    CO2e released at the plant for each MWh generated
-                  </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {kgCO2ePerMWh > 0
@@ -484,19 +547,28 @@ export function GeneratorBuildItem(
                 value: `${formatMoneyConcise(cash)} → ${formatMoneyConcise(cash - generator.buildCost)}`,
               },
               {
+                concept: "finances",
+                label: "Loan option",
+                value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
+                detail: "Payments start now.",
+              },
+              {
+                concept: "money",
+                label: "Estimated upkeep",
+                value: `${formatMoneyConcise(estimatedAnnualOperatingCost(generator) / 12)}/mo`,
+                detail: "Plus fuel and loan payments.",
+              },
+              {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail: "Reserve does not change until construction finishes.",
+                detail: "No output until built.",
               },
               {
                 concept: "supply",
-                label: "Estimated average output",
+                label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail:
-                  gapCoverage === undefined
-                    ? `${formatWatts(generator.peakW)} maximum rated output; average output is not guaranteed during a shortage`
-                    : `About ${gapCoverage}% of the largest forecast shortage, based on average output`,
+                detail: `${formatWatts(generator.peakW)} max; weather may limit it.`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
@@ -576,7 +648,7 @@ export function GeneratorBuildItem(
           </Button>
           <Button
             color="primary"
-            variant="contained"
+            variant="outlined"
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(true, e)
             }
@@ -587,31 +659,6 @@ export function GeneratorBuildItem(
         </DialogActions>
       </Dialog>
     </Card>
-  );
-}
-
-function GeneratorMetric(props: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <Box
-      sx={{
-        minWidth: 0,
-        p: 1,
-        border: 1,
-        borderColor: "divider",
-        borderRadius: 1,
-        bgcolor: "action.hover",
-      }}
-    >
-      <Typography variant="caption" color="textSecondary" component="div">
-        {props.label}
-      </Typography>
-      <Typography variant="body2" component="div" sx={{ fontWeight: 600 }}>
-        {props.value}
-      </Typography>
-    </Box>
   );
 }
 
@@ -684,11 +731,19 @@ function valueLabelFormat(x: number) {
 }
 
 export interface StateProps {
+  hasEvidenceReturn?: boolean;
+  evidenceRequest?: import("../../Types").EvidenceRequestType;
+  facilityDragActive?: boolean;
   game: GameType;
   focusFuel?: FuelNameType;
 }
 
 export interface DispatchProps {
+  onEvidenceReturn?: () => void;
+  onEvidenceReady?: (
+    request: import("../../Types").EvidenceRequestType,
+    element: HTMLElement | null,
+  ) => void;
   onBuildGenerator: (
     generator: GeneratorShoppingType,
     financed: boolean,
@@ -696,9 +751,25 @@ export interface DispatchProps {
   onBack: () => void;
 }
 
-export interface Props extends StateProps, DispatchProps {}
+export interface Props extends StateProps, DispatchProps {
+  embedded?: boolean;
+}
 
 export default function BuildGenerators(props: Props): React.JSX.Element {
+  const { evidenceRequest, facilityDragActive, onEvidenceReady } = props;
+  const evidenceAnchor = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const request = evidenceRequest;
+    if (
+      request &&
+      typeof request.target === "object" &&
+      request.target.card === "FACILITIES" &&
+      request.target.view === "BUILD_GENERATORS" &&
+      !facilityDragActive
+    ) {
+      onEvidenceReady?.(request, evidenceAnchor.current);
+    }
+  }, [evidenceRequest, facilityDragActive, onEvidenceReady]);
   const { game, onBack } = props;
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const filtered = game.facilities.filter((f) => !f.peakWh);
@@ -750,6 +821,13 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     0,
     ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
   );
+  const outputShapes = new Map(
+    generators.map((generator) => [
+      generator.name,
+      expectedMonthlyOutputShape(generator, forecastedTimeline),
+    ]),
+  );
+  const outputCeiling = sharedOutputCeiling(Array.from(outputShapes.values()));
   const buildableGenerators = generators.filter(
     (generator) => generator.available && generator.peakW <= generator.maxPeakW,
   );
@@ -777,8 +855,32 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   };
 
   return (
-    <div id="topbar" className="flexContainer">
+    <div
+      id={props.embedded ? undefined : "topbar"}
+      className="flexContainer screenCatalog"
+      ref={evidenceAnchor}
+      tabIndex={-1}
+      aria-label="Generator build options"
+    >
+      {props.hasEvidenceReturn && (
+        <Button
+          onClick={props.onEvidenceReturn}
+          sx={{ minHeight: 44, alignSelf: "flex-start" }}
+        >
+          Return to evidence
+        </Button>
+      )}
+      {props.focusFuel &&
+        !buildableGenerators.some(
+          (generator) => generator.fuel === props.focusFuel,
+        ) && (
+          <Typography role="status" sx={{ px: 2, py: 1 }}>
+            The requested fuel has no available generator at this size. Showing
+            generator options.
+          </Typography>
+        )}
       <ConstructionBuildHeader
+        hideTitle={props.embedded}
         concept="generator"
         title="Build Generator"
         cash={cash}
@@ -817,12 +919,16 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
               secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
               forecastGapW={forecastGapW}
               advantages={advantages.slice(0, 2)}
+              outputShape={outputShapes.get(g.name)}
+              outputCeiling={outputCeiling}
               compared={compared}
               compareDisabled={comparedNames.length >= 3}
               onCompare={() => toggleCompare(g.name)}
               onBuild={(financed: boolean) => {
                 props.onBuildGenerator(g, financed);
-                onBack();
+                if (props.hasEvidenceReturn && props.onEvidenceReturn)
+                  props.onEvidenceReturn();
+                else onBack();
               }}
             />
           );

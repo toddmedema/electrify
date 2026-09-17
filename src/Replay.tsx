@@ -1,3 +1,6 @@
+import { validScenarioResponse } from "./helpers/ScenarioChoices";
+import { validBuildFacility } from "./helpers/BuildValidation";
+import { validPolicyChange } from "./helpers/Policies";
 import cloneDeep from "lodash.clonedeep";
 import packageJson from "../package.json";
 import { isValidLocation } from "./helpers/Locations";
@@ -28,9 +31,6 @@ import {
  * reducers/ImportOrder.test.tsx guards against.
  */
 
-// Initial public schema. Increment this when a post-release change becomes incompatible.
-export const REPLAY_VERSION = 1;
-
 /**
  * How many actions a run may record before recording is abandoned. A twenty year game is a few
  * dozen builds and a handful of rate changes, so this sits far past normal play; it's here so
@@ -57,10 +57,15 @@ export type RecordedDeltaType = Partial<
 >;
 
 const REPLAY_ACTION_NAMES: ReplayActionNameType[] = [
+  "chooseScenarioResponse",
+  "schedulePolicy",
+  "cancelPolicy",
   "buildFacility",
   "sellFacility",
   "togglePauseFacility",
   "reprioritizeFacility",
+  "buildTransmissionLine",
+  "setTradingPolicy",
   "delta",
 ];
 
@@ -126,13 +131,14 @@ export function serializeReplay(game: GameType): ReplayType | undefined {
     return undefined;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: packageJson.version,
     scenarioId: game.scenarioId,
     difficulty: game.difficulty,
     seed: game.seed,
     location: cloneDeep(game.location),
     actions: cloneDeep(game.replayLog),
+    meaningfulDecisionGateWaived:
+      game.meaningfulDecisionGateWaived || undefined,
   };
 }
 
@@ -177,6 +183,33 @@ function parseActions(raw: unknown): ReplayActionType[] | null {
     ) {
       return null;
     }
+    if (
+      (action.type === "schedulePolicy" || action.type === "cancelPolicy") &&
+      !validPolicyChange(action.payload)
+    )
+      return null;
+    if (
+      action.type === "buildTransmissionLine" &&
+      (typeof action.payload !== "object" ||
+        action.payload === null ||
+        typeof (action.payload as { corridorId?: unknown }).corridorId !==
+          "string")
+    )
+      return null;
+    if (
+      action.type === "setTradingPolicy" &&
+      !["BALANCED", "RELIABILITY_FIRST", "SURPLUS_ONLY", "CLOSED"].includes(
+        action.payload as string,
+      )
+    )
+      return null;
+    if (
+      action.type === "chooseScenarioResponse" &&
+      !validScenarioResponse(action.payload)
+    )
+      return null;
+    if (action.type === "buildFacility" && !validBuildFacility(action.payload))
+      return null;
     actions.push({
       minute: action.minute,
       type: action.type as ReplayActionNameType,
@@ -203,14 +236,13 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   const doc = raw as Partial<ReplayDocType>;
-  if (doc.version !== REPLAY_VERSION) {
-    return null;
-  }
   if (
     !isFiniteNumber(doc.scenarioId) ||
     !isFiniteNumber(doc.seed) ||
     typeof doc.appVersion !== "string" ||
     typeof doc.difficulty !== "string" ||
+    (doc.meaningfulDecisionGateWaived !== undefined &&
+      typeof doc.meaningfulDecisionGateWaived !== "boolean") ||
     // Checked in full rather than trusted: the location's id becomes the path of the weather file
     // the loading screen fetches, and its lat/long drive the sun model
     !isValidLocation(doc.location)
@@ -222,12 +254,12 @@ export function decodeReplay(raw: unknown): ReplayType | null {
     return null;
   }
   return {
-    version: REPLAY_VERSION,
     appVersion: doc.appVersion,
     scenarioId: doc.scenarioId,
     difficulty: doc.difficulty as ReplayType["difficulty"],
     seed: doc.seed,
     location: doc.location,
     actions,
+    meaningfulDecisionGateWaived: doc.meaningfulDecisionGateWaived || undefined,
   };
 }

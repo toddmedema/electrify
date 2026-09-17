@@ -7,6 +7,7 @@ import {
   TickPresentFutureType,
 } from "../../Types";
 import {
+  axisTicksAreYearly,
   formatMinuteAsMonthAxis,
   formatMinuteAsTooltipHeader,
   MINUTES_PER_MONTH,
@@ -72,11 +73,13 @@ function buildOptions(showXLabels: boolean) {
         },
         values: (_u, splits) => {
           const state = getState();
+          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
           return splits.map((minute) =>
             formatMinuteAsMonthAxis(
               minute,
               state.startingYear,
               state.multiyear,
+              yearOnly,
             ),
           );
         },
@@ -107,6 +110,7 @@ const EMPTY_BREAKDOWN: DemandByTypeType = {
   Commercial: 0,
   Industrial: 0,
   Transportation: 0,
+  Mining: 0,
   "Data centers": 0,
 };
 
@@ -122,7 +126,17 @@ export function demandTypesBySizeAtStart(
     timeline.find((tick) => tick.minute >= startMinute) ||
     timeline[timeline.length - 1];
   const breakdown = firstVisible?.demandByType || EMPTY_BREAKDOWN;
-  return [...DEMAND_TYPES].sort(
+  // Mining is on a grid or it is not, and on the grids that have it, it is one of the largest
+  // things on the chart. A flat zero row on every other scenario's legend is noise, so it earns
+  // its place by appearing somewhere in view. The other end uses are always present - data
+  // centers included, which open at zero before 2000 and arrive on a known curve - and keeping
+  // them listed is what makes the ranking stable to read.
+  const visible = DEMAND_TYPES.filter(
+    (type) =>
+      type !== "Mining" ||
+      timeline.some((tick) => (tick.demandByType?.Mining || 0) > 0),
+  );
+  return visible.sort(
     (a, b) =>
       breakdown[b] - breakdown[a] ||
       DEMAND_TYPES.indexOf(a) - DEMAND_TYPES.indexOf(b),

@@ -86,7 +86,7 @@ interface ChartKeyMetadataType {
 
 // Two tables rather than one built per render: the labels are the same either way, and only
 // the two emissions rows care which system they are read in
-function buildChartKeys(units: UnitSystemType): {
+export function buildChartKeys(units: UnitSystemType): {
   [index: string]: ChartKeyMetadataType;
 } {
   return {
@@ -150,6 +150,13 @@ function buildChartKeys(units: UnitSystemType): {
     },
     expensesOM: {
       label: "Operations & maintenance",
+      higherIsBetter: false,
+      format: formatMoneyConcise,
+      formatTable: formatMoneyStable,
+      nesting: 1,
+    },
+    expensesPolicy: {
+      label: "Customer programs",
       higherIsBetter: false,
       format: formatMoneyConcise,
       formatTable: formatMoneyStable,
@@ -925,7 +932,7 @@ export default class Finances extends React.Component<Props, State> {
               variant="body2"
               color="textSecondary"
             >
-              Electricity Rate
+              Electricity Base Rate
               <ManualLink
                 entry={MANUAL_ENTRY.RATES}
                 label="electricity rates"
@@ -949,6 +956,15 @@ export default class Finances extends React.Component<Props, State> {
               )}
             </Typography>
             <div className="budgetSlider flex-newline">
+              {(game.policies?.programs.timeOfUse?.tier !== "Off" ||
+                game.policies?.programs.curtailment?.tier !== "Off") &&
+                game.policies && (
+                  <Typography variant="caption">
+                    Tariffs and credits adjust this base rate. The customer
+                    estimate assumes a flat rate; revenue and cash include
+                    active offers.
+                  </Typography>
+                )}
               <Slider
                 id="rateSlider"
                 disabled={!!game.replayPlayback}

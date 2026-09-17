@@ -20,4 +20,22 @@ describe("card reducer", () => {
     // Back from the scenario list should still reach the title screen
     expect(state.history).toEqual(["NEW_GAME", "MAIN_MENU"]);
   });
+
+  it("writes a public URL for routed cards", () => {
+    window.history.replaceState(null, "", "/");
+    cardReducer(
+      undefined,
+      navigate({ name: "NEW_GAME_DETAILS", url: "/?scenario=111" }),
+    );
+    expect(window.location.search).toBe("?scenario=111");
+  });
+
+  it("does not add a browser entry while restoring a route", () => {
+    window.history.replaceState(null, "", "/?scenario=111");
+    cardReducer(
+      undefined,
+      navigate({ name: "NEW_GAME_DETAILS", skipBrowserHistory: true }),
+    );
+    expect(window.location.search).toBe("?scenario=111");
+  });
 });

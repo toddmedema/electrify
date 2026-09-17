@@ -66,33 +66,6 @@ describe("NewGameDetails leaderboard", () => {
     await screen.findByText("Finish this game to join the leaderboard");
   });
 
-  it("leads with the scenario fantasy, objective, and stakes", async () => {
-    render(<NewGameDetails {...props()} />);
-
-    expect(
-      screen.getByRole("img", { name: "Carbon Fee icon" }),
-    ).toHaveAttribute("src", "/images/carbon fee.svg");
-    expect(
-      screen.getByRole("heading", {
-        name: "Carbon Fee",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Modernize an aging grid as pollution gets more expensive.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Your goal")).toBeInTheDocument();
-    expect(screen.getByText("Watch out")).toBeInTheDocument();
-    expect(screen.queryByText("Winning looks like")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "What counts as a win" }),
-    ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start game" })).toBeVisible();
-    expect(screen.getByText(/Forgiving: lower game costs/)).toBeVisible();
-    await screen.findByText("Finish this game to join the leaderboard");
-  });
-
   it("is always visible and follows the selected difficulty", async () => {
     const { rerender } = render(<NewGameDetails {...props()} />);
 

@@ -12,12 +12,16 @@ export const DEMAND_TYPES: readonly DemandTypeNameType[] = [
   "Commercial",
   "Industrial",
   "Transportation",
+  "Mining",
   "Data centers",
 ] as const;
 
-type NonDataCenterType = Exclude<DemandTypeNameType, "Data centers">;
-type SectorMix = Record<NonDataCenterType, number>;
-type GrowthProfile = Record<NonDataCenterType, number>;
+// The two authored end uses sit outside the regional mix. A region has no characteristic share
+// of either: a grid has the mine or the campus on it or it does not, and how big it is comes
+// from the scenario rather than from how many customers the utility serves.
+type OrganicDemandType = Exclude<DemandTypeNameType, "Data centers" | "Mining">;
+type SectorMix = Record<OrganicDemandType, number>;
+type GrowthProfile = Record<OrganicDemandType, number>;
 
 // EIA divides end-use demand into residential, commercial, industrial, and transportation.
 // These broad regional mixes preserve that standard while data centers are pulled out of the
@@ -54,6 +58,20 @@ const REGION_MIX: Record<string, SectorMix> = {
     Commercial: 0.3,
     Industrial: 0.31,
     Transportation: 0.01,
+  },
+  // Soviet-era metals, mining and chemicals still anchor these grids, so industry takes a larger
+  // share than in the Gulf and the commercial sector a smaller one.
+  "Central Asia": {
+    Residential: 0.32,
+    Commercial: 0.21,
+    Industrial: 0.46,
+    Transportation: 0.01,
+  },
+  Caucasus: {
+    Residential: 0.4,
+    Commercial: 0.26,
+    Industrial: 0.32,
+    Transportation: 0.02,
   },
   "South Asia": {
     Residential: 0.38,
@@ -115,6 +133,18 @@ const REGION_GROWTH: Record<string, GrowthProfile> = {
     Industrial: 0.009,
     Transportation: 0.025,
   },
+  "Central Asia": {
+    Residential: 0.009,
+    Commercial: 0.012,
+    Industrial: 0.01,
+    Transportation: 0.025,
+  },
+  Caucasus: {
+    Residential: 0.005,
+    Commercial: 0.008,
+    Industrial: 0.004,
+    Transportation: 0.025,
+  },
   "South Asia": {
     Residential: 0.012,
     Commercial: 0.014,
@@ -167,6 +197,8 @@ const REGION_DATA_CENTER_FACTOR: Record<string, number> = {
   Europe: 0.75,
   Africa: 0.2,
   "Middle East": 0.45,
+  "Central Asia": 0.2,
+  Caucasus: 0.2,
   "South Asia": 0.45,
   "East Asia": 0.9,
   "Southeast Asia": 0.65,
@@ -257,6 +289,117 @@ function growthFor(location?: LocationType): GrowthProfile {
   return profile;
 }
 
+export type ClimateLoadArchetypeType =
+  "cooling" | "mixed" | "electric-heating" | "fuel-heating";
+
+// Heating/cooling degree approaches use a comfortable-weather reference rather than the old
+// minimum near 5 C. EIA commonly uses 65 F (18.3 C):
+// https://www.eia.gov/energyexplained/units-and-calculators/degree-days.php
+// Regional heating fuels matter: electric heating is more prevalent in the U.S. South;
+// cold northern states often heat with fuels rather than electricity:
+// https://www.eia.gov/todayinenergy/detail.php?id=55940
+// These four rounded response curves are authored archetypes, not measured city load models.
+// Location chooses automatically; a student does not need to specify heating equipment.
+const CLIMATE_LOAD_RESPONSES = {
+  cooling: { heating: 1.8, cooling: 7.4, coolingSquared: 0.22 },
+  mixed: { heating: 1, cooling: 7, coolingSquared: 0.2 },
+  "electric-heating": { heating: 2.5, cooling: 4, coolingSquared: 0.12 },
+  "fuel-heating": { heating: 0.8, cooling: 6, coolingSquared: 0.18 },
+} as const;
+
+// IEA describes substantial heat-pump use in these countries. This grouping is
+// intentionally coarse and fixed over game history, not a historical equipment census:
+// https://www.iea.org/reports/the-future-of-heat-pumps/executive-summary
+const ELECTRIC_HEATING_COUNTRIES = new Set([
+  "Norway",
+  "Sweden",
+  "Finland",
+  "France",
+]);
+// Countries whose winters are carried by district heat, gas stoves or coal rather than by the
+// grid. Their electric load still peaks in summer, so the cooling response stays high while the
+// heating one does not. Relevant to Central Asia and the Caucasus, which until this catalogue
+// were grouped with the Gulf and treated as cooling-only despite continental winters.
+const FUEL_HEATING_COUNTRIES = new Set([
+  "Armenia",
+  "Belarus",
+  "Georgia",
+  "Kazakhstan",
+  "Kyrgyzstan",
+  "Mongolia",
+  "Russia",
+  "Tajikistan",
+  "Turkmenistan",
+  "Ukraine",
+  "Uzbekistan",
+]);
+const COOLING_US_STATES = new Set([
+  "AL",
+  "AR",
+  "AZ",
+  "FL",
+  "GA",
+  "HI",
+  "LA",
+  "MS",
+  "NM",
+  "SC",
+  "TX",
+]);
+const FUEL_HEATING_US_STATES = new Set([
+  "CT",
+  "IA",
+  "IL",
+  "IN",
+  "MA",
+  "ME",
+  "MI",
+  "MN",
+  "ND",
+  "NE",
+  "NH",
+  "NJ",
+  "NY",
+  "OH",
+  "PA",
+  "RI",
+  "SD",
+  "VT",
+  "WI",
+]);
+
+export function climateLoadArchetype(
+  location?: LocationType,
+): ClimateLoadArchetypeType {
+  if (!location) return "mixed";
+  if (location.country === "United States") {
+    if (COOLING_US_STATES.has(location.admin || "")) return "cooling";
+    if (FUEL_HEATING_US_STATES.has(location.admin || "")) return "fuel-heating";
+  }
+  if (Math.abs(location.lat) < 25 || location.region === "Middle East")
+    return "cooling";
+  if (ELECTRIC_HEATING_COUNTRIES.has(location.country || ""))
+    return "electric-heating";
+  if (FUEL_HEATING_COUNTRIES.has(location.country || "")) return "fuel-heating";
+  return "mixed";
+}
+
+/** Weather-driven watts per customer; the other daily and sector patterns remain separate. */
+export function temperatureDemandWattsPerCustomer(
+  temperatureC: number,
+  location?: LocationType,
+): number {
+  const response = CLIMATE_LOAD_RESPONSES[climateLoadArchetype(location)];
+  const heatingDegrees = Math.max(0, 18 - temperatureC);
+  const coolingDegrees = Math.max(0, temperatureC - 18);
+  return (
+    20 +
+    response.heating * heatingDegrees +
+    response.cooling * coolingDegrees +
+    response.coolingSquared * coolingDegrees ** 2
+  );
+}
+
 function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
   const hour = minuteOfDay / 60;
   const peak = (at: number, width: number) =>
@@ -271,6 +414,10 @@ function hourShape(type: DemandTypeNameType, minuteOfDay: number): number {
     case "Transportation":
       return 0.55 + 0.8 * peak(1, 3) + 0.55 * peak(21, 2.5);
     case "Data centers":
+      return 1;
+    // A concentrator or a hoist runs the shift it is given, and the large mines run all of
+    // them. Flat, for the same reason Industrial is.
+    case "Mining":
       return 1;
   }
 }
@@ -314,6 +461,10 @@ export function demandByTypeAt(
     Industrial: nonDataCenterScale * mix.Industrial,
     Transportation: nonDataCenterScale * mix.Transportation,
     "Data centers": startDataCenters,
+    // There is no generic mining curve to open against, the way there is for data centers.
+    // A scenario that has mines on its grid says so with a schedule, and that load arrives
+    // below as an absolute addition rather than as a share of the customer baseline.
+    Mining: 0,
   } satisfies Record<DemandTypeNameType, number>;
   const shapedStartingTotal = DEMAND_TYPES.reduce(
     (sum, type) =>
@@ -334,6 +485,13 @@ export function demandByTypeAt(
       result[type] = (baselineDemandW * weight * shape) / shapedStartingTotal;
       return;
     }
+    if (type === "Mining") {
+      // Opens at nothing and has no regional trajectory to follow. A mine's load is whatever
+      // the scenario's schedule says it is, applied below, and it does not drift with the
+      // region's households in between.
+      result[type] = 0;
+      return;
+    }
     result[type] =
       (baselineDemandW *
         startingWeights[type] *
@@ -348,7 +506,8 @@ export function demandByTypeAt(
     );
     // Besides preserving authored balance conceptually, keep it bit-for-bit stable. A few UI
     // calculations compare the change in reserve capacity after adding a plant, and a residual
-    // fraction of a watt from summing five floating-point components should not leak into that.
+    // fraction of a watt from summing the components should not leak into that. Mining is never
+    // the sink: it opens at zero, and pushing the residual there would invent a mine.
     result[hasAuthoredDataCenters ? "Commercial" : "Data centers"] +=
       baselineDemandW - openingTotal;
   }

@@ -21,8 +21,8 @@ it("projects geographic extremes onto the map", () => {
 
 it("clamps zoom and map centers to visible bounds", () => {
   expect(clampViewport({ center: { x: -2, y: 4 }, zoom: 99 })).toEqual({
-    center: { x: 0.0625, y: 0.9375 },
-    zoom: 3,
+    center: { x: 0.03125, y: 0.96875 },
+    zoom: 4,
   });
 });
 
@@ -48,7 +48,7 @@ it("zooms around a screen point and keeps its world location stationary", () => 
 
   expect(zoomed).toEqual({ center: { x: 0.625, y: 0.375 }, zoom: 1 });
   expect(pointInViewport({ x: 0.75, y: 0.25 }, zoomed)).toEqual(anchor);
-  expect(zoomViewportAt(zoomed, 99, anchor).zoom).toBe(3);
+  expect(zoomViewportAt(zoomed, 99, anchor).zoom).toBe(4);
 });
 
 it("clusters close locations deterministically but keeps selection visible", () => {

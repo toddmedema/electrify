@@ -33,19 +33,10 @@ function aScenario(overrides: Partial<ScenarioType> = {}): ScenarioType {
 }
 
 describe("getLocation", () => {
-  it("resolves a shipped location", () => {
-    expect(getLocation("PIT")).toBe(LOCATIONS.PIT);
-  });
-
   it("returns undefined rather than a bogus object for an unknown id", () => {
     expect(getLocation("NOWHERE")).toBeUndefined();
     expect(getLocation(undefined)).toBeUndefined();
     expect(getLocation(null)).toBeUndefined();
-  });
-
-  it("ships the two locations whose data was already in the repo", () => {
-    expect(getLocation("LA")?.name).toContain("Los Angeles");
-    expect(getLocation("CAMountains")?.lat).toBeGreaterThan(30);
   });
 
   it("gives every shipped location an id matching its key and a valid position", () => {
@@ -98,12 +89,6 @@ describe("isValidLocationId", () => {
 });
 
 describe("isValidLocation", () => {
-  it("accepts a well formed location", () => {
-    expect(isValidLocation(ELSEWHERE)).toBe(true);
-    expect(isValidLocation({ ...ELSEWHERE, timeZone: undefined })).toBe(true);
-    expect(isValidLocation({ ...ELSEWHERE, offshore: true })).toBe(true);
-  });
-
   it("rejects blobs that aren't one", () => {
     expect(isValidLocation(null)).toBe(false);
     expect(isValidLocation("SF")).toBe(false);

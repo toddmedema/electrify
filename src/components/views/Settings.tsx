@@ -100,7 +100,7 @@ function SettingRow({
         display: "grid",
         gridTemplateColumns: {
           xs: stackOnMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
-          sm: "minmax(180px, 1fr) minmax(260px, auto)",
+          sm: "minmax(180px, 1fr) auto",
         },
         alignItems: "center",
         gap: { xs: stackOnMobile ? 1.5 : 1, sm: 3 },
@@ -125,7 +125,7 @@ function SettingRow({
       <Box
         sx={{
           minWidth: 0,
-          width: stackOnMobile ? "100%" : "auto",
+          // Controls hug their content at the row's right edge; stacked phone rows stretch instead
           justifySelf: { xs: stackOnMobile ? "stretch" : "end", sm: "end" },
         }}
       >
@@ -165,7 +165,6 @@ function VolumeSlider(props: {
         onChange={(_e: Event, sliderValue: number | number[]) =>
           props.onChange((sliderValue as number) / 100)
         }
-        sx={{ width: "100% !important" }}
       />
       <Typography
         variant="body2"

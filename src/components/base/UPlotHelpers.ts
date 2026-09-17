@@ -1,5 +1,6 @@
 import uPlot from "uplot";
 import { chartPalette, withAlpha } from "../../Theme";
+import { ChartEventMarker } from "./ChartAnnotationsContext";
 
 /**
  * Shared pieces for the game's uPlot charts: axis styling that matches what the charts looked
@@ -324,6 +325,67 @@ export function verticalLinePlugin(
         u.ctx.moveTo(x, u.bbox.top);
         u.ctx.lineTo(x, u.bbox.top + u.bbox.height);
         u.ctx.stroke();
+        u.ctx.restore();
+      },
+    },
+  };
+}
+
+/** Scenario-event onset markers shared by the stacked Insight charts. */
+export function eventMarkersPlugin(
+  getMarkers: () => ChartEventMarker[],
+  getActiveKey: () => string | undefined,
+): uPlot.Plugin {
+  return {
+    hooks: {
+      draw: (u: uPlot) => {
+        const domainMin = u.scales.x.min;
+        const domainMax = u.scales.x.max;
+        const markers = getMarkers().filter(
+          (marker) =>
+            domainMin != null &&
+            domainMax != null &&
+            marker.x >= domainMin &&
+            marker.x <= domainMax,
+        );
+        if (!markers.length) {
+          return;
+        }
+        const scale = canvasScale(u);
+        const palette = chartPalette();
+        const activeKey = getActiveKey();
+        u.ctx.save();
+        clipToPlot(u);
+        u.ctx.setLineDash([4 * scale, 3 * scale]);
+        u.ctx.strokeStyle = palette.interactive;
+        for (const marker of markers) {
+          const active = marker.key === activeKey;
+          const x = Math.round(u.valToPos(marker.x, "x", true)) + 0.5;
+          u.ctx.globalAlpha = active ? 0.95 : 0.5;
+          u.ctx.lineWidth = (active ? 2 : 1) * uPlot.pxRatio;
+          u.ctx.beginPath();
+          u.ctx.moveTo(x, u.bbox.top);
+          u.ctx.lineTo(x, u.bbox.top + u.bbox.height);
+          u.ctx.stroke();
+
+          const radius = 8 * scale;
+          const badgeY = u.bbox.top + radius + 2 * scale;
+          u.ctx.globalAlpha = 1;
+          u.ctx.setLineDash([]);
+          u.ctx.fillStyle = palette.background;
+          u.ctx.strokeStyle = palette.interactive;
+          u.ctx.lineWidth = (active ? 2 : 1) * uPlot.pxRatio;
+          u.ctx.beginPath();
+          u.ctx.arc(x, badgeY, radius, 0, Math.PI * 2);
+          u.ctx.fill();
+          u.ctx.stroke();
+          u.ctx.fillStyle = palette.interactive;
+          u.ctx.font = chartFont(scale, 10);
+          u.ctx.textAlign = "center";
+          u.ctx.textBaseline = "middle";
+          u.ctx.fillText(String(marker.number), x, badgeY);
+          u.ctx.setLineDash([4 * scale, 3 * scale]);
+        }
         u.ctx.restore();
       },
     },

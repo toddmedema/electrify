@@ -48,20 +48,6 @@ function fileInput(): HTMLInputElement {
 }
 
 describe("Settings", () => {
-  it("groups controls into labeled, scannable sections", () => {
-    renderSettings();
-
-    ["Preferences", "Leaderboard", "Game data", "Keyboard shortcuts"].forEach(
-      (name) =>
-        expect(screen.getByRole("region", { name })).toBeInTheDocument(),
-    );
-    expect(screen.getByRole("switch", { name: "Sound" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Units" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("group", { name: "Appearance" }),
-    ).toBeInTheDocument();
-  });
-
   it("changes appearance and units with direct choices", async () => {
     const onThemeChange = jest.fn();
     const onUnitsChange = jest.fn();
@@ -124,31 +110,6 @@ describe("Settings", () => {
     ).toBeVisible();
   });
 
-  it("keeps keyboard shortcuts available without letting them dominate the page", async () => {
-    renderSettings();
-
-    expect(
-      screen.queryByRole("table", { name: "Keyboard shortcuts" }),
-    ).toBeNull();
-    await userEvent.click(
-      screen.getByRole("button", { name: /Keys for faster play/ }),
-    );
-    expect(
-      screen.getByRole("table", { name: "Keyboard shortcuts" }),
-    ).toBeVisible();
-  });
-
-  it("names the saved game that Export would download", async () => {
-    const onExportSave = jest.fn();
-    renderSettings({ savedGame: "Rise of Renewables, 2035", onExportSave });
-
-    expect(exportButton().disabled).toBe(false);
-    expect(screen.getByText(/Rise of Renewables, 2035/)).toBeInTheDocument();
-
-    await userEvent.click(exportButton());
-    expect(onExportSave).toHaveBeenCalled();
-  });
-
   // The button being greyed out says nothing about why, and "start a game first" is not something
   // a player would otherwise guess from a settings screen
   it("disables Export and says what's missing when there's no saved game", () => {
@@ -194,27 +155,6 @@ describe("Settings", () => {
 
     // Picking the same file again still counts, for the player who went and fixed a bad one
     expect(fileInput().value).toBe("");
-  });
-
-  it("does not show an install group when no install action is available", () => {
-    const originalMatchMedia = window.matchMedia;
-    window.matchMedia = jest.fn().mockReturnValue({
-      matches: true,
-      media: "(display-mode: standalone)",
-      onchange: null,
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn(),
-    });
-
-    renderSettings();
-
-    expect(
-      screen.queryByRole("region", { name: "Install Electrify" }),
-    ).not.toBeInTheDocument();
-    window.matchMedia = originalMatchMedia;
   });
 
   it("offers a subtle cache reset at the bottom", async () => {

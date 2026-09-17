@@ -1,6 +1,6 @@
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
-import Redux from "redux";
+import type { Action } from "@reduxjs/toolkit";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 export interface AudioType {
@@ -22,6 +22,58 @@ export type MonthType =
   | "Dec";
 export type DifficultyType = "Intern" | "Employee" | "Manager" | "VP" | "CEO";
 export type SpeedType = "PAUSED" | "SLOW" | "NORMAL" | "FAST";
+
+/** How an intertie may trade with neighbouring electricity markets. */
+export type TradingPolicyType =
+  "BALANCED" | "RELIABILITY_FIRST" | "SURPLUS_ONLY" | "CLOSED";
+
+/** Authored facts about a neighbouring wholesale electricity market. */
+export interface AdjacentMarketDefinitionType {
+  id: string;
+  name: string;
+  description: string;
+  basePricePerMWh: number;
+  availableSupplyW: number;
+  availableDemandW: number;
+  emissionsKgco2ePerMWh: number;
+  emissionsBasis: string;
+  emissionsSource: string;
+}
+
+/** A buildable physical connection to one adjacent market. */
+export interface TransmissionCorridorDefinitionType {
+  id: string;
+  adjacentMarketId: string;
+  name: string;
+  routeType: "EXISTING" | "NEW";
+  capacityW: number;
+  buildCost: number;
+  annualOperatingCost: number;
+  yearsToBuild: number;
+  heatDerateStartsC: number;
+  heatDeratePerC: number;
+  solarDerateFraction: number;
+}
+
+export interface TransmissionLineOperatingType {
+  id: number;
+  corridorId: string;
+  name: string;
+  capacityW: number;
+  buildCost: number;
+  annualOperatingCost: number;
+  yearsToBuildLeft: number;
+  minuteCreated: number;
+  financed: boolean;
+  loanAmountLeft: number;
+  loanMonthlyPayment: number;
+  interestRate: number;
+}
+
+export interface TransmissionStateType {
+  tradingPolicy: TradingPolicyType;
+  lines: TransmissionLineOperatingType[];
+}
 
 // Deliberately open rather than a union of the places that happen to ship today: a custom game
 // may hold a location that isn't in LOCATIONS at all, so nothing is allowed to key off the
@@ -98,7 +150,8 @@ export type DemandTypeNameType =
   | "Commercial"
   | "Industrial"
   | "Transportation"
-  | "Data centers";
+  | "Data centers"
+  | "Mining";
 
 export type DemandByTypeType = Record<DemandTypeNameType, number>;
 
@@ -113,6 +166,7 @@ export interface DifficultyMultipliersType {
 export type CardNameType =
   | "BUILD_GENERATORS"
   | "BUILD_STORAGE"
+  | "BUILD_INTERTIES"
   | "FACILITIES"
   | "INSIGHTS"
   | "EVENTS"
@@ -159,10 +213,26 @@ export type StoryActionTargetType =
     }
   | { card: "EVENTS" };
 
+export type EvidenceTargetType =
+  "supply-demand" | "finances" | "mission-details" | StoryActionTargetType;
+
+export interface EvidenceRequestType {
+  id: number;
+  runId: number;
+  target: EvidenceTargetType;
+}
+
 // What the card reducer's navigate action accepts, beyond a bare card name
 export interface NavigateActionType {
   name: CardNameType;
   dontRemember?: boolean;
+  // Most cards use the app's anonymous hash entry. Public routes can supply a meaningful URL,
+  // while a popstate restoration must not write another browser-history entry.
+  url?: string;
+  skipBrowserHistory?: boolean;
+  replaceCurrentCard?: boolean;
+  journeyTraversal?: "origin" | "control";
+  journeyMarker?: { id: number; runId: number; role: "origin" | "control" };
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
   storyTarget?: StoryActionTargetType;
@@ -203,10 +273,15 @@ export interface ScoreType {
 // The player actions a replay has to reproduce. Everything else about a run -- weather, fuel
 // prices, demand -- falls out of the seed, so this is the whole of what the player contributed.
 export type ReplayActionNameType =
+  | "chooseScenarioResponse"
+  | "schedulePolicy"
+  | "cancelPolicy"
   | "buildFacility"
   | "sellFacility"
   | "togglePauseFacility"
   | "reprioritizeFacility"
+  | "buildTransmissionLine"
+  | "setTradingPolicy"
   | "delta";
 
 export interface ReplayActionType {
@@ -218,8 +293,21 @@ export interface ReplayActionType {
   payload: unknown;
 }
 
+export type MeaningfulDecisionKindType =
+  "asset" | "sale" | "rate" | "policy" | "operation" | "dispatch" | "trading";
+
+/** One accepted player decision after lifetime no-ops and reversals are coalesced. */
+export interface MeaningfulDecisionType {
+  key: string;
+  lever: string;
+  label: string;
+  month: number;
+  kind: MeaningfulDecisionKindType;
+  before: string;
+  after: string;
+}
+
 export interface ReplayType {
-  version: number;
   appVersion: string; // For bug reports
   scenarioId: number;
   difficulty: DifficultyType;
@@ -229,6 +317,7 @@ export interface ReplayType {
   // without it a replay would silently be re-simulated against a different city's weather
   location: LocationType;
   actions: ReplayActionType[];
+  meaningfulDecisionGateWaived?: boolean;
 }
 
 /**
@@ -249,6 +338,7 @@ export interface ReplayPlaybackType {
 export interface LocalStoragePlayedType {
   scenarioId: number;
   date: string; // Stringified new Date()
+  timesPlayed: number;
 }
 
 export interface DateType {
@@ -282,9 +372,11 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
     minute: number;
     supplyW: number; // Watts
+    availableSupplyW?: number; // Supply plus unused fuel-burning generation capacity
     demandW: number; // Watts
-    // Components sum to demandW. Kept on forecast ticks so Insights can explain what is driving
-    // load without bloating the long-lived monthly history in saves.
+    reserveW?: number; // Signed supply margin plus local spare output reachable next tick
+    importKgco2ePerMWh?: number; // Modeled mix of usable neighboring import capacity
+    // Components sum to demandW; monthly chart averages preserve the breakdown in saves.
     demandByType: DemandByTypeType;
     solarIrradianceWM2: number;
     windKph: number;
@@ -301,10 +393,24 @@ export type TickPresentFutureType = Partial<FuelPricesType> &
     hydroReservoirCapacityWh: number;
     hydroSpillWh: number; // Water above reservoir capacity lost during this tick
     hydroMandatedReleaseW: number; // Must-run water-rights flow through turbines
-    storageLossWh: number; // Self-discharge / evaporation during this simulated tick
+    storageChargeW?: number; // Actual grid draw before conversion losses
+    storageDischargeW?: number; // Actual energy returned to the grid
+    storageLossWh: number; // Charging conversion plus self-discharge / evaporation this tick
     // The exponentially smoothed bill customers respond to, rather than the slider's latest value
     customerRate: number;
+    customerBillingRate?: number; // Delivered-energy blended rate, including enrolled offers.
+    deferredResidentialWh?: number; // Unscaled representative-day energy awaiting late-evening use.
+    deferredResidentialWhStart?: number; // Queue before this tick, retained when forecasts trim prior history.
+    deferredResidential?: DeferredResidentialLoad[]; // Outstanding energy tied to its original recovery window.
+    deferredResidentialStart?: DeferredResidentialLoad[]; // Before this tick, for repeated forecasts.
+    shiftedResidentialW?: number; // Returned enrolled residential load, billed at the late rate.
     supplyByFuel: FuelProductionType;
+    /** Positive gross flow into/out of the player's grid during this tick. */
+    importedW?: number;
+    exportedW?: number;
+    transmissionCapacityW?: number;
+    marketPricePerMWh?: number;
+    renewableCapacityFactors?: Record<string, number>;
   };
 
 export type DerivedHistoryKeysType = Exclude<
@@ -327,6 +433,9 @@ export interface DerivedHistoryType extends MonthlyHistoryType {
 
 // Basically, downsample per-tick information so that I can store it for the entire game, which could go 100+ years
 export interface MonthlyHistoryType extends HistoryForecastShared {
+  // Compact monthly averages for all non-financial Insights layers.
+  chartAverage?: TickPresentFutureType;
+  chartTickWeight?: number;
   year: number;
   month: number;
   supplyWh: number; // total
@@ -341,6 +450,9 @@ export interface MonthlyHistoryType extends HistoryForecastShared {
 }
 
 interface HistoryForecastShared {
+  expensesPolicy?: number; // Monthly funded upgrades; absent in legacy histories.
+  revenueExports?: number;
+  expensesImports?: number;
   cash: number;
   customers: number;
   netWorth: number;
@@ -349,7 +461,9 @@ interface HistoryForecastShared {
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-  kgco2e: number; // total
+  kgco2e: number; // Local generation plus purchased-electricity emissions
+  localKgco2e?: number;
+  importedKgco2e?: number;
   // Point in time rather than totals: what a new loan would cost, and what prices were doing,
   // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
   // keeps the last one it sees, the way it does for cash and net worth.
@@ -496,13 +610,21 @@ export interface TutorialStepType {
   // A one-way side effect of leaving this step forwards, such as starting the clock. It
   // isn't replayed when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
-  onNext?: () => Redux.Action;
+  onNext?: () => Action;
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;
+  // The one thing to do right now, as a short imperative ("Tap 1× to start time"). Every step
+  // has one, explanations included - there it names what to look at and says to tap Next - so
+  // the objective always opens on a deed instead of a paragraph to read
+  action: string;
   content: React.JSX.Element;
-  // Player-requested help. Kept outside content so the objective HUD never reveals it before the
-  // player asks, and so hiding/showing it does not affect the underlying objective gate.
+  // Game chrome this step doesn't need yet. The first mission starts almost bare and reveals
+  // controls as they're taught, so a new player isn't choosing between a dozen buttons before
+  // they've made their first move. Presentation only: the gates never depend on it
+  hideUi?: TutorialUiIdType[];
+  // Extra help, always shown beneath the step's sentence. Kept outside content so authored
+  // steps state the task first and the help second, in a consistent style.
   hint?: React.ReactNode;
   // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
   // objective" status instead of a Next button, and the walkthrough advances the moment this
@@ -510,6 +632,10 @@ export interface TutorialStepType {
   // cheap field reads. Tutorial scenarios have fixed authored starting states, so
   // predicates are absolute (e.g. facilities.length >= 2), never relative to step entry
   advanceOn?: (state: AppStateType) => boolean;
+  // Explanations still offer Next, but completed deeds can move them along too.
+  continueOn?: (state: AppStateType) => boolean;
+  // Presentation-only controls. Game mutations use predicates to exclude rejected actions.
+  continueOnClick?: string;
   // Gate for deeds that leave no distinguishable state behind (a drag re-order, a pause
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)
@@ -540,9 +666,33 @@ export interface TutorialStepType {
   // different wording too, since there are no tabs left to switch between
   desktop?: {
     target: string;
+    action?: string;
     content?: React.JSX.Element;
   };
 }
+
+// Chrome a tutorial step can hide. Most ids map to selectors in app.scss under
+// [data-tutorial-hide]; sidePanes is dropped in Compositor.renderCard instead, since the pane grid
+// has resizable tracks that hiding a pane with CSS would leave empty. TUTORIAL_UI_SELECTORS lists
+// what each one hides for the authoring test
+export type TutorialUiIdType =
+  | "nav" // bottom navigation, and its hotkeys
+  | "build" // Build button, and its hotkeys
+  | "menu" // the ⋮ game menu
+  | "speed" // speed buttons, and their hotkeys
+  | "facilityActions" // row actions (Pause, Sell, Move) and drag handles
+  | "yearProgress" // the thin year progress bar
+  | "sidePanes"; // Insights and Events beside Facilities on tablets and desktops
+
+export const TUTORIAL_UI_SELECTORS: Record<TutorialUiIdType, string[]> = {
+  nav: ["#navfooter", "#insightsNav", "#eventsNav", "#faciltiesNav"],
+  build: [".button-buildFacility"],
+  menu: [".gameMenuButton"],
+  speed: ["#speedChangeButtons"],
+  facilityActions: [".facilityActions", ".facilityDragHandle"],
+  yearProgress: ["#yearProgressBar"],
+  sidePanes: ["#insightsPane", "#eventsPane"],
+};
 
 export function isGatedStep(step: TutorialStepType): boolean {
   return !!(step.advanceOn || step.advanceOnAction || step.capstone);
@@ -560,6 +710,9 @@ export interface TutorialStepChangeType {
 
 export type ScenarioBriefingToneType =
   "transition" | "boom" | "island" | "innovation" | "storm" | "legacy";
+
+export type ScenarioThemeType =
+  "Extreme weather" | "Energy transition" | "Rapid growth";
 
 /**
  * The authored promise of a scenario, kept beside its simulation setup so the mission list and
@@ -583,8 +736,14 @@ export interface ScenarioType {
   location?: LocationType;
   summary?: string;
   briefing?: ScenarioBriefingType;
+  // Player-facing browse categories. A challenge may appear in more than one theme.
+  themes?: ScenarioThemeType[];
+  // Lower numbers appear first in the compact recommendations; omitted challenges follow.
+  recommendationOrder?: number;
   ownership: "Investor" | "Public";
   tutorialSteps?: TutorialStepType[];
+  /** Explicit scenario override. Tutorials default off; ordinary games use location availability. */
+  intertiesEnabled?: boolean;
   // Pins the run's RNG so it plays out identically every time. Every authored scenario leaves
   // this off and draws a fresh seed each play; only the custom game screen sets it
   seed?: number;
@@ -620,6 +779,12 @@ export interface ScenarioType {
 /** An authored starting asset may already have spent years in service when a scenario opens. */
 export type ScenarioFacilityType = Partial<FacilityShoppingType> & {
   initialAgeYears?: number;
+  /**
+   * Share of its reservoir a starting hydro plant holds on the opening tick. Defaults to the
+   * neutral half-pool. A scenario that opens on a known lake level, or in a hemisphere whose
+   * dry season arrives before its first wet one, has to be able to say so.
+   */
+  initialReservoirFraction?: number;
   /** Optional player-facing name for an authored aggregate or gameplay proxy. */
   label?: string;
 };
@@ -633,7 +798,13 @@ export interface ScenarioLoadAdditionType {
   /** Maximum total load after the start date, never an annual increment. */
   peakW: number;
   loadFactor: number;
-  demandType: "Data centers";
+  /**
+   * The two end uses a scenario can own outright. Both sit outside the regional sector mix: a
+   * grid either has the mine or the campus on it or it does not, and neither scales with the
+   * customer count. "Data centers" replaces the generic regional curve when authored; "Mining"
+   * has no generic curve and is purely additive.
+   */
+  demandType: "Data centers" | "Mining";
 }
 
 /**
@@ -687,17 +858,12 @@ export interface WorldEventEffectsType {
   demandMultiplier?: number;
   /** Multiplies modeled watershed inflow before it reaches a hydro reservoir. */
   hydroRunoffMultiplier?: number;
-  /** Intraday solar reduction used for a predictable eclipse profile. */
-  solarEclipse?: {
-    startsMinuteOfDay: number;
-    totalityMinuteOfDay: number;
-    endsMinuteOfDay: number;
-    minimumOutputMultiplier: number;
-  };
   // An override rather than a multiplier. Content validation rejects overlapping policy phases.
   carbonFeePerKgCO2e?: number;
   buildCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   operatingCostMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
+  /** Fixed company-wide operating expense charged once per active story month. */
+  operatingExpensePerMonth?: number;
   facilityOutputMultipliersByFuel?: Partial<Record<FuelNameType, number>>;
   facilityOutputMultipliersById?: Record<string, number>;
 }
@@ -742,6 +908,13 @@ export interface ActiveWorldEventType {
   effects: WorldEventEffectsType;
   /** False for surprises that must not appear in the event list or forward forecasts. */
   forecastable?: boolean;
+  // Presentation travels with a persisted occurrence so the Events pane can continue to explain
+  // an ongoing effect after a save/load without re-resolving authored content.
+  title?: string;
+  message?: string;
+  concept?: ConceptNameType;
+  importance?: GameEventImportanceType;
+  actionTarget?: StoryActionTargetType;
 }
 
 export interface WorldEventStateType {
@@ -754,7 +927,33 @@ export interface WorldEventStateType {
   checkedKeys: string[];
 }
 
+export type PolicyId = "efficiency" | "solar" | "timeOfUse" | "curtailment";
+export type PolicyTier = "Off" | "Small" | "Large";
+export interface DeferredResidentialLoad {
+  energyWh: number; // Unscaled representative-day energy.
+  recoveryStartMinute: number; // Absolute simulation minute, including across month boundaries.
+  recoveryEndMinute: number;
+}
+export interface PolicyProgramType {
+  tier: PolicyTier;
+  startHour?: number; // Four-hour local-clock window; absent means 17 for earlier callers.
+  adoption: number; // Installed potential for rebates; current enrolled share for operating offers.
+  spending: number; // Funded upgrades this month; offer credits instead reduce billed revenue.
+  pending?: { tier: PolicyTier; month: number; startHour?: number };
+}
+export interface PoliciesType {
+  month: number; // Last processed elapsed month; prevents duplicate enrollment and charges.
+  programs: Record<PolicyId, PolicyProgramType>;
+}
+export interface PolicyChangeType {
+  id: PolicyId;
+  tier: PolicyTier;
+  month: number;
+  startHour?: number;
+}
 export interface GameType {
+  policies?: PoliciesType;
+  policyPause?: { token: string; speed: SpeedType };
   seed: number;
   difficulty: DifficultyType;
   scenarioId: number;
@@ -797,6 +996,15 @@ export interface GameType {
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
+  // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
+  // scenarios and their normalized saves carry an explicit empty state.
+  transmission?: TransmissionStateType;
+  // Reducer-validated progress for the visible CEO objective. Replays rebuild it by applying the
+  // same accepted state changes; saves persist and validate it so progress survives a reload.
+  meaningfulDecisions: MeaningfulDecisionType[];
+  // Older in-progress saves/replays predate decision tracking. They keep their original victory
+  // rules rather than becoming impossible to finish after an upgrade.
+  meaningfulDecisionGateWaived?: boolean;
   // Every simulation-affecting thing the player has done this run, for the replay attached to a
   // high score. Undefined means the run isn't being recorded: before a game starts, while one is
   // being watched, or once a run has grown past MAX_REPLAY_ACTIONS. Persisted with the rest of the
@@ -902,7 +1110,26 @@ export interface VictoryDebriefType {
   >;
 }
 
+export interface InsightsOriginType {
+  viewport: [number, number];
+  month: number;
+  layers: string[];
+  preset: string;
+  revision: number;
+  temporaryLayer?: string;
+  anchor?: string;
+  scrollTop: number;
+}
+
 export interface UIType {
+  insightsConfigurationRevision?: number;
+  evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
+  evidenceJourneyMarker?: { id: number; runId: number };
+  insightsRestore?: InsightsOriginType;
+  evidenceRequest?: EvidenceRequestType;
+  evidenceSequence?: number;
+  evidenceRunId?: number;
+  manualHelpEntry?: string;
   dialog: DialogType;
   snackbar: SnackbarType;
   // True only while the player is physically reordering the fleet. Expensive sibling panes can
@@ -953,4 +1180,25 @@ export interface AppStateType {
   settings: SettingsType;
   ui: UIType;
   user: UserType;
+}
+
+/** Authored time-triggered choices; IDs are persisted in story occurrences. */
+export interface ScenarioChoiceType {
+  id: string;
+  scenarioId: number;
+  atMonth: number;
+  title: string;
+  message: string;
+  options: {
+    id: string;
+    label: string;
+    message: string;
+    cost: (difficulty: DifficultyType) => number;
+    description?: string;
+    /** One-time company contribution, never plant electricity sales. */
+    upfrontGrant?: (difficulty: DifficultyType) => number;
+    loadAdditions?: ScenarioLoadAdditionType[];
+    /** False for a response that preserves the baseline without changing the operating plan. */
+    meaningful?: boolean;
+  }[];
 }

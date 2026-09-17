@@ -19,9 +19,6 @@ export default function DecisionImpactPreview({
 }: DecisionImpactPreviewProps): React.JSX.Element {
   return (
     <section className="decisionImpact" aria-label="Expected impact">
-      <Typography variant="overline" component="h3">
-        What changes
-      </Typography>
       <div className="decisionImpactFacts">
         {facts.map((fact) => (
           <div className="decisionImpactFact" key={fact.label}>

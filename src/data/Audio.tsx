@@ -1,4 +1,3 @@
-import { eachLimit } from "async";
 import { AudioNode } from "../audio/AudioNode";
 import { ThemeManager } from "../audio/ThemeManager";
 import { SoundEffects, SoundEffectType } from "../audio/SoundEffects";
@@ -67,26 +66,44 @@ export function getAllMusicFiles(): string[] {
 export function loadAudioLocalFile(
   context: AudioContext,
   url: string,
-  callback: (err: Error | null, buffer: AudioNode | null) => void,
-) {
-  const request = new XMLHttpRequest();
-  request.open("GET", url, true);
-  request.responseType = "arraybuffer";
-  request.onload = () => {
-    context.decodeAudioData(
-      request.response,
-      (buffer: AudioBuffer) => {
-        return callback(null, new AudioNode(context, buffer));
-      },
-      (err: Error) => {
-        return callback(err, null);
-      },
-    );
-  };
-  request.onerror = () => {
-    return callback(Error("Network error"), null);
-  };
-  request.send();
+): Promise<AudioNode> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("GET", url, true);
+    request.responseType = "arraybuffer";
+    request.onload = () => {
+      context.decodeAudioData(
+        request.response,
+        (buffer: AudioBuffer) => resolve(new AudioNode(context, buffer)),
+        reject,
+      );
+    };
+    request.onerror = () => reject(Error("Network error"));
+    request.send();
+  });
+}
+
+async function eachWithLimit<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  let stopped = false;
+  async function runWorker() {
+    while (!stopped && nextIndex < items.length) {
+      const item = items[nextIndex++];
+      try {
+        await worker(item);
+      } catch (error) {
+        stopped = true;
+        throw error;
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, runWorker),
+  );
 }
 
 export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
@@ -107,40 +124,27 @@ export function loadAudioFiles(musicVolume = 1, soundEffectsVolume = 1) {
   }
   const musicFiles = getAllMusicFiles();
   const audioNodes: { [key: string]: AudioNode } = {};
-  eachLimit(
-    musicFiles,
-    4,
-    (file: string, callback: (err?: Error) => void) => {
-      loadAudioLocalFile(
-        ac,
-        "audio/" + file + ".mp3",
-        (err: Error | null, buffer: AudioNode | null) => {
-          if (err || buffer == null) {
-            err = err || new Error("buffer is null");
-            console.error(
-              "Error loading audio file " + file + ": " + err.toString(),
-            );
-            return callback(err);
-          }
-          // Every track routes through one gain node, so changing music volume does not disturb
-          // ThemeManager's per-track fades or restart the six-minute loop.
-          buffer.setOutput(musicOutput);
-          audioNodes[file] = buffer;
-          return callback();
-        },
-      );
-    },
-    (err?: Error | null) => {
-      if (err) {
-        state.loaded = "ERROR";
-        return;
-      }
+  eachWithLimit(musicFiles, 4, async (file) => {
+    try {
+      const buffer = await loadAudioLocalFile(ac, "audio/" + file + ".mp3");
+      // Every track routes through one gain node, so changing music volume does not disturb
+      // ThemeManager's per-track fades or restart the six-minute loop.
+      buffer.setOutput(musicOutput);
+      audioNodes[file] = buffer;
+    } catch (error) {
+      console.error("Error loading audio file " + file + ": " + String(error));
+      throw error;
+    }
+  })
+    .then(() => {
       state.themeManager = new ThemeManager(ac, audioNodes);
       state.loaded = "LOADED";
       if (state.paused) {
         state.themeManager.pause();
       }
       state.themeManager.setIntensity(1);
-    },
-  );
+    })
+    .catch(() => {
+      state.loaded = "ERROR";
+    });
 }

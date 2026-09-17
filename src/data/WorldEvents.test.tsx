@@ -11,13 +11,9 @@ import {
   RENEWABLES_BALANCE,
   resolveStoryAtDate,
   resolveStoryScheduleMonth,
-  SHALE_BOOM_BALANCE,
-  solarEclipseOutputMultiplier,
-  SOLAR_ECLIPSE_MINIMUM_OUTPUT,
   STORY_ARC_DEFINITIONS,
   StoryArcDefinitionType,
   storyPhaseKey,
-  TEXAS_DEEP_FREEZE_DEMAND,
   upcomingStoryPhases,
   validateStoryDifficultyMonotonicity,
 } from "./WorldEvents";
@@ -171,6 +167,7 @@ describe("story effect composition", () => {
             temperatureOffsetC: -4,
             fuelPriceMultipliers: { "Natural Gas": 0.75 },
             carbonFeePerKgCO2e: 0.1,
+            operatingExpensePerMonth: 1000,
           },
         },
         {
@@ -179,6 +176,7 @@ describe("story effect composition", () => {
             temperatureOffsetC: 2,
             fuelPriceMultipliers: { "Natural Gas": 1.8 },
             carbonFeePerKgCO2e: 0.1,
+            operatingExpensePerMonth: 2500,
           },
         },
       ]),
@@ -187,6 +185,7 @@ describe("story effect composition", () => {
       temperatureOffsetC: -2,
       fuelPriceMultipliers: { "Natural Gas": 1.35 },
       carbonFeePerKgCO2e: 0.1,
+      operatingExpensePerMonth: 3500,
     });
   });
 
@@ -249,79 +248,66 @@ describe("The Shale Boom pilot arc", () => {
     expect(resolveStoryAtDate(shaleContext(122)).effects).toEqual({});
   });
 
-  it("checks in exact Manager values and monotonic difficulty scaling", () => {
-    expect(SHALE_BOOM_BALANCE.Manager).toEqual({
-      boomGasMultiplier: 0.75,
-      freezeSurcharge: 1.8,
-      freezeGasOutput: 0.7,
-    });
-    const ordered: DifficultyType[] = [
-      "Intern",
-      "Employee",
-      "Manager",
-      "VP",
-      "CEO",
-    ];
-    const values = ordered.map((difficulty) => SHALE_BOOM_BALANCE[difficulty]);
-    expect(values.map((value) => value.boomGasMultiplier)).toEqual([
-      0.7, 0.725, 0.75, 0.775, 0.8,
-    ]);
-    expect(values.map((value) => value.freezeSurcharge)).toEqual([
-      1.5, 1.65, 1.8, 1.95, 2.1,
-    ]);
-    expect(values.map((value) => value.freezeGasOutput)).toEqual([
-      0.8, 0.75, 0.7, 0.65, 0.6,
-    ]);
-  });
-
   it("shows future phases without treating upcoming rows as active effects", () => {
     const upcoming = upcomingStoryPhases(shaleContext(47));
     expect(upcoming.map((phase) => phase.key)).toEqual([
       "story:103:shale-boom:regional-glut",
-      "story:103:shale-boom:freeze-warning",
       "story:103:shale-boom:freeze",
       "story:103:shale-boom:freeze-recovery",
       "story:103:shale-boom:normalization",
     ]);
+    expect(upcoming.map(({ title, message }) => ({ title, message }))).toEqual([
+      {
+        title: "Gas prices will fall",
+        message: "Natural gas prices will drop 25% through Feb 2016.",
+      },
+      {
+        title: "Winter freeze will hit",
+        message:
+          "Gas costs will spike and gas plants will be limited to 70% output for three months.",
+      },
+      {
+        title: "Gas output will recover",
+        message:
+          "Plant limits will lift and lower boom-era prices will resume.",
+      },
+      {
+        title: "Gas boom will end",
+        message: "Natural gas prices will return to normal.",
+      },
+    ]);
     expect(resolveStoryAtDate(shaleContext(47)).effects).toEqual({});
   });
 
-  it("authors every scenario with deterministic story events and no custom game", () => {
-    expect(
-      [...new Set(STORY_ARC_DEFINITIONS.map((arc) => arc.scenarioId))].sort(),
-    ).toEqual([100, 101, 102, 103, 104, 105, 107, 108, 109, 110]);
-    expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
-  });
+  it("omits warning-only phases from upcoming events in every scenario", () => {
+    const warningIds = new Set([
+      "published-ratchet",
+      "manufacturing-warning",
+      "clean-tech-load-warning",
+      "aging-warning",
+      "compliance-warning",
+      "regional-glut-warning",
+      "freeze-warning",
+      "outlook",
+      "visitor-warning",
+      "cargo-warning",
+      "seasonal-warning",
+      "advance-warning",
+      "contingency-review",
+      "red-flag-warning",
+      "restoration-complete",
+    ]);
 
-  it("keeps every authored event body to one sentence and one text level", () => {
-    const entries = STORY_ARC_DEFINITIONS.flatMap((arc) =>
-      arc.phases.flatMap((phase) => {
-        const storyContext = context(0, arc.scenarioId);
-        return [
-          phase.describe(storyContext, () => 0.5),
-          ...(phase.preview ? [phase.preview(storyContext, () => 0.5)] : []),
-        ];
-      }),
-    );
-
-    entries.forEach((entry) => {
-      expect(entry).not.toHaveProperty("details");
-      expect(entry.message.match(/[.!?](?=\s|$)/g) || []).toHaveLength(1);
+    STORY_ARC_DEFINITIONS.forEach((arc) => {
+      const upcomingIds = upcomingStoryPhases(context(0, arc.scenarioId)).map(
+        (phase) => phase.key.split(":").at(-1),
+      );
+      expect(upcomingIds.filter((id) => id && warningIds.has(id))).toEqual([]);
     });
   });
 });
 
 describe("Texas Deep Freeze", () => {
-  it("uses the observed-to-unconstrained ERCOT demand range by difficulty", () => {
-    expect(TEXAS_DEEP_FREEZE_DEMAND).toEqual({
-      Intern: 1.2,
-      Employee: 1.23,
-      Manager: 1.27,
-      VP: 1.3,
-      CEO: 1.33,
-    });
-  });
-
   it("starts only in February 2021 and expires completely in March", () => {
     const january = resolveStoryAtDate(context(48, 107));
     const february = resolveStoryAtDate(context(49, 107));
@@ -349,14 +335,6 @@ describe("Texas Deep Freeze", () => {
     });
     expect(resolveStoryAtDate(context(49, 0)).effects).toEqual({});
     expect(resolveStoryAtDate(context(49, 999)).effects).toEqual({});
-  });
-
-  it("raises cold-weather demand and uses exactly one wind adjustment", () => {
-    const uri = resolveStoryAtDate(context(49, 107)).occurrences[0];
-    expect(uri.effects.facilityOutputMultipliersByFuel?.Wind).toBe(0.44);
-    expect(uri.effects.demandMultiplier).toBe(1.27);
-    expect(uri.message).toMatch(/demand runs 27% above normal/i);
-    expect(uri.message).toMatch(/plants produce less/i);
   });
 
   it("keeps the future thaw neutral, then reports the recorded outcome", () => {
@@ -414,21 +392,6 @@ describe("generation and storage reliability scenarios", () => {
     );
   });
 
-  it("models the eclipse as a known intraday fall and recovery", () => {
-    const effects = resolveStoryAtDate(context(32, 109)).effects;
-    expect(effects.solarEclipse).toMatchObject({
-      startsMinuteOfDay: 510,
-      totalityMinuteOfDay: 600,
-      endsMinuteOfDay: 690,
-      minimumOutputMultiplier: SOLAR_ECLIPSE_MINIMUM_OUTPUT.Manager,
-    });
-    expect(solarEclipseOutputMultiplier(effects, 510)).toBe(1);
-    expect(solarEclipseOutputMultiplier(effects, 555)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 600)).toBe(0.08);
-    expect(solarEclipseOutputMultiplier(effects, 645)).toBeCloseTo(0.54);
-    expect(solarEclipseOutputMultiplier(effects, 690)).toBe(1);
-  });
-
   it("keeps the seeded nuclear trip hidden and targets a paused unit at onset", () => {
     const snapshot: StorySnapshotType = {
       ...EMPTY_SNAPSHOT,
@@ -467,27 +430,91 @@ describe("generation and storage reliability scenarios", () => {
       "Grand Nuclear Unit",
     ]);
   });
+});
 
-  it("uses short preview copy before the eclipse and precise copy at onset", () => {
-    const upcoming = upcomingStoryPhases(context(0, 109));
-    const warning = upcoming.find((phase) =>
-      phase.key.endsWith(":advance-warning"),
-    )!;
-    const eclipse = upcoming.find((phase) => phase.key.endsWith(":eclipse"))!;
+describe("California wildfire emergency", () => {
+  const wildfireContext = (month: number) => ({
+    ...context(month, 111, 2468),
+    location: LOCATIONS.LA,
+    snapshot: {
+      ...EMPTY_SNAPSHOT,
+      facilities: [
+        {
+          id: 10,
+          name: "Natural Gas",
+          fuel: "Natural Gas" as const,
+          ageYears: 18,
+          peakW: 60,
+          operational: true,
+        },
+        {
+          id: 11,
+          name: "Solar Portfolio",
+          fuel: "Sun" as const,
+          ageYears: 6,
+          peakW: 40,
+          operational: true,
+        },
+        {
+          id: 12,
+          name: "Battery",
+          ageYears: 4,
+          peakW: 100,
+          operational: true,
+        },
+      ],
+    },
+  });
 
-    expect(warning).toMatchObject({
-      title: "Eclipse planning ahead",
-      message: "Grid planners will begin preparing for a total eclipse.",
+  it("applies the fixed January 2025 emergency only to scenario 111", () => {
+    const january = resolveStoryAtDate(wildfireContext(12));
+    const february = resolveStoryAtDate(wildfireContext(13));
+
+    expect(january.occurrences[0]).toMatchObject({
+      key: "story:111:california-wildfire-2025:firestorm",
+      title: "Wildfire emergency",
+      importance: "CRITICAL",
+      effects: { demandMultiplier: 0.94 },
     });
-    expect(eclipse).toMatchObject({
-      title: "Total solar eclipse",
-      message: "A total eclipse will briefly reduce solar generation.",
-    });
-    expect(eclipse.message).not.toMatch(/underway|08:30|10:00|11:30/i);
+    expect(january.effects.facilityOutputMultipliersById).toBeDefined();
+    expect(january.effects.operatingExpensePerMonth).toBe(1_000_000);
+    expect(february.effects).toEqual(january.effects);
+    expect(resolveStoryAtDate(wildfireContext(14)).effects).toEqual({});
+    expect(
+      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 999 })
+        .occurrences,
+    ).toEqual([]);
+    expect(
+      resolveStoryAtDate({ ...wildfireContext(12), scenarioId: 0 }).occurrences,
+    ).toEqual([]);
+  });
 
-    const live = resolveStoryAtDate(context(32, 109)).occurrences[0];
-    expect(live.title).toBe("The eclipse is underway");
-    expect(live.message).toMatch(/08:30.*10:00.*11:30/i);
+  it("previews one emergency and reports the recorded restoration result", () => {
+    const upcoming = upcomingStoryPhases(wildfireContext(0));
+    expect(upcoming.map((phase) => phase.key)).toEqual([
+      "story:111:california-wildfire-2025:firestorm",
+    ]);
+    expect(upcoming[0].message).toMatch(/safety shutoffs/i);
+
+    const onset = resolveStoryAtDate(wildfireContext(12)).occurrences[0];
+    const restoration = resolveStoryAtDate({
+      ...wildfireContext(14),
+      periodSnapshots: {
+        2: {
+          deliveredWhByFuel: {},
+          demandWh: 100,
+          unservedWh: 1,
+          netIncome: -10,
+          peakDemandW: 10,
+        },
+      },
+      occurrences: [onset],
+    }).occurrences[0];
+    expect(restoration).toMatchObject({
+      key: "story:111:california-wildfire-2025:restoration-complete",
+      attributes: { reliability: 0.99 },
+    });
+    expect(restoration.message).toMatch(/met 99% of connected demand/i);
   });
 });
 

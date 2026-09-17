@@ -65,11 +65,11 @@ export interface StoryPhaseDefinitionType {
   /** Allows linked seeded phases (for example landfall/restoration) to share one addressed draw. */
   scheduleAddress?: string;
   scheduleOffsetMonths?: number | ((context: StoryContextType) => number);
-  /** Short, future-tense copy for the Events tab. Live logs continue to use `describe`. */
+  /** Events-tab copy; live logs use `describe`. Return null to omit warning-only phases. */
   preview?: (
     context: StoryContextType,
     random: StoryRandomType,
-  ) => StoryPhasePreviewType;
+  ) => StoryPhasePreviewType | null;
   describe: (
     context: StoryContextType,
     random: StoryRandomType,
@@ -168,6 +168,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "regional-glut-warning",
       schedule: { atMonth: 12 },
+      preview: () => null,
       describe: () => ({
         title: "Cheaper gas forecast",
         message:
@@ -182,6 +183,10 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "regional-glut",
       schedule: { atMonth: 48 },
       durationMonths: 74,
+      preview: ({ difficulty }) => ({
+        title: "Gas prices will fall",
+        message: `Natural gas prices will drop ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% through Feb 2016.`,
+      }),
       describe: ({ difficulty }) => {
         const { boomGasMultiplier } = SHALE_BOOM_BALANCE[difficulty];
         return {
@@ -201,6 +206,7 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "freeze-warning",
       schedule: { atMonth: 95 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const { freezeGasOutput } = SHALE_BOOM_BALANCE[difficulty];
         return {
@@ -217,6 +223,13 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
       id: "freeze",
       schedule: { atMonth: 96 },
       durationMonths: 3,
+      preview: ({ difficulty }) => {
+        const balance = SHALE_BOOM_BALANCE[difficulty];
+        return {
+          title: "Winter freeze will hit",
+          message: `Gas costs will spike and gas plants will be limited to ${Math.round(balance.freezeGasOutput * 100)}% output for three months.`,
+        };
+      },
       describe: ({ difficulty }) => {
         const balance = SHALE_BOOM_BALANCE[difficulty];
         const effectiveMultiplier =
@@ -247,6 +260,10 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "normalization",
       schedule: { atMonth: 122 },
+      preview: () => ({
+        title: "Gas boom will end",
+        message: "Natural gas prices will return to normal.",
+      }),
       describe: ({ snapshot }) => {
         const gasShare = share(
           snapshot.deliveredWhByFuel12m["Natural Gas"] || 0,
@@ -274,6 +291,11 @@ const SHALE_BOOM_ARC: StoryArcDefinitionType = {
     {
       id: "freeze-recovery",
       schedule: { atMonth: 99 },
+      preview: () => ({
+        title: "Gas output will recover",
+        message:
+          "Plant limits will lift and lower boom-era prices will resume.",
+      }),
       describe: ({ difficulty }) => ({
         title: "Winter freeze ends",
         message: `Gas output is fully restored, and prices return to the ${Math.round((1 - SHALE_BOOM_BALANCE[difficulty].boomGasMultiplier) * 100)}% reduction caused by the shale gas boom.`,
@@ -436,6 +458,7 @@ const CARBON_FEE_ARC: StoryArcDefinitionType = {
     {
       id: "published-ratchet",
       schedule: { atMonth: 12 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const feePerTon = CARBON_FEE_BALANCE[difficulty];
         return {
@@ -515,6 +538,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
     {
       id: "visitor-warning",
       schedule: { atMonth: 21 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Visitor surge forecast",
         message: `Visitors are expected to raise electricity use ${Math.round((PARADISE_BALANCE[difficulty].visitorDemand - 1) * 100)}% from May 2006 through October 2007.`,
@@ -545,6 +569,7 @@ const PARADISE_ARC: StoryArcDefinitionType = {
     {
       id: "cargo-warning",
       schedule: { atMonth: 101 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Fuel delivery warning",
         message: `A late fuel shipment could raise oil prices ${Math.round((PARADISE_BALANCE[difficulty].oilShock - 1) * 100)}% this fall, so prepare local generation or stored energy before September.`,
@@ -662,6 +687,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
     {
       id: "manufacturing-warning",
       schedule: { atMonth: 72 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const balance = RENEWABLES_BALANCE[difficulty];
         return {
@@ -704,6 +730,7 @@ const RENEWABLES_ARC: StoryArcDefinitionType = {
     {
       id: "clean-tech-load-warning",
       schedule: { atMonth: 114 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "Factory growth forecast",
         message: `New factories are expected to raise electricity use ${Math.round((RENEWABLES_BALANCE[difficulty].demandLoad - 1) * 100)}% from 2012 through 2013.`,
@@ -775,6 +802,7 @@ const HURRICANE_ARC: StoryArcDefinitionType = {
     {
       id: "outlook",
       schedule: { atMonth: 96 },
+      preview: () => null,
       describe: ({ difficulty }) => {
         const balance = HURRICANE_BALANCE[difficulty];
         return {
@@ -896,6 +924,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
     {
       id: "aging-warning",
       schedule: { atMonth: 48 },
+      preview: () => null,
       describe: ({ snapshot, difficulty }) => {
         const selected = snapshot.facilities.filter(
           (facility) => facility.fuel === "Coal" && facility.ageYears + 2 >= 30,
@@ -951,6 +980,7 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
     {
       id: "compliance-warning",
       schedule: { atMonth: 130 },
+      preview: () => null,
       describe: ({ difficulty }) => ({
         title: "New coal rules announced",
         message: `Operating costs for old and new coal plants will rise ${Math.round((END_OF_ERA_BALANCE[difficulty].coalOM - 1) * 100)}% in January 1995.`,
@@ -1046,6 +1076,34 @@ const END_OF_ERA_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export const DEEP_FREEZE_DECISION_KEY =
+  "story:107:texas-deep-freeze:winterization";
+// Rounded 2020-dollar planning allowance: about $82M for the 3,827 MW resource
+// portfolio plus representative pre-freeze expansion, not a literal plant retrofit quote.
+// Observed thermal-fleet spending and a conservative wind allowance inform the scale;
+// see src/testing/SCENARIO_CHOICE_BALANCE.md. Difficulty changes risk, not service cost.
+export const WINTERIZATION_COST = {
+  Intern: 90000000,
+  Employee: 90000000,
+  Manager: 90000000,
+  VP: 90000000,
+  CEO: 90000000,
+};
+export function winterizationCost(difficulty: DifficultyType): number {
+  return WINTERIZATION_COST[difficulty];
+}
+export function deepFreezeWinterized(
+  occurrences?: ActiveWorldEventType[],
+): boolean {
+  return (
+    occurrences?.some(
+      (event) =>
+        event.key === DEEP_FREEZE_DECISION_KEY &&
+        event.attributes.choice === "winterize",
+    ) ?? false
+  );
+}
+
 export const TEXAS_DEEP_FREEZE_DEMAND: Record<DifficultyType, number> = {
   // The joint FERC/NERC report measured actual ERCOT peak load 20% above the normal-weather
   // forecast and estimated unconstrained demand 33% above it. Difficulty spans that observed
@@ -1072,11 +1130,14 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
       // January 2017 is month zero, so February 2021 is month 49.
       schedule: { atMonth: 49 },
       durationMonths: 1,
-      describe: ({ difficulty }) => {
+      describe: ({ difficulty, occurrences }) => {
+        const winterized = deepFreezeWinterized(occurrences);
+        const protectedOutput = (normal: number) =>
+          winterized ? (1 + normal) / 2 : normal;
         const demandMultiplier = TEXAS_DEEP_FREEZE_DEMAND[difficulty];
         return {
           title: "The deep freeze",
-          message: `Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
+          message: `${winterized ? "Your funded winterization halves plant output losses. " : "Without funded winterization, the full plant output losses apply. "}Record cold is straining power supplies across Texas as demand runs ${Math.round((demandMultiplier - 1) * 100)}% above normal, gas, coal, nuclear, and wind plants produce less, and natural-gas prices rise sharply.`,
           concept: "blackout",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
@@ -1088,10 +1149,10 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
             demandMultiplier,
             fuelPriceMultipliers: { "Natural Gas": 2.8 },
             facilityOutputMultipliersByFuel: {
-              "Natural Gas": 0.62,
-              Coal: 0.73,
-              Uranium: 0.77,
-              Wind: 0.44,
+              "Natural Gas": protectedOutput(0.62),
+              Coal: protectedOutput(0.73),
+              Uranium: protectedOutput(0.77),
+              Wind: protectedOutput(0.44),
             },
           },
           turningPointPriority: 110,
@@ -1101,17 +1162,20 @@ const TEXAS_DEEP_FREEZE_ARC: StoryArcDefinitionType = {
     {
       id: "thaw",
       schedule: { atMonth: 50 },
-      describe: ({ periodSnapshots }) => {
+      describe: ({ periodSnapshots, occurrences }) => {
         const event = periodSnapshots?.[1];
         const unservedWh = event?.unservedWh || 0;
+        const preparation = deepFreezeWinterized(occurrences)
+          ? "Your funded winterization halved plant output losses. "
+          : "Your construction budget was preserved, with full plant output losses. ";
         return {
           title: "The thaw",
           message:
             event === undefined
               ? "The freeze ends next month, restoring normal plant output and gas prices."
               : unservedWh > 0
-                ? "The freeze has ended, leaving the grid with a difficult recovery after blackouts."
-                : "The freeze has ended, and your preparations kept every customer supplied.",
+                ? `${preparation}The freeze has ended, leaving the grid with a difficult recovery after blackouts.`
+                : `${preparation}The freeze has ended, and your preparations kept every customer supplied.`,
           concept: "weather",
           kind: "WORLD_EVENT",
           importance: "NOTABLE",
@@ -1166,14 +1230,6 @@ export const HEATWAVE_DROUGHT_BALANCE: Record<
   },
 };
 
-export const SOLAR_ECLIPSE_MINIMUM_OUTPUT: Record<DifficultyType, number> = {
-  Intern: 0.15,
-  Employee: 0.12,
-  Manager: 0.08,
-  VP: 0.05,
-  CEO: 0.02,
-};
-
 const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   id: "heatwave-drought",
   scenarioId: 108,
@@ -1181,6 +1237,7 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
     {
       id: "seasonal-warning",
       schedule: { atMonth: 24 },
+      preview: () => null,
       describe: () => ({
         title: "A hot, dry summer ahead",
         message:
@@ -1243,53 +1300,192 @@ const HEATWAVE_DROUGHT_ARC: StoryArcDefinitionType = {
   ],
 };
 
-const SOLAR_ECLIPSE_ARC: StoryArcDefinitionType = {
-  id: "solar-eclipse",
-  scenarioId: 109,
+export interface CaliforniaWildfireBalanceType {
+  disconnectedDemand: number;
+  targetCapacityShare: number;
+  outputMultiplier: number;
+  restorationCostPerMonth: number;
+}
+
+// Restoration is an inferred damage-severity proxy, not a validated cost curve:
+// LADWP's $78M electric restoration estimate × 1% municipal scale × 0.97436
+// (2025 to 2024 dollars) gives about $760k at 2.2375% disconnected customers.
+// Scale with the scenario's 2–10% severity, divide over January/February, and round.
+// See src/testing/SCENARIO_CHOICE_BALANCE.md; advance preparation remains separate.
+export const CALIFORNIA_WILDFIRE_BALANCE: Record<
+  DifficultyType,
+  CaliforniaWildfireBalanceType
+> = {
+  Intern: {
+    disconnectedDemand: 0.02,
+    targetCapacityShare: 0.3,
+    outputMultiplier: 0.65,
+    restorationCostPerMonth: 350000,
+  },
+  Employee: {
+    disconnectedDemand: 0.04,
+    targetCapacityShare: 0.4,
+    outputMultiplier: 0.55,
+    restorationCostPerMonth: 700000,
+  },
+  Manager: {
+    disconnectedDemand: 0.06,
+    targetCapacityShare: 0.5,
+    outputMultiplier: 0.45,
+    restorationCostPerMonth: 1000000,
+  },
+  VP: {
+    disconnectedDemand: 0.08,
+    targetCapacityShare: 0.6,
+    outputMultiplier: 0.35,
+    restorationCostPerMonth: 1350000,
+  },
+  CEO: {
+    disconnectedDemand: 0.1,
+    targetCapacityShare: 0.7,
+    outputMultiplier: 0.25,
+    restorationCostPerMonth: 1700000,
+  },
+};
+
+export const WILDFIRE_DECISION_KEY =
+  "story:111:california-wildfire-2025:preparedness";
+export function wildfirePrepared(
+  occurrences?: ActiveWorldEventType[],
+): boolean {
+  return (
+    occurrences?.some(
+      (event) =>
+        event.key === WILDFIRE_DECISION_KEY &&
+        event.attributes.choice === "prepare",
+    ) ?? false
+  );
+}
+// Advance inspection, staged backup equipment and response resources for the small
+// municipal system. This is separate from severity-dependent post-fire restoration.
+export function wildfirePreparationCost(_difficulty: DifficultyType): number {
+  return 200000;
+}
+
+const CALIFORNIA_WILDFIRE_ARC: StoryArcDefinitionType = {
+  id: "california-wildfire-2025",
+  scenarioId: 111,
   phases: [
     {
-      id: "advance-warning",
-      schedule: { atMonth: 24 },
-      preview: () => ({
-        title: "Eclipse planning ahead",
-        message: "Grid planners will begin preparing for a total eclipse.",
-      }),
+      id: "red-flag-warning",
+      schedule: { atMonth: 11 },
+      preview: () => null,
       describe: () => ({
-        title: "Eclipse preparations begin",
+        title: "Red-flag warning",
         message:
-          "China's September 2035 total eclipse will sharply reduce morning solar output, so check both storage discharge power (MW) and duration (MWh).",
+          "After an exceptionally dry fall, extreme Santa Ana winds are forecast for January, so choose whether to fund advance inspections, staged backup equipment and response resources or preserve cash. The game is paused until you select.",
         concept: "forecast",
         kind: "WORLD_EVENT",
-        importance: "NOTABLE",
-        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+        importance: "CRITICAL",
+        actionTarget: { card: "EVENTS" },
       }),
     },
     {
-      id: "eclipse",
-      schedule: { atMonth: 32 },
-      durationMonths: 1,
-      preview: () => ({
-        title: "Total solar eclipse",
-        message: "A total eclipse will briefly reduce solar generation.",
+      id: "firestorm",
+      schedule: { atMonth: 12 },
+      durationMonths: 2,
+      preview: (context) => ({
+        title: "January wildfire emergency",
+        message: wildfirePrepared(context.occurrences)
+          ? "Prepared crews halve disconnected load and generation output losses during January and February. Normal restoration costs still apply."
+          : "Extreme fire weather may force two months of safety shutoffs, lost sales, constrained generation, and restoration work.",
       }),
-      describe: ({ difficulty }) => {
-        const minimumOutputMultiplier =
-          SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty];
+      describe: (context, random) => {
+        const original = CALIFORNIA_WILDFIRE_BALANCE[context.difficulty];
+        const prepared = wildfirePrepared(context.occurrences);
+        const balance = {
+          ...original,
+          disconnectedDemand:
+            original.disconnectedDemand * (prepared ? 0.5 : 1),
+          outputMultiplier: prepared
+            ? (1 + original.outputMultiplier) / 2
+            : original.outputMultiplier,
+        };
+        const candidates = context.snapshot.facilities
+          .filter((facility) => facility.operational && !!facility.fuel)
+          .map((facility) => ({
+            ...facility,
+            score: random(`facility|${facility.id}`),
+          }))
+          .sort((a, b) => a.score - b.score || a.id - b.id);
+        const totalPeakW = candidates.reduce(
+          (total, facility) => total + facility.peakW,
+          0,
+        );
+        const targetPeakW = totalPeakW * balance.targetCapacityShare;
+        const selected: typeof candidates = [];
+        let selectedPeakW = 0;
+        for (const candidate of candidates) {
+          if (selectedPeakW >= targetPeakW) {
+            break;
+          }
+          selected.push(candidate);
+          selectedPeakW += candidate.peakW;
+        }
+        const outputMultipliers = Object.fromEntries(
+          selected.map((facility) => [
+            String(facility.id),
+            balance.outputMultiplier,
+          ]),
+        );
+        const selectedNames = selected.map((facility) => facility.name);
+        const affectedFacilities = selectedNames.length
+          ? selectedNames.join(", ")
+          : "No operating generators";
         return {
-          title: "The eclipse is underway",
-          message: `Solar output falls from normal at 08:30 to ${Math.round(minimumOutputMultiplier * 100)}% at 10:00 before recovering by 11:30, so storage and on-demand generators must cover the shortage.`,
-          concept: "storage",
+          title: "Wildfire emergency",
+          message: `${prepared ? "Prepared crews are in place. " : "Standard response is in place. "}${Math.round(balance.disconnectedDemand * 100)}% of customer load is disconnected by safety shutoffs while ${affectedFacilities} ${selectedNames.length === 1 ? "is" : "are"} limited to ${percent(balance.outputMultiplier)} output and restoration costs $${balance.restorationCostPerMonth / 1000000}M per month through February.`,
+          concept: "danger",
           kind: "WORLD_EVENT",
           importance: "CRITICAL",
-          actionTarget: { card: "FACILITIES", view: "FLEET" },
-          effects: {
-            solarEclipse: {
-              startsMinuteOfDay: 8 * 60 + 30,
-              totalityMinuteOfDay: 10 * 60,
-              endsMinuteOfDay: 11 * 60 + 30,
-              minimumOutputMultiplier,
-            },
+          actionTarget: FLEET_TARGET,
+          attributes: {
+            prepared,
+            disconnectedDemand: balance.disconnectedDemand,
+            targetCapacityShare: balance.targetCapacityShare,
+            selectedCapacityShare: share(selectedPeakW, totalPeakW),
+            selectedFacilityIds: selected.map((facility) => facility.id),
+            selectedFacilityNames: selectedNames,
+            outputMultiplier: balance.outputMultiplier,
+            restorationCostPerMonth: balance.restorationCostPerMonth,
           },
+          effects: {
+            demandMultiplier: 1 - balance.disconnectedDemand,
+            facilityOutputMultipliersById: outputMultipliers,
+            operatingExpensePerMonth: balance.restorationCostPerMonth,
+          },
+          turningPointPriority: 120,
+        };
+      },
+    },
+    {
+      id: "restoration-complete",
+      schedule: { atMonth: 14 },
+      preview: () => null,
+      describe: (context) => {
+        const period = context.periodSnapshots?.[2];
+        const demandWh = period?.demandWh || context.snapshot.demandWh12m;
+        const unservedWh = period?.unservedWh || context.snapshot.unservedWh12m;
+        const reliability = reliabilityOf(demandWh, unservedWh);
+        const onset = context.occurrences?.find(
+          (event) =>
+            event.key === "story:111:california-wildfire-2025:firestorm",
+        );
+        const selectedNames = (onset?.attributes.selectedFacilityNames ||
+          []) as string[];
+        return {
+          title: "Wildfire restoration complete",
+          message: `${wildfirePrepared(context.occurrences) ? "Your funded preparedness halved physical disconnections and generator output losses during the emergency. " : "The standard response preserved your preparedness budget. "}Safety shutoffs are lifted, ${selectedNames.length ? selectedNames.join(", ") : "affected generators"} return to normal, and the grid met ${percent(reliability)} of connected demand during the emergency.`,
+          concept: "supply",
+          kind: "WORLD_EVENT",
+          importance: unservedWh > demandWh * 0.001 ? "NOTABLE" : "ROUTINE",
+          actionTarget: SUPPLY_DEMAND_TARGET,
+          attributes: { demandWh, unservedWh, reliability },
           turningPointPriority: 110,
         };
       },
@@ -1304,6 +1500,7 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
     {
       id: "contingency-review",
       schedule: { atMonth: 24 },
+      preview: () => null,
       describe: () => ({
         title: "Backup-power review",
         message:
@@ -1349,6 +1546,293 @@ const NUCLEAR_TRIP_ARC: StoryArcDefinitionType = {
   ],
 };
 
+export interface LoadSheddingBalanceType {
+  /** Share of nominal coal output still available, year by year from 2019 to 2022. */
+  coalOutputMultipliers: [number, number, number, number];
+  /** Coal operating cost, which rises with the breakdowns and the running repairs. */
+  coalOperatingMultipliers: [number, number, number, number];
+  /** Diesel is what covers the gap, and it is bought at short notice. */
+  dieselPriceMultipliers: [number, number, number, number];
+}
+
+// Eskom's energy availability factor fell from 78% in 2018 to about 58% in 2022, with unplanned
+// outages roughly doubling over the same period. These multiply nameplate output, so Employee is
+// set to the published EAF itself - 67, 65, 62 and 58 percent - and the other difficulties sit
+// either side of the record. Anything shallower leaves the fleet able to carry the load on its
+// own, which is the one thing the years these steps describe were not.
+// https://www.eskom.co.za/dataportal/supply-side/eaf-weekly-data/
+export const LOAD_SHEDDING_BALANCE: Record<
+  DifficultyType,
+  LoadSheddingBalanceType
+> = {
+  Intern: {
+    coalOutputMultipliers: [0.74, 0.72, 0.7, 0.68],
+    coalOperatingMultipliers: [1.05, 1.1, 1.15, 1.2],
+    dieselPriceMultipliers: [1.05, 1.1, 1.15, 1.2],
+  },
+  Employee: {
+    coalOutputMultipliers: [0.67, 0.65, 0.62, 0.58],
+    coalOperatingMultipliers: [1.08, 1.16, 1.24, 1.32],
+    dieselPriceMultipliers: [1.1, 1.2, 1.3, 1.4],
+  },
+  Manager: {
+    coalOutputMultipliers: [0.64, 0.61, 0.57, 0.53],
+    coalOperatingMultipliers: [1.1, 1.2, 1.3, 1.45],
+    dieselPriceMultipliers: [1.15, 1.3, 1.45, 1.6],
+  },
+  VP: {
+    coalOutputMultipliers: [0.61, 0.57, 0.52, 0.47],
+    coalOperatingMultipliers: [1.12, 1.26, 1.4, 1.55],
+    dieselPriceMultipliers: [1.2, 1.4, 1.6, 1.8],
+  },
+  CEO: {
+    coalOutputMultipliers: [0.58, 0.53, 0.47, 0.42],
+    coalOperatingMultipliers: [1.15, 1.32, 1.5, 1.7],
+    dieselPriceMultipliers: [1.25, 1.5, 1.75, 2],
+  },
+};
+
+const LOAD_SHEDDING_ARC: StoryArcDefinitionType = {
+  id: "load-shedding",
+  scenarioId: 113,
+  phases: [
+    {
+      id: "maintenance-backlog",
+      schedule: { atMonth: 6 },
+      preview: () => null,
+      describe: () => ({
+        title: "The maintenance backlog is growing",
+        message:
+          "Unplanned breakdowns across the coal fleet are rising and the oldest stations are missing their scheduled outages. Expect less coal output every year from here, and build replacement capacity before the gap opens.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([12, 24, 36, 48] as const).map((atMonth, index) => ({
+      id: `availability-step-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: 12,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = LOAD_SHEDDING_BALANCE[difficulty];
+        const output = balance.coalOutputMultipliers[index];
+        const operating = balance.coalOperatingMultipliers[index];
+        const diesel = balance.dieselPriceMultipliers[index];
+        return {
+          title: [
+            "Breakdowns outpace repairs",
+            "Another station derated",
+            "The fleet is running on borrowed time",
+            "Availability at its lowest",
+          ][index],
+          message: `Coal output is down to ${Math.round(output * 100)}% of nominal for the year, coal running costs are ${Math.round((operating - 1) * 100)}% higher, and diesel for the peakers costs ${Math.round((diesel - 1) * 100)}% more than normal.`,
+          concept: "fuel" as const,
+          kind: "WORLD_EVENT" as const,
+          importance: index >= 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            facilityOutputMultipliersByFuel: { Coal: output },
+            operatingCostMultipliersByFuel: { Coal: operating },
+            fuelPriceMultipliers: { Oil: diesel },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
+export interface KaribaDroughtBalanceType {
+  /** Inflow to the reservoir across the four steps of the drought. */
+  hydroRunoffMultipliers: [number, number, number, number];
+  /** What the remaining head can actually deliver as the lake falls. */
+  hydroOutputMultipliers: [number, number, number, number];
+}
+
+// Kariba's usable storage fell from full in early 2014 to about 12% by the end of 2015 and under
+// 5% in late 2016, taking Zambia's generation down with it. These steps are authored game-scale
+// derates that trace that decline rather than a reconstruction of the lake's level record.
+// https://www.zambezira.org/hydrology/lake-levels
+export const KARIBA_DROUGHT_BALANCE: Record<
+  DifficultyType,
+  KaribaDroughtBalanceType
+> = {
+  Intern: {
+    hydroRunoffMultipliers: [0.8, 0.6, 0.45, 0.6],
+    hydroOutputMultipliers: [0.9, 0.75, 0.6, 0.75],
+  },
+  Employee: {
+    hydroRunoffMultipliers: [0.7, 0.5, 0.33, 0.5],
+    hydroOutputMultipliers: [0.85, 0.66, 0.5, 0.68],
+  },
+  Manager: {
+    hydroRunoffMultipliers: [0.62, 0.4, 0.24, 0.45],
+    hydroOutputMultipliers: [0.8, 0.58, 0.42, 0.62],
+  },
+  VP: {
+    hydroRunoffMultipliers: [0.55, 0.32, 0.17, 0.4],
+    hydroOutputMultipliers: [0.75, 0.5, 0.34, 0.56],
+  },
+  CEO: {
+    hydroRunoffMultipliers: [0.48, 0.25, 0.1, 0.35],
+    hydroOutputMultipliers: [0.7, 0.42, 0.26, 0.5],
+  },
+};
+
+const KARIBA_DROUGHT_ARC: StoryArcDefinitionType = {
+  id: "kariba-drought",
+  scenarioId: 114,
+  phases: [
+    {
+      id: "poor-rains-forecast",
+      schedule: { atMonth: 8 },
+      preview: () => null,
+      describe: () => ({
+        title: "A weak rainy season is forecast",
+        message:
+          "Forecasters expect El Nino to suppress the rains over the Zambezi catchment. Inflow to the reservoir will fall through 2015 and 2016, and almost every megawatt you own depends on it.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    // Continuous cover from the first failed season to the end of the run. A gap here would hand
+    // the lake a spell of undiminished inflow in the middle of the drought - and, worse, leave
+    // the recovery step reading as a step down from the months before it.
+    ...([12, 18, 24, 36] as const).map((atMonth, index) => ({
+      id: `reservoir-step-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: index >= 2 ? 12 : 6,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = KARIBA_DROUGHT_BALANCE[difficulty];
+        const runoff = balance.hydroRunoffMultipliers[index];
+        const output = balance.hydroOutputMultipliers[index];
+        return {
+          title: [
+            "The rains came up short",
+            "The lake keeps dropping",
+            "Kariba near its minimum",
+            "The rains return",
+          ][index],
+          message:
+            index === 3
+              ? `A better season lifts inflow back to ${Math.round(runoff * 100)}% of normal, and the machines recover to ${Math.round(output * 100)}% as the lake refills.`
+              : `Inflow is ${Math.round(runoff * 100)}% of normal and the falling head limits hydro output to ${Math.round(output * 100)}% of nominal.`,
+          concept: "weather" as const,
+          kind: "WORLD_EVENT" as const,
+          importance:
+            index === 2 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            hydroRunoffMultiplier: runoff,
+            facilityOutputMultipliersByFuel: { Hydro: output },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
+export interface DelhiSummerBalanceType {
+  /** Peak-season demand across the summers of 2021 through 2024. */
+  demandMultipliers: [number, number, number, number];
+  /** Thermal output lost to intake and condenser temperatures in the same months. */
+  thermalOutputMultipliers: [number, number, number, number];
+  /** Degrees added to the record during each summer window. */
+  temperatureOffsetC: [number, number, number, number];
+}
+
+// Delhi's peak demand rose from 7,695MW in 2022 to 8,656MW on 19 June 2024, its all-time record,
+// after weeks above 45C. Thermal derating in extreme heat is an authored game-scale effect.
+// https://cea.nic.in/general-review-report/
+export const DELHI_SUMMER_BALANCE: Record<
+  DifficultyType,
+  DelhiSummerBalanceType
+> = {
+  Intern: {
+    demandMultipliers: [1.01, 1.02, 1.04, 1.06],
+    thermalOutputMultipliers: [0.99, 0.98, 0.96, 0.94],
+    temperatureOffsetC: [0.2, 0.4, 0.6, 0.9],
+  },
+  Employee: {
+    demandMultipliers: [1.02, 1.03, 1.05, 1.08],
+    thermalOutputMultipliers: [0.98, 0.97, 0.95, 0.92],
+    temperatureOffsetC: [0.3, 0.5, 0.8, 1.2],
+  },
+  Manager: {
+    demandMultipliers: [1.03, 1.04, 1.07, 1.1],
+    thermalOutputMultipliers: [0.97, 0.96, 0.93, 0.9],
+    temperatureOffsetC: [0.4, 0.6, 1, 1.5],
+  },
+  VP: {
+    demandMultipliers: [1.04, 1.05, 1.08, 1.12],
+    thermalOutputMultipliers: [0.96, 0.95, 0.92, 0.88],
+    temperatureOffsetC: [0.5, 0.7, 1.2, 1.8],
+  },
+  CEO: {
+    demandMultipliers: [1.05, 1.06, 1.1, 1.14],
+    thermalOutputMultipliers: [0.95, 0.94, 0.9, 0.86],
+    temperatureOffsetC: [0.6, 0.8, 1.4, 2.1],
+  },
+};
+
+const DELHI_SUMMER_ARC: StoryArcDefinitionType = {
+  id: "delhi-summer",
+  scenarioId: 115,
+  phases: [
+    {
+      id: "summer-outlook",
+      schedule: { atMonth: 2 },
+      preview: () => null,
+      describe: () => ({
+        title: "A hotter summer than the last",
+        message:
+          "Each pre-monsoon season is peaking higher than the one before, and the heat that drives the peak also takes output away from the coal and gas plants meeting it. Build for the peak, not the average.",
+        concept: "forecast",
+        kind: "WORLD_EVENT",
+        importance: "NOTABLE",
+        actionTarget: { card: "INSIGHTS", layer: "SUPPLY_DEMAND" },
+      }),
+    },
+    ...([4, 16, 28, 40] as const).map((atMonth, index) => ({
+      id: `summer-peak-${index + 1}`,
+      schedule: { atMonth },
+      durationMonths: 3,
+      describe: ({ difficulty }: StoryContextType) => {
+        const balance = DELHI_SUMMER_BALANCE[difficulty];
+        const demand = balance.demandMultipliers[index];
+        const thermal = balance.thermalOutputMultipliers[index];
+        return {
+          title: [
+            "The 2021 pre-monsoon heat",
+            "A longer, hotter 2022",
+            "2023 sets a new peak",
+            "The record summer",
+          ][index],
+          message: `Demand runs ${Math.round((demand - 1) * 100)}% above normal while heat holds coal and gas output to ${Math.round(thermal * 100)}% of nominal.${index === 3 ? " This is the summer the city sets its all-time peak." : ""}`,
+          concept: "weather" as const,
+          kind: "WORLD_EVENT" as const,
+          importance:
+            index === 3 ? ("CRITICAL" as const) : ("NOTABLE" as const),
+          actionTarget: { card: "FACILITIES" as const, view: "FLEET" as const },
+          effects: {
+            temperatureOffsetC: balance.temperatureOffsetC[index],
+            demandMultiplier: demand,
+            facilityOutputMultipliersByFuel: {
+              Coal: thermal,
+              "Natural Gas": thermal,
+            },
+          },
+          turningPointPriority: 100 + index,
+        };
+      },
+    })),
+  ],
+};
+
 export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   CARBON_FEE_ARC,
   RENEWABLES_ARC,
@@ -1358,8 +1842,11 @@ export const STORY_ARC_DEFINITIONS: StoryArcDefinitionType[] = [
   PARADISE_ARC,
   TEXAS_DEEP_FREEZE_ARC,
   HEATWAVE_DROUGHT_ARC,
-  SOLAR_ECLIPSE_ARC,
   NUCLEAR_TRIP_ARC,
+  CALIFORNIA_WILDFIRE_ARC,
+  LOAD_SHEDDING_ARC,
+  KARIBA_DROUGHT_ARC,
+  DELHI_SUMMER_ARC,
 ];
 
 /** Content-level difficulty scaling is centralized and mechanically checkable. */
@@ -1465,12 +1952,6 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       ),
     );
   });
-  descending(
-    "Solar eclipse minimum output",
-    DIFFICULTY_ORDER.map(
-      (difficulty) => SOLAR_ECLIPSE_MINIMUM_OUTPUT[difficulty],
-    ),
-  );
   ascending(
     "Hurricane affected capacity",
     DIFFICULTY_ORDER.map(
@@ -1511,6 +1992,93 @@ export function validateStoryDifficultyMonotonicity(): string[] {
       (difficulty) => END_OF_ERA_BALANCE[difficulty].complianceCoalOutput,
     ),
   );
+  ascending(
+    "California wildfire disconnected demand",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].disconnectedDemand,
+    ),
+  );
+  ascending(
+    "California wildfire affected capacity",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].targetCapacityShare,
+    ),
+  );
+  descending(
+    "California wildfire output",
+    DIFFICULTY_ORDER.map(
+      (difficulty) => CALIFORNIA_WILDFIRE_BALANCE[difficulty].outputMultiplier,
+    ),
+  );
+  ascending(
+    "California wildfire restoration cost",
+    DIFFICULTY_ORDER.map(
+      (difficulty) =>
+        CALIFORNIA_WILDFIRE_BALANCE[difficulty].restorationCostPerMonth,
+    ),
+  );
+  ([0, 1, 2, 3] as const).forEach((step) => {
+    descending(
+      `Load shedding step ${step + 1} coal output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].coalOutputMultipliers[step],
+      ),
+    );
+    ascending(
+      `Load shedding step ${step + 1} coal operating cost`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].coalOperatingMultipliers[step],
+      ),
+    );
+    ascending(
+      `Load shedding step ${step + 1} diesel price`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          LOAD_SHEDDING_BALANCE[difficulty].dieselPriceMultipliers[step],
+      ),
+    );
+    descending(
+      `Kariba step ${step + 1} runoff`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          KARIBA_DROUGHT_BALANCE[difficulty].hydroRunoffMultipliers[step],
+      ),
+    );
+    descending(
+      `Kariba step ${step + 1} hydro output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          KARIBA_DROUGHT_BALANCE[difficulty].hydroOutputMultipliers[step],
+      ),
+    );
+  });
+  ([0, 1, 2, 3] as const).forEach((summer) => {
+    ascending(
+      `Delhi summer ${summer + 1} demand`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].demandMultipliers[summer],
+      ),
+    );
+    descending(
+      `Delhi summer ${summer + 1} thermal output`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].thermalOutputMultipliers[summer],
+      ),
+    );
+    ascending(
+      `Delhi summer ${summer + 1} temperature`,
+      DIFFICULTY_ORDER.map(
+        (difficulty) =>
+          DELHI_SUMMER_BALANCE[difficulty].temperatureOffsetC[summer],
+      ),
+    );
+  });
   return problems;
 }
 
@@ -1591,12 +2159,6 @@ export function combineStoryEffects(
         (combined.hydroRunoffMultiplier ?? 1) *
         (effects.hydroRunoffMultiplier ?? 1);
     }
-    if (effects.solarEclipse !== undefined) {
-      if (combined.solarEclipse !== undefined) {
-        throw new Error("Overlapping solar-eclipse effects");
-      }
-      combined.solarEclipse = effects.solarEclipse;
-    }
     const fuelPriceMultipliers = multiplyEffects(
       combined.fuelPriceMultipliers,
       effects.fuelPriceMultipliers,
@@ -1617,6 +2179,14 @@ export function combineStoryEffects(
     );
     if (operatingCostMultipliersByFuel !== undefined) {
       combined.operatingCostMultipliersByFuel = operatingCostMultipliersByFuel;
+    }
+    if (
+      combined.operatingExpensePerMonth !== undefined ||
+      effects.operatingExpensePerMonth !== undefined
+    ) {
+      combined.operatingExpensePerMonth =
+        (combined.operatingExpensePerMonth || 0) +
+        (effects.operatingExpensePerMonth || 0);
     }
     const facilityOutputMultipliersByFuel = multiplyEffects(
       combined.facilityOutputMultipliersByFuel,
@@ -1760,10 +2330,10 @@ export function upcomingStoryPhases(
     .flatMap((arc) =>
       arc.phases
         .filter((phase) => phase.forecastable !== false)
-        .map((phase) => {
+        .flatMap((phase) => {
           const resolved = resolveStoryPhase(arc, phase, context);
           if (!phase.preview) {
-            return resolved;
+            return [resolved];
           }
           const random = (attribute: string) =>
             randomAt(
@@ -1772,11 +2342,15 @@ export function upcomingStoryPhases(
               storyHash(`${resolved.key}|${attribute}`),
             );
           const preview = phase.preview(context, random);
-          return {
-            ...resolved,
-            title: preview.title,
-            message: preview.message,
-          };
+          return preview
+            ? [
+                {
+                  ...resolved,
+                  title: preview.title,
+                  message: preview.message,
+                },
+              ]
+            : [];
         }),
     )
     .filter(
@@ -1787,37 +2361,6 @@ export function upcomingStoryPhases(
     .sort(
       (a, b) => a.startsMinute - b.startsMinute || a.key.localeCompare(b.key),
     );
-}
-
-/** Piecewise-linear loss and recovery across a known eclipse window. */
-export function solarEclipseOutputMultiplier(
-  effects: WorldEventEffectsType,
-  minuteOfDay: number,
-): number {
-  const eclipse = effects.solarEclipse;
-  if (
-    !eclipse ||
-    minuteOfDay <= eclipse.startsMinuteOfDay ||
-    minuteOfDay >= eclipse.endsMinuteOfDay
-  ) {
-    return 1;
-  }
-  if (minuteOfDay === eclipse.totalityMinuteOfDay) {
-    return eclipse.minimumOutputMultiplier;
-  }
-  if (minuteOfDay <= eclipse.totalityMinuteOfDay) {
-    const progress =
-      (minuteOfDay - eclipse.startsMinuteOfDay) /
-      (eclipse.totalityMinuteOfDay - eclipse.startsMinuteOfDay);
-    return 1 - progress * (1 - eclipse.minimumOutputMultiplier);
-  }
-  const recovery =
-    (minuteOfDay - eclipse.totalityMinuteOfDay) /
-    (eclipse.endsMinuteOfDay - eclipse.totalityMinuteOfDay);
-  return (
-    eclipse.minimumOutputMultiplier +
-    recovery * (1 - eclipse.minimumOutputMultiplier)
-  );
 }
 
 export function activeWorldEventEffects(

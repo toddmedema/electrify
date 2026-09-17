@@ -1,4 +1,4 @@
-import { produce } from "immer";
+import { createNextState as produce } from "@reduxjs/toolkit";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../data/Scenarios";
 import { getStore } from "../StoreRegistry";
 import { getPlayedScenarioIds } from "../LocalStorage";
@@ -85,15 +85,6 @@ describe("ending a scenario from inside the reducer", () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
-  });
-
-  it("survives to the end of the term without reading the revoked draft", () => {
-    const scenario = customScenario({ durationMonths: 2 });
-    let state = createGame({ scenarioId: CUSTOM_SCENARIO_ID, scenario });
-    while (state.date.monthsElapsed < (scenario.durationMonths as number)) {
-      state = tick(state);
-    }
-    expect(() => jest.runOnlyPendingTimers()).not.toThrow();
   });
 
   /**

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TableCell, TableRow, Typography } from "@mui/material";
+import { TableCell, TableRow } from "@mui/material";
 
 interface BuildAvailability {
   buildable: boolean;
@@ -17,14 +17,14 @@ export function getBuildAvailability(
   if (!available && viableLocationsRemaining !== 0) {
     return {
       buildable: false,
-      secondaryText: "Not available at this location or point in time.",
+      secondaryText: "Not available here yet.",
     };
   }
   const siteBuildable = viableLocationsRemaining !== 0;
   if (!siteBuildable) {
     return {
       buildable: false,
-      secondaryText: "No suitable project sites remain at this location.",
+      secondaryText: "No project sites remain in this game at this location.",
     };
   }
   if (!sizeBuildable) {
@@ -51,12 +51,7 @@ export function ViableLocationsRow(props: {
   }
   return (
     <TableRow>
-      <TableCell>
-        Suitable project sites remaining
-        <Typography variant="body2" color="textSecondary">
-          Each project uses one suitable site
-        </Typography>
-      </TableCell>
+      <TableCell>Sites left</TableCell>
       <TableCell align="right">{props.remaining}</TableCell>
     </TableRow>
   );
