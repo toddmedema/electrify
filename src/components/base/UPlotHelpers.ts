@@ -1,6 +1,11 @@
 import uPlot from "uplot";
 import { chartPalette, withAlpha } from "../../Theme";
 import { ChartEventMarker } from "./ChartAnnotationsContext";
+import {
+  axisTicksAreYearly,
+  formatMinuteAsMonthAxis,
+  MINUTES_PER_MONTH,
+} from "../../helpers/DateTime";
 
 /**
  * Shared pieces for the game's uPlot charts: axis styling that matches what the charts looked
@@ -208,6 +213,37 @@ export function xAxis(scale: number, o: AxisOptions): uPlot.Axis {
     gap: 2 * scale,
     values: showLabels ? o.values : (_u, splits) => splits.map(() => ""),
   };
+}
+
+/** Shared month spacing and year-aware labels for forecast charts. Read live state on redraw. */
+export function forecastMonthAxis(
+  scale: number,
+  getState: () => {
+    domain: { x: [number, number] };
+    startingYear: number;
+    multiyear: boolean;
+  },
+  showLabels?: boolean,
+): uPlot.Axis {
+  return xAxis(scale, {
+    showLabels,
+    splits: () => {
+      const [min, max] = getState().domain.x;
+      return stepTicks(min, max, MINUTES_PER_MONTH);
+    },
+    values: (_u, splits) => {
+      const state = getState();
+      const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
+      return splits.map((minute) =>
+        formatMinuteAsMonthAxis(
+          minute,
+          state.startingYear,
+          state.multiyear,
+          yearOnly,
+        ),
+      );
+    },
+  });
 }
 
 /**

@@ -6,7 +6,7 @@ async function openCustomSetup(page: Page) {
     window.localStorage.setItem(
       "plays",
       JSON.stringify({
-        plays: [{ scenarioId: 0, date: new Date().toString() }],
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
   });
@@ -40,6 +40,33 @@ async function activateFocusedNeighbor(
     await expect(focusedMarker).toHaveAttribute("aria-pressed", "true");
     await expect(search).not.toHaveValue(previousSelection);
   }
+}
+
+async function mapBackgroundPoint(map: Locator) {
+  await map.scrollIntoViewIfNeeded();
+  const point = await map.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    for (const yFraction of [0.5, 0.35, 0.65]) {
+      for (const xFraction of [0.5, 0.35, 0.65]) {
+        const x = Math.round(box.x + box.width * xFraction);
+        const y = Math.round(box.y + box.height * yFraction);
+        const target = document.elementFromPoint(x, y);
+        if (
+          target &&
+          element.contains(target) &&
+          !target.closest(".worldMapControls, .worldMapMarker")
+        ) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+  expect(
+    point,
+    "map must expose a background target for dragging",
+  ).not.toBeNull();
+  return point!;
 }
 
 test("world map location picker works with pointer, touch, search, and keyboard", async ({
@@ -373,17 +400,14 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   const startingTransform = await land.getAttribute("transform");
   const mapBox = await map.boundingBox();
   expect(mapBox).not.toBeNull();
+  // Cluster positions vary by viewport and loaded catalogue. Starting over a marker
+  // selects it instead of panning, so hit-test an actual background point.
 
   if (testInfo.project.name.startsWith("desktop")) {
-    await page.mouse.move(
-      mapBox!.x + mapBox!.width / 2,
-      mapBox!.y + mapBox!.height / 2,
-    );
+    const panStart = await mapBackgroundPoint(map);
+    await page.mouse.move(panStart.x, panStart.y);
     await page.mouse.down();
-    await page.mouse.move(
-      mapBox!.x + mapBox!.width / 2 - 80,
-      mapBox!.y + mapBox!.height / 2 - 30,
-    );
+    await page.mouse.move(panStart.x - 80, panStart.y - 30);
     await page.mouse.up();
     await expect
       .poll(() => land.getAttribute("transform"))
@@ -412,12 +436,7 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
   await map.scrollIntoViewIfNeeded();
   const touchMapBox = await map.boundingBox();
   expect(touchMapBox).not.toBeNull();
-  // Start over the open ocean in the lower-left. Coarse-pointer marker hit areas deliberately
-  // reach 44px, so the geometric center can belong to a marker on a 320px map.
-  const panStart = {
-    x: Math.round(touchMapBox!.x + 24),
-    y: Math.round(touchMapBox!.y + touchMapBox!.height - 24),
-  };
+  const panStart = await mapBackgroundPoint(map);
   const session = await page.context().newCDPSession(page);
   await session.send("Input.dispatchTouchEvent", {
     type: "touchStart",

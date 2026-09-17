@@ -1,4 +1,4 @@
-import { LOCATIONS } from "./Constants";
+import { DIFFICULTIES, LOCATIONS } from "./Constants";
 import {
   decodeReplay,
   encodeReplay,
@@ -261,6 +261,24 @@ describe("encodeReplay", () => {
 });
 
 describe("decodeReplay", () => {
+  it.each([undefined, null, 1, "", "Expert", "constructor", "toString"])(
+    "rejects an unsupported difficulty %p before playback",
+    (difficulty) => {
+      expect(
+        decodeReplay({ ...encodeReplay(aReplay()), difficulty }),
+      ).toBeNull();
+    },
+  );
+
+  it.each(Object.keys(DIFFICULTIES))(
+    "accepts the authored difficulty %s",
+    (difficulty) => {
+      expect(
+        decodeReplay({ ...encodeReplay(aReplay()), difficulty })?.difficulty,
+      ).toBe(difficulty);
+    },
+  );
+
   it("round-trips a replay through the document shape", () => {
     const replay = aReplay();
     expect(

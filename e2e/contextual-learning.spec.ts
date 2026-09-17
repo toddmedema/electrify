@@ -136,7 +136,9 @@ test("reading help preserves the current tutorial objective", async ({
     localStorage.setItem("audioEnabled", "false");
     localStorage.setItem(
       "plays",
-      JSON.stringify({ plays: [{ scenarioId: 0, date: "2026-09-10" }] }),
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-09-10" }],
+      }),
     );
   });
   await page.goto("/");

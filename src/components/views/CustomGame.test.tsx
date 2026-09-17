@@ -146,6 +146,68 @@ it("keeps Play available when the optional outlook fails", () => {
   expect(screen.getByRole("button", { name: "Play" })).toBeEnabled();
 });
 
+it.each(["startup", "postMessage"])(
+  "recovers from a synchronous forecast %s failure without blocking Play",
+  (failure) => {
+    jest.useFakeTimers();
+    const failedWorker = forecastWorkerStub();
+    const recoveredWorker = forecastWorkerStub();
+    const onStart = jest.fn();
+    if (failure === "startup") {
+      mockCreateForecastWorker.mockImplementationOnce(() => {
+        throw new Error("Worker blocked");
+      });
+    } else {
+      (failedWorker.postMessage as jest.Mock).mockImplementation(() => {
+        throw new DOMException("Cannot clone request", "DataCloneError");
+      });
+      mockCreateForecastWorker.mockReturnValueOnce(failedWorker);
+    }
+    mockCreateForecastWorker.mockReturnValue(recoveredWorker);
+    render(
+      <CustomGame
+        game={createGame({ scenarioId: 100 })}
+        scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+        onBack={jest.fn()}
+        onDelta={jest.fn()}
+        onStart={onStart}
+      />,
+    );
+
+    act(() => jest.advanceTimersByTime(250));
+    expect(screen.getByText("Year 1 outlook unavailable.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Year 1 outlook" }),
+    ).toHaveAttribute("aria-busy", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(failedWorker.terminate).toHaveBeenCalledTimes(
+      failure === "postMessage" ? 1 : 0,
+    );
+
+    fireEvent.change(
+      screen.getByRole("slider", { name: "Starting customers" }),
+      {
+        target: { value: 2_000_000 },
+      },
+    );
+    act(() => jest.advanceTimersByTime(250));
+    const request = (recoveredWorker.postMessage as jest.Mock).mock.calls[0][0];
+    act(() => {
+      recoveredWorker.onmessage?.({
+        data: {
+          requestId: request.requestId,
+          outlook: { demandServed: 1, worstShortfallW: 0 },
+        },
+      } as MessageEvent);
+    });
+    expect(screen.getByText("Demand covered")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Year 1 outlook unavailable."),
+    ).not.toBeInTheDocument();
+  },
+);
+
 it("ignores an older forecast result after the setup changes", () => {
   jest.useFakeTimers();
   const worker = forecastWorkerStub();

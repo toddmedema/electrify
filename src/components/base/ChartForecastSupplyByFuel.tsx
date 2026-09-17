@@ -4,16 +4,10 @@ import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   FORECAST_AXIS_LEFT,
   FORECAST_AXIS_RIGHT,
-  stepTicks,
-  xAxis,
+  forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
-import {
-  axisTicksAreYearly,
-  formatMinuteAsMonthAxis,
-  formatMinuteAsTooltipHeader,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { FuelNameType, TickPresentFutureType } from "../../Types";
 import { chartPalette, fuelColors, withAlpha } from "../../Theme";
@@ -102,20 +96,7 @@ function buildOptions(
       y: { range: () => [0, getState().maxY] as [number, number] },
     },
     axes: [
-      xAxis(scale, {
-        showLabels: showXLabels,
-        splits: () => {
-          const [min, max] = getState().domain.x;
-          return stepTicks(min, max, MINUTES_PER_MONTH);
-        },
-        values: (_u, splits) => {
-          const s = getState();
-          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
-          return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
-          );
-        },
-      }),
+      forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),

@@ -5,17 +5,11 @@ import {
   FORECAST_AXIS_LEFT,
   FORECAST_AXIS_RIGHT,
   padRange,
-  stepTicks,
-  xAxis,
+  forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
 import { TickPresentFutureType } from "../../Types";
-import {
-  axisTicksAreYearly,
-  formatMinuteAsMonthAxis,
-  formatMinuteAsTooltipHeader,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursAxis } from "../../helpers/Format";
 import { chartPalette } from "../../Theme";
 
@@ -57,20 +51,7 @@ function buildOptions(showXLabels: boolean) {
       },
     },
     axes: [
-      xAxis(scale, {
-        showLabels: showXLabels,
-        splits: () => {
-          const [min, max] = getState().domain.x;
-          return stepTicks(min, max, MINUTES_PER_MONTH);
-        },
-        values: (_u, splits) => {
-          const s = getState();
-          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
-          return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
-          );
-        },
-      }),
+      forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         size: FORECAST_AXIS_LEFT,
         values: (_u, splits) =>

@@ -388,7 +388,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
         difficulty: game.difficulty,
         seed: scenario.seed ?? previewSeed.current,
       };
-      ensureForecastWorker().postMessage(request);
+      try {
+        ensureForecastWorker().postMessage(request);
+      } catch {
+        // Startup and structured-clone failures happen synchronously, outside onerror.
+        const worker = forecastWorker.current;
+        forecastWorker.current = undefined;
+        if (worker) {
+          worker.onmessage = null;
+          worker.onerror = null;
+          worker.terminate();
+        }
+        setOutlook({ status: "error" });
+      }
     }, FORECAST_DEBOUNCE_MS);
 
     return () => {

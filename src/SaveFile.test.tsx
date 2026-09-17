@@ -16,6 +16,7 @@ import { GameType, ScenarioType } from "./Types";
 function fakeGame(overrides: Partial<GameType> = {}): GameType {
   return {
     scenarioId: 101, // Rise of Renewables
+    difficulty: "Employee",
     seed: 31337,
     startingYear: 2020,
     customerMarketSize: 2_000_000,

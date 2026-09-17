@@ -1,5 +1,6 @@
 import { getTimeFromTimeline, summarizeTimeline } from "./helpers/DateTime";
 import { emptyPolicies } from "./helpers/Policies";
+import { DIFFICULTIES } from "./Constants";
 import gameReducer, {
   buildTransmissionLine,
   delta,
@@ -57,6 +58,24 @@ describe("SaveGame", () => {
         ?.variableOperatingCostPerMWh,
     );
   });
+
+  it.each([undefined, null, 1, "", "Expert", "constructor", "toString"])(
+    "rejects an unsupported difficulty %p before resuming",
+    (difficulty) => {
+      const save = serializeSave(game);
+      expect(parseSave({ ...save, game: { ...game, difficulty } })).toBeNull();
+    },
+  );
+
+  it.each(Object.keys(DIFFICULTIES))(
+    "accepts the authored difficulty %s",
+    (difficulty) => {
+      const save = serializeSave(game);
+      expect(
+        parseSave({ ...save, game: { ...game, difficulty } })?.game.difficulty,
+      ).toBe(difficulty);
+    },
+  );
 
   it.each(["active", "occurrences"] as const)(
     "validates every persisted world-event %s entry",
