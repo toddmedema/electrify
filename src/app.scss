@@ -3859,8 +3859,28 @@ html[data-theme="dark"] .uplot {
   }
 }
 
+// Each new objective eases in so the change of step registers without pulling focus
+.tutorialHudStep {
+  animation: tutorialHudStepIn 240ms ease-out;
+}
+
+@keyframes tutorialHudStepIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tutorialTargetRingPulse {
+    animation: none;
+  }
+
+  .tutorialHudStep {
     animation: none;
   }
 
@@ -4327,6 +4347,7 @@ $sizemap: (
   color: var(--font-color-faded);
 }
 .facilityRowHeader {
+  position: relative;
   display: flex;
   align-items: center;
 }
@@ -4361,6 +4382,10 @@ $sizemap: (
   width: 100%;
   padding: 12px 16px;
   gap: 8px;
+}
+// The grip already spaces the row from the edge
+.base_main .facilityDragHandle + .facilityDisclosure .facility {
+  padding-left: 8px;
 }
 .facilityDisclosure .MuiListItemAvatar-root {
   min-width: 48px;
@@ -4427,8 +4452,46 @@ $sizemap: (
   opacity: 1;
   visibility: visible;
 }
+// Every row carries its reorder grip on the leading edge, always visible, with no label
 .base_main .facilityDragHandle {
-  margin: 4px 16px;
+  position: relative; // over the row's output bar
+  appearance: none;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 28px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--font-color-faded);
+  cursor: grab;
+  touch-action: none;
+}
+.facilityDisclosure .facilityText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.facilityDisclosure .constructionProgress {
+  display: block;
+  position: relative;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border-subtle); /* fallback; the fuel tint is set inline */
+}
+.facilityDisclosure .constructionProgressFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+  transition: transform 200ms linear;
 }
 .base_main .facilityDetails {
   padding: 8px 16px 16px;
