@@ -30,6 +30,7 @@ for (const mission of [
               )
               .map((scenarioId) => ({
                 scenarioId,
+                timesPlayed: 1,
                 date: "2026-09-10",
               })),
           }),

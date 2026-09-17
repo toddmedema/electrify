@@ -136,15 +136,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put("/", copy));
-          return response;
-        })
-        .catch(() => caches.match("/")),
-    );
+    const network = fetch(request);
+    event.waitUntil(cacheNetworkResponse(network, "/"));
+    event.respondWith(network.catch(() => caches.match("/")));
     return;
   }
 
@@ -161,16 +155,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      });
-      return cached || network;
-    }),
-  );
+  const network = fetch(request);
+  event.waitUntil(cacheNetworkResponse(network, request));
+  event.respondWith(caches.match(request).then((cached) => cached || network));
 });
+
+// Register this work during the fetch event so refreshes can finish after a cached response is
+// returned. Offline refreshes and storage failures are expected and must not reject in the
+// background or prevent a successful network response from reaching the page.
+async function cacheNetworkResponse(network, key) {
+  try {
+    const response = await network;
+    if (response.ok) {
+      const copy = response.clone();
+      const cache = await caches.open(CACHE_VERSION);
+      await cache.put(key, copy);
+    }
+  } catch {
+    // Best-effort cache refresh.
+  }
+}

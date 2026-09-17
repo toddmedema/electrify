@@ -16,6 +16,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
       JSON.stringify({
         plays: [0, 1, 2, 4, 3, 5].map((scenarioId) => ({
           scenarioId,
+          timesPlayed: 1,
           date: "2026-09-08",
         })),
       }),

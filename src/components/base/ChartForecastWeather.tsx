@@ -6,18 +6,12 @@ import {
   FORECAST_AXIS_LEFT,
   padRange,
   SPLINE,
-  stepTicks,
-  xAxis,
+  forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
 import { TICK_MINUTES } from "../../Constants";
 import { TickPresentFutureType, UnitSystemType } from "../../Types";
-import {
-  axisTicksAreYearly,
-  formatMinuteAsMonthAxis,
-  formatMinuteAsTooltipHeader,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { chartPalette } from "../../Theme";
 import {
   formatTemperature,
@@ -70,19 +64,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       y: { range: (_u, min, max) => padRange(min, max) },
     },
     axes: [
-      xAxis(scale, {
-        splits: () => {
-          const [min, max] = getState().domain.x;
-          return stepTicks(min, max, MINUTES_PER_MONTH);
-        },
-        values: (_u, splits) => {
-          const s = getState();
-          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
-          return splits.map((t) =>
-            formatMinuteAsMonthAxis(t, s.startingYear, s.multiyear, yearOnly),
-          );
-        },
-      }),
+      forecastMonthAxis(scale, getState),
       yAxis(scale, {
         grid: true,
         label: `Heat (${temperatureUnit(getState().units)})`,

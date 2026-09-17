@@ -17,6 +17,7 @@ test("challenge details have a shareable URL and return to the catalog", async (
       JSON.stringify({
         plays: [0, 1, 2, 3, 4, 5, 100, 103].map((scenarioId) => ({
           scenarioId,
+          timesPlayed: 1,
           date: new Date().toString(),
         })),
       }),
@@ -60,7 +61,7 @@ test("game picker prioritizes one lesson and filters the challenge catalog", asy
     window.localStorage.setItem(
       "plays",
       JSON.stringify({
-        plays: [{ scenarioId: 0, date: new Date().toString() }],
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
   });

@@ -6,20 +6,14 @@ import {
   DemandTypeNameType,
   TickPresentFutureType,
 } from "../../Types";
-import {
-  axisTicksAreYearly,
-  formatMinuteAsMonthAxis,
-  formatMinuteAsTooltipHeader,
-  MINUTES_PER_MONTH,
-} from "../../helpers/DateTime";
+import { formatMinuteAsTooltipHeader } from "../../helpers/DateTime";
 import { formatWatts, formatWattsAxis } from "../../helpers/Format";
 import { chartPalette, demandTypeColors } from "../../Theme";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   FORECAST_AXIS_LEFT,
   FORECAST_AXIS_RIGHT,
-  stepTicks,
-  xAxis,
+  forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
 
@@ -65,25 +59,7 @@ function buildOptions(showXLabels: boolean) {
       y: { range: () => [0, getState().maxY] as [number, number] },
     },
     axes: [
-      xAxis(scale, {
-        showLabels: showXLabels,
-        splits: () => {
-          const [min, max] = getState().domain.x;
-          return stepTicks(min, max, MINUTES_PER_MONTH);
-        },
-        values: (_u, splits) => {
-          const state = getState();
-          const yearOnly = axisTicksAreYearly(splits, MINUTES_PER_MONTH);
-          return splits.map((minute) =>
-            formatMinuteAsMonthAxis(
-              minute,
-              state.startingYear,
-              state.multiyear,
-              yearOnly,
-            ),
-          );
-        },
-      }),
+      forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
         size: FORECAST_AXIS_LEFT,
         values: (_u, splits) =>

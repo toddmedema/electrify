@@ -82,9 +82,19 @@ export function removeStorageKey(key: string) {
 }
 
 function getPlays(): LocalStoragePlayedType[] {
-  return getStorageJson<{ plays: LocalStoragePlayedType[] }>("plays", {
-    plays: [],
-  }).plays;
+  const stored = getStorageJson<{ plays?: unknown }>("plays", {});
+  if (!Array.isArray(stored.plays)) {
+    return [];
+  }
+  return stored.plays.filter(
+    (play): play is LocalStoragePlayedType =>
+      play !== null &&
+      typeof play === "object" &&
+      Number.isSafeInteger(play.scenarioId) &&
+      typeof play.date === "string" &&
+      Number.isSafeInteger(play.timesPlayed) &&
+      play.timesPlayed > 0,
+  );
 }
 
 // The scenarios (tutorials included) the player has finished, used for the completion
