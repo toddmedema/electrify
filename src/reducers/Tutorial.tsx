@@ -4,6 +4,7 @@ import { getNextTutorial, getScenario } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
+  GameType,
   TutorialStepChangeType,
   TutorialStepType,
   isGatedStep,
@@ -29,6 +30,26 @@ export function restartTutorialAtStep(
   dispatch(quit());
   dispatch(start(scenarioId));
   dispatch(delta({ tutorialStep }));
+}
+
+/**
+ * Counts a tutorial the player walks away from as done, the same as one they finish.
+ *
+ * The missions are a sequence, and Start playing sends anyone with no finished mission straight
+ * back into Mission 1 - so a player who closed or quit it without reaching the end could never get
+ * past it. Only an unfinished walkthrough is recorded: finishing or closing one already recorded
+ * it, and recording again on the way out would count one attempt twice. Replays are someone
+ * else's run.
+ */
+export function recordTutorialLeft(game: GameType): void {
+  const steps = getScenario(
+    game.scenarioId,
+    game.customScenario,
+  )?.tutorialSteps;
+  if (!steps || game.replayPlayback || game.tutorialStep >= steps.length) {
+    return;
+  }
+  recordScenarioPlayed(game.scenarioId);
 }
 
 // Moves a live walkthrough between two steps, whether a HUD button or a satisfied gate

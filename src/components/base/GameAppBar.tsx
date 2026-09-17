@@ -29,6 +29,7 @@ import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
+import { recordTutorialLeft } from "../../reducers/Tutorial";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -212,8 +213,8 @@ export function GameAppBar(props: Props) {
   // tutorial to offer?" for the menu item below. Also undefined throughout a replay, since a
   // tutorial never sets a score and so never has one to watch
   const nextTutorial = getNextTutorial(game.scenarioId);
-  // A tutorial's progress isn't worth resuming, so its menu item stays "Quit" - only a real run
-  // gets the "Save & Quit" reminder that leaving keeps it around to come back to
+  // A tutorial's progress isn't worth resuming, so its menu item just says where it goes - only a
+  // real run gets the "Save & Quit" reminder that leaving keeps it around to come back to
   const isTutorial = !!getScenario(game.scenarioId, game.customScenario)
     ?.tutorialSteps;
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) =>
@@ -285,7 +286,11 @@ export function GameAppBar(props: Props) {
             </MenuItem>
           )}
           <MenuItem onClick={handleQuit}>
-            {isReplay ? "Exit replay" : isTutorial ? "Quit" : "Save & Quit"}
+            {isReplay
+              ? "Exit replay"
+              : isTutorial
+                ? "Main menu"
+                : "Save & Quit"}
           </MenuItem>
         </Menu>
       </>
@@ -411,9 +416,11 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
+      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       dispatch(quit());
     },
   };
