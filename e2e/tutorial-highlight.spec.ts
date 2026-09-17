@@ -53,7 +53,7 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
   }
 
   // The chart's box and the smallest rectangle it can be drawn in (the viewport narrowed by
-  // every clipping ancestor), measured the same way the ring is positioned.
+  // every clipping ancestor and sticky bar), measured the same way the ring is positioned.
   const { target, clip } = await page.evaluate(() => {
     const el = document.querySelector("#chartSupplyDemand")!;
     const r = el.getBoundingClientRect();
@@ -75,6 +75,18 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
       top = Math.max(top, b.top);
       right = Math.min(right, b.right);
       bottom = Math.min(bottom, b.bottom);
+      // A sticky bar lying across the chart (the nav footer on short phones) covers it too.
+      for (const child of Array.from(a.children)) {
+        const cs = getComputedStyle(child);
+        if (cs.position !== "sticky" || child.contains(el)) continue;
+        const bar = child.getBoundingClientRect();
+        if (bar.bottom <= r.top || bar.top >= r.bottom) continue;
+        if (cs.bottom !== "auto") {
+          bottom = Math.max(top, Math.min(bottom, bar.top));
+        } else if (cs.top !== "auto") {
+          top = Math.min(bottom, Math.max(top, bar.bottom));
+        }
+      }
     }
     return { target, clip: { left, top, right, bottom } };
   });

@@ -266,4 +266,62 @@ describe("TutorialHud", () => {
     unmount();
     target.remove();
   });
+  it("follows a target that mounts late or is replaced during the step", () => {
+    jest.useFakeTimers();
+    const { unmount } = render(<TutorialHud {...props()} />);
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+
+    // The control mounts after the step starts, like a list that is still loading.
+    const first = document.createElement("div");
+    first.id = "tutorial-target";
+    stubRect(first, 200, 150, 400, 250);
+    document.body.appendChild(first);
+    act(() => jest.advanceTimersByTime(100));
+    expect(first).toHaveClass("tutorialTarget");
+    expect(screen.getAllByTestId("tutorial-target-ring")).toHaveLength(1);
+
+    // The layout swaps it for a new node after the reminder has started.
+    act(() => jest.advanceTimersByTime(10_000));
+    first.remove();
+    const second = document.createElement("div");
+    second.id = "tutorial-target";
+    stubRect(second, 0, 150, 1024, 250);
+    document.body.appendChild(second);
+    act(() => jest.advanceTimersByTime(100));
+    expect(second).toHaveClass("tutorialTarget", "tutorialTargetReminder");
+    expect(first).not.toHaveClass("tutorialTarget");
+    const rings = screen.getAllByTestId("tutorial-target-ring");
+    expect(rings).toHaveLength(1);
+    expect(rings[0]).toHaveClass("tutorialTargetRingPulse");
+    expect(rings[0].style.left).toBe("0px");
+
+    unmount();
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+    expect(second).not.toHaveClass("tutorialTarget");
+    second.remove();
+    jest.useRealTimers();
+  });
+
+  it("stops the ring above a sticky bar lying across the control", () => {
+    const scroller = document.createElement("div");
+    scroller.style.overflowY = "auto";
+    stubRect(scroller, 0, 0, 1024, 768);
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 0, 600, 1024, 900);
+    const footer = document.createElement("nav");
+    footer.style.position = "sticky";
+    footer.style.bottom = "0px";
+    stubRect(footer, 0, 700, 1024, 768);
+    scroller.append(target, footer);
+    document.body.appendChild(scroller);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring.style.top).toBe("595px");
+    expect(ring.style.height).toBe("105px");
+
+    unmount();
+    scroller.remove();
+  });
 });
