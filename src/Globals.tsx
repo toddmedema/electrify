@@ -129,6 +129,7 @@ export function getDevicePlatform(): "web" {
  * // https://stackoverflow.com/questions/1038727/how-to-get-browser-width-using-javascript-code
  */
 let cachedViewportWidth: number | null = null;
+let cachedViewportHeight: number | null = null;
 
 function getViewportWidth(): number {
   if (cachedViewportWidth === null) {
@@ -143,9 +144,18 @@ function getViewportWidth(): number {
   return cachedViewportWidth;
 }
 
+function getViewportHeight(): number {
+  if (cachedViewportHeight === null) {
+    cachedViewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+  }
+  return cachedViewportHeight;
+}
+
 if (typeof window !== "undefined") {
   const invalidate = () => {
     cachedViewportWidth = null;
+    cachedViewportHeight = null;
   };
   window.addEventListener("resize", invalidate);
   window.addEventListener("orientationchange", invalidate);
@@ -188,12 +198,25 @@ export function isDesktopScreen(): boolean {
  *
  * True from $pane_breakpoint up: between there and the desktop breakpoint the layout is
  * Facilities pinned beside Insights or Events. Narrower portrait tablets keep the single-pane
- * navigation because a facility row and its controls do not fit in the default split.
+ * navigation because a facility row and its controls do not fit in the default split. Unfolded
+ * foldables are the exception: at least 700x600 and near-square, each pane still gets about a
+ * phone's width. Keep in sync with $pane_media in app.scss.
  *
- * @returns {boolean} - Returns true if the screen is at least 1024px wide, otherwise false.
+ * @returns {boolean} - Returns true for the two-pane layout, otherwise false.
  */
 export function isPaneLayout(): boolean {
-  return getViewportWidth() >= 1024;
+  const width = getViewportWidth();
+  if (width >= 1024) {
+    return true;
+  }
+  const height = getViewportHeight();
+  const aspectRatio = width / height;
+  return (
+    width >= 700 &&
+    height >= 600 &&
+    aspectRatio >= 4 / 5 &&
+    aspectRatio <= 5 / 4
+  );
 }
 
 export function getHistoryApi(): HistoryApi {
