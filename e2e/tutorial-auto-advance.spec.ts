@@ -109,6 +109,11 @@ for (const mission of [
       }
     }
     await expect(page.locator(".buildOption")).toHaveCount(0);
+    if (mission === "Generators" || mission === "Storage") {
+      await expect(
+        page.locator(".facilityRowHeader.tutorialTarget").first(),
+      ).toBeVisible();
+    }
     await page.screenshot({
       path: testInfo.outputPath(`${mission}-advanced.png`),
     });

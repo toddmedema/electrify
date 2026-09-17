@@ -139,7 +139,7 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityDisclosure',
+        target: '[data-fuel="Natural Gas"] .facilityRowHeader',
         hideUi: MISSION_ONE_FIRST_LOOK,
         advanceOn: (s: AppStateType) =>
           s.ui.selectedFacilityId !== null &&
@@ -248,7 +248,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".facility",
+        target: ".facilityRowHeader",
         action: "Find the construction progress, then tap Next",
         content: (
           <TutorialPrompt text="Construction has started. The generator cannot supply the grid until it is complete." />
@@ -321,7 +321,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".capacityProgressBar",
+        target: '[data-storage="true"]',
         action: "Check the storage bar, then tap Next",
         content: (
           <TutorialPrompt text="The bar shows usable stored energy in MWh. MW tells you how quickly the system can charge or discharge." />
@@ -329,7 +329,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".facility",
+        target: ".facilityRowHeader",
         advanceOnAction: "game/reprioritizeFacility",
         action: "Move your generator above storage",
         content: (
@@ -563,7 +563,7 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: ".facility",
+        target: ".facilityRowHeader",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.some((facility) => facility.paused),
         action: "Tap your plant, then tap Pause",
@@ -605,7 +605,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".facility",
+        target: ".facilityRowHeader",
         advanceOn: (s: AppStateType) =>
           s.game.facilities.every((f) => !f.paused),
         action: "Tap your plant, then tap Resume",

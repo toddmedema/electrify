@@ -96,8 +96,8 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
 
   // The ring's line sits at most a gap plus its own width outside the control, and never
   // inside both the control's edge and the clipping boundary. The ring is positioned in whole
-  // pixels, so allow for rounding on top of the gap. The ring follows its target at ~15fps,
-  // so poll until it has caught up after the scroll above.
+  // pixels, so allow for rounding on top of the gap. Poll through the next animation frame
+  // after the scroll above so layout and the overlay have both been painted.
   const MAX_OFFSET = 6; // 3px gap + 2px line, plus rounding
   const ROUNDING = 1;
   await expect

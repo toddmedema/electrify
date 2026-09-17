@@ -34,7 +34,8 @@
   --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
   --interactive-tint: rgba(21, 101, 192, 0.5);
   // The bright head of the glint that circles the tutorial ring
-  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 70%, white);
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 64%, white);
+  --tutorial-glow: color-mix(in srgb, var(--interactive-blue) 60%, transparent);
   --focus-ring: #7b1fa2;
   --blackout-red: #c62828; /* red800 - matches blackoutColor in Theme.tsx */
   --blackout-tint: rgba(198, 40, 40, 0.07);
@@ -79,7 +80,7 @@
   --spark-baseline: rgba(148, 163, 184, 0.34);
   --spark-marker-fill: #111820;
   --interactive-tint: rgba(106, 184, 247, 0.42);
-  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 45%, white);
+  --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 34%, white);
   --focus-ring: #ffd54f;
   --blackout-red: #ef5350; /* red400 */
   --blackout-tint: rgba(239, 83, 80, 0.16);
@@ -3970,7 +3971,7 @@ html[data-theme="dark"] .uplot {
 //
 // So the cue reads as live without flashing, a soft glint travels clockwise around the line,
 // one lap every six seconds. ::before brightens the 2px line along a ~60deg comet; ::after
-// bleeds the tint inward into the 3px gap, fading toward the control. Nothing draws outside
+// bleeds the tint inward into the 4px gap, fading toward the control. Nothing draws outside
 // the ring's box. Both sweep the same registered angle; where @property is unsupported the
 // angle cannot animate, so --tutorial-glint-on stays unset and the plain ring shows alone.
 @property --tutorial-glint-angle {
@@ -4027,33 +4028,33 @@ html[data-theme="dark"] .uplot {
   }
 
   // The halo: four edge strips that skip the 2px line (so they do not dull its bright head)
-  // and fade across the 3px gap, cut off before the interior so the control is never tinted.
+  // and fade across the 4px gap, cut off before the interior so the control is never tinted.
   &::after {
     background: conic-gradient(
       from var(--tutorial-glint-angle),
       transparent 0deg,
-      var(--interactive-tint) 30deg,
-      var(--interactive-tint) 42deg,
+      var(--tutorial-glow) 30deg,
+      var(--tutorial-glow) 42deg,
       transparent 60deg
     );
     -webkit-mask:
-      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
-        top / 100% 5px no-repeat,
-      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
-        bottom / 100% 5px no-repeat,
-      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
-        left / 5px 100% no-repeat,
-      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
-        right / 5px 100% no-repeat;
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 6px)
+        top / 100% 6px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 6px)
+        bottom / 100% 6px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 6px)
+        left / 6px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 6px)
+        right / 6px 100% no-repeat;
     mask:
-      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 5px)
-        top / 100% 5px no-repeat,
-      linear-gradient(to top, transparent 2px, #000 2px, transparent 5px)
-        bottom / 100% 5px no-repeat,
-      linear-gradient(to right, transparent 2px, #000 2px, transparent 5px)
-        left / 5px 100% no-repeat,
-      linear-gradient(to left, transparent 2px, #000 2px, transparent 5px)
-        right / 5px 100% no-repeat;
+      linear-gradient(to bottom, transparent 2px, #000 2px, transparent 6px)
+        top / 100% 6px no-repeat,
+      linear-gradient(to top, transparent 2px, #000 2px, transparent 6px)
+        bottom / 100% 6px no-repeat,
+      linear-gradient(to right, transparent 2px, #000 2px, transparent 6px)
+        left / 6px 100% no-repeat,
+      linear-gradient(to left, transparent 2px, #000 2px, transparent 6px)
+        right / 6px 100% no-repeat;
   }
 }
 
@@ -4076,10 +4077,10 @@ html[data-theme="dark"] .uplot {
   0%,
   16%,
   100% {
-    box-shadow: 0 0 0 0 var(--interactive-tint);
+    box-shadow: 0 0 0 0 var(--tutorial-glow);
   }
   8% {
-    box-shadow: 0 0 0 7px transparent;
+    box-shadow: 0 0 0 8.4px transparent;
   }
 }
 
@@ -5133,4 +5134,42 @@ $sizemap: (
 
 .constructionInterties {
   padding: $space-4 $space-2;
+}
+
+// Shared geometry keeps generator properties aligned regardless of their help content.
+.generatorDetails {
+  table-layout: fixed;
+  .MuiTableCell-root {
+    height: 48px;
+    box-sizing: border-box;
+    padding: 4px 12px;
+    vertical-align: middle;
+    border-color: var(--border-subtle);
+  }
+  .generatorDetailLabel {
+    width: 54%;
+    padding-left: 16px;
+  }
+  .generatorDetailValue {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .generatorDetailHelp {
+    width: 48px;
+    padding: 4px;
+  }
+  .manual-link {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+@media (pointer: coarse) {
+  .generatorDetails .generatorDetailHelp {
+    width: 52px;
+  }
+  .generatorDetails .MuiTableCell-root {
+    height: 52px;
+  }
 }

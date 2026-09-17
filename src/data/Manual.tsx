@@ -45,6 +45,10 @@ export type ManualGroupType = (typeof MANUAL_GROUPS)[number];
 // them here rather than passing raw strings means renaming an entry breaks the build instead of
 // silently breaking the link.
 export const MANUAL_ENTRY = {
+  OPERATING_COSTS: "Operating costs",
+  FUEL_COSTS: "Fuel costs",
+  ACCOUNTING_LIFETIME: "Accounting lifetime",
+  PROJECT_SITES: "Project sites",
   CUSTOMER_PROGRAMS: "Customer programs",
   HOW_TO_PLAY: "How to Play",
   BASELOAD_VS_PEAKER: "Baseload vs Peaker",
@@ -1042,6 +1046,91 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             </tr>
           </tbody>
         </table>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.OPERATING_COSTS,
+    group: "Money",
+    keywords:
+      "O&M fixed base variable operations maintenance non-fuel start annual upkeep",
+    related: [MANUAL_ENTRY.CAPACITY_FACTOR, MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    entry: (
+      <div>
+        <p>
+          Operations and maintenance (O&amp;M) covers upkeep, excluding fuel,
+          carbon fees, and loan payments. Fixed O&amp;M is a standing annual
+          expense; base O&amp;M is the annual quote at the expected capacity
+          factor shown in the build details.
+        </p>
+        <p>
+          Variable O&amp;M is charged per MWh generated. Expected variable
+          O&amp;M converts that rate into an annual estimate using the plant's
+          capacity and expected capacity factor. Oil plants pay both fixed and
+          variable O&amp;M; pausing halves the fixed charge and stops the
+          variable charge.
+        </p>
+        <p>
+          Non-fuel start cost is maintenance charged when a plant starts
+          generating. Estimated annual O&amp;M adds base or fixed costs,
+          expected variable costs, and start costs assuming one start per
+          simulated day (365 starts per year). Actual costs depend on how you
+          operate the plant.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.FUEL_COSTS,
+    group: "Money",
+    keywords: "fuel price per MWh gas coal oil uranium heat rate",
+    related: [MANUAL_ENTRY.BTU, MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    entry: (
+      <div>
+        <p>
+          The build quote shows fuel cost per MWh generated, using the current
+          fuel price and the generator's fuel consumption. Fuel prices can
+          change over time; this is an estimate, not a fixed future price.
+        </p>
+        <p>
+          Fuel costs are separate from operations and maintenance, carbon fees,
+          and loan payments.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.ACCOUNTING_LIFETIME,
+    group: "Money",
+    keywords: "lifespan years depreciation retirement aging",
+    related: [MANUAL_ENTRY.TOTAL_COST_OF_ENERGY],
+    entry: (
+      <div>
+        <p>
+          Accounting lifetime is the period used for depreciation and lifetime
+          cost estimates. It is not an automatic retirement date: a plant can
+          keep running, while aging can reduce output or raise upkeep.
+        </p>
+      </div>
+    ),
+  },
+  {
+    title: MANUAL_ENTRY.PROJECT_SITES,
+    group: "Gameplay",
+    keywords:
+      "sites left viable locations remaining available hydro geothermal",
+    entry: (
+      <div>
+        <p>
+          Sites left is the number of projects you can still build for this
+          technology at this location in the current game. Building a project
+          uses a site.
+        </p>
+        <p>
+          These are coarse project limits. Zero sites means no further projects
+          are available in this game; it does not mean the resource is
+          physically impossible at that location.
+        </p>
       </div>
     ),
   },
