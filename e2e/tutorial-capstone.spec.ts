@@ -3,7 +3,13 @@ import { expect, test } from "@playwright/test";
 test("guided objective reaches a retryable capstone and succeeds", async ({
   page,
 }, testInfo) => {
-  await page.addInitScript(() => window.localStorage.clear());
+  await page.addInitScript(
+    (theme) => {
+      window.localStorage.clear();
+      window.localStorage.setItem("theme", theme);
+    },
+    testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
+  );
   await page.goto("/");
   await page
     .getByRole("button", { name: "Start playing", exact: true })
@@ -76,10 +82,18 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
   await page.getByRole("button", { name: "pause" }).click();
+  await expect(
+    page.getByText("Watch how gas generation changes as sunlight fades."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("note").filter({ hasText: "Pause to inspect the chart" }),
+  ).toBeVisible();
+  await expectObjectiveDocked();
+  await page.screenshot({ path: testInfo.outputPath("capstone.png") });
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
   // objective is docked outside the game surface, so the same control remains operable at every
@@ -99,7 +113,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Retry final challenge" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Inspect Natural Gas", exact: true })

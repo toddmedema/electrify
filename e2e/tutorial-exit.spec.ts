@@ -21,7 +21,7 @@ test("tapping 1x carries a running clock into Mission 1's final step", async ({
   await reachStartTimeStep(page);
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
-    page.getByText("Keep the lights on for a full day"),
+    page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "normal speed" }),
