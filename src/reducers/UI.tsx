@@ -30,6 +30,15 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    facilityPurchased: (state, action: PayloadAction<number>) => {
+      state.selectedFacilityId = action.payload;
+      state.arrivingFacilityId = action.payload;
+    },
+    acknowledgeFacilityArrival: (state, action: PayloadAction<number>) => {
+      if (state.arrivingFacilityId === action.payload) {
+        delete state.arrivingFacilityId;
+      }
+    },
     requestEvidence: (state, action: PayloadAction<EvidenceTargetType>) => {
       delete state.evidenceJourney;
       delete state.insightsRestore;
@@ -113,6 +122,7 @@ export const uiSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(quit, (state) => {
+      delete state.arrivingFacilityId;
       state.snackbar = { ...initialUI.snackbar };
       state.dialog = { ...initialUI.dialog };
       state.victory = null;
@@ -135,6 +145,7 @@ export const uiSlice = createSlice({
           "game/initGame",
         ].includes(action.type),
       (state) => {
+        delete state.arrivingFacilityId;
         delete state.evidenceRequest;
         delete state.evidenceJourney;
         delete state.evidenceJourneyMarker;
@@ -162,6 +173,8 @@ export const uiSlice = createSlice({
 });
 
 export const {
+  facilityPurchased,
+  acknowledgeFacilityArrival,
   requestEvidence,
   acknowledgeEvidence,
   manualHelpOpen,
