@@ -141,7 +141,10 @@ test("status boundary follows the saved movable pane divider and window width", 
         const grids = page.locator(".gridHealth:visible");
         if ((await grids.count()) !== 1) return Infinity;
         const grid = await grids.boundingBox();
-        const divider = await splitter.boundingBox();
+        const divider = await page
+          .locator(".pane-splitter")
+          .first()
+          .boundingBox();
         if (!grid || !divider) return Infinity;
         return Math.abs(grid.x + grid.width - divider.x);
       })
@@ -152,7 +155,9 @@ test("status boundary follows the saved movable pane divider and window width", 
   const before = (await splitter.boundingBox())!;
   await page.mouse.move(before.x + before.width / 2, before.y + 20);
   await page.mouse.down();
-  await page.mouse.move(before.x + 100, before.y + 20, { steps: 8 });
+  await page.mouse.move(before.x + before.width / 2 + 100, before.y + 20, {
+    steps: 8,
+  });
   await page.mouse.up();
   await aligned();
   expect((await splitter.boundingBox())!.x).toBeGreaterThan(before.x + 80);

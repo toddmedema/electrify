@@ -45,18 +45,18 @@ for (const theme of ["light", "dark"] as const) {
         expect(strokes[0]).toBe(
           theme === "light" ? "rgb(84, 110, 122)" : "rgb(154, 169, 186)",
         );
-        // Cost, time and the output line share one row
+        // Metrics reflow at a readable minimum width.
         const cells = await metrics
           .locator(".buildOptionMetric")
           .evaluateAll((els) =>
-            els.map((el) => el.getBoundingClientRect().top),
+            els.map((el) => el.getBoundingClientRect().width),
           );
-        expect(new Set(cells.map(Math.round)).size).toBe(1);
+        expect(cells.every((width) => width >= 128)).toBe(true);
       }
       const review = first.getByRole("button", { name: /Review purchase of/ });
       const header = first.locator(".MuiCardHeader-root");
       const box = (await first.boundingBox())!;
-      expect(box.height).toBeLessThan(kind === "Generator" ? 230 : 285);
+      expect(box.height).toBeLessThan(kind === "Generator" ? 310 : 390);
       expect((await review.boundingBox())!.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
@@ -96,10 +96,10 @@ for (const theme of ["light", "dark"] as const) {
         const sortedCells = await first
           .locator(".buildOptionMetric")
           .evaluateAll((els) =>
-            els.map((el) => el.getBoundingClientRect().top),
+            els.map((el) => el.getBoundingClientRect().width),
           );
         expect(sortedCells).toHaveLength(4);
-        expect(new Set(sortedCells.map(Math.round)).size).toBe(1);
+        expect(sortedCells.every((width) => width >= 128)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);

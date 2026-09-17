@@ -14,6 +14,7 @@
 // ===============================================
 
 :root {
+  --control-size: 40px;
   --bg-primary: #ffffff;
   --bg-raised: #fafafa; /* grey50 - hover, one step off the page */
   --bg-sunken: #eceff1; /* blueGray50 - behind lists of cards */
@@ -979,22 +980,24 @@ $topbar_height: 56px;
 // screen at once. One height for all of them so their contents start on the same line, whether
 // the header is plain text or carries the build buttons. Selector needs to out-specificity
 // ".base_main .MuiToolbar-root" above (also !important) or its min-height:0 wins instead
-$pane_header_height: 40px;
+$pane_header_height: 48px;
 
 .base_main .MuiToolbar-root.paneHeader {
   min-height: $pane_header_height !important;
+  box-sizing: border-box;
+  padding-top: 4px;
+  padding-bottom: 4px;
   border-bottom: $border_accent;
 }
 
 .facilities .paneHeader {
   gap: 8px;
 
-  // Compact enough to leave 4px above and below inside the header, with the icon sized to the
-  // label rather than towering over it
+  // Shared control size, with 4px of breathing room inside the pane header.
   .button-buildFacility {
     margin-left: auto;
-    height: 32px;
-    min-height: 32px;
+    height: var(--control-size);
+    min-height: var(--control-size);
     padding: 4px 12px;
 
     .MuiButton-startIcon {
@@ -1296,8 +1299,6 @@ $pane_header_height: 40px;
 }
 
 .insightsPresetSaveMenuItem {
-  display: none !important;
-
   > svg {
     margin-right: 12px;
   }
@@ -1406,7 +1407,7 @@ $pane_header_height: 40px;
   max-width: 960px;
   min-height: 40px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 4px 16px;
   margin: 0 auto;
   border-bottom: $border_accent;
@@ -1436,9 +1437,9 @@ $pane_header_height: 40px;
 .insightEventChip {
   display: inline-flex;
   min-width: 0;
-  min-height: 30px;
+  min-height: var(--control-size);
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 8px 3px 4px;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -1492,13 +1493,18 @@ $pane_header_height: 40px;
   }
 
   .MuiButton-root {
-    min-height: 36px;
-    margin-top: 10px;
+    min-height: var(--control-size);
+    margin-top: 12px;
   }
 }
 
 .insightEventPopover {
   z-index: 1300;
+}
+
+.insights {
+  container-type: inline-size;
+  container-name: insights;
 }
 
 .insightsTracks {
@@ -1536,10 +1542,10 @@ $pane_header_height: 40px;
   text-align: center;
 }
 
-@media screen and (max-width: 700px) {
-  .base_main .MuiToolbar-root.insightsHeader {
+.insightsCompact {
+  .MuiToolbar-root.insightsHeader {
     // Match the shared touch target size without adding an empty band around the controls.
-    min-height: var(--insights-control-size) !important;
+    min-height: calc(var(--insights-control-size) + 8px) !important;
     padding: 4px 8px !important;
   }
 
@@ -1579,16 +1585,6 @@ $pane_header_height: 40px;
     }
   }
 
-  .insightsPresetSaveMenuItem {
-    display: flex !important;
-  }
-
-  // The custom state already uses the same "Save as new preset" action above. Keep one clear
-  // save action in the compact mobile menu instead of repeating it on adjacent rows.
-  .insightsPresetSaveMenuItem + .insightsPresetSaveAsMenuItem {
-    display: none;
-  }
-
   .insightsPresetEdited,
   .insightsPresetCustomized {
     position: absolute !important;
@@ -1620,8 +1616,9 @@ $pane_header_height: 40px;
   }
 
   .insightsViewportToolbar {
-    height: 52px;
+    height: auto;
     min-height: 52px;
+    flex-wrap: wrap;
     gap: 4px;
     // The date lines up with the chart titles below; the icon buttons carry their own inset.
     padding: 4px 4px 4px 16px;
@@ -1681,15 +1678,18 @@ $pane_header_height: 40px;
       min-width: 0;
       height: 44px;
       grid-column: 1;
-      grid-template-columns: minmax(68px, 0.8fr) minmax(60px, 0.75fr) minmax(
-          112px,
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
+          0,
           1.25fr
         );
       gap: 4px;
       align-items: stretch;
 
       &.insightsRateMetricsPublic {
-        grid-template-columns: 68px 60px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
+            0,
+            1.25fr
+          );
       }
     }
 
@@ -1719,7 +1719,7 @@ $pane_header_height: 40px;
     }
 
     .insightsRateMetricLabel {
-      color: var(--text-secondary);
+      color: var(--font-color-faded);
       font-size: 0.8125rem;
       line-height: 1.15;
       text-transform: uppercase;
@@ -1759,12 +1759,12 @@ $pane_header_height: 40px;
     }
   }
 
-  @media screen and (max-width: 359px) {
+  @container insights (max-width: 359px) {
     .insightsViewportDate {
       white-space: normal;
       overflow-wrap: anywhere;
     }
-    .base_main .MuiToolbar-root.insightsTrackHeader {
+    .MuiToolbar-root.insightsTrackHeader {
       flex-flow: row nowrap !important;
       padding-right: 8px;
       padding-left: 8px;
@@ -2015,10 +2015,12 @@ $pane_header_height: 40px;
   background: var(--tooltip-bg);
   box-shadow: 0 8px 24px var(--tooltip-shadow);
   color: $font_color_primary;
-  font-size: 11px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   line-height: 1.45;
-  white-space: pre;
+  white-space: pre-wrap;
+  max-width: min(320px, calc(100vw - 32px));
+  overflow-wrap: anywhere;
   pointer-events: none;
   backdrop-filter: none;
 }
@@ -2047,9 +2049,9 @@ html[data-theme="dark"] .uplot {
 .chartLegend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
+  gap: 4px 12px;
   padding: 0 8px 0 55px; // line up with the plot area, past the y axis labels
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.01em;
   line-height: 1.4;
@@ -2336,6 +2338,11 @@ html[data-theme="dark"] .uplot {
 
 // The "?" next to a term the game shows, which opens that term's manual entry
 .manual-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-size);
+  min-height: var(--control-size);
   padding: 0 2px;
   border: none;
   background: none;
@@ -4187,16 +4194,35 @@ $sizemap: (
   // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
   // never changes the total width the panes have to share
   .pane-splitter {
-    cursor: col-resize;
+    position: relative;
     border-left: $border_accent;
-    background: transparent;
-    transition: background 0.15s;
-
+  }
+  .pane-splitter-handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--control-size);
+    height: var(--control-size);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: col-resize;
+    touch-action: none;
+    border-radius: 8px;
+    &::after {
+      content: "";
+      width: 4px;
+      height: 24px;
+      border-radius: 2px;
+      background: var(--font-color-faded);
+    }
     &:hover,
     &:focus-visible {
-      background: $interactive_blue;
-      border-left-color: $interactive_blue;
-      outline: none;
+      background: var(--bg-raised);
+      outline: 2px solid $interactive_blue;
+      outline-offset: -2px;
     }
   }
 }
@@ -4337,20 +4363,12 @@ $sizemap: (
   }
   .buildOptionMetrics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
+    gap: 12px;
     padding: 0 12px 8px;
   }
   .buildOptionMetric {
     min-width: 0;
-  }
-  // Generator cards keep every figure on one row, however many there are, in equal shares
-  .buildOptionMetrics.singleRow {
-    display: flex;
-    .buildOptionMetric {
-      flex: 1 1 0;
-      overflow-wrap: anywhere;
-    }
   }
   .buildOptionSparkline {
     // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
@@ -4523,7 +4541,10 @@ $sizemap: (
   }
 }
 @media (pointer: coarse) {
-  .base_main .facilities .MuiToolbar-root.paneHeader {
+  :root {
+    --control-size: 44px;
+  }
+  .base_main .MuiToolbar-root.paneHeader {
     min-height: 52px !important; // 44px Build button with 4px either side
   }
 }
@@ -4622,9 +4643,7 @@ $sizemap: (
   margin: 0;
   min-width: 0;
 }
-// A row is one line of name over one line of status at any pane width, down to a 320px phone.
-// Text that still doesn't fit truncates instead of wrapping, and the lower-priority part goes
-// first: the name before its derate badge, the trailing detail before the reading and state.
+// Keep each reading on one line, moving its supporting detail below when the text column narrows.
 .facilityDisclosure .MuiListItemText-primary,
 .facilityDisclosure .MuiListItemText-secondary {
   display: flex;
@@ -4665,6 +4684,17 @@ $sizemap: (
 }
 // The longest hydro line, "999.9/999.9MW · running · reservoir 100%", needs about this much
 @container (max-width: 239px) {
+  .facilityDisclosure .MuiListItemText-secondary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .facilityDisclosure .facilityStatusDetail {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .facilityDisclosure .facilityStatusSeparator {
+    display: none;
+  }
   .facilityDisclosure .facilityStatusLong {
     display: none;
   }
@@ -4689,8 +4719,8 @@ $sizemap: (
   align-items: center;
   justify-content: center;
   align-self: stretch;
-  width: 28px;
-  min-height: 44px;
+  width: var(--control-size);
+  min-height: var(--control-size);
   margin: 0;
   padding: 0 0 0 4px;
   border: 0;
@@ -4877,16 +4907,6 @@ $sizemap: (
 .buildOption .MuiCardHeader-title {
   font-size: 1rem;
   font-weight: 600;
-}
-.buildOption .MuiCardHeader-root {
-  padding: 16px;
-}
-.buildOption .buildOptionMetrics {
-  padding-left: 16px;
-  padding-right: 16px;
-}
-.buildOption .buildOptionFooter {
-  padding: 8px 16px 12px;
 }
 .forecastScope > summary {
   display: flex;

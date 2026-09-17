@@ -64,6 +64,36 @@ function toWeights(widths: number[]): number[] {
   return widths.map((w) => (w / total) * widths.length);
 }
 
+// Freeze undersized tracks at their minimum, then redistribute the remaining space.
+export function constrainedPaneWidths(
+  weights: number[],
+  total: number,
+): number[] {
+  const minimum = Math.min(MIN_PANE_PX, total / weights.length);
+  const result = new Array(weights.length).fill(0);
+  let remaining = weights.map((_, index) => index);
+  let available = total;
+  while (remaining.length) {
+    const space = available;
+    const sum = remaining.reduce((value, index) => value + weights[index], 0);
+    const small = remaining.filter(
+      (index) => (space * weights[index]) / sum < minimum,
+    );
+    if (!small.length) {
+      remaining.forEach((index) => {
+        result[index] = (space * weights[index]) / sum;
+      });
+      break;
+    }
+    for (const index of small) {
+      result[index] = minimum;
+      available -= minimum;
+    }
+    remaining = remaining.filter((index) => !small.includes(index));
+  }
+  return result;
+}
+
 export interface Props {
   children: React.ReactNode;
 }
@@ -71,6 +101,18 @@ export interface Props {
 export default function DesktopPanes(props: Props): React.JSX.Element {
   const panes = React.Children.toArray(props.children);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () =>
+      setContainerWidth(container.getBoundingClientRect().width);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
   const [weights, setWeights] = React.useState(() => loadWeights(panes.length));
   // Where the drag started, and how wide every pane was at that moment -- the move handler works
   // from those rather than from the live widths, so rounding doesn't accumulate over a drag
@@ -107,7 +149,7 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
     ).reduce((sum, el) => sum + el.getBoundingClientRect().width, 0);
     const current = weightsRef.current;
     const weighted = current.reduce((sum, w) => sum + w, 0);
-    return weighted > 0 ? current.map((w) => (w / weighted) * total) : [];
+    return weighted > 0 ? constrainedPaneWidths(current, total) : [];
   };
 
   /**
@@ -124,9 +166,10 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
       return undefined;
     }
     const pair = widths[index] + widths[index + 1];
+    const minimum = Math.min(MIN_PANE_PX, pair / 2);
     const first = Math.max(
-      MIN_PANE_PX,
-      Math.min(pair - MIN_PANE_PX, widths[index] + delta),
+      minimum,
+      Math.min(pair - minimum, widths[index] + delta),
     );
     const next = [...widths];
     next[index] = first;
@@ -190,10 +233,19 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
 
   // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
   // never changes the total width the panes have to share
-  const sized =
+  const requested =
     weights.length === panes.length ? weights : loadWeights(panes.length);
+  const sized =
+    containerWidth > 0
+      ? constrainedPaneWidths(
+          requested,
+          Math.max(0, containerWidth - SPLITTER_PX * (panes.length - 1)),
+        )
+      : requested;
   const totalWeight = sized.reduce((sum, weight) => sum + weight, 0);
-  const template = sized.map((w) => `${w}fr`).join(` ${SPLITTER_PX}px `);
+  const template = sized
+    .map((w) => `minmax(0, ${w}fr)`)
+    .join(` ${SPLITTER_PX}px `);
 
   // The status header is a sibling of this grid. Share the first track's exact weighted
   // width, including splitter space, so it follows dragging, saved layouts and resizing.
@@ -217,26 +269,28 @@ export default function DesktopPanes(props: Props): React.JSX.Element {
       {panes.map((pane, i) => (
         <React.Fragment key={i}>
           {i > 0 && (
-            <div
-              className="pane-splitter"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={`Resize pane ${i} and pane ${i + 1}`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(
-                (sized.slice(0, i).reduce((sum, weight) => sum + weight, 0) /
-                  totalWeight) *
-                  100,
-              )}
-              tabIndex={0}
-              onPointerDown={onPointerDown(i - 1)}
-              onPointerMove={onPointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              onKeyDown={onKeyDown(i - 1)}
-              onDoubleClick={onDoubleClick}
-            />
+            <div className="pane-splitter">
+              <div
+                className="pane-splitter-handle"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label={`Resize pane ${i} and pane ${i + 1}`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(
+                  (sized.slice(0, i).reduce((sum, weight) => sum + weight, 0) /
+                    totalWeight) *
+                    100,
+                )}
+                tabIndex={0}
+                onPointerDown={onPointerDown(i - 1)}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={onKeyDown(i - 1)}
+                onDoubleClick={onDoubleClick}
+              />
+            </div>
           )}
           <div className="desktop-pane">{pane}</div>
         </React.Fragment>

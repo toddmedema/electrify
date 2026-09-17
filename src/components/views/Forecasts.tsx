@@ -43,7 +43,12 @@ import ForecastScope from "../base/ForecastScope";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { TICK_MINUTES } from "../../Constants";
-import { chartPalette, fuelColors, fuelDashArrays } from "../../Theme";
+import {
+  waterDashArrays,
+  chartPalette,
+  fuelColors,
+  fuelDashArrays,
+} from "../../Theme";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 
 const FORECAST_YEARS_KEY = "forecastYears";
@@ -339,9 +344,18 @@ export default class Forecasts extends React.Component<Props, State> {
                     {
                       name: "Precipitation",
                       color: chartPalette().precipitation,
+                      dash: waterDashArrays.precipitation,
                     },
-                    { name: "Snowpack", color: chartPalette().snowpack },
-                    { name: "Reservoir", color: chartPalette().reservoir },
+                    {
+                      name: "Snowpack",
+                      color: chartPalette().snowpack,
+                      dash: waterDashArrays.snowpack,
+                    },
+                    {
+                      name: "Reservoir",
+                      color: chartPalette().reservoir,
+                      dash: waterDashArrays.reservoir,
+                    },
                   ]}
                 />
               </Toolbar>

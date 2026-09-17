@@ -234,14 +234,17 @@ test("insights header controls stay aligned in one compact row", async ({
     page.getByRole("button", { name: "Preset actions" }),
     page.getByRole("button", { name: /^Layers \(/ }),
   ];
-  if (!testInfo.project.name.startsWith("mobile-")) {
+  const compact = await insights.evaluate((element) =>
+    element.classList.contains("insightsCompact"),
+  );
+  if (!compact) {
     controls.splice(1, 0, page.getByRole("button", { name: "Save" }));
   }
   const boxes = await Promise.all(
     controls.map((control) => control.boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
-  const minimumControlHeight = testInfo.project.name.startsWith("mobile-")
+  const minimumControlHeight = testInfo.project.use.hasTouch
     ? 44
     : 40;
   expect(boxes.every((box) => box!.height >= minimumControlHeight)).toBe(true);
@@ -254,7 +257,7 @@ test("insights header controls stay aligned in one compact row", async ({
     );
   expect(headerOverflow).toBeLessThanOrEqual(1);
 
-  if (testInfo.project.name === "desktop-chromium") {
+  if (!compact) {
     const [group, layerButton] = await Promise.all([
       page.locator(".insightsPresetControls").boundingBox(),
       page.locator("#insightsLayersButton").boundingBox(),
@@ -266,11 +269,11 @@ test("insights header controls stay aligned in one compact row", async ({
     );
   }
 
-  if (testInfo.project.name.startsWith("mobile-")) {
+  if (compact) {
     const header = await page.locator(".insightsHeader").boundingBox();
     expect(header).not.toBeNull();
-    expect(header!.height).toBeGreaterThanOrEqual(52);
-    expect(header!.height).toBeLessThanOrEqual(54);
+    expect(header!.height).toBeGreaterThanOrEqual(minimumControlHeight + 8);
+    expect(header!.height).toBeLessThanOrEqual(minimumControlHeight + 10);
 
     const levers = page.locator(".insightsLevers");
     await expect(levers).toHaveCSS("display", "grid");

@@ -110,6 +110,12 @@ export const fuelDashArrays = {
   Uranium: "9,3,2,3",
 };
 
+export const waterDashArrays = {
+  precipitation: undefined,
+  snowpack: "6,3",
+  reservoir: "12,3,2,3",
+};
+
 interface ChartPaletteType {
   /** Facilities that burn or catch nothing, which borrow the battery UI's blue */
   storage: string;
@@ -154,7 +160,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
     // The weather chart draws wind in the same blue the wind generators are drawn in
     wind: FUEL_COLORS.light.Wind,
     offshoreWind: FUEL_COLORS.light["Offshore Wind"],
-    precipitation: blue[400],
+    precipitation: blue[700],
     snowpack: "#6d4c9a",
     reservoir: FUEL_COLORS.light.Hydro,
     cursor: grey[600],
@@ -317,6 +323,17 @@ export function createAppTheme(mode: ThemeModeType): Theme {
             fontWeight: 600,
             textTransform: "none",
             touchAction: "manipulation",
+          },
+        },
+      },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: {
+            textTransform: "none",
+            fontWeight: 600,
+            minHeight: 40,
+            minWidth: 40,
+            "@media (pointer: coarse)": { minHeight: 44, minWidth: 44 },
           },
         },
       },
