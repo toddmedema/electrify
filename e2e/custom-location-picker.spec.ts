@@ -62,17 +62,18 @@ test("world map location picker works with pointer, touch, search, and keyboard"
 
   // At the narrowest widths a 44px touch target can't fit every city at world zoom, so all
   // unselected cities are clustered and a player taps a cluster to zoom in before picking. Do
-  // the same when no marker is tappable yet; each tap zooms one level, and there are five.
-  for (let level = 0; level < 4; level++) {
-    const tappable = await expect
-      .poll(async () => (await pointerTarget.count()) > 0, { timeout: 1500 })
-      .toBe(true)
-      .then(
-        () => true,
-        () => false,
-      );
-    if (tappable) break;
+  // the same when no marker is tappable yet. Markers are computed in the same render as the map
+  // transform, so once the transform changes the markers shown are those of the new zoom level.
+  const land = map.locator(".worldMapLand > g");
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  while ((await pointerTarget.count()) === 0) {
+    expect(
+      await zoomIn.isEnabled(),
+      "a standalone city marker appears before the map reaches its closest zoom",
+    ).toBe(true);
+    const transform = await land.getAttribute("transform");
     await map.locator(".worldMapMarker.cluster").first().click();
+    await expect(land).not.toHaveAttribute("transform", transform!);
   }
 
   const pointerTargetLabel = await pointerTarget.getAttribute("aria-label");
@@ -189,7 +190,10 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
 
   // The Year 1 outlook settles in a worker after mount; while it is still calculating, its
   // height changes and shifts the rows below. Measure only once both are still.
-  await expect(outlook).not.toHaveAttribute("aria-busy", "true");
+  // The forecast gets the same allowance as the outlook recalculation test below.
+  await expect(outlook).not.toHaveAttribute("aria-busy", "true", {
+    timeout: 20000,
+  });
 
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
