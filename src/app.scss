@@ -3742,7 +3742,7 @@ html[data-theme="dark"] .uplot {
 }
 
 // "Step" with the counter right beside it: one unit, so a wide layout never opens an awkward
-// gap and a narrow one never has to ellipsize the number. The counter speaks as "2 of 5".
+// gap. The counter shows "2/5" and speaks as "2 of 5". Phones move it into the button row.
 .tutorialHudHeader {
   display: flex;
   min-width: 0;
@@ -4693,6 +4693,72 @@ $sizemap: (
 }
 .tutorialHudFooter {
   gap: 4px;
+}
+// Spoken-only text, such as the step counter's "2 of 5" behind its visible "2/5"
+.tutorialHudVisuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+// On a phone the step counter does not earn a row of its own: it joins the button row, just
+// before Back/Next, where it reads like pager controls. It stays there on gated steps, which
+// have no Next button to carry it. The header keeps its place first in the DOM, so the region
+// name and the tab order are unchanged; only the visual order moves.
+@media screen and (max-width: 699.98px) {
+  .tutorialHud {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 4px;
+  }
+  .tutorialHudContent,
+  .tutorialHudHint {
+    flex: 0 0 100%;
+  }
+  .tutorialHudContent {
+    order: 0;
+    margin-top: 0;
+  }
+  .tutorialHudHint {
+    order: 1;
+  }
+  // A plain div with no role, so flattening it into the HUD's row loses no semantics
+  .tutorialHudFooter {
+    display: contents;
+  }
+  .tutorialHudFooter > * {
+    order: 2;
+    margin-top: 4px;
+  }
+  .tutorialHudHeader {
+    order: 3;
+    margin-top: 4px;
+  }
+  .tutorialHudFooter > .tutorialHudNav {
+    order: 4;
+  }
+  .tutorialHudHeader h2 {
+    color: $font_color_faded;
+    font-size: 0.8125rem;
+    font-weight: 400;
+  }
+}
+// Exit, Hide hint, "Step 10/10", Back and Next need ~300px, so 320px phones drop the word and
+// keep the number (still spoken as "Step 2 of 5"). A capstone has no Next, so "Your turn" fits.
+@media screen and (max-width: 339.98px) {
+  .tutorialHud:not(.tutorialHud-capstone) .tutorialHudStepLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 .missionSummary {
   padding-top: 4px;

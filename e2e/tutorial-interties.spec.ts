@@ -30,7 +30,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   ).toBeVisible();
   await page.getByRole("button", { name: "Start Interties" }).click();
 
-  await expect(page.getByRole("heading", { name: "Step 1 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 1 of 10" }),
+  ).toBeVisible();
   await expect(page.locator(".button-buildFacility")).toBeVisible();
   if (testInfo.project.name.startsWith("mobile-")) {
     for (const selector of [".button-buildFacility"]) {
@@ -42,7 +44,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   // Opening the tab completes navigation without a redundant Next click.
   await page.locator(".button-buildFacility").click();
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Step 2 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 2 of 10" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", {
       name: "Review purchase of Pacific Northwest intertie",
@@ -55,14 +59,18 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     })
     .click();
   // The open dialog aria-hides the rest of the app, so role queries cannot see the HUD while
-  // it is up; getByLabel still matches the counter's aria-label attribute.
-  await expect(page.getByLabel("2 of 10")).toBeVisible();
+  // it is up; read the counter's spoken text directly instead.
+  await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText(
+    "2 of 10",
+  );
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
     .click();
   await expect(page.getByText("Building")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Step 3 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 3 of 10" }),
+  ).toBeVisible();
   // Playwright's mouse remains over the new snackbar after the approval layout changes.
   // MUI deliberately pauses auto-hide on hover; move away as a touch user would release.
   await page.mouse.move(0, 0);
@@ -74,17 +82,27 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     timeout: 20000,
   });
   // Construction alone is not enough: the objective advances only after this explicit pause.
-  await expect(page.getByRole("heading", { name: "Step 3 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 3 of 10" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "pause", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Step 4 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 4 of 10" }),
+  ).toBeVisible();
 
   await page.getByLabel("Trading rule").click();
   await page.getByRole("option", { name: "Buy for shortages only" }).click();
-  await expect(page.getByRole("heading", { name: "Step 5 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 5 of 10" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Step 6 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 6 of 10" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Pause Natural Gas" }).click();
-  await expect(page.getByRole("heading", { name: "Step 7 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 7 of 10" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(page.getByText(/Importing /)).toBeVisible({
@@ -96,7 +114,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     timeout: 20000,
   });
   await page.getByRole("button", { name: "pause", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Step 8 of 10" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 8 of 10" }),
+  ).toBeVisible();
 
   const exchange = page.locator('[data-layer="powerExchange"]');
   await expect(exchange).toBeVisible();

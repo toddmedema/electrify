@@ -297,9 +297,15 @@ export default function TutorialHud({
     >
       <div className="tutorialHudHeader">
         <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
-          {step.capstone ? "Your turn" : "Step"}{" "}
-          <span className="tutorialHudStepCount" aria-label={progressText}>
-            {stepIndex + 1}/{totalSteps}
+          <span className="tutorialHudStepLabel">
+            {step.capstone ? "Your turn" : "Step"}
+          </span>{" "}
+          {/* aria-label is ignored on a plain span, so the spoken form is real hidden text */}
+          <span className="tutorialHudStepCount">
+            <span aria-hidden="true">
+              {stepIndex + 1}/{totalSteps}
+            </span>
+            <span className="tutorialHudVisuallyHidden">{progressText}</span>
           </span>
         </Typography>
       </div>
@@ -333,12 +339,18 @@ export default function TutorialHud({
         )}
         <span className="tutorialHudFooterSpacer" />
         {canGoBack && (
-          <Button color="primary" size="small" onClick={onBack}>
+          <Button
+            className="tutorialHudNav"
+            color="primary"
+            size="small"
+            onClick={onBack}
+          >
             Back
           </Button>
         )}
         {!isGatedStep(step) && (
           <Button
+            className="tutorialHudNav"
             color="primary"
             size="small"
             variant="contained"

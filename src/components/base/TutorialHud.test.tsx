@@ -11,12 +11,7 @@ function objective(
   return {
     card: "FACILITIES",
     target: "#tutorial-target",
-    content: (
-      <TutorialPrompt
-        concepts={["supply", "demand"]}
-        text="Keep supply above demand."
-      />
-    ),
+    content: <TutorialPrompt text="Keep supply above demand." />,
     ...overrides,
   };
 }
@@ -112,8 +107,9 @@ describe("TutorialHud", () => {
     expect(
       screen.getByRole("region", { name: "Step 2 of 3" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Step")).toBeInTheDocument();
-    expect(screen.getByLabelText("2 of 3")).toHaveTextContent("2/3");
+    expect(
+      screen.getByRole("heading", { name: "Step 2 of 3" }),
+    ).toHaveTextContent("2/3");
     expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
