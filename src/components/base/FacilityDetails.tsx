@@ -4,7 +4,6 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   facilityAgeYears,
   facilityEquivalentCycles,
-  facilityEquivalentOperatingHours,
   facilityLifetime,
   facilityOutputFactor,
 } from "../../helpers/Financials";
@@ -128,7 +127,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
   const ageYears = facilityAgeYears(facility, date.minute);
   const outputFactor = facilityOutputFactor(facility, date.minute);
   const equivalentCycles = facilityEquivalentCycles(facility);
-  const equivalentOperatingHours = facilityEquivalentOperatingHours(facility);
 
   // Price history only changes at a month boundary. Selected-facility lifetime totals still
   // refresh visually, but the twelve table lookups and sparkline input do not run every tick.
@@ -155,11 +153,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
 
   return (
     <div className="facilityDetails">
-      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-        {isHydro
-          ? "Rain and snow refill the reservoir; generation drains it. Seasonal shortages matter, while water releases are handled automatically."
-          : "Dispatch and equipment limits are managed automatically. Inspect costs and output here before changing the plant priority."}
-      </Typography>
       <div className="facilityStats">
         {underConstruction ? (
           <Stat
@@ -169,15 +162,13 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         ) : (
           <>
             <Stat
-              label="Age / accounting life"
+              label="Age"
               value={`${ageYears.toFixed(1)} / ${facility.lifespanYears} yr${ageYears >= facility.lifespanYears ? " · beyond" : ""}`}
             />
             <Stat
               // Capacity factor is the generator's word for it; a battery isn't producing
               // anything, it's being used or it isn't
-              label={
-                isStorage ? "Time in use" : "Average output (capacity factor)"
-              }
+              label={isStorage ? "Time in use" : "Avg output"}
               value={
                 lifetime.capacityFactor === undefined
                   ? "—"
@@ -219,14 +210,8 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {facility.name === "Battery" && equivalentCycles !== undefined && (
           <Stat
-            label="Full-charge cycles (equivalent)"
+            label="Cycles"
             value={`${Math.round(equivalentCycles).toLocaleString()} / 7,300`}
-          />
-        )}
-        {!isStorage && equivalentOperatingHours !== undefined && (
-          <Stat
-            label="Full-output hours (equivalent)"
-            value={Math.round(equivalentOperatingHours).toLocaleString()}
           />
         )}
         {minimumStableOutput !== undefined && (
@@ -237,38 +222,26 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {variableOperatingCostPerMWh !== undefined && (
           <Stat
-            label="Fixed operations & maintenance"
+            label="Fixed upkeep"
             value={`${formatMoneyConcise(facility.annualOperatingCost)}/yr`}
           />
         )}
         {variableOperatingCostPerMWh !== undefined && (
           <Stat
-            label="Variable operations & maintenance"
-            value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh generated`}
+            label="Variable upkeep"
+            value={`$${variableOperatingCostPerMWh.toFixed(2)}/MWh`}
           />
         )}
         {facility.tracksStarts && (
           <Stat
-            label="Full start cycles (equivalent)"
+            label="Starts"
             value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
-          />
-        )}
-        {facility.tracksStarts && fuel === "Natural Gas" && (
-          <Stat
-            label="Gas-turbine service"
-            value="Hot-gas-path: 900 starts · major: 1,800 starts"
           />
         )}
         {facility.costPerStart !== undefined && (
           <Stat
             label="Non-fuel start cost"
             value={`${formatMoneyConcise(facility.costPerStart)}/start`}
-          />
-        )}
-        {facility.tracksStarts && (
-          <Stat
-            label="How starts are scaled"
-            value="One displayed operating day represents a full month of starts and costs"
           />
         )}
         {isHydro && (
@@ -288,7 +261,7 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
         )}
         {isHydro && (
           <Stat
-            label="Overflow lost last month"
+            label="Spilled last month"
             value={formatWattHours(facility.hydroLastSpillWh || 0)}
           />
         )}
@@ -341,11 +314,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           </div>
         )}
       </div>
-      <Typography variant="caption" color="textSecondary" component="p">
-        Accounting life determines asset depreciation, not a shutdown date.
-        Aging can reduce output and increase upkeep while the plant keeps
-        running.
-      </Typography>
     </div>
   );
 }

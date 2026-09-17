@@ -764,11 +764,6 @@ $topbar_height: 56px;
 .insightsTrack {
   scroll-margin-block: 12px;
 }
-.operatingSampleLabel {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
 .temporaryEvidence {
   padding: 4px 8px;
   font-size: 0.75rem;
@@ -4619,9 +4614,6 @@ $sizemap: (
   padding: 16px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
-}
-.decisionImpact > h3 {
-  margin-bottom: 8px;
 }
 .decisionImpactFacts {
   display: grid;

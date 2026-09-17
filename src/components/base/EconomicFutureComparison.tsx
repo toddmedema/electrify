@@ -3,8 +3,6 @@ import { GameType } from "../../Types";
 import { summarizeTimeline } from "../../helpers/DateTime";
 import { compareEconomicFutures } from "../../helpers/EconomicFutures";
 import { formatMoneyConcise } from "../../helpers/Format";
-import { getFuelPriceProvenance } from "../../data/FuelPrices";
-import { getEconomyProvenance } from "../../data/Economy";
 
 export default function EconomicFutureComparison({ game }: { game: GameType }) {
   const rows = compareEconomicFutures({
@@ -19,10 +17,7 @@ export default function EconomicFutureComparison({ game }: { game: GameType }) {
         Compare possible costs in five years
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Keep this month’s fuel use and fleet fixed, and multiply its fuel bill
-        by 12 for an annual estimate. These three price assumptions explore
-        uncertainty; they have no assigned probability and do not change your
-        game or existing loan contracts.
+        Assumes today's fuel use continues.
       </Typography>
       {rows.map((row) => (
         <Box
@@ -42,17 +37,6 @@ export default function EconomicFutureComparison({ game }: { game: GameType }) {
           </Typography>
         </Box>
       ))}
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        component="p"
-        sx={{ mt: 1 }}
-      >
-        Current underlying fuel series: {getFuelPriceProvenance(game.date)}.
-        Current economy series: {getEconomyProvenance(game.date)}. Regional
-        prices and future trends are estimates. Actual costs also change with
-        weather, demand, dispatch, and construction.
-      </Typography>
     </Box>
   );
 }

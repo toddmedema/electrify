@@ -99,10 +99,6 @@ export function TransmissionTradingSummary({
           ))}
         </Select>
       </FormControl>
-      <Typography variant="caption" color="textSecondary">
-        One rule for all connections. Imports depend on line capacity and
-        neighboring supply.
-      </Typography>
       <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
     </details>
   );
@@ -216,15 +212,14 @@ export default function TransmissionPanel({
                       {market?.name} · {formatWatts(line.capacityW)} rated
                       capacity
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {building
-                        ? "Power can flow when construction finishes."
-                        : "Available capacity changes with weather. Trading is automatic across the network."}
-                    </Typography>
+                    {building && (
+                      <Typography variant="body2" color="textSecondary">
+                        Power can flow when construction finishes.
+                      </Typography>
+                    )}
                     {line.loanAmountLeft > 0 && (
                       <Typography variant="body2">
-                        Loan balance {formatMoneyConcise(line.loanAmountLeft)} ·
-                        Monthly payments during construction and operation
+                        Loan balance {formatMoneyConcise(line.loanAmountLeft)}
                       </Typography>
                     )}
                     {market && (
@@ -325,9 +320,7 @@ export default function TransmissionPanel({
                   {!readOnly && (
                     <Typography variant="caption" color="textSecondary">
                       Pay {formatMoneyConcise(downpayment)} now · finance{" "}
-                      {formatMoneyConcise(financed)}. Payments begin during
-                      construction; electricity purchases and maintenance cost
-                      extra.
+                      {formatMoneyConcise(financed)}
                     </Typography>
                   )}
                 </article>
@@ -344,16 +337,8 @@ export default function TransmissionPanel({
           />
           <details>
             <summary style={{ minHeight: 44, cursor: "pointer" }}>
-              How trading and purchased emissions are estimated
+              Neighbor emissions
             </summary>
-            <Typography variant="body2" color="textSecondary" sx={{ my: 1 }}>
-              Buy backup during shortages; sell surplus after customers and
-              storage. Trading is automatic, limited by line capacity and
-              neighboring supply; imports are not guaranteed backup. Prices and
-              flows are simplified estimates, not a least-cost dispatch or a
-              network engineering study. Imported emissions count toward your
-              total; the game's carbon fee applies to your local plants.
-            </Typography>
             {Array.from(new Set(corridors.map((corridor) => corridor.id))).map(
               (id) => {
                 const market = adjacentMarketForCorridor(id);

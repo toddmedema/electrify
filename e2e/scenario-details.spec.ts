@@ -22,7 +22,7 @@ for (const theme of ["light", "dark"] as const) {
     const dialog = page.getByRole("dialog", { name: "Wildfire Emergency" });
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByText(/Your score will appear after the first month/),
+      dialog.getByText(/Score appears after your first month/),
     ).toBeAttached();
     const back = dialog.getByRole("button", { name: "Back to game" });
     await expect(back).toBeInViewport();
@@ -70,9 +70,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await menu.click();
     await page.getByRole("menuitem", { name: "Scenario details" }).click();
-    await expect(
-      dialog.getByText("Through last month · updates monthly"),
-    ).toBeAttached();
+    await expect(dialog.getByText("Through last month")).toBeAttached();
     const content = dialog.locator(".MuiDialogContent-root");
     expect(
       await content.evaluate((el) => el.scrollWidth - el.clientWidth),

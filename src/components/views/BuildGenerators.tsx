@@ -36,7 +36,6 @@ import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
 import {
   DOWNPAYMENT_PERCENT,
   FUELS,
-  GAME_TO_REAL_YEARS,
   LOAN_MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -124,6 +123,20 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
+  // A short role tag stays on the card; how to use it waits for the details
+  const [role, roleHint] =
+    generator.fuel === "Hydro"
+      ? [
+          "Flexible water supply",
+          "Rain and snow refill the reservoir; generation drains it.",
+        ]
+      : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
+            generator.fuel,
+          )
+        ? ["Weather-dependent supply", "Pair with backup or storage."]
+        : generator.spinMinutes > 60
+          ? ["Steady supply", "Best for demand that lasts for hours."]
+          : ["Fast response", "Can follow changing demand."];
   const toggleExpand = () => {
     setExpanded(!expanded);
   };
@@ -196,15 +209,7 @@ export function GeneratorBuildItem(
         title={generator.name}
       />
       <Typography className="buildOptionContext" variant="body2">
-        {generator.fuel === "Hydro"
-          ? "Flexible water supply · rain and snow refill the reservoir; generation drains it"
-          : ["Sun", "Wind", "Offshore Wind", "Airborne Wind"].includes(
-                generator.fuel,
-              )
-            ? "Weather-dependent supply · pair with backup or storage"
-            : generator.spinMinutes > 60
-              ? "Steady supply · best for demand that lasts for hours"
-              : "Fast response · can follow changing demand"}
+        {role}
       </Typography>
       {!canBuild && (
         <Typography
@@ -259,8 +264,7 @@ export function GeneratorBuildItem(
           variant="body2"
           color="textSecondary"
         >
-          {generator.description} Starts, minimum output, and ramping are
-          managed automatically.
+          {roleHint} {generator.description}
         </Typography>
         {(props.advantages || []).length > 0 && (
           <Box sx={{ px: 2, pb: 1 }}>
@@ -287,12 +291,8 @@ export function GeneratorBuildItem(
                     Estimated lifetime cost per MWh
                     <ManualLink entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY} />
                     <Typography variant="body2" color="textSecondary">
-                      Across its lifetime, assuming a{" "}
-                      {Math.round(generator.capacityFactor * 100)}% capacity
+                      At {Math.round(generator.capacityFactor * 100)}% capacity
                       factor
-                      {generator.costPerStart !== undefined
-                        ? " and one start/day"
-                        : ""}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -305,9 +305,6 @@ export function GeneratorBuildItem(
                   <TableCell>
                     Minimum stable output
                     <ManualLink entry={MANUAL_ENTRY.RAMP_RATE} />
-                    <Typography variant="body2" color="textSecondary">
-                      While the plant remains online
-                    </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {Math.round(generator.minimumStableOutput * 100)}% ·{" "}
@@ -334,12 +331,7 @@ export function GeneratorBuildItem(
               </TableRow>
               {hasVariableOM && (
                 <TableRow>
-                  <TableCell>
-                    Variable operations & maintenance
-                    <Typography variant="body2" color="textSecondary">
-                      Per generated MWh
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Variable operations & maintenance</TableCell>
                   <TableCell align="right">
                     ${(generator.variableOperatingCostPerMWh || 0).toFixed(2)}
                     /MWh generated
@@ -348,30 +340,9 @@ export function GeneratorBuildItem(
               )}
               {generator.costPerStart !== undefined && (
                 <TableRow>
-                  <TableCell>
-                    Non-fuel start cost
-                    <Typography variant="body2" color="textSecondary">
-                      Per equivalent start
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Non-fuel start cost</TableCell>
                   <TableCell align="right">
                     {formatMoneyConcise(generator.costPerStart)}/start
-                  </TableCell>
-                </TableRow>
-              )}
-              {generator.costPerStart !== undefined && (
-                <TableRow>
-                  <TableCell>
-                    Representative-day charge
-                    <Typography variant="body2" color="textSecondary">
-                      365 / 12 equivalent starts
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatMoneyConcise(
-                      generator.costPerStart * GAME_TO_REAL_YEARS,
-                    )}
-                    /displayed start
                   </TableCell>
                 </TableRow>
               )}
@@ -395,12 +366,7 @@ export function GeneratorBuildItem(
               )}
               {fuelPrices[generator.fuel] && (
                 <TableRow>
-                  <TableCell>
-                    Fuel costs
-                    <Typography variant="body2" color="textSecondary">
-                      Varies with fuel prices
-                    </Typography>
-                  </TableCell>
+                  <TableCell>Fuel costs</TableCell>
                   <TableCell align="right">
                     {/* btuPerWh * 1M = BTU per MWh, and prices are per million BTU,
                         so the two factors of a million cancel out */}
@@ -429,13 +395,7 @@ export function GeneratorBuildItem(
                 </TableRow>
               )}
               <TableRow>
-                <TableCell>
-                  Accounting lifetime
-                  <Typography variant="body2" color="textSecondary">
-                    Used for asset value and cost estimates; plants do not
-                    automatically retire at this age.
-                  </Typography>
-                </TableCell>
+                <TableCell>Accounting lifetime</TableCell>
                 <TableCell align="right">
                   {generator.lifespanYears} years
                 </TableCell>
@@ -450,9 +410,6 @@ export function GeneratorBuildItem(
                     entry={MANUAL_ENTRY.EMISSIONS}
                     label="CO2e emissions"
                   />
-                  <Typography variant="body2" color="textSecondary">
-                    CO2e released at the plant for each MWh generated
-                  </Typography>
                 </TableCell>
                 <TableCell align="right">
                   {kgCO2ePerMWh > 0
@@ -489,28 +446,25 @@ export function GeneratorBuildItem(
                 concept: "finances",
                 label: "Loan option",
                 value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(monthlyPayment)}/mo`,
-                detail:
-                  "Payments start during construction. Borrowing leaves less cash for future bills.",
+                detail: "Payments start now.",
               },
               {
                 concept: "money",
                 label: "Estimated upkeep",
                 value: `${formatMoneyConcise(estimatedAnnualOperatingCost(generator) / 12)}/mo`,
-                detail:
-                  "Operations and maintenance at typical use; fuel, carbon fees, and loan payments are extra. Actual use changes costs.",
+                detail: "Plus fuel and loan payments.",
               },
               {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(generator.yearsToBuild * 12)} months`,
-                detail:
-                  "Output and reserve do not increase until construction finishes.",
+                detail: "No output until built.",
               },
               {
                 concept: "supply",
                 label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail: `${formatWatts(generator.peakW)} maximum rated output; check availability during the shortage. Typical output is not guaranteed at that hour.`,
+                detail: `${formatWatts(generator.peakW)} max; weather may limit it.`,
               },
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
