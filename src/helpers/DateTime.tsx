@@ -143,13 +143,15 @@ function accumulateTick(
     "Airborne Wind": getAirborneWindCapacityFactor([t.windAirborneKph]),
     Solar: getSolarCapacityFactor([t.solarIrradianceWM2]),
   };
-  // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
-  const sample = Object.fromEntries(Object.entries(t)) as TickPresentFutureType;
-  // Recovery batches belong to resumable ticks, not averaged chart history.
-  delete sample.deferredResidential;
-  delete sample.deferredResidentialStart;
-  sample.renewableCapacityFactors = factors;
   if (!summary.chartAverage) {
+    // Runtime dispatch metadata uses symbol keys and must never enter a persisted chart record.
+    const sample = Object.fromEntries(
+      Object.entries(t),
+    ) as TickPresentFutureType;
+    // Recovery batches belong to resumable ticks, not averaged chart history.
+    delete sample.deferredResidential;
+    delete sample.deferredResidentialStart;
+    sample.renewableCapacityFactors = factors;
     summary.chartAverage = {
       ...sample,
       demandByType: { ...t.demandByType },
@@ -158,31 +160,37 @@ function accumulateTick(
   } else {
     // Average levels, including fuel prices and weather. Financial totals live above this
     // chart-only record. Clone nested maps so summarizing never mutates simulation ticks.
-    const average = summary.chartAverage;
-    for (const key of Object.keys(sample) as (keyof TickPresentFutureType)[]) {
-      const value = sample[key];
-      if (typeof value === "number") {
-        Object.assign(average, {
-          [key]:
-            Number(average[key] ?? value) +
-            (value - Number(average[key] ?? value)) * share,
-        });
+    // This runs for every tick of every month, so it reads the tick directly instead of first
+    // copying it: Object.keys skips the same symbol keys the copy did, and the recovery batches
+    // and capacity factors the copy replaced are never numbers.
+    const average = summary.chartAverage as unknown as Record<string, unknown>;
+    const tick = t as unknown as Record<string, unknown>;
+    for (const key of Object.keys(tick)) {
+      const value = tick[key];
+      if (
+        typeof value === "number" &&
+        key !== "deferredResidentialStart" &&
+        key !== "renewableCapacityFactors"
+      ) {
+        const previous = Number(average[key] ?? value);
+        average[key] = previous + (value - previous) * share;
       }
     }
-    for (const key of [
-      "demandByType",
-      "supplyByFuel",
-      "renewableCapacityFactors",
-    ] as const) {
-      const previous = average[key] as Record<string, number>;
-      const current = (sample[key] || {}) as Record<string, number>;
-      for (const name of new Set([
-        ...Object.keys(previous),
-        ...Object.keys(current),
-      ])) {
+    for (const [previous, current] of [
+      [average.demandByType, t.demandByType],
+      [average.supplyByFuel, t.supplyByFuel],
+      [average.renewableCapacityFactors, factors],
+    ] as Array<[Record<string, number>, Record<string, number> | undefined]>) {
+      const next = current || {};
+      for (const name of Object.keys(previous)) {
         previous[name] =
           (previous[name] || 0) +
-          ((current[name] || 0) - (previous[name] || 0)) * share;
+          ((next[name] || 0) - (previous[name] || 0)) * share;
+      }
+      for (const name of Object.keys(next)) {
+        if (!Object.prototype.hasOwnProperty.call(previous, name)) {
+          previous[name] = 0 + ((next[name] || 0) - 0) * share;
+        }
       }
     }
   }

@@ -162,6 +162,7 @@ import { start, loaded, quit, resume, startReplay } from "./GameActions";
 import { clearSaveFor } from "../SaveGame";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
+  ActiveWorldEventType,
   DateType,
   FacilityOperatingType,
   FacilityShoppingType,
@@ -557,6 +558,47 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
  */
 const storyEffectsCache = new Map<string, WorldEventEffectsType>();
 
+/**
+ * storyEffectsAt runs several times per forecast tick, and serializing every occurrence for each
+ * call was a third of a simulated month's work. Occurrences are only ever appended, trimmed from
+ * the front, or replaced wholesale -- never edited in place -- so an array whose length and last
+ * entry are unchanged still serializes the same. Each distinct serialization is interned to a
+ * short id so that cache keys stay cheap to hash.
+ */
+let occurrencesKeyCache = new WeakMap<
+  ActiveWorldEventType[],
+  { length: number; last: ActiveWorldEventType | undefined; id: number }
+>();
+const occurrencesKeyIds = new Map<string, number>();
+
+function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
+  const last = occurrences[occurrences.length - 1];
+  const cached = occurrencesKeyCache.get(occurrences);
+  if (cached && cached.length === occurrences.length && cached.last === last) {
+    return cached.id;
+  }
+  const json = JSON.stringify(
+    occurrences.map((event) => [event.key, event.attributes]),
+  );
+  let id = occurrencesKeyIds.get(json);
+  if (id === undefined) {
+    if (occurrencesKeyIds.size > 10000) {
+      // Ids must never be reused for a different serialization while a key built on them is live
+      occurrencesKeyIds.clear();
+      occurrencesKeyCache = new WeakMap();
+      storyEffectsCache.clear();
+    }
+    id = occurrencesKeyIds.size;
+    occurrencesKeyIds.set(json, id);
+  }
+  occurrencesKeyCache.set(occurrences, {
+    length: occurrences.length,
+    last,
+    id,
+  });
+  return id;
+}
+
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
   const fleetSensitive =
     state.scenarioId === 104 ||
@@ -585,12 +627,7 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
     state.seed,
     date.monthsElapsed,
     fleetKey,
-    JSON.stringify(
-      state.worldEvents.occurrences.map((event) => [
-        event.key,
-        event.attributes,
-      ]),
-    ),
+    occurrencesKey(state.worldEvents.occurrences),
   ].join("|");
 }
 
