@@ -242,14 +242,78 @@ describe("TutorialHud", () => {
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
     expect(ring).toBeInTheDocument();
-    // Top and bottom keep the gap; left and right hug the viewport edge instead of being cut.
-    expect(ring.style.top).toBe("145px");
-    expect(ring.style.height).toBe("110px");
+    // No room outside on the left and right, so the ring frames the control from inside on
+    // every side rather than sitting outside it on two and on top of it on the others.
+    expect(ring.style.top).toBe("150px");
+    expect(ring.style.height).toBe("100px");
     expect(ring.style.left).toBe("0px");
     expect(ring.style.width).toBe("1024px");
 
     unmount();
     target.remove();
+  });
+
+  it("keeps the gap even on every side when one side has only a little room", () => {
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    // 4px from the viewport's right edge, like the speed buttons on a phone.
+    stubRect(target, 800, 20, 1020, 60);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring.style.left).toBe("796px");
+    expect(ring.style.top).toBe("16px");
+    expect(ring.style.width).toBe("228px");
+    expect(ring.style.height).toBe("48px");
+
+    unmount();
+    target.remove();
+  });
+
+  it("keeps the gap for a control flush with a pane that clips but does not scroll", () => {
+    // The Build button fills the desktop pane header, so its top edge is the pane's top edge.
+    const pane = document.createElement("div");
+    pane.style.overflow = "hidden";
+    stubRect(pane, 0, 100, 425, 768);
+    const target = document.createElement("button");
+    target.id = "tutorial-target";
+    stubRect(target, 320, 100, 410, 140);
+    pane.appendChild(target);
+    document.body.appendChild(pane);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    expect(ring.style.top).toBe("95px");
+    expect(ring.style.height).toBe("50px");
+
+    unmount();
+    pane.remove();
+  });
+
+  it("draws one ring around targets that touch edge to edge", () => {
+    const rows = [150, 220].map((top) => {
+      const row = document.createElement("div");
+      row.className = "tutorial-row";
+      stubRect(row, 200, top, 600, top + 70);
+      document.body.appendChild(row);
+      return row;
+    });
+
+    const { unmount } = render(
+      <TutorialHud
+        {...props({ step: objective({ target: ".tutorial-row" }) })}
+      />,
+    );
+    const visible = screen
+      .getAllByTestId("tutorial-target-ring")
+      .filter((ring) => ring.style.display !== "none");
+    expect(visible).toHaveLength(1);
+    expect(visible[0].style.top).toBe("145px");
+    expect(visible[0].style.height).toBe("150px");
+
+    unmount();
+    rows.forEach((row) => row.remove());
   });
 
   it("hides the ring while its target has no box", () => {
@@ -318,8 +382,10 @@ describe("TutorialHud", () => {
 
     const { unmount } = render(<TutorialHud {...props()} />);
     const ring = screen.getByTestId("tutorial-target-ring");
-    expect(ring.style.top).toBe("595px");
-    expect(ring.style.height).toBe("105px");
+    // The bar cuts the bottom, so the ring ends at the bar; the control spans the scroller's
+    // width, so the rest of the ring frames it from inside.
+    expect(ring.style.top).toBe("600px");
+    expect(ring.style.height).toBe("100px");
 
     unmount();
     scroller.remove();
