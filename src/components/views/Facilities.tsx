@@ -14,7 +14,6 @@ import {
   ListItemText,
   Toolbar,
   Typography,
-  useMediaQuery,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
@@ -57,7 +56,6 @@ import { combineStoryEffects } from "../../data/WorldEvents";
 import TransmissionPanel, {
   TransmissionTradingSummary,
 } from "./TransmissionPanel";
-import { getScenario } from "../../data/Scenarios";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
@@ -556,47 +554,32 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   );
 }
 
+// Always drawn rather than behind a phone-only disclosure: on a phone the chart scrolls away
+// with the rest of the pane (see .facilitiesBody), the way Insights does, instead of pinning
+// 180px above the fleet or making the player open it first
 function FacilitySupplyChart({
   game,
-  forceOpen,
   anchor,
 }: {
   game: GameType;
-  forceOpen: boolean;
   anchor: React.RefObject<HTMLDivElement>;
 }) {
-  const phone = useMediaQuery("(max-width:599px)");
-  const [expanded, setExpanded] = React.useState(false);
-  React.useEffect(() => {
-    if (forceOpen) setExpanded(true);
-  }, [forceOpen]);
-  const open = !phone || expanded || forceOpen;
   return (
-    <details className="facilitySupplyDisclosure" open={open}>
-      <summary
-        onClick={(event) => {
-          event.preventDefault();
-          setExpanded(!open);
-        }}
-      >
-        Supply & demand <KeyboardArrowDownIcon aria-hidden />
-      </summary>
-      <div
-        ref={anchor}
-        tabIndex={-1}
-        className="operatingEvidence"
-        aria-label="Supply and demand"
-      >
-        <ChartSupplyDemand
-          height={180}
-          timeline={game.timeline}
-          currentMinute={game.date.minute}
-          location={game.location}
-          legend
-          startingYear={game.startingYear}
-        />
-      </div>
-    </details>
+    <div
+      ref={anchor}
+      tabIndex={-1}
+      className="operatingEvidence facilitySupplyChart"
+      aria-label="Supply and demand"
+    >
+      <ChartSupplyDemand
+        height={180}
+        timeline={game.timeline}
+        currentMinute={game.date.minute}
+        location={game.location}
+        legend
+        startingYear={game.startingYear}
+      />
+    </div>
   );
 }
 
@@ -633,15 +616,9 @@ export interface DispatchProps {
 
 export interface Props extends StateProps, DispatchProps {}
 
-export default class Facilities extends React.Component<
-  Props,
-  { revealChart: boolean }
-> {
+export default class Facilities extends React.Component<Props> {
   constructor(props: Props) {
     super(props);
-    this.state = {
-      revealChart: false,
-    };
     this.onBeforeDragStart = this.onBeforeDragStart.bind(this);
     this.onDragEnd = this.onDragEnd.bind(this);
   }
@@ -656,12 +633,7 @@ export default class Facilities extends React.Component<
 
   // Keep 1x presentation unchanged, but cap FAST's 100 simulation ticks/sec to 25 visual
   // refreshes/sec. Intermediate simulation ticks still run; the pane simply presents the newest.
-  public shouldComponentUpdate(
-    nextProps: Props,
-    nextState: Readonly<{
-      revealChart: boolean;
-    }>,
-  ) {
+  public shouldComponentUpdate(nextProps: Props) {
     if (this.dragging) {
       return false;
     }
@@ -669,7 +641,6 @@ export default class Facilities extends React.Component<
     // goes through whatever the throttle is up to - otherwise the row waits for the next
     // unskipped frame, and at FAST that reads as a click that missed
     if (
-      nextState !== this.state ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       nextProps.game.speed !== "FAST" ||
@@ -682,13 +653,7 @@ export default class Facilities extends React.Component<
     return this.throttle.due(nextProps.game.date.minute, 4);
   }
 
-  public componentDidUpdate(previousProps: Props) {
-    if (
-      !this.props.evidenceRequest &&
-      previousProps.evidenceRequest &&
-      this.state.revealChart
-    )
-      this.setState({ revealChart: false });
+  public componentDidUpdate() {
     this.resolveEvidence();
     this.throttle.rendered(this.props.game.date.minute);
   }
@@ -711,10 +676,6 @@ export default class Facilities extends React.Component<
       )
     )
       return;
-    if (!this.state.revealChart) {
-      this.setState({ revealChart: true });
-      return;
-    }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
@@ -778,16 +739,8 @@ export default class Facilities extends React.Component<
               </Button>
             )}
           </Toolbar>
-          <>
-            <FacilitySupplyChart
-              game={game}
-              anchor={this.evidenceAnchor}
-              forceOpen={
-                this.state.revealChart ||
-                getScenario(game.scenarioId)?.tutorialSteps?.[game.tutorialStep]
-                  ?.target === "#chartSupplyDemand"
-              }
-            />
+          <div className="scrollable facilitiesBody">
+            <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
             {intertiesAvailable && (
               <TransmissionTradingSummary
                 game={game}
@@ -863,7 +816,7 @@ export default class Facilities extends React.Component<
                 />
               )}
             </List>
-          </>
+          </div>
         </>
       </GameCard>
     );
