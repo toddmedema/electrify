@@ -37,6 +37,7 @@ import {
   DOWNPAYMENT_PERCENT,
   FUELS,
   LOAN_MONTHS,
+  MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
 import { GENERATORS } from "../../data/Facilities";
@@ -48,6 +49,10 @@ import {
   LocationType,
 } from "../../Types";
 import { generateNewTimeline } from "../../reducers/Game";
+import {
+  expectedMonthlyOutputShape,
+  ExpectedOutputShape,
+} from "../../helpers/ExpectedOutput";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { formatMass } from "../../helpers/Units";
 import ManualLink from "../base/ManualLink";
@@ -60,6 +65,98 @@ import {
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
+import Sparkline from "../base/Sparkline";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function percent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * Every card's line is drawn against the same ceiling, so a flat solar curve looks flat next to a
+ * wind curve rather than being stretched to fill its own box. Rounded up to a tenth so the scale
+ * doesn't wobble between forecasts. Hydro's inflow is left out: a wet month routinely tops its
+ * nameplate, and letting that set the scale would flatten every other line on the list, so hydro
+ * clips at the top edge instead and its caption carries the dry month.
+ */
+export function sharedOutputCeiling(
+  shapes: (ExpectedOutputShape | undefined)[],
+): number {
+  const highest = Math.max(
+    0,
+    ...shapes.flatMap((shape) =>
+      shape && shape.kind === "weather" ? shape.monthly : [],
+    ),
+  );
+  return Math.min(1, Math.max(0.1, Math.ceil(highest * 10 - 1e-9) / 10));
+}
+
+function ExpectedOutputMetric(props: {
+  shape?: ExpectedOutputShape;
+  ceiling: number;
+}): React.JSX.Element {
+  const { shape, ceiling } = props;
+  let caption = "";
+  let chart: React.ReactNode = null;
+  if (shape && shape.kind === "on-demand") {
+    caption = "Any month";
+    chart = (
+      <Sparkline
+        values={new Array(12).fill(ceiling)}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        dash
+        ariaLabel="Available in any month."
+      />
+    );
+  } else if (shape) {
+    const highMonth = shape.monthly.reduce(
+      (high, value, month) => (value > shape.monthly[high] ? month : high),
+      0,
+    );
+    const low = shape.monthly[shape.lowMonth];
+    const water = shape.kind === "water-inflow";
+    caption = `Low ${MONTHS[shape.lowMonth]} ${percent(low)}${water ? " water in" : ""}`;
+    chart = (
+      <Sparkline
+        values={shape.monthly}
+        domain={[0, ceiling]}
+        width={96}
+        height={24}
+        stretch
+        baseline
+        fill
+        lowMarker
+        ariaLabel={`Typical year${water ? " of water inflow" : ""}: highest in ${MONTH_NAMES[highMonth]} at ${percent(shape.monthly[highMonth])}, lowest in ${MONTH_NAMES[shape.lowMonth]} at ${percent(low)}.`}
+      />
+    );
+  }
+  return (
+    <div className="buildOptionMetric buildOptionOutput">
+      <Typography variant="caption" color="textSecondary" component="div">
+        {caption}
+      </Typography>
+      <div className="buildOptionSparkline">{chart}</div>
+    </div>
+  );
+}
 
 interface GeneratorBuildItemProps {
   cash: number;
@@ -71,6 +168,9 @@ interface GeneratorBuildItemProps {
   secondaryMetric?: string;
   forecastGapW?: number;
   advantages?: string[];
+  /** Typical-year output; computed from the generator alone when omitted (on-demand plants only) */
+  outputShape?: ExpectedOutputShape;
+  outputCeiling?: number;
   compared?: boolean;
   compareDisabled?: boolean;
   onCompare?: () => void;
@@ -123,6 +223,8 @@ export function GeneratorBuildItem(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
   const typicalOutputW = generator.peakW * generator.capacityFactor;
+  const outputShape =
+    props.outputShape || expectedMonthlyOutputShape(generator, []);
   // A short role tag stays on the card; how to use it waits for the details
   const [role, roleHint] =
     generator.fuel === "Hydro"
@@ -181,7 +283,9 @@ export function GeneratorBuildItem(
   );
 
   return (
-    <Card className="build-list-item buildOption">
+    <Card
+      className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
+    >
       <CardHeader
         avatar={
           <Avatar
@@ -220,11 +324,7 @@ export function GeneratorBuildItem(
           {buildSubtitle}
         </Typography>
       )}
-      <Box className="buildOptionMetrics">
-        <BuildMetric
-          label="Typical output"
-          value={formatWatts(typicalOutputW)}
-        />
+      <Box className="buildOptionMetrics withOutput">
         <BuildMetric
           label="Build cost"
           value={formatMoneyConcise(generator.buildCost)}
@@ -232,6 +332,10 @@ export function GeneratorBuildItem(
         <BuildMetric
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
+        />
+        <ExpectedOutputMetric
+          shape={outputShape}
+          ceiling={props.outputCeiling || 1}
         />
         {props.secondaryMetric === "lcWh" && (
           <BuildMetric
@@ -717,6 +821,13 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     0,
     ...forecastedTimeline.map((tick) => tick.demandW - tick.supplyW),
   );
+  const outputShapes = new Map(
+    generators.map((generator) => [
+      generator.name,
+      expectedMonthlyOutputShape(generator, forecastedTimeline),
+    ]),
+  );
+  const outputCeiling = sharedOutputCeiling(Array.from(outputShapes.values()));
   const buildableGenerators = generators.filter(
     (generator) => generator.available && generator.peakW <= generator.maxPeakW,
   );
@@ -808,6 +919,8 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
               secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
               forecastGapW={forecastGapW}
               advantages={advantages.slice(0, 2)}
+              outputShape={outputShapes.get(g.name)}
+              outputCeiling={outputCeiling}
               compared={compared}
               compareDisabled={comparedNames.length >= 3}
               onCompare={() => toggleCompare(g.name)}

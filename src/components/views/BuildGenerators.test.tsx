@@ -18,6 +18,7 @@ import {
 } from "@testing-library/react";
 import { GENERATORS } from "../../data/Facilities";
 import { createGame } from "../../testing/Simulator";
+import * as ExpectedOutput from "../../helpers/ExpectedOutput";
 import BuildGenerators, { GeneratorBuildItem } from "./BuildGenerators";
 
 jest.mock("../base/ManualLink", () => () => null);
@@ -46,7 +47,7 @@ it("shows natural-gas base, per-start, and daily-start estimated O&M", async () 
   ).not.toBeInTheDocument();
   expect(screen.queryByText("$13.4M/yr")).not.toBeInTheDocument();
   expect(screen.queryByText("Flexible power")).toBeNull();
-  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
+  expect(screen.queryByText(/Typical output/)).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Show Natural Gas details" }),
   );
@@ -219,7 +220,10 @@ it("keeps primary generator metrics visible and discloses secondary details", ()
   );
 
   expect(screen.getByText("Natural Gas")).toBeInTheDocument();
-  expect(screen.getByText(/Typical output/)).toBeInTheDocument();
+  expect(screen.getByText("Any month")).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Available in any month." }),
+  ).toBeInTheDocument();
   expect(
     screen.queryByText(/largest forecast shortage/),
   ).not.toBeInTheDocument();
@@ -352,6 +356,40 @@ it("explains unavailable technologies and hides their comparison button", () => 
       name: "Review purchase of Unavailable Solar",
     }),
   ).toBeDisabled();
+});
+
+it("draws each generator's typical year against one shared scale", () => {
+  const game = createGame({ scenarioId: 100, difficulty: "Employee" });
+  const monthly = jest.spyOn(ExpectedOutput, "expectedMonthlyOutputShape");
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={jest.fn()}
+    />,
+  );
+
+  const cards = screen.getAllByRole("button", {
+    name: /^Review purchase of/,
+  });
+  // Once per generator in the list, not again inside each card
+  expect(monthly).toHaveBeenCalledTimes(cards.length);
+  monthly.mockRestore();
+
+  expect(
+    screen.getAllByRole("img", { name: /^Typical year|any month/ }),
+  ).toHaveLength(cards.length);
+  expect(
+    screen.getAllByRole("img", { name: /^Typical year: .*lowest in/ }).length,
+  ).toBeGreaterThan(0);
+  expect(
+    screen.getAllByText(/^Low [A-Z][a-z]{2} \d+%$/).length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText("Any month").length).toBeGreaterThan(0);
+  expect(screen.getByText(/^Low [A-Z][a-z]{2} \d+% water in$/)).toBeVisible();
+  expect(
+    screen.getByRole("img", { name: /^Typical year of water inflow: / }),
+  ).toBeInTheDocument();
 });
 
 it("pins up to three current-grid choices into a comparison tray", () => {

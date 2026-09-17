@@ -1,6 +1,5 @@
 import * as React from "react";
 import uPlot from "uplot";
-import { HOURS_PER_YEAR_REAL } from "../../Constants";
 import { GENERATORS } from "../../data/Facilities";
 import {
   axisTicksAreYearly,
@@ -9,11 +8,9 @@ import {
   MINUTES_PER_MONTH,
 } from "../../helpers/DateTime";
 import {
-  getAirborneWindCapacityFactor,
-  getOffshoreWindCapacityFactor,
-  getSolarCapacityFactor,
-  getWindCapacityFactor,
-} from "../../helpers/Energy";
+  monthlyRenewableCapacityFactors,
+  RenewableCapacityFactorPoint,
+} from "../../helpers/ExpectedOutput";
 import { fuelColors } from "../../Theme";
 import {
   GameType,
@@ -49,11 +46,6 @@ export interface Props {
   syncKey?: string;
 }
 
-export interface RenewableCapacityFactorPoint {
-  minute: number;
-  factors: Record<string, number>;
-}
-
 interface State {
   data: RenewableCapacityFactorPoint[];
   domain: Props["domain"];
@@ -82,76 +74,6 @@ export function availableWeatherRenewables(
     (generator) =>
       generator.available && WEATHER_RENEWABLES.has(generator.name),
   );
-}
-
-function capacityFactor(
-  technology: GeneratorShoppingType,
-  ticks: TickPresentFutureType[],
-): number {
-  if (
-    ticks.every(
-      (tick) => tick.renewableCapacityFactors?.[technology.name] !== undefined,
-    )
-  ) {
-    return (
-      ticks.reduce(
-        (sum, tick) => sum + tick.renewableCapacityFactors![technology.name],
-        0,
-      ) / ticks.length
-    );
-  }
-  switch (technology.name) {
-    case "Wind":
-      return getWindCapacityFactor(ticks.map((tick) => tick.windKph));
-    case "Offshore Wind":
-      return getOffshoreWindCapacityFactor(
-        ticks.flatMap((tick) =>
-          tick.windOffshoreKph === undefined ? [] : [tick.windOffshoreKph],
-        ),
-      );
-    case "Airborne Wind":
-      return getAirborneWindCapacityFactor(
-        ticks.map((tick) => tick.windAirborneKph),
-      );
-    case "Solar":
-      return getSolarCapacityFactor(
-        ticks.map((tick) => tick.solarIrradianceWM2),
-      );
-    case "Hydro": {
-      const runoffMm =
-        ticks.reduce((total, tick) => total + tick.hydroRunoffMm, 0) /
-        ticks.length;
-      const monthlyPotentialWh = (technology.hydroWhPerMm || 0) * runoffMm;
-      return Math.min(
-        1,
-        monthlyPotentialWh / (technology.peakW * (HOURS_PER_YEAR_REAL / 12)),
-      );
-    }
-    default:
-      return 0;
-  }
-}
-
-export function monthlyRenewableCapacityFactors(
-  timeline: TickPresentFutureType[],
-  technologies: GeneratorShoppingType[],
-): RenewableCapacityFactorPoint[] {
-  const months = new Map<number, TickPresentFutureType[]>();
-  timeline.forEach((tick) => {
-    const month = Math.floor(tick.minute / MINUTES_PER_MONTH);
-    const ticks = months.get(month) || [];
-    ticks.push(tick);
-    months.set(month, ticks);
-  });
-  return Array.from(months.values()).map((ticks) => ({
-    minute: Math.round((ticks[0].minute + ticks[ticks.length - 1].minute) / 2),
-    factors: Object.fromEntries(
-      technologies.map((technology) => [
-        technology.name,
-        capacityFactor(technology, ticks),
-      ]),
-    ),
-  }));
 }
 
 function percent(fraction: number): string {

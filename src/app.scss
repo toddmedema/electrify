@@ -26,6 +26,11 @@
   --font-color-faded: #666666;
   --font-color-disabled: #bdbdbd; /* grey400 */
   --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
+  // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
+  --spark-stroke: #546e7a; /* blueGray600 */
+  --spark-fill: rgba(84, 110, 122, 0.12);
+  --spark-baseline: #90a4ae; /* blueGray300 */
+  --spark-marker-fill: #ffffff; /* The card paper, so the hollow dot cuts the line */
   --interactive-tint: rgba(21, 101, 192, 0.5);
   // The bright head of the glint that circles the tutorial ring
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 70%, white);
@@ -68,6 +73,10 @@
   --font-color-faded: #9aa9ba;
   --font-color-disabled: #627083;
   --interactive-blue: #6ab8f7;
+  --spark-stroke: #9aa9ba;
+  --spark-fill: rgba(154, 169, 186, 0.16);
+  --spark-baseline: rgba(148, 163, 184, 0.34);
+  --spark-marker-fill: #111820;
   --interactive-tint: rgba(106, 184, 247, 0.42);
   --tutorial-glint: color-mix(in oklab, var(--interactive-blue) 45%, white);
   --focus-ring: #ffd54f;
@@ -4231,6 +4240,48 @@ $sizemap: (
   }
   .buildOptionMetric {
     min-width: 0;
+  }
+  .buildOptionMetrics.withOutput {
+    // Cost and time hug their figures so the output line gets whatever width is left
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: 16px;
+    // The optional fourth figure takes a row of its own instead of widening the cost column
+    .buildOptionMetric:nth-child(n + 4) {
+      grid-column: 1 / -1;
+    }
+  }
+  .buildOptionSparkline {
+    // Reserved even before the forecast can draw a line, so the card doesn't jump. The gap keeps
+    // a line along the top edge from reading as an underline of the caption.
+    height: 24px;
+    margin-top: 4px;
+    .sparkline {
+      display: block;
+      overflow: visible;
+      // Gives way on the narrowest cards rather than pushing the row wider than the screen
+      width: 100%;
+      min-width: 72px;
+      max-width: 96px;
+    }
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--spark-stroke);
+    }
+    .sparklineFill {
+      fill: var(--spark-fill);
+    }
+    .sparklineBaseline {
+      stroke: var(--spark-baseline);
+    }
+    .sparklineMarker {
+      fill: var(--spark-marker-fill);
+    }
+  }
+  &.compared .buildOptionSparkline {
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--interactive-blue);
+    }
   }
   .buildOptionContext {
     display: block;
