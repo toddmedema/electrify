@@ -10,7 +10,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Mission objective" }),
+    page.getByRole("heading", { name: "Step 1 of 4" }),
   ).toBeVisible();
   await expect(page.getByText("Tap your gas plant")).toBeVisible();
   // The first step is a new player's first look at the game, so everything it doesn't use
@@ -76,7 +76,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
-    page.getByText("Your turn: keep the lights on for a full day"),
+    page.getByText("Keep the lights on for a full day"),
   ).toBeVisible();
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
   await page.getByRole("button", { name: "pause" }).click();
@@ -99,7 +99,7 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
 
   await page.getByRole("button", { name: "Retry final challenge" }).click();
   await expect(
-    page.getByText("Your turn: keep the lights on for a full day"),
+    page.getByText("Keep the lights on for a full day"),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Inspect Natural Gas", exact: true })

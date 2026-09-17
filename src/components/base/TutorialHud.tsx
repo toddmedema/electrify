@@ -242,15 +242,12 @@ export default function TutorialHud({
   totalSteps,
   canGoBack,
 }: TutorialHudProps): React.JSX.Element {
-  const [hintVisible, setHintVisible] = React.useState(false);
   const { action, content, target } = resolveStep(step, desktop);
   // Next is the step's main button only when it's the only way forward. A step that also
   // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
   // thing on screen asking to be tapped
   const nextIsPrimary = !step.continueOn && !step.continueOnClick;
-  const progressText = `Objective ${stepIndex + 1} of ${totalSteps}`;
-
-  React.useEffect(() => setHintVisible(false), [stepIndex]);
+  const progressText = `${stepIndex + 1} of ${totalSteps}`;
 
   React.useEffect(() => {
     if (!step.continueOnClick || isGatedStep(step)) {
@@ -390,25 +387,19 @@ export default function TutorialHud({
   return (
     <section
       className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}`}
-      aria-labelledby="tutorial-objective-title"
+      aria-labelledby="tutorial-step-title"
     >
       <div className="tutorialHudHeader">
-        <div className="tutorialHudHeading">
-          <Typography
-            id="tutorial-objective-title"
-            component="h2"
-            variant="subtitle2"
-          >
-            {step.capstone ? "Your turn" : "Mission objective"}
-          </Typography>
-          <Typography
-            variant="caption"
-            component="span"
-            aria-label={progressText}
-          >
-            {stepIndex + 1} / {totalSteps}
-          </Typography>
-        </div>
+        <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
+          {step.capstone ? "Your turn" : "Step"}{" "}
+          {/* aria-label is ignored on a plain span, so the spoken form is real hidden text */}
+          <span className="tutorialHudStepCount">
+            <span aria-hidden="true">
+              {stepIndex + 1}/{totalSteps}
+            </span>
+            <span className="tutorialHudVisuallyHidden">{progressText}</span>
+          </span>
+        </Typography>
       </div>
 
       <div className="tutorialHudContent" aria-live="polite">
@@ -422,7 +413,7 @@ export default function TutorialHud({
         </div>
       </div>
 
-      {hintVisible && step.hint && (
+      {step.hint && (
         <div className="tutorialHudHint" role="note">
           <strong>Hint:</strong> {step.hint}
         </div>
@@ -432,24 +423,20 @@ export default function TutorialHud({
         <Button color="primary" size="small" onClick={onExit}>
           Exit
         </Button>
-        {step.hint && (
-          <Button
-            color="primary"
-            size="small"
-            aria-expanded={hintVisible}
-            onClick={() => setHintVisible((value) => !value)}
-          >
-            {hintVisible ? "Hide hint" : "Hint"}
-          </Button>
-        )}
         <span className="tutorialHudFooterSpacer" />
         {canGoBack && (
-          <Button color="primary" size="small" onClick={onBack}>
+          <Button
+            className="tutorialHudNav"
+            color="primary"
+            size="small"
+            onClick={onBack}
+          >
             Back
           </Button>
         )}
         {!isGatedStep(step) && (
           <Button
+            className="tutorialHudNav"
             color="primary"
             size="small"
             variant={nextIsPrimary ? "contained" : "text"}

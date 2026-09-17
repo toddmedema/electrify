@@ -12,12 +12,7 @@ function objective(
     card: "FACILITIES",
     target: "#tutorial-target",
     action: "Tap the target",
-    content: (
-      <TutorialPrompt
-        concepts={["supply", "demand"]}
-        text="Keep supply above demand."
-      />
-    ),
+    content: <TutorialPrompt text="Keep supply above demand." />,
     ...overrides,
   };
 }
@@ -109,15 +104,17 @@ describe("TutorialHud", () => {
     expect(hudProps.onNext).not.toHaveBeenCalled();
   });
 
-  it("exposes the current objective, progress and ordinary navigation", async () => {
+  it("exposes the current step, progress and ordinary navigation", async () => {
     const user = userEvent.setup();
     const hudProps = props({ canGoBack: true, stepIndex: 1 });
     render(<TutorialHud {...hudProps} />);
 
     expect(
-      screen.getByRole("region", { name: "Mission objective" }),
+      screen.getByRole("region", { name: "Step 2 of 3" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Objective 2 of 3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Step 2 of 3" }),
+    ).toHaveTextContent("2/3");
     expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
     expect(screen.getByText("Tap the target")).toBeInTheDocument();
 
@@ -132,8 +129,7 @@ describe("TutorialHud", () => {
     expect(hudProps.onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("reveals help only when requested and has no redundant Next for gates", async () => {
-    const user = userEvent.setup();
+  it("always shows help and has no redundant Next for gates", () => {
     render(
       <TutorialHud
         {...props({
@@ -145,15 +141,12 @@ describe("TutorialHud", () => {
       />,
     );
 
-    expect(screen.queryByText("Look at the reserve readout.")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.queryByText("Complete objective")).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Hint" }));
     expect(screen.getByRole("note")).toHaveTextContent(
       "Look at the reserve readout.",
     );
-    expect(screen.getByRole("button", { name: "Hide hint" })).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /hint/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByText("Complete objective")).toBeNull();
   });
 
   it("delays target reminders and never points out a capstone answer", () => {
@@ -193,7 +186,7 @@ describe("TutorialHud", () => {
     expect(target).not.toHaveClass("tutorialTarget");
     expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
     expect(
-      screen.getByRole("region", { name: "Your turn" }),
+      screen.getByRole("region", { name: /Your turn/ }),
     ).toBeInTheDocument();
 
     unmount();

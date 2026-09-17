@@ -623,8 +623,8 @@ export interface TutorialStepType {
   // controls as they're taught, so a new player isn't choosing between a dozen buttons before
   // they've made their first move. Presentation only: the gates never depend on it
   hideUi?: TutorialUiIdType[];
-  // Player-requested help. Kept outside content so the objective HUD never reveals it before the
-  // player asks, and so hiding/showing it does not affect the underlying objective gate.
+  // Extra help, always shown beneath the step's sentence. Kept outside content so authored
+  // steps state the task first and the help second, in a consistent style.
   hint?: React.ReactNode;
   // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
   // objective" status instead of a Next button, and the walkthrough advances the moment this

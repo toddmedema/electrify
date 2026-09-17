@@ -3,11 +3,9 @@ import { render, screen } from "@testing-library/react";
 import TutorialPrompt from "./TutorialPrompt";
 
 describe("TutorialPrompt", () => {
-  it("gives the concept sequence an accessible summary", () => {
-    render(<TutorialPrompt concepts={["supply", "demand"]} />);
+  it("teaches the step with its sentence", () => {
+    render(<TutorialPrompt text="Keep supply above demand." />);
 
-    expect(
-      screen.getByLabelText("Tutorial concepts: Supply, Demand"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Keep supply above demand.")).toBeInTheDocument();
   });
 });

@@ -77,7 +77,9 @@ for (const mission of [
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();
-      await expect(page.getByLabel("Objective 2 of 9")).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Step 2 of 9" }),
+      ).toBeVisible();
     } else {
       const nav = page.locator("#insightsNav");
       await waitForPaneOrNav(page.locator(".insights"), nav);

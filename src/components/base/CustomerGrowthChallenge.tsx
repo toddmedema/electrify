@@ -10,8 +10,7 @@ function CustomerGrowthChallenge({
 }) {
   return (
     <TutorialPrompt
-      concepts={["rate", "customers", "money"]}
-      text={`Your turn: reach at least ${Math.ceil(startingCustomers * 1.05).toLocaleString("en-US")} customers (5% above the starting ${startingCustomers.toLocaleString("en-US")}) in six months while staying profitable and reliable.`}
+      text={`Reach at least ${Math.ceil(startingCustomers * 1.05).toLocaleString("en-US")} customers (5% above the starting ${startingCustomers.toLocaleString("en-US")}) in six months while staying profitable and reliable.`}
     />
   );
 }
