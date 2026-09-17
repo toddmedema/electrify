@@ -896,7 +896,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         onClear={() => setComparedNames([])}
       />
       <List dense className="scrollable cardList">
-        {generators.map((g: GeneratorShoppingType, i: number) => {
+        {generators.map((g: GeneratorShoppingType) => {
           const advantages = [
             g.buildCost === lowestBuildCost ? "Lowest upfront cost" : undefined,
             g.yearsToBuild === fastestBuild ? "Fastest online" : undefined,
@@ -911,7 +911,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
               location={game.location}
               interestRate={game.interestRate}
               generator={g}
-              key={i}
+              key={g.name}
               cash={cash}
               secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
               forecastGapW={forecastGapW}

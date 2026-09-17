@@ -470,3 +470,25 @@ it("commits a loan purchase then closes the selected journey through browser Ret
   expect(store.getState().game.speed).toBe("PAUSED");
   back.mockRestore();
 });
+it("keeps expanded details with their generator when tutorial choices expand", () => {
+  const game = createGame({ scenarioId: 1 });
+  game.tutorialStep = 1;
+  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
+  const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
+  expect(
+    screen.getAllByRole("button", { name: /^Review purchase of/ }),
+  ).toHaveLength(3);
+  fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
+  rerender(
+    <BuildGenerators game={{ ...game, tutorialStep: 2 }} {...callbacks} />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Hide Wind details" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(
+    screen.getAllByRole("button", { name: /^Hide .* details/ }),
+  ).toHaveLength(1);
+  expect(
+    screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
+  ).toBeGreaterThan(3);
+});
