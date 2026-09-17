@@ -177,11 +177,11 @@ export const SCENARIOS = [
       {
         card: "FACILITIES",
         hideUi: MISSION_ONE_CAPSTONE,
-        action: "Keep supply above demand until midnight",
+        action: "Reach midnight without a blackout",
         content: (
-          <TutorialPrompt text="Keep the lights on for a full day with no blackout." />
+          <TutorialPrompt text="Watch how gas generation changes as sunlight fades." />
         ),
-        hint: "One simulated day represents a month. Keep supply at least equal to demand.",
+        hint: "Pause to inspect the chart, or speed up when you’re ready.",
         capstone: {
           // The step before is tapping 1x, so the player arrives with the clock already running.
           // Rebuilding the scenario here reloaded the game and paused it again under them, and the
