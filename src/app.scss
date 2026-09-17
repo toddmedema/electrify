@@ -196,6 +196,13 @@ $desktop_breakpoint: 1300px;
 // Below this, the default two-pane split makes a facility row narrower than its data and controls.
 // Keep in sync with isPaneLayout() in Globals.tsx.
 $pane_breakpoint: 1024px;
+// Unfolded foldables (Galaxy Z Fold ~707x823, Pixel Fold ~841x701) are narrower than that but
+// nearly square, so each pane still gets a phone's width. The aspect ratio window leaves out
+// portrait tablets (3:4 and taller) and landscape phones. Keep in sync with isPaneLayout().
+$fold_pane_min_width: 700px;
+$fold_pane_min_height: 600px;
+$pane_media: "screen and (min-width: #{$pane_breakpoint}), screen and (min-width: #{$fold_pane_min_width}) and (min-height: #{$fold_pane_min_height}) and (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4)";
+$single_pane_media: "screen and (max-width: #{$fold_pane_min_width - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-height: #{$fold_pane_min_height - 1px}), screen and (max-width: #{$pane_breakpoint - 1px}) and (max-aspect-ratio: 799/1000), screen and (max-width: #{$pane_breakpoint - 1px}) and (min-aspect-ratio: 1251/1000)";
 
 $sizemap: (
   large: 6vmin,
@@ -290,7 +297,9 @@ button,
 }
 
 @media (pointer: coarse) {
-  .MuiButtonBase-root,
+  // A Switch's thumb sits in its own button base sized to the track; stretching that base drops
+  // the thumb below the track's centre, and the row around the switch already gives a big target
+  .MuiButtonBase-root:not(.MuiSwitch-switchBase),
   .MuiButton-root,
   .MuiIconButton-root,
   .MuiToggleButton-root {
@@ -896,7 +905,7 @@ $topbar_height: 56px;
 
 // Keep every grid state alongside the mission on wide screens. Long mission copy can wrap
 // within its share of the row without overlapping the operating status.
-@media screen and (min-width: $pane_breakpoint) {
+@media #{$pane_media} {
   .gameStatusBar {
     display: flex;
     align-items: stretch;
@@ -925,7 +934,7 @@ $topbar_height: 56px;
 
 // Phones and narrow tablets keep the readout in its own intentional row: state on the left,
 // operational cushion on the right.
-@media screen and (max-width: ($pane_breakpoint - 1px)) {
+@media #{$single_pane_media} {
   .gridHealth {
     box-sizing: border-box;
     min-height: $topbar_height;
@@ -2802,7 +2811,7 @@ html[data-theme="dark"] .uplot {
     text-align: center;
   }
 
-  @media screen and (min-width: $pane_breakpoint) {
+  @media #{$pane_media} {
     .customSetupColumns {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4101,7 +4110,7 @@ $sizemap: (
 // destinations above it. The grid itself comes from DesktopPanes, since the player can drag it.
 // ===============================================
 
-@media screen and (min-width: $pane_breakpoint) {
+@media #{$pane_media} {
   .desktop-layout,
   .pane-layout {
     height: 100%;
