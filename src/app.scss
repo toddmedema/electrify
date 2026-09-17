@@ -968,8 +968,21 @@ $pane_header_height: 40px;
 .facilities .paneHeader {
   gap: 8px;
 
+  // Compact enough to leave 4px above and below inside the header, with the icon sized to the
+  // label rather than towering over it
   .button-buildFacility {
     margin-left: auto;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 12px;
+
+    .MuiButton-startIcon {
+      margin-right: 6px;
+    }
+
+    .MuiButton-startIcon > svg {
+      font-size: 1em;
+    }
   }
 }
 
@@ -1118,15 +1131,10 @@ $pane_header_height: 40px;
   }
 }
 
-// Keep the compact pane-header height on phones while preventing the global coarse-pointer
-// target size from making these two labeled controls spill into the chart below.
+// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
 @media (pointer: coarse) {
-  .facilities .paneHeader {
-    .button-buildGenerator,
-    .button-buildStorage {
-      height: 32px;
-      min-height: 32px !important;
-    }
+  .facilities .paneHeader .button-buildFacility {
+    height: 44px;
   }
 }
 
@@ -2012,25 +2020,6 @@ html[data-theme="dark"] .uplot {
   box-shadow:
     inset 0 0 0 1px var(--chart-edge),
     0 8px 22px -16px var(--chart-shadow);
-}
-
-.chartDataSummary {
-  margin: 4px 8px 10px;
-  font-size: 0.75rem;
-  overflow-x: auto;
-
-  summary {
-    width: fit-content;
-    color: $interactive_blue;
-    cursor: pointer;
-    font-weight: 700;
-  }
-
-  table {
-    width: 100%;
-    min-width: max-content;
-    margin-top: 6px;
-  }
 }
 
 // The crosshair marking which x the tooltip is reporting, lighter than the data it crosses
@@ -4287,7 +4276,7 @@ $sizemap: (
 }
 @media (pointer: coarse) {
   .base_main .facilities .MuiToolbar-root.paneHeader {
-    min-height: 52px !important;
+    min-height: 52px !important; // 44px Build button with 4px either side
   }
 }
 
