@@ -615,8 +615,8 @@ export interface TutorialStepType {
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;
   content: React.JSX.Element;
-  // Player-requested help. Kept outside content so the objective HUD never reveals it before the
-  // player asks, and so hiding/showing it does not affect the underlying objective gate.
+  // Extra help, always shown beneath the step's sentence. Kept outside content so authored
+  // steps state the task first and the help second, in a consistent style.
   hint?: React.ReactNode;
   // Present = the step is action-gated ("play, don't tell"): the HUD shows a "complete
   // objective" status instead of a Next button, and the walkthrough advances the moment this

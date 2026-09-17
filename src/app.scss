@@ -4748,18 +4748,6 @@ $sizemap: (
     font-weight: 400;
   }
 }
-// Exit, Hide hint, "Step 10/10", Back and Next need ~300px, so 320px phones drop the word and
-// keep the number (still spoken as "Step 2 of 5"). A capstone has no Next, so "Your turn" fits.
-@media screen and (max-width: 339.98px) {
-  .tutorialHud:not(.tutorialHud-capstone) .tutorialHudStepLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-}
 .missionSummary {
   padding-top: 4px;
   padding-bottom: 4px;

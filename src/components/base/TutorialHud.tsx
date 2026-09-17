@@ -156,11 +156,8 @@ export default function TutorialHud({
   totalSteps,
   canGoBack,
 }: TutorialHudProps): React.JSX.Element {
-  const [hintVisible, setHintVisible] = React.useState(false);
   const { content, target } = resolveStep(step, desktop);
   const progressText = `${stepIndex + 1} of ${totalSteps}`;
-
-  React.useEffect(() => setHintVisible(false), [stepIndex]);
 
   React.useEffect(() => {
     if (!step.continueOnClick || isGatedStep(step)) {
@@ -297,9 +294,7 @@ export default function TutorialHud({
     >
       <div className="tutorialHudHeader">
         <Typography id="tutorial-step-title" component="h2" variant="subtitle2">
-          <span className="tutorialHudStepLabel">
-            {step.capstone ? "Your turn" : "Step"}
-          </span>{" "}
+          {step.capstone ? "Your turn" : "Step"}{" "}
           {/* aria-label is ignored on a plain span, so the spoken form is real hidden text */}
           <span className="tutorialHudStepCount">
             <span aria-hidden="true">
@@ -317,7 +312,7 @@ export default function TutorialHud({
         </div>
       </div>
 
-      {hintVisible && step.hint && (
+      {step.hint && (
         <div className="tutorialHudHint" role="note">
           <strong>Hint:</strong> {step.hint}
         </div>
@@ -327,16 +322,6 @@ export default function TutorialHud({
         <Button color="primary" size="small" onClick={onExit}>
           Exit
         </Button>
-        {step.hint && (
-          <Button
-            color="primary"
-            size="small"
-            aria-expanded={hintVisible}
-            onClick={() => setHintVisible((value) => !value)}
-          >
-            {hintVisible ? "Hide hint" : "Hint"}
-          </Button>
-        )}
         <span className="tutorialHudFooterSpacer" />
         {canGoBack && (
           <Button

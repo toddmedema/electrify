@@ -67,7 +67,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     .getByRole("dialog")
     .getByRole("button", { name: "Take loan" })
     .click();
-  await expect(page.getByText("Building")).toBeVisible();
+  await expect(page.getByText("Building", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Step 3 of 10" }),
   ).toBeVisible();

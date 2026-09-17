@@ -120,8 +120,7 @@ describe("TutorialHud", () => {
     expect(hudProps.onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("reveals help only when requested and has no redundant Next for gates", async () => {
-    const user = userEvent.setup();
+  it("always shows help and has no redundant Next for gates", () => {
     render(
       <TutorialHud
         {...props({
@@ -133,15 +132,12 @@ describe("TutorialHud", () => {
       />,
     );
 
-    expect(screen.queryByText("Look at the reserve readout.")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.queryByText("Complete objective")).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Hint" }));
     expect(screen.getByRole("note")).toHaveTextContent(
       "Look at the reserve readout.",
     );
-    expect(screen.getByRole("button", { name: "Hide hint" })).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /hint/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByText("Complete objective")).toBeNull();
   });
 
   it("delays target reminders and never points out a capstone answer", () => {
