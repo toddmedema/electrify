@@ -27,10 +27,11 @@ export interface DispatchProps {
 interface Props extends StateProps, DispatchProps {}
 
 export default class Audio extends React.Component<Props, {}> {
-  constructor(props: Props) {
-    super(props);
+  private loadTimer: ReturnType<typeof setTimeout> | undefined;
+
+  componentDidMount() {
     // Load after a timeout so as not to overload the device.
-    setTimeout(() => {
+    this.loadTimer = setTimeout(() => {
       if (!this.props.enabled) {
         return;
       }
@@ -38,19 +39,25 @@ export default class Audio extends React.Component<Props, {}> {
     }, INIT_DELAY.LOAD_AUDIO_MILLIS);
   }
 
+  componentWillUnmount() {
+    clearTimeout(this.loadTimer);
+    pause();
+  }
+
   private handleEnableState(enabled?: boolean) {
+    if (!enabled) {
+      pause();
+      return;
+    }
     if (audioState.loaded === "UNLOADED") {
+      resume();
       loadAudioFiles(this.props.musicVolume, this.props.soundEffectsVolume);
-    } else if (audioState.loaded === "ERROR" && enabled) {
+    } else if (audioState.loaded === "ERROR") {
       this.props.disableAudio();
     } else {
       setMusicVolume(this.props.musicVolume);
       setSoundEffectsVolume(this.props.soundEffectsVolume);
-      if (!enabled) {
-        pause();
-      } else {
-        resume();
-      }
+      resume();
     }
   }
 

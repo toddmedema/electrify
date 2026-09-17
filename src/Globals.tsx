@@ -36,11 +36,8 @@ export function login() {
       // access token, and the console is readable by anything running on the page.
     })
     .catch((error) => {
-      console.error(
-        "Auth error: ",
-        error,
-        GoogleAuthProvider.credentialFromError(error),
-      );
+      // Firebase errors can include OAuth credentials; only log the diagnostic code.
+      console.error("Auth error:", error.code);
     });
 }
 

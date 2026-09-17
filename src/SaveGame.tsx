@@ -7,6 +7,7 @@ import packageJson from "../package.json";
 import { validWorldEvent } from "./helpers/WorldEventValidation";
 import { MINUTES_PER_MONTH } from "./helpers/DateTime";
 import { isValidLocation } from "./helpers/Locations";
+import { isValidDifficulty } from "./helpers/Difficulty";
 import {
   getStorageJson,
   removeStorageKey,
@@ -143,6 +144,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     return null;
   }
   if (
+    !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||

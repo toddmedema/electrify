@@ -55,3 +55,36 @@ jobs:
       - name: Simulation
         if: '!cancelled()'
         run: npm run sim -- --all
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository and media
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+
+      # Cover purchases, themes, tutorial progression and exit behavior on both
+      # phone and desktop without running the entire responsive matrix per PR.
+      - name: Browser smoke tests
+        run: npm run test:e2e -- build-options.spec.ts tutorial-exit.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
+
+      - name: Preserve browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-failures
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

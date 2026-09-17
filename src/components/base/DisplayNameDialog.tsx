@@ -53,6 +53,7 @@ export default function DisplayNameDialog(props: Props): React.JSX.Element {
   }, [open, currentName, googleDisplayName]);
 
   const save = () => {
+    if (saving) return;
     const invalid = validateDisplayName(name);
     if (invalid) {
       setError(invalid);

@@ -130,7 +130,9 @@ function monthlyWeatherFromRows(rows: readonly RawWeatherType[], at: number) {
   };
 }
 
-const runoffCache = new Map<string, { signature: string; runoffMm: number }>();
+// A reload replaces the recorded snapshot, even when the endpoints have not changed.
+// Weak keys also release calibration entries when their weather data is unloaded.
+const runoffCache = new WeakMap<readonly RawWeatherType[], number>();
 
 /** Mean annual runoff in the loaded basin, used only to calibrate a plant's Wh per millimetre. */
 export function getMeanAnnualRunoffMm(seriesId?: string): number {
@@ -138,14 +140,18 @@ export function getMeanAnnualRunoffMm(seriesId?: string): number {
   if (rows.length < HOURS_PER_DAY * MONTHS_PER_YEAR) {
     return 1;
   }
-  const signature = `${rows.length}:${rows[0].TEMP_C}:${rows[0].PRECIP_MM}:${rows[rows.length - 1].YEAR}`;
-  const key = seriesId || "local";
-  const cached = runoffCache.get(key);
-  if (cached?.signature === signature) {
-    return cached.runoffMm;
+  const cached = runoffCache.get(rows);
+  if (cached !== undefined) {
+    return cached;
   }
 
   const months = Math.floor(rows.length / HOURS_PER_DAY);
+  // Keep at least a complete year to measure when a valid record is shorter than
+  // the usual warmup plus one year. Full historical records retain the same spinup.
+  const warmupMonths = Math.min(
+    SNOWPACK_LOOKBACK_MONTHS,
+    months - MONTHS_PER_YEAR,
+  );
   let snowpackMm = 0;
   let runoffMm = 0;
   let countedMonths = 0;
@@ -157,19 +163,13 @@ export function getMeanAnnualRunoffMm(seriesId?: string): number {
     const meltMm = Math.min(snowpackMm, meltPotentialMm(weather.temperatureC));
     snowpackMm = Math.max(0, snowpackMm - meltMm);
     // Let the first bounded-lookback window spin up before measuring the climatology.
-    if (month >= SNOWPACK_LOOKBACK_MONTHS) {
+    if (month >= warmupMonths) {
       runoffMm += RUNOFF_COEFFICIENT * (rainMm + meltMm);
       countedMonths++;
     }
   }
-  // A record with no months past the spin-up window (the loader accepts anything from one year
-  // up) has nothing to average. Fall back the way the too-short early return does rather than
-  // dividing by zero months and handing a NaN into every hydro plant sized off this basin.
-  const annual =
-    countedMonths > 0
-      ? Math.max(1, (runoffMm / countedMonths) * MONTHS_PER_YEAR)
-      : 1;
-  runoffCache.set(key, { signature, runoffMm: annual });
+  const annual = Math.max(1, (runoffMm / countedMonths) * MONTHS_PER_YEAR);
+  runoffCache.set(rows, annual);
   return annual;
 }
 

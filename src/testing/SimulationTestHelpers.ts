@@ -100,13 +100,19 @@ export function runSimulationOnce(options: SimOptionsType): SimResultType {
 }
 
 export function runMonths(state: GameType, months: number) {
+  if (!Number.isSafeInteger(months) || months < 0) {
+    throw new Error("Simulation months must be a non-negative safe integer");
+  }
   const until = state.date.monthsElapsed + months;
   while (state.date.monthsElapsed < until) {
     const decision = pendingScenarioChoice(state);
     if (decision && !state.replayPlayback) {
       const option = decision.options.find(
         (option) => option.cost(state.difficulty) === 0,
-      )!;
+      );
+      if (!option) {
+        throw new Error(`Simulation has no free response for ${decision.id}`);
+      }
       Object.assign(
         state,
         cloneDeep(
@@ -120,7 +126,13 @@ export function runMonths(state: GameType, months: number) {
         ),
       );
     }
+    const previousMinute = state.date.minute;
     tickState(state);
+    if (state.date.minute <= previousMinute) {
+      throw new Error(
+        `Simulation stopped advancing at month ${state.date.monthsElapsed}`,
+      );
+    }
   }
 }
 

@@ -8,7 +8,7 @@ test("chart-heavy controls remain responsive during pointer gestures", async ({
     window.localStorage.setItem(
       "plays",
       JSON.stringify({
-        plays: [{ scenarioId: 0, date: new Date().toString() }],
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
       }),
     );
   });
