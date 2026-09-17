@@ -614,7 +614,15 @@ export interface TutorialStepType {
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;
+  // The one thing to do right now, as a short imperative ("Tap 1× to start time"). Every step
+  // has one, explanations included - there it names what to look at and says to tap Next - so
+  // the objective always opens on a deed instead of a paragraph to read
+  action: string;
   content: React.JSX.Element;
+  // Game chrome this step doesn't need yet. The first mission starts almost bare and reveals
+  // controls as they're taught, so a new player isn't choosing between a dozen buttons before
+  // they've made their first move. Presentation only: the gates never depend on it
+  hideUi?: TutorialUiIdType[];
   // Player-requested help. Kept outside content so the objective HUD never reveals it before the
   // player asks, and so hiding/showing it does not affect the underlying objective gate.
   hint?: React.ReactNode;
@@ -658,9 +666,29 @@ export interface TutorialStepType {
   // different wording too, since there are no tabs left to switch between
   desktop?: {
     target: string;
+    action?: string;
     content?: React.JSX.Element;
   };
 }
+
+// Chrome a tutorial step can hide. Each id maps to selectors in app.scss under
+// [data-tutorial-hide], and TUTORIAL_UI_SELECTORS lists the same ones for the authoring test
+export type TutorialUiIdType =
+  | "nav" // bottom navigation, and its hotkeys
+  | "build" // Build button, and its hotkeys
+  | "menu" // the ⋮ game menu
+  | "speed" // speed buttons, and their hotkeys
+  | "facilityActions" // row actions (Pause, Sell, Move) and drag handles
+  | "yearProgress"; // the thin year progress bar
+
+export const TUTORIAL_UI_SELECTORS: Record<TutorialUiIdType, string[]> = {
+  nav: ["#navfooter", "#insightsNav", "#eventsNav", "#faciltiesNav"],
+  build: [".button-buildFacility"],
+  menu: [".gameMenuButton"],
+  speed: ["#speedChangeButtons"],
+  facilityActions: [".facilityActions", ".facilityDragHandle"],
+  yearProgress: ["#yearProgressBar"],
+};
 
 export function isGatedStep(step: TutorialStepType): boolean {
   return !!(step.advanceOn || step.advanceOnAction || step.capstone);

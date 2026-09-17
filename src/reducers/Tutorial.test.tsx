@@ -14,6 +14,7 @@ import settingsReducer from "./Settings";
 import {
   recordTutorialLeft,
   restartTutorialAtStep,
+  selectTutorialHiddenUi,
   tutorialGateMiddleware,
 } from "./Tutorial";
 import uiReducer from "./UI";
@@ -347,5 +348,30 @@ describe("restartTutorialAtStep", () => {
     ]);
     expect(dispatched[1].payload).toBe(1);
     expect(dispatched[2].payload).toEqual({ tutorialStep: 5 });
+  });
+});
+
+describe("selectTutorialHiddenUi", () => {
+  const bare = {
+    ...informational(),
+    hideUi: ["nav", "speed"],
+  } as TutorialStepType;
+
+  it("hides what the current step asks for, and nothing once the walkthrough ends", () => {
+    const state = initialState([bare, informational()]);
+    state.game.inGame = true;
+    expect(selectTutorialHiddenUi(state)).toEqual(["nav", "speed"]);
+
+    state.game.tutorialStep = 1;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
+
+    state.game.tutorialStep = 2;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
+  });
+
+  it("hides nothing outside a game", () => {
+    const state = initialState([bare]);
+    state.game.inGame = false;
+    expect(selectTutorialHiddenUi(state)).toEqual([]);
   });
 });

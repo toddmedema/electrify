@@ -3778,17 +3778,38 @@ html[data-theme="dark"] .uplot {
   margin-top: 6px;
   overflow-wrap: anywhere;
 
+  // Left-aligned under the action line, so the deed and its reason read as one block
   .tutorialPrompt {
     display: grid !important;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 4px !important;
+    text-align: left;
   }
 
   .tutorialPromptConcepts {
     min-height: 32px;
     margin-bottom: 0;
     padding: 4px 8px;
+  }
+}
+
+// The step's one deed, set apart from the explanation beside it so a glance finds what to do
+.tutorialHudAction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  border-left: 3px solid $interactive_blue;
+  border-radius: 4px;
+  background: var(--bg-selected);
+  font-weight: 600;
+  line-height: 1.3;
+
+  svg {
+    flex: 0 0 auto;
+    color: var(--interactive-blue);
   }
 }
 
@@ -3813,6 +3834,34 @@ html[data-theme="dark"] .uplot {
   flex: 1 1 auto;
 }
 
+// Progressive reveal: a tutorial step names the chrome it doesn't need yet (see
+// TUTORIAL_UI_SELECTORS in Types). Speed keeps its space so the cash and date beside it don't
+// jump when it arrives; everything else gives its room back to the game.
+[data-tutorial-hide~="nav"] #navfooter,
+[data-tutorial-hide~="build"] .button-buildFacility,
+[data-tutorial-hide~="menu"] .gameMenuButton,
+[data-tutorial-hide~="facilityActions"] .facilityActions,
+[data-tutorial-hide~="facilityActions"] .facilityDragHandle,
+[data-tutorial-hide~="yearProgress"] #yearProgressBar {
+  display: none !important;
+}
+
+[data-tutorial-hide~="speed"] #speedChangeButtons {
+  visibility: hidden;
+}
+
+// On a phone the objective's height comes out of the game, so the icon row gives way to the
+// action and its one-line reason
+@media screen and (max-width: 599px) {
+  .tutorialHudContent .tutorialPromptConcepts {
+    display: none !important;
+  }
+
+  .tutorialHudContent .tutorialPrompt {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 // A restrained cue rather than a spotlight: it names the relevant control without dimming the
 // surrounding choices. The cue is a ring overlay that TutorialHud positions on <body> around
 // the control, because an outline draws outside the element's box and any clipping ancestor --
@@ -3830,6 +3879,11 @@ html[data-theme="dark"] .uplot {
 
 .tutorialTargetRingPulse {
   animation: tutorialTargetPulse 10s ease-in-out infinite;
+}
+
+// A single pulse as each step begins, before the slower reminder takes over
+.tutorialTargetRingIntro {
+  animation: tutorialTargetPulse 5s ease-in-out 1;
 }
 
 @keyframes tutorialTargetPulse {
@@ -3860,7 +3914,8 @@ html[data-theme="dark"] .uplot {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tutorialTargetRingPulse {
+  .tutorialTargetRingPulse,
+  .tutorialTargetRingIntro {
     animation: none;
   }
 

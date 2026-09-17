@@ -1,3 +1,4 @@
+import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
 import { Button, Typography } from "@mui/material";
 import * as React from "react";
 import { TutorialStepType, isGatedStep } from "../../Types";
@@ -17,6 +18,7 @@ export interface TutorialHudProps {
 function resolveStep(step: TutorialStepType, desktop: boolean) {
   const override = desktop ? step.desktop : undefined;
   return {
+    action: override?.action || step.action,
     content: override?.content || step.content,
     target: override?.target || step.target,
   };
@@ -157,7 +159,11 @@ export default function TutorialHud({
   canGoBack,
 }: TutorialHudProps): React.JSX.Element {
   const [hintVisible, setHintVisible] = React.useState(false);
-  const { content, target } = resolveStep(step, desktop);
+  const { action, content, target } = resolveStep(step, desktop);
+  // Next is the step's main button only when it's the only way forward. A step that also
+  // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
+  // thing on screen asking to be tapped
+  const nextIsPrimary = !step.continueOn && !step.continueOnClick;
   const progressText = `Objective ${stepIndex + 1} of ${totalSteps}`;
 
   React.useEffect(() => setHintVisible(false), [stepIndex]);
@@ -237,6 +243,9 @@ export default function TutorialHud({
         if (reminding) {
           element.classList.add("tutorialTargetReminder");
           ring.classList.add("tutorialTargetRingPulse");
+        } else {
+          // One pulse the moment the step starts draws the eye to where the action is
+          ring.classList.add("tutorialTargetRingIntro");
         }
         document.body.appendChild(ring);
         rings.set(element, ring);
@@ -277,6 +286,7 @@ export default function TutorialHud({
       reminding = true;
       rings.forEach((ring, element) => {
         element.classList.add("tutorialTargetReminder");
+        ring.classList.remove("tutorialTargetRingIntro");
         ring.classList.add("tutorialTargetRingPulse");
       });
     }, 10_000);
@@ -317,6 +327,10 @@ export default function TutorialHud({
       <div className="tutorialHudContent" aria-live="polite">
         {/* Keyed inside the live region so the region itself persists and keeps announcing */}
         <div key={stepIndex} className="tutorialHudStep">
+          <p className="tutorialHudAction">
+            <TouchAppOutlinedIcon fontSize="small" aria-hidden />
+            <span>{action}</span>
+          </p>
           {content}
         </div>
       </div>
@@ -351,7 +365,7 @@ export default function TutorialHud({
           <Button
             color="primary"
             size="small"
-            variant="contained"
+            variant={nextIsPrimary ? "contained" : "text"}
             onClick={onNext}
           >
             Next

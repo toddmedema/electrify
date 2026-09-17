@@ -20,6 +20,7 @@ import {
   TransitionClassType,
   TutorialStepChangeType,
   TutorialStepType,
+  TutorialUiIdType,
   UIType,
   isGatedStep,
 } from "../Types";
@@ -49,6 +50,7 @@ import {
   setSpeed,
   togglePauseFacility,
 } from "../reducers/Game";
+import { selectTutorialHiddenUi } from "../reducers/Tutorial";
 import { snackbarOpen, manualHelpClose } from "../reducers/UI";
 import { isDesktopScreen, isPaneLayout } from "../Globals";
 import { store } from "../Store";
@@ -202,6 +204,12 @@ function reprioritizeSelected(delta: number) {
   store.dispatch(reprioritizeFacility({ spotInList, delta }));
 }
 
+// A shortcut must not reach a control the tutorial is still keeping hidden: a new player who
+// presses space on Mission 1's first step would otherwise start a clock they haven't met yet
+function uiHidden(id: TutorialUiIdType): boolean {
+  return selectTutorialHiddenUi(store.getState()).includes(id);
+}
+
 const shortcutHandlers = {
   // Space is one of this handler's own keys, and the browser's default action for it is to
   // scroll the page -- which fires alongside the pause because react-hotkeys doesn't call
@@ -209,40 +217,56 @@ const shortcutHandlers = {
   // native behaviour of their own
   PAUSED: (e?: KeyboardEvent) => {
     e?.preventDefault();
-    store.dispatch(setSpeed("PAUSED"));
+    if (!uiHidden("speed")) {
+      store.dispatch(setSpeed("PAUSED"));
+    }
   },
   SLOW: () => {
-    store.dispatch(setSpeed("SLOW"));
+    if (!uiHidden("speed")) {
+      store.dispatch(setSpeed("SLOW"));
+    }
   },
   NORMAL: () => {
-    store.dispatch(setSpeed("NORMAL"));
+    if (!uiHidden("speed")) {
+      store.dispatch(setSpeed("NORMAL"));
+    }
   },
   FAST: () => {
-    store.dispatch(setSpeed("FAST"));
+    if (!uiHidden("speed")) {
+      store.dispatch(setSpeed("FAST"));
+    }
   },
   FACILITIES: () => {
-    store.dispatch(navigate("FACILITIES"));
+    if (!uiHidden("nav")) {
+      store.dispatch(navigate("FACILITIES"));
+    }
   },
   INSIGHTS: () => {
-    store.dispatch(navigate("INSIGHTS"));
+    if (!uiHidden("nav")) {
+      store.dispatch(navigate("INSIGHTS"));
+    }
   },
   EVENTS: () => {
-    store.dispatch(navigate("EVENTS"));
+    if (!uiHidden("nav")) {
+      store.dispatch(navigate("EVENTS"));
+    }
   },
   BUILD_GENERATOR: () => {
-    if (canPlay()) {
+    if (canPlay() && !uiHidden("build")) {
       store.dispatch(
         navigate({ name: "BUILD_GENERATORS", dontRemember: true }),
       );
     }
   },
   BUILD_STORAGE: () => {
-    if (canPlay()) {
+    if (canPlay() && !uiHidden("build")) {
       store.dispatch(navigate({ name: "BUILD_STORAGE", dontRemember: true }));
     }
   },
-  PRIORITIZE_EARLIER: () => reprioritizeSelected(-1),
-  PRIORITIZE_LATER: () => reprioritizeSelected(1),
+  PRIORITIZE_EARLIER: () =>
+    !uiHidden("facilityActions") && reprioritizeSelected(-1),
+  PRIORITIZE_LATER: () =>
+    !uiHidden("facilityActions") && reprioritizeSelected(1),
   MANUAL: () => {
     store.dispatch(navigate("MANUAL"));
   },
@@ -258,7 +282,7 @@ const shortcutHandlers = {
   ...Object.fromEntries(
     FACILITY_SLOTS.map((slot: number) => [
       `TOGGLE_FACILITY_${slot}`,
-      () => togglePauseSlot(slot),
+      () => !uiHidden("facilityActions") && togglePauseSlot(slot),
     ]),
   ),
 };
@@ -523,11 +547,17 @@ export default class Compositor extends React.Component<Props, {}> {
                 ? TABLET_PANES_KEY
                 : this.props.card.name;
     const transitionNodeRef = this.nodeRefFor(transitionKey);
+    // Chrome the step hides is dropped by app.scss rules on this attribute, so no pane or bar
+    // needs to know about tutorials to step aside
+    const hiddenUi = currentTutorialStep?.hideUi;
 
     // See https://medium.com/lalilo/dynamic-transitions-with-react-router-and-react-transition-group-69ab795815c9
     // for more details on use of childFactory in TransitionGroup
     return (
-      <div className="app_container">
+      <div
+        className="app_container"
+        data-tutorial-hide={hiddenUi?.length ? hiddenUi.join(" ") : undefined}
+      >
         <GlobalHotKeys keyMap={keyMap} handlers={shortcutHandlers} />
         <TransitionGroup
           className="cardTransitions"

@@ -1,4 +1,9 @@
-import { AppStateType, ScenarioType } from "../Types";
+import {
+  AppStateType,
+  isGatedStep,
+  ScenarioType,
+  TUTORIAL_UI_SELECTORS,
+} from "../Types";
 import { getScenarioLocation } from "../helpers/Locations";
 import { intertiesEnabledForScenario } from "./AdjacentMarkets";
 import {
@@ -132,6 +137,81 @@ describe("tutorial mission metadata", () => {
         islanded,
       ),
     ).toBe(false);
+  });
+});
+
+describe("tutorial step actions", () => {
+  const allSteps = TUTORIALS.flatMap((tutorial) =>
+    tutorial.tutorialSteps!.map((step, index) => ({
+      step,
+      label: `${tutorial.name} step ${index}`,
+    })),
+  );
+
+  // Every objective opens on something to do, short enough to take in at a glance
+  it("gives every step one short imperative action", () => {
+    allSteps.forEach(({ step, label }) => {
+      [step.action, step.desktop?.action]
+        .filter((action) => action !== undefined)
+        .forEach((action) => {
+          expect({ label, action: action!.trim().length > 0 }).toEqual({
+            label,
+            action: true,
+          });
+          expect({ label, length: action!.length <= 60 }).toEqual({
+            label,
+            length: true,
+          });
+        });
+    });
+  });
+
+  // A gated step has no Next button, and a step whose only way forward is Next has to say so.
+  // Steps that also advance on a deed may say either: their desktop layout can leave Next as
+  // the only way on, where the phone's tab tap does not exist
+  it("mentions Next only where there is one, and always where it's the only way on", () => {
+    allSteps.forEach(({ step, label }) => {
+      const gated = isGatedStep(step);
+      const onlyNext = !gated && !step.continueOn && !step.continueOnClick;
+      [step.action, step.desktop?.action]
+        .filter((action) => action !== undefined)
+        .forEach((action) => {
+          const saysNext = /\bNext\b/.test(action!);
+          // Steps that may also advance on a deed are free to say either
+          const allowed = gated ? [false] : onlyNext ? [true] : [true, false];
+          expect({ label, action, ok: allowed.includes(saysNext) }).toEqual({
+            label,
+            action,
+            ok: true,
+          });
+        });
+    });
+  });
+
+  it("never points a step at chrome that step hides", () => {
+    allSteps.forEach(({ step, label }) => {
+      const targets = [step.target, step.desktop?.target].filter(Boolean);
+      (step.hideUi || []).forEach((id) => {
+        TUTORIAL_UI_SELECTORS[id].forEach((selector) => {
+          targets.forEach((target) => {
+            expect({
+              label,
+              target,
+              hides: target!.includes(selector),
+            }).toEqual({ label, target, hides: false });
+          });
+        });
+      });
+    });
+  });
+
+  it("opens the first mission without navigation, building or speed controls", () => {
+    const [first] = TUTORIALS[0].tutorialSteps!;
+    expect(first.hideUi).toEqual(
+      expect.arrayContaining(["nav", "build", "speed", "menu"]),
+    );
+    const capstone = TUTORIALS[0].tutorialSteps!.find((step) => step.capstone)!;
+    expect(capstone.hideUi).not.toContain("speed");
   });
 });
 
