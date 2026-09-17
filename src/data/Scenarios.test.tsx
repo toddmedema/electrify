@@ -208,7 +208,7 @@ describe("tutorial step actions", () => {
   it("opens the first mission without navigation, building or speed controls", () => {
     const [first] = TUTORIALS[0].tutorialSteps!;
     expect(first.hideUi).toEqual(
-      expect.arrayContaining(["nav", "build", "speed", "menu"]),
+      expect.arrayContaining(["nav", "build", "speed", "menu", "sidePanes"]),
     );
     const capstone = TUTORIALS[0].tutorialSteps!.find((step) => step.capstone)!;
     expect(capstone.hideUi).not.toContain("speed");

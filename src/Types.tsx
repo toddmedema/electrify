@@ -671,15 +671,18 @@ export interface TutorialStepType {
   };
 }
 
-// Chrome a tutorial step can hide. Each id maps to selectors in app.scss under
-// [data-tutorial-hide], and TUTORIAL_UI_SELECTORS lists the same ones for the authoring test
+// Chrome a tutorial step can hide. Most ids map to selectors in app.scss under
+// [data-tutorial-hide]; sidePanes is dropped in Compositor.renderCard instead, since the pane grid
+// has resizable tracks that hiding a pane with CSS would leave empty. TUTORIAL_UI_SELECTORS lists
+// what each one hides for the authoring test
 export type TutorialUiIdType =
   | "nav" // bottom navigation, and its hotkeys
   | "build" // Build button, and its hotkeys
   | "menu" // the ⋮ game menu
   | "speed" // speed buttons, and their hotkeys
   | "facilityActions" // row actions (Pause, Sell, Move) and drag handles
-  | "yearProgress"; // the thin year progress bar
+  | "yearProgress" // the thin year progress bar
+  | "sidePanes"; // Insights and Events beside Facilities on tablets and desktops
 
 export const TUTORIAL_UI_SELECTORS: Record<TutorialUiIdType, string[]> = {
   nav: ["#navfooter", "#insightsNav", "#eventsNav", "#faciltiesNav"],
@@ -688,6 +691,7 @@ export const TUTORIAL_UI_SELECTORS: Record<TutorialUiIdType, string[]> = {
   speed: ["#speedChangeButtons"],
   facilityActions: [".facilityActions", ".facilityDragHandle"],
   yearProgress: ["#yearProgressBar"],
+  sidePanes: ["#insightsPane", "#eventsPane"],
 };
 
 export function isGatedStep(step: TutorialStepType): boolean {

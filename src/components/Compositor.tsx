@@ -426,6 +426,25 @@ export default class Compositor extends React.Component<Props, {}> {
 
   private renderCard(): React.JSX.Element {
     const isPanes = isNavCard(this.props.card.name) && isPaneLayout();
+    const { tutorialStep, tutorialSteps } = this.props;
+    // A step that keeps the side panes back gets the fleet on its own. Dropped here rather than
+    // hidden in CSS: the grid's tracks come from the pane count, so a hidden pane would leave an
+    // empty column and a splitter to nowhere
+    if (
+      isPanes &&
+      tutorialSteps?.[tutorialStep]?.hideUi?.includes("sidePanes")
+    ) {
+      return (
+        <div
+          className={`${isDesktopScreen() ? "desktop-layout" : "pane-layout"} flexContainer`}
+        >
+          <GameAppBarContainer />
+          <DesktopPanes>
+            <FacilitiesContainer />
+          </DesktopPanes>
+        </div>
+      );
+    }
     // Give analysis room to breathe: the fleet stays beside one configurable Insights workbench
     // instead of splitting the width between separate Finance and Forecast chart columns.
     if (isPanes && isDesktopScreen()) {

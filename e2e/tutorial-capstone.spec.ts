@@ -43,6 +43,13 @@ test("guided objective reaches a retryable capstone and succeeds", async ({
   if (testInfo.project.name === "desktop-1440px") {
     await expect(page.locator(".desktop-layout")).toHaveCount(1);
     await expect(page.locator(".pane-layout")).toHaveCount(0);
+    // Mission 1 keeps Insights and Events for later: the fleet has the screen to itself, with
+    // no empty column or splitter left where they would be
+    await expect(page.locator("#facilitiesPane")).toBeVisible();
+    await expect(page.locator(".desktop-pane")).toHaveCount(1);
+    await expect(page.locator(".pane-splitter")).toHaveCount(0);
+    await expect(page.locator("#insightsPane")).toHaveCount(0);
+    await expect(page.locator("#eventsPane")).toHaveCount(0);
   }
 
   await page

@@ -7,12 +7,14 @@ import { AppStateType, ScenarioType, TutorialUiIdType } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
 
 // Mission 1 is a new player's first minute in the game, so it opens on the fleet and the chart
-// alone and hands over controls only as the steps teach them. Navigation, building and the menu
-// belong to later missions; the objective's own Exit button is always there to leave by.
+// alone and hands over controls only as the steps teach them. Navigation, building, the menu and
+// the Insights and Events panes belong to later missions; the objective's own Exit button is
+// always there to leave by.
 const MISSION_ONE_CAPSTONE: TutorialUiIdType[] = [
   "nav",
   "build",
   "yearProgress",
+  "sidePanes",
 ];
 const MISSION_ONE_CLOCK: TutorialUiIdType[] = [
   ...MISSION_ONE_CAPSTONE,
