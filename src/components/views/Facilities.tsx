@@ -349,7 +349,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             provided.draggableProps.style,
           )}
         >
-          <div className="facilityRowHeader">
+          <div
+            className="facilityRowHeader"
+            data-storage={isStorage || undefined}
+          >
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}

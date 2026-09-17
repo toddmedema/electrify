@@ -258,6 +258,43 @@ describe("TutorialHud", () => {
     target.remove();
   });
 
+  it("tracks moving targets on every animation frame and stops after unmount", () => {
+    let nextFrame: FrameRequestCallback | undefined;
+    const requestFrame = jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        nextFrame = callback;
+        return 1;
+      });
+    const cancelFrame = jest.spyOn(window, "cancelAnimationFrame");
+    const target = document.createElement("div");
+    target.id = "tutorial-target";
+    stubRect(target, 200, 150, 400, 250);
+    document.body.appendChild(target);
+
+    const { unmount } = render(<TutorialHud {...props()} />);
+    const ring = screen.getByTestId("tutorial-target-ring");
+    // Scroll motion must be reflected at the next paint, including frames less than 66ms
+    // apart. This also covers pane dragging and layout animation without scroll events.
+    for (const [time, top] of [
+      [16, 130],
+      [32, 110],
+      [48, 90],
+    ]) {
+      stubRect(target, 200, top, 400, top + 100);
+      const frame = nextFrame!;
+      act(() => frame(time));
+      expect(ring.style.top).toBe(`${top - 5}px`);
+    }
+
+    unmount();
+    expect(cancelFrame).toHaveBeenCalledWith(1);
+    expect(screen.queryByTestId("tutorial-target-ring")).toBeNull();
+    target.remove();
+    requestFrame.mockRestore();
+    cancelFrame.mockRestore();
+  });
+
   it("keeps the gap even on every side when one side has only a little room", () => {
     const target = document.createElement("div");
     target.id = "tutorial-target";

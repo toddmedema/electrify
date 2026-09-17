@@ -9,7 +9,9 @@ function renderManual(focusEntry?: string) {
 }
 
 function entryHeader(title: string): HTMLElement {
-  return screen.getByRole("button", { name: new RegExp(title, "i") });
+  return screen
+    .getAllByRole("button", { name: new RegExp(title, "i") })
+    .find((element) => element.hasAttribute("aria-expanded"))!;
 }
 
 function search(term: string) {

@@ -349,18 +349,14 @@ export default function TutorialHud({
       boxes.forEach(({ ring, box }) => applyTargetRing(ring, box));
     };
 
-    // Position in the same task that applies the step, then follow the control through
-    // scrolling, pane drags and resizes. A highlight does not need 60fps; ~15 keeps the
-    // per-frame layout reads cheap while the game is running.
+    // Follow scrolling, pane drags and animated layout on every paint. Throttling these
+    // fixed overlays makes them trail the controls they frame, particularly while scrolling.
+    // Keep the measurements outside React and batch reads before writes above.
     let frame = 0;
     sync();
     if (typeof window.requestAnimationFrame === "function") {
-      let last = 0;
-      const tick = (now: number) => {
-        if (now - last >= 66) {
-          last = now;
-          sync();
-        }
+      const tick = () => {
+        sync();
         frame = window.requestAnimationFrame(tick);
       };
       frame = window.requestAnimationFrame(tick);
