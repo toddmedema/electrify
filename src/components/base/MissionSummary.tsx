@@ -30,11 +30,6 @@ export default function MissionSummary({
     <div className="missionSummary" aria-label="Mission progress">
       <div className="missionSummaryHeader">
         <div className="missionSummaryCopy">
-          <span className="missionSummaryMonths">
-            {mission.monthsRemaining === 0
-              ? "Term complete"
-              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
-          </span>
           {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
               itself is always one tap away in All requirements. */}
           {shownRisk ? (
@@ -62,6 +57,12 @@ export default function MissionSummary({
               </span>
             )
           )}
+          {/* Leads with the goal or its risk, so a warning icon lines up with the grid readout's. */}
+          <span className="missionSummaryMonths">
+            {mission.monthsRemaining === 0
+              ? "Term complete"
+              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`}
+          </span>
         </div>
         <Tooltip title="All requirements">
           <IconButton
