@@ -235,6 +235,12 @@ function declares(simple: string): boolean {
     const attribute = simple.match(/^\[([\w-]+)/)?.[1];
     return !!attribute && SOURCE.includes(`${attribute}=`);
   }
+  if (/^[a-z]/.test(simple)) {
+    return (
+      SOURCE.includes(`<${simple}`) ||
+      SOURCE.includes(`<${simple[0].toUpperCase()}${simple.slice(1)}`)
+    );
+  }
   const name = simple.slice(1);
   if (simple.startsWith("#")) {
     return (
@@ -320,7 +326,10 @@ describe("walkthrough steps", () => {
     tutorials.forEach((scenario) => {
       const steps = scenario.tutorialSteps as TutorialStepType[];
       targetsOf(steps).forEach((target) => {
-        (target.match(/\[[^\]]+\]|[^\s]+/g) || []).forEach((simple) => {
+        (
+          target.match(/\[[^\]]+\]|[.#][\w-]+|(?:^|\s)[a-z][\w-]*/g) || []
+        ).forEach((part) => {
+          const simple = part.trim();
           expect([scenario.name, target, declares(simple)]).toEqual([
             scenario.name,
             target,

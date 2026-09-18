@@ -7,7 +7,11 @@ import {
   GameType,
   TutorialStepType,
 } from "../Types";
-import { DEFAULT_CUSTOM_SCENARIO, CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import {
+  DEFAULT_CUSTOM_SCENARIO,
+  CUSTOM_SCENARIO_ID,
+  getScenario,
+} from "../data/Scenarios";
 import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
@@ -138,6 +142,24 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
+  it.each([
+    [2, "BUILD_STORAGE"],
+    [112, "BUILD_INTERTIES"],
+  ] as const)(
+    "gives mission %s a separate highlighted category action",
+    (scenarioId, category) => {
+      const steps = getScenario(scenarioId)!.tutorialSteps!;
+      const store = tutorialStore(steps);
+      store.dispatch({ type: "card/navigate", payload: "BUILD_GENERATORS" });
+      expect(store.getState().game.tutorialStep).toBe(1);
+      expect(store.getState().card.name).toBe("BUILD_GENERATORS");
+      expect(steps[1].target).toBe(`#tab-${category}`);
+      store.dispatch({ type: "card/navigate", payload: category });
+      expect(store.getState().game.tutorialStep).toBe(2);
+      expect(store.getState().card.name).toBe(category);
+    },
+  );
+
   it("continues an explanation after a successful deed and skips its already-completed gate", () => {
     const satisfied = (state: AppStateType) => state.game.dollarsPerkWh < 0.07;
     const store = tutorialStore([

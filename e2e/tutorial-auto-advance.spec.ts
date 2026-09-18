@@ -52,19 +52,26 @@ for (const mission of [
     if (mission === "Generators" || mission === "Storage") {
       await page.locator(".button-buildFacility").click();
       if (mission === "Storage") {
-        await page.getByRole("tab", { name: "Storage", exact: true }).click();
+        const storageTab = page.getByRole("tab", {
+          name: "Storage",
+          exact: true,
+        });
+        await expect(hud).toContainText("Tap Storage");
+        await expect(storageTab).toHaveClass(/tutorialTarget/);
+        await storageTab.click();
       }
       await expect(hud).toContainText(
-        mission === "Generators" ? "Compare cost" : "Choose storage",
+        mission === "Generators" ? "Review a generator" : "Review a storage",
       );
       await page
         .getByRole("button", { name: /Review purchase of/ })
         .first()
         .click();
-      // Opening a purchase review does not mean a purchase succeeded.
-      await expect(hud).toContainText(
-        mission === "Generators" ? "Compare cost" : "Choose storage",
-      );
+      // Reviewing and approving are distinct steps; highlight the payment controls in the dialog.
+      await expect(hud).toContainText("Buy it with cash, or take a loan");
+      await expect(
+        page.getByRole("button", { name: "Take loan", exact: true }),
+      ).toHaveClass(/tutorialTarget/);
       await page
         .getByRole("button", { name: "Take loan", exact: true })
         .click();
@@ -79,7 +86,7 @@ for (const mission of [
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();
       await expect(
-        page.getByRole("heading", { name: "Step 2 of 9" }),
+        page.getByRole("heading", { name: "Step 3 of 11" }),
       ).toBeVisible();
     } else {
       const nav = page.locator("#insightsNav");

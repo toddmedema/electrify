@@ -263,13 +263,16 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 concept: "time",
                 label: "Online in",
                 value: `${Math.round(storage.yearsToBuild * 12)} months`,
-                detail: "No storage until built.",
               },
               {
                 concept: "storage",
                 label: "Energy capacity",
                 value: `+${formatWattHours(storage.peakWh)} stored energy`,
-                detail: `${formatWatts(storage.peakW)} maximum charge or discharge rate`,
+              },
+              {
+                concept: "supply",
+                label: "Charge/discharge rate",
+                value: formatWatts(storage.peakW),
               },
               {
                 concept: "supply",
@@ -278,16 +281,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               },
             ]}
           />
-          <Box className="buildOptionHelp">
-            <ManualLink
-              entry={MANUAL_ENTRY.POWER_AND_ENERGY}
-              text="Power, energy & duration"
-            />
-            <ManualLink
-              entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
-              text="Charging & losses"
-            />
-          </Box>
           <Button
             color="primary"
             size="small"

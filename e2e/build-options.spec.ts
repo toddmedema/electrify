@@ -112,6 +112,12 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         page.getByRole("button", { name: "Pay cash", exact: true }),
       ).toBeVisible();
+      if (kind === "Storage") {
+        await page.screenshot({
+          path: testInfo.outputPath(`Storage-purchase-${theme}.png`),
+          animations: "disabled",
+        });
+      }
       await page
         .getByRole("dialog")
         .getByRole("button", { name: "close" })
