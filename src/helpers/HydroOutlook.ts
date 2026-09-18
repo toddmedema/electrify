@@ -1,4 +1,5 @@
 import { TickPresentFutureType } from "../Types";
+import { MONTH_NAMES } from "../Constants";
 import { getMonthYearFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 import { HYDRO_DEADPOOL_FRACTION, mandatedReleaseFraction } from "./Hydro";
 
@@ -60,8 +61,11 @@ export function reservoirOutlook(
 }
 
 export interface HydroStatus {
-  text: string;
-  tone?: "good" | "warn" | "bad";
+  /** A short verdict, the only part that carries the tone colour */
+  lead: string;
+  /** What it means, in the ordinary text colour */
+  detail: string;
+  tone?: "warn" | "bad";
 }
 
 export interface HydroStatusInput {
@@ -71,32 +75,20 @@ export interface HydroStatusInput {
   spilling: boolean;
   monthNumber: number;
   latitude?: number;
+  /** Combined forecast for every operating dam */
   outlook?: ReservoirOutlookPoint[];
+  /** More than one dam operating, so the forecast describes the fleet rather than this dam */
+  fleet?: boolean;
 }
 
 // Close enough to the minimum generating level that output is already being held back
-const LOW_FRACTION = HYDRO_DEADPOOL_FRACTION + 0.05;
+export const LOW_RESERVOIR_FRACTION = HYDRO_DEADPOOL_FRACTION + 0.05;
 // Changes smaller than this over a month read as noise rather than a direction
 const TREND_THRESHOLD = 0.03;
 // Enough snow on the ground to be worth waiting for, in mm of water equivalent
 const MEANINGFUL_SNOWPACK_MM = 25;
 // From here the growing-season curve is the dominant draw on the reservoir
 const HEAVY_RELEASE_FRACTION = 0.3;
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function snowRefillMonth(outlook: ReservoirOutlookPoint[]): number | undefined {
   const current = outlook[0];
@@ -112,51 +104,68 @@ function snowRefillMonth(outlook: ReservoirOutlookPoint[]): number | undefined {
   return melted > 0 ? outlook[melted].monthNumber : undefined;
 }
 
+function firstRise(outlook?: ReservoirOutlookPoint[]): number | undefined {
+  const index = (outlook || []).findIndex(
+    (point, i) => i > 0 && point.fraction > outlook![i - 1].fraction + 0.02,
+  );
+  return index > 0 ? outlook![index].monthNumber : undefined;
+}
+
 export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
   const { fraction, outlook } = input;
-  if (fraction <= LOW_FRACTION) {
+  if (fraction <= LOW_RESERVOIR_FRACTION) {
+    const refill = firstRise(outlook);
     return {
-      text: "Nearly empty. Output stays low until rain or snowmelt refills it.",
+      lead: "Nearly empty.",
+      detail: `Output stays low until rain or snowmelt refills it${refill ? `, likely from ${MONTH_NAMES[refill - 1]}` : ""}. Plan other supply until then.`,
       tone: "bad",
     };
   }
   if (input.spilling) {
     return {
-      text: "Full, so extra water is spilling. Running it harder uses water that would be lost anyway.",
-      tone: "good",
+      lead: "Full.",
+      detail:
+        "Extra water is spilling. Moving it up the dispatch order uses water that would otherwise be lost.",
     };
   }
 
-  let text: string;
+  const subject = input.fleet ? "Your dams" : "It";
   const change =
     outlook && outlook.length > 1
       ? outlook[1].fraction - outlook[0].fraction
       : 0;
+  let lead: string;
+  let detail: string;
   if (change > TREND_THRESHOLD) {
-    text = "Filling: more water is arriving than it uses.";
+    lead = "Filling.";
+    detail = "More water is arriving than is being used.";
   } else if (change < -TREND_THRESHOLD) {
-    text = "Draining: it uses water faster than rain and snowmelt replace it.";
+    lead = "Draining.";
+    detail =
+      "Generation and required releases use more water than rain and snowmelt bring in.";
   } else {
-    text = "Steady: water arriving roughly matches water used.";
+    lead = "Steady.";
+    detail = "Water arriving roughly matches water used.";
   }
 
   const refill =
     outlook && change <= TREND_THRESHOLD ? snowRefillMonth(outlook) : undefined;
   const runsLow = outlook?.find(
-    (point, index) => index > 0 && point.fraction <= LOW_FRACTION,
+    (point, index) => index > 0 && point.fraction <= LOW_RESERVOIR_FRACTION,
   );
   if (refill) {
-    text += ` Snow is holding water back; it should refill around ${MONTH_NAMES[refill - 1]}.`;
+    detail += ` Snow is holding water back; expect a refill around ${MONTH_NAMES[refill - 1]}.`;
   } else if (runsLow) {
     return {
-      text: `${text} At this rate it runs low around ${MONTH_NAMES[runsLow.monthNumber - 1]}.`,
+      lead,
+      detail: `${detail} ${subject} will run low around ${MONTH_NAMES[runsLow.monthNumber - 1]}. Pausing saves water for when you need it more.`,
       tone: "warn",
     };
   } else if (
     mandatedReleaseFraction(input.monthNumber, input.latitude) >=
     HEAVY_RELEASE_FRACTION
   ) {
-    text += " Downstream water rights also require releases this month.";
+    detail += " Downstream water rights require extra releases this month.";
   }
-  return { text };
+  return { lead, detail };
 }

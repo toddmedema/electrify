@@ -31,21 +31,13 @@ export default function HydroPrimer(props: {
       <Typography id={titleId} variant="subtitle2" component="h2">
         How hydro differs
       </Typography>
-      <ul>
-        <li>
-          <strong>Limited sites.</strong> {props.place} has room for{" "}
-          {props.totalSites} {props.totalSites === 1 ? "dam" : "dams"}. Each one
-          takes a site, whatever its size.
-        </li>
-        <li>
-          <strong>Water, not fuel.</strong> Rain and snowmelt fill the
-          reservoir; generating drains it. Dry seasons limit output.
-        </li>
-        <li>
-          <strong>Watch the water.</strong> Select a dam in your fleet to see
-          its reservoir forecast.
-        </li>
-      </ul>
+      <Typography variant="body2">
+        This game allows {props.totalSites} hydro{" "}
+        {props.totalSites === 1 ? "project" : "projects"} near {props.place},
+        each using one site whatever its size. Output follows rain and snowmelt,
+        not fuel. Once one is built, open it in your fleet to see its water
+        forecast.
+      </Typography>
       <Button size="small" onClick={props.onDismiss}>
         Got it
       </Button>

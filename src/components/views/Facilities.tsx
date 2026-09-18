@@ -50,6 +50,7 @@ import {
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FacilityDetails from "../base/FacilityDetails";
+import { LOW_RESERVOIR_FRACTION } from "../../helpers/HydroOutlook";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -354,14 +355,21 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       const reservoirPercent = Math.round(
         ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
       );
+      // Near the minimum generating level the dam can't deliver, which is worth seeing without
+      // opening the row. Words carry it too, so the colour is never the only signal.
+      const low =
+        (facility.reservoirWh || 0) / facility.reservoirCapacityWh <=
+        LOW_RESERVOIR_FRACTION;
       // Only one of these shows, picked by how wide the row is
       detail = (
-        <>
+        <span className={low ? "facilityStatusLow" : undefined}>
           <span className="facilityStatusLong">
-            reservoir {reservoirPercent}%
+            reservoir {reservoirPercent}%{low ? " · nearly empty" : ""}
           </span>
-          <span className="facilityStatusShort">{reservoirPercent}% full</span>
-        </>
+          <span className="facilityStatusShort">
+            {reservoirPercent}% {low ? "· low" : "full"}
+          </span>
+        </span>
       );
     }
   }

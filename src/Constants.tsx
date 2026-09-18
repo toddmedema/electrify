@@ -176,6 +176,20 @@ export const MONTHS = [
   "Nov",
   "Dec",
 ] as MonthType[];
+export const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 export const YEARS_PER_TICK = TICK_MINUTES / (DAYS_PER_YEAR * 1440);
 
 export const INIT_DELAY = {

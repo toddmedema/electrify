@@ -695,7 +695,7 @@ export function STORAGE(state: GameType, peakWh: number) {
     {
       name: "Pumped Hydro",
       description:
-        "Pumps water uphill to store large amounts of energy. Does not depend on rain, but needs a suitable site and takes years to build",
+        "Pumps water uphill between two reservoirs to store large amounts of energy. Needs no river inflow, but needs a suitable site and takes years to build",
       available: year > 1930 && (pumpedHydroLocations || 0) > 0, // New Milford plant, 33MW - https://blogs.scientificamerican.com/plugged-in/throwback-thursday-the-first-u-s-energy-storage-plant/
       buildCost: 2000000 + 0.3319 * peakWh,
       // NREL's 2024 ATB closed-loop sites span $2,205-$4,434/kW. At this facility's ten-hour

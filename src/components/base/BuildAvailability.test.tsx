@@ -36,7 +36,7 @@ describe("getBuildAvailability", () => {
     });
     expect(result.buildable).toBe(false);
     expect(result.secondaryText).toBe(
-      "No river near Houston is suited to a new dam.",
+      "No hydro sites near Houston in this game.",
     );
   });
 
@@ -47,12 +47,10 @@ describe("getBuildAvailability", () => {
       viableLocationsRemaining: 0,
     });
     expect(result.buildable).toBe(false);
-    expect(result.secondaryText).toBe(
-      "All 3 sites near Madrid are in use by your projects.",
-    );
+    expect(result.secondaryText).toBe("You've used all 3 sites near Madrid.");
   });
 
-  test("pumped hydro names the terrain it needs", () => {
+  test("pumped hydro names itself in the reason", () => {
     const result = getBuildAvailability({
       ...hydroOption,
       name: "Pumped Hydro",
@@ -60,7 +58,9 @@ describe("getBuildAvailability", () => {
       location: withHydro,
       viableLocationsRemaining: 0,
     });
-    expect(result.secondaryText).toMatch(/height difference/);
+    expect(result.secondaryText).toBe(
+      "No pumped hydro sites near Madrid in this game.",
+    );
   });
 
   test("a buildable option shows its description", () => {
@@ -79,4 +79,5 @@ describe("getBuildAvailability", () => {
 test("site counts read as remaining of total", () => {
   expect(siteCountLabel({ remaining: 2, total: 3 })).toBe("2 of 3 sites left");
   expect(siteCountLabel({ remaining: 1, total: 1 })).toBe("1 of 1 site left");
+  expect(siteCountLabel({ remaining: 1, total: 3 })).toBe("Last site left");
 });

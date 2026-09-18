@@ -32,16 +32,18 @@ export function getSiteInventory(
 }
 
 export function siteCountLabel(sites: SiteInventory): string {
+  if (sites.remaining === 1 && sites.total > 1) {
+    return "Last site left";
+  }
   return `${sites.remaining} of ${sites.total} ${sites.total === 1 ? "site" : "sites"} left`;
 }
 
-// Why the location has none at all. Worded as what the land lacks, since that is the thing a
-// player can't fix by waiting or saving up.
-const NO_SITE_REASONS: Record<string, (place: string) => string> = {
-  Hydro: (place) => `No river near ${place} is suited to a new dam.`,
-  "Pumped Hydro": (place) =>
-    `No sites near ${place} have the height difference for two reservoirs.`,
-  Geothermal: (place) => `No usable underground heat near ${place}.`,
+// Site counts are a game limit built from coarse national and survey data, not a map of every
+// river or hillside, so the reason says what this game allows rather than what the land lacks.
+const SITE_NOUNS: Record<string, string> = {
+  Hydro: "hydro",
+  "Pumped Hydro": "pumped hydro",
+  Geothermal: "geothermal",
 };
 
 /** Shared availability copy and state for generator and storage purchase cards. */
@@ -61,18 +63,16 @@ export function getBuildAvailability(options: {
     options.viableLocationsRemaining,
   );
   if (sites && sites.total === 0) {
-    const reason = NO_SITE_REASONS[options.name];
+    const noun = SITE_NOUNS[options.name] || options.name.toLowerCase();
     return {
       buildable: false,
-      secondaryText: reason
-        ? reason(place)
-        : `No suitable sites near ${place}.`,
+      secondaryText: `No ${noun} sites near ${place} in this game.`,
     };
   }
   if (sites && sites.remaining === 0) {
     return {
       buildable: false,
-      secondaryText: `All ${sites.total} ${sites.total === 1 ? "site" : "sites"} near ${place} are in use by your projects.`,
+      secondaryText: `You've used all ${sites.total} ${sites.total === 1 ? "site" : "sites"} near ${place}.`,
     };
   }
   if (!options.available) {

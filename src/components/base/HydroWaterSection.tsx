@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Typography } from "@mui/material";
-import { TICKS_PER_YEAR } from "../../Constants";
+import { MONTH_NAMES, MONTHS, TICKS_PER_YEAR } from "../../Constants";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatWattHours, formatWattHoursOfPeak } from "../../helpers/Format";
@@ -13,21 +13,6 @@ import { generateNewTimeline } from "../../reducers/Game";
 import { FacilityOperatingType, GameType } from "../../Types";
 import ManualLink from "./ManualLink";
 import Sparkline from "./Sparkline";
-
-const MONTHS_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 
 const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
@@ -100,13 +85,16 @@ export default function HydroWaterSection(props: {
       <section className="facilityDetailSection" aria-label="Water">
         {heading}
         <Typography variant="body2" className="facilityWaterStatus">
-          Opens half full. After that, rain and snowmelt refill it and
-          generating drains it.
+          Opens half full.
         </Typography>
       </section>
     );
   }
 
+  const fleet =
+    game.facilities.filter(
+      (f) => f.fuel === "Hydro" && f.yearsToBuildLeft === 0,
+    ).length > 1;
   const fraction =
     capacityWh > 0 ? (facility.reservoirWh || 0) / capacityWh : 0;
   const status = describeHydroStatus({
@@ -115,6 +103,7 @@ export default function HydroWaterSection(props: {
     monthNumber: game.date.monthNumber,
     latitude: game.location.lat,
     outlook,
+    fleet,
   });
   const values = outlook?.map((point) => point.fraction) || [];
   const lowIndex = values.reduce(
@@ -122,15 +111,14 @@ export default function HydroWaterSection(props: {
     0,
   );
   const lowPoint = outlook?.[lowIndex];
+  // A line pressed flat against the baseline says nothing a sentence can't say better
+  const emptyAllYear = values.every((value) => value <= 0.02);
 
   return (
     <section className="facilityDetailSection" aria-label="Water">
       {heading}
-      <Typography
-        variant="body2"
-        className={`facilityWaterStatus${status.tone ? ` ${status.tone}` : ""}`}
-      >
-        {status.text}
+      <Typography variant="body2" className="facilityWaterStatus">
+        <strong className={status.tone}>{status.lead}</strong> {status.detail}
       </Typography>
       <dl className="facilityStats">
         <Stat
@@ -138,7 +126,7 @@ export default function HydroWaterSection(props: {
           value={formatWattHoursOfPeak(facility.reservoirWh || 0, capacityWh)}
         />
         <Stat
-          label="Water in this month"
+          label="Inflow this month"
           value={
             now
               ? formatWattHours(
@@ -155,24 +143,29 @@ export default function HydroWaterSection(props: {
             color="textSecondary"
             component="figcaption"
           >
-            Reservoir, next 12 months
+            {fleet ? "All your dams, next 12 months" : "Next 12 months"}
           </Typography>
-          <div className="facilityTrend">
-            <Sparkline
-              values={values}
-              domain={[0, 1]}
-              width={144}
-              height={28}
-              fill
-              baseline
-              lowMarker
-              ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${percent(values[0])}, lowest in ${MONTHS_SHORT[lowPoint.monthNumber - 1]} at ${percent(lowPoint.fraction)}.`}
-            />
-            <Typography variant="caption" color="textSecondary">
-              Low {MONTHS_SHORT[lowPoint.monthNumber - 1]}{" "}
-              {percent(lowPoint.fraction)}
-            </Typography>
-          </div>
+          {emptyAllYear ? (
+            <Typography variant="body2">Empty all year</Typography>
+          ) : (
+            <div className="facilityTrend">
+              <Sparkline
+                values={values}
+                domain={[0, 1]}
+                width={144}
+                height={28}
+                fill
+                baseline
+                lowMarker
+                ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${percent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${percent(lowPoint.fraction)}.`}
+              />
+              <Typography variant="caption" color="textSecondary">
+                Now {percent(values[0])}
+                {lowIndex > 0 &&
+                  ` · Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`}
+              </Typography>
+            </div>
+          )}
         </figure>
       )}
     </section>

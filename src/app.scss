@@ -3350,6 +3350,21 @@ html[data-theme="dark"] .uplot {
   .facilityWaterOutlook {
     margin: 12px 0 0;
 
+    // Same neutral marks as the build cards' typical-year lines
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--spark-stroke);
+    }
+    .sparklineFill {
+      fill: var(--spark-fill);
+    }
+    .sparklineBaseline {
+      stroke: var(--spark-baseline);
+    }
+    .sparklineMarker {
+      fill: var(--spark-marker-fill);
+    }
+
     figcaption {
       margin: 0 0 4px;
       font-size: 12px;
@@ -3357,17 +3372,18 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  // The one-sentence reason a dam is producing what it is, read before the numbers behind it
+  // The one-sentence reason a dam is producing what it is. Only the verdict takes the warning
+  // colour, so the sentence stays readable and the colour stays a signal rather than a slab.
   .facilityWaterStatus {
     margin: 0 0 12px;
 
-    &.good {
-      color: $delta_good;
+    strong {
+      font-weight: 600;
     }
-    &.warn {
+    .warn {
       color: var(--warning-icon);
     }
-    &.bad {
+    .bad {
       color: $delta_bad;
     }
   }
@@ -4409,20 +4425,11 @@ $sizemap: (
   padding: 12px 12px 4px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  background: var(--interactive-tint);
+  background: var(--bg-raised);
 
   h2 {
     margin: 0 0 4px;
     font-weight: 600;
-  }
-  ul {
-    margin: 0;
-    padding-left: 16px;
-    font-size: 14px;
-    line-height: 20px;
-  }
-  li + li {
-    margin-top: 4px;
   }
   .MuiButton-root {
     min-height: 40px;
@@ -4501,6 +4508,9 @@ $sizemap: (
   .buildOptionContext {
     display: block;
     padding: 0 12px 8px;
+  }
+  .nowrap {
+    white-space: nowrap;
   }
   .buildOptionWarning,
   .buildOptionDescription {
@@ -4784,6 +4794,9 @@ $sizemap: (
 }
 .facilityDisclosure .MuiListItemText-root {
   container-type: inline-size;
+}
+.facilityDisclosure .facilityStatusLow {
+  color: var(--delta-bad);
 }
 .facilityDisclosure .facilityStatusShort {
   display: none;

@@ -37,6 +37,7 @@ import {
   DOWNPAYMENT_PERCENT,
   FUELS,
   LOAN_MONTHS,
+  MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -70,21 +71,6 @@ import { getScenario } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function percent(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
@@ -253,11 +239,14 @@ export function GeneratorBuildItem(
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
-  const typicalOutputW = generator.peakW * generator.capacityFactor;
   const outputShape =
     props.outputShape || expectedMonthlyOutputShape(generator, []);
   const waterShape =
     outputShape?.kind === "water-inflow" ? outputShape : undefined;
+  // Hydro can only deliver the water that arrives, so its typical output follows the forecast
+  // inflow rather than the design capacity factor, which a drought year can fall well short of
+  const typicalOutputW =
+    generator.peakW * (waterShape ? waterShape.mean : generator.capacityFactor);
   // A short role tag stays on the card; how to use it waits for the details
   const [role, roleHint] =
     generator.fuel === "Hydro"
@@ -347,7 +336,12 @@ export function GeneratorBuildItem(
       />
       <Typography className="buildOptionContext" variant="body2">
         {role}
-        {sites && sites.remaining > 0 && ` · ${siteCountLabel(sites)}`}
+        {sites && sites.remaining > 0 && (
+          <>
+            {" · "}
+            <span className="nowrap">{siteCountLabel(sites)}</span>
+          </>
+        )}
       </Typography>
       {!canBuild && (
         <Typography
@@ -575,26 +569,18 @@ export function GeneratorBuildItem(
                 concept: "supply",
                 label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail: `${formatWatts(generator.peakW)} max; ${waterShape ? "water" : "weather"} may limit it.`,
+                detail: waterShape
+                  ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
+                  : `${formatWatts(generator.peakW)} max; weather may limit it.`,
               },
-              ...(waterShape
-                ? [
-                    {
-                      concept: "weather" as const,
-                      label: "Water supply",
-                      value: `${percent(waterShape.monthly[waterShape.lowMonth])}–${percent(Math.max(...waterShape.monthly))} of full power`,
-                      detail: `Rain and snowmelt, lowest in ${MONTH_NAMES[waterShape.lowMonth]}. The reservoir stores water between.`,
-                    },
-                  ]
-                : []),
               ...(sites
                 ? [
                     {
                       concept: "build" as const,
                       label: "Project site",
-                      value: `Uses 1 of ${sites.remaining} left`,
+                      value: `Leaves ${sites.remaining - 1} of ${sites.total}`,
                       detail:
-                        "Each project takes a whole site, whatever its size.",
+                        "In this game each project takes one site, whatever its size.",
                     },
                   ]
                 : []),
