@@ -135,13 +135,15 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await expect(exchange).toContainText("Available capacity");
   await expect(exchange).toContainText("Neighbor price");
   if (testInfo.project.name.startsWith("mobile-")) {
-    const [box, viewport] = await Promise.all([
-      exchange.boundingBox(),
-      page.evaluate(() => ({
-        height: window.innerHeight,
-        width: window.innerWidth,
-      })),
-    ]);
+    const viewport = await page.evaluate(() => ({
+      height: window.innerHeight,
+      width: window.innerWidth,
+    }));
+    // Visibility does not wait for the card transition and one-time target reveal.
+    await expect
+      .poll(async () => (await exchange.boundingBox())?.y ?? Infinity)
+      .toBeLessThan(viewport.height - 56);
+    const box = await exchange.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y).toBeLessThan(viewport.height - 56);
@@ -154,7 +156,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(
-    page.getByText(/Hot, sunny weather can reduce what it carries/),
+    page.getByText(/Hot, sunny weather can reduce how much the line carries/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
   // The final step is the capstone, so its heading says "Your turn" rather than "Step".

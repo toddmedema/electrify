@@ -227,6 +227,43 @@ function applyTargetRing(ring: HTMLElement, box: RingBox | null) {
   ring.style.borderRadius = box.borderRadius;
 }
 
+/** Reveal a newly mounted objective once, without taking scrolling away from the player. */
+function revealTarget(element: Element) {
+  for (
+    let parent = element.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
+    const style = window.getComputedStyle(parent);
+    if (
+      !/(auto|scroll)/.test(style.overflowY) ||
+      parent.scrollHeight <= parent.clientHeight
+    ) {
+      continue;
+    }
+    const box = parent.getBoundingClientRect();
+    let top = Math.max(0, box.top);
+    let bottom = Math.min(window.innerHeight, box.bottom);
+    // The phone footer belongs to the same scroller and covers its bottom edge.
+    for (const child of Array.from(parent.children)) {
+      const childStyle = window.getComputedStyle(child);
+      if (childStyle.position !== "sticky" || child.contains(element)) continue;
+      const bar = child.getBoundingClientRect();
+      if (childStyle.bottom !== "auto" && childStyle.bottom !== "")
+        bottom = Math.min(bottom, bar.top);
+      if (childStyle.top !== "auto" && childStyle.top !== "")
+        top = Math.max(top, bar.bottom);
+    }
+    const target = element.getBoundingClientRect();
+    // Instant scrolling also respects reduced motion and does not race card transitions.
+    if (target.top < top || target.height > bottom - top) {
+      parent.scrollTop += target.top - top;
+    } else if (target.bottom > bottom) {
+      parent.scrollTop += target.bottom - bottom;
+    }
+  }
+}
+
 /**
  * A non-modal tutorial objective that leaves the game visible and interactive.
  *
@@ -295,6 +332,8 @@ export default function TutorialHud({
     // clipping ancestor -- a pane, a card, the viewport -- cut its sides wherever a control
     // ran edge to edge. The ring hugs the control instead, so every side stays visible.
     const rings = new Map<Element, HTMLElement>();
+    let revealElement: Element | undefined;
+    let revealAt: number | undefined;
     let reminding = false;
     const release = (element: Element, ring: HTMLElement) => {
       element.classList.remove("tutorialTarget", "tutorialTargetReminder");
@@ -313,16 +352,20 @@ export default function TutorialHud({
         }
       });
       current.forEach((element) => {
+        // React may replace className on an existing target (for example when a
+        // facility's arrival animation ends). Keep its hooks alongside the live ring.
+        element.classList.add("tutorialTarget");
+        if (reminding) {
+          element.classList.add("tutorialTargetReminder");
+        }
         if (rings.has(element)) {
           return;
         }
-        element.classList.add("tutorialTarget");
         const ring = document.createElement("div");
         ring.className = "tutorialTargetRing";
         ring.setAttribute("aria-hidden", "true");
         ring.setAttribute("data-testid", "tutorial-target-ring");
         if (reminding) {
-          element.classList.add("tutorialTargetReminder");
           ring.classList.add("tutorialTargetRingPulse");
         } else {
           // One pulse the moment the step starts draws the eye to where the action is
@@ -331,6 +374,25 @@ export default function TutorialHud({
         document.body.appendChild(ring);
         rings.set(element, ring);
       });
+      // A shop may highlight every purchase button. Reveal its first choice rather than
+      // scrolling through all choices and leaving the player at the bottom of the shop.
+      const firstTarget = Array.from(current).find((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (firstTarget !== revealElement) {
+        revealElement = firstTarget;
+        // Card transitions temporarily keep both trees mounted. Let their layout settle.
+        revealAt = performance.now() + 450;
+      }
+      if (
+        revealElement &&
+        revealAt !== undefined &&
+        performance.now() >= revealAt
+      ) {
+        revealAt = undefined;
+        revealTarget(revealElement);
+      }
       // Measure every ring before moving any, so one ring's write does not force a fresh
       // layout for the next one's read. Touching targets share the first one's ring.
       const first = rings.values().next();
@@ -354,6 +416,12 @@ export default function TutorialHud({
     // Keep the measurements outside React and batch reads before writes above.
     let frame = 0;
     sync();
+    // Some responsive changes reuse the same target node. Re-reveal once after the
+    // resize settles, just as for a replacement node, without reacting to user scroll.
+    const onResize = () => {
+      revealAt = performance.now() + 450;
+    };
+    window.addEventListener("resize", onResize);
     if (typeof window.requestAnimationFrame === "function") {
       const tick = () => {
         sync();
@@ -373,6 +441,7 @@ export default function TutorialHud({
 
     return () => {
       window.clearTimeout(reminder);
+      window.removeEventListener("resize", onResize);
       if (frame) {
         window.cancelAnimationFrame(frame);
       }
@@ -382,7 +451,7 @@ export default function TutorialHud({
 
   return (
     <section
-      className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}`}
+      className={`tutorialHud${step.capstone ? " tutorialHud-capstone" : ""}${step.nextLabel ? " tutorialHud-namedAction" : ""}`}
       aria-labelledby="tutorial-step-title"
     >
       <div className="tutorialHudHeader">
@@ -398,22 +467,24 @@ export default function TutorialHud({
         </Typography>
       </div>
 
-      <div className="tutorialHudContent" aria-live="polite">
-        {/* Keyed inside the live region so the region itself persists and keeps announcing */}
-        <div key={stepIndex} className="tutorialHudStep">
-          <p className="tutorialHudAction">
-            <TouchAppOutlinedIcon fontSize="small" aria-hidden />
-            <span>{action}</span>
-          </p>
-          {content}
+      <div className="tutorialHudBody">
+        <div className="tutorialHudContent" aria-live="polite">
+          {/* Keyed inside the live region so the region itself persists and keeps announcing */}
+          <div key={stepIndex} className="tutorialHudStep">
+            <p className="tutorialHudAction">
+              <TouchAppOutlinedIcon fontSize="small" aria-hidden />
+              <span>{action}</span>
+            </p>
+            {content}
+          </div>
         </div>
-      </div>
 
-      {step.hint && (
-        <div className="tutorialHudHint" role="note">
-          <strong>Hint:</strong> {step.hint}
-        </div>
-      )}
+        {step.hint && (
+          <div className="tutorialHudHint" role="note">
+            <strong>Hint:</strong> {step.hint}
+          </div>
+        )}
+      </div>
 
       <div className="tutorialHudFooter">
         <Button color="primary" size="small" onClick={onExit}>
@@ -438,7 +509,7 @@ export default function TutorialHud({
             variant={nextIsPrimary ? "contained" : "text"}
             onClick={onNext}
           >
-            Next
+            {step.nextLabel || "Next"}
           </Button>
         )}
       </div>

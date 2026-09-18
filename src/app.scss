@@ -3809,6 +3809,10 @@ html[data-theme="dark"] .uplot {
   border: 0;
 }
 
+.tutorialHudBody {
+  display: contents;
+}
+
 .tutorialHudContent {
   min-width: 0;
   margin: 0;
@@ -3889,39 +3893,59 @@ html[data-theme="dark"] .uplot {
 // name and the tab order are unchanged; only the visual order moves.
 @media screen and (max-width: 699.98px) {
   .tutorialHud {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 4px;
+    gap: 8px 4px;
+    overflow: hidden;
   }
-  .tutorialHudContent,
-  .tutorialHudHint {
-    flex: 0 0 100%;
+  .tutorialHudBody {
+    display: block;
+    grid-column: 1 / -1;
+    min-height: 0;
+    overflow: auto;
   }
   // A full-width flex basis plus the hanging indent would otherwise run past the right edge
   .tutorialHudHint {
     box-sizing: border-box;
-    order: 1;
   }
   // A plain div with no role, so flattening it into the HUD's row loses no semantics
   .tutorialHudFooter {
     display: contents;
   }
-  .tutorialHudFooter > * {
-    order: 2;
-    margin-top: 8px;
+  .tutorialHudFooter > button {
+    grid-row: 2;
+    min-height: 44px;
+  }
+  .tutorialHudFooter > button:first-child {
+    grid-column: 1;
+  }
+  .tutorialHudFooterSpacer {
+    display: none;
   }
   .tutorialHudHeader {
-    order: 3;
-    margin-top: 8px;
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: end;
   }
   .tutorialHudFooter > .tutorialHudNav {
-    order: 4;
+    grid-column: 3;
+  }
+  .tutorialHudFooter > .tutorialHudNav:last-child {
+    grid-column: 4;
   }
   .tutorialHudHeader h2 {
     color: $font_color_faded;
     font-size: 0.8125rem;
     font-weight: 400;
+  }
+  .tutorialHud-namedAction {
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+  .tutorialHud-namedAction .tutorialHudFooter > .tutorialHudNav:last-child {
+    grid-row: 3;
+    grid-column: 1 / -1;
   }
 }
 

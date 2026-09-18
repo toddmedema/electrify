@@ -249,7 +249,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
-        target: ".facilityRowHeader",
+        target: ".facilityRowHeader:has(.constructionProgress)",
         action: "Find the construction progress",
         content: (
           <TutorialPrompt text="Construction has started. The generator cannot supply the grid until it is complete." />
@@ -325,7 +325,7 @@ export const SCENARIOS = [
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_STORAGE",
         action: "Tap Storage",
         content: (
-          <TutorialPrompt text="The storage tab shows what you can build." />
+          <TutorialPrompt text="Compare how much energy each option stores and how quickly it can deliver it." />
         ),
       },
       {
@@ -359,30 +359,26 @@ export const SCENARIOS = [
       {
         card: "FACILITIES",
         target: '[aria-label="Reorder Coal"]',
-        advanceOn: (s: AppStateType) =>
-          s.game.facilities.findIndex((facility) => "fuel" in facility) <
-          s.game.facilities.findIndex((facility) => "currentWh" in facility),
-        action: "Drag your generator above storage",
+        action: "Check generation comes before storage",
         content: (
           <TutorialPrompt text="Spare power charges storage only when generation comes first. Storage returns less energy than it takes in." />
         ),
       },
       {
         card: "FACILITIES",
-        target: '#speedChangeButtons [aria-label="slow speed"]',
-        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to run it",
+        nextLabel: "Start final challenge",
+        action: "Try storage through the evening peak",
         content: (
-          <TutorialPrompt text="Watch storage fill while demand is low." />
+          <TutorialPrompt text="Start a fresh grid with a smaller coal plant and the original storage. Your practice purchase will be cleared." />
         ),
       },
       {
         card: "FACILITIES",
         action: "Supply the evening peak with stored energy",
         content: (
-          <TutorialPrompt text="Keep the grid supplied through the evening peak using storage within two simulated days." />
+          <TutorialPrompt text="Charge from spare generation, then keep supply above demand through the evening." />
         ),
-        hint: "Put generation before storage to charge from its surplus. Watch usable energy fill and then supply the evening peak. Charging power cannot also serve customers; paused storage neither charges nor discharges.",
+        hint: "Put Coal above storage, then run time. Finish within two simulated days.",
         capstone: {
           checkpoint: {
             facilities: [
@@ -445,12 +441,12 @@ export const SCENARIOS = [
       },
       {
         card: "INSIGHTS",
-        target: "#chartFinances",
+        target: ".insightsViewportToolbar",
         continueOnClick:
           ".insightsViewportToolbar button, [data-insight-preset]",
-        action: "Choose a measure or time period",
+        action: "Change the chart time period",
         content: (
-          <TutorialPrompt text="Each measure shows how your money changes over time." />
+          <TutorialPrompt text="Use the arrows and zoom controls to compare upcoming months." />
         ),
       },
       {
@@ -475,9 +471,9 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         action: "Set a rate that turns next month’s loss into profit",
         content: (
-          <TutorialPrompt text="Turn the forecast monthly loss into a profit without causing a blackout." />
+          <TutorialPrompt text="Revenue must cover fuel, upkeep and loan payments while supply meets demand." />
         ),
-        hint: "Compare revenue with fuel, operating, loan, and any carbon-fee expenses. Oil also pays for its emissions when a fee applies. Choose a rate that makes the next month profitable.",
+        hint: "Raise the rate in Insights and compare revenue with expenses before the month ends.",
         capstone: {
           preserveProgress: true,
           checkpoint: { dollarsPerkWh: 0.03 },
@@ -551,9 +547,9 @@ export const SCENARIOS = [
         card: "INSIGHTS",
         target: '#speedChangeButtons [aria-label="slow speed"]',
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to run the year",
+        action: "Tap 1× to watch customers respond",
         content: (
-          <TutorialPrompt text="Watch customers respond to your new rate." />
+          <TutorialPrompt text="Customers switch gradually; keep supply ahead of their growing demand." />
         ),
       },
       {
@@ -562,6 +558,7 @@ export const SCENARIOS = [
         content: <CustomerGrowthChallenge />,
         hint: "A modest discount below the market rate attracts customers. Check the financial forecast too: a rate that is too low can grow sales while losing money.",
         capstone: {
+          preserveProgress: true,
           success: pricingCapstoneSucceeded,
           failure: (s: AppStateType) =>
             hasBlackout(s) ||
@@ -683,10 +680,11 @@ export const SCENARIOS = [
       },
       {
         card: "INSIGHTS",
-        target: '#speedChangeButtons [aria-label="slow speed"]',
-        advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to run the year",
-        content: <TutorialPrompt text="The Manual has the deep dives." />,
+        nextLabel: "Start final challenge",
+        action: "Prevent the shortage you can see ahead",
+        content: (
+          <TutorialPrompt text="Start again before the blackout, then build enough generation to cover summer demand." />
+        ),
       },
       {
         card: "FACILITIES",
@@ -749,7 +747,7 @@ export const SCENARIOS = [
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_INTERTIES",
         action: "Tap Interties",
         content: (
-          <TutorialPrompt text="The interties tab shows what you can build." />
+          <TutorialPrompt text="Each line has a capacity limit and takes time to build." />
         ),
       },
       {
@@ -873,7 +871,7 @@ export const SCENARIOS = [
         target: ".powerExchangeSummary",
         action: "Compare available capacity with 500 MW",
         content: (
-          <TutorialPrompt text="Compare the line’s available capacity with its 500 MW rating. Hot, sunny weather can reduce what it carries." />
+          <TutorialPrompt text="Hot, sunny weather can reduce how much the line carries." />
         ),
       },
       {

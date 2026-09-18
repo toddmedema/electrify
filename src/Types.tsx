@@ -612,6 +612,8 @@ export interface TutorialStepType {
   // isn't replayed when stepping backwards, since nothing would undo it - navigation
   // belongs in `card`, which works in both directions
   onNext?: () => Action;
+  // Name an explicit transition when continuing starts a fresh challenge.
+  nextLabel?: string;
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;

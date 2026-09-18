@@ -1844,7 +1844,7 @@ export default class Insights extends React.Component<Props, State> {
               />
               {projection.blackoutTotalWh > 0 && (
                 <Typography className="insightsWarning" variant="body2">
-                  Forecasted shortfall: ~
+                  {MAX_FORECAST_YEARS}-year forecast shortfall: ~
                   {formatWattHours(projection.blackoutTotalWh)} of demand not
                   met · largest shortage{" "}
                   {formatWatts(projection.largestBlackout.peakW)}
