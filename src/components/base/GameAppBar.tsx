@@ -29,7 +29,6 @@ import ScenarioDetailsDialog from "./ScenarioDetailsDialog";
 import ConceptIcon from "./ConceptIcon";
 import MissionSummary from "./MissionSummary";
 import { EvidenceRequestType, EvidenceTargetType } from "../../Types";
-import { recordTutorialLeft } from "../../reducers/Tutorial";
 import { acknowledgeEvidence } from "../../reducers/UI";
 import { openEvidence } from "../../helpers/Evidence";
 import {
@@ -433,11 +432,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(setSpeed(speed));
     },
     onNextTutorial: (scenarioId: number) => {
-      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       startTutorial(dispatch, scenarioId);
     },
     onQuit: () => {
-      dispatch((_dispatch, getState) => recordTutorialLeft(getState().game));
       dispatch(quit());
     },
   };

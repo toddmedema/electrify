@@ -130,6 +130,9 @@ describe("authored tutorial capstones", () => {
     );
     // createGame loads the scenario's weather/economy fixtures used by initGame below.
     const baseline = createGame({ scenarioId: scenario.id });
+    // Entry preserves guided progress, so the lesson must already start at a loss-making rate.
+    expect(baseline.dollarsPerkWh).toBe(0.03);
+    expect(capstone(4).success(appState(baseline))).toBe(false);
     let game = gameReducer(undefined, start(scenario.id));
     game = gameReducer(game, delta({ tutorialStep: capstoneIndex }));
     game = gameReducer(

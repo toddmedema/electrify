@@ -70,3 +70,39 @@ test("closing a walkthrough offers a working way to the missions", async ({
     page.getByRole("heading", { name: "Choose a game" }),
   ).toBeVisible();
 });
+
+for (const explicitlyExit of [false, true]) {
+  test(`main menu records completion only after explicit Exit (exit=${explicitlyExit})`, async ({
+    page,
+  }) => {
+    await reachStartTimeStep(page);
+    await page
+      .getByRole("button", { name: "normal speed", exact: true })
+      .click();
+    await expect(
+      page.getByText("Reach midnight without a blackout"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "pause", exact: true }).click();
+    if (explicitlyExit) {
+      await page
+        .locator(".tutorialHud")
+        .getByRole("button", { name: "Exit", exact: true })
+        .click();
+      await expect(page.locator(".tutorialHud")).toBeHidden();
+    }
+    await page.getByRole("button", { name: "menu", exact: true }).click();
+    await page
+      .getByRole("menuitem", { name: "Main menu", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Start playing", exact: true })
+      .click();
+    if (explicitlyExit) {
+      await expect(
+        page.getByRole("heading", { name: "Choose a game" }),
+      ).toBeVisible();
+    } else {
+      await expect(page.getByText("Tap your gas plant")).toBeVisible();
+    }
+  });
+}
