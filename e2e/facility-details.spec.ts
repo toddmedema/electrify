@@ -4,7 +4,7 @@ import { openPane } from "./layout";
 // Exercise pane width rather than assuming a viewport implies a column count.
 // Only one project runs this explicit matrix to avoid duplicating it per project.
 for (const colorScheme of ["light", "dark"] as const) {
-  for (const width of [320, 390, 540, 768, 1024, 1440]) {
+  for (const width of [320, 390, 460, 540, 768, 1024, 1440]) {
     test(`expanded facility alignment at ${width}px in ${colorScheme}`, async ({
       page,
     }, testInfo) => {
@@ -40,39 +40,39 @@ for (const colorScheme of ["light", "dark"] as const) {
         ).toBeVisible();
         const geometry = await details.evaluate((element) => {
           const innerWidth = element.clientWidth - 32;
-          const grids = Array.from(element.querySelectorAll(".facilityStats"));
+          const groups = Array.from(element.querySelectorAll(".facilityStats"));
           return {
             innerWidth,
-            columns: grids.map(
-              (grid) =>
-                getComputedStyle(grid).gridTemplateColumns.split(" ").length,
-            ),
+            counts: groups.map((group) => group.children.length),
+            columns: groups.map((group) => {
+              const cells = Array.from(group.children);
+              const firstTop = cells[0].getBoundingClientRect().top;
+              return cells.filter(
+                (cell) =>
+                  Math.abs(cell.getBoundingClientRect().top - firstTop) < 1,
+              ).length;
+            }),
             overflow: Array.from(
               element.querySelectorAll<HTMLElement>(".facilityStat"),
             ).some((stat) => stat.scrollWidth > stat.clientWidth + 1),
-            aligned: grids.every((grid) => {
-              const rows = new Map<number, number[]>();
-              for (const stat of Array.from(
-                grid.querySelectorAll(".facilityStat:not(.facilityFuelTrend)"),
-              )) {
-                const top = Math.round(stat.getBoundingClientRect().top);
-                const values = rows.get(top) || [];
-                values.push(
-                  stat.querySelector("dd")!.getBoundingClientRect().top,
-                );
-                rows.set(top, values);
-              }
-              return Array.from(rows.values()).every(
-                (values) => Math.max(...values) - Math.min(...values) < 1,
-              );
+            grouped: Array.from(
+              element.querySelectorAll(".facilityStat"),
+            ).every((stat) => {
+              const label = stat.querySelector("dt")!.getBoundingClientRect();
+              const value = stat.querySelector("dd")!.getBoundingClientRect();
+              return Math.abs(value.top - label.bottom - 4) < 1;
             }),
           };
         });
-        const expectedColumns =
-          geometry.innerWidth >= 540 ? 3 : geometry.innerWidth >= 280 ? 2 : 1;
-        expect(geometry.columns).toEqual([expectedColumns, expectedColumns]);
+        const expectedColumns = Math.max(
+          1,
+          Math.floor((geometry.innerWidth + 16) / (132 + 16)),
+        );
+        expect(geometry.columns).toEqual(
+          geometry.counts.map((count) => Math.min(count, expectedColumns)),
+        );
         expect(geometry.overflow).toBe(false);
-        expect(geometry.aligned).toBe(true);
+        expect(geometry.grouped).toBe(true);
         const labels = row.locator(".facilityActionLabel");
         for (const label of await labels.all())
           await expect(label).toBeVisible();
@@ -103,18 +103,19 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const facilities = page.locator(".facilities:visible");
   await expect(facilities).toBeVisible();
-  const row = facilities
-    .locator(".facilityRow")
-    .filter({
-      has: page.locator(".facilityName", { hasText: /^Natural Gas$/ }),
-    });
+  const row = facilities.locator(".facilityRow").filter({
+    has: page.locator(".facilityName", { hasText: /^Natural Gas$/ }),
+  });
   await row.locator(".facilityDisclosure").click();
   const grid = row.locator(".facilityStats").first();
   const columns = () =>
-    grid.evaluate(
-      (element) =>
-        getComputedStyle(element).gridTemplateColumns.split(" ").length,
-    );
+    grid.evaluate((element) => {
+      const cells = Array.from(element.children);
+      const firstTop = cells[0].getBoundingClientRect().top;
+      return cells.filter(
+        (cell) => Math.abs(cell.getBoundingClientRect().top - firstTop) < 1,
+      ).length;
+    });
   await expect.poll(columns).toBe(1);
   expect(
     await row.evaluate(
@@ -124,12 +125,14 @@ test("expanded details reflow in a resized desktop pane and at 200% magnificatio
   const handle = page.getByRole("separator").first();
   await handle.focus();
   for (let i = 0; i < 35; i++) await page.keyboard.press("ArrowRight");
-  await expect.poll(columns).toBe(3);
+  await expect.poll(columns).toBeGreaterThanOrEqual(3);
+  const wideColumns = await columns();
   // CSS zoom magnifies text, controls and spacing together while the pane keeps its allotted width.
   await facilities.evaluate((element) => {
     (element as HTMLElement).style.zoom = "2";
   });
-  await expect.poll(columns).toBe(2);
+  await expect.poll(columns).toBeLessThan(wideColumns);
+  await expect.poll(columns).toBeGreaterThanOrEqual(1);
   expect(
     await row.evaluate(
       (element) => element.scrollWidth <= element.clientWidth + 1,

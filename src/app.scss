@@ -3298,10 +3298,8 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  // Container widths follow the actual pane, including user-resized desktop layouts.
   .facilityDetails {
     padding: 0 16px 16px;
-    container: facility-details / inline-size;
   }
 
   .facilityDetailSection {
@@ -3314,25 +3312,27 @@ html[data-theme="dark"] .uplot {
   }
 
   .facilityDetailHeading {
-    margin: 0 0 12px;
+    margin: 0 0 8px;
     font-size: 14px;
     line-height: 20px;
     font-weight: 600;
   }
 
   .facilityStats {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
     margin: 0;
   }
 
   .facilityStat {
+    // Fit as many readable cells as the pane allows, including during resizing.
+    flex: 1 1 132px;
     min-width: 0;
     overflow-wrap: anywhere;
 
     dt {
-      min-height: 32px;
+      margin: 0 0 4px;
       font-size: 12px;
       line-height: 16px;
       color: var(--font-color-faded);
@@ -3366,7 +3366,7 @@ html[data-theme="dark"] .uplot {
   }
 
   .facilityFuelTrend {
-    grid-column: 1 / -1;
+    flex-basis: 100%;
   }
 
   .facilityTrend {
@@ -4792,17 +4792,6 @@ $sizemap: (
   }
 }
 
-@container facility-details (min-width: 280px) {
-  .base_main .facilityStats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container facility-details (min-width: 540px) {
-  .base_main .facilityStats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 // Every row carries its reorder grip on the leading edge, always visible, with no label
 .base_main .facilityDragHandle {
   position: relative; // over the row's output bar
