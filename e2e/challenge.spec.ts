@@ -129,9 +129,7 @@ for (const theme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(start).toBeVisible();
-    await expect(
-      page.getByText("Shared score · unverified", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Expert", { exact: true })).toBeVisible();
     await expect(page.getByRole("group", { name: "Difficulty" })).toHaveCount(
       0,
     );

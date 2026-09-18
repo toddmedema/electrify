@@ -445,15 +445,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
                         Friend’s score: {formatScore(challenge.target)}
                       </strong>
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Shared score · unverified
-                    </Typography>
                     <Typography variant="body2">
-                      {DIFFICULTY_LABELS[game.difficulty]} · Fixed difficulty
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Same starting conditions. Your decisions change the
-                      outcome.
+                      {DIFFICULTY_LABELS[game.difficulty]}
                     </Typography>
                   </div>
                 ) : (
