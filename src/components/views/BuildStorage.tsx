@@ -266,8 +266,8 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
               },
               {
                 concept: "storage",
-                label: "Energy capacity",
-                value: `+${formatWattHours(storage.peakWh)} stored energy`,
+                label: "Energy storage",
+                value: formatWattHours(storage.peakWh),
               },
               {
                 concept: "supply",
