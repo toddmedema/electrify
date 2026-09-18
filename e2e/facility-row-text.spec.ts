@@ -105,7 +105,10 @@ for (const theme of ["light", "dark"]) {
       lineHeight: parseFloat(getComputedStyle(el).lineHeight),
     }));
     expect(layout.height).toBeLessThanOrEqual(layout.lineHeight + 1);
-      const idle = pane.getByRole("button", { name: "Inspect Solar", exact: true });
+    const idle = pane.getByRole("button", {
+      name: "Inspect Solar",
+      exact: true,
+    });
     await expect(idle.locator(".facilityStatus")).toContainText("idle");
     await expect(idle.locator(".MuiAvatar-root")).toHaveCSS(
       "opacity",

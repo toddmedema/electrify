@@ -18,7 +18,7 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -120,7 +120,7 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
-      return <PowerSettingsNewIcon style={style} />;
+      return <RemoveIcon style={style} />;
     case "CHARGING":
       return <ArrowUpwardIcon style={style} />;
     case "DISCHARGING":
