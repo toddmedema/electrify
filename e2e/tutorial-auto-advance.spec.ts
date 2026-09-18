@@ -104,7 +104,7 @@ for (const mission of [
         await rate.press("ArrowLeft");
         await expect(hud).toContainText("Find customer growth");
       } else {
-        await expect(hud).toContainText("Choose a measure or time period");
+        await expect(hud).toContainText("Change the chart time period");
         await page
           .getByRole("button", { name: "Zoom in", exact: true })
           .click();

@@ -142,6 +142,30 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
+  it.each([2, 5])(
+    "keeps mission %s on its reset disclosure even while time runs",
+    (id) => {
+      const steps = getScenario(id)!.tutorialSteps!;
+      const preparation = steps.length - 2;
+      const store = tutorialStore(steps, {
+        speed: "FAST",
+        tutorialStep: preparation,
+      });
+      store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
+      expect(store.getState().game.tutorialStep).toBe(preparation);
+      expect(store.getState().game.speed).toBe("SLOW");
+      expect(steps[preparation].nextLabel).toBe("Start final challenge");
+    },
+  );
+
+  it("keeps the chosen price and running clock when entering the customer challenge", () => {
+    const steps = getScenario(3)!.tutorialSteps!;
+    const store = tutorialStore(steps, { rate: 0.069, tutorialStep: 3 });
+    store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
+    expect(store.getState().game.tutorialStep).toBe(4);
+    expect(store.getState().game.dollarsPerkWh).toBe(0.069);
+    expect(store.getState().game.speed).toBe("SLOW");
+  });
   it.each([
     [2, "BUILD_STORAGE"],
     [112, "BUILD_INTERTIES"],
