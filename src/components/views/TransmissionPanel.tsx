@@ -1,5 +1,6 @@
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
+import { getScenario } from "../../data/Scenarios";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import CloseIcon from "@mui/icons-material/Close";
@@ -54,11 +55,14 @@ export function TransmissionTradingSummary({
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readOnly = !!game.replayPlayback;
   if (!state?.lines.length) return null;
+  const tutorialStep = getScenario(game.scenarioId, game.customScenario)
+    ?.tutorialSteps?.[game.tutorialStep];
   return (
     <details
       className="tradingSummary"
       open={
-        game.scenarioId === 112 && [3, 9].includes(game.tutorialStep)
+        game.scenarioId === 112 &&
+        (tutorialStep?.target === ".tradingPolicy" || !!tutorialStep?.capstone)
           ? true
           : undefined
       }

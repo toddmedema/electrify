@@ -269,7 +269,11 @@ describe("transmission actions", () => {
       expect(getTimeFromTimeline(state.date.minute, state.timeline)!.cash).toBe(
         startingCash - 36000000,
       );
-      expect(steps[1].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Tap Take loan")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       let constructionTicks = 0;
       while (state.transmission!.lines[0].yearsToBuildLeft > 0) {
@@ -279,17 +283,33 @@ describe("transmission actions", () => {
       state.speed = "NORMAL";
       expect(constructionTicks).toBeGreaterThanOrEqual(TICKS_PER_YEAR - 1);
       expect(constructionTicks).toBeLessThanOrEqual(TICKS_PER_YEAR + 1);
-      expect(steps[2].advanceOn?.(appState())).toBe(false);
+      expect(
+        steps
+          .find((step) => step.action === "Pause when the line says Connected")!
+          .advanceOn?.(appState()),
+      ).toBe(false);
       state.speed = "PAUSED";
-      expect(steps[2].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Pause when the line says Connected")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       state = cloneDeep(
         gameReducer(state, setTradingPolicy("RELIABILITY_FIRST")),
       );
       const gas = state.facilities.find(({ fuel }) => fuel === "Natural Gas")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
-      expect(steps[3].advanceOn?.(appState())).toBe(true);
-      expect(steps[5].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Choose “Buy for shortages only”")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Tap Pause on the gas plant")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
 
       const operatingTicks = [] as Array<{
         importedW: number;
@@ -306,7 +326,11 @@ describe("transmission actions", () => {
         });
       }
       state.speed = "PAUSED";
-      expect(steps[6].advanceOn?.(appState())).toBe(true);
+      expect(
+        steps
+          .find((step) => step.action === "Pause after an importing month")!
+          .advanceOn?.(appState()),
+      ).toBe(true);
       expect(
         state.monthlyHistory.some(
           (month) => (month.chartAverage?.importedW || 0) > 0,
@@ -316,7 +340,7 @@ describe("transmission actions", () => {
         false,
       );
 
-      const capstone = steps[9].capstone!;
+      const capstone = steps.find((step) => step.capstone)!.capstone!;
       state = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
       const solar = state.facilities.find(({ fuel }) => fuel === "Sun")!;
       state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));

@@ -835,15 +835,7 @@ export default class Facilities extends React.Component<Props> {
                             onPause={onPause}
                             onReprioritize={onReprioritize}
                             onSelect={onSelect}
-                            selected={
-                              (game.scenarioId === 5 &&
-                                [0, 4].includes(game.tutorialStep)) ||
-                              selectedFacilityId === g.id ||
-                              (game.scenarioId === 112 &&
-                                game.tutorialStep === 5 &&
-                                "fuel" in g &&
-                                g.fuel === "Natural Gas")
-                            }
+                            selected={selectedFacilityId === g.id}
                             storyOutputMultiplier={storyOutputMultiplierForFacility(
                               g,
                               storyEffects,

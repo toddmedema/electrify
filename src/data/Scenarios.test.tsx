@@ -105,7 +105,7 @@ describe("tutorial mission metadata", () => {
       expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
       expect.objectContaining({ fuel: "Natural Gas", peakW: 500000000 }),
     ]);
-    expect(interties.tutorialSteps).toHaveLength(10);
+    expect(interties.tutorialSteps).toHaveLength(15);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
@@ -166,25 +166,14 @@ describe("tutorial step actions", () => {
     });
   });
 
-  // A gated step has no Next button, and a step whose only way forward is Next has to say so.
-  // Steps that also advance on a deed may say either: their desktop layout can leave Next as
-  // the only way on, where the phone's tab tap does not exist
-  it("mentions Next only where there is one, and always where it's the only way on", () => {
-    allSteps.forEach(({ step, label }) => {
-      const gated = isGatedStep(step);
-      const onlyNext = !gated && !step.continueOn && !step.continueOnClick;
-      [step.action, step.desktop?.action]
-        .filter((action) => action !== undefined)
-        .forEach((action) => {
-          const saysNext = /\bNext\b/.test(action!);
-          // Steps that may also advance on a deed are free to say either
-          const allowed = gated ? [false] : onlyNext ? [true] : [true, false];
-          expect({ label, action, ok: allowed.includes(saysNext) }).toEqual({
-            label,
-            action,
-            ok: true,
-          });
-        });
+  it("does not combine sequential player actions in a step", () => {
+    allSteps.forEach(({ step }) => {
+      [step.action, step.desktop?.action].filter(Boolean).forEach((action) => {
+        expect(action).not.toMatch(
+          /,? then | and (?:tap|click|choose|drag|run)/i,
+        );
+        expect(isGatedStep(step) && /\bNext\b/.test(action!)).toBe(false);
+      });
     });
   });
 
