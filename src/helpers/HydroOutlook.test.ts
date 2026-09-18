@@ -116,7 +116,7 @@ test("a forecast that reaches the minimum level warns with the month", () => {
   });
   expect(status.tone).toBe("warn");
   expect(status.detail).toMatch(/It will run low around March/);
-  expect(status.detail).toMatch(/dispatch order/);
+  expect(status.detail).toMatch(/later in the dispatch order/);
   expect(
     describeHydroStatus({
       spilling: false,
@@ -175,4 +175,17 @@ test("a reservoir rising before a dry spell says the rise is temporary", () => {
     ],
   });
   expect(status).toMatchObject({ lead: "Filling for now.", tone: "warn" });
+});
+
+test("running low before the month ends says so", () => {
+  const status = describeHydroStatus({
+    spilling: false,
+    monthNumber: 1,
+    fraction: 0.4,
+    outlook: [
+      { monthNumber: 1, fraction: 0.4, snowpackMm: 0 },
+      { monthNumber: 1, fraction: 0.1, snowpackMm: 0 },
+    ],
+  });
+  expect(status.detail).toMatch(/will run low this month/);
 });

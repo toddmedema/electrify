@@ -111,6 +111,16 @@ export default function HydroWaterSection(props: {
     0,
   );
   const lowPoint = outlook?.[lowIndex];
+  // The combined level would contradict this dam's own Reservoir stat above, so it's only
+  // shown for a lone dam
+  const outlookLabel = [
+    fleet ? undefined : `Now ${percent(values[0])}`,
+    lowIndex > 0 && lowPoint
+      ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   // A line pressed flat against the baseline says nothing a sentence can't say better
   const emptyAllYear = values.every((value) => value <= 0.02);
 
@@ -144,7 +154,8 @@ export default function HydroWaterSection(props: {
             component="figcaption"
           >
             {fleet ? "All your dams, next 12 months" : "Next 12 months"}
-            {emptyAllYear && ": no refill expected"}
+            {/* A lone dam's status already says no refill is coming */}
+            {emptyAllYear && fleet && ": no refill expected"}
           </Typography>
           {!emptyAllYear && (
             <div className="facilityTrend">
@@ -158,17 +169,11 @@ export default function HydroWaterSection(props: {
                 lowMarker
                 ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${percent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${percent(lowPoint.fraction)}.`}
               />
-              <Typography variant="caption" color="textSecondary">
-                {/* The combined level would contradict this dam's own Reservoir stat above */}
-                {[
-                  fleet ? undefined : `Now ${percent(values[0])}`,
-                  lowIndex > 0
-                    ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`
-                    : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Typography>
+              {outlookLabel && (
+                <Typography variant="caption" color="textSecondary">
+                  {outlookLabel}
+                </Typography>
+              )}
             </div>
           )}
         </figure>

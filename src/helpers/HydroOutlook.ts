@@ -159,6 +159,13 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
   const runsLow = outlook?.find(
     (point, index) => index > 0 && point.fraction <= LOW_RESERVOIR_FRACTION,
   );
+  // The first forecast point closes the current month
+  const runsLowWhen =
+    runsLow &&
+    (outlook!.indexOf(runsLow) === 1 &&
+    runsLow.monthNumber === outlook![0].monthNumber
+      ? "this month"
+      : `around ${MONTH_NAMES[runsLow.monthNumber - 1]}`);
   if (refill) {
     detail = `Snow is holding water back; expect a refill around ${MONTH_NAMES[refill - 1]}.`;
   } else if (runsLow) {
@@ -168,7 +175,7 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
       // A reservoir rising now and running dry later needs both halves said, or they read as a
       // contradiction
       lead: change > TREND_THRESHOLD ? trend("Filling for now") : lead,
-      detail: `${fleet ? "They" : "It"} will run low around ${MONTH_NAMES[runsLow.monthNumber - 1]}. Moving ${fleet ? "a dam" : "it"} down the dispatch order saves water for later.`,
+      detail: `${fleet ? "They" : "It"} will run low ${runsLowWhen}. Moving ${fleet ? "a dam" : "it"} later in the dispatch order saves water for when you need it.`,
       tone: "warn",
     };
   } else if (

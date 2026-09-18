@@ -348,7 +348,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Once you own hydro, the <strong>Water</strong> chart shows
           precipitation, water held as snow, and reservoir levels. Winter snow
-          can delay water supply until spring.
+          can delay water supply until spring. Select a dam in your fleet to see
+          why its output is what it is and where its reservoir is heading over
+          the next year.
         </p>
         <p>
           <strong>Water rights</strong> require releases for farms, cities and

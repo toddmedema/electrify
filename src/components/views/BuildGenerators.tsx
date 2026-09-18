@@ -438,7 +438,12 @@ export function GeneratorBuildItem(
                 />
               )}
               <GeneratorDetailRow
-                label="Expected capacity factor"
+                // Lifetime cost still assumes average water years; this is the year ahead
+                label={
+                  waterShape
+                    ? "Capacity factor, this forecast"
+                    : "Expected capacity factor"
+                }
                 value={percent(capacityFactor)}
                 entry={MANUAL_ENTRY.CAPACITY_FACTOR}
               />
