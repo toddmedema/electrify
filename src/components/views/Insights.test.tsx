@@ -14,6 +14,7 @@ import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
+import { getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
@@ -571,6 +572,41 @@ describe("Insights layers", () => {
     };
 
     expect(points(established)).toBeLessThan(points(cheaper));
+  });
+
+  it("always counts a public rate's points over a full year, even as the run ends", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = within(
+        screen.getByRole("region", { name: "Planning controls" }),
+      ).getByText(/pts$/, {
+        selector: ".insightsRateMetricValue.insightsRateScore",
+      }).textContent;
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const established = {
+      ...game,
+      dollarsPerkWh: game.dollarsPerkWh - 0.02,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+    // One month left; the projection is the same one, so only the window could differ
+    const ending = {
+      ...established,
+      date: {
+        ...established.date,
+        monthsElapsed: getScenario(107)!.durationMonths - 1,
+      },
+    };
+
+    expect(points(ending)).toBe(points(established));
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {

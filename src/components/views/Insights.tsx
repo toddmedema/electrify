@@ -1381,18 +1381,13 @@ export default class Insights extends React.Component<Props, State> {
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
       : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
     // The score judges the lifetime average rate, so what a rate is worth is how far it moves
-    // that average over the coming year: the projection's next twelve months (or what is left of
-    // the run) added to the months already on the record. The projection was built at the current
-    // rate; other slider positions shift its revenue by the difference on the same energy.
+    // that average over the coming year: the projection's next twelve months added to the months
+    // already on the record. Always a full year, even near the end of a run, so the figure means
+    // the same thing every time. The projection was built at the current rate; other slider
+    // positions shift its revenue by the difference on the same energy.
     const upcoming = investor
       ? []
-      : this.getProjection(now).financeProjected.slice(
-          0,
-          Math.max(
-            1,
-            Math.min(12, scenario.durationMonths - game.date.monthsElapsed),
-          ),
-        );
+      : this.getProjection(now).financeProjected.slice(0, 12);
     const pastTotals = summarizeHistory(game.monthlyHistory);
     const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
     const nextRevenue = upcoming.reduce((sum, m) => sum + m.revenue, 0);
@@ -1475,7 +1470,7 @@ export default class Insights extends React.Component<Props, State> {
           color="textSecondary"
           aria-hidden="true"
         >
-          Base rate{" "}
+          Your rate{" "}
           <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
           {investor ? (
             <>
@@ -1496,7 +1491,7 @@ export default class Insights extends React.Component<Props, State> {
         </Typography>
         <div className="insightsRateMetrics" aria-hidden="true">
           <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Base rate</span>
+            <span className="insightsRateMetricLabel">Your rate</span>
             <strong className="insightsRateMetricValue">
               {formatRateCompact(game.dollarsPerkWh)}/kWh
             </strong>
