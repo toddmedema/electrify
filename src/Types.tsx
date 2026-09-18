@@ -176,7 +176,8 @@ export type CardNameType =
   | "NEW_GAME_DETAILS"
   | "MANUAL"
   | "SETTINGS"
-  | "CUSTOM_GAME";
+  | "CUSTOM_GAME"
+  | "CHALLENGE";
 
 export type ConceptNameType =
   | "money"
@@ -952,6 +953,8 @@ export interface PolicyChangeType {
   startHour?: number;
 }
 export interface GameType {
+  runIdentity?: RunIdentity;
+  challenge?: ChallengeInvitationV1;
   policies?: PoliciesType;
   policyPause?: { token: string; speed: SpeedType };
   seed: number;
@@ -1065,6 +1068,8 @@ export interface SnackbarType {
  * the moment the scenario ends; the rank and the score write are enrichment that lands later.
  */
 export interface VictoryType {
+  runIdentity?: RunIdentity;
+  challenge?: ChallengeInvitationV1;
   scenarioId: number;
   scenarioName: string;
   difficulty: DifficultyType;
@@ -1092,6 +1097,7 @@ export interface VictoryFleetCapacityType {
 
 /** A compact, serializable story of the run captured before the reducer's Immer draft expires. */
 export interface VictoryDebriefType {
+  demandWh?: number;
   startingFleet: VictoryFleetCapacityType[];
   finalFleet: VictoryFleetCapacityType[];
   startingCash: number;
@@ -1122,6 +1128,9 @@ export interface InsightsOriginType {
 }
 
 export interface UIType {
+  challengeHref?: string;
+  scenarioPreview?: number;
+  previewDifficulty?: DifficultyType;
   insightsConfigurationRevision?: number;
   evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
   evidenceJourneyMarker?: { id: number; runId: number };
@@ -1202,4 +1211,37 @@ export interface ScenarioChoiceType {
     /** False for a response that preserves the baseline without changing the operating plan. */
     meaningful?: boolean;
   }[];
+}
+
+/** Canonical initial inputs, captured before the first simulation tick. */
+export interface RunIdentity {
+  identitySchemaVersion: 1;
+  scenarioId: number;
+  scenarioRevision: string;
+  seed: number;
+  difficulty: DifficultyType;
+  compatibilityId: string;
+  origin: "authored" | "custom" | "tutorial" | "replay";
+  inputs: {
+    scenario: string;
+    location: LocationType;
+    facilities: ScenarioFacilityType[];
+    cash: number;
+    customers: number;
+    meaningfulDecisionGateWaived: boolean;
+  };
+}
+export interface AuthoredRunReferenceV1 {
+  identitySchemaVersion: 1;
+  scenarioId: number;
+  scenarioRevision: string;
+  seed: number;
+  difficulty: DifficultyType;
+  compatibilityId: string;
+  optionsProfile: "canonical-v1";
+}
+export interface ChallengeInvitationV1 {
+  invitationSchemaVersion: 1;
+  run: AuthoredRunReferenceV1;
+  target: number;
 }

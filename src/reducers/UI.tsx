@@ -7,7 +7,14 @@ import {
   EvidenceTargetType,
   EvidenceRequestType,
 } from "../Types";
-import { quit, start, resume, startReplay, loaded } from "./GameActions";
+import {
+  launchRun,
+  quit,
+  start,
+  resume,
+  startReplay,
+  loaded,
+} from "./GameActions";
 import { navigate, navigateBack } from "./Card";
 
 export const initialUI: UIType = {
@@ -141,6 +148,7 @@ export const uiSlice = createSlice({
           start.type,
           resume.type,
           startReplay.type,
+          launchRun.type,
           loaded.type,
           "game/initGame",
         ].includes(action.type),

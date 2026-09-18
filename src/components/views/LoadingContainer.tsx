@@ -64,7 +64,7 @@ let loadListeners: Array<{
   onError: (message: string) => void;
 }> = [];
 
-const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     load: async (
       game: GameType,
@@ -109,7 +109,9 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       // the location the run was recorded in on the slice, which is the only thing that keeps a
       // replay from being re-simulated somewhere else
       const location =
-        resumed || replaying ? game.location : getScenarioLocation(scenario);
+        resumed || replaying || game.runIdentity
+          ? game.location
+          : getScenarioLocation(scenario);
       if (!location) {
         reportError("We couldn't find the location data for this mission.");
         loadInProgress = false;
@@ -146,7 +148,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
               // A replay has to run on the seed it was recorded with. Otherwise only the custom
               // game screen sets one; every authored scenario leaves it undefined and draws a
               // fresh seed
-              seed: replaying ? game.seed : scenario.seed,
+              seed: replaying || game.runIdentity ? game.seed : scenario.seed,
             }),
           );
         }

@@ -1,3 +1,6 @@
+import { parseChallengeUrl } from "./helpers/Challenge";
+import { delta as uiDelta } from "./reducers/UI";
+import { logEvent } from "./Globals";
 import { traverseEvidenceJourney } from "./helpers/EvidenceJourney";
 import ScenarioChoiceDialog from "./components/base/ScenarioChoiceDialog";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
@@ -11,7 +14,7 @@ import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
 import { delta, loadProfile, reset } from "./reducers/User";
 import { SCENARIOS } from "./data/Scenarios";
-import { delta as gameDelta } from "./reducers/Game";
+
 import {
   scenarioDetailsUrl,
   scenarioFromSearch,
@@ -158,14 +161,26 @@ export default function App() {
     // site. The ref makes this safe under StrictMode's development effect replay.
     if (!scenarioRouteInitialized.current) {
       scenarioRouteInitialized.current = true;
-      const sharedScenario = scenarioFromSearch(window.location.search);
+      const challenge = parseChallengeUrl(window.location.href);
+      if (challenge) {
+        const href = window.location.href;
+        getHistoryApi().replaceState(null, "", scenarioListUrl());
+        store.dispatch(
+          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
+        );
+        store.dispatch(uiDelta({ challengeHref: href }));
+        store.dispatch(navigate({ name: "CHALLENGE", url: href }));
+        logEvent("challenge_view", { compatible: !!challenge.invitation });
+      }
+      const sharedScenario =
+        !challenge && scenarioFromSearch(window.location.search);
       if (sharedScenario) {
         const detailsUrl = scenarioDetailsUrl(sharedScenario.id);
         getHistoryApi().replaceState(null, "", scenarioListUrl());
         store.dispatch(
           navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
         );
-        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(uiDelta({ scenarioPreview: sharedScenario.id }));
         store.dispatch(navigate({ name: "NEW_GAME_DETAILS", url: detailsUrl }));
       }
     }
@@ -175,9 +190,18 @@ export default function App() {
         e.preventDefault();
         return;
       }
+      const challenge = parseChallengeUrl(window.location.href);
+      if (challenge) {
+        store.dispatch(uiDelta({ challengeHref: window.location.href }));
+        store.dispatch(
+          navigate({ name: "CHALLENGE", skipBrowserHistory: true }),
+        );
+        e.preventDefault();
+        return;
+      }
       const sharedScenario = scenarioFromSearch(window.location.search);
       if (sharedScenario) {
-        store.dispatch(gameDelta({ scenarioId: sharedScenario.id }));
+        store.dispatch(uiDelta({ scenarioPreview: sharedScenario.id }));
         store.dispatch(
           navigate({
             name: "NEW_GAME_DETAILS",

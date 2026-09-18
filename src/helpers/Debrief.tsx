@@ -88,6 +88,7 @@ export function buildVictoryDebrief(
       ? Math.max(0, Math.min(1, summary.supplyWh / summary.demandWh))
       : 1;
   return {
+    demandWh: summary.demandWh,
     startingFleet: fleetCapacity(scenario.facilities),
     finalFleet: fleetCapacity(facilities, true),
     startingCash: scenario.cash,

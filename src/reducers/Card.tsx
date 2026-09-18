@@ -1,8 +1,17 @@
+import type { Middleware } from "@reduxjs/toolkit";
+import type { AppStateType } from "../Types";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { getHistoryApi, logEvent } from "../Globals";
 import { NAVIGATION_DEBOUNCE_MS } from "../Constants";
 import { CardNameType, CardType, NavigateActionType } from "../Types";
-import { start, loaded, quit, resume, startReplay } from "./GameActions";
+import {
+  launchRun,
+  start,
+  loaded,
+  quit,
+  resume,
+  startReplay,
+} from "./GameActions";
 import type { RootState } from "../Store";
 
 /**
@@ -60,7 +69,7 @@ export const cardSlice = createSlice({
         toPrevious: false,
       };
     },
-    navigateBack: (state) => {
+    navigateBack: (state, _action: PayloadAction<CardNameType | undefined>) => {
       return {
         name: (state.history || [])[1] || "MAIN_MENU", // Look 2 back since first is current card
         ts: Date.now(),
@@ -70,6 +79,11 @@ export const cardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(launchRun, (state) => {
+      state.history = [];
+      state.name = "LOADING";
+      state.ts = Date.now();
+    });
     builder.addCase(start, (state) => {
       state = {
         name: "LOADING",
@@ -123,3 +137,16 @@ export const { navigate, navigateBack } = cardSlice.actions;
 export const selectCardName = (state: RootState) => state.card.name;
 
 export default cardSlice.reducer;
+
+/** Resolve Back before reducing, so the game knows whether its destination still blocks play. */
+export const navigationDestinationMiddleware: Middleware<
+  object,
+  AppStateType
+> = (api) => (next) => (action) => {
+  if (navigateBack.match(action))
+    return next({
+      ...action,
+      payload: api.getState().card.history?.[1] || "MAIN_MENU",
+    });
+  return next(action);
+};

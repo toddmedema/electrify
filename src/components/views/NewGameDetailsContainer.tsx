@@ -1,16 +1,21 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { start, delta, startReplay } from "../../reducers/Game";
+import { start, delta, quit, startReplay } from "../../reducers/Game";
 import { getHistoryApi } from "../../Globals";
 import { scenarioListUrl } from "../../ScenarioUrl";
-import { snackbarOpen } from "../../reducers/UI";
+import { store } from "../../Store";
+import { delta as uiDelta, snackbarOpen } from "../../reducers/UI";
 import { startWithSaveGuard } from "./StartGame";
 import { AppStateType, GameType, ReplayType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 
 const mapStateToProps = (state: AppStateType): StateProps => {
   return {
-    game: state.game,
+    game: {
+      ...state.game,
+      scenarioId: state.ui.scenarioPreview ?? state.game.scenarioId,
+      difficulty: state.ui.previewDifficulty ?? state.game.difficulty,
+    },
     uid: state.user.uid,
   };
 };
@@ -23,11 +28,16 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       getHistoryApi().back();
     },
     onDelta: (d: Partial<GameType>) => {
-      dispatch(delta(d));
+      dispatch(uiDelta({ previewDifficulty: d.difficulty }));
     },
     onStart: (scenarioId: number) => {
       startWithSaveGuard(dispatch, () => {
         getHistoryApi().replaceState(null, "", scenarioListUrl());
+        const difficulty =
+          store.getState().ui.previewDifficulty ??
+          store.getState().game.difficulty;
+        dispatch(quit());
+        dispatch(delta({ difficulty }));
         dispatch(start(scenarioId));
       });
     },

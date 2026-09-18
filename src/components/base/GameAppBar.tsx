@@ -373,6 +373,16 @@ export function GameAppBar(props: Props) {
           />
         )}
       </div>
+      {game.challenge && (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ px: 2, pb: 0.5 }}
+        >
+          Friend’s target: {game.challenge.target.toLocaleString("en-US")} ·
+          Shared score · unverified
+        </Typography>
+      )}
       <span className="srOnly" aria-live="polite">
         {gridHealth.announcement}
       </span>

@@ -41,7 +41,7 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "react-scripts build",
+    "build": "npm run compatibility:check && react-scripts build",
     "test": "react-scripts test",
     "test:ci": "react-scripts test --watchAll=false --coverage --testMatch=\"**/src/**/*.{spec,test}.{js,jsx,ts,tsx}\"",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
@@ -55,8 +55,10 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" --max-warnings=0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.js\" --fix",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run sim -- --all",
-    "deploy": "./scripts/deploy.sh"
+    "check": "npm run compatibility:check && npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run sim -- --all",
+    "deploy": "./scripts/deploy.sh",
+    "compatibility:generate": "node scripts/run-compatibility.js",
+    "compatibility:check": "node scripts/run-compatibility.js --check"
   },
   "eslintConfig": {
     "extends": [
@@ -112,7 +114,9 @@
     "node": ">= 24 < 25"
   },
   "jest": {
-    "extraGlobals": ["Math"],
+    "extraGlobals": [
+      "Math"
+    ],
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/**/*.test.{ts,tsx}",

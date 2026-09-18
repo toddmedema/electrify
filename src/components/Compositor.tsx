@@ -1,3 +1,4 @@
+import ChallengeLanding from "./views/ChallengeLanding";
 import {
   Button,
   Dialog,
@@ -501,6 +502,8 @@ export default class Compositor extends React.Component<Props, {}> {
         return <NewGameContainer />;
       case "NEW_GAME_DETAILS":
         return <NewGameDetailsContainer />;
+      case "CHALLENGE":
+        return <ChallengeLanding />;
       case "CUSTOM_GAME":
         return <CustomGameContainer />;
       default:

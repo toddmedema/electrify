@@ -63,7 +63,12 @@ describe("SaveGame", () => {
     "rejects an unsupported difficulty %p before resuming",
     (difficulty) => {
       const save = serializeSave(game);
-      expect(parseSave({ ...save, game: { ...game, difficulty } })).toBeNull();
+      expect(
+        parseSave({
+          ...save,
+          game: { ...game, runIdentity: undefined, difficulty },
+        }),
+      ).toBeNull();
     },
   );
 
@@ -72,7 +77,10 @@ describe("SaveGame", () => {
     (difficulty) => {
       const save = serializeSave(game);
       expect(
-        parseSave({ ...save, game: { ...game, difficulty } })?.game.difficulty,
+        parseSave({
+          ...save,
+          game: { ...game, runIdentity: undefined, difficulty },
+        })?.game.difficulty,
       ).toBe(difficulty);
     },
   );
@@ -418,7 +426,10 @@ describe("SaveGame", () => {
   it("ignores a save whose location isn't one", () => {
     const save = serializeSave(game);
     const withLocation = (location: unknown) =>
-      parseSave({ ...save, game: { ...save.game, location } });
+      parseSave({
+        ...save,
+        game: { ...save.game, runIdentity: undefined, location },
+      });
     expect(withLocation(undefined)).toBeNull();
     expect(withLocation({})).toBeNull();
     // Straight into `/data/weather/<id>.bin`

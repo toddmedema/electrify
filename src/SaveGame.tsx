@@ -1,4 +1,11 @@
 import {
+  validRunIdentity,
+  sameRunIdentity,
+  expandAuthoredRunReference,
+  normalizedInputs,
+} from "./helpers/RunIdentity";
+import { validInvitation } from "./helpers/Challenge";
+import {
   emptyPolicies,
   validPolicies,
   validDeferredResidential,
@@ -422,6 +429,28 @@ export function parseSave(raw: unknown): SaveGameType | null {
       revenueExports: t.revenueExports ?? 0,
     })),
   };
+  if (
+    normalized.runIdentity &&
+    (!validRunIdentity(normalized.runIdentity) ||
+      normalized.runIdentity.seed !== normalized.seed ||
+      normalized.runIdentity.scenarioId !== normalized.scenarioId ||
+      normalized.runIdentity.difficulty !== normalized.difficulty ||
+      normalizedInputs(normalized.location) !==
+        normalizedInputs(normalized.runIdentity.inputs.location) ||
+      normalized.meaningfulDecisionGateWaived ||
+      normalized.storyEffectsDisabled ||
+      normalized.customScenario)
+  )
+    return null;
+  if (
+    normalized.challenge &&
+    (!validInvitation(normalized.challenge) ||
+      !sameRunIdentity(
+        normalized.runIdentity,
+        expandAuthoredRunReference(normalized.challenge.run),
+      ))
+  )
+    return null;
   return { ...save, game: normalized } as SaveGameType;
 }
 

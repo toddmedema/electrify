@@ -1,4 +1,9 @@
 import {
+  captureRunIdentity,
+  projectAuthoredRunReference,
+} from "../helpers/RunIdentity";
+import { launchRun } from "./GameActions";
+import {
   hasChronicBlackouts,
   scenarioObjectiveFailure,
 } from "../helpers/ObjectiveRules";
@@ -225,7 +230,16 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
 let speedBeforeManualHelp: SpeedType | undefined;
-const BLOCKING_CARDS = new Set(["MANUAL", "BUILD_GENERATORS", "BUILD_STORAGE"]);
+const BLOCKING_CARDS = new Set([
+  "MAIN_MENU",
+  "MANUAL",
+  "BUILD_GENERATORS",
+  "BUILD_STORAGE",
+  "CHALLENGE",
+  "NEW_GAME",
+  "NEW_GAME_DETAILS",
+  "CUSTOM_GAME",
+]);
 // Tracks whether the self-rescheduling tick() loop is currently alive, so that any transition
 // out of PAUSED (manual speed click, tutorial script, dialog closing) reliably restarts it.
 let tickLoopRunning = false;
@@ -811,6 +825,22 @@ export const gameSlice = createSlice({
         policyPause: _policyPause,
         ...payload
       } = action.payload;
+      if (
+        state.runIdentity &&
+        [
+          "seed",
+          "difficulty",
+          "scenarioId",
+          "customScenario",
+          "location",
+          "storyEffectsDisabled",
+          "meaningfulDecisionGateWaived",
+        ].some((key) =>
+          Object.prototype.hasOwnProperty.call(action.payload, key),
+        )
+      ) {
+        state.runIdentity = undefined;
+      }
       const recorded = recordedDelta(action.payload);
       const rateBefore = state.dollarsPerkWh;
       Object.assign(state, payload);
@@ -846,6 +876,30 @@ export const gameSlice = createSlice({
       state.seed = a.seed !== undefined ? a.seed : newSeed();
       const scenario =
         getScenario(state.scenarioId, state.customScenario) || SCENARIOS[0];
+      const canonicalIdentity = captureRunIdentity(
+        scenario,
+        state.seed,
+        state.difficulty,
+        {
+          location: a.location,
+          facilities: a.facilities,
+          cash: a.cash,
+          customers: a.customers,
+          meaningfulDecisionGateWaived: !!state.meaningfulDecisionGateWaived,
+        },
+        state.replayPlayback
+          ? "replay"
+          : scenario.tutorialSteps
+            ? "tutorial"
+            : state.customScenario
+              ? "custom"
+              : "authored",
+      );
+      state.runIdentity =
+        !state.storyEffectsDisabled &&
+        projectAuthoredRunReference(canonicalIdentity)
+          ? canonicalIdentity
+          : undefined;
       const checkpoint =
         scenario.tutorialSteps?.[state.tutorialStep]?.capstone?.checkpoint;
       const startingCash = checkpoint?.cash ?? a.cash;
@@ -1059,7 +1113,25 @@ export const gameSlice = createSlice({
   // start, loaded and quit are declared in GameActions so that Card and UI can react to them
   // without importing this module -- see the note there
   extraReducers: (builder) => {
+    builder.addCase(launchRun, (_state, action) => {
+      const { identity, challenge } = action.payload;
+      if (!projectAuthoredRunReference(identity)) return;
+      speedBeforeBlockingCard = undefined;
+      speedBeforeManualHelp = undefined;
+      speedBeforeDialog = "PAUSED";
+      return {
+        ...cloneDeep(initialGame),
+        scenarioId: identity.scenarioId,
+        difficulty: identity.difficulty,
+        seed: identity.seed,
+        location: cloneDeep(identity.inputs.location),
+        runIdentity: cloneDeep(identity),
+        challenge: cloneDeep(challenge),
+      };
+    });
     builder.addCase(start, (state, action) => {
+      state.runIdentity = undefined;
+      state.challenge = undefined;
       state.scenarioId = action.payload;
       // An empty timeline is how the loading screen tells a new game from a resumed one, so make
       // that true by construction rather than by whichever paths happen to lead here
@@ -1159,7 +1231,10 @@ export const gameSlice = createSlice({
         state.speed = "PAUSED";
       }
     });
-    builder.addCase(navigateBack, restoreSpeedAfterBlockingCard);
+    builder.addCase(navigateBack, (state, action) => {
+      if (!action.payload || !BLOCKING_CARDS.has(action.payload))
+        restoreSpeedAfterBlockingCard(state);
+    });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
         speedBeforeManualHelp = state.speed;
@@ -1898,6 +1973,12 @@ export function tickState(state: GameType) {
         const difficulty = state.difficulty;
         const { id: scoredScenarioId, name: scenarioName } = scenario;
         const submitsScore = ranked;
+        const runIdentity = state.runIdentity
+          ? cloneDeep(state.runIdentity)
+          : undefined;
+        const challenge = state.challenge
+          ? cloneDeep(state.challenge)
+          : undefined;
         const replay = submitsScore ? serializeReplay(state) : undefined;
         const debrief = buildVictoryDebrief(
           scenario,
@@ -1920,6 +2001,11 @@ export function tickState(state: GameType) {
             difficulty,
             score: finalScore,
           });
+          if (challenge)
+            logEvent("challenge_complete", {
+              scenarioId: scoredScenarioId,
+              outcome,
+            });
         }
         setTimeout(() => {
           // In the timeout rather than here in the reducer: the autosave subscriber runs as soon
@@ -1933,6 +2019,8 @@ export function tickState(state: GameType) {
             getStore().getState().user.bests?.[String(scoredScenarioId)]?.score;
           getStore().dispatch(
             victoryOpen({
+              runIdentity,
+              challenge,
               scenarioId: scoredScenarioId,
               scenarioName,
               difficulty,
