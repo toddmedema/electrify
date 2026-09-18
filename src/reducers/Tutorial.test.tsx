@@ -12,7 +12,7 @@ import cardReducer from "./Card";
 import gameReducer from "./Game";
 import settingsReducer from "./Settings";
 import {
-  recordTutorialLeft,
+  recordTutorialExited,
   restartTutorialAtStep,
   selectTutorialHiddenUi,
   tutorialGateMiddleware,
@@ -294,22 +294,20 @@ describe("tutorialGateMiddleware", () => {
   });
 });
 
-describe("recordTutorialLeft", () => {
+describe("recordTutorialExited", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
   const steps = [informational(), informational()];
 
-  // Regression test. Start playing sends a player with no finished mission back into Mission 1,
-  // so leaving it unfinished used to make the rest of the missions unreachable
-  it("counts a walkthrough left partway as done", () => {
-    recordTutorialLeft(initialState(steps, { tutorialStep: 1 }).game);
+  it("counts a walkthrough explicitly exited partway as done", () => {
+    recordTutorialExited(initialState(steps, { tutorialStep: 1 }).game);
     expect(getPlayedScenarioIds()).toContain(CUSTOM_SCENARIO_ID);
   });
 
   it("doesn't count a finished or closed walkthrough a second time", () => {
-    recordTutorialLeft(
+    recordTutorialExited(
       initialState(steps, { tutorialStep: steps.length }).game,
     );
     expect(getPlayedScenarioIds()).toEqual([]);
@@ -317,11 +315,11 @@ describe("recordTutorialLeft", () => {
 
   it("ignores scenarios without a walkthrough, and replays", () => {
     const game = initialState(steps, { tutorialStep: 0 }).game;
-    recordTutorialLeft({
+    recordTutorialExited({
       ...game,
       customScenario: { ...DEFAULT_CUSTOM_SCENARIO, tutorialSteps: undefined },
     });
-    recordTutorialLeft({
+    recordTutorialExited({
       ...game,
       replayPlayback: {} as GameType["replayPlayback"],
     });

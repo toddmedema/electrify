@@ -395,7 +395,7 @@ export const SCENARIOS = [
     startingYear: 2019,
     cash: 220000000,
     feePerKgCO2e: 0,
-    dollarsPerkWh: 0.07,
+    dollarsPerkWh: 0.03,
     durationMonths: 1,
     endTitle: "Mission complete!",
     endMessage: "You read the books and tracked how the company makes money.",
@@ -457,6 +457,7 @@ export const SCENARIOS = [
         ),
         hint: "Compare revenue with fuel, operating, loan, and any carbon-fee expenses. Oil also pays for its emissions when a fee applies. Choose a rate that makes the next month profitable.",
         capstone: {
+          preserveProgress: true,
           checkpoint: { dollarsPerkWh: 0.03 },
           success: financesCapstoneSucceeded,
           failure: (s: AppStateType) =>

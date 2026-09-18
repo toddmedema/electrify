@@ -117,6 +117,23 @@ for (const mission of [
     await page.screenshot({
       path: testInfo.outputPath(`${mission}-advanced.png`),
     });
+    if (mission === "Finances") {
+      await page.locator("#insightsLayersButton").click();
+      await page
+        .getByRole("button", { name: "slow speed", exact: true })
+        .click();
+      await expect(hud).toContainText(
+        "Set a rate that turns next month’s loss into profit",
+      );
+      await expect(
+        page.getByRole("button", { name: "slow speed", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole("tooltip")).toBeHidden();
+      await page.screenshot({
+        path: testInfo.outputPath("finances-running.png"),
+      });
+    }
     if (mission === "Generators") {
       const progress = page.getByRole("progressbar", { name: "Year progress" });
       await expect(progress).toHaveAttribute("aria-valuenow", "0");
