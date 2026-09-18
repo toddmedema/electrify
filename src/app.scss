@@ -3347,6 +3347,31 @@ html[data-theme="dark"] .uplot {
     grid-column: 1 / -1;
   }
 
+  .facilityWaterOutlook {
+    margin: 12px 0 0;
+
+    figcaption {
+      margin: 0 0 4px;
+      font-size: 12px;
+      line-height: 16px;
+    }
+  }
+
+  // The one-sentence reason a dam is producing what it is, read before the numbers behind it
+  .facilityWaterStatus {
+    margin: 0 0 12px;
+
+    &.good {
+      color: $delta_good;
+    }
+    &.warn {
+      color: var(--warning-icon);
+    }
+    &.bad {
+      color: $delta_bad;
+    }
+  }
+
   .facilityTrend {
     display: flex;
     flex-wrap: wrap;
@@ -4375,6 +4400,33 @@ $sizemap: (
     margin: 0 !important;
     align-self: center;
     flex-shrink: 0;
+  }
+}
+
+// A once-only note above the first site-limited option; quieter than the cards it introduces.
+.buildPrimer {
+  margin: 0 8px 8px;
+  padding: 12px 12px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--interactive-tint);
+
+  h2 {
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  ul {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  li + li {
+    margin-top: 4px;
+  }
+  .MuiButton-root {
+    min-height: 40px;
+    margin-left: -8px;
   }
 }
 

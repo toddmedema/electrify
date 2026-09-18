@@ -37,15 +37,18 @@ import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import {
   getBuildAvailability,
+  getSiteInventory,
+  siteCountLabel,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
-import { GameType, StorageShoppingType } from "../../Types";
+import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
 interface StorageBuildItemProps {
   cash: number;
   interestRate: number;
+  location?: LocationType;
   storage: StorageShoppingType;
   onBuild: (financed: boolean) => void;
 }
@@ -65,11 +68,18 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
     LOAN_MONTHS,
   );
   const sizeBuildable = props.storage.peakWh <= props.storage.maxPeakWh;
-  const { buildable, secondaryText } = getBuildAvailability(
-    storage.description,
-    storage.available,
+  const { buildable, secondaryText } = getBuildAvailability({
+    name: storage.name,
+    description: storage.description,
+    available: storage.available,
     sizeBuildable,
-    `${formatWatts(storage.maxPeakWh)}h`,
+    maxSizeLabel: `${formatWatts(storage.maxPeakWh)}h`,
+    location: props.location,
+    viableLocationsRemaining: storage.viableLocationsRemaining,
+  });
+  const sites = getSiteInventory(
+    storage.name,
+    props.location,
     storage.viableLocationsRemaining,
   );
   const financingGap = Math.max(0, downpayment - cash);
@@ -129,6 +139,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         }
         title={storage.name}
       />
+      {buildable && sites && (
+        <Typography className="buildOptionContext" variant="body2">
+          {siteCountLabel(sites)}
+        </Typography>
+      )}
       {(!buildable || financingGap > 0) && (
         <Typography
           component="div"
@@ -219,9 +234,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                   {Number((storage.hourlyLoss * 100).toFixed(3))}%
                 </TableCell>
               </TableRow>
-              <ViableLocationsRow
-                remaining={storage.viableLocationsRemaining}
-              />
+              <ViableLocationsRow sites={sites} />
             </TableBody>
           </Table>
         </TableContainer>
@@ -279,6 +292,17 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                 label: "Round-trip efficiency",
                 value: `${Math.round(storage.roundTripEfficiency * 100)}%`,
               },
+              ...(sites
+                ? [
+                    {
+                      concept: "build" as const,
+                      label: "Project site",
+                      value: `Uses 1 of ${sites.remaining} left`,
+                      detail:
+                        "Each project takes a whole site, whatever its size.",
+                    },
+                  ]
+                : []),
             ]}
           />
           <Button
@@ -448,6 +472,7 @@ export default function StorageBuildDialog(props: Props): React.JSX.Element {
             key={i}
             cash={cash}
             interestRate={game.interestRate}
+            location={game.location}
             onBuild={(financed: boolean) => {
               props.onBuildStorage(g, financed);
               onBack();
