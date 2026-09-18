@@ -44,6 +44,20 @@ for (const colorScheme of ["light", "dark"] as const) {
           return {
             innerWidth,
             counts: groups.map((group) => group.children.length),
+            aligned: groups.every((group) => {
+              const cells = Array.from(
+                group.querySelectorAll(".facilityStat:not(.facilityFuelTrend)"),
+              ).map((cell) => cell.getBoundingClientRect());
+              const firstRow = cells.filter(
+                (cell) => Math.abs(cell.top - cells[0].top) < 1,
+              );
+              return cells.every(
+                (cell, index) =>
+                  Math.abs(cell.width - cells[0].width) < 1 &&
+                  Math.abs(cell.left - firstRow[index % firstRow.length].left) <
+                    1,
+              );
+            }),
             columns: groups.map((group) => {
               const cells = Array.from(group.children);
               const firstTop = cells[0].getBoundingClientRect().top;
@@ -72,6 +86,7 @@ for (const colorScheme of ["light", "dark"] as const) {
           geometry.counts.map((count) => Math.min(count, expectedColumns)),
         );
         expect(geometry.overflow).toBe(false);
+        expect(geometry.aligned).toBe(true);
         expect(geometry.grouped).toBe(true);
         const labels = row.locator(".facilityActionLabel");
         for (const label of await labels.all())
