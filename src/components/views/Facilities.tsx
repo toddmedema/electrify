@@ -18,7 +18,7 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import RemoveIcon from "@mui/icons-material/Remove";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -120,7 +120,7 @@ function activityIcon(activity: FacilityActivityType, color: string) {
     case "PAUSED":
       return <ConceptIcon concept="pause" style={style} />;
     case "IDLE":
-      return <PowerSettingsNewIcon style={style} />;
+      return <RemoveIcon style={style} />;
     case "CHARGING":
       return <ArrowUpwardIcon style={style} />;
     case "DISCHARGING":
@@ -319,6 +319,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const accentColor = facilityColor(fuel);
+  const capacityFraction = isStorage
+    ? facility.currentWh / facility.peakWh
+    : fuel === "Hydro" && facility.reservoirCapacityWh
+      ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
+      : null;
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
@@ -360,10 +365,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       );
     }
   }
-  // "Building 40%" already says what the construction badge does
-  const status = underConstruction
-    ? reading
-    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
+  // Output communicates normal operation; keep explicit labels for other states.
+  const status =
+    underConstruction || activity === "RUNNING"
+      ? reading
+      : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -441,16 +447,16 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <ListItemAvatar>
                   <div>
                     <Avatar
-                      className={facility.currentWh === 0 ? "offline" : ""}
+                      className={activity === "IDLE" ? "facilityIconIdle" : ""}
                       alt={facility.name}
                       src={`/images/${facilityIconName(facility)}.svg`}
                     />
-                    {facility.peakWh > 0 && !underConstruction && (
-                      <div className="capacityProgressBar">
+                    {capacityFraction !== null && !underConstruction && (
+                      <div className="capacityProgressBar" aria-hidden="true">
                         <div
                           className="capacityProgressBarFill"
                           style={{
-                            transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                            transform: `scaleY(${capacityFraction})`,
                             backgroundColor:
                               activity === "CHARGING"
                                 ? chartPalette().storage
