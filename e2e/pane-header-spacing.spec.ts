@@ -16,7 +16,11 @@ for (const colorScheme of ["light", "dark"] as const) {
         const status = (await page
           .locator(".gameStatusBar:visible")
           .boundingBox())!;
-        const header = (await pane.locator(".paneHeader").boundingBox())!;
+        // A compact Insights pane drops its title row and opens on the rate controls instead
+        const header = (await pane
+          .locator(".paneHeader:visible, .insightsLevers")
+          .first()
+          .boundingBox())!;
         expect(header.y).toBeCloseTo(status.y + status.height, 0);
         expect(header.y).toBeCloseTo(bar.y + bar.height, 0);
         if (

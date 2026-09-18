@@ -56,7 +56,7 @@ test("public insights retain the benchmark and an absolute customer objective", 
     );
     expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
     await expect(page.locator(".insightsRateMetricGrowth")).toContainText(
-      "Customer growth / yr",
+      "Fixed growth / yr",
     );
   }
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
