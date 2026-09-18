@@ -1343,6 +1343,16 @@ $pane_header_height: 48px;
   display: none;
 }
 
+// A public utility's rate score, coloured the way every other favourable or harmful change is
+.insightsRateScore {
+  &.good {
+    color: $delta_good;
+  }
+  &.bad {
+    color: $delta_bad;
+  }
+}
+
 .insightsRateSliderCollapsed {
   display: none;
 }
@@ -1688,13 +1698,6 @@ $pane_header_height: 48px;
         );
       gap: 4px;
       align-items: stretch;
-
-      &.insightsRateMetricsPublic {
-        grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.75fr) minmax(
-            0,
-            1.25fr
-          );
-      }
     }
 
     .insightsRateMetric {
@@ -1709,10 +1712,6 @@ $pane_header_height: 48px;
     .insightsRateMetric:first-child {
       padding-left: 0;
       border-left: 0;
-    }
-
-    .insightsRateMetricGrowth {
-      grid-column: 3;
     }
 
     .insightsRateMetricLabel,
@@ -1824,9 +1823,11 @@ $pane_header_height: 48px;
   }
 
   #yearProgressBar {
-    // Overlay the app bar's lower edge without adding a gap before the pane headers.
+    // Overlay the app bar's lower edge without adding a gap before the pane headers. The box
+    // hangs below the edge by its bottom padding, so the line itself sits on the status bar's
+    // bottom border rather than floating just above it.
     position: absolute;
-    inset: auto 0 0;
+    inset: auto 0 -4px;
     // Retain breathing room around the line for the tutorial's target ring.
     padding: 4px 0;
     pointer-events: none;

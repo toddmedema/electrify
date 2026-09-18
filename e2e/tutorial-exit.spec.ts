@@ -6,9 +6,7 @@ async function reachStartTimeStep(page: Page) {
   await page
     .getByRole("button", { name: "Start playing", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Tap 1× to start time")).toBeVisible();
 }
@@ -102,7 +100,7 @@ for (const explicitlyExit of [false, true]) {
         page.getByRole("heading", { name: "Choose a game" }),
       ).toBeVisible();
     } else {
-      await expect(page.getByText("Tap your gas plant")).toBeVisible();
+      await expect(page.getByText("Tap your coal plant")).toBeVisible();
     }
   });
 }

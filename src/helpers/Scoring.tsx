@@ -27,11 +27,20 @@ export function computeScoreBreakdown(
         blackouts: Math.round(-8 * blackoutsTWh),
       }
     : {
-        rate: Math.round(80 * 100 * (scenario.dollarsPerkWh - effectiveRate)),
+        rate: publicRateScore(scenario.dollarsPerkWh, effectiveRate),
         supply: Math.round((10 * summary.supplyWh) / 1000000000000),
         emissions: Math.round((-5 * summary.kgco2e) / 1000000000),
         blackouts: Math.round(-10 * blackoutsTWh),
       };
+}
+
+// A public utility earns this many points for each cent per kWh its lifetime average rate sits
+// below the scenario's target, and loses the same above it.
+export const PUBLIC_RATE_POINTS_PER_CENT = 80;
+
+/** The rate category of a public utility's score, for a lifetime average `rate` in $/kWh. */
+export function publicRateScore(targetRate: number, rate: number): number {
+  return Math.round(PUBLIC_RATE_POINTS_PER_CENT * 100 * (targetRate - rate));
 }
 
 export function totalScore(breakdown: ScoreBreakdownType): number {

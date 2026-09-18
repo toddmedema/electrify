@@ -44,7 +44,7 @@ test("generator capstone completes immediately after a different second purchase
   await page
     .locator(".facilityRow")
     .last()
-    .getByRole("button", { name: "Inspect Natural Gas", exact: true })
+    .getByRole("button", { name: "Inspect Coal", exact: true })
     .click();
   await expect(page.locator(".facilityDetails")).toBeVisible();
   await expect(

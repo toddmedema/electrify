@@ -26,6 +26,10 @@ const MISSION_ONE_FIRST_LOOK: TutorialUiIdType[] = [
   "speed",
 ];
 
+// Missions 2 and 3 hand over building, the clock and the menu, but still keep the player on the
+// fleet: navigation and the Insights and Events panes arrive with the Finances mission.
+const EARLY_MISSION_HIDDEN: TutorialUiIdType[] = ["nav", "sidePanes"];
+
 const hasBlackout = (state: AppStateType) =>
   state.game.eventLog.some((event) => event.kind === "BLACKOUT");
 
@@ -133,26 +137,28 @@ export const SCENARIOS = [
     endTitle: "Mission complete!",
     endMessage: "You kept the grid running for a full day.",
     facilities: [
-      { fuel: "Natural Gas", peakW: 410000000, initialAgeYears: 12 },
-      { fuel: "Sun", peakW: 300000000, initialAgeYears: 5 },
+      // Coal rather than gas: it cannot turn down below its minimum output, so the midday sun
+      // pushes supply visibly above demand instead of hiding the supply line under it. Sized so
+      // it still ramps fast enough to cover the evening without a shortfall.
+      { fuel: "Coal", peakW: 600000000, initialAgeYears: 12 },
+      { fuel: "Sun", peakW: 600000000, initialAgeYears: 5 },
     ],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
-        target: '[data-fuel="Natural Gas"] .facilityRowHeader',
+        target: '[data-fuel="Coal"] .facilityRowHeader',
         hideUi: MISSION_ONE_FIRST_LOOK,
         advanceOn: (s: AppStateType) =>
           s.ui.selectedFacilityId !== null &&
           s.ui.selectedFacilityId ===
             s.game.facilities.find(
-              (facility) =>
-                "fuel" in facility && facility.fuel === "Natural Gas",
+              (facility) => "fuel" in facility && facility.fuel === "Coal",
             )?.id,
         // Selection only opens row actions this mission keeps hidden, so let it go rather
         // than leave a lit row behind that the capstone's first tap would close
         onNext: () => selectFacility(null),
-        action: "Tap your gas plant",
+        action: "Tap your coal plant",
         content: (
           <TutorialPrompt text="These two plants keep San Francisco’s lights on. The bar shows how hard each is working." />
         ),
@@ -163,7 +169,7 @@ export const SCENARIOS = [
         hideUi: MISSION_ONE_FIRST_LOOK,
         action: "Find the supply and demand lines",
         content: (
-          <TutorialPrompt text="Supply must stay at or above demand. If demand climbs higher, the city goes dark." />
+          <TutorialPrompt text="Supply must stay at or above demand, or the city goes dark. Coal adjusts slowly, so supply can run above demand." />
         ),
       },
       {
@@ -180,7 +186,7 @@ export const SCENARIOS = [
         hideUi: MISSION_ONE_CAPSTONE,
         action: "Reach midnight without a blackout",
         content: (
-          <TutorialPrompt text="Watch how gas generation changes as sunlight fades." />
+          <TutorialPrompt text="Watch coal output climb slowly as sunlight fades." />
         ),
         hint: "Pause to inspect the chart, or speed up when you’re ready.",
         capstone: {
@@ -214,13 +220,12 @@ export const SCENARIOS = [
     durationMonths: 12,
     endTitle: "Mission complete!",
     endMessage: "You built your first generator and put it to work.",
-    facilities: [
-      { fuel: "Natural Gas", peakW: 500000000, initialAgeYears: 15 },
-    ],
+    facilities: [{ fuel: "Coal", peakW: 600000000, initialAgeYears: 15 }],
     tutorialSteps: [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_GENERATORS",
         action: "Tap Build",
@@ -230,6 +235,7 @@ export const SCENARIOS = [
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label^="Review purchase of"]',
         continueOn: (s: AppStateType) => s.game.facilities.length >= 2,
         continueOnClick: '[aria-label^="Review purchase of"]',
@@ -240,6 +246,7 @@ export const SCENARIOS = [
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[role="dialog"] .MuiDialogActions-root button',
         advanceOn: (s: AppStateType) => s.game.facilities.length >= 2,
         action: "Buy it with cash, or take a loan",
@@ -249,6 +256,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: ".facilityRowHeader:has(.constructionProgress)",
         action: "Find the construction progress",
         content: (
@@ -257,6 +265,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '#speedChangeButtons [aria-label="fast speed"]',
         advanceOn: (s: AppStateType) => s.game.speed === "FAST",
         action: "Tap 20× to start construction time",
@@ -266,6 +275,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: "#yearProgressBar",
         action: "Watch the year bar advance",
         content: (
@@ -274,18 +284,19 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         action: "Order a second generator of a different type",
         content: (
           <TutorialPrompt text="Compare when it can generate and what it costs to run. Choose a plant that adds a useful strength to your grid." />
         ),
-        hint: "Your starting gas plant does not count. Open Build and order a different type from your first purchase; you do not need to wait for construction.",
+        hint: "Your starting coal plant does not count. Open Build and order a different type from your first purchase; you do not need to wait for construction.",
         capstone: {
           preserveProgress: true,
           success: generatorCapstoneSucceeded,
           successMessage:
             "Final challenge complete—you ordered two different generator types. Their output and running costs will shape your grid.",
           failureMessage:
-            "Order a different generator type from your first purchase. Your starting gas plant does not count.",
+            "Order a different generator type from your first purchase. Your starting coal plant does not count.",
         },
       },
     ],
@@ -314,6 +325,7 @@ export const SCENARIOS = [
       {
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: ".button-buildFacility",
         advanceOn: (s: AppStateType) => s.card.name.startsWith("BUILD_"),
         action: "Tap Build",
@@ -321,6 +333,7 @@ export const SCENARIOS = [
       },
       {
         card: { name: "BUILD_GENERATORS", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: "#tab-BUILD_STORAGE",
         advanceOn: (s: AppStateType) => s.card.name === "BUILD_STORAGE",
         action: "Tap Storage",
@@ -330,6 +343,7 @@ export const SCENARIOS = [
       },
       {
         card: { name: "BUILD_STORAGE", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label^="Review purchase of"]',
         continueOn: (s: AppStateType) => s.game.facilities.length >= 3,
         continueOnClick: '[aria-label^="Review purchase of"]',
@@ -340,6 +354,7 @@ export const SCENARIOS = [
       },
       {
         card: { name: "BUILD_STORAGE", dontRemember: true },
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[role="dialog"] .MuiDialogActions-root button',
         advanceOn: (s: AppStateType) => s.game.facilities.length >= 3,
         action: "Buy it with cash, or take a loan",
@@ -349,6 +364,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target:
           '.facilityRowHeader[data-storage="true"]:has(.capacityProgressBar)',
         action: "Check the storage bar",
@@ -358,6 +374,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         target: '[aria-label="Reorder Coal"]',
         action: "Check generation comes before storage",
         content: (
@@ -366,6 +383,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         nextLabel: "Start final challenge",
         action: "Try storage through the evening peak",
         content: (
@@ -374,6 +392,7 @@ export const SCENARIOS = [
       },
       {
         card: "FACILITIES",
+        hideUi: EARLY_MISSION_HIDDEN,
         action: "Supply the evening peak with stored energy",
         content: (
           <TutorialPrompt text="Charge from spare generation, then keep supply above demand through the evening." />
