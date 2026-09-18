@@ -13,7 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  # Keep the short checks together to avoid paying for a separate install each.
+  static:
+    name: Static checks and simulation
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -35,43 +37,80 @@ jobs:
       # Each check runs even if an earlier one failed, so one PR run reports
       # every problem rather than only the first.
       - name: Types
-        if: '!cancelled()'
+        if: "!cancelled()"
         run: npm run typecheck
 
       - name: Lint
-        if: '!cancelled()'
+        if: "!cancelled()"
         run: npm run lint
 
       - name: Formatting
-        if: '!cancelled()'
+        if: "!cancelled()"
         run: npm run format:check
-
-      # No --passWithNoTests: if the jest config ever breaks so that no test
-      # matches, that should fail the build rather than report success.
-      - name: Tests
-        if: '!cancelled()'
-        run: npm run test:ci
 
       # The headless simulation asserts the economy's invariants across every
       # scenario. Simulation.test.tsx covers this too, but running the CLI keeps
       # the entry point itself honest.
       - name: Simulation
-        if: '!cancelled()'
+        if: "!cancelled()"
         run: npm run sim -- --all
 
-      - name: Production build
-        if: '!cancelled()'
-        run: npm run build
+  # Give the CPU-heavy covered suite and production compiler their own runners.
+  # Keep Jest coverage in one invocation so all existing thresholds still apply.
+  validation:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Tests
+            script: test:ci
+          - name: Production build
+            script: build
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - run: npm ci
+
+      # No --passWithNoTests: a broken testMatch must fail, not silently pass.
+      - run: npm run ${{ matrix.script }}
+
+  # Playwright starts its own dev server; it does not consume the production build.
+  browser:
+    name: Browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - run: npm ci
 
       - name: Install browser
-        id: browser
-        if: '!cancelled()'
         run: npx playwright install --with-deps chromium
 
       # Cover purchases, themes, tutorial progression and exit behavior on both
       # phone and desktop without running the entire responsive matrix per PR.
       - name: Browser smoke tests
-        if: "!cancelled() && steps.browser.outcome == 'success'"
         run: npm run test:e2e -- build-options.spec.ts tutorial-exit.spec.ts --project=desktop-chromium --project=mobile-390px --workers=2
 
       - name: Preserve browser failure diagnostics
@@ -82,3 +121,24 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Preserve the existing status-check name for branch rules. Run even when a
+  # dependency fails or is skipped, and accept only explicit success from all.
+  check:
+    if: always()
+    needs: [static, validation, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to pass
+        env:
+          STATIC_RESULT: ${{ needs.static.result }}
+          VALIDATION_RESULT: ${{ needs.validation.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: |
+          for result in "$STATIC_RESULT" "$VALIDATION_RESULT" "$BROWSER_RESULT"; do
+            if [ "$result" != success ]; then
+              echo "A required job did not succeed: $result" >&2
+              exit 1
+            fi
+          done
