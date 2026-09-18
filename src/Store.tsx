@@ -1,7 +1,7 @@
 import { configureStore, ThunkAction, Action } from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import { registerStore } from "./StoreRegistry";
-import cardReducer from "./reducers/Card";
+import cardReducer, { navigationDestinationMiddleware } from "./reducers/Card";
 import gameReducer from "./reducers/Game";
 import settingsReducer from "./reducers/Settings";
 import { tutorialGateMiddleware } from "./reducers/Tutorial";
@@ -40,7 +40,7 @@ export const store = configureStore({
           "game.replayLog",
         ],
       },
-    }).concat(tutorialGateMiddleware),
+    }).concat(tutorialGateMiddleware, navigationDestinationMiddleware),
 });
 
 export type AppStore = typeof store;

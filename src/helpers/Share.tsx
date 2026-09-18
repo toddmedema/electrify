@@ -1,4 +1,5 @@
 import numbro from "numbro";
+import { SCENARIOS } from "../data/Scenarios";
 
 // Sharing a score, which is the whole point of putting a name and a rank on the board. Kept out
 // of Globals so the text builder can be tested without a DOM and the transport without Firebase.
@@ -42,12 +43,19 @@ export function buildScoreShareContent(
     typeof window === "undefined"
       ? "https://electrifygame.com"
       : window.location.origin;
-  const scenario =
-    score.scenarioId === undefined ? "" : `scenario=${score.scenarioId}&`;
+  const scenario = SCENARIOS.some(
+    (s) => s.id === score.scenarioId && !s.tutorialSteps,
+  )
+    ? `scenario=${score.scenarioId}&`
+    : "";
+  const candidate = `${base}/?${scenario}utm_source=share`;
   return {
     title: `My ${score.scenarioName} score in Electrify`,
-    text: `${buildShareText(score)} Can you beat it?`,
-    url: `${base}/?${scenario}utm_source=share`,
+    text: buildShareText(score),
+    url:
+      candidate.length <= 2048
+        ? candidate
+        : `https://electrifygame.com/?${scenario}utm_source=share`,
   };
 }
 

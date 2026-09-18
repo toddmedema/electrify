@@ -1,3 +1,4 @@
+import type { RunIdentity, ChallengeInvitationV1 } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
 import type { GameType, ReplayType, PolicyChangeType } from "../Types";
 
@@ -25,6 +26,10 @@ export const closePolicyDecision = createAction<string>(
  * The type strings are the ones createSlice generated for a slice named "game", so devtools traces
  * and anything matching on action type are unaffected.
  */
+export const launchRun = createAction<{
+  identity: RunIdentity;
+  challenge?: ChallengeInvitationV1;
+}>("game/launchRun");
 export const start = createAction<number>("game/start");
 export const loaded = createAction("game/loaded");
 /**

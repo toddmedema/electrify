@@ -1,6 +1,7 @@
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
-import { delta, start, quit } from "../../reducers/Game";
+import { startTutorial, quit } from "../../reducers/Game";
+import { delta as uiDelta } from "../../reducers/UI";
 import { navigate } from "../../reducers/Card";
 import { scenarioDetailsUrl } from "../../ScenarioUrl";
 import { AppStateType, GameType } from "../../Types";
@@ -21,7 +22,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("CUSTOM_GAME"));
     },
     onDetails: (d: Partial<GameType>) => {
-      dispatch(delta(d));
+      dispatch(uiDelta({ scenarioPreview: d.scenarioId }));
       if (d.scenarioId !== undefined) {
         dispatch(
           navigate({
@@ -35,7 +36,7 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       dispatch(navigate("MANUAL"));
     },
     onTutorial: (scenarioId: number) => {
-      dispatch(start(scenarioId));
+      startTutorial(dispatch, scenarioId);
     },
   };
 };

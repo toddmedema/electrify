@@ -1,3 +1,5 @@
+import { simulationDataRequest } from "./SimulationDataIntegrity";
+
 /**
  * The reader for the two hand-maintained data files, public/data/EconomyRaw.csv and
  * public/data/FuelPricesRaw.csv.
@@ -64,7 +66,7 @@ export function parseCsv<T extends CsvRowType = CsvRowType>(csv: string): T[] {
 export function fetchCsv<T extends CsvRowType = CsvRowType>(
   url: string,
 ): Promise<T[]> {
-  return fetch(url)
+  return fetch(url, simulationDataRequest(url))
     .then((response: Response) => {
       if (!response.ok) {
         throw new Error(`${response.status} fetching ${url}`);

@@ -4,6 +4,7 @@ import { normalAt, randomAt, RANDOM_STREAM } from "../helpers/Math";
 import { getSunriseSunset } from "../helpers/DateTime";
 import { isValidLocationId } from "../helpers/Locations";
 import { decodeWeather } from "./WeatherBinary";
+import { simulationDataRequest } from "../helpers/SimulationDataIntegrity";
 
 // The first year any location has data for, Jan 1st. Everything after the recorded years is
 // forecast indefinitely, but nothing exists to run backwards from, so this is the floor on when a
@@ -313,7 +314,10 @@ export function initWeather(
   }
   Promise.all(
     ids.map((id) =>
-      fetch(`/data/weather/${id}.bin`).then((response: Response) => {
+      fetch(
+        `/data/weather/${id}.bin`,
+        simulationDataRequest(`/data/weather/${id}.bin`),
+      ).then((response: Response) => {
         if (!response.ok) {
           throw new Error(`${response.status} fetching ${id}'s weather file`);
         }

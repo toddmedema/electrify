@@ -40,6 +40,7 @@ import { getScenarioLocation } from "../../helpers/Locations";
 import { prefetchScenarioData } from "../../helpers/OfflineData";
 import { decodeReplay } from "../../Replay";
 import {
+  ChallengeInvitationV1,
   DifficultyType,
   GameType,
   LocationType,
@@ -59,6 +60,8 @@ function formatDifficulty(difficulty: string): string {
 }
 
 export interface StateProps {
+  challenge?: ChallengeInvitationV1;
+  onContinue?: () => void;
   game: GameType;
   uid?: string;
 }
@@ -128,6 +131,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
    * incentive it exists to create.
    */
   private async loadBoard() {
+    if (this.props.challenge) return;
     const scenario = this.state.scenario;
     if (!scenario) {
       return;
@@ -294,6 +298,18 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   public componentDidUpdate(prevProps: Props) {
+    if (this.props.game.scenarioId !== prevProps.game.scenarioId) {
+      const scenario =
+        getScenario(
+          this.props.game.scenarioId,
+          this.props.game.customScenario,
+        ) || null;
+      this.setState(
+        { scenario, location: getScenarioLocation(scenario) || null },
+        () => this.loadBoard(),
+      );
+      return;
+    }
     if (this.props.game.difficulty !== prevProps.game.difficulty) {
       this.loadBoard();
       if (this.props.uid) {
@@ -311,7 +327,8 @@ export default class NewGameDetails extends React.Component<Props, State> {
   }
 
   public render() {
-    const { onBack, onDelta, onStart, game, uid } = this.props;
+    const { onBack, onDelta, onStart, game, uid, challenge, onContinue } =
+      this.props;
     const {
       scenario,
       scores,
@@ -373,7 +390,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
               <ArrowBackIosIcon />
             </IconButton>
             <Typography component="div" variant="h6">
-              Game details
+              {challenge ? "Friend challenge" : "Game details"}
             </Typography>
           </Toolbar>
         </div>
@@ -421,38 +438,58 @@ export default class NewGameDetails extends React.Component<Props, State> {
                 </BriefingFact>
               </div>
               <div className="scenarioStartControls">
-                <div className="difficultyPicker">
-                  <ToggleButtonGroup
-                    exclusive
-                    value={game.difficulty}
-                    size="small"
-                    color="primary"
-                    aria-label="Difficulty"
-                    onChange={(_event, difficulty: DifficultyType | null) => {
-                      if (difficulty) {
-                        onDelta({ difficulty });
-                      }
-                    }}
-                  >
-                    {Object.keys(DIFFICULTIES).map((d: string) => (
-                      <ToggleButton
-                        value={d}
-                        key={d}
-                        title={DIFFICULTIES[d].description}
-                        aria-label={DIFFICULTY_LABELS[d]}
-                      >
-                        {DIFFICULTY_LABELS[d]}
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
-                  <Typography
-                    className="difficultyDescription"
-                    variant="body2"
-                    color="textSecondary"
-                  >
-                    {DIFFICULTIES[game.difficulty].description}
-                  </Typography>
-                </div>
+                {challenge ? (
+                  <div className="difficultyPicker">
+                    <Typography variant="body1">
+                      <strong>
+                        Friend’s score: {formatScore(challenge.target)}
+                      </strong>
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Shared score · unverified
+                    </Typography>
+                    <Typography variant="body2">
+                      {DIFFICULTY_LABELS[game.difficulty]} · Fixed difficulty
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Same starting conditions. Your decisions change the
+                      outcome.
+                    </Typography>
+                  </div>
+                ) : (
+                  <div className="difficultyPicker">
+                    <ToggleButtonGroup
+                      exclusive
+                      value={game.difficulty}
+                      size="small"
+                      color="primary"
+                      aria-label="Difficulty"
+                      onChange={(_event, difficulty: DifficultyType | null) => {
+                        if (difficulty) {
+                          onDelta({ difficulty });
+                        }
+                      }}
+                    >
+                      {Object.keys(DIFFICULTIES).map((d: string) => (
+                        <ToggleButton
+                          value={d}
+                          key={d}
+                          title={DIFFICULTIES[d].description}
+                          aria-label={DIFFICULTY_LABELS[d]}
+                        >
+                          {DIFFICULTY_LABELS[d]}
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                    <Typography
+                      className="difficultyDescription"
+                      variant="body2"
+                      color="textSecondary"
+                    >
+                      {DIFFICULTIES[game.difficulty].description}
+                    </Typography>
+                  </div>
+                )}
                 <Button
                   className="scenarioStartButton"
                   size="large"
@@ -462,9 +499,12 @@ export default class NewGameDetails extends React.Component<Props, State> {
                   autoFocus
                   startIcon={<PlayCircleIcon />}
                 >
-                  Start game
+                  {challenge ? "Start challenge" : "Start game"}
                 </Button>
               </div>
+              {onContinue && (
+                <Button onClick={onContinue}>Continue saved game</Button>
+              )}
             </div>
           </section>
 
@@ -507,101 +547,106 @@ export default class NewGameDetails extends React.Component<Props, State> {
             </DialogActions>
           </Dialog>
 
-          <div className="leaderboard">
-            <Table id="HighScores">
-              <TableHead>
-                <TableRow>
-                  <TableCell colSpan={scoreColumnCount}>
-                    <Typography variant="h6">
-                      {leaderboardExpanded
-                        ? "Leaderboard — All levels"
-                        : `Leaderboard — ${DIFFICULTY_LABELS[game.difficulty]}`}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="rank">#</TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Score</TableCell>
-                  {leaderboardExpanded && <TableCell>Level</TableCell>}
-                  <TableCell className="replay">Replay</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {myTopScore && (
-                  <TableRow
-                    sx={{ fontWeight: "bold", bgcolor: "action.selected" }}
-                  >
-                    <TableCell className="rank" />
-                    <TableCell>Your best</TableCell>
-                    <TableCell>{formatScore(myTopScore.score)}</TableCell>
-                    {leaderboardExpanded && (
-                      <TableCell>
-                        {formatDifficulty(myTopScore.difficulty)}
-                      </TableCell>
-                    )}
-                    {this.renderReplayCell(myTopScore)}
-                  </TableRow>
-                )}
-                {!visibleScores && (
+          {!challenge && (
+            <div className="leaderboard">
+              <Table id="HighScores">
+                <TableHead>
                   <TableRow>
                     <TableCell colSpan={scoreColumnCount}>
-                      <Typography variant="body2" color="textSecondary">
-                        Loading...
+                      <Typography variant="h6">
+                        {leaderboardExpanded
+                          ? "Leaderboard — All levels"
+                          : `Leaderboard — ${DIFFICULTY_LABELS[game.difficulty]}`}
                       </Typography>
                     </TableCell>
                   </TableRow>
-                )}
-                {visibleScores && visibleScores.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={scoreColumnCount}>
-                      <Typography variant="body2" color="textSecondary">
-                        {visibleBoardFailed
-                          ? "Couldn't load the high scores right now."
-                          : "Finish this game to join the leaderboard"}
-                      </Typography>
-                    </TableCell>
+                    <TableCell className="rank">#</TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Score</TableCell>
+                    {leaderboardExpanded && <TableCell>Level</TableCell>}
+                    <TableCell className="replay">Replay</TableCell>
                   </TableRow>
-                )}
-                {visibleScores &&
-                  visibleScores.map((score: ScoreType, i: number) => {
-                    const mine = Boolean(uid) && score.uid === uid;
-                    return (
-                      <TableRow
-                        key={i}
-                        sx={
-                          mine
-                            ? { fontWeight: "bold", bgcolor: "action.selected" }
-                            : undefined
-                        }
-                      >
-                        <TableCell className="rank">{i + 1}</TableCell>
-                        {/* Scores set before display names existed carry no name */}
+                </TableHead>
+                <TableBody>
+                  {myTopScore && (
+                    <TableRow
+                      sx={{ fontWeight: "bold", bgcolor: "action.selected" }}
+                    >
+                      <TableCell className="rank" />
+                      <TableCell>Your best</TableCell>
+                      <TableCell>{formatScore(myTopScore.score)}</TableCell>
+                      {leaderboardExpanded && (
                         <TableCell>
-                          {score.displayName || "Anonymous"}
+                          {formatDifficulty(myTopScore.difficulty)}
                         </TableCell>
-                        <TableCell>{formatScore(score.score)}</TableCell>
-                        {leaderboardExpanded && (
+                      )}
+                      {this.renderReplayCell(myTopScore)}
+                    </TableRow>
+                  )}
+                  {!visibleScores && (
+                    <TableRow>
+                      <TableCell colSpan={scoreColumnCount}>
+                        <Typography variant="body2" color="textSecondary">
+                          Loading...
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {visibleScores && visibleScores.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={scoreColumnCount}>
+                        <Typography variant="body2" color="textSecondary">
+                          {visibleBoardFailed
+                            ? "Couldn't load the high scores right now."
+                            : "Finish this game to join the leaderboard"}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {visibleScores &&
+                    visibleScores.map((score: ScoreType, i: number) => {
+                      const mine = Boolean(uid) && score.uid === uid;
+                      return (
+                        <TableRow
+                          key={i}
+                          sx={
+                            mine
+                              ? {
+                                  fontWeight: "bold",
+                                  bgcolor: "action.selected",
+                                }
+                              : undefined
+                          }
+                        >
+                          <TableCell className="rank">{i + 1}</TableCell>
+                          {/* Scores set before display names existed carry no name */}
                           <TableCell>
-                            {formatDifficulty(score.difficulty)}
+                            {score.displayName || "Anonymous"}
                           </TableCell>
-                        )}
-                        {this.renderReplayCell(score)}
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </Table>
-            {scores !== undefined && (
-              <div className="leaderboardToggle">
-                <Button size="small" onClick={() => this.toggleLeaderboard()}>
-                  {leaderboardExpanded ? "Show top 3" : "View all scores"}
-                </Button>
-              </div>
-            )}
-          </div>
+                          <TableCell>{formatScore(score.score)}</TableCell>
+                          {leaderboardExpanded && (
+                            <TableCell>
+                              {formatDifficulty(score.difficulty)}
+                            </TableCell>
+                          )}
+                          {this.renderReplayCell(score)}
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+              {scores !== undefined && (
+                <div className="leaderboardToggle">
+                  <Button size="small" onClick={() => this.toggleLeaderboard()}>
+                    {leaderboardExpanded ? "Show top 3" : "View all scores"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           {/* Below the board rather than in place of it: the board is the reason to log in */}
-          {!uid && (
+          {!challenge && !uid && (
             <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
               <Button variant="outlined" color="primary" onClick={login}>
                 Sign in with Google

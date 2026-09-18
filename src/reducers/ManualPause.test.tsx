@@ -128,3 +128,16 @@ describe("contextual manual help", () => {
     ).toBe("PAUSED");
   });
 });
+
+it("keeps Back paused in mission previews until returning to play", () => {
+  gameReducer(undefined, quit());
+  let state = gameReducer(running("FAST"), navigate("CHALLENGE"));
+  state = gameReducer(state, navigate("NEW_GAME"));
+  state = gameReducer(state, navigate("NEW_GAME_DETAILS"));
+  state = gameReducer(state, navigateBack("NEW_GAME"));
+  expect(state.speed).toBe("PAUSED");
+  state = gameReducer(state, navigate("CUSTOM_GAME"));
+  state = gameReducer(state, navigateBack("NEW_GAME"));
+  expect(state.speed).toBe("PAUSED");
+  expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("FAST");
+});
