@@ -1,6 +1,10 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { MonthlyHistoryType, ScenarioType } from "../Types";
-import { computeScoreBreakdown, totalScore } from "./Scoring";
+import {
+  computeScoreBreakdown,
+  publicRateScoreChange,
+  totalScore,
+} from "./Scoring";
 import { EMPTY_HISTORY } from "./DateTime";
 
 it("gives a public utility that supplied no electricity a finite score", () => {
@@ -49,4 +53,40 @@ it("counts purchased emissions in the score just like the same local total", () 
   });
   expect(imports.emissions).toBe(-2);
   expect(imports).toEqual(local);
+});
+
+describe("publicRateScoreChange", () => {
+  const kWh = (n: number) => n * 1000;
+
+  it("credits a first year the full distance of its rate from the target", () => {
+    // Nothing sold yet: the category starts neutral, then lands on the year's own average
+    expect(
+      publicRateScoreChange(
+        0.1,
+        { revenue: 0, supplyWh: 0 },
+        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
+      ),
+    ).toBe(160);
+  });
+
+  it("moves an established average less than a fresh one", () => {
+    // Three years at the target, then one at 2¢ under: the average only falls by 0.5¢
+    expect(
+      publicRateScoreChange(
+        0.1,
+        { revenue: 0.1 * 3000, supplyWh: kWh(3000) },
+        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
+      ),
+    ).toBe(40);
+  });
+
+  it("takes points back when a cheap history is followed by a dear year", () => {
+    expect(
+      publicRateScoreChange(
+        0.1,
+        { revenue: 0.08 * 1000, supplyWh: kWh(1000) },
+        { revenue: 0.12 * 1000, supplyWh: kWh(1000) },
+      ),
+    ).toBe(-160);
+  });
 });

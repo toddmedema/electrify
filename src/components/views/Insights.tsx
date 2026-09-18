@@ -59,6 +59,7 @@ import {
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
   reduceHistories,
+  summarizeHistory,
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
@@ -116,7 +117,7 @@ import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
-  publicRateScore,
+  publicRateScoreChange,
 } from "../../helpers/Scoring";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
@@ -1379,7 +1380,28 @@ export default class Insights extends React.Component<Props, State> {
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
       : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
-    const rateScore = (rate: number) => publicRateScore(targetRate, rate);
+    // The score judges the lifetime average rate, so what a rate is worth is how far it moves
+    // that average over the coming year: the projection's next twelve months (or what is left of
+    // the run) added to the months already on the record. The projection was built at the current
+    // rate; other slider positions shift its revenue by the difference on the same energy.
+    const upcoming = investor
+      ? []
+      : this.getProjection(now).financeProjected.slice(
+          0,
+          Math.max(
+            1,
+            Math.min(12, scenario.durationMonths - game.date.monthsElapsed),
+          ),
+        );
+    const pastTotals = summarizeHistory(game.monthlyHistory);
+    const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
+    const nextRevenue = upcoming.reduce((sum, m) => sum + m.revenue, 0);
+    const rateScore = (rate: number) =>
+      publicRateScoreChange(targetRate, pastTotals, {
+        supplyWh: nextSupplyWh,
+        revenue:
+          nextRevenue + (rate - game.dollarsPerkWh) * (nextSupplyWh / 1000),
+      });
     const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
     const marks = investor
       ? [
@@ -1426,7 +1448,7 @@ export default class Insights extends React.Component<Props, State> {
     );
     const rateSummary = investor
       ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} if this is your lifetime average. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it.`;
+      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} over the next year at this rate. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it.`;
     const rateScoreClass = `insightsRateScore ${
       rateScore(game.dollarsPerkWh) > 0
         ? "good"
@@ -1465,8 +1487,10 @@ export default class Insights extends React.Component<Props, State> {
             <>
               {" "}
               · target {formatMoneyConcise(targetRate)} · rate score{" "}
-              <strong className={rateScoreClass}>{formattedRateScore}</strong>{" "}
-              as a lifetime average ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢)
+              <strong className={rateScoreClass}>
+                {formattedRateScore}/yr
+              </strong>{" "}
+              ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢ of lifetime average)
             </>
           )}
         </Typography>
@@ -1494,7 +1518,7 @@ export default class Insights extends React.Component<Props, State> {
             </span>
           ) : (
             <span className="insightsRateMetric">
-              <span className="insightsRateMetricLabel">Rate score</span>
+              <span className="insightsRateMetricLabel">Points / yr</span>
               <strong className={`insightsRateMetricValue ${rateScoreClass}`}>
                 {formattedRateScore}
               </strong>
@@ -1532,12 +1556,12 @@ export default class Insights extends React.Component<Props, State> {
             valueLabelFormat={(rate) =>
               investor
                 ? `${formatMoneyConcise(rate)}/kWh`
-                : `${formatMoneyConcise(rate)}/kWh · ${formatRateScore(rateScore(rate))}`
+                : `${formatMoneyConcise(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
             }
             getAriaValueText={(rate) =>
               investor
                 ? `${formatMoneyConcise(rate)} per kilowatt hour`
-                : `${formatMoneyConcise(rate)} per kilowatt hour, rate score ${formatRateScore(rateScore(rate))}`
+                : `${formatMoneyConcise(rate)} per kilowatt hour, rate score ${formatRateScore(rateScore(rate))} over the next year`
             }
             marks={marks}
             min={0}

@@ -509,7 +509,7 @@ describe("Insights layers", () => {
     generate.mockRestore();
   });
 
-  it("shows a public utility the score its rate earns instead of market terms", () => {
+  it("shows a public utility the points its rate earns over the next year", () => {
     const game = createGame({ scenarioId: 107 });
     const target = game.dollarsPerkWh;
     renderInsights(107, { ...game, dollarsPerkWh: target - 0.02 });
@@ -519,15 +519,14 @@ describe("Insights layers", () => {
     expect(levers).not.toHaveTextContent(/market/i);
     expect(levers).not.toHaveTextContent(/growth/i);
     expect(within(levers).getByText("Target")).toBeInTheDocument();
-    expect(within(levers).getByText("Rate score")).toBeInTheDocument();
-    // 80 points per cent below the target
-    expect(
-      within(levers).getByText("+160 pts", {
-        selector: ".insightsRateMetricValue",
-      }),
-    ).toHaveClass("good");
+    expect(within(levers).getByText("Points / yr")).toBeInTheDocument();
+    const points = within(levers).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^\+\d+ pts$/);
+    expect(points).toHaveClass("good");
     expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
-      /rate score \+160 pts/i,
+      /rate score \+\d+ pts over the next year/i,
     );
   });
 
@@ -535,11 +534,43 @@ describe("Insights layers", () => {
     const game = createGame({ scenarioId: 107 });
     renderInsights(107, { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 });
 
-    expect(
-      within(
-        screen.getByRole("region", { name: "Planning controls" }),
-      ).getByText("−80 pts", { selector: ".insightsRateMetricValue" }),
-    ).toHaveClass("bad");
+    const points = within(
+      screen.getByRole("region", { name: "Planning controls" }),
+    ).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^−\d+ pts$/);
+    expect(points).toHaveClass("bad");
+  });
+
+  it("shows a year's rate moving a long record's score less", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = Number(
+        within(screen.getByRole("region", { name: "Planning controls" }))
+          .getByText(/pts$/, {
+            selector: ".insightsRateMetricValue.insightsRateScore",
+          })
+          .textContent!.replace(/[^\d]/g, ""),
+      );
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const cheaper = { ...game, dollarsPerkWh: game.dollarsPerkWh - 0.02 };
+    // Years of sales at the target already on the record dilute the coming year
+    const established = {
+      ...cheaper,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+
+    expect(points(established)).toBeLessThan(points(cheaper));
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {

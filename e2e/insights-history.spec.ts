@@ -55,7 +55,7 @@ test("public insights show the rate score and an absolute customer objective", a
     );
     expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
     await expect(page.locator(".insightsRateMetric").last()).toContainText(
-      "Rate score",
+      "Points / yr",
     );
   }
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
