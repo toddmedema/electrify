@@ -1824,8 +1824,12 @@ $pane_header_height: 48px;
   }
 
   #yearProgressBar {
-    margin-top: 0;
+    // Overlay the app bar's lower edge without adding a gap before the pane headers.
+    position: absolute;
+    inset: auto 0 0;
+    // Retain breathing room around the line for the tutorial's target ring.
     padding: 4px 0;
+    pointer-events: none;
     z-index: 100;
 
     .yearProgressFill {
