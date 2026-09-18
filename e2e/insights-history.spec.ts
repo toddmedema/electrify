@@ -2,7 +2,7 @@ import path from "path";
 import { expect, test } from "@playwright/test";
 import { openPane } from "./layout";
 
-test("public insights retain the benchmark and an absolute customer objective", async ({
+test("public insights show the rate score and an absolute customer objective", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -26,10 +26,9 @@ test("public insights retain the benchmark and an absolute customer objective", 
     insights,
     page.getByRole("button", { name: "Insights", exact: true }),
   );
-  await expect(page.locator(".insightsLevers")).toContainText(
-    "market benchmark",
-  );
-  await expect(page.locator(".insightsLevers")).toContainText("+1.5%");
+  // A public utility's rate moves its score, not its customers, so that is what the levers show
+  await expect(page.locator(".insightsLevers")).toContainText(/rate score/i);
+  await expect(page.locator(".insightsLevers")).not.toContainText(/market/i);
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "fast speed" })
@@ -55,8 +54,8 @@ test("public insights retain the benchmark and an absolute customer objective", 
       metrics.map((metric) => metric.boundingBox()),
     );
     expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
-    await expect(page.locator(".insightsRateMetricGrowth")).toContainText(
-      "Fixed growth / yr",
+    await expect(page.locator(".insightsRateMetric").last()).toContainText(
+      "Points / yr",
     );
   }
   const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;

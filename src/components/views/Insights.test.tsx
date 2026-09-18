@@ -10,9 +10,11 @@ import cloneDeep from "lodash.clonedeep";
 import * as React from "react";
 import { Provider } from "react-redux";
 import { EMPTY_HISTORY, MINUTES_PER_MONTH } from "../../helpers/DateTime";
+import * as GameModule from "../../reducers/Game";
 import gameReducer, { buildTransmissionLine } from "../../reducers/Game";
 import { cancelPolicy, schedulePolicy } from "../../reducers/GameActions";
 import uiReducer from "../../reducers/UI";
+import { getScenario } from "../../data/Scenarios";
 import { createGame } from "../../testing/Simulator";
 import { GameType, TickPresentFutureType } from "../../Types";
 import Insights, {
@@ -479,16 +481,132 @@ describe("Insights layers", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the customer growth rate visible for public utilities", () => {
-    renderInsights(107);
+  // Regression test. Construction progress was part of the projection's cache key, so every
+  // tick of a build re-simulated the long-range forecast from a start that had moved on by one
+  // tick, and its hourly samples (wind most visibly) jittered from frame to frame
+  it("keeps the long-range projection stable while a facility is under construction", () => {
+    const game = createGame({
+      scenarioId: 100,
+      initialBuild: { name: "Wind", peakW: 100000000, financed: true },
+    });
+    expect(game.facilities.some((f) => f.yearsToBuildLeft > 0)).toBe(true);
+    const generate = jest.spyOn(GameModule, "generateNewTimeline");
+    const props = {
+      selectedFacilityId: null,
+      facilityDragActive: false,
+      onDelta: () => undefined,
+    };
+    const { rerender } = render(<Insights game={game} {...props} />);
+    const calls = generate.mock.calls.length;
+
+    const nextTick = cloneDeep(game);
+    nextTick.date = { ...nextTick.date, minute: nextTick.date.minute + 15 };
+    nextTick.facilities.forEach((facility) => {
+      if (facility.yearsToBuildLeft > 0) facility.yearsToBuildLeft -= 0.001;
+    });
+    rerender(<Insights game={nextTick} {...props} />);
+
+    expect(generate.mock.calls.length).toBe(calls);
+    generate.mockRestore();
+  });
+
+  it("shows a public utility the points its rate earns over the next year", () => {
+    const game = createGame({ scenarioId: 107 });
+    const target = game.dollarsPerkWh;
+    renderInsights(107, { ...game, dollarsPerkWh: target - 0.02 });
 
     const levers = screen.getByRole("region", { name: "Planning controls" });
-    expect(levers).toHaveTextContent(/customer growth \+1.5%\/yr at any rate/i);
-    expect(levers).toHaveTextContent(/market benchmark/i);
-    expect(within(levers).getByText("Fixed growth / yr")).toBeInTheDocument();
-    expect(
-      within(levers).getByText("+1.5%", { selector: "strong" }),
-    ).toBeVisible();
+    // Customers never switch and growth is fixed, so neither is worth the space
+    expect(levers).not.toHaveTextContent(/market/i);
+    expect(levers).not.toHaveTextContent(/growth/i);
+    expect(within(levers).getByText("Target")).toBeInTheDocument();
+    expect(within(levers).getByText("Points / yr")).toBeInTheDocument();
+    const points = within(levers).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^\+\d+ pts$/);
+    expect(points).toHaveClass("good");
+    expect(labelledButton("Hide rate slider")).toHaveAccessibleDescription(
+      /rate score \+\d+ pts over the next year/i,
+    );
+  });
+
+  it("marks a public utility rate above its target as losing points", () => {
+    const game = createGame({ scenarioId: 107 });
+    renderInsights(107, { ...game, dollarsPerkWh: game.dollarsPerkWh + 0.01 });
+
+    const points = within(
+      screen.getByRole("region", { name: "Planning controls" }),
+    ).getByText(/pts$/, {
+      selector: ".insightsRateMetricValue.insightsRateScore",
+    });
+    expect(points.textContent).toMatch(/^−\d+ pts$/);
+    expect(points).toHaveClass("bad");
+  });
+
+  it("shows a year's rate moving a long record's score less", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = Number(
+        within(screen.getByRole("region", { name: "Planning controls" }))
+          .getByText(/pts$/, {
+            selector: ".insightsRateMetricValue.insightsRateScore",
+          })
+          .textContent!.replace(/[^\d]/g, ""),
+      );
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const cheaper = { ...game, dollarsPerkWh: game.dollarsPerkWh - 0.02 };
+    // Years of sales at the target already on the record dilute the coming year
+    const established = {
+      ...cheaper,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+
+    expect(points(established)).toBeLessThan(points(cheaper));
+  });
+
+  it("always counts a public rate's points over a full year, even as the run ends", () => {
+    const points = (game: GameType) => {
+      const { unmount } = renderInsights(107, game);
+      const value = within(
+        screen.getByRole("region", { name: "Planning controls" }),
+      ).getByText(/pts$/, {
+        selector: ".insightsRateMetricValue.insightsRateScore",
+      }).textContent;
+      unmount();
+      return value;
+    };
+    const game = createGame({ scenarioId: 107 });
+    const established = {
+      ...game,
+      dollarsPerkWh: game.dollarsPerkWh - 0.02,
+      monthlyHistory: [
+        {
+          ...EMPTY_HISTORY,
+          supplyWh: 1e15,
+          revenue: (1e15 / 1000) * game.dollarsPerkWh,
+        },
+      ],
+    };
+    // One month left; the projection is the same one, so only the window could differ
+    const ending = {
+      ...established,
+      date: {
+        ...established.date,
+        monthsElapsed: getScenario(107)!.durationMonths - 1,
+      },
+    };
+
+    expect(points(ending)).toBe(points(established));
   });
 
   it("shows in-range scenario events and reveals their forecast details", async () => {

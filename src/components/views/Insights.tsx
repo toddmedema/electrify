@@ -39,7 +39,6 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
   GAME_TO_REAL_YEARS,
-  ORGANIC_GROWTH_MAX_ANNUAL,
   TICK_MINUTES,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -60,6 +59,7 @@ import {
   getTimeFromTimeline,
   MINUTES_PER_MONTH,
   reduceHistories,
+  summarizeHistory,
   summarizeTimeline,
   summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
@@ -115,6 +115,10 @@ import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
 import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
+import {
+  PUBLIC_RATE_POINTS_PER_CENT,
+  publicRateScoreChange,
+} from "../../helpers/Scoring";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
 import { UpcomingStoryEventType } from "./StoryEventSelectors";
@@ -290,14 +294,9 @@ function rateMarkLabel(
   );
 }
 
-const RATE_MARKS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3].map((rate) => ({
-  value: rate,
-  label: rateMarkLabel(
-    rate,
-    formatMoneyConcise(rate),
-    [0, 0.15, 0.3].includes(rate) ? formatRateCompact(rate) : "",
-  ),
-}));
+function formatRateScore(points: number): string {
+  return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${Math.abs(points).toLocaleString("en-US")} pts`;
+}
 
 interface BlackoutEdges {
   minute: number;
@@ -700,19 +699,25 @@ function policySignature(game: GameType): string {
   ]);
 }
 
+// Construction progress is deliberately reduced to built or not. The remaining years tick down
+// every game tick, and keying on them re-simulated the whole projection each frame from a start
+// minute that had moved on by one tick, so the hourly-sampled forecast (wind most of all) jittered
+// under the player. The month rollover already refreshes progress; completion refreshes it too.
 function facilitySignature(game: GameType): string {
   const facilities = game.facilities
     .map((facility) =>
       [
         facility.id,
         facility.paused,
-        facility.yearsToBuildLeft,
+        facility.yearsToBuildLeft > 0,
         facility.peakW,
       ].join(":"),
     )
     .join("|");
   const transmission = (game.transmission?.lines || [])
-    .map((line) => [line.id, line.corridorId, line.yearsToBuildLeft].join(":"))
+    .map((line) =>
+      [line.id, line.corridorId, line.yearsToBuildLeft > 0].join(":"),
+    )
     .join("|");
   return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
 }
@@ -1367,40 +1372,85 @@ export default class Insights extends React.Component<Props, State> {
         ),
       ownership: scenario.ownership,
     });
-    const max =
-      scenario.ownership === "Investor"
-        ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
-        : 0.3;
-    const marks =
-      scenario.ownership === "Investor"
-        ? [
-            { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
-            {
-              value: marketRate,
-              label: rateMarkLabel(
-                marketRate,
-                `${formatMoneyConcise(marketRate)} market`,
-                `market ${formatRateCompact(marketRate)}`,
-              ),
-            },
-            {
-              value: max,
-              label: rateMarkLabel(
-                max,
-                formatMoneyConcise(max),
-                formatRateCompact(max),
-              ),
-            },
-          ]
-        : RATE_MARKS;
+    const investor = scenario.ownership === "Investor";
+    // A public utility's customers never switch and its growth is fixed, so the market rate
+    // changes nothing it can act on. What the rate does move is the score, against the
+    // scenario's own target.
+    const targetRate = scenario.dollarsPerkWh;
+    const max = investor
+      ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
+      : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
+    // The score judges the lifetime average rate, so what a rate is worth is how far it moves
+    // that average over the coming year: the projection's next twelve months added to the months
+    // already on the record. Always a full year, even near the end of a run, so the figure means
+    // the same thing every time. The projection was built at the current rate; other slider
+    // positions shift its revenue by the difference on the same energy.
+    const upcoming = investor
+      ? []
+      : this.getProjection(now).financeProjected.slice(0, 12);
+    const pastTotals = summarizeHistory(game.monthlyHistory);
+    const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
+    const nextRevenue = upcoming.reduce((sum, m) => sum + m.revenue, 0);
+    const rateScore = (rate: number) =>
+      publicRateScoreChange(targetRate, pastTotals, {
+        supplyWh: nextSupplyWh,
+        revenue:
+          nextRevenue + (rate - game.dollarsPerkWh) * (nextSupplyWh / 1000),
+      });
+    const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
+    const marks = investor
+      ? [
+          { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
+          {
+            value: marketRate,
+            label: rateMarkLabel(
+              marketRate,
+              `${formatMoneyConcise(marketRate)} market`,
+              `market ${formatRateCompact(marketRate)}`,
+            ),
+          },
+          {
+            value: max,
+            label: rateMarkLabel(
+              max,
+              formatMoneyConcise(max),
+              formatRateCompact(max),
+            ),
+          },
+        ]
+      : [
+          { value: 0, label: rateMarkLabel(0, "$0", "0¢") },
+          {
+            value: targetRate,
+            label: rateMarkLabel(
+              targetRate,
+              `${formatMoneyConcise(targetRate)} target`,
+              `target ${formatRateCompact(targetRate)}`,
+            ),
+          },
+          {
+            value: max,
+            label: rateMarkLabel(
+              max,
+              formatMoneyConcise(max),
+              formatRateCompact(max),
+            ),
+          },
+        ];
     const formattedCustomerChange = formatCustomerChange(
       customerChange,
       now.customers,
     );
-    const rateSummary =
-      scenario.ownership === "Investor"
-        ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-        : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market benchmark ${formatMoneyConcise(marketRate)}; customer growth plus ${(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)} percent per year. Public utility customers do not switch based on rates.`;
+    const rateSummary = investor
+      ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
+      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} over the next year at this rate. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it.`;
+    const rateScoreClass = `insightsRateScore ${
+      rateScore(game.dollarsPerkWh) > 0
+        ? "good"
+        : rateScore(game.dollarsPerkWh) < 0
+          ? "bad"
+          : ""
+    }`;
     return (
       <section className="insightsLevers" aria-label="Planning controls">
         <Button
@@ -1420,59 +1470,52 @@ export default class Insights extends React.Component<Props, State> {
           color="textSecondary"
           aria-hidden="true"
         >
-          Base rate{" "}
+          Your rate{" "}
           <strong>{formatMoneyConcise(game.dollarsPerkWh)}/kWh</strong>
-          {scenario.ownership === "Investor" && (
+          {investor ? (
             <>
               {" "}
               · market {formatMoneyConcise(marketRate)} · projected customers{" "}
               <strong>{formattedCustomerChange}</strong> next month
             </>
-          )}
-          {scenario.ownership === "Public" && (
+          ) : (
             <>
               {" "}
-              · market benchmark {formatMoneyConcise(marketRate)} · customer
-              growth{" "}
-              <strong>
-                +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
+              · target {formatMoneyConcise(targetRate)} · rate score{" "}
+              <strong className={rateScoreClass}>
+                {formattedRateScore}/yr
               </strong>{" "}
-              at any rate
+              ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢ of lifetime average)
             </>
           )}
         </Typography>
-        <div
-          className={`insightsRateMetrics ${
-            scenario.ownership === "Public" ? "insightsRateMetricsPublic" : ""
-          }`}
-          aria-hidden="true"
-        >
+        <div className="insightsRateMetrics" aria-hidden="true">
           <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Base rate</span>
+            <span className="insightsRateMetricLabel">Your rate</span>
             <strong className="insightsRateMetricValue">
               {formatRateCompact(game.dollarsPerkWh)}/kWh
             </strong>
           </span>
           <span className="insightsRateMetric">
-            <span className="insightsRateMetricLabel">Market</span>
+            <span className="insightsRateMetricLabel">
+              {investor ? "Market" : "Target"}
+            </span>
             <span className="insightsRateMetricValue">
-              {formatRateCompact(marketRate)}
+              {formatRateCompact(investor ? marketRate : targetRate)}
             </span>
           </span>
-          {scenario.ownership === "Investor" ? (
-            <>
-              <span className="insightsRateMetric">
-                <span className="insightsRateMetricLabel">Customers / mo</span>
-                <strong className="insightsRateMetricValue">
-                  {formattedCustomerChange}
-                </strong>
-              </span>
-            </>
-          ) : (
-            <span className="insightsRateMetric insightsRateMetricGrowth">
-              <span className="insightsRateMetricLabel">Fixed growth / yr</span>
+          {investor ? (
+            <span className="insightsRateMetric">
+              <span className="insightsRateMetricLabel">Customers / mo</span>
               <strong className="insightsRateMetricValue">
-                +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%
+                {formattedCustomerChange}
+              </strong>
+            </span>
+          ) : (
+            <span className="insightsRateMetric">
+              <span className="insightsRateMetricLabel">Points / yr</span>
+              <strong className={`insightsRateMetricValue ${rateScoreClass}`}>
+                {formattedRateScore}
               </strong>
             </span>
           )}
@@ -1505,13 +1548,19 @@ export default class Insights extends React.Component<Props, State> {
             defaultValue={game.dollarsPerkWh}
             aria-label="The rate you charge for electricity generation"
             valueLabelDisplay="auto"
-            valueLabelFormat={(rate) => `${formatMoneyConcise(rate)}/kWh`}
+            valueLabelFormat={(rate) =>
+              investor
+                ? `${formatMoneyConcise(rate)}/kWh`
+                : `${formatMoneyConcise(rate)}/kWh · ${formatRateScore(rateScore(rate))}/yr`
+            }
             getAriaValueText={(rate) =>
-              `${formatMoneyConcise(rate)} per kilowatt hour`
+              investor
+                ? `${formatMoneyConcise(rate)} per kilowatt hour`
+                : `${formatMoneyConcise(rate)} per kilowatt hour, rate score ${formatRateScore(rateScore(rate))} over the next year`
             }
             marks={marks}
             min={0}
-            step={scenario.ownership === "Investor" ? 0.001 : 0.01}
+            step={investor ? 0.001 : 0.01}
             max={max}
             onChangeCommitted={(_event, value) =>
               onDelta({
