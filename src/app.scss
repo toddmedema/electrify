@@ -50,6 +50,7 @@
   --warning-icon: #7a4500; /* deep amber */
   --mark-bg: #ffe082; /* amber200 - the manual's search highlight */
   --capacity-bar: #212121; /* grey900 */
+  --facility-idle-opacity: 0.55;
   --shadow-ring: rgba(0, 0, 0, 0.15);
   --tooltip-border: rgba(0, 0, 0, 0.2);
   --tooltip-bg: #ffffff;
@@ -90,6 +91,7 @@
   --warning-icon: #ffd54f; /* amber300 - 5.5:1 on the fill */
   --mark-bg: #6d4c00;
   --capacity-bar: #e0e0e0;
+  --facility-idle-opacity: 0.7;
   --shadow-ring: rgba(0, 0, 0, 0.72);
   --tooltip-border: rgba(148, 163, 184, 0.24);
   --tooltip-bg: #111820;
@@ -4658,11 +4660,15 @@ $sizemap: (
 .facilityDisclosure .MuiListItemAvatar-root {
   min-width: 48px;
 }
+.facilityDisclosure .facilityIconIdle {
+  // Only quiet the illustration; reserve levels and state labels stay legible.
+  opacity: var(--facility-idle-opacity);
+}
 .facilityDisclosure .MuiListItemText-root {
   margin: 0;
   min-width: 0;
 }
-// Keep each reading on one line, moving its supporting detail below when the text column narrows.
+// Keep readings and supporting details together; abbreviate reservoir text on narrow rows.
 .facilityDisclosure .MuiListItemText-primary,
 .facilityDisclosure .MuiListItemText-secondary {
   display: flex;
@@ -4701,19 +4707,8 @@ $sizemap: (
 .facilityDisclosure .facilityStatusShort {
   display: none;
 }
-// The longest hydro line, "999.9/999.9MW · running · reservoir 100%", needs about this much
+// Compact reservoir wording keeps the output and fullness together on phones.
 @container (max-width: 239px) {
-  .facilityDisclosure .MuiListItemText-secondary {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .facilityDisclosure .facilityStatusDetail {
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-  .facilityDisclosure .facilityStatusSeparator {
-    display: none;
-  }
   .facilityDisclosure .facilityStatusLong {
     display: none;
   }

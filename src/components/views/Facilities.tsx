@@ -364,10 +364,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       );
     }
   }
-  // "Building 40%" already says what the construction badge does
-  const status = underConstruction
-    ? reading
-    : `${reading} · ${ACTIVITY_LABELS[activity]}`;
+  // Output communicates normal operation; keep explicit labels for other states.
+  const status =
+    underConstruction || activity === "RUNNING"
+      ? reading
+      : `${reading} · ${ACTIVITY_LABELS[activity]}`;
 
   return (
     <Draggable
@@ -445,7 +446,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 <ListItemAvatar>
                   <div>
                     <Avatar
-                      className={facility.currentWh === 0 ? "offline" : ""}
+                      className={activity === "IDLE" ? "facilityIconIdle" : ""}
                       alt={facility.name}
                       src={`/images/${facilityIconName(facility)}.svg`}
                     />

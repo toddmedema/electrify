@@ -76,3 +76,46 @@ test("facility rows keep readings untruncated when narrow details reflow", async
     ),
   ).toBe(true);
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`hydro stays compact and idle icons stay distinct in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=108");
+    await page.getByRole("button", { name: "Start game", exact: true }).click();
+    const pane = page.locator(".facilities:visible");
+    await openPane(
+      pane,
+      page.getByRole("button", { name: "Facilities", exact: true }),
+    );
+    await expect(
+      page.getByText("Starting your mission…", { exact: true }),
+    ).toBeHidden();
+    const hydro = pane.locator('.facilityRow[data-fuel="Hydro"]');
+    const subtitle = hydro.locator(".MuiListItemText-secondary");
+    await expect(subtitle).not.toContainText("running");
+    await expect(hydro.locator(".capacityProgressBar")).toBeVisible();
+    const layout = await subtitle.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+    }));
+    expect(layout.height).toBeLessThanOrEqual(layout.lineHeight + 1);
+      const idle = pane.getByRole("button", { name: "Inspect Solar", exact: true });
+    await expect(idle.locator(".facilityStatus")).toContainText("idle");
+    await expect(idle.locator(".MuiAvatar-root")).toHaveCSS(
+      "opacity",
+      theme === "dark" ? "0.7" : "0.55",
+    );
+    await expect(hydro.locator(".MuiAvatar-root")).toHaveCSS("opacity", "1");
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      await page.screenshot({
+        path: `${process.env.REVIEW_SCREENSHOT_DIR}/pr-${testInfo.project.name}-${theme}.png`,
+      });
+    }
+  });
+}
