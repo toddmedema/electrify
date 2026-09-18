@@ -112,12 +112,17 @@ function firstRise(outlook?: ReservoirOutlookPoint[]): number | undefined {
 }
 
 export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
-  const { fraction, outlook } = input;
+  const { fraction, outlook, fleet } = input;
   if (fraction <= LOW_RESERVOIR_FRACTION) {
-    const refill = firstRise(outlook);
+    // The combined forecast can rise while this dam stays empty, so only a lone dam gets a month
+    const refill = fleet ? undefined : firstRise(outlook);
     return {
       lead: "Nearly empty.",
-      detail: `Output stays low until rain or snowmelt refills it${refill ? `, likely from ${MONTH_NAMES[refill - 1]}` : ""}. Plan other supply until then.`,
+      detail: refill
+        ? `Output stays low until it refills, likely in ${MONTH_NAMES[refill - 1]}.`
+        : outlook && !fleet
+          ? "Output stays low; no refill is expected within a year."
+          : "Output stays low until rain or snowmelt refills it.",
       tone: "bad",
     };
   }
@@ -125,26 +130,27 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
     return {
       lead: "Full.",
       detail:
-        "Extra water is spilling. Moving it up the dispatch order uses water that would otherwise be lost.",
+        "Extra water is spilling, so any extra output from it costs no stored water.",
     };
   }
 
-  const subject = input.fleet ? "Your dams" : "It";
   const change =
     outlook && outlook.length > 1
       ? outlook[1].fraction - outlook[0].fraction
       : 0;
+  // Trends come from every operating dam together, so with several they say so
+  const trend = (verb: string) =>
+    fleet ? `Your dams are ${verb.toLowerCase()}.` : `${verb}.`;
   let lead: string;
   let detail: string;
   if (change > TREND_THRESHOLD) {
-    lead = "Filling.";
+    lead = trend("Filling");
     detail = "More water is arriving than is being used.";
   } else if (change < -TREND_THRESHOLD) {
-    lead = "Draining.";
-    detail =
-      "Generation and required releases use more water than rain and snowmelt bring in.";
+    lead = trend("Draining");
+    detail = "Generation and required releases exceed inflow.";
   } else {
-    lead = "Steady.";
+    lead = trend("Steady");
     detail = "Water arriving roughly matches water used.";
   }
 
@@ -154,11 +160,15 @@ export function describeHydroStatus(input: HydroStatusInput): HydroStatus {
     (point, index) => index > 0 && point.fraction <= LOW_RESERVOIR_FRACTION,
   );
   if (refill) {
-    detail += ` Snow is holding water back; expect a refill around ${MONTH_NAMES[refill - 1]}.`;
+    detail = `Snow is holding water back; expect a refill around ${MONTH_NAMES[refill - 1]}.`;
   } else if (runsLow) {
+    // Pausing would also stop the required releases turning into power, so the gentler lever
+    // is the one worth naming
     return {
-      lead,
-      detail: `${detail} ${subject} will run low around ${MONTH_NAMES[runsLow.monthNumber - 1]}. Pausing saves water for when you need it more.`,
+      // A reservoir rising now and running dry later needs both halves said, or they read as a
+      // contradiction
+      lead: change > TREND_THRESHOLD ? trend("Filling for now") : lead,
+      detail: `${fleet ? "They" : "It"} will run low around ${MONTH_NAMES[runsLow.monthNumber - 1]}. Moving ${fleet ? "a dam" : "it"} down the dispatch order saves water for later.`,
       tone: "warn",
     };
   } else if (

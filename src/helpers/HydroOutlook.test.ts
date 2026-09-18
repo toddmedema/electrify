@@ -31,7 +31,7 @@ describe("describeHydroStatus", () => {
       spilling: true,
     });
     expect(status.lead).toBe("Full.");
-    expect(status.detail).toMatch(/dispatch order/);
+    expect(status.detail).toMatch(/costs no stored water/);
   });
 
   test("the next month of the forecast sets the direction", () => {
@@ -116,6 +116,7 @@ test("a forecast that reaches the minimum level warns with the month", () => {
   });
   expect(status.tone).toBe("warn");
   expect(status.detail).toMatch(/It will run low around March/);
+  expect(status.detail).toMatch(/dispatch order/);
   expect(
     describeHydroStatus({
       spilling: false,
@@ -126,6 +127,52 @@ test("a forecast that reaches the minimum level warns with the month", () => {
         { monthNumber: 1, fraction: 0.47, snowpackMm: 0 },
         { monthNumber: 2, fraction: 0.12, snowpackMm: 0 },
       ],
+    }),
+  ).toMatchObject({
+    lead: "Your dams are draining.",
+    detail: expect.stringMatching(/They will run low around February/),
+  });
+});
+
+test("a nearly empty lone dam names when it refills, or says it won't", () => {
+  const input = {
+    spilling: false,
+    monthNumber: 8,
+    latitude: 40,
+    fraction: 0.05,
+  };
+  expect(
+    describeHydroStatus({
+      ...input,
+      outlook: [
+        { monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
+        { monthNumber: 9, fraction: 0.05, snowpackMm: 0 },
+        { monthNumber: 10, fraction: 0.2, snowpackMm: 0 },
+      ],
     }).detail,
-  ).toMatch(/Your dams will run low around February/);
+  ).toMatch(/likely in October/);
+  expect(
+    describeHydroStatus({
+      ...input,
+      outlook: [
+        { monthNumber: 8, fraction: 0.05, snowpackMm: 0 },
+        { monthNumber: 9, fraction: 0.04, snowpackMm: 0 },
+      ],
+    }).detail,
+  ).toMatch(/no refill is expected/);
+});
+
+test("a reservoir rising before a dry spell says the rise is temporary", () => {
+  const status = describeHydroStatus({
+    spilling: false,
+    monthNumber: 4,
+    latitude: 40,
+    fraction: 0.32,
+    outlook: [
+      { monthNumber: 4, fraction: 0.32, snowpackMm: 0 },
+      { monthNumber: 5, fraction: 0.4, snowpackMm: 0 },
+      { monthNumber: 6, fraction: 0.05, snowpackMm: 0 },
+    ],
+  });
+  expect(status).toMatchObject({ lead: "Filling for now.", tone: "warn" });
 });

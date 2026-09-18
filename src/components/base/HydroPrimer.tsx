@@ -32,11 +32,10 @@ export default function HydroPrimer(props: {
         How hydro differs
       </Typography>
       <Typography variant="body2">
-        This game allows {props.totalSites} hydro{" "}
+        You can build {props.totalSites} hydro{" "}
         {props.totalSites === 1 ? "project" : "projects"} near {props.place},
         each using one site whatever its size. Output follows rain and snowmelt,
-        not fuel. Once one is built, open it in your fleet to see its water
-        forecast.
+        not fuel.
       </Typography>
       <Button size="small" onClick={props.onDismiss}>
         Got it

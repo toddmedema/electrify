@@ -148,6 +148,17 @@ function ExpectedOutputMetric(props: {
   );
 }
 
+/**
+ * Hydro can only deliver the water that arrives, so its typical output follows the forecast
+ * inflow rather than the design capacity factor, which a drought year can fall well short of.
+ */
+function typicalCapacityFactor(
+  generator: GeneratorShoppingType,
+  shape?: ExpectedOutputShape,
+): number {
+  return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
+}
+
 function GeneratorDetailRow(props: {
   label: string;
   value: React.ReactNode;
@@ -243,10 +254,8 @@ export function GeneratorBuildItem(
     props.outputShape || expectedMonthlyOutputShape(generator, []);
   const waterShape =
     outputShape?.kind === "water-inflow" ? outputShape : undefined;
-  // Hydro can only deliver the water that arrives, so its typical output follows the forecast
-  // inflow rather than the design capacity factor, which a drought year can fall well short of
-  const typicalOutputW =
-    generator.peakW * (waterShape ? waterShape.mean : generator.capacityFactor);
+  const capacityFactor = typicalCapacityFactor(generator, outputShape);
+  const typicalOutputW = generator.peakW * capacityFactor;
   // A short role tag stays on the card; how to use it waits for the details
   const [role, roleHint] =
     generator.fuel === "Hydro"
@@ -430,7 +439,7 @@ export function GeneratorBuildItem(
               )}
               <GeneratorDetailRow
                 label="Expected capacity factor"
-                value={percent(generator.capacityFactor)}
+                value={percent(capacityFactor)}
                 entry={MANUAL_ENTRY.CAPACITY_FACTOR}
               />
               {generator.minimumStableOutput !== undefined && (
@@ -578,9 +587,11 @@ export function GeneratorBuildItem(
                     {
                       concept: "build" as const,
                       label: "Project site",
-                      value: `Leaves ${sites.remaining - 1} of ${sites.total}`,
-                      detail:
-                        "In this game each project takes one site, whatever its size.",
+                      value:
+                        sites.remaining === 1
+                          ? "Uses your last site"
+                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                      detail: "Each project takes one site, whatever its size.",
                     },
                   ]
                 : []),
@@ -678,6 +689,7 @@ export function GeneratorBuildItem(
 
 function GeneratorComparison(props: {
   generators: GeneratorShoppingType[];
+  outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
 }): React.JSX.Element | null {
   if (props.generators.length === 0) {
@@ -709,8 +721,14 @@ function GeneratorComparison(props: {
               {Math.round(generator.yearsToBuild * 12)} mo
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {formatWatts(generator.peakW * generator.capacityFactor)} typical
-              · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+              {formatWatts(
+                generator.peakW *
+                  typicalCapacityFactor(
+                    generator,
+                    props.outputShapes.get(generator.name),
+                  ),
+              )}{" "}
+              typical · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
             </Typography>
           </div>
         ))}
@@ -930,6 +948,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       />
       <GeneratorComparison
         generators={comparedGenerators}
+        outputShapes={outputShapes}
         onClear={() => setComparedNames([])}
       />
       <List dense className="scrollable cardList">

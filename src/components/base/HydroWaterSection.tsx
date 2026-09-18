@@ -144,10 +144,9 @@ export default function HydroWaterSection(props: {
             component="figcaption"
           >
             {fleet ? "All your dams, next 12 months" : "Next 12 months"}
+            {emptyAllYear && ": no refill expected"}
           </Typography>
-          {emptyAllYear ? (
-            <Typography variant="body2">Empty all year</Typography>
-          ) : (
+          {!emptyAllYear && (
             <div className="facilityTrend">
               <Sparkline
                 values={values}
@@ -160,9 +159,15 @@ export default function HydroWaterSection(props: {
                 ariaLabel={`Reservoir forecast for the next ${values.length - 1} months: now ${percent(values[0])}, lowest in ${MONTH_NAMES[lowPoint.monthNumber - 1]} at ${percent(lowPoint.fraction)}.`}
               />
               <Typography variant="caption" color="textSecondary">
-                Now {percent(values[0])}
-                {lowIndex > 0 &&
-                  ` · Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`}
+                {/* The combined level would contradict this dam's own Reservoir stat above */}
+                {[
+                  fleet ? undefined : `Now ${percent(values[0])}`,
+                  lowIndex > 0
+                    ? `Low ${MONTHS[lowPoint.monthNumber - 1]} ${percent(lowPoint.fraction)}`
+                    : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Typography>
             </div>
           )}

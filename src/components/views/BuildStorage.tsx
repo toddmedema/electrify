@@ -297,9 +297,11 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
                     {
                       concept: "build" as const,
                       label: "Project site",
-                      value: `Leaves ${sites.remaining - 1} of ${sites.total}`,
-                      detail:
-                        "In this game each project takes one site, whatever its size.",
+                      value:
+                        sites.remaining === 1
+                          ? "Uses your last site"
+                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                      detail: "Each project takes one site, whatever its size.",
                     },
                   ]
                 : []),
