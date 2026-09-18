@@ -18,12 +18,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v4.0.2
+        uses: actions/setup-node@v7
         with:
           node-version: 24.14.0
           cache: npm
@@ -76,7 +76,7 @@ jobs:
 
       - name: Preserve browser failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-smoke-failures
           path: test-results/

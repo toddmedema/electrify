@@ -19,7 +19,7 @@ jobs:
       contents: read
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Images and audio live in Git LFS (see .gitattributes). Without this
           # the runner gets 130-byte pointer files, the build still succeeds, and
@@ -27,14 +27,18 @@ jobs:
           lfs: true
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v4.0.2
+        uses: actions/setup-node@v7
         with:
           node-version: 24.14.0
           cache: npm
 
       - run: npm ci
 
-      # Tests are not run here; workflow.yml already runs them on every push.
+      # Reject stale simulation metadata before changing production Firestore.
+      - name: Check run compatibility
+        run: npm run compatibility:check
+
+      # Tests are not run here; workflow.yml gates pull requests before merge.
 
       # Firestore rules and indexes go out BEFORE the bundle that depends on them.
       # The other order ships a client whose reads the deployed rules still refuse,
@@ -64,7 +68,7 @@ jobs:
             npx --yes firebase-tools@15 deploy --only firestore --non-interactive
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
