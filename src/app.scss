@@ -693,6 +693,7 @@ $topbar_height: 56px;
 
 #navfooter {
   box-sizing: content-box;
+  flex-shrink: 0;
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
@@ -924,6 +925,8 @@ $topbar_height: 56px;
     background: var(--bg-raised);
   }
   .gameStatusBar .gridHealth {
+    justify-content: flex-start;
+    text-align: left;
     flex: 0 0 var(--facilities-pane-width, auto);
     box-sizing: border-box;
     min-width: 0;
@@ -932,7 +935,7 @@ $topbar_height: 56px;
   }
   .gameStatusBar .gridHealthSummary {
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 4px 8px;
   }
   .gameStatusBar .missionSummary {
@@ -4196,6 +4199,17 @@ $sizemap: (
     }
   }
 
+  .secondary-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    > .pane {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+  }
+
   // Splitters are grid tracks of their own rather than borders on the panes, so dragging one
   // never changes the total width the panes have to share
   .pane-splitter {
@@ -4714,6 +4728,22 @@ $sizemap: (
   padding: 0 16px 8px;
   opacity: 1;
   visibility: visible;
+}
+
+@media screen and (max-width: 600px) {
+  .base_main .facilityActions {
+    .facilityActionLabel {
+      display: none;
+    }
+    .MuiButton-root {
+      min-width: var(--control-size);
+      min-height: var(--control-size);
+      padding: 8px;
+    }
+    .MuiButton-startIcon {
+      margin: 0;
+    }
+  }
 }
 // Every row carries its reorder grip on the leading edge, always visible, with no label
 .base_main .facilityDragHandle {

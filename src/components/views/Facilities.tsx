@@ -181,7 +181,9 @@ function FacilityActions(props: {
               : onPause(facility.id, facility.name)
           }
         >
-          {facility.paused ? "Resume" : "Pause"}
+          <span className="facilityActionLabel">
+            {facility.paused ? "Resume" : "Pause"}
+          </span>
         </Button>
       )}
       <Button
@@ -192,7 +194,9 @@ function FacilityActions(props: {
         }
         onClick={onOpenSell}
       >
-        {underConstruction ? "Cancel construction" : "Sell"}
+        <span className="facilityActionLabel">
+          {underConstruction ? "Cancel construction" : "Sell"}
+        </span>
       </Button>
       {listLength > 1 && (
         <>
@@ -204,7 +208,7 @@ function FacilityActions(props: {
             disabled={spotInList === 0}
             onClick={() => onReprioritize(spotInList, -1)}
           >
-            Move up
+            <span className="facilityActionLabel">Move up</span>
           </Button>
           <Button
             startIcon={<KeyboardArrowDownIcon />}
@@ -214,7 +218,7 @@ function FacilityActions(props: {
             disabled={spotInList === listLength - 1}
             onClick={() => onReprioritize(spotInList, 1)}
           >
-            Move down
+            <span className="facilityActionLabel">Move down</span>
           </Button>
         </>
       )}

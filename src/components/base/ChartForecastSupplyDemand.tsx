@@ -3,7 +3,6 @@ import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
 import {
   bandsPlugin,
-  FORECAST_AXIS_LEFT,
   padRange,
   spansFromEdges,
   forecastMonthAxis,
@@ -46,7 +45,7 @@ function buildOptions(showXLabels: boolean) {
     height: 0,
     // Keep only enough trailing room for a centred x-axis label. This chart has no right axis,
     // so reserving the weather chart's gutter made its plot visibly narrower than its peers.
-    padding: [5 * scale, 24 * scale, 0, 0],
+    padding: [10 * scale, 24 * scale, 0, 0],
     cursor: {
       x: true,
       y: false,
@@ -66,7 +65,6 @@ function buildOptions(showXLabels: boolean) {
     axes: [
       forecastMonthAxis(scale, getState, showXLabels),
       yAxis(scale, {
-        size: FORECAST_AXIS_LEFT,
         values: (_u, splits) => splits.map((t) => formatWattsAxis(t, splits)),
       }),
     ],
