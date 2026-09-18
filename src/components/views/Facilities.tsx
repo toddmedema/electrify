@@ -187,6 +187,7 @@ function FacilityActions(props: {
         </Button>
       )}
       <Button
+        className={underConstruction ? "facilityCancelConstruction" : undefined}
         startIcon={underConstruction ? <CancelIcon /> : <DeleteForeverIcon />}
         aria-label={
           (underConstruction ? "Cancel construction of " : "Sell ") +

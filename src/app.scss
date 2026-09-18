@@ -3298,24 +3298,57 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  // What the row is worth, opened underneath it. A wrapping grid rather than fixed columns:
-  // the pane is resizable, and a stat that has to be truncated to fit is worth less than one
-  // that wraps onto the next line
+  // Container widths follow the actual pane, including user-resized desktop layouts.
   .facilityDetails {
-    padding: size(small) 16px size(base) 56px;
+    padding: 0 16px 16px;
+    container: facility-details / inline-size;
+  }
+
+  .facilityDetailSection {
+    padding: 16px 0;
+    border-top: 1px solid var(--border-subtle);
+
+    &:last-child {
+      padding-bottom: 0;
+    }
+  }
+
+  .facilityDetailHeading {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
   }
 
   .facilityStats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: size(base) size(medium);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin: 0;
   }
 
   .facilityStat {
-    min-width: 72px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    dt {
+      min-height: 32px;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--font-color-faded);
+    }
+
+    dd {
+      margin: 0;
+    }
   }
 
   .facilityStatValue {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+
     &.good {
       color: $delta_good;
     }
@@ -3324,22 +3357,28 @@ html[data-theme="dark"] .uplot {
     }
   }
 
+  .facilityStatNote {
+    display: block;
+    color: var(--font-color-faded);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+  }
+
+  .facilityFuelTrend {
+    grid-column: 1 / -1;
+  }
+
   .facilityTrend {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
 
   .sparkline {
     display: block;
     overflow: visible;
-  }
-
-  // Buttons that only appear when a mouse is near them (see the desktop block below); on a
-  // touch screen there is no hover to reveal them with, so they stay put
-  .facilityActions {
-    display: inline-flex;
-    align-items: center;
   }
 
   // Every headline metric drawn at once, with the one on the big chart above promoted. A grid
@@ -4270,20 +4309,6 @@ $sizemap: (
   #navfooter {
     display: none;
   }
-
-  // There is a mouse now, so the row's actions can wait to be asked for -- which gives the
-  // numbers in the details panel the width the buttons were holding. Anything that reveals
-  // them has to include focus, or they'd be unreachable by keyboard
-  .facilityActions {
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-
-  .facilityRow:hover .facilityActions,
-  .facilityRow:focus-within .facilityActions,
-  .facilityRow.selected .facilityActions {
-    opacity: 1;
-  }
 }
 
 // KEYFRAMES
@@ -4721,28 +4746,61 @@ $sizemap: (
     display: inline;
   }
 }
-.base_main .facilityActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  padding: 0 16px 8px;
-  opacity: 1;
-  visibility: visible;
+.base_main .facilityRow {
+  container: facility-row / inline-size;
 }
 
-@media screen and (max-width: 600px) {
+.base_main .facilityActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
+  padding: 0 16px 12px;
+
+  .MuiButton-root {
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px;
+    line-height: 20px;
+    text-transform: none;
+  }
+
+  .facilityCancelConstruction {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (pointer: coarse) {
+  .base_main .facilityActions .MuiButton-root {
+    min-height: 44px;
+  }
+}
+
+// Row queries include the two 16px insets; detail queries use its content box directly.
+@container facility-row (max-width: 271px) {
   .base_main .facilityActions {
-    .facilityActionLabel {
-      display: none;
-    }
-    .MuiButton-root {
-      min-width: var(--control-size);
-      min-height: var(--control-size);
-      padding: 8px;
-    }
-    .MuiButton-startIcon {
-      margin: 0;
-    }
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container facility-row (min-width: 512px) {
+  .base_main .facilityActions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .base_main .facilityActions .facilityCancelConstruction {
+    grid-column: span 2;
+  }
+}
+
+@container facility-details (min-width: 280px) {
+  .base_main .facilityStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container facility-details (min-width: 540px) {
+  .base_main .facilityStats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 // Every row carries its reorder grip on the leading edge, always visible, with no label
@@ -4785,9 +4843,6 @@ $sizemap: (
   border-radius: inherit;
   transform-origin: left center;
   transition: transform 200ms linear;
-}
-.base_main .facilityDetails {
-  padding: 8px 16px 16px;
 }
 .transmissionFleet {
   margin-top: 0;

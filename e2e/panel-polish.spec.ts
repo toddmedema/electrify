@@ -18,10 +18,10 @@ test("responsive controls and panel navigation keep their geometry", async ({
   await facilities.locator(".facilityDisclosure").first().click();
   const actions = facilities.locator(".facilityActions").first();
   await expect(actions).toBeVisible();
+  for (const label of await actions.locator(".facilityActionLabel").all()) {
+    await expect(label).toBeVisible();
+  }
   if (page.viewportSize()!.width <= 600) {
-    for (const label of await actions.locator(".facilityActionLabel").all()) {
-      await expect(label).toBeHidden();
-    }
     const buttons = await actions.locator("button").evaluateAll((elements) =>
       elements.map((element) => {
         const rect = element.getBoundingClientRect();
@@ -33,7 +33,10 @@ test("responsive controls and panel navigation keep their geometry", async ({
         };
       }),
     );
-    expect(new Set(buttons.map((button) => button.y)).size).toBe(1);
+    expect(new Set(buttons.map((button) => button.y)).size).toBe(2);
+    expect(
+      new Set(buttons.map((button) => Math.round(button.width))).size,
+    ).toBe(1);
     expect(
       buttons.every(
         (button) => button.name && button.height >= 44 && button.width >= 44,
