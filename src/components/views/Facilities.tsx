@@ -318,6 +318,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
 
   const fuel = (facility as Partial<GeneratorOperatingType>).fuel;
   const accentColor = facilityColor(fuel);
+  const capacityFraction = isStorage
+    ? facility.currentWh / facility.peakWh
+    : fuel === "Hydro" && facility.reservoirCapacityWh
+      ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
+      : null;
   const outputFraction =
     facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
@@ -444,12 +449,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       alt={facility.name}
                       src={`/images/${facilityIconName(facility)}.svg`}
                     />
-                    {facility.peakWh > 0 && !underConstruction && (
-                      <div className="capacityProgressBar">
+                    {capacityFraction !== null && !underConstruction && (
+                      <div className="capacityProgressBar" aria-hidden="true">
                         <div
                           className="capacityProgressBarFill"
                           style={{
-                            transform: `scaleY(${facility.currentWh / facility.peakWh})`,
+                            transform: `scaleY(${capacityFraction})`,
                             backgroundColor:
                               activity === "CHARGING"
                                 ? chartPalette().storage
