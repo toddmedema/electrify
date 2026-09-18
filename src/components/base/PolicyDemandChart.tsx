@@ -1,7 +1,34 @@
 import * as React from "react";
+import { Box } from "@mui/material";
 import UPlotChart from "./UPlotChart";
 import { chartPalette } from "../../Theme";
 import { formatWatts } from "../../helpers/Format";
+import { DESIGN_WIDTH, MAX_CHART_SCALE } from "./UPlotHelpers";
+
+const CHART_HEIGHT = 140;
+
+/**
+ * Holds the chart's exact footprint while the estimate is computed. UPlotChart scales its height
+ * with its width up to a cap, so an aspect ratio plus that cap reproduces it at every size.
+ */
+export function PolicyDemandChartPlaceholder() {
+  return (
+    <Box
+      role="status"
+      sx={{
+        width: "100%",
+        aspectRatio: `${DESIGN_WIDTH} / ${CHART_HEIGHT}`,
+        maxHeight: CHART_HEIGHT * MAX_CHART_SCALE,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "text.secondary",
+      }}
+    >
+      Estimating this choice…
+    </Box>
+  );
+}
 
 export default function PolicyDemandChart({
   current,
@@ -13,7 +40,7 @@ export default function PolicyDemandChart({
   return (
     <UPlotChart
       ariaLabel="Estimated utility demand: current plan and with this change, over a representative day"
-      height={140}
+      height={CHART_HEIGHT}
       state={{}}
       data={[
         current.map((_, i) => (i * 24) / current.length),

@@ -30,7 +30,7 @@ export const DESIGN_WIDTH = 350;
  * extra width as plot rather than as type -- which is also where the room for a fifth chart on
  * screen comes from, since heights are quoted in the same space.
  */
-const MAX_CHART_SCALE = 1.4;
+export const MAX_CHART_SCALE = 1.4;
 
 /** Design units to CSS pixels for a chart of `width`. */
 export function chartScale(width: number): number {

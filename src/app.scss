@@ -988,7 +988,8 @@ $topbar_height: 56px;
 // ".base_main .MuiToolbar-root" above (also !important) or its min-height:0 wins instead
 $pane_header_height: 48px;
 
-.base_main .MuiToolbar-root.paneHeader {
+.base_main .MuiToolbar-root.paneHeader,
+.base_main .MuiToolbar-root.insightsHeader {
   min-height: $pane_header_height !important;
   box-sizing: border-box;
   padding-top: 4px;
@@ -1192,10 +1193,6 @@ $pane_header_height: 48px;
 .insightsHeader {
   --insights-control-size: 40px;
   gap: 8px;
-
-  > h6 {
-    flex: 0 0 auto;
-  }
 }
 
 .insightsHeaderControls {
@@ -1549,14 +1546,15 @@ $pane_header_height: 48px;
 }
 
 .insightsCompact {
+  // A compact pane opens on the rate controls; the tab bar already names it
+  .insightsTitle {
+    display: none;
+  }
+
   .MuiToolbar-root.insightsHeader {
     // Match the shared touch target size without adding an empty band around the controls.
     min-height: calc(var(--insights-control-size) + 8px) !important;
     padding: 4px 8px !important;
-  }
-
-  .insightsHeader > h6 {
-    display: none;
   }
 
   .insightsHeaderControls {
@@ -4589,7 +4587,8 @@ $sizemap: (
   :root {
     --control-size: 44px;
   }
-  .base_main .MuiToolbar-root.paneHeader {
+  .base_main .MuiToolbar-root.paneHeader,
+  .base_main .MuiToolbar-root.insightsHeader {
     min-height: 52px !important; // 44px Build button with 4px either side
   }
 }

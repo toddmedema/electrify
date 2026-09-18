@@ -20,12 +20,6 @@ for (const theme of ["light", "dark"] as const) {
       insights,
       page.getByRole("button", { name: "Insights", exact: true }),
     );
-    const scope = insights
-      .locator("details")
-      .filter({ hasText: "About these estimates" });
-    await scope.locator("summary").click();
-    await expect(scope).toContainText("windless spells aren't modeled");
-    await scope.locator("summary").click();
     const costs = insights
       .locator("details")
       .filter({ hasText: "Compare possible costs in five years" });

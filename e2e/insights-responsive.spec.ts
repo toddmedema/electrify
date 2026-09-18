@@ -244,9 +244,7 @@ test("insights header controls stay aligned in one compact row", async ({
     controls.map((control) => control.boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
-  const minimumControlHeight = testInfo.project.use.hasTouch
-    ? 44
-    : 40;
+  const minimumControlHeight = testInfo.project.use.hasTouch ? 44 : 40;
   expect(boxes.every((box) => box!.height >= minimumControlHeight)).toBe(true);
   expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
 

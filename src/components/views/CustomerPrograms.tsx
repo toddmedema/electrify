@@ -8,12 +8,15 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  IconButton,
   Radio,
   RadioGroup,
+  Skeleton,
   TextField,
   Typography,
   useMediaQuery,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import {
   cancelPolicy,
@@ -38,13 +41,19 @@ import {
 import { getScenario } from "../../data/Scenarios";
 import { createPolicyPreviewWorker } from "../../helpers/PolicyPreviewClient";
 import { PolicyPreviewResult } from "../../helpers/PolicyPreview";
-import PolicyDemandChart from "../base/PolicyDemandChart";
+import PolicyDemandChart, {
+  PolicyDemandChartPlaceholder,
+} from "../base/PolicyDemandChart";
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import {
   policyWindowLabel,
   suggestedPolicyStartHour,
 } from "../../helpers/PolicyWindow";
+// The estimate's closing note wraps to two lines at dialog width. Reserving both whether or not
+// it appears keeps the dialog from changing height when an estimate arrives.
+const NOTE_SLOT = { minHeight: "2lh" };
+
 const programLabel = (id: PolicyId, tier: PolicyTier) =>
   isOperatingPolicy(id) && tier !== "Off" ? "On" : tier;
 
@@ -172,6 +181,13 @@ function Decision({
       >
         {selected ? POLICIES[selected].name : "Customer programs"}
         <ManualLink entry={MANUAL_ENTRY.CUSTOMER_PROGRAMS} />
+        <IconButton
+          aria-label="Close customer programs"
+          onClick={onClose}
+          sx={{ ml: "auto", width: 44, height: 44 }}
+        >
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
       <DialogContent
         dividers
@@ -333,7 +349,24 @@ function Decision({
                 {error ? (
                   <Alert severity="error">{error}</Alert>
                 ) : !result ? (
-                  <Typography role="status">Estimating this choice…</Typography>
+                  // Mirrors the loaded layout line for line so the dialog keeps its height
+                  // when the estimate arrives instead of jumping under the player's pointer
+                  <>
+                    <Typography variant="body2">
+                      Current plan ━ · With this change ┄
+                    </Typography>
+                    <PolicyDemandChartPlaceholder />
+                    <Box aria-hidden>
+                      {Array.from({ length: operating ? 2 : 4 }, (_, i) => (
+                        <Typography key={i}>
+                          <Skeleton width={i % 2 ? "60%" : "80%"} />
+                        </Typography>
+                      ))}
+                      <Typography variant="body2" sx={NOTE_SLOT}>
+                        &nbsp;
+                      </Typography>
+                    </Box>
+                  </>
                 ) : (
                   <>
                     <Typography variant="body2">
@@ -369,16 +402,19 @@ function Decision({
                         {formatMoneyConcise(result.cashChange)}
                       </Typography>
 
-                      {(formatWatts(peakBefore) === formatWatts(peakAfter) ||
-                        Math.abs(peakAfter - peakBefore) <
-                          peakBefore * 0.001) && (
-                        <Typography variant="body2">
+                      {formatWatts(peakBefore) === formatWatts(peakAfter) ||
+                      Math.abs(peakAfter - peakBefore) < peakBefore * 0.001 ? (
+                        <Typography variant="body2" sx={NOTE_SLOT}>
                           Little change in peak demand.{" "}
                           {operating
                             ? "Only eligible loads respond. Try a different daily window to target your peak."
                             : selected === "solar"
                               ? "Daylight savings may leave the evening peak unchanged."
                               : "Efficiency savings build gradually as upgrades are installed."}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" sx={NOTE_SLOT} aria-hidden>
+                          &nbsp;
                         </Typography>
                       )}
                     </Box>
@@ -419,7 +455,7 @@ function Decision({
         sx={{ p: 2, flexWrap: "wrap", gap: 1, "& button": { minHeight: 44 } }}
       >
         <Button onClick={() => (selected ? setSelected(undefined) : onClose())}>
-          {selected ? "Cancel" : "Close"}
+          {selected ? "Back" : "Close"}
         </Button>
         {selected && (
           <Button

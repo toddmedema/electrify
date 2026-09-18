@@ -110,7 +110,6 @@ import ChartForecastWater from "../base/ChartForecastWater";
 import ChartForecastWeather from "../base/ChartForecastWeather";
 import ChartLegend from "../base/ChartLegend";
 import GameCard from "../base/GameCard";
-import ForecastScope from "../base/ForecastScope";
 import EconomicFutureComparison from "../base/EconomicFutureComparison";
 import { forecastShortfalls } from "../../helpers/ForecastShortfalls";
 import { UnitsContext } from "../base/UnitsContext";
@@ -1415,10 +1414,6 @@ export default class Insights extends React.Component<Props, State> {
         >
           <span className="insightsRateToggleLabel">Rate controls</span>
         </Button>
-        <CustomerPrograms
-          game={game}
-          onViewDemand={() => this.setLayers(["demandByType"])}
-        />
         <Typography
           className="insightsRateSummaryDesktop"
           variant="body2"
@@ -1441,7 +1436,8 @@ export default class Insights extends React.Component<Props, State> {
               growth{" "}
               <strong>
                 +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%/yr
-              </strong>
+              </strong>{" "}
+              at any rate
             </>
           )}
         </Typography>
@@ -1474,9 +1470,7 @@ export default class Insights extends React.Component<Props, State> {
             </>
           ) : (
             <span className="insightsRateMetric insightsRateMetricGrowth">
-              <span className="insightsRateMetricLabel">
-                Customer growth / yr
-              </span>
+              <span className="insightsRateMetricLabel">Fixed growth / yr</span>
               <strong className="insightsRateMetricValue">
                 +{(ORGANIC_GROWTH_MAX_ANNUAL * 100).toFixed(1)}%
               </strong>
@@ -1526,6 +1520,10 @@ export default class Insights extends React.Component<Props, State> {
             }
           />
         </div>
+        <CustomerPrograms
+          game={game}
+          onViewDemand={() => this.setLayers(["demandByType"])}
+        />
       </section>
     );
   }
@@ -2330,8 +2328,12 @@ export default class Insights extends React.Component<Props, State> {
         id="insightsPane"
       >
         <div className="scrollable" ref={this.paneRef}>
-          <Toolbar className="paneHeader insightsHeader">
+          <Toolbar className="paneHeader insightsTitle">
             <Typography variant="h6">Insights</Typography>
+          </Toolbar>
+          {this.renderLevers(now)}
+          {/* The preset and layer controls sit directly above the charts they choose */}
+          <Toolbar className="insightsHeader">
             <div className="insightsHeaderControls">
               <div
                 className="insightsPresetControls"
@@ -2504,6 +2506,7 @@ export default class Insights extends React.Component<Props, State> {
                   disabled={customLimitReached || !this.state.layers.length}
                   onClick={() => this.openPresetDialog("saveAs")}
                 >
+                  <AddIcon fontSize="small" />
                   Save as new preset
                 </MenuItem>
               )}
@@ -2525,9 +2528,7 @@ export default class Insights extends React.Component<Props, State> {
                 )}
             </Menu>
           </Toolbar>
-          <ForecastScope />
           {this.renderLayerPanel(projection)}
-          {this.renderLevers(now)}
           {this.renderViewportControls(
             viewportBounds,
             viewportRange,

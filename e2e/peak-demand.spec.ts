@@ -44,7 +44,7 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: "What is Customer programs?" })
         .click();
       const manual = page.getByRole("dialog", { name: "Manual help" });
-      await expect(manual).toContainText("total energy use is unchanged");
+      await expect(manual).toContainText("Total energy use stays the same");
       await page.keyboard.press("Escape");
       await expect(manual).toHaveCount(0);
       await expect(large).toBeChecked();
