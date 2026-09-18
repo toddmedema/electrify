@@ -780,7 +780,8 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
       (this.state.layers.includes("powerExchange") &&
-        nextProps.game.date.minute !== this.props.game.date.minute) ||
+        (nextProps.game.date.minute !== this.props.game.date.minute ||
+          nextProps.game.speed !== this.props.game.speed)) ||
       nextProps.game.dollarsPerkWh !== this.props.game.dollarsPerkWh ||
       nextProps.game.feePerKgCO2e !== this.props.game.feePerKgCO2e ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||

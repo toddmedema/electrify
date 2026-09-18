@@ -1140,6 +1140,7 @@ export interface UIType {
   // fleet row expands, Supply by Fuel dims everything it doesn't burn, and Insights reports what
   // it has earned. Cleared when the run ends, or when the facility is sold out from under it
   selectedFacilityId: number | null;
+  arrivingFacilityId?: number;
   // The score screen for a run that just ended, or null when none has. Its own slot rather than a
   // `dialog`, because the shared dialog only holds a title and a message and this one fills
   // itself in as async results arrive

@@ -11,6 +11,7 @@ import {
 } from "../../reducers/Game";
 import {
   selectFacility,
+  acknowledgeFacilityArrival,
   setFacilityDragActive,
   snackbarOpen,
 } from "../../reducers/UI";
@@ -25,11 +26,13 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     facilityDragActive: state.ui.facilityDragActive,
     game: state.game,
     selectedFacilityId: state.ui.selectedFacilityId,
+    arrivingFacilityId: state.ui.arrivingFacilityId,
   };
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
+    onArrivalShown: (id) => dispatch(acknowledgeFacilityArrival(id)),
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
     },

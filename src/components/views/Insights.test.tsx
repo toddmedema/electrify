@@ -922,7 +922,7 @@ describe("Insights layers", () => {
     expect(mockSupplyDemandPaints).toBeGreaterThan(chartCountBeforeDrag);
   });
 
-  it("refreshes a visible power exchange on every simulation tick", () => {
+  it("refreshes a visible power exchange on ticks and speed changes", () => {
     localStorage.setItem("insightsLayers", JSON.stringify(["powerExchange"]));
     const game = cloneDeep(
       gameReducer(
@@ -943,6 +943,18 @@ describe("Insights layers", () => {
     const ref = React.createRef<Insights>();
     render(<Insights {...props} ref={ref} />);
 
+    expect(
+      ref.current!.shouldComponentUpdate(
+        {
+          ...props,
+          game: {
+            ...game,
+            speed: game.speed === "PAUSED" ? "NORMAL" : "PAUSED",
+          },
+        },
+        ref.current!.state,
+      ),
+    ).toBe(true);
     expect(
       ref.current!.shouldComponentUpdate(
         {

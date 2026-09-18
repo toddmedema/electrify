@@ -2,6 +2,9 @@ import ManualLink from "./ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import { Typography } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { GameType, TickPresentFutureType } from "../../Types";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 
@@ -15,6 +18,30 @@ export default function PowerExchangeSummary({
   const flow = (now.importedW || 0) - (now.exportedW || 0);
   const direction =
     flow > 0 ? "Importing" : flow < 0 ? "Exporting" : "Standing by";
+  const previousDirection = React.useRef(direction);
+  const lastMotion = React.useRef(-Infinity);
+  const [moving, setMoving] = React.useState<string | null>(null);
+  const motionEnabled = game.speed === "SLOW" || game.speed === "NORMAL";
+  React.useEffect(() => {
+    const changed = previousDirection.current !== direction;
+    previousDirection.current = direction;
+    setMoving(null);
+    // Initial display and resume are snapshots, not new trades. FAST can reverse many
+    // times a second; don't queue effects or let an old arrow outlive its direction.
+    if (!changed || !motionEnabled || direction === "Standing by") return;
+    let finish: number | undefined;
+    const timer = window.setTimeout(() => {
+      if (performance.now() - lastMotion.current < 2500) return;
+      lastMotion.current = performance.now();
+      setMoving(direction);
+      // Reduced motion suppresses animationend, but must still consume this cue.
+      finish = window.setTimeout(() => setMoving(null), 500);
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(finish);
+    };
+  }, [direction, motionEnabled]);
   const available = now.transmissionCapacityW || 0;
   const nameplate = (game.transmission?.lines || [])
     .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
@@ -26,7 +53,24 @@ export default function PowerExchangeSummary({
       <div className="powerExchangeHero">
         <img src="/images/transmission.svg" alt="" />
         <div>
-          <Typography variant="h6">{direction}</Typography>
+          <Typography variant="h6" className="powerExchangeDirection">
+            {direction}
+            <span
+              aria-hidden="true"
+              className="powerExchangeArrow"
+              data-direction={direction}
+              data-moving={(motionEnabled && moving === direction) || undefined}
+              onAnimationEnd={() => setMoving(null)}
+            >
+              {direction === "Importing" ? (
+                <ArrowBackIcon />
+              ) : direction === "Exporting" ? (
+                <ArrowForwardIcon />
+              ) : (
+                <RemoveIcon />
+              )}
+            </span>
+          </Typography>
         </div>
       </div>
       <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />

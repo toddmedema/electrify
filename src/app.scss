@@ -5177,3 +5177,102 @@ $sizemap: (
     height: 52px;
   }
 }
+
+// Local feedback never moves hit targets or interpolates the simulation's readings.
+.facilityArrival {
+  animation: facilityArrival 240ms ease-out;
+}
+
+@keyframes facilityArrival {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.facilityReady::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--delta-good);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: facilityCommissioned 700ms ease-out forwards;
+}
+
+.facilityReadyLabel {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  color: var(--delta-good);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@keyframes facilityCommissioned {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.facilityRow .facilityDetails {
+  animation: facilityDetailsReveal 160ms ease-out;
+}
+
+@keyframes facilityDetailsReveal {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.powerExchangeDirection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.powerExchangeArrow {
+  display: inline-flex;
+  justify-content: center;
+  width: 32px;
+  flex: 0 0 32px;
+  color: var(--font-color-faded);
+  --flow-offset: -8px;
+
+  &[data-direction="Exporting"] {
+    --flow-offset: 8px;
+  }
+  &[data-moving="true"] svg {
+    animation: powerExchangeFlow 500ms ease-out;
+  }
+}
+
+@keyframes powerExchangeFlow {
+  0% {
+    transform: translateX(calc(-1 * var(--flow-offset)));
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .facilityArrival,
+  .facilityReady::after,
+  .facilityRow .facilityDetails,
+  .powerExchangeArrow[data-moving="true"] svg {
+    animation: none;
+  }
+  .facilityReady::after {
+    opacity: 0;
+  }
+}

@@ -60,6 +60,8 @@ import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
 interface FacilityListItemProps {
+  arriving: boolean;
+  onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
   spotInList: number;
   listLength: number;
@@ -258,9 +260,37 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     selected,
     spotInList,
     storyOutputMultiplier,
+    arriving: arrivalRequested,
+    onArrivalShown,
   } = props;
   const underConstruction = facility.yearsToBuildLeft > 0;
   const isStorage = facility.peakWh > 0;
+  const wasBuilding = React.useRef(underConstruction);
+  const [arriving, setArriving] = React.useState(arrivalRequested);
+  const [ready, setReady] = React.useState(false);
+  React.useEffect(() => {
+    if (arrivalRequested) {
+      setArriving(true);
+      onArrivalShown?.(facility.id);
+    }
+  }, [arrivalRequested, onArrivalShown, facility.id]);
+  React.useEffect(() => {
+    if (!arriving) return;
+    // Also consume the cue when reduced motion prevents animationend from firing.
+    const timer = window.setTimeout(() => setArriving(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [arriving]);
+  React.useEffect(() => {
+    if (wasBuilding.current && !underConstruction && !readOnly) {
+      setReady(true);
+    }
+    wasBuilding.current = underConstruction;
+  }, [underConstruction, readOnly]);
+  React.useEffect(() => {
+    if (!ready) return;
+    const timer = window.setTimeout(() => setReady(false), 2400);
+    return () => window.clearTimeout(timer);
+  }, [ready]);
 
   // Storage is charging or discharging depending on which way its stored energy moved since the
   // last tick, which is only knowable by remembering the last one
@@ -350,8 +380,11 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         >
           <div
-            className="facilityRowHeader"
+            className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
             data-storage={isStorage || undefined}
+            onAnimationEnd={(event) => {
+              if (event.animationName === "facilityArrival") setArriving(false);
+            }}
           >
             {/* Behind the whole row, grip included, so the fill reads edge to edge. Tinted by
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
@@ -439,6 +472,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                     primary={
                       <>
                         <span className="facilityName">{facility.name}</span>
+                        {ready && (
+                          <span className="facilityReadyLabel">Ready</span>
+                        )}
                         {storyOutputMultiplier < 1 && (
                           <Chip
                             className="storyDerateBadge"
@@ -592,6 +628,7 @@ function FacilitySupplyChart({
 }
 
 export interface StateProps {
+  arrivingFacilityId?: number;
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
   game: GameType;
@@ -601,6 +638,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
+  onArrivalShown?: (id: number) => void;
   onEvidenceReady?: (
     request: EvidenceRequestType,
     element: HTMLElement | null,
@@ -650,6 +688,7 @@ export default class Facilities extends React.Component<Props> {
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
+      nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       nextProps.game.speed !== "FAST" ||
       nextProps.selectedFacilityId !== this.props.selectedFacilityId ||
@@ -775,6 +814,8 @@ export default class Facilities extends React.Component<Props> {
                       {game.facilities.map(
                         (g: FacilityOperatingType, i: number) => (
                           <FacilityListItem
+                            arriving={this.props.arrivingFacilityId === g.id}
+                            onArrivalShown={this.props.onArrivalShown}
                             facility={g}
                             game={game}
                             key={g.id}
