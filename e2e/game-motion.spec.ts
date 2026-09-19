@@ -34,13 +34,8 @@ for (const theme of ["light", "dark"]) {
       "data-motion-seen",
       /facilityArrival/,
     );
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-motion-seen",
-      /facilityDetailsReveal/,
-    );
-    await expect(
-      pane.locator(".facilityRow.selected .facilityDetails"),
-    ).toBeVisible();
+    // The new row is highlighted but left collapsed
+    await expect(pane.locator(".facilityRow.selected")).toHaveCount(0);
 
     // Resume a real saved run just before commissioning; loading must not celebrate it.
     const commissionedId = await page.evaluate(() => {

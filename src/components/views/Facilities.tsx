@@ -54,9 +54,7 @@ import { LOW_RESERVOIR_FRACTION } from "../../helpers/HydroOutlook";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
-import TransmissionPanel, {
-  TransmissionTradingSummary,
-} from "./TransmissionPanel";
+import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
@@ -808,12 +806,6 @@ export default class Facilities extends React.Component<Props> {
           </Toolbar>
           <div className="scrollable facilitiesBody">
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {intertiesAvailable && (
-              <TransmissionTradingSummary
-                game={game}
-                onPolicy={onTradingPolicy}
-              />
-            )}
             <List dense className="scrollable unifiedFacilitiesList">
               {intertiesAvailable && (
                 <Typography
