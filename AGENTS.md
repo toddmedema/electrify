@@ -35,9 +35,9 @@ whole (see `.gitattributes`), so resolve the other files and regenerate. See
 
 ## Claude Code
 
-`CLAUDE.md` imports this file. `.claude/settings.json` allows the npm scripts above without a
-prompt and formats each file Claude edits with Prettier, so formatting failures should be rare;
-agents without that hook should run `npm run format` before `check`.
+This file is the only agent guide; do not add a `CLAUDE.md`. `.claude/settings.json` allows the
+npm scripts above without a prompt and formats each file Claude edits with Prettier, so formatting
+failures should be rare; agents without that hook should run `npm run format` before `check`.
 
 ## Pull requests
 
