@@ -7,12 +7,37 @@ files are large, so broad rewrites create expensive review diffs.
 ## Start here
 
 - Use Node 24 and install exactly the lockfile with `npm ci`.
-- Run `npm run check` before handing work off. It runs types, lint, formatting, the covered Jest
-  suite, and every scenario through the headless simulation.
-- Use `npm test -- <name>` while iterating on one Jest suite and `npm run sim -- --scenario <id>`
-  while iterating on game economics. See `src/testing/README.md` for simulation flags and traps.
+- Run `npm run check` before handing work off (about a minute). It runs the same gates as CI:
+  run compatibility, types (including `e2e/`), lint, formatting, the covered Jest suite, and every
+  scenario through the headless simulation. It reports every failing step at once, prints only
+  failing output, and ends with a one-line-per-step summary and fix commands.
+- `npm run fix` applies every mechanical fix: regenerates the run compatibility manifest, then
+  runs `lint:fix` and `format`. Review its diff; it does not fix types or tests.
+- Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
+  interactive watch mode and never exits in a non-interactive shell. Coverage thresholds apply
+  only to `test:ci`.
+- Iterate on game economics with `npm run sim -- --scenario <id>`. See `src/testing/README.md`
+  for simulation flags and traps.
 - Build with `npm run build`. Browser-level responsive and tutorial checks live under `e2e/` and
-  run with `npm run test:e2e` when the changed path warrants them.
+  run with `npm run test:e2e -- <spec> --project=desktop-chromium` when the changed path warrants
+  them. CI runs `build-options.spec.ts` and `tutorial-exit.spec.ts` on desktop and 390 px phone.
+
+## Run compatibility manifest
+
+`src/data/RunCompatibility.json` is a generated hash of every simulation input: everything under
+`src/data`, `src/helpers`, and `src/reducers` except tests, plus `src/Constants.tsx`,
+`src/Types.tsx`, `package-lock.json`, and `public/data`. Any edit to those files makes
+`compatibility:check`, and therefore `check` and `build`, fail until you run
+`npm run compatibility:generate` and commit the result. Regenerate it last, after all other edits
+and after any merge or rebase; never hand-merge it. Git keeps one side of a conflicted manifest
+whole (see `.gitattributes`), so resolve the other files and regenerate. See
+`docs/run-compatibility.md` for why the hash is intentionally broad.
+
+## Claude Code
+
+`CLAUDE.md` imports this file. `.claude/settings.json` allows the npm scripts above without a
+prompt and formats each file Claude edits with Prettier, so formatting failures should be rare;
+agents without that hook should run `npm run format` before `check`.
 
 ## Pull requests
 
@@ -48,6 +73,13 @@ files are large, so broad rewrites create expensive review diffs.
   replay behavior covered by tests.
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
+- Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
+  `docs/facilities-economics.md` (facility cost sources), `docs/run-compatibility.md`
+  (challenge compatibility), and `src/testing/SCENARIO_CHOICE_BALANCE.md` (scenario choice
+  balance).
+- Several files are large: `app.scss`, `reducers/Game.tsx`, `views/Insights.tsx`,
+  `data/WorldEvents.tsx`, `data/TransmissionProfiles.ts`, `data/Scenarios.tsx`, and `Types.tsx`.
+  Search them for the symbol you need and read that range instead of loading the whole file.
 
 ## Changes that span files
 
