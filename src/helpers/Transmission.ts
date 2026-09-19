@@ -180,6 +180,24 @@ export function importAvailabilityFraction(
   );
 }
 
+/**
+ * Watts the neighbour can send over the line right now: the weather-adjusted rating, times the
+ * share the neighbour can fill, capped by the market's spare supply. Mirrors the reducer's tick.
+ */
+export function intertieImportLimitW(
+  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+  context: IntertieContext,
+  minute: number,
+  conditions: TransmissionConditions,
+): number {
+  const market = adjacentMarketForCorridor(line.corridorId);
+  return Math.min(
+    transmissionRatingW(line, conditions) *
+      importAvailabilityFraction(line.corridorId, context, minute, conditions),
+    market?.availableSupplyW || 0,
+  );
+}
+
 /** Offline, seeded wholesale price in dollars per MWh, shaped by the neighbour's archetype. */
 export function adjacentMarketPricePerMWh(
   corridorId: string,
@@ -198,9 +216,14 @@ export function adjacentMarketPricePerMWh(
     1 -
     neighbourYearFactor(market, context.seed, minute) *
       neighbourLullFactor(market, context.seed, minute);
+  // Each neighbour gets its own noise, so which line is cheaper can change tick to tick.
+  // The index wraps to 32 bits inside normalAt; the collisions that allows are harmless here.
   const noise =
-    normalAt(context.seed, RANDOM_STREAM.transmissionMarkets, tick) *
-    archetype.priceNoise;
+    normalAt(
+      context.seed,
+      RANDOM_STREAM.transmissionMarkets,
+      marketIndex(market.id) * 131071 + tick,
+    ) * archetype.priceNoise;
   return Math.max(
     5,
     Math.round(

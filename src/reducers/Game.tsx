@@ -95,8 +95,8 @@ import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
   clearTransmissionMarket,
-  importAvailabilityFraction,
   intertieContextForGame,
+  intertieImportLimitW,
   IntertieOffer,
   transmissionRatingW,
 } from "../helpers/Transmission";
@@ -2826,15 +2826,11 @@ function updateSupplyFacilitiesFinances(
       now,
     );
     // The neighbour's archetype decides how much of the line it can fill right now.
-    const importLimitW = Math.min(
-      rating *
-        importAvailabilityFraction(
-          line.corridorId,
-          intertieContext,
-          now.minute,
-          now,
-        ),
-      market?.availableSupplyW || 0,
+    const importLimitW = intertieImportLimitW(
+      line,
+      intertieContext,
+      now.minute,
+      now,
     );
     const exportLimitW = Math.min(rating, market?.availableDemandW || 0);
     transmissionCapacity += rating;

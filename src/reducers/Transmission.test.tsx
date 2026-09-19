@@ -284,7 +284,7 @@ describe("transmission actions", () => {
     expect(now.exportedW).toBe(0);
     expect(now.supplyW).toBeCloseTo(expectedImportW, 0);
     expect(now.transmissionCapacityW).toBe(offer.ratingW);
-    expect(now.marketPricePerMWh).toBe(offer.pricePerMWh);
+    expect(now.marketPricePerMWh).toBeCloseTo(offer.pricePerMWh, 6);
     expect(now.expensesImports).toBeCloseTo(
       tickMWh(now.importedW!) * offer.pricePerMWh,
       6,

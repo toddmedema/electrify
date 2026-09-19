@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { Provider } from "react-redux";
@@ -345,6 +345,40 @@ describe("the interties view", () => {
     ).toBeInTheDocument();
   });
 
+  it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
+    renderProjects(playedGame(0));
+    const north = screen.getByTestId("transmission-project-california-north");
+    const south = screen.getByTestId("transmission-project-california-south");
+    expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
+    expect(within(south).getByText("Solar surplus")).toBeInTheDocument();
+    expect(within(north).getByText("Existing route")).toBeInTheDocument();
+    for (const card of [north, south]) {
+      expect(
+        within(card).getByRole("img", { name: /^Typical year of import room/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(card).getByText(/^Typical year · Low \w{3} \d+%$/),
+      ).toBeInTheDocument();
+      expect(within(card).getByText("At your peak")).toBeInTheDocument();
+      expect(within(card).getByText(/^~\d+%$/)).toBeInTheDocument();
+      expect(within(card).getByText(/^\$\d+–\d+\/MWh$/)).toBeInTheDocument();
+    }
+    expect(
+      within(south).getByText("Cheapest midday · priciest evening"),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Review purchase of Desert Southwest intertie",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent(/Import room~\d+% at your peak/);
+    expect(dialog).toHaveTextContent(/Neighbor price\$\d+–\d+\/MWh/);
+    expect(dialog).toHaveTextContent("cheapest connected neighbor first");
+    expect(dialog).not.toHaveTextContent("backup is not guaranteed");
+  });
+
   it("keeps every earlier tutorial focused on plants", () => {
     for (const scenarioId of [0, 1, 2, 4, 3, 5]) {
       renderFacilities(createGame({ scenarioId }), null);
@@ -453,6 +487,28 @@ describe("unified connections", () => {
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
+    // The connected line reports what it can do right now beside its typical year
+    expect(connections[0]).toHaveTextContent(/Price now\$\d+/);
+    expect(connections[0]).toHaveTextContent(/Can import now.+ of /);
+    expect(connections[0]).toHaveTextContent(/Typical price\$\d+–\d+\/MWh/);
+    expect(connections[0]).toHaveTextContent("At your peak");
+    expect(connections[0]).toHaveTextContent("Purchased emissions");
+    expect(
+      within(connections[0] as HTMLElement).getByRole("img", {
+        name: /^Typical year of import room/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a building line's outlook without claiming it can import yet", async () => {
+    const game = connectedGame();
+    renderFacilities(game, null);
+    await user.click(screen.getByText(game.transmission!.lines[1].name));
+    // eslint-disable-next-line testing-library/no-node-access
+    const building = document.querySelectorAll(".transmissionLine")[1];
+    expect(building).toHaveTextContent("Power can flow when construction");
+    expect(building).not.toHaveTextContent("Can import now");
+    expect(building).toHaveTextContent("Typical price");
   });
 
   it("permits inspecting replay connections but disables trading and building", async () => {

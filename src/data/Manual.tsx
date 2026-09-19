@@ -666,7 +666,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.INTERTIES,
     group: "Gameplay",
     keywords:
-      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus",
+      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype",
     related: [
       MANUAL_ENTRY.RESERVE_CAPACITY,
       MANUAL_ENTRY.EMISSIONS,
@@ -680,9 +680,22 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           storage.
         </p>
         <p>
-          Imports depend on line capacity and the neighbor's spare supply. Hot,
-          sunny weather can reduce capacity. Check construction time, loan
-          payments, upkeep and wholesale prices before relying on imports.
+          Neighbors differ in when they can spare power and what it costs. The
+          chip on each intertie names the kind of grid next door, such as
+          seasonal hydro or solar surplus. The small line shows its typical
+          year: how much of the line it can usually fill each month.
+        </p>
+        <p>
+          &ldquo;At your peak&rdquo; matters most. It is how much the neighbor
+          can usually send during your highest-demand hours, when a shortage
+          would hurt. Neighbors that share your heat waves and cold snaps help
+          less then, and even less on harder difficulties.
+        </p>
+        <p>
+          Imports come from the cheapest available neighbor first, and exports
+          go to the best-paying one. Hot, sunny weather can also reduce line
+          capacity. Check construction time, loan payments and upkeep before
+          relying on imports.
         </p>
         <p>
           Purchased electricity adds estimated emissions to your score.
