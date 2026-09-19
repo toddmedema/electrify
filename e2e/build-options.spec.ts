@@ -109,6 +109,29 @@ for (const theme of ["light", "dark"] as const) {
       await expect(first.getByRole("table")).toBeVisible();
       await review.click();
       await expect(page.getByRole("dialog")).toBeVisible();
+      const dialog = page.getByRole("dialog");
+      const title = dialog.locator(".closableDialogTitleText");
+      const close = dialog.getByRole("button", { name: "close", exact: true });
+      const titleBox = (await title.boundingBox())!;
+      const closeBox = (await close.boundingBox())!;
+      expect(titleBox.x + titleBox.width + 7).toBeLessThanOrEqual(closeBox.x);
+      expect(closeBox.height).toBeGreaterThanOrEqual(
+        testInfo.project.use.hasTouch ? 44 : 40,
+      );
+      const actionStyles = await dialog
+        .locator(".MuiDialogActions-root")
+        .evaluate((element) => ({
+          gap: getComputedStyle(element).gap,
+          bottom: parseFloat(getComputedStyle(element).paddingBottom),
+          margins: Array.from(element.children).map(
+            (child) => getComputedStyle(child).marginLeft,
+          ),
+        }));
+      expect(actionStyles.gap).toBe("8px");
+      expect(actionStyles.bottom).toBeGreaterThanOrEqual(16);
+      expect(actionStyles.margins.every((margin) => margin === "0px")).toBe(
+        true,
+      );
       await expect(
         page.getByRole("button", { name: "Pay cash", exact: true }),
       ).toBeVisible();

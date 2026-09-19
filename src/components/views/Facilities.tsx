@@ -97,12 +97,9 @@ function facilityIconName(facility: FacilityOperatingType): string {
 }
 
 const getDraggableStyle = (
-  isDragging: boolean,
   draggableStyle: DraggingStyle | NotDraggingStyle | undefined,
 ): React.CSSProperties => ({
   userSelect: "none",
-  border: isDragging ? `1px solid rgba(30, 136, 229, 0.5)` : "none", // Match buttons
-  borderRadius: isDragging ? `4px` : "0",
   ...draggableStyle,
 });
 
@@ -389,12 +386,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={selected ? "facilityRow selected" : "facilityRow"}
+          className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           data-fuel={fuel}
-          style={getDraggableStyle(
-            snapshot.isDragging,
-            provided.draggableProps.style,
-          )}
+          style={getDraggableStyle(provided.draggableProps.style)}
         >
           <div
             className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}

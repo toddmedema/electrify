@@ -20,14 +20,13 @@ import {
   Toolbar,
   Typography,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -505,17 +504,9 @@ export default class NewGameDetails extends React.Component<Props, State> {
             open={victoryDialogOpen || false}
             onClose={toggleVictoryDialog}
           >
-            <DialogTitle>
+            <ClosableDialogTitle onClose={toggleVictoryDialog}>
               What counts as a win
-              <IconButton
-                aria-label="close"
-                onClick={toggleVictoryDialog}
-                className="top-right"
-                size="large"
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
+            </ClosableDialogTitle>
             <DialogContent>
               <VictoryConditions
                 ownership={scenario.ownership}

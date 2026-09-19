@@ -2,15 +2,13 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import {
   Button,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  IconButton,
   FormControl,
   FormHelperText,
   InputLabel,
@@ -388,17 +386,12 @@ export default function TransmissionPanel({
           maxWidth="sm"
           aria-labelledby="intertie-review-title"
         >
-          <DialogTitle id="intertie-review-title">
+          <ClosableDialogTitle
+            id="intertie-review-title"
+            onClose={() => setReviewId(null)}
+          >
             Build {reviewMarket?.name} intertie?
-            <IconButton
-              aria-label="close"
-              onClick={() => setReviewId(null)}
-              className="top-right"
-              size="large"
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
+          </ClosableDialogTitle>
           <DialogContent className="noPadding">
             <DecisionImpactPreview
               facts={[

@@ -346,6 +346,13 @@ export function createAppTheme(mode: ThemeModeType): Theme {
           },
         },
       },
+      MuiSelect: {
+        defaultProps: { size: "small" },
+        styleOverrides: {
+          select: { paddingTop: 8, paddingBottom: 8 },
+          standard: { paddingLeft: 8 },
+        },
+      },
       MuiInputBase: {
         styleOverrides: {
           root: {
@@ -375,7 +382,15 @@ export function createAppTheme(mode: ThemeModeType): Theme {
       MuiDialogTitle: { styleOverrides: { root: { padding: 16 } } },
       MuiDialogContent: { styleOverrides: { root: { padding: 16 } } },
       MuiDialogActions: {
-        styleOverrides: { root: { padding: 16, gap: 8, flexWrap: "wrap" } },
+        defaultProps: { disableSpacing: true },
+        styleOverrides: {
+          root: {
+            padding: 16,
+            paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+            gap: 8,
+            flexWrap: "wrap",
+          },
+        },
       },
       MuiButtonBase: {
         defaultProps: {
