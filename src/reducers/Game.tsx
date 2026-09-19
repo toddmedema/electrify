@@ -93,7 +93,11 @@ import {
 } from "../data/AdjacentMarkets";
 import {
   adjacentMarketPricePerMWh,
+  allocateIntertieFlows,
   clearTransmissionMarket,
+  intertieContextForGame,
+  intertieImportLimitW,
+  IntertieOffer,
   transmissionRatingW,
 } from "../helpers/Transmission";
 import {
@@ -2799,30 +2803,38 @@ function updateSupplyFacilitiesFinances(
   const operatingLines = transmission.lines.filter(
     ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
   );
+  const intertieContext = intertieContextForGame(state);
   let transmissionCapacity = 0;
-  let weightedMarketPrice = 0;
   let marketImportLimitW = 0;
-  let weightedImportEmissions = 0;
   let marketExportLimitW = 0;
+  const offers: (IntertieOffer & { emissionsKgco2ePerMWh: number })[] = [];
   for (const line of operatingLines) {
     const rating = transmissionRatingW(line, now);
     const market = adjacentMarketForCorridor(line.corridorId);
-    const price = adjacentMarketPricePerMWh(
+    const pricePerMWh = adjacentMarketPricePerMWh(
       line.corridorId,
-      state.seed,
+      intertieContext,
       now.minute,
       now,
     );
+    // The neighbour's archetype decides how much of the line it can fill right now.
+    const importLimitW = intertieImportLimitW(
+      line,
+      intertieContext,
+      now.minute,
+      now,
+    );
+    const exportLimitW = Math.min(rating, market?.availableDemandW || 0);
     transmissionCapacity += rating;
-    weightedMarketPrice += rating * price;
-    const importCapacityW = Math.min(rating, market?.availableSupplyW || 0);
-    marketImportLimitW += importCapacityW;
-    weightedImportEmissions +=
-      importCapacityW * (market?.emissionsKgco2ePerMWh || 0);
-    marketExportLimitW += Math.min(rating, market?.availableDemandW || 0);
+    marketImportLimitW += importLimitW;
+    marketExportLimitW += exportLimitW;
+    offers.push({
+      importLimitW,
+      exportLimitW,
+      pricePerMWh,
+      emissionsKgco2ePerMWh: market?.emissionsKgco2ePerMWh || 0,
+    });
   }
-  const marketPricePerMWh =
-    transmissionCapacity > 0 ? weightedMarketPrice / transmissionCapacity : 0;
   // Export already-produced surplus; unused dispatchable capacity remains ready without
   // burning fuel or pretending that a reserve is electricity supplied to customers.
   const grossLocalSupplyW = supply;
@@ -2835,6 +2847,28 @@ function updateSupplyFacilitiesFinances(
     policy: transmission.tradingPolicy,
   });
   const { importedW, exportedW } = clearing;
+  // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
+  const flows = allocateIntertieFlows(offers, importedW, exportedW);
+  let importCostPerHour = 0;
+  let exportRevenuePerHour = 0;
+  let importEmissionsWeight = 0;
+  let importEmissionsBasisW = 0;
+  offers.forEach((offer, index) => {
+    importCostPerHour += flows.importedW[index] * offer.pricePerMWh;
+    exportRevenuePerHour += flows.exportedW[index] * offer.pricePerMWh;
+    // Actual imports carry their own mix; with none flowing, show the mix that would arrive.
+    const basisW = importedW > 0 ? flows.importedW[index] : offer.importLimitW;
+    importEmissionsWeight += basisW * offer.emissionsKgco2ePerMWh;
+    importEmissionsBasisW += basisW;
+  });
+  const flowW = importedW + exportedW;
+  const marketPricePerMWh =
+    flowW > 0
+      ? (importCostPerHour + exportRevenuePerHour) / flowW
+      : transmissionCapacity > 0
+        ? offers.reduce((sum, offer) => sum + offer.pricePerMWh, 0) /
+          offers.length
+        : 0;
   supply = clearing.localAvailableSupplyW;
   now.importedW = importedW;
   now.exportedW = exportedW;
@@ -2846,7 +2880,9 @@ function updateSupplyFacilitiesFinances(
   // Surplus exports are interruptible under the game policy and can be redirected locally.
   now.reserveW = supply - now.demandW + reachableHeadroomW + exportedW;
   now.importKgco2ePerMWh =
-    marketImportLimitW > 0 ? weightedImportEmissions / marketImportLimitW : 0;
+    importEmissionsBasisW > 0
+      ? importEmissionsWeight / importEmissionsBasisW
+      : 0;
 
   now.supplyByFuel = supplyByFuel;
   now.storedWh = storedWh;
@@ -2870,8 +2906,14 @@ function updateSupplyFacilitiesFinances(
     (supplyWh / 1000) * (now.customerBillingRate ?? state.dollarsPerkWh);
   const importedWh = (importedW / ticksPerHour) * GAME_TO_REAL_YEARS;
   const exportedWh = (exportedW / ticksPerHour) * GAME_TO_REAL_YEARS;
-  const expensesImports = (importedWh / 1000000) * marketPricePerMWh;
-  const revenueExports = (exportedWh / 1000000) * marketPricePerMWh;
+  const expensesImports =
+    importedW > 0
+      ? (importedWh / 1000000) * (importCostPerHour / importedW)
+      : 0;
+  const revenueExports =
+    exportedW > 0
+      ? (exportedWh / 1000000) * (exportRevenuePerHour / exportedW)
+      : 0;
   const choiceGrant = state.worldEvents.occurrences
     .filter(
       (event) =>

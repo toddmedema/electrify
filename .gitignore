@@ -46,3 +46,7 @@ google-services.json
 GoogleService-Info.plist
 .env.local
 .idea
+
+# Claude Code: personal settings and session worktrees
+.claude/settings.local.json
+.claude/worktrees/

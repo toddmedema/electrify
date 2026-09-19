@@ -2,7 +2,8 @@ import reducer, { facilityPurchased, acknowledgeFacilityArrival } from "./UI";
 
 it("consumes only the matching purchase and clears arrivals between runs", () => {
   const purchased = reducer(undefined, facilityPurchased(7));
-  expect(purchased.selectedFacilityId).toBe(7);
+  expect(purchased.selectedFacilityId).toBeNull();
+  expect(purchased.arrivingFacilityId).toBe(7);
   expect(
     reducer(purchased, acknowledgeFacilityArrival(6)).arrivingFacilityId,
   ).toBe(7);

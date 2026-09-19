@@ -10,6 +10,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { CityType } from "../../data/Cities";
 import { WORLD_LAND_PATH } from "../../data/WorldLand";
@@ -90,6 +91,8 @@ export default function LocationPicker({
   loading = false,
   onChange,
 }: Props): React.JSX.Element {
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
+  const markerSize = coarsePointer ? 44 : 40;
   const [viewport, setViewport] = React.useState<MapViewport>(WORLD_VIEW);
   const [mapSize, setMapSize] = React.useState({ width: 600, height: 300 });
   const [rovingId, setRovingId] = React.useState(
@@ -145,10 +148,10 @@ export default function LocationPicker({
         viewport,
         mapSize.width,
         mapSize.height,
-        mapSize.width < 700 ? 44 : 32,
+        markerSize,
         value?.id,
       ),
-    [locations, viewport, mapSize, value?.id],
+    [locations, viewport, mapSize, markerSize, value?.id],
   );
 
   React.useEffect(() => {
@@ -467,6 +470,9 @@ export default function LocationPicker({
       <div
         className={`worldMap${viewport.zoom > 0 ? " zoomed" : ""}${panning ? " panning" : ""}`}
         ref={mapRef}
+        style={
+          { "--map-marker-size": `${markerSize}px` } as React.CSSProperties
+        }
         role="group"
         aria-label="Playable locations map"
         aria-describedby="location-map-instructions"

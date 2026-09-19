@@ -10,8 +10,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  IconButton,
   List,
   Stack,
   Table,
@@ -24,7 +22,7 @@ import {
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
 import {
   estimatedAnnualOperatingCost,
@@ -542,17 +540,9 @@ export function GeneratorBuildItem(
       </Collapse>
 
       <Dialog open={open} onClose={toggleOpen}>
-        <DialogTitle>
+        <ClosableDialogTitle onClose={toggleOpen}>
           Build {formatWatts(generator.peakW)} {generator.name}?
-          <IconButton
-            aria-label="close"
-            onClick={toggleOpen}
-            className="top-right"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+        </ClosableDialogTitle>
         <DialogContent className="noPadding">
           <DecisionImpactPreview
             facts={[

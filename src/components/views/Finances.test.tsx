@@ -1,5 +1,5 @@
 import { createNextState as produce } from "@reduxjs/toolkit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { summarizeTimeline } from "../../helpers/DateTime";
@@ -358,7 +358,7 @@ describe("the month over month column", () => {
 
   // Both point up, so the arrow alone can't tell these apart -- and colouring a rise in
   // spending the same green as a rise in earnings would be exactly backwards
-  it("reads a rise in revenue as good news and a rise in an expense as bad", () => {
+  it("reads a rise in revenue as good news and a rise in an expense as bad", async () => {
     renderFinances(withChange({ revenue: 0 }), "PAUSED");
     expect(toneOf("Revenue")).toEqual("bad");
 
@@ -370,6 +370,9 @@ describe("the month over month column", () => {
         expensesFuel: previous.expensesFuel * 1.5,
       }),
       "PAUSED",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show financial breakdown" }),
     );
     expect(toneOf("Revenue")).toEqual("good");
     expect(toneOf("Fuel")).toEqual("bad");
@@ -387,4 +390,34 @@ describe("the month over month column", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/of your fleet/)).toBeInTheDocument();
   });
+});
+
+it("exposes a keyboard disclosure without making the financial table clickable", async () => {
+  localStorage.clear();
+  renderFinances(createGame({ scenarioId: 101 }), "PAUSED");
+  expect(
+    screen.getByRole("combobox", { name: "Financial metric" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("combobox", { name: "Financial time range" }),
+  ).toBeInTheDocument();
+  const disclosure = screen.getByRole("button", {
+    name: "Show financial breakdown",
+  });
+  const table = screen.getByRole("table");
+  expect(disclosure).toHaveAttribute("aria-controls", table.id);
+  const collapsedRows = within(table).getAllByRole("row").length;
+  act(() => disclosure.focus());
+  await user.keyboard("{Enter}");
+  expect(disclosure).toHaveAttribute("aria-expanded", "true");
+  expect(within(table).getAllByRole("row").length).toBeGreaterThan(
+    collapsedRows,
+  );
+  await user.click(within(table).getAllByRole("cell")[0]);
+  expect(disclosure).toHaveAttribute("aria-expanded", "true");
+  act(() => disclosure.focus());
+  await user.keyboard(" ");
+  expect(disclosure).toHaveAttribute("aria-expanded", "false");
+  expect(within(table).getAllByRole("row")).toHaveLength(collapsedRows);
+  cleanup();
 });

@@ -212,7 +212,7 @@ test("a city marker still selects after the map has zoomed", async ({
   await expect(search).not.toHaveValue(startingSelection);
 });
 
-test("custom setup uses side-by-side settings and facilities only at desktop widths", async ({
+test("custom setup uses side-by-side settings and facilities only in two-pane layouts", async ({
   page,
 }, testInfo) => {
   await openCustomSetup(page);
@@ -261,7 +261,11 @@ test("custom setup uses side-by-side settings and facilities only at desktop wid
     facilitiesBox!.x + facilitiesBox!.width,
   );
 
-  if (testInfo.project.name.startsWith("desktop")) {
+  // Unfolded foldables get the two-pane layout too (see $pane_media in app.scss).
+  if (
+    testInfo.project.name.startsWith("desktop") ||
+    testInfo.project.name === "foldable-unfolded"
+  ) {
     expect(Math.abs(settingsBox!.y - facilitiesBox!.y)).toBeLessThanOrEqual(1);
     expect(settingsBox!.x + settingsBox!.width).toBeLessThan(facilitiesBox!.x);
   } else {

@@ -54,9 +54,7 @@ import { LOW_RESERVOIR_FRACTION } from "../../helpers/HydroOutlook";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
-import TransmissionPanel, {
-  TransmissionTradingSummary,
-} from "./TransmissionPanel";
+import TransmissionPanel from "./TransmissionPanel";
 import { TradingPolicyType } from "../../Types";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
 
@@ -99,12 +97,9 @@ function facilityIconName(facility: FacilityOperatingType): string {
 }
 
 const getDraggableStyle = (
-  isDragging: boolean,
   draggableStyle: DraggingStyle | NotDraggingStyle | undefined,
 ): React.CSSProperties => ({
   userSelect: "none",
-  border: isDragging ? `1px solid rgba(30, 136, 229, 0.5)` : "none", // Match buttons
-  borderRadius: isDragging ? `4px` : "0",
   ...draggableStyle,
 });
 
@@ -391,12 +386,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={selected ? "facilityRow selected" : "facilityRow"}
+          className={`facilityRow${selected ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           data-fuel={fuel}
-          style={getDraggableStyle(
-            snapshot.isDragging,
-            provided.draggableProps.style,
-          )}
+          style={getDraggableStyle(provided.draggableProps.style)}
         >
           <div
             className={`facilityRowHeader${arriving && !readOnly ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
@@ -808,12 +800,6 @@ export default class Facilities extends React.Component<Props> {
           </Toolbar>
           <div className="scrollable facilitiesBody">
             <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-            {intertiesAvailable && (
-              <TransmissionTradingSummary
-                game={game}
-                onPolicy={onTradingPolicy}
-              />
-            )}
             <List dense className="scrollable unifiedFacilitiesList">
               {intertiesAvailable && (
                 <Typography

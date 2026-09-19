@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { Provider } from "react-redux";
@@ -249,7 +249,11 @@ describe("the fleet list", () => {
       onFacilityDragEnd,
       onSelect: () => undefined,
     };
-    render(<Facilities {...props} ref={ref} />);
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <Facilities {...props} ref={ref} />
+      </Provider>,
+    );
 
     ref.current!.onBeforeDragStart();
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
@@ -343,6 +347,40 @@ describe("the interties view", () => {
     expect(
       screen.getByText(/Pay \$36M now · finance \$144M/),
     ).toBeInTheDocument();
+  });
+
+  it("tells the neighbours apart by kind, typical year, peak help and price", async () => {
+    renderProjects(playedGame(0));
+    const north = screen.getByTestId("transmission-project-california-north");
+    const south = screen.getByTestId("transmission-project-california-south");
+    expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
+    expect(within(south).getByText("Solar surplus")).toBeInTheDocument();
+    expect(within(north).getByText("Existing corridor")).toBeInTheDocument();
+    for (const card of [north, south]) {
+      expect(
+        within(card).getByRole("img", { name: /^Typical year of import room/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(card).getByText(/^Typical year · Low \w{3} \d+%$/),
+      ).toBeInTheDocument();
+      expect(within(card).getByText("At your peak")).toBeInTheDocument();
+      expect(within(card).getByText(/^~\d+% of line$/)).toBeInTheDocument();
+      expect(within(card).getByText(/^\$\d+–\d+\/MWh$/)).toBeInTheDocument();
+    }
+    expect(
+      within(south).getByText("Cheapest midday · priciest evening"),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Review purchase of Desert Southwest intertie",
+      }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent(/Import room~\d+% at your peak/);
+    expect(dialog).toHaveTextContent(/Neighbor price\$\d+–\d+\/MWh/);
+    expect(dialog).toHaveTextContent("cheapest connected neighbor first");
+    expect(dialog).not.toHaveTextContent("backup is not guaranteed");
   });
 
   it("keeps every earlier tutorial focused on plants", () => {
@@ -441,7 +479,7 @@ describe("unified connections", () => {
     /* eslint-disable testing-library/no-node-access */
     const connections = document.querySelectorAll(".transmissionLine");
     expect(connections).toHaveLength(2);
-    expect(document.querySelectorAll(".tradingSummary")).toHaveLength(1);
+    expect(document.querySelectorAll(".tradingControls")).toHaveLength(1);
     expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
     /* eslint-enable testing-library/no-node-access */
     expect(connections[0]).toHaveTextContent("Connected");
@@ -453,6 +491,28 @@ describe("unified connections", () => {
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
+    // The connected line reports what it can do right now beside its typical year
+    expect(connections[0]).toHaveTextContent(/Price now\$\d+/);
+    expect(connections[0]).toHaveTextContent(/Can import now.+ of /);
+    expect(connections[0]).toHaveTextContent(/Typical price\$\d+–\d+\/MWh/);
+    expect(connections[0]).toHaveTextContent("At your peak");
+    expect(connections[0]).toHaveTextContent("Purchased emissions");
+    expect(
+      within(connections[0] as HTMLElement).getByRole("img", {
+        name: /^Typical year of import room/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a building line's outlook without claiming it can import yet", async () => {
+    const game = connectedGame();
+    renderFacilities(game, null);
+    await user.click(screen.getByText(game.transmission!.lines[1].name));
+    // eslint-disable-next-line testing-library/no-node-access
+    const building = document.querySelectorAll(".transmissionLine")[1];
+    expect(building).toHaveTextContent("Power can flow when construction");
+    expect(building).not.toHaveTextContent("Can import now");
+    expect(building).toHaveTextContent("Typical price");
   });
 
   it("permits inspecting replay connections but disables trading and building", async () => {
@@ -463,9 +523,10 @@ describe("unified connections", () => {
     } as GameType["replayPlayback"];
     renderFacilities(game, null);
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    await user.click(screen.getByText("No power flowing"));
+    expect(screen.getByText("No power flowing")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Trading rule" })).toBeNull();
     expect(
-      screen.getByRole("combobox", { name: "Trading rule" }),
-    ).toHaveAttribute("aria-disabled", "true");
+      screen.getByText("Trading rule: Buy for shortages, sell extra"),
+    ).toBeInTheDocument();
   });
 });
