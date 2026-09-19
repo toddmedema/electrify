@@ -26,7 +26,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
-import CloseIcon from "@mui/icons-material/Close";
+import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -949,17 +949,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
         open={victoryDialogOpen}
         onClose={() => setVictoryDialogOpen(false)}
       >
-        <DialogTitle>
+        <ClosableDialogTitle onClose={() => setVictoryDialogOpen(false)}>
           Victory Conditions: {scenario.ownership}-Owned
-          <IconButton
-            aria-label="close"
-            onClick={() => setVictoryDialogOpen(false)}
-            className="top-right"
-            size="large"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+        </ClosableDialogTitle>
         <DialogContent>
           <VictoryConditions
             ownership={scenario.ownership}

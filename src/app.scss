@@ -26,6 +26,7 @@
   --font-color-primary: #000000;
   --font-color-faded: #666666;
   --font-color-disabled: #bdbdbd; /* grey400 */
+  --interactive-contrast: #f5f5f5;
   --interactive-blue: #1565c0; /* blue800 - 5.75:1 on white */
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
@@ -75,6 +76,7 @@
   --font-color-primary: #e6edf5;
   --font-color-faded: #9aa9ba;
   --font-color-disabled: #627083;
+  --interactive-contrast: #0a0a0a;
   --interactive-blue: #6ab8f7;
   --spark-stroke: #9aa9ba;
   --spark-fill: rgba(154, 169, 186, 0.16);
@@ -417,21 +419,6 @@ button,
   padding: 16px;
 }
 
-.MuiSelect-select {
-  padding-top: 2px !important;
-  padding-left: 6px !important;
-  padding-bottom: 0 !important;
-  color: $interactive_blue !important;
-}
-
-.MuiSelect-icon {
-  fill: $interactive_blue;
-}
-
-.MuiInput-underline:before {
-  border: none !important;
-}
-
 .bold {
   font-weight: bold;
 }
@@ -474,17 +461,6 @@ table {
   }
   td {
     font-weight: 200;
-  }
-}
-
-.expandable {
-  position: relative;
-  padding-bottom: size(small);
-  &.notExpanded {
-    .tabs-1,
-    .tabs-2 {
-      display: none;
-    }
   }
 }
 
@@ -600,10 +576,6 @@ $topbar_height: 56px;
 
 .constructionSortSelect {
   min-width: 156px !important;
-
-  .MuiSelect-select {
-    padding: 8px 32px 8px 12px !important;
-  }
 }
 
 @media screen and (min-width: 600px) {
@@ -699,10 +671,6 @@ $topbar_height: 56px;
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-}
-
-.MuiDialogActions-root {
-  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }
 
 .offlineBanner {
@@ -1975,16 +1943,6 @@ $pane_header_height: 48px;
   z-index: 1;
 }
 
-.expandable {
-  &:hover {
-    cursor: pointer;
-    background: var(--bg-raised);
-  }
-  .MuiCardContent-root {
-    padding-top: 0;
-  }
-}
-
 .blackout-pulsing {
   &:before {
     content: "";
@@ -2115,10 +2073,26 @@ html[data-theme="dark"] .uplot {
   overflow: visible;
 }
 
-.top-right {
-  position: absolute !important;
-  top: 0;
-  right: 0;
+.closableDialogTitle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+
+  .closableDialogTitleText {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .MuiIconButton-root {
+    flex-shrink: 0;
+  }
+}
+
+.facilityRow.dragging {
+  outline: 1px solid var(--interactive-blue);
+  outline-offset: -1px;
+  border-radius: 4px;
 }
 
 // for text inputs that are close to bottom, give the screen space to scroll up
@@ -2925,35 +2899,44 @@ html[data-theme="dark"] .uplot {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--map-marker-size);
+    height: var(--map-marker-size);
     padding: 0;
     transform: translate(-50%, -50%);
-    border: 0;
+    border: 4px solid transparent;
     border-radius: 50%;
-    color: #fff;
+    color: var(--interactive-contrast);
     background: $interactive_blue;
-    box-shadow: 0 1px 3px var(--shadow-ring);
+    background-clip: padding-box;
     cursor: pointer;
     font: inherit;
     font-size: 12px;
     font-weight: 700;
 
     &.marker {
-      width: 18px;
-      height: 18px;
-      border: 3px solid var(--bg-primary);
+      background: transparent;
+
+      &:after {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border: 3px solid var(--bg-primary);
+        border-radius: 50%;
+        background: $interactive_blue;
+        box-shadow: 0 1px 3px var(--shadow-ring);
+      }
     }
 
     &.selected {
-      width: 28px;
-      height: 28px;
-      border: 4px solid var(--bg-primary);
-      box-shadow:
-        0 0 0 3px $interactive_blue,
-        0 2px 4px var(--shadow-ring);
+      background: $interactive_blue;
+      background-clip: padding-box;
+      box-shadow: inset 0 0 0 2px var(--bg-primary);
       z-index: 2;
       font-size: 14px;
+
+      &:after {
+        display: none;
+      }
     }
   }
 
@@ -2992,45 +2975,6 @@ html[data-theme="dark"] .uplot {
         "map";
       width: calc(100% - 24px);
       margin-top: 12px;
-    }
-  }
-
-  @media screen and (max-width: 699px), (pointer: coarse) {
-    .worldMapMarker {
-      width: 44px;
-      height: 44px;
-
-      &.marker {
-        width: 44px;
-        height: 44px;
-        border-color: transparent;
-        background: transparent;
-        box-shadow: none;
-
-        &:after {
-          content: "";
-          width: 16px;
-          height: 16px;
-          border: 3px solid var(--bg-primary);
-          border-radius: 50%;
-          background: $interactive_blue;
-          box-shadow: 0 1px 3px var(--shadow-ring);
-        }
-      }
-
-      &.selected {
-        color: #fff;
-        border: 8px solid transparent;
-        background: $interactive_blue;
-        background-clip: padding-box;
-        box-shadow:
-          inset 0 0 0 2px var(--bg-primary),
-          0 0 0 3px $interactive_blue;
-
-        &:after {
-          display: none;
-        }
-      }
     }
   }
 
@@ -4651,6 +4595,10 @@ $sizemap: (
 // Wider layouts pin the chart above the fleet, which scrolls on its own.
 // A phone has no room to pin a 180px chart, so the whole body scrolls as one column instead,
 // like Insights -- the list gives up its own scroll so there is one scroll container for drag.
+.facilities {
+  container: facilities / size;
+}
+
 .facilities .facilitiesBody {
   display: flex;
   flex-direction: column;
@@ -4669,6 +4617,18 @@ $sizemap: (
     overflow: visible;
   }
 }
+// Reserve room for the fleet when a resized pane cannot fit the chart and usable list
+// together. Respond to the pane, including desktop split layouts.
+@container facilities (max-height: 600px) {
+  .facilities .facilitiesBody {
+    display: block;
+    overflow-y: auto;
+  }
+  .facilities .facilitiesBody > .unifiedFacilitiesList {
+    overflow: visible;
+  }
+}
+
 .facilities .facilitySectionLabel {
   display: flex;
   align-items: center;
@@ -4999,10 +4959,6 @@ $sizemap: (
 .base_main .customFacilityPicker .MuiInputBase-root {
   flex: 1 1 120px;
 }
-.base_main .customFacilityPicker .MuiSelect-select {
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
 .decisionImpact {
   padding: 16px;
   background: var(--bg-primary);
@@ -5135,7 +5091,6 @@ $sizemap: (
   }
   .MuiDialogActions-root > .MuiButton-root {
     flex: 1 1 100%;
-    margin: 0;
   }
   .facilitySectionLabel {
     flex-wrap: wrap;

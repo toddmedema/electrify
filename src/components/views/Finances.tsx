@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  Button,
   MenuItem,
   Select,
   SelectChangeEvent,
@@ -875,6 +876,7 @@ export default class Finances extends React.Component<Props, State> {
               <Typography variant="h6">Finances</Typography>
               <Select
                 id="plotRange"
+                inputProps={{ "aria-label": "Financial time range" }}
                 value={this.state.range}
                 onChange={(e: SelectChangeEvent<string>) =>
                   this.setRange(e.target.value)
@@ -1006,6 +1008,7 @@ export default class Finances extends React.Component<Props, State> {
                 {/* Controlled, so the label and the chart cannot disagree about what is plotted */}
                 <Select
                   id="plotMetric"
+                  inputProps={{ "aria-label": "Financial metric" }}
                   value={chartKey}
                   onChange={(e: SelectChangeEvent<string>) =>
                     this.setChartKey(e.target.value as DerivedHistoryKeysType)
@@ -1040,6 +1043,7 @@ export default class Finances extends React.Component<Props, State> {
                 </Typography>
                 <Select
                   id="plotRange"
+                  inputProps={{ "aria-label": "Financial time range" }}
                   value={this.state.range}
                   onChange={(e: SelectChangeEvent<string>) =>
                     this.setRange(e.target.value)
@@ -1090,11 +1094,20 @@ export default class Finances extends React.Component<Props, State> {
               }
             />
           )}
-          <div
-            className={`expandable ${!expanded && "notExpanded"}`}
-            onClick={() => this.setExpand(!expanded)}
-          >
-            <Table size="small" className="summaryTable">
+          <div className="financialBreakdown">
+            <Button
+              onClick={() => this.setExpand(!expanded)}
+              aria-expanded={expanded}
+              aria-controls="financial-breakdown"
+              endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+            >
+              {expanded ? "Hide" : "Show"} financial breakdown
+            </Button>
+            <Table
+              id="financial-breakdown"
+              size="small"
+              className="summaryTable"
+            >
               {/* Two numbers a row rather than one: a total on its own says nothing about
                   whether it is heading the right way, which is the question the table is
                   actually being read for */}
@@ -1111,6 +1124,7 @@ export default class Finances extends React.Component<Props, State> {
                 {CHART_KEY_NAMES.map((key: string) => {
                   const k = chartKeys[key];
                   const format = k.formatTable || k.format;
+                  if (!expanded && k.nesting) return null;
                   return (
                     <TableRow
                       className={!k.nesting ? "bold" : `tabs-${k.nesting}`}
@@ -1142,21 +1156,6 @@ export default class Finances extends React.Component<Props, State> {
                 })}
               </TableBody>
             </Table>
-            {!expanded && (
-              <ArrowDropDownIcon color="primary" className="expand-icon" />
-            )}
-            {expanded && (
-              <ArrowDropUpIcon color="primary" className="expand-icon" />
-            )}
-            {!expanded && (
-              <Typography
-                color="textSecondary"
-                variant="body2"
-                style={{ textAlign: "center" }}
-              >
-                (click table to expand)
-              </Typography>
-            )}
           </div>
         </div>
       </GameCard>
