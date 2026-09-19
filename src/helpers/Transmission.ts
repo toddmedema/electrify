@@ -8,7 +8,10 @@ import {
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
 } from "../data/AdjacentMarkets";
-import { INTERTIE_ARCHETYPES } from "../data/IntertieArchetypes";
+import {
+  INTERTIE_ARCHETYPES,
+  IntertieArchetypeType,
+} from "../data/IntertieArchetypes";
 import { normalAt, randomAt, RANDOM_STREAM } from "./Math";
 import {
   AdjacentMarketDefinitionType,
@@ -81,8 +84,9 @@ function clamp01(value: number): number {
 }
 
 /**
- * How hard local weather is pushing the whole region, 0..1 for each of heat and cold. Neighbours
- * usually feel the same weather system, so this doubles as their stress.
+ * How hard extreme local weather is pushing the whole region, 0..1 for each of heat and cold.
+ * Neighbours usually feel the same weather system, so this doubles as their stress; a neighbour
+ * that shares your peaks follows the gentler `loadStress` instead.
  */
 export function gridStress(temperatureC: number): {
   heat: number;
@@ -97,6 +101,49 @@ export function gridStress(temperatureC: number): {
       (COLD_STRESS_STARTS_C - temperatureC) /
         (COLD_STRESS_STARTS_C - COLD_STRESS_FULL_C),
     ),
+  };
+}
+
+// A neighbour that shares your peaks is squeezed by the same heating and cooling load you are,
+// which builds from the edges of the comfort band, well before the extremes that derate hydro,
+// wind and thermal fleets. On the extreme-weather scale above, a temperate city's summer or
+// winter peak barely registered, so the peak-sharing penalty (and its difficulty setting) only
+// ever showed up in desert and tropical cities.
+const LOAD_HEAT_STARTS_C = 24;
+const LOAD_HEAT_FULL_C = 34;
+const LOAD_COLD_STARTS_C = 8;
+const LOAD_COLD_FULL_C = -7;
+
+/** How hard heating and cooling demand is pushing the region, 0..1 for each of heat and cold */
+export function loadStress(temperatureC: number): {
+  heat: number;
+  cold: number;
+} {
+  return {
+    heat: clamp01(
+      (temperatureC - LOAD_HEAT_STARTS_C) /
+        (LOAD_HEAT_FULL_C - LOAD_HEAT_STARTS_C),
+    ),
+    cold: clamp01(
+      (LOAD_COLD_STARTS_C - temperatureC) /
+        (LOAD_COLD_STARTS_C - LOAD_COLD_FULL_C),
+    ),
+  };
+}
+
+/**
+ * The stress a neighbour feels: a peak-sharing one (a `null` stress loss) follows your load, every
+ * other kind follows extreme weather.
+ */
+function neighbourStress(
+  archetype: IntertieArchetypeType,
+  temperatureC: number,
+): { heat: number; cold: number } {
+  const grid = gridStress(temperatureC);
+  const load = loadStress(temperatureC);
+  return {
+    heat: archetype.heatStressLoss === null ? load.heat : grid.heat,
+    cold: archetype.coldStressLoss === null ? load.cold : grid.cold,
   };
 }
 
@@ -166,7 +213,7 @@ export function importAvailabilityFraction(
   const archetype = INTERTIE_ARCHETYPES[market.archetype];
   const month = archetypeMonth(minute, context.southernHemisphere);
   const hour = Math.floor((minute % 1440) / 60);
-  const stress = gridStress(conditions.temperatureC);
+  const stress = neighbourStress(archetype, conditions.temperatureC);
   const heatLoss = archetype.heatStressLoss ?? context.peakSharingImportLoss;
   const coldLoss = archetype.coldStressLoss ?? context.peakSharingImportLoss;
   const seasonal =
@@ -211,7 +258,7 @@ export function adjacentMarketPricePerMWh(
   const tick = Math.floor(minute / TICK_MINUTES);
   const month = archetypeMonth(minute, context.southernHemisphere);
   const hour = Math.floor((minute % 1440) / 60);
-  const stress = gridStress(conditions.temperatureC);
+  const stress = neighbourStress(archetype, conditions.temperatureC);
   const scarcity =
     1 -
     neighbourYearFactor(market, context.seed, minute) *

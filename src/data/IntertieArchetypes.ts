@@ -29,8 +29,9 @@ export interface IntertieArchetypeType {
   /** Hour 0..23, multiplies the monthly share */
   hourlyAvailability: readonly number[];
   /**
-   * Share of availability lost at full local heat or cold stress. `null` means the neighbour
-   * shares your peaks, so the loss comes from the difficulty's `peakSharingImportLoss` instead.
+   * Share of availability lost at full local heat or cold stress (extreme weather). `null` means
+   * the neighbour shares your peaks: the loss comes from the difficulty's `peakSharingImportLoss`
+   * and follows local heating and cooling load, which builds well before extreme weather.
    */
   heatStressLoss: number | null;
   coldStressLoss: number | null;
@@ -190,10 +191,10 @@ export const INTERTIE_ARCHETYPES: Readonly<
     yearlyVariability: 0,
     lullChance: 0,
     lullAvailability: 1,
-    hourlyPriceOffset: hours(0, [0, 6, -6], [7, 10, 6], [17, 21, 16]),
+    hourlyPriceOffset: hours(0, [0, 6, -6], [7, 10, 6], [17, 21, 12]),
     monthlyPriceOffset: [4, 4, 0, -4, -2, 4, 8, 8, 0, -4, 0, 4],
-    heatStressPremium: 70,
-    coldStressPremium: 60,
+    heatStressPremium: 45,
+    coldStressPremium: 40,
     scarcityPremium: 0,
     priceNoise: 5,
   },
@@ -202,10 +203,12 @@ export const INTERTIE_ARCHETYPES: Readonly<
     label: "Large pool",
     summary:
       "A big, diverse market that can almost always spare power at moderate prices.",
-    monthlyAvailability: new Array(12).fill(1),
-    hourlyAvailability: hours(1, [17, 21, 0.95]),
-    heatStressLoss: 0.1,
-    coldStressLoss: 0.1,
+    // Plenty of spare energy in the shoulder seasons, but the pool's own summer and winter peaks,
+    // its evening peak and regional extremes use up the headroom
+    monthlyAvailability: [0.9, 0.95, 1, 1, 1, 0.9, 0.85, 0.85, 1, 1, 0.95, 0.9],
+    hourlyAvailability: hours(1, [17, 21, 0.9]),
+    heatStressLoss: 0.2,
+    coldStressLoss: 0.2,
     yearlyVariability: 0,
     lullChance: 0,
     lullAvailability: 1,
@@ -221,14 +224,16 @@ export const INTERTIE_ARCHETYPES: Readonly<
     label: "Steady plants",
     summary:
       "Steady but pricier supply from fuel-burning, nuclear, or geothermal plants, with prices set more by fuel costs than weather.",
+    // Dispatchable plants sell the same firm block around the clock and barely notice weather, so
+    // they are the dependable pick at your peak in exchange for a higher, fuel-set price
     monthlyAvailability: new Array(12).fill(0.9),
-    hourlyAvailability: hours(0.9, [17, 21, 0.85]),
-    heatStressLoss: 0.15,
-    coldStressLoss: 0.2,
+    hourlyAvailability: new Array(24).fill(1),
+    heatStressLoss: 0.05,
+    coldStressLoss: 0.05,
     yearlyVariability: 0,
     lullChance: 0,
     lullAvailability: 1,
-    hourlyPriceOffset: hours(0, [0, 6, -3], [17, 21, 6]),
+    hourlyPriceOffset: hours(4, [0, 6, 1], [17, 21, 8]),
     monthlyPriceOffset: FLAT_MONTHS,
     heatStressPremium: 25,
     coldStressPremium: 25,

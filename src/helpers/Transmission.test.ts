@@ -18,6 +18,7 @@ import {
   importAvailabilityFraction,
   IntertieContext,
   intertieContextForGame,
+  loadStress,
   neighbourLullFactor,
   neighbourYearFactor,
   transmissionRatingW,
@@ -149,6 +150,38 @@ describe("grid stress", () => {
       expect(heat).toBeGreaterThanOrEqual(0);
       expect(cold).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("load stress", () => {
+  it("is zero inside the comfort band", () => {
+    for (const t of [8, 15, 20, 24]) {
+      expect(loadStress(t)).toEqual({ heat: 0, cold: 0 });
+    }
+  });
+
+  it("ramps linearly to full heat at 34C and full cold at -7C, then clamps", () => {
+    expect(loadStress(29).heat).toBeCloseTo(0.5);
+    expect(loadStress(34).heat).toBe(1);
+    expect(loadStress(45).heat).toBe(1);
+    expect(loadStress(0.5).cold).toBeCloseTo(0.5);
+    expect(loadStress(-7).cold).toBe(1);
+    expect(loadStress(-30).cold).toBe(1);
+  });
+
+  it("starts well before extreme-weather grid stress and never reports heat and cold together", () => {
+    for (let t = -50; t <= 55; t += 0.5) {
+      const load = loadStress(t);
+      const grid = gridStress(t);
+      expect(load.heat * load.cold).toBe(0);
+      expect(load.heat).toBeGreaterThanOrEqual(grid.heat);
+      expect(load.cold).toBeGreaterThanOrEqual(grid.cold);
+    }
+    // A hot temperate summer afternoon or a cold winter evening already registers
+    expect(loadStress(30).heat).toBeGreaterThan(0.5);
+    expect(gridStress(30).heat).toBe(0);
+    expect(loadStress(-3).cold).toBeGreaterThan(0.5);
+    expect(gridStress(-3).cold).toBe(0);
   });
 });
 
@@ -373,7 +406,8 @@ describe("import availability", () => {
         MILD,
       );
       expect(unstressed).toBeGreaterThan(0);
-      for (const temperatureC of [38, 45, -20, -30]) {
+      // A peak-sharing neighbour follows load stress, which is full from 34C and from -7C
+      for (const temperatureC of [34, 45, -7, -30]) {
         expect(
           importAvailabilityFraction(corridorId, ctx, minute, {
             temperatureC,
@@ -381,11 +415,19 @@ describe("import availability", () => {
         ).toBeCloseTo(unstressed * (1 - loss), 10);
       }
       // Half stress costs half the share
+      for (const temperatureC of [29, 0.5]) {
+        expect(
+          importAvailabilityFraction(corridorId, ctx, minute, {
+            temperatureC,
+          }),
+        ).toBeCloseTo(unstressed * (1 - loss / 2), 10);
+      }
+      // Inside the comfort band it keeps its full share
       expect(
         importAvailabilityFraction(corridorId, ctx, minute, {
-          temperatureC: 34,
+          temperatureC: 24,
         }),
-      ).toBeCloseTo(unstressed * (1 - loss / 2), 10);
+      ).toBeCloseTo(unstressed, 10);
     }
     const intern = importAvailabilityFraction(
       corridorId,

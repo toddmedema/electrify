@@ -93,15 +93,16 @@ what the balance looks like. They run on every tick of every simulated month, an
 reports the game time it happened and the values involved, so a broken run points at a line of
 code rather than a vibe.
 
-|                     |                                                                                                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finite values       | No `NaN` or `Infinity` reaches any tick or monthly field. `NaN` propagates silently through the whole economy, so this is the one that catches the most                                           |
-| Signs               | Supply, demand, customers, stored energy, revenue and every expense stay non-negative; demand stays positive. Cash and net worth may go negative, by design                                       |
-| Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                |
-| Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                    |
-| Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount |
-| Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                       |
-| Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                     |
+|                     |                                                                                                                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finite values       | No `NaN` or `Infinity` reaches any tick or monthly field. `NaN` propagates silently through the whole economy, so this is the one that catches the most                                                                                                                                                                         |
+| Signs               | Supply, demand, customers, stored energy, revenue and every expense stay non-negative; demand stays positive. Cash and net worth may go negative, by design                                                                                                                                                                     |
+| Cash continuity     | Within a month, cash moves by exactly the tick's own revenue minus its recorded expenses, allowing for loan principal, which is spent but not recorded on the tick                                                                                                                                                              |
+| Energy conservation | Stored energy moves by exactly what the storage fleet charged or discharged. Storage cannot invent electricity                                                                                                                                                                                                                  |
+| Fleet bounds        | Generators output between 0 and their rated power, storage stays within its rated power and capacity, construction time never goes negative, loan balances stay between 0 and the original amount                                                                                                                               |
+| Supply accounting   | Gross generation plus storage discharge and imports, minus grid-side charging and exports, equals `supplyW`                                                                                                                                                                                                                     |
+| Trade               | Imports plus exports never exceed the built lines' weather-adjusted rating, a tick never imports and exports at once, imports and exports are paid for exactly when they flow, and imports never exceed what each built line's neighbour can spare (its archetype availability share of the rating, capped by its spare supply) |
+| Monthly totals      | Billed supply never exceeds demand, and every total is finite                                                                                                                                                                                                                                                                   |
 
 `Simulation.test.tsx` asserts these invariants and determinism as part of `npm test`.
 `SimulationEconomics*.test.tsx` cover difficulty, player strategies, price competition, and
@@ -159,6 +160,29 @@ dispatch or Immer draft behavior must still exercise those paths.
   rollovers, which is why the cash and energy checks only run within a month.
 - **`getFuelPricesPerMBTU` throws a clear error if no prices are loaded**, and `getWeather`
   throws. Any non-browser entry point has to call `loadSimData` first.
+
+## Intertie archetypes
+
+Each neighbouring market's archetype (`src/data/IntertieArchetypes.ts`) sets when it can spare
+power and what it costs. The intended roles, measured with each city's two-year hourly outlook
+(typical-year share of the line, share at the top 5% of local demand hours, median price above
+the market's base):
+
+| Archetype      | Typical year | At your peak (Intern / CEO) | Median premium | Role                                  |
+| -------------- | -----------: | --------------------------: | -------------: | ------------------------------------- |
+| Large pool     |          92% |                   83% / 83% |            +$1 | Most energy, cheapest on average      |
+| Stored hydro   |          88% |                   90% / 90% |            +$3 | Best at peak and low-emission         |
+| Steady plants  |          89% |                   86% / 86% |            +$5 | Dependable at peak, narrow, dearer    |
+| Shares peaks   |          89% |                   76% / 62% |           +$10 | Plenty of room, weak at peak, exports |
+| Seasonal hydro |          79% |                   80% / 80% |            +$2 | Cheap in snowmelt, dry-year risk      |
+| Monsoon hydro  |          77% |                   68% / 68% |            +$2 | Cheap after the rains, dry-season gap |
+| Wind surplus   |          75% |                   58% / 58% |            +$3 | Cheapest overnight, calm-spell risk   |
+| Solar surplus  |          67% |                   69% / 69% |            +$5 | Cheap midday, dear evenings           |
+
+A neighbour that shares your peaks follows `loadStress` (heating and cooling load, full from 34°C
+and from -7°C), while every other archetype follows the extreme-weather `gridStress` (38°C and
+-20°C). Using extreme weather for peak sharers left the difficulty's `peakSharingImportLoss`
+invisible outside desert and tropical cities.
 
 ## Time-triggered scenario choices
 

@@ -1,6 +1,6 @@
 {
   "rulesRevision": 1,
-  "compatibilityId": "rules-1-f0eb373edcc8d84a063bb183f033f237760101be9e454123100f40050b046228",
+  "compatibilityId": "rules-1-e68b76f4490f346d48a5d556bc4bb3a6003ce3aa8849631331d88e530b99a56b",
   "dataIntegrity": {
     "/data/EconomyRaw.csv": "sha256-k/hCW/VGPtEOOUIkyEhvZuqTcSyJ03ojGTsD9p+SQt4=",
     "/data/FuelPricesRaw.csv": "sha256-rRMPMbjt+Z5nzNmbJlUlXZYQPO/IMXOONXng61jxiSc=",
