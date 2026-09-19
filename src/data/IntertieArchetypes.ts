@@ -10,6 +10,7 @@
 
 export type IntertieArchetypeIdType =
   | "SEASONAL_HYDRO"
+  | "MONSOON_HYDRO"
   | "RESERVOIR_HYDRO"
   | "SOLAR_HEAVY"
   | "WIND_HEAVY"
@@ -83,6 +84,28 @@ export const INTERTIE_ARCHETYPES: Readonly<
     lullAvailability: 1,
     hourlyPriceOffset: hours(0, [17, 21, 5]),
     monthlyPriceOffset: [2, 2, 0, -6, -12, -12, -4, 4, 10, 10, 6, 4],
+    heatStressPremium: 12,
+    coldStressPremium: 8,
+    scarcityPremium: 60,
+    priceNoise: 3,
+  },
+  MONSOON_HYDRO: {
+    id: "MONSOON_HYDRO",
+    label: "Monsoon hydro",
+    summary:
+      "Plentiful and cheap after the rainy season fills the rivers, tight late in the dry season, and weak rains cut supply.",
+    // Rains arrive around June, rivers run high July to October and are lowest March to May
+    monthlyAvailability: [
+      0.75, 0.7, 0.6, 0.55, 0.6, 0.8, 0.95, 1, 1, 1, 0.9, 0.8,
+    ],
+    hourlyAvailability: hours(1, [17, 21, 0.95]),
+    heatStressLoss: 0.15,
+    coldStressLoss: 0.1,
+    yearlyVariability: 0.12,
+    lullChance: 0,
+    lullAvailability: 1,
+    hourlyPriceOffset: hours(0, [17, 21, 5]),
+    monthlyPriceOffset: [4, 6, 10, 12, 10, 2, -8, -12, -12, -10, -4, 2],
     heatStressPremium: 12,
     coldStressPremium: 8,
     scarcityPremium: 60,
@@ -195,9 +218,9 @@ export const INTERTIE_ARCHETYPES: Readonly<
   },
   FIRM_THERMAL: {
     id: "FIRM_THERMAL",
-    label: "Fuel-fired",
+    label: "Steady plants",
     summary:
-      "Steady but pricier supply from fuel-burning plants; prices follow fuel costs more than weather.",
+      "Steady but pricier supply from fuel-burning, nuclear, or geothermal plants, with prices set more by fuel costs than weather.",
     monthlyAvailability: new Array(12).fill(0.9),
     hourlyAvailability: hours(0.9, [17, 21, 0.85]),
     heatStressLoss: 0.15,

@@ -275,7 +275,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "mx-sin-yucatan": [
     [
       ["yucatan-sin-upgrade-market","Eastern Mexico","The peninsula's main connection carries power to and from the rest of Mexico.",52,1700000000,1800000000,"LARGE_POOL"],
-      ["yucatan-belize-upgrade-market","Belize grid","A small border line reaches Belize's river dams for emergency trade, but cannot power the whole peninsula.",59,120000000,140000000,"SEASONAL_HYDRO"]
+      ["yucatan-belize-upgrade-market","Belize grid","A small border line reaches Belize's river dams for emergency trade, but cannot power the whole peninsula.",59,120000000,140000000,"MONSOON_HYDRO"]
     ],
     [
       ["yucatan-sin-upgrade","yucatan-sin-upgrade-market","Eastern Mexico upgrade","EXISTING",600000000,270000000,5400000,2,32,0.015,0.06],
@@ -284,7 +284,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-north": [
     [
-      ["siepac-north-neighbor-upgrade-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"SEASONAL_HYDRO"],
+      ["siepac-north-neighbor-upgrade-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"MONSOON_HYDRO"],
       ["guatemala-mexico-upgrade-market","Mexico market","A northern border line gives the regional market another source and buyer.",54,900000000,1000000000,"LARGE_POOL"]
     ],
     [
@@ -295,7 +295,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "siepac-central": [
     [
       ["siepac-central-north-upgrade-market","Northern SIEPAC market","Trade north toward Guatemala and El Salvador, whose coal, fuel-oil, and geothermal plants run in any season.",60,650000000,700000000,"FIRM_THERMAL"],
-      ["siepac-central-south-upgrade-market","Southern SIEPAC market","Trade south toward Costa Rica and Panama, where rainfall and generation can follow a different pattern.",57,750000000,750000000,"SEASONAL_HYDRO"]
+      ["siepac-central-south-upgrade-market","Southern SIEPAC market","Trade south toward Costa Rica and Panama, where rainfall and generation can follow a different pattern.",57,750000000,750000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-central-north-upgrade","siepac-central-north-upgrade-market","Northern SIEPAC market upgrade","EXISTING",250000000,100000000,2000000,2,32,0.014,0.05],
@@ -304,7 +304,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-south": [
     [
-      ["siepac-south-north-upgrade-market","Northern SIEPAC market","The regional backbone reaches Costa Rica's rain-fed hydropower and four more national markets to the north.",59,800000000,800000000,"SEASONAL_HYDRO"],
+      ["siepac-south-north-upgrade-market","Northern SIEPAC market","The regional backbone reaches Costa Rica's rain-fed hydropower and four more national markets to the north.",59,800000000,800000000,"MONSOON_HYDRO"],
       ["panama-colombia-hvdc-new-market","Colombia market","A planned HVDC line would join Central and South America's regional grids.",48,1000000000,900000000,"LARGE_POOL"]
     ],
     [
@@ -314,7 +314,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-san-salvador": [
     [
-      ["siepac-honduras-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"SEASONAL_HYDRO"]
+      ["siepac-honduras-market","Neighboring SIEPAC market","The regional line trades power with the next country when rainfall, wind, or demand differs.",61,650000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-honduras-upgrade","siepac-honduras-market","Honduras intertie upgrade","EXISTING",250000000,105000000,2100000,2,31,0.014,0.05]
@@ -322,7 +322,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "siepac-costa-rica": [
     [
-      ["siepac-panama-market","Northern SIEPAC market","The regional backbone links Costa Rica to Panama's rain-fed hydropower and the wider SIEPAC market.",59,800000000,800000000,"SEASONAL_HYDRO"]
+      ["siepac-panama-market","Northern SIEPAC market","The regional backbone links Costa Rica to Panama's rain-fed hydropower and the wider SIEPAC market.",59,800000000,800000000,"MONSOON_HYDRO"]
     ],
     [
       ["siepac-panama-upgrade","siepac-panama-market","Panama intertie upgrade","EXISTING",300000000,120000000,2400000,2,31,0.014,0.05]
@@ -866,7 +866,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-abidjan": [
     [
-      ["geo-abidjan-ghanaian-market","Ghana","The coastal neighbour mixes hydro, gas, and growing solar, so either grid may have surplus at a different hour.",62,700000000,700000000,"SEASONAL_HYDRO"],
+      ["geo-abidjan-ghanaian-market","Ghana","The coastal neighbour mixes hydro, gas, and growing solar, so either grid may have surplus at a different hour.",62,700000000,700000000,"MONSOON_HYDRO"],
       ["geo-abidjan-sahel-west-market","Mali and Burkina Faso","Northern grids often need imports, while sunny hours can create a smaller solar surplus.",68,400000000,650000000,"SOLAR_HEAVY"]
     ],
     [
@@ -876,7 +876,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-dakar": [
     [
-      ["geo-dakar-mali-hydro-market","Mali and Senegal River hydropower","Shared river dams can provide low-cost power, but dry seasons leave less water to generate.",55,400000000,450000000,"SEASONAL_HYDRO"],
+      ["geo-dakar-mali-hydro-market","Mali and Senegal River hydropower","Shared river dams can provide low-cost power, but dry seasons leave less water to generate.",55,400000000,450000000,"MONSOON_HYDRO"],
       ["geo-dakar-omvg-coastal-market","Gambia, Guinea, and Guinea-Bissau","A regional loop reaches Guinea's large dam reservoirs and several smaller grids with solar and thermal backup.",63,350000000,450000000,"RESERVOIR_HYDRO"]
     ],
     [
@@ -887,7 +887,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "geo-bamako": [
     [
       ["geo-bamako-ivorian-market","Côte d'Ivoire","A larger coastal grid can send gas-fired and hydro power north when Mali's supply is tight.",62,450000000,500000000,"FIRM_THERMAL"],
-      ["geo-bamako-senegal-river-market","Senegal River grid","Shared hydropower is flexible, but output changes with the wet and dry seasons.",55,350000000,350000000,"SEASONAL_HYDRO"]
+      ["geo-bamako-senegal-river-market","Senegal River grid","Shared hydropower is flexible, but output changes with the wet and dry seasons.",55,350000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["mali-ivory-coast-upgrade","geo-bamako-ivorian-market","Southern 225 kV upgrade","EXISTING",250000000,150000000,3000000,2,40,0.019,0.08],
@@ -896,7 +896,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-ouagadougou": [
     [
-      ["geo-ouagadougou-ghanaian-market","Ghana","Power from Ghana's hydro and gas plants can travel north, while Burkina's midday solar can reduce imports.",62,450000000,550000000,"SEASONAL_HYDRO"],
+      ["geo-ouagadougou-ghanaian-market","Ghana","Power from Ghana's hydro and gas plants can travel north, while Burkina's midday solar can reduce imports.",62,450000000,550000000,"MONSOON_HYDRO"],
       ["geo-ouagadougou-north-core-market","Niger, Benin, and Nigeria","A new high-voltage backbone would open a second direction toward Nigeria's gas-fired plants.",68,500000000,550000000,"FIRM_THERMAL"]
     ],
     [
@@ -916,7 +916,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-khartoum": [
     [
-      ["geo-khartoum-ethiopian-hydro","Ethiopian hydropower","Rainy-season hydro can be inexpensive, while dry years reduce the surplus available to export.",45,500000000,350000000,"SEASONAL_HYDRO"],
+      ["geo-khartoum-ethiopian-hydro","Ethiopian hydropower","Rainy-season hydro can be inexpensive, while dry years reduce the surplus available to export.",45,500000000,350000000,"MONSOON_HYDRO"],
       ["geo-khartoum-egyptian-market","Egypt","The northern grid is much larger and can support emergencies, but the present border path is limited.",69,350000000,400000000,"LARGE_POOL"]
     ],
     [
@@ -927,7 +927,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "geo-addisababa": [
     [
       ["geo-addisababa-kenyan-market","Kenya","A modern converter sends Ethiopian hydropower south to a grid with steady geothermal and oil-fired backup.",57,1000000000,1000000000,"FIRM_THERMAL"],
-      ["geo-addisababa-sudan-djibouti-market","Sudan and Djibouti","Older regional lines serve smaller markets; dry weather can tighten hydropower exports.",62,500000000,550000000,"SEASONAL_HYDRO"]
+      ["geo-addisababa-sudan-djibouti-market","Sudan and Djibouti","Older regional lines serve smaller markets; dry weather can tighten hydropower exports.",62,500000000,550000000,"MONSOON_HYDRO"]
     ],
     [
       ["ethiopia-kenya-upgrade","geo-addisababa-kenyan-market","Eastern Electricity Highway upgrade","EXISTING",600000000,260000000,5200000,2,34,0.012,0.03],
@@ -994,7 +994,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-lusaka": [
     [
-      ["geo-lusaka-congo-copperbelt","DR Congo Copperbelt","Hydropower and mining demand sit on both sides of the border, so flows can change direction.",62,600000000,650000000,"SEASONAL_HYDRO"],
+      ["geo-lusaka-congo-copperbelt","DR Congo Copperbelt","Hydropower and mining demand sit on both sides of the border, so flows can change direction.",62,600000000,650000000,"MONSOON_HYDRO"],
       ["geo-lusaka-zimbabwe-market","Zimbabwe and the Kariba grid","Hwange coal, shared Kariba water, and southern trade meet at a busy regional junction.",65,700000000,800000000,"FIRM_THERMAL"]
     ],
     [
@@ -1004,7 +1004,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-harare": [
     [
-      ["geo-harare-zambian-market","Zambia","Hydropower crosses near Kariba, but drought can tighten both grids at the same time.",60,650000000,700000000,"SEASONAL_HYDRO"],
+      ["geo-harare-zambian-market","Zambia","Hydropower crosses near Kariba, but drought can tighten both grids at the same time.",60,650000000,700000000,"MONSOON_HYDRO"],
       ["geo-harare-mozambique-market","Mozambique","Cahora Bassa's huge reservoir and southern lines give a second direction for imports and exports.",58,700000000,650000000,"RESERVOIR_HYDRO"]
     ],
     [
@@ -1015,7 +1015,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "geo-maputo": [
     [
       ["geo-maputo-south-african-market","South Africa","A very large coal-fired neighbour can buy Cahora Bassa power or send emergency support, but its own system can also be stressed.",67,1100000000,1200000000,"FIRM_THERMAL"],
-      ["geo-maputo-zimbabwe-zambia-market","Zimbabwe and Zambia","Northern routes reach Kariba and Kafue hydropower, which drought can cut, and mining demand across the pool.",61,650000000,700000000,"SEASONAL_HYDRO"]
+      ["geo-maputo-zimbabwe-zambia-market","Zimbabwe and Zambia","Northern routes reach Kariba and Kafue hydropower, which drought can cut, and mining demand across the pool.",61,650000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["mozambique-south-africa-upgrade","geo-maputo-south-african-market","MOTRACO corridor upgrade","EXISTING",600000000,250000000,5000000,2,35,0.015,0.05],
@@ -1025,7 +1025,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "geo-gaborone": [
     [
       ["geo-gaborone-south-african-market","South Africa","Several border lines reach a huge market, but imports become expensive when the southern grid is short.",68,800000000,900000000,"LARGE_POOL"],
-      ["geo-gaborone-zimbabwe-market","Zimbabwe","A northern route adds diversity, though drought can reduce regional hydropower.",64,450000000,550000000,"SEASONAL_HYDRO"]
+      ["geo-gaborone-zimbabwe-market","Zimbabwe","A northern route adds diversity, though drought can reduce regional hydropower.",64,450000000,550000000,"MONSOON_HYDRO"]
     ],
     [
       ["botswana-south-africa-upgrade","geo-gaborone-south-african-market","Gaborone border upgrade","EXISTING",300000000,155000000,3100000,1,39,0.018,0.08],
@@ -1035,7 +1035,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "geo-windhoek": [
     [
       ["geo-windhoek-south-african-market","South Africa","The southern connection reaches South Africa's coal-heavy grid, while Namibian solar can create daytime export opportunities.",67,750000000,800000000,"FIRM_THERMAL"],
-      ["geo-windhoek-zambia-zimbabwe-market","Zambia and Zimbabwe","A northern path reaches Kariba and Kafue hydropower, but long distances and drought limit dependable supply.",61,450000000,500000000,"SEASONAL_HYDRO"]
+      ["geo-windhoek-zambia-zimbabwe-market","Zambia and Zimbabwe","A northern path reaches Kariba and Kafue hydropower, but long distances and drought limit dependable supply.",61,450000000,500000000,"MONSOON_HYDRO"]
     ],
     [
       ["namibia-south-africa-upgrade","geo-windhoek-south-african-market","Kokerboom corridor upgrade","EXISTING",350000000,180000000,3600000,2,39,0.018,0.08],
@@ -1054,7 +1054,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-delhi": [
     [
-      ["geo-delhi-himalayan-hydro-market","Nepal and Bhutan hydropower","Mountain rivers can send low-carbon power in wet months; winter and dry-season flows can be smaller.",43,1200000000,700000000,"SEASONAL_HYDRO"],
+      ["geo-delhi-himalayan-hydro-market","Nepal and Bhutan hydropower","Mountain rivers can send low-carbon power in wet months; winter and dry-season flows can be smaller.",43,1200000000,700000000,"MONSOON_HYDRO"],
       ["geo-delhi-bangladesh-market","Bangladesh","A fast-growing, gas-fired neighbouring grid usually buys power, but a two-way market can share reserves during an emergency.",67,700000000,1300000000,"FIRM_THERMAL"]
     ],
     [
@@ -1148,7 +1148,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-east": [
     [
-      ["cn-east-southwest-hydro","Southwest hydropower","UHVDC carries large blocks of western hydropower to the east-coast load center.",46,2400000000,800000000,"SEASONAL_HYDRO"],
+      ["cn-east-southwest-hydro","Southwest hydropower","UHVDC carries large blocks of western hydropower to the east-coast load center.",46,2400000000,800000000,"MONSOON_HYDRO"],
       ["cn-east-central-china-grid","Central China","Reinforce the interregional network to inland provinces that swelter in the same summer heat as the coast.",52,1200000000,1100000000,"PEAK_SHARING"]
     ],
     [
@@ -1158,7 +1158,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-south": [
     [
-      ["cn-south-southwest-renewables","Yunnan and Guizhou","Hydro-rich western provinces can serve the Pearl River Delta through the Southern Grid.",45,2100000000,800000000,"SEASONAL_HYDRO"],
+      ["cn-south-southwest-renewables","Yunnan and Guizhou","Hydro-rich western provinces can serve the Pearl River Delta through the Southern Grid.",45,2100000000,800000000,"MONSOON_HYDRO"],
       ["cn-south-hong-kong-system","Hong Kong system","A limited cross-system link can exchange support with Hong Kong's gas- and coal-fired plants; it is not an international border.",68,600000000,900000000,"FIRM_THERMAL"]
     ],
     [
@@ -1179,7 +1179,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "cn-central": [
     [
       ["cn-central-north-china-grid","North China","Use the interregional UHV mesh to share reserves north of Wuhan.",54,1100000000,1200000000,"LARGE_POOL"],
-      ["cn-central-southwest-hydro","Southwest hydropower","Western hydro can cover central-China peaks when river conditions allow.",46,1800000000,700000000,"SEASONAL_HYDRO"]
+      ["cn-central-southwest-hydro","Southwest hydropower","Western hydro can cover central-China peaks when river conditions allow.",46,1800000000,700000000,"MONSOON_HYDRO"]
     ],
     [
       ["central-north-uhv","cn-central-north-china-grid","North China connection","EXISTING",850000000,310000000,6000000,2,30,0.012,0.04],
@@ -1206,7 +1206,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "cn-xinjiang": [
     [
-      ["cn-xinjiang-chongqing-grid","Chongqing","A very long UHVDC corridor exports desert wind and solar to southwest demand, which has hydropower to spare in wet months.",60,700000000,1700000000,"SEASONAL_HYDRO"],
+      ["cn-xinjiang-chongqing-grid","Chongqing","A very long UHVDC corridor exports desert wind and solar to southwest demand, which has hydropower to spare in wet months.",60,700000000,1700000000,"MONSOON_HYDRO"],
       ["cn-xinjiang-east-china-grid","East China","Add another long-haul outlet for western renewable surpluses.",66,700000000,2000000000,"LARGE_POOL"]
     ],
     [
@@ -1217,7 +1217,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "cn-xizang": [
     [
       ["cn-xizang-qinghai-grid","Qinghai","Reinforce the high-altitude line to Qinghai's vast solar parks and China's wider grid.",48,600000000,450000000,"SOLAR_HEAVY"],
-      ["cn-xizang-sichuan-grid","Sichuan","A second mountain route adds support from Sichuan's hydro-rich grid to the east.",52,700000000,500000000,"SEASONAL_HYDRO"]
+      ["cn-xizang-sichuan-grid","Sichuan","A second mountain route adds support from Sichuan's hydro-rich grid to the east.",52,700000000,500000000,"MONSOON_HYDRO"]
     ],
     [
       ["qinghai-xizang-reinforcement","cn-xizang-qinghai-grid","Qinghai connection","EXISTING",350000000,300000000,5200000,3,26,0.01,0.08],
@@ -1272,7 +1272,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "th-central": [
     [
-      ["th-central-laos-hydro","Lao hydropower","Laos can export hydro to Thailand, while the same network supports wider regional trading.",45,1500000000,500000000,"SEASONAL_HYDRO"],
+      ["th-central-laos-hydro","Lao hydropower","Laos can export hydro to Thailand, while the same network supports wider regional trading.",45,1500000000,500000000,"MONSOON_HYDRO"],
       ["th-central-peninsular-malaysia","Peninsular Malaysia","The controllable HVDC border link trades gas- and coal-fired power with Malaysia.",59,500000000,600000000,"FIRM_THERMAL"]
     ],
     [
@@ -1282,7 +1282,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "th-north": [
     [
-      ["th-north-northern-laos","Northern Laos","A nearby cross-border line exchanges hydro and dry-season backup.",47,500000000,300000000,"SEASONAL_HYDRO"],
+      ["th-north-northern-laos","Northern Laos","A nearby cross-border line exchanges hydro and dry-season backup.",47,500000000,300000000,"MONSOON_HYDRO"],
       ["th-north-central-thailand","Central Thailand","Reinforce the domestic path to Thailand's main load center, which feels the same hot-season peaks.",61,400000000,700000000,"PEAK_SHARING"]
     ],
     [
@@ -1293,7 +1293,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "vn-south": [
     [
       ["vn-south-cambodia-grid","Cambodia","The Chau Doc-Takeo corridor mostly carries Vietnamese power toward Cambodia's coal- and oil-fired grid.",66,350000000,550000000,"FIRM_THERMAL"],
-      ["vn-south-north-vietnam-grid","Northern Vietnam","Reinforce the long 500 kV backbone to northern hydro plants, which run short in dry years.",58,900000000,1100000000,"SEASONAL_HYDRO"]
+      ["vn-south-north-vietnam-grid","Northern Vietnam","Reinforce the long 500 kV backbone to northern hydro plants, which run short in dry years.",58,900000000,1100000000,"MONSOON_HYDRO"]
     ],
     [
       ["vietnam-cambodia-upgrade","vn-south-cambodia-grid","Cambodia connection","EXISTING",300000000,170000000,3200000,2,33,0.015,0.06],
@@ -1303,7 +1303,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "vn-north": [
     [
       ["vn-north-yunnan-grid","Yunnan grid","Existing northern border lines import power from China when Vietnam needs it.",53,800000000,600000000,"LARGE_POOL"],
-      ["vn-north-northern-laos","Northern Laos","Mountain hydro and wind enter Vietnam through growing Laos interconnections.",47,700000000,350000000,"SEASONAL_HYDRO"]
+      ["vn-north-northern-laos","Northern Laos","Mountain hydro and wind enter Vietnam through growing Laos interconnections.",47,700000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["vietnam-china-upgrade","vn-north-yunnan-grid","Yunnan grid connection","EXISTING",500000000,210000000,4000000,2,33,0.015,0.06],
@@ -1313,7 +1313,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "kh-national": [
     [
       ["kh-national-southern-vietnam","Southern Vietnam","Southern Vietnam's large solar farms support Phnom Penh through the existing 230 kV route.",57,700000000,400000000,"SOLAR_HEAVY"],
-      ["kh-national-laos-hydro","Lao hydropower","A northern border route brings hydropower into Cambodia.",48,600000000,250000000,"SEASONAL_HYDRO"]
+      ["kh-national-laos-hydro","Lao hydropower","A northern border route brings hydropower into Cambodia.",48,600000000,250000000,"MONSOON_HYDRO"]
     ],
     [
       ["cambodia-vietnam-reinforcement","kh-national-southern-vietnam","Southern Vietnam connection","EXISTING",350000000,180000000,3400000,2,33,0.015,0.06],
@@ -1333,7 +1333,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "mm-national": [
     [
       ["mm-national-thailand-grid","Thailand","Build a first bulk route toward Thailand's gas-fired grid; today this remains a regional plan.",59,800000000,700000000,"FIRM_THERMAL"],
-      ["mm-national-central-myanmar","Central Myanmar","Strengthen the domestic 230 kV backbone to central hydro dams, which run short in the dry season.",54,500000000,600000000,"SEASONAL_HYDRO"]
+      ["mm-national-central-myanmar","Central Myanmar","Strengthen the domestic 230 kV backbone to central hydro dams, which run short in the dry season.",54,500000000,600000000,"MONSOON_HYDRO"]
     ],
     [
       ["myanmar-thailand-new-link","mm-national-thailand-grid","Thailand connection","NEW",500000000,720000000,9000000,5,33,0.015,0.06],
@@ -1432,7 +1432,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "ve-reconnection": [
     [
-      ["ve-reconnection-colombia-restart-market","Colombia (dormant connection)","The wires to Colombia's hydro-heavy grid exist, but regular trading stopped. Reopening them creates a fragile new source of backup power.",66,300000000,350000000,"SEASONAL_HYDRO"]
+      ["ve-reconnection-colombia-restart-market","Colombia (dormant connection)","The wires to Colombia's hydro-heavy grid exist, but regular trading stopped. Reopening them creates a fragile new source of backup power.",66,300000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["ve-colombia-reactivation","ve-reconnection-colombia-restart-market","Restart the Colombia link","EXISTING",250000000,240000000,4800000,3,34,0.018,0.08]
@@ -1461,7 +1461,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "bo-national": [
     [
       ["bo-national-argentina-market-bo","Argentina","The Juana Azurduy line lets Bolivia export generation to northern Argentina.",57,300000000,450000000,"LARGE_POOL"],
-      ["bo-national-peru-market-bo","Peru (proposed)","A future Andean connection could reach Peru's hydropower, which runs strongest in the rainy season.",60,300000000,350000000,"SEASONAL_HYDRO"]
+      ["bo-national-peru-market-bo","Peru (proposed)","A future Andean connection could reach Peru's hydropower, which runs strongest in the rainy season.",60,300000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["bo-argentina-upgrade","bo-national-argentina-market-bo","Juana Azurduy upgrade","EXISTING",200000000,150000000,3000000,2,26,0.01,0.08],
@@ -1471,7 +1471,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "cl-national": [
     [
       ["cl-national-argentina-market-cl","Argentina","The Andes-Salta route can move gas-fired power across the mountains when the two systems coordinate.",61,350000000,450000000,"FIRM_THERMAL"],
-      ["cl-national-peru-market-cl","Peru (proposed)","A northern line would extend the Andean corridor to Peru's rain-fed hydropower.",58,400000000,350000000,"SEASONAL_HYDRO"]
+      ["cl-national-peru-market-cl","Peru (proposed)","A northern line would extend the Andean corridor to Peru's rain-fed hydropower.",58,400000000,350000000,"MONSOON_HYDRO"]
     ],
     [
       ["cl-argentina-andes","cl-national-argentina-market-cl","Andes-Salta reinforcement","EXISTING",300000000,250000000,5000000,3,26,0.01,0.08],
@@ -1531,7 +1531,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   "br-ne": [
     [
       ["br-ne-br-seco-market","Southeast and Centre-West Brazil","The country's largest demand centre can buy Northeast renewable surplus or send backup north.",61,1400000000,1500000000,"LARGE_POOL"],
-      ["br-ne-br-north-market","Northern Brazil","Hydro and long-distance renewable flows connect the North and Northeast.",55,1000000000,900000000,"SEASONAL_HYDRO"]
+      ["br-ne-br-north-market","Northern Brazil","Hydro and long-distance renewable flows connect the North and Northeast.",55,1000000000,900000000,"MONSOON_HYDRO"]
     ],
     [
       ["br-ne-seco-upgrade","br-ne-br-seco-market","Northeast-Southeast reinforcement","EXISTING",850000000,310000000,6200000,3,33,0.015,0.06],
