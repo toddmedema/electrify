@@ -37,6 +37,7 @@ import {
   DOWNPAYMENT_PERCENT,
   FUELS,
   LOAN_MONTHS,
+  MONTH_NAMES,
   MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
@@ -59,25 +60,17 @@ import ManualLink from "../base/ManualLink";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
-import { getBuildAvailability } from "../base/BuildAvailability";
+import {
+  getBuildAvailability,
+  getSiteInventory,
+  shortPlaceName,
+  siteCountLabel,
+} from "../base/BuildAvailability";
+import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
+import { getScenario } from "../../data/Scenarios";
 import BuildMetric from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function percent(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
@@ -155,6 +148,17 @@ function ExpectedOutputMetric(props: {
   );
 }
 
+/**
+ * Hydro can only deliver the water that arrives, so its typical output follows the forecast
+ * inflow rather than the design capacity factor, which a drought year can fall well short of.
+ */
+function typicalCapacityFactor(
+  generator: GeneratorShoppingType,
+  shape?: ExpectedOutputShape,
+): number {
+  return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
+}
+
 function GeneratorDetailRow(props: {
   label: string;
   value: React.ReactNode;
@@ -219,11 +223,18 @@ export function GeneratorBuildItem(
     LOAN_MONTHS,
   );
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
-  const { buildable, secondaryText } = getBuildAvailability(
-    generator.description,
-    generator.available,
+  const { buildable, secondaryText } = getBuildAvailability({
+    name: generator.name,
+    description: generator.description,
+    available: generator.available,
     sizeBuildable,
-    formatWatts(generator.maxPeakW),
+    maxSizeLabel: formatWatts(generator.maxPeakW),
+    location: props.location,
+    viableLocationsRemaining: generator.viableLocationsRemaining,
+  });
+  const sites = getSiteInventory(
+    generator.name,
+    props.location,
     generator.viableLocationsRemaining,
   );
   const financingGap = Math.max(0, downpayment - cash);
@@ -239,9 +250,12 @@ export function GeneratorBuildItem(
   const kgCO2ePerMWh = Math.round(
     1000000 * generator.btuPerWh * (fuel.kgCO2ePerBtu || 0),
   );
-  const typicalOutputW = generator.peakW * generator.capacityFactor;
   const outputShape =
     props.outputShape || expectedMonthlyOutputShape(generator, []);
+  const waterShape =
+    outputShape?.kind === "water-inflow" ? outputShape : undefined;
+  const capacityFactor = typicalCapacityFactor(generator, outputShape);
+  const typicalOutputW = generator.peakW * capacityFactor;
   // A short role tag stays on the card; how to use it waits for the details
   const [role, roleHint] =
     generator.fuel === "Hydro"
@@ -331,6 +345,12 @@ export function GeneratorBuildItem(
       />
       <Typography className="buildOptionContext" variant="body2">
         {role}
+        {sites && sites.remaining > 0 && (
+          <>
+            {" · "}
+            <span className="nowrap">{siteCountLabel(sites)}</span>
+          </>
+        )}
       </Typography>
       {!canBuild && (
         <Typography
@@ -418,8 +438,13 @@ export function GeneratorBuildItem(
                 />
               )}
               <GeneratorDetailRow
-                label="Expected capacity factor"
-                value={percent(generator.capacityFactor)}
+                // Lifetime cost still assumes average water years; this is the year ahead
+                label={
+                  waterShape
+                    ? "Capacity factor, this forecast"
+                    : "Expected capacity factor"
+                }
+                value={percent(capacityFactor)}
                 entry={MANUAL_ENTRY.CAPACITY_FACTOR}
               />
               {generator.minimumStableOutput !== undefined && (
@@ -499,10 +524,10 @@ export function GeneratorBuildItem(
                 value={generator.lifespanYears + " years"}
                 entry={MANUAL_ENTRY.ACCOUNTING_LIFETIME}
               />
-              {generator.viableLocationsRemaining !== undefined && (
+              {sites && (
                 <GeneratorDetailRow
                   label="Sites left"
-                  value={generator.viableLocationsRemaining}
+                  value={`${sites.remaining} of ${sites.total}`}
                   entry={MANUAL_ENTRY.PROJECT_SITES}
                 />
               )}
@@ -558,8 +583,23 @@ export function GeneratorBuildItem(
                 concept: "supply",
                 label: "Typical output",
                 value: `+${formatWatts(typicalOutputW)}`,
-                detail: `${formatWatts(generator.peakW)} max; weather may limit it.`,
+                detail: waterShape
+                  ? `${formatWatts(generator.peakW)} max; water limits it, lowest in ${MONTH_NAMES[waterShape.lowMonth]}.`
+                  : `${formatWatts(generator.peakW)} max; weather may limit it.`,
               },
+              ...(sites
+                ? [
+                    {
+                      concept: "build" as const,
+                      label: "Project site",
+                      value:
+                        sites.remaining === 1
+                          ? "Uses your last site"
+                          : `Leaves ${sites.remaining - 1} of ${sites.total}`,
+                      detail: "Each project takes one site, whatever its size.",
+                    },
+                  ]
+                : []),
               {
                 concept: kgCO2ePerMWh > 0 ? "danger" : "goal",
                 label: "Direct emissions",
@@ -654,6 +694,7 @@ export function GeneratorBuildItem(
 
 function GeneratorComparison(props: {
   generators: GeneratorShoppingType[];
+  outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
 }): React.JSX.Element | null {
   if (props.generators.length === 0) {
@@ -685,8 +726,14 @@ function GeneratorComparison(props: {
               {Math.round(generator.yearsToBuild * 12)} mo
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {formatWatts(generator.peakW * generator.capacityFactor)} typical
-              · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
+              {formatWatts(
+                generator.peakW *
+                  typicalCapacityFactor(
+                    generator,
+                    props.outputShapes.get(generator.name),
+                  ),
+              )}{" "}
+              typical · {formatMoneyConcise(generator.lcWh * 1000000)}/MWh
             </Typography>
           </div>
         ))}
@@ -771,6 +818,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   );
   const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
   const [comparedNames, setComparedNames] = React.useState<string[]>([]);
+  const [primerVisible, dismissPrimer] = useHydroPrimer();
 
   if (!now) {
     return <span />;
@@ -841,6 +889,18 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     comparedNames.includes(generator.name),
   );
 
+  // Tutorials script their own path through this list, so the primer waits for a real game
+  const hydro = generators.find((generator) => generator.name === "Hydro");
+  const hydroSites =
+    hydro &&
+    getSiteInventory(hydro.name, game.location, hydro.viableLocationsRemaining);
+  const showPrimer =
+    primerVisible &&
+    !!hydro?.available &&
+    !!hydroSites &&
+    hydroSites.remaining > 0 &&
+    !getScenario(game.scenarioId, game.customScenario)?.tutorialSteps;
+
   const toggleCompare = (name: string) => {
     setComparedNames((current) =>
       current.includes(name)
@@ -893,6 +953,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       />
       <GeneratorComparison
         generators={comparedGenerators}
+        outputShapes={outputShapes}
         onClear={() => setComparedNames([])}
       />
       <List dense className="scrollable cardList">
@@ -905,29 +966,37 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           ].filter((value): value is string => Boolean(value));
           const compared = comparedNames.includes(g.name);
           return (
-            <GeneratorBuildItem
-              date={game.date}
-              seed={game.seed}
-              location={game.location}
-              interestRate={game.interestRate}
-              generator={g}
-              key={g.name}
-              cash={cash}
-              secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
-              forecastGapW={forecastGapW}
-              advantages={advantages.slice(0, 2)}
-              outputShape={outputShapes.get(g.name)}
-              outputCeiling={outputCeiling}
-              compared={compared}
-              compareDisabled={comparedNames.length >= 3}
-              onCompare={() => toggleCompare(g.name)}
-              onBuild={(financed: boolean) => {
-                props.onBuildGenerator(g, financed);
-                if (props.hasEvidenceReturn && props.onEvidenceReturn)
-                  props.onEvidenceReturn();
-                else onBack();
-              }}
-            />
+            <React.Fragment key={g.name}>
+              {showPrimer && g.name === "Hydro" && hydroSites && (
+                <HydroPrimer
+                  place={shortPlaceName(game.location)}
+                  totalSites={hydroSites.total}
+                  onDismiss={dismissPrimer}
+                />
+              )}
+              <GeneratorBuildItem
+                date={game.date}
+                seed={game.seed}
+                location={game.location}
+                interestRate={game.interestRate}
+                generator={g}
+                cash={cash}
+                secondaryMetric={sort === "buildCost" ? "yearsToBuild" : sort}
+                forecastGapW={forecastGapW}
+                advantages={advantages.slice(0, 2)}
+                outputShape={outputShapes.get(g.name)}
+                outputCeiling={outputCeiling}
+                compared={compared}
+                compareDisabled={comparedNames.length >= 3}
+                onCompare={() => toggleCompare(g.name)}
+                onBuild={(financed: boolean) => {
+                  props.onBuildGenerator(g, financed);
+                  if (props.hasEvidenceReturn && props.onEvidenceReturn)
+                    props.onEvidenceReturn();
+                  else onBack();
+                }}
+              />
+            </React.Fragment>
           );
         })}
       </List>

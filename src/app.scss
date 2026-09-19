@@ -3347,6 +3347,47 @@ html[data-theme="dark"] .uplot {
     grid-column: 1 / -1;
   }
 
+  .facilityWaterOutlook {
+    margin: 12px 0 0;
+
+    // Same neutral marks as the build cards' typical-year lines
+    .sparklineLine,
+    .sparklineMarker {
+      stroke: var(--spark-stroke);
+    }
+    .sparklineFill {
+      fill: var(--spark-fill);
+    }
+    .sparklineBaseline {
+      stroke: var(--spark-baseline);
+    }
+    .sparklineMarker {
+      fill: var(--spark-marker-fill);
+    }
+
+    figcaption {
+      margin: 0 0 4px;
+      font-size: 12px;
+      line-height: 16px;
+    }
+  }
+
+  // The one-sentence reason a dam is producing what it is. Only the verdict takes the warning
+  // colour, so the sentence stays readable and the colour stays a signal rather than a slab.
+  .facilityWaterStatus {
+    margin: 0 0 12px;
+
+    strong {
+      font-weight: 600;
+    }
+    .warn {
+      color: var(--warning-icon);
+    }
+    .bad {
+      color: $delta_bad;
+    }
+  }
+
   .facilityTrend {
     display: flex;
     flex-wrap: wrap;
@@ -4378,6 +4419,24 @@ $sizemap: (
   }
 }
 
+// A once-only note above the first site-limited option; quieter than the cards it introduces.
+.buildPrimer {
+  margin: 0 8px 8px;
+  padding: 12px 12px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-raised);
+
+  h2 {
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  .MuiButton-root {
+    min-height: 40px;
+    margin-left: -8px;
+  }
+}
+
 // Shared purchase rows: keep the decision and touch targets compact without clipping copy.
 .build-list-item.buildOption {
   .MuiCardHeader-root {
@@ -4449,6 +4508,9 @@ $sizemap: (
   .buildOptionContext {
     display: block;
     padding: 0 12px 8px;
+  }
+  .nowrap {
+    white-space: nowrap;
   }
   .buildOptionWarning,
   .buildOptionDescription {
@@ -4732,6 +4794,9 @@ $sizemap: (
 }
 .facilityDisclosure .MuiListItemText-root {
   container-type: inline-size;
+}
+.facilityDisclosure .facilityStatusLow {
+  color: var(--delta-bad);
 }
 .facilityDisclosure .facilityStatusShort {
   display: none;

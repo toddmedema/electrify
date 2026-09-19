@@ -18,10 +18,12 @@ import {
   DateType,
   FacilityOperatingType,
   FuelNameType,
+  GameType,
   GeneratorOperatingType,
   LocationType,
   StorageOperatingType,
 } from "../../Types";
+import HydroWaterSection from "./HydroWaterSection";
 import Sparkline from "./Sparkline";
 
 /**
@@ -42,6 +44,8 @@ export interface Props {
   date: DateType;
   seed: number;
   location: LocationType;
+  /** Needed only by a hydro plant, whose water outlook is a forecast of the whole game */
+  game?: GameType;
 }
 
 interface StatProps {
@@ -209,27 +213,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
               value={Math.round(facility.lifetimeStarts || 0).toLocaleString()}
             />
           )}
-          {isHydro && (
-            <Stat
-              label="Reservoir"
-              value={formatWattHoursOfPeak(
-                facility.reservoirWh || 0,
-                facility.reservoirCapacityWh || 0,
-              )}
-            />
-          )}
-          {isHydro && (
-            <Stat
-              label="Water added last month"
-              value={formatWattHours(facility.hydroLastInflowWh || 0)}
-            />
-          )}
-          {isHydro && (
-            <Stat
-              label="Spilled last month"
-              value={formatWattHours(facility.hydroLastSpillWh || 0)}
-            />
-          )}
           {isStorage && (
             <Stat
               label="Round-trip efficiency"
@@ -253,6 +236,9 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
           )}
         </dl>
       </section>
+      {isHydro && props.game && (
+        <HydroWaterSection facility={facility} game={props.game} />
+      )}
       <section className="facilityDetailSection" aria-label="Economics">
         <Typography component="h3" className="facilityDetailHeading">
           Economics
