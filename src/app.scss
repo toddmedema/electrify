@@ -1068,6 +1068,48 @@ $pane_header_height: 48px;
   }
 }
 
+// Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the
+// same neutral marks as the generator build cards' output lines
+.transmissionArchetype {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.intertieYear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+
+  .sparkline {
+    display: block;
+    flex: 0 0 96px;
+    overflow: visible;
+  }
+  .sparklineLine,
+  .sparklineMarker {
+    stroke: var(--spark-stroke);
+  }
+  .sparklineFill {
+    fill: var(--spark-fill);
+  }
+  .sparklineBaseline {
+    stroke: var(--spark-baseline);
+  }
+  .sparklineMarker {
+    fill: var(--spark-marker-fill);
+  }
+}
+
+.transmissionMetrics dd.transmissionMetricNote {
+  margin-top: 4px;
+  color: $font_color_faded;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
 .transmissionMetrics,
 .powerExchangeMetrics {
   display: grid;

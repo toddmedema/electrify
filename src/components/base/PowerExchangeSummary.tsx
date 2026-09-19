@@ -43,9 +43,13 @@ export default function PowerExchangeSummary({
     };
   }, [direction, motionEnabled]);
   const available = now.transmissionCapacityW || 0;
-  const nameplate = (game.transmission?.lines || [])
-    .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
-    .reduce((sum, line) => sum + line.capacityW, 0);
+  const operatingLines = (game.transmission?.lines || []).filter(
+    ({ yearsToBuildLeft }) => yearsToBuildLeft <= 0,
+  );
+  const nameplate = operatingLines.reduce(
+    (sum, line) => sum + line.capacityW,
+    0,
+  );
   const weatherLimited = available + 1 < nameplate;
 
   return (
@@ -84,7 +88,12 @@ export default function PowerExchangeSummary({
           <dd>{formatWatts(available)}</dd>
         </div>
         <div>
-          <dt>Neighbor price</dt>
+          {/* With several lines this is what trade actually cost, weighted by each line's flow */}
+          <dt>
+            {operatingLines.length > 1
+              ? "Average neighbor price"
+              : "Neighbor price"}
+          </dt>
           <dd>{formatMoneyConcise(now.marketPricePerMWh || 0)}/MWh</dd>
         </div>
       </dl>

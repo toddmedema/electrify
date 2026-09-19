@@ -1,6 +1,7 @@
 import type { FieldValue, Timestamp } from "firebase/firestore";
 import type * as React from "react";
 import type { Action } from "@reduxjs/toolkit";
+import type { IntertieArchetypeIdType } from "./data/IntertieArchetypes";
 
 export type AudioLoadingType = "UNLOADED" | "LOADING" | "ERROR" | "LOADED";
 export interface AudioType {
@@ -32,6 +33,9 @@ export interface AdjacentMarketDefinitionType {
   id: string;
   name: string;
   description: string;
+  archetype: IntertieArchetypeIdType;
+  /** Set when the neighbour's seasons differ from the player's, e.g. across the equator */
+  seasonHemisphere?: "NORTH" | "SOUTH";
   basePricePerMWh: number;
   availableSupplyW: number;
   availableDemandW: number;
@@ -160,6 +164,7 @@ export interface DifficultyMultipliersType {
   expensesOM: number;
   buildTime: number;
   blackoutPenalty: number; // for each % of demand unfulfilled, how much the regional growth rate is reduced
+  peakSharingImportLoss: number; // share of a peak-sharing neighbour's imports lost at full local heat/cold stress
   description: string; // shown in a tooltip on the difficulty picker
 }
 
