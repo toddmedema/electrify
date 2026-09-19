@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run check)",
+      "Bash(npm run fix)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix)",
+      "Bash(npm run format)",
+      "Bash(npm run format:check)",
+      "Bash(npm run test:once:*)",
+      "Bash(npm run test:ci:*)",
+      "Bash(npm run sim:*)",
+      "Bash(npm run build)",
+      "Bash(npm run compatibility:check)",
+      "Bash(npm run compatibility:generate)",
+      "Bash(npm run test:e2e:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-edited-file.js\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -19,8 +19,10 @@ Code changes are welcome and should follow the guidelines below.
 
 ## Testing
 
-Run `npm run check` before opening a PR -- it runs types, lint, formatting and tests, which is
-exactly what CI checks. For us to consider merging your PR, all of it must pass.
+Run `npm run check` before opening a PR -- it runs the run compatibility check, types, lint,
+formatting, tests and the headless simulation, which is what CI checks before its build and browser
+smoke tests. `npm run fix` regenerates the compatibility manifest and fixes lint and formatting
+where it can. For us to consider merging your PR, all of it must pass.
 
 If a pull request intentionally changes behavior, update the affected tests and explain the change
 in the pull request description.

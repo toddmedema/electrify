@@ -36,13 +36,17 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".tutorialHud")).toContainText(
       "Check the storage bar",
     );
+    // Keep the pointer off the toast so its auto-dismiss timer is not paused by hover; it
+    // covers the new row until it leaves.
+    await page.mouse.move(0, 0);
+    await expect(page.locator(".snackbarContent")).toBeHidden();
     const construction = page
       .locator(".facilityRow")
       .filter({ hasText: "Building 0%" });
+    // A purchase highlights its row without expanding it
     const disclosure = construction.locator(".facilityDisclosure");
-    if ((await disclosure.getAttribute("aria-expanded")) !== "true") {
-      await disclosure.click();
-    }
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    await disclosure.click();
     await expect(construction.locator(".facilityDetails")).toBeVisible();
     await expect(construction).toHaveCSS("box-shadow", "none");
     await expect(page.locator(".tutorialTargetRing")).toBeVisible();
@@ -50,9 +54,6 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("tab", { name: "Storage", exact: true }),
     ).toHaveCount(0);
-    // Keep the pointer off the toast so its auto-dismiss timer is not paused by hover.
-    await page.mouse.move(0, 0);
-    await expect(page.locator(".snackbarContent")).toBeHidden();
     await page.screenshot({
       path: testInfo.outputPath("storage-tutorial-expanded.png"),
       animations: "disabled",

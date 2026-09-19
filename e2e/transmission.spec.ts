@@ -60,14 +60,10 @@ test("California players can build and understand an intertie", async ({
     page.getByText("Intertie approved — power can flow in 1 year."),
   ).toBeVisible();
   await expect(
-    facilities
-      .getByText("Interties", { exact: false })
-      .filter({ hasText: "Automatic trading" }),
+    facilities.locator("#your-interties-title", { hasText: "Interties" }),
   ).toBeVisible();
   await expect(facilities.getByText("Building")).toBeVisible();
-  await expect(
-    facilities.getByText("Network trading", { exact: true }),
-  ).toHaveCount(1);
+  await expect(facilities.locator(".tradingControls")).toHaveCount(1);
   const line = facilities.locator(".transmissionLine").first();
   const [rowBox, chevronBox] = await Promise.all([
     line.locator(".facilityDisclosure").boundingBox(),
@@ -78,14 +74,12 @@ test("California players can build and understand an intertie", async ({
       rowBox!.y + rowBox!.height / 2 - (chevronBox!.y + chevronBox!.height / 2),
     ),
   ).toBeLessThanOrEqual(1);
-  await facilities.locator(".tradingSummary > summary").focus();
-  await page.keyboard.press("Enter");
   await expect(facilities.getByLabel("Trading rule")).toContainText(
     "Buy for shortages, sell extra",
   );
-  await expect(facilities.getByText("Northern intertie upgrade")).toHaveCount(
-    1,
-  );
+  await expect(
+    facilities.getByText("Northern intertie", { exact: true }),
+  ).toHaveCount(1);
   expect(
     await facilities.evaluate((element) =>
       Math.max(0, element.scrollWidth - element.clientWidth),
@@ -227,7 +221,7 @@ for (const theme of ["light", "dark"] as const) {
         await card.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
       await expect(card.locator(".transmissionProjectMetadata")).toContainText(
-        /route/,
+        /corridor/,
       );
     }
   });

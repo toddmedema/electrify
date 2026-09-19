@@ -635,7 +635,7 @@ export const SCENARIOS = [
         target: "#chartForecastSupplyDemand",
         action: "Find the predicted blackout",
         content: (
-          <TutorialPrompt text="The chart shows one representative day per month, not every difficult day." />
+          <TutorialPrompt text="The chart shows one representative day per month." />
         ),
       },
       {
@@ -653,12 +653,12 @@ export const SCENARIOS = [
         target: ".eventLogItem",
         action: "Read the blackout event",
         content: (
-          <TutorialPrompt text="Each dated event explains what changed. Events also flag changes in which fuel is cheaper." />
+          <TutorialPrompt text="Each dated event explains what changed." />
         ),
         desktop: {
           target: "#eventsPane",
           content: (
-            <TutorialPrompt text="Each dated event explains what changed. Events also flag changes in which fuel is cheaper." />
+            <TutorialPrompt text="Each dated event explains what changed." />
           ),
         },
       },

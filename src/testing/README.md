@@ -1,14 +1,5 @@
 # Headless simulation
 
-Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
-`initialPrograms: { efficiency: "Small", solar: "Large" }` and schedules each through the real
-reducer for month two. The matrix compares Off, Small, Large, solar-only, and combined funding
-in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant.
-Program costs are authored game assumptions, scaled by initial customer market and demand
-scale, then inflated from the starting year. Adoption is allocated once at the month boundary;
-its actual cost is spread across that month's ticks. Installed upgrades persist within the run.
-These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
-
 Plays the game without a browser, then checks that the economy behaved lawfully. A 20 year
 scenario runs in about half a second, so a change to the simulation can be sanity checked in
 seconds instead of by clicking through the UI in real time.
@@ -115,6 +106,15 @@ The CEO matrix retains complete winning playbooks and multiple seeds. The minimu
 gate is tested directly in `helpers/MeaningfulDecisions.test.ts`; replaying every playbook with
 each decision omitted only repeats that gate, without proving the omitted action matters to the
 economy. `ScenarioChoiceBalance.test.tsx` waives the gate when checking physical economic outcomes.
+
+Customer program balance coverage lives in `PolicyBalance.test.tsx`. The simulator accepts
+`initialPrograms: { efficiency: "Small", solar: "Large" }` and schedules each through the real
+reducer for month two. The matrix compares Off, Small, Large, solar-only, and combined funding
+in Paradise, Data Center Boom, and Deep Freeze, including every cash/energy invariant.
+Program costs are authored game assumptions, scaled by initial customer market and demand
+scale, then inflated from the starting year. Adoption is allocated once at the month boundary;
+its actual cost is spread across that month's ticks. Installed upgrades persist within the run.
+These automated tradeoff checks do not replace the issue's proposed first-time-player playtest.
 
 `createGame` is exported for tests that want a realistic mid-game state without running a whole
 simulation -- `reducers/BuildFacility.test.tsx` uses it to check what building actually does.

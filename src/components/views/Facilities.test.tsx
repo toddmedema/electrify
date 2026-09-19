@@ -249,7 +249,11 @@ describe("the fleet list", () => {
       onFacilityDragEnd,
       onSelect: () => undefined,
     };
-    render(<Facilities {...props} ref={ref} />);
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <Facilities {...props} ref={ref} />
+      </Provider>,
+    );
 
     ref.current!.onBeforeDragStart();
     expect(onFacilityDragStart).toHaveBeenCalledWith("FAST");
@@ -475,7 +479,7 @@ describe("unified connections", () => {
     /* eslint-disable testing-library/no-node-access */
     const connections = document.querySelectorAll(".transmissionLine");
     expect(connections).toHaveLength(2);
-    expect(document.querySelectorAll(".tradingSummary")).toHaveLength(1);
+    expect(document.querySelectorAll(".tradingControls")).toHaveLength(1);
     expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
     /* eslint-enable testing-library/no-node-access */
     expect(connections[0]).toHaveTextContent("Connected");
@@ -519,9 +523,10 @@ describe("unified connections", () => {
     } as GameType["replayPlayback"];
     renderFacilities(game, null);
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
-    await user.click(screen.getByText("No power flowing"));
+    expect(screen.getByText("No power flowing")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Trading rule" })).toBeNull();
     expect(
-      screen.getByRole("combobox", { name: "Trading rule" }),
-    ).toHaveAttribute("aria-disabled", "true");
+      screen.getByText("Trading rule: Buy for shortages, sell extra"),
+    ).toBeInTheDocument();
   });
 });
