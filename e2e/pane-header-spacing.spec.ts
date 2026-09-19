@@ -28,11 +28,19 @@ for (const colorScheme of ["light", "dark"] as const) {
         ) {
           expect((await pane.boundingBox())!.y).toBeCloseTo(header.y, 0);
         }
-        const progress = (await page
-          .getByRole("progressbar", { name: "Year progress" })
+        const progressBar = page.getByRole("progressbar", {
+          name: "Year progress",
+        });
+        // The bar's box hangs past the edge by its tutorial-ring padding; the line itself is the
+        // fill, which must sit on the header's top edge.
+        const line = (await progressBar
+          .locator(".yearProgressFill")
           .boundingBox())!;
-        expect(progress.y + progress.height).toBeCloseTo(header.y, 0);
-        expect(progress.width).toBeCloseTo(bar.width, 0);
+        expect(line.y + line.height).toBeCloseTo(header.y, 0);
+        expect((await progressBar.boundingBox())!.width).toBeCloseTo(
+          bar.width,
+          0,
+        );
       }).toPass();
       if (name === "Facilities") {
         const build = (await pane

@@ -45,8 +45,11 @@ for (const theme of ["light", "dark"] as const) {
       .first()
       .click();
     const purchase = page.getByRole("dialog");
+    await purchase
+      .getByRole("button", { name: "Show financing terms", exact: true })
+      .click();
     const help = purchase.getByRole("button", {
-      name: "Power, energy & duration",
+      name: "What is interest rate?",
       exact: true,
     });
     await expect(help).toBeVisible();
@@ -57,23 +60,29 @@ for (const theme of ["light", "dark"] as const) {
     const manual = page.getByRole("dialog", { name: "Manual help" });
     await expect(manual).toBeVisible();
     const topic = manual
-      .getByRole("heading", { name: "Power and Energy", exact: true })
+      .getByRole("heading", {
+        name: "Interest Rates & Inflation",
+        exact: true,
+      })
       .getByRole("button", {
-        name: "Power and Energy",
+        name: "Interest Rates & Inflation",
         exact: true,
       });
     await expect(topic).toHaveAttribute("aria-expanded", "true");
     await expect(topic).toBeFocused();
-    await expect(manual).toContainText("80 MWh");
+    await expect(manual).toContainText("prime rate");
     await manual
       .getByRole("textbox", { name: "Search the manual" })
       .fill("round-trip");
+    const related = manual
+      .getByRole("heading", { name: "Power and Energy", exact: true })
+      .getByRole("button", { name: "Power and Energy", exact: true });
     await manual
       .getByRole("navigation", { name: "Related to Round-trip Efficiency" })
       .getByRole("button", { name: "Power and Energy", exact: true })
       .click();
-    await expect(topic).toHaveAttribute("aria-expanded", "true");
-    await expect(topic).toBeFocused();
+    await expect(related).toHaveAttribute("aria-expanded", "true");
+    await expect(related).toBeFocused();
     expect(
       await manual.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
@@ -98,16 +107,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.keyboard.press("Escape");
     await expect(manual).not.toBeVisible();
     await expect(purchase).toContainText("Loan option");
-    const purchaseHelp = purchase.getByRole("button", {
-      name: "Power, energy & duration",
-      exact: true,
-    });
-    await purchaseHelp.click();
-    await expect(manual).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(manual).not.toBeVisible();
-    await expect(purchaseHelp).toBeFocused();
-    await expect(purchase).toContainText("Loan option");
+    await expect(help).toBeFocused();
     await purchase.getByRole("button", { name: "close", exact: true }).click();
     await expect(purchase).not.toBeVisible();
     await expect(capacity).toHaveAttribute("aria-valuenow", selectedCapacity!);
@@ -154,14 +154,26 @@ test("reading help preserves the current tutorial objective", async ({
     .click();
   const objective = page.locator(".tutorialHud");
   await expect(objective).toBeVisible();
-  const before = await objective.innerText();
-  const insights = page.locator(".insights:visible");
+  // Financing terms carry the mission's money help. Insights no longer has an inline help link.
+  const facilities = page.locator(".facilities:visible");
   await openPane(
-    insights,
-    page.getByRole("button", { name: "Insights", exact: true }),
+    facilities,
+    page.getByRole("button", { name: "Facilities", exact: true }),
   );
+  await facilities.locator(".button-buildFacility").click();
+  await page.locator(".button-buildGenerator").click();
+  await page
+    .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
+    .first()
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Show financing terms", exact: true })
+    .click();
+  await expect(objective).toBeVisible();
+  const before = await objective.innerText();
   const help = page.getByRole("button", {
-    name: "How reserve works",
+    name: "What is interest rate?",
     exact: true,
   });
   await help.click();

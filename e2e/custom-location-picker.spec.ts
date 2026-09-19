@@ -46,21 +46,31 @@ async function mapBackgroundPoint(map: Locator) {
   await map.scrollIntoViewIfNeeded();
   const point = await map.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    for (const yFraction of [0.5, 0.35, 0.65]) {
-      for (const xFraction of [0.5, 0.35, 0.65]) {
-        const x = Math.round(box.x + box.width * xFraction);
-        const y = Math.round(box.y + box.height * yFraction);
+    // Touch adjustment snaps a finger onto a nearby tappable marker, so take the background
+    // point with the most room around it, not merely one that is off every marker.
+    const avoid = Array.from(
+      element.querySelectorAll(".worldMapControls, .worldMapMarker"),
+    ).map((candidate) => candidate.getBoundingClientRect());
+    let best: { x: number; y: number; room: number } | null = null;
+    for (let row = 1; row < 12; row++) {
+      for (let column = 1; column < 12; column++) {
+        const x = Math.round(box.x + (box.width * column) / 12);
+        const y = Math.round(box.y + (box.height * row) / 12);
         const target = document.elementFromPoint(x, y);
-        if (
-          target &&
-          element.contains(target) &&
-          !target.closest(".worldMapControls, .worldMapMarker")
-        ) {
-          return { x, y };
-        }
+        if (!target || !element.contains(target)) continue;
+        const room = Math.min(
+          Infinity,
+          ...avoid.map((rect) =>
+            Math.hypot(
+              Math.max(rect.left - x, 0, x - rect.right),
+              Math.max(rect.top - y, 0, y - rect.bottom),
+            ),
+          ),
+        );
+        if (room > 0 && (!best || room > best.room)) best = { x, y, room };
       }
     }
-    return null;
+    return best && { x: best.x, y: best.y };
   });
   expect(
     point,
