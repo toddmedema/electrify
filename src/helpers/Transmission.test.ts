@@ -699,3 +699,62 @@ describe("market clearing", () => {
     expect(capped.localAvailableSupplyW).toBeLessThan(request.demandW);
   });
 });
+
+describe("neighbour seasons across the equator", () => {
+  const cool = { temperatureC: 20 };
+  const north = {
+    seed: 7,
+    southernHemisphere: false,
+    peakSharingImportLoss: 0.25,
+    expectedLuck: true,
+  };
+  const south = { ...north, southernHemisphere: true };
+  const septemberNoon = 8 * DAYS_PER_MONTH * 1440 + 12 * 60;
+
+  it("gives the same dams the same seasons from either side of the equator", () => {
+    // Khartoum is north of the equator and Nairobi south; both see Ethiopia's monsoon dams.
+    expect(
+      importAvailabilityFraction(
+        "kenya-ethiopia-upgrade",
+        south,
+        septemberNoon,
+        cool,
+      ),
+    ).toBeCloseTo(
+      importAvailabilityFraction(
+        "sudan-ethiopia-upgrade",
+        north,
+        septemberNoon,
+        cool,
+      ),
+      10,
+    );
+  });
+});
+
+describe("expected luck", () => {
+  it("replaces seeded wet and dry years with the same average for every seed", () => {
+    const corridor = TRANSMISSION_CORRIDORS.find(
+      ({ id }) =>
+        INTERTIE_ARCHETYPES[adjacentMarketForCorridor(id)!.archetype]
+          .yearlyVariability > 0,
+    )!;
+    const at = (seed: number, expectedLuck: boolean) =>
+      [0, 1, 2, 3, 4].map((year) =>
+        importAvailabilityFraction(
+          corridor.id,
+          {
+            seed,
+            southernHemisphere: false,
+            peakSharingImportLoss: 0.25,
+            expectedLuck,
+          },
+          year * DAYS_PER_YEAR * 1440 + 3 * 1440 + 3 * 60,
+          { temperatureC: 20 },
+        ),
+      );
+    expect(at(1, true)).toEqual(at(2, true));
+    expect(new Set(at(1, true)).size).toBe(1);
+    expect(new Set(at(1, false)).size).toBeGreaterThan(1);
+  });
+});

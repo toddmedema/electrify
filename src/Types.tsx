@@ -34,6 +34,8 @@ export interface AdjacentMarketDefinitionType {
   name: string;
   description: string;
   archetype: IntertieArchetypeIdType;
+  /** Set when the neighbour's seasons differ from the player's, e.g. across the equator */
+  seasonHemisphere?: "NORTH" | "SOUTH";
   basePricePerMWh: number;
   availableSupplyW: number;
   availableDemandW: number;

@@ -77,14 +77,20 @@ describe("intertie outlook", () => {
     );
   });
 
-  it("averages exactly what the simulation would let each tick import", () => {
+  it("averages what the simulation would let each tick import in a year of average luck", () => {
     const ticks = year();
     const line = { corridorId: "california-south", capacityW: 750_000_000 };
     const january = ticks.filter((tick) => tick.minute < MINUTES_PER_MONTH);
     const expected =
       january.reduce(
         (sum, tick) =>
-          sum + intertieImportLimitW(line, intern, tick.minute, tick),
+          sum +
+          intertieImportLimitW(
+            line,
+            { ...intern, expectedLuck: true },
+            tick.minute,
+            tick,
+          ),
         0,
       ) /
       january.length /

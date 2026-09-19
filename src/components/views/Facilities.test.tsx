@@ -364,7 +364,7 @@ describe("the interties view", () => {
         within(card).getByText(/^Typical year · Low \w{3} \d+%$/),
       ).toBeInTheDocument();
       expect(within(card).getByText("At your peak")).toBeInTheDocument();
-      expect(within(card).getByText(/^~\d+%$/)).toBeInTheDocument();
+      expect(within(card).getByText(/^~\d+% of line$/)).toBeInTheDocument();
       expect(within(card).getByText(/^\$\d+–\d+\/MWh$/)).toBeInTheDocument();
     }
     expect(

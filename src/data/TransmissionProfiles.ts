@@ -936,7 +936,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-nairobi": [
     [
-      ["geo-nairobi-ethiopian-hydro","Ethiopian hydropower","The long HVDC highway brings low-carbon power, though drought can reduce how much is offered.",45,1000000000,700000000,"SEASONAL_HYDRO"],
+      ["geo-nairobi-ethiopian-hydro","Ethiopian hydropower","The long HVDC highway brings low-carbon power, though drought can reduce how much is offered.",45,1000000000,700000000,"MONSOON_HYDRO"],
       ["geo-nairobi-tanzanian-market","Tanzania","A newly energized 400 kV line reaches Tanzania's large new reservoir dam and gas plants.",60,700000000,750000000,"RESERVOIR_HYDRO"]
     ],
     [
@@ -966,7 +966,7 @@ export const TRANSMISSION_PROFILE_DATA = {
   ],
   "geo-daressalaam": [
     [
-      ["geo-daressalaam-kenyan-market","Kenya and Ethiopia","The northern route can bring Kenyan geothermal and Ethiopian hydro, with Kenya carrying power between markets.",55,750000000,700000000,"SEASONAL_HYDRO"],
+      ["geo-daressalaam-kenyan-market","Kenya and Ethiopia","The northern route can bring Kenyan geothermal and Ethiopian hydro, with Kenya carrying power between markets.",55,750000000,700000000,"MONSOON_HYDRO"],
       ["geo-daressalaam-southern-pool","Southern African Power Pool","A future southern gateway would connect Tanzania to Zambia and the larger SAPP market.",63,650000000,700000000,"LARGE_POOL"]
     ],
     [

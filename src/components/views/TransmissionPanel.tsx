@@ -35,6 +35,7 @@ import { getTimeFromTimeline } from "../../helpers/DateTime";
 import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
 import {
   adjacentMarketPricePerMWh,
+  allowsImports,
   intertieContextForGame,
   intertieImportLimitW,
   transmissionRatingW,
@@ -72,7 +73,7 @@ function priceRange(outlook: IntertieOutlook): string {
   // Whole dollars: a typical range is an estimate, and cents would suggest otherwise
   const low = formatMoneyConcise(Math.round(outlook.priceLow));
   const high = formatMoneyConcise(Math.round(outlook.priceHigh));
-  return `${low}–${high.replace("$", "")}/MWh`;
+  return low === high ? `${low}/MWh` : `${low}–${high.replace("$", "")}/MWh`;
 }
 
 /** Hourly steps keep every hour of the day while costing a quarter of a full-resolution forecast */
@@ -344,7 +345,10 @@ export default function TransmissionPanel({
                         ? line.yearsToBuildLeft.toFixed(1) +
                           (line.yearsToBuildLeft <= 1 ? " year" : " years") +
                           " remaining"
-                        : formatWatts(importableW) + " can import"}
+                        : formatWatts(importableW) +
+                          (allowsImports(state.tradingPolicy)
+                            ? " can import"
+                            : " available")}
                       {" · "}
                       <span className="transmissionLineStatus">
                         {building ? "Building" : "Connected"}
@@ -410,7 +414,7 @@ export default function TransmissionPanel({
                           <>
                             <div>
                               <dt>At your peak</dt>
-                              <dd>~{percent(outlook.atPeak)}</dd>
+                              <dd>~{percent(outlook.atPeak)} of line</dd>
                             </div>
                             <PriceMetric outlook={outlook} />
                           </>
@@ -507,7 +511,7 @@ export default function TransmissionPanel({
                       <>
                         <div>
                           <dt>At your peak</dt>
-                          <dd>~{percent(outlook.atPeak)}</dd>
+                          <dd>~{percent(outlook.atPeak)} of line</dd>
                         </div>
                         <PriceMetric outlook={outlook} />
                       </>
@@ -644,7 +648,7 @@ export default function TransmissionPanel({
                         concept: "supply" as const,
                         label: "Import room",
                         value: `~${percent(reviewOutlook.atPeak)} at your peak`,
-                        detail: `Typically ${percent(reviewOutlook.mean)} of the line; least in ${MONTH_NAMES[reviewOutlook.lowMonth]} (${percent(reviewOutlook.monthly[reviewOutlook.lowMonth])}). ${reviewOutlook.archetype.summary}`,
+                        detail: `Typically ${percent(reviewOutlook.mean)} of the line; least in ${MONTH_NAMES[reviewOutlook.lowMonth]} (${percent(reviewOutlook.monthly[reviewOutlook.lowMonth])}). ${reviewMarket?.description ?? ""}`,
                       },
                       {
                         concept: "money" as const,

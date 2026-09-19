@@ -61,6 +61,11 @@ export interface IntertieContext {
   southernHemisphere: boolean;
   /** How much of a peak-sharing neighbour's supply disappears at full local stress */
   peakSharingImportLoss: number;
+  /**
+   * Replace this run's seeded wet/dry years and calm days with their average, for describing a
+   * typical year to the player rather than the specific luck the next few years will bring.
+   */
+  expectedLuck?: boolean;
 }
 
 export function intertieContextForGame(
@@ -158,6 +163,32 @@ function marketIndex(marketId: string): number {
 
 const MINUTES_PER_GAME_YEAR = DAYS_PER_YEAR * 1440;
 
+/** Neighbours share the player's hemisphere unless their market data says otherwise */
+function marketSouthern(
+  market: AdjacentMarketDefinitionType,
+  context: Pick<IntertieContext, "southernHemisphere">,
+): boolean {
+  return market.seasonHemisphere
+    ? market.seasonHemisphere === "SOUTH"
+    : context.southernHemisphere;
+}
+
+/** The yearly and calm-day multipliers, or their averages when describing a typical year */
+function neighbourLuck(
+  market: AdjacentMarketDefinitionType,
+  context: Pick<IntertieContext, "seed" | "expectedLuck">,
+  minute: number,
+): number {
+  if (context.expectedLuck) {
+    const archetype = INTERTIE_ARCHETYPES[market.archetype];
+    return 1 - archetype.lullChance * (1 - archetype.lullAvailability);
+  }
+  return (
+    neighbourYearFactor(market, context.seed, minute) *
+    neighbourLullFactor(market, context.seed, minute)
+  );
+}
+
 /** 0..11, shifted so archetype shapes written for the north line up with southern seasons */
 export function archetypeMonth(minute: number, southernHemisphere: boolean) {
   const month = Math.floor(minute / (DAYS_PER_MONTH * 1440)) % 12;
@@ -211,16 +242,14 @@ export function importAvailabilityFraction(
   const market = adjacentMarketForCorridor(corridorId);
   if (!market) return 0;
   const archetype = INTERTIE_ARCHETYPES[market.archetype];
-  const month = archetypeMonth(minute, context.southernHemisphere);
+  const month = archetypeMonth(minute, marketSouthern(market, context));
   const hour = Math.floor((minute % 1440) / 60);
   const stress = neighbourStress(archetype, conditions.temperatureC);
   const heatLoss = archetype.heatStressLoss ?? context.peakSharingImportLoss;
   const coldLoss = archetype.coldStressLoss ?? context.peakSharingImportLoss;
   const seasonal =
     archetype.monthlyAvailability[month] * archetype.hourlyAvailability[hour];
-  const luck =
-    neighbourYearFactor(market, context.seed, minute) *
-    neighbourLullFactor(market, context.seed, minute);
+  const luck = neighbourLuck(market, context, minute);
   return clamp01(
     Math.min(1, seasonal * luck) *
       (1 - heatLoss * stress.heat - coldLoss * stress.cold),
@@ -248,7 +277,10 @@ export function intertieImportLimitW(
 /** Offline, seeded wholesale price in dollars per MWh, shaped by the neighbour's archetype. */
 export function adjacentMarketPricePerMWh(
   corridorId: string,
-  context: Pick<IntertieContext, "seed" | "southernHemisphere">,
+  context: Pick<
+    IntertieContext,
+    "seed" | "southernHemisphere" | "expectedLuck"
+  >,
   minute: number,
   conditions: Pick<TransmissionConditions, "temperatureC">,
 ): number {
@@ -256,13 +288,10 @@ export function adjacentMarketPricePerMWh(
   if (!market) return 0;
   const archetype = INTERTIE_ARCHETYPES[market.archetype];
   const tick = Math.floor(minute / TICK_MINUTES);
-  const month = archetypeMonth(minute, context.southernHemisphere);
+  const month = archetypeMonth(minute, marketSouthern(market, context));
   const hour = Math.floor((minute % 1440) / 60);
   const stress = neighbourStress(archetype, conditions.temperatureC);
-  const scarcity =
-    1 -
-    neighbourYearFactor(market, context.seed, minute) *
-      neighbourLullFactor(market, context.seed, minute);
+  const scarcity = 1 - neighbourLuck(market, context, minute);
   // Each neighbour gets its own noise, so which line is cheaper can change tick to tick.
   // The index wraps to 32 bits inside normalAt; the collisions that allows are harmless here.
   const noise =
