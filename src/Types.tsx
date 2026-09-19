@@ -1137,6 +1137,8 @@ export interface UIType {
   evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
   evidenceJourneyMarker?: { id: number; runId: number };
   insightsRestore?: InsightsOriginType;
+  // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
+  insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
   evidenceSequence?: number;
   evidenceRunId?: number;

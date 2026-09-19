@@ -1542,8 +1542,16 @@ $pane_header_height: 48px;
 }
 
 .insightsWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0 12px 8px;
   color: var(--delta-bad);
+
+  .MuiSvgIcon-root {
+    flex-shrink: 0;
+    margin-top: 1px; // Sits on the first line of body2 text
+  }
 }
 
 .insightsSummaryTable {

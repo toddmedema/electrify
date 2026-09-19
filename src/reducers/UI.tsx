@@ -140,6 +140,7 @@ export const uiSlice = createSlice({
       delete state.evidenceJourney;
       delete state.evidenceJourneyMarker;
       delete state.insightsRestore;
+      delete state.insightsViewport;
       state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
     builder.addMatcher(
@@ -158,6 +159,7 @@ export const uiSlice = createSlice({
         delete state.evidenceJourney;
         delete state.evidenceJourneyMarker;
         delete state.insightsRestore;
+        delete state.insightsViewport;
         state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
       },
     );

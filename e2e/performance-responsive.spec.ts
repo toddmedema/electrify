@@ -57,6 +57,8 @@ test("chart-heavy controls remain responsive during pointer gestures", async ({
 
   // The expensive 20-year projection should retain its current preview during the drag and
   // commit exactly where the player releases, keeping the pointer path free of projection work.
+  // A long custom run opens on the full forecast, so narrow it first to exercise Fit.
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await page
     .getByRole("button", { name: "Fit full timeline", exact: true })
     .click();

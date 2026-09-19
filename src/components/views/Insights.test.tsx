@@ -666,9 +666,9 @@ describe("Insights layers", () => {
     renderInsights(100, gameWithHistory(), [
       {
         key: "future",
-        startsMinute: 48 * MINUTES_PER_MONTH,
-        endsMinute: 49 * MINUTES_PER_MONTH,
-        label: "Expected Jan 2027",
+        startsMinute: 150 * MINUTES_PER_MONTH,
+        endsMinute: 151 * MINUTES_PER_MONTH,
+        label: "Expected Jul 2032",
         title: "Future event",
         message: "Forecast only.",
       },
@@ -694,7 +694,7 @@ describe("Insights layers", () => {
     expect(zoomed[1] - zoomed[0]).toBeCloseTo((initial[1] - initial[0]) / 2);
     expect(cash).toHaveAttribute("data-domain", JSON.stringify(zoomed));
     expect(
-      screen.getByLabelText("Displayed date range: Apr–Oct 2020"),
+      screen.getByLabelText("Displayed date range: 2023–28"),
     ).toBeVisible();
     expect(labelledButton("Pan earlier")).toBeEnabled();
     expect(labelledButton("Pan later")).toBeEnabled();
@@ -707,17 +707,17 @@ describe("Insights layers", () => {
       JSON.stringify([0, 20 * 12 * MINUTES_PER_MONTH]),
     );
     expect(
-      screen.getByLabelText("Displayed date range: 2020–40"),
+      screen.getByLabelText("Displayed date range: 2020–39"),
     ).toBeVisible();
   });
 
-  it("advances the end while keeping a scenario-start viewport anchored", () => {
+  it("opens on the whole scenario and keeps it pinned as the game advances", () => {
     const game = createGame({ scenarioId: 100 });
     const view = renderInsights(100, game);
     const supply = screen.getByTestId("supply-demand-chart");
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 12 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
     );
 
     const nextGame = {
@@ -739,7 +739,60 @@ describe("Insights layers", () => {
 
     expect(supply).toHaveAttribute(
       "data-domain",
-      JSON.stringify([0, 13 * MINUTES_PER_MONTH]),
+      JSON.stringify([0, 144 * MINUTES_PER_MONTH]),
+    );
+  });
+
+  it("sizes the forecast shortfall to the displayed range", async () => {
+    const game = createGame({ scenarioId: 100 });
+    game.facilities = [];
+    renderInsights(100, game);
+    const note = screen.getByRole("note", {
+      name: /^Forecast shortfall for 2020–31:/,
+    });
+    expect(note).toHaveTextContent(
+      /^Forecast shortfall, 2020–31: ~.+ unmet · peak ~/,
+    );
+    const wholeScenario = note.textContent;
+
+    await user.click(labelledButton("Zoom in"));
+    expect(
+      screen.getByRole("note", { name: /^Forecast shortfall for 2023–28:/ }),
+    ).not.toHaveTextContent(wholeScenario!);
+  });
+
+  it("reports the viewport and reopens on it after the pane remounts", async () => {
+    const game = createGame({ scenarioId: 100 });
+    const onViewportChange = jest.fn();
+    const view = render(
+      <Insights
+        game={game}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+        onViewportChange={onViewportChange}
+      />,
+    );
+    await user.click(labelledButton("Zoom in"));
+    const saved = onViewportChange.mock.calls.at(-1)[0];
+    const zoomed = screen
+      .getByTestId("supply-demand-chart")
+      .getAttribute("data-domain");
+    expect(JSON.stringify(saved.viewport)).toBe(zoomed);
+    view.unmount();
+
+    render(
+      <Insights
+        game={game}
+        selectedFacilityId={null}
+        facilityDragActive={false}
+        onDelta={() => undefined}
+        savedViewport={saved}
+      />,
+    );
+    expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+      "data-domain",
+      zoomed!,
     );
   });
 

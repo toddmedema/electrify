@@ -1,4 +1,3 @@
-import { beginGeneratorJourney } from "../../helpers/EvidenceJourney";
 import { delta as uiDelta } from "../../reducers/UI";
 import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
@@ -21,6 +20,7 @@ const STORY_INSIGHT_LAYERS: Record<string, InsightLayerId> = {
 const mapStateToProps = (state: AppStateType): StateProps => ({
   evidenceRequest: state.ui.evidenceRequest,
   journeyRestore: state.ui.insightsRestore,
+  savedViewport: state.ui.insightsViewport,
   configurationRevision: state.ui.insightsConfigurationRevision,
   evidenceRunId: state.ui.evidenceRunId,
   activeCard: state.card.name,
@@ -35,9 +35,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
-  onGeneratorJourney: (origin) => {
-    dispatch(beginGeneratorJourney(origin));
-  },
+  onViewportChange: (saved) => dispatch(uiDelta({ insightsViewport: saved })),
   onJourneyRestored: (origin) =>
     dispatch((_dispatch, getState) => {
       if (getState().ui.insightsRestore !== origin) return false;
