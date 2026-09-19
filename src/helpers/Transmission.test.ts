@@ -24,14 +24,15 @@ describe("transmission ratings", () => {
 
   it("produces a deterministic offline market price", () => {
     const conditions = { temperatureC: 35, solarIrradianceWM2: 700 };
+    const context = { seed: 1234, southernHemisphere: false };
     const first = adjacentMarketPricePerMWh(
       "california-north",
-      1234,
+      context,
       600,
       conditions,
     );
     expect(
-      adjacentMarketPricePerMWh("california-north", 1234, 600, conditions),
+      adjacentMarketPricePerMWh("california-north", context, 600, conditions),
     ).toBe(first);
     expect(first).toBeGreaterThan(0);
   });

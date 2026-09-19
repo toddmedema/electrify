@@ -12,6 +12,7 @@ export const DIFFICULTIES = {
     expensesOM: 0.6,
     buildTime: 0.2,
     blackoutPenalty: 2,
+    peakSharingImportLoss: 0.25,
     description:
       "Most forgiving: much lower game costs, very fast building, and smaller gameplay penalties from outages.",
   },
@@ -20,6 +21,7 @@ export const DIFFICULTIES = {
     expensesOM: 0.7,
     buildTime: 0.3,
     blackoutPenalty: 4,
+    peakSharingImportLoss: 0.3,
     description:
       "Forgiving: lower game costs, faster building, and smaller gameplay penalties from outages.",
   },
@@ -28,6 +30,7 @@ export const DIFFICULTIES = {
     expensesOM: 0.8,
     buildTime: 0.5,
     blackoutPenalty: 6,
+    peakSharingImportLoss: 0.375,
     description:
       "Balanced: some help with game costs, building time, and outage penalties.",
   },
@@ -36,6 +39,7 @@ export const DIFFICULTIES = {
     expensesOM: 0.9,
     buildTime: 0.7,
     blackoutPenalty: 8,
+    peakSharingImportLoss: 0.45,
     description: "Demanding: a little help with game costs and building time.",
   },
   CEO: {
@@ -43,6 +47,7 @@ export const DIFFICULTIES = {
     expensesOM: 1,
     buildTime: 1,
     blackoutPenalty: 10,
+    peakSharingImportLoss: 0.5,
     description:
       "Full challenge: unadjusted game costs, building times, and outage penalties.",
   },

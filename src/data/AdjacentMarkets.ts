@@ -31,6 +31,7 @@ function expandProfile(
         basePricePerMWh,
         availableSupplyW,
         availableDemandW,
+        archetype,
       ]) => ({
         id,
         name,
@@ -38,6 +39,7 @@ function expandProfile(
         basePricePerMWh,
         availableSupplyW,
         availableDemandW,
+        archetype,
         ...importEmissionsAssumption(id),
       }),
     ),
