@@ -10,6 +10,12 @@ import {
   StorageOperatingType,
   TickPresentFutureType,
 } from "../Types";
+import { adjacentMarketForCorridor } from "../data/AdjacentMarkets";
+import {
+  importAvailabilityFraction,
+  intertieContextForGame,
+  transmissionRatingW,
+} from "../helpers/Transmission";
 
 type TickFieldType = keyof TickPresentFutureType;
 type MonthFieldType = keyof MonthlyHistoryType;
@@ -269,6 +275,8 @@ export function checkTick(
     );
   }
 
+  checkTrade(collector, state, now, when);
+
   if (now.customerBillingRate !== undefined) {
     const billedRevenue =
       (((Math.min(now.supplyW, now.demandW) / TICKS_PER_HOUR) *
@@ -443,6 +451,85 @@ export function checkTick(
   if (prev) {
     checkStorageEnergyBalance(collector, state, prev, now, when);
     checkHydroEnergyBalance(collector, state, prev, now, when);
+  }
+}
+
+/**
+ * Trade stays within what the built lines and neighbours can carry, and is paid for exactly when it
+ * flows. The import bound is an upper limit composed from the same helpers the reducer uses, so it
+ * catches a flow that bypasses a neighbour's availability without restating how flows are split.
+ */
+function checkTrade(
+  collector: InvariantCollector,
+  state: GameType,
+  now: TickPresentFutureType,
+  when: string,
+) {
+  const importedW = now.importedW || 0;
+  const exportedW = now.exportedW || 0;
+  const capacityW = now.transmissionCapacityW || 0;
+  if (importedW + exportedW > capacityW * (1 + RELATIVE_TOLERANCE) + 1) {
+    collector.add(
+      "trade stays within transmission capacity",
+      when,
+      `imported ${Math.round(importedW)}W + exported ${Math.round(exportedW)}W vs ${Math.round(capacityW)}W`,
+    );
+  }
+  if (importedW > 0 && exportedW > 0) {
+    collector.add(
+      "a tick never imports and exports at once",
+      when,
+      `imported ${importedW}W and exported ${exportedW}W`,
+    );
+  }
+  const importsFlow = importedW > 0;
+  const importsPaid = (now.expensesImports || 0) > 0;
+  if (importsFlow !== importsPaid) {
+    collector.add(
+      "imports are paid for exactly when they flow",
+      when,
+      `imported ${importedW}W, import expenses ${now.expensesImports}`,
+    );
+  }
+  const exportsFlow = exportedW > 0;
+  const exportsPaid = (now.revenueExports || 0) > 0;
+  if (exportsFlow !== exportsPaid) {
+    collector.add(
+      "exports are paid for exactly when they flow",
+      when,
+      `exported ${exportedW}W, export revenue ${now.revenueExports}`,
+    );
+  }
+  if (importedW > 0 && state.transmission && now.temperatureC !== undefined) {
+    const context = intertieContextForGame(state);
+    const conditions = {
+      temperatureC: now.temperatureC,
+      solarIrradianceWM2: now.solarIrradianceWM2 || 0,
+    };
+    const neighbourLimitW = state.transmission.lines
+      .filter(({ yearsToBuildLeft }) => yearsToBuildLeft <= 0)
+      .reduce(
+        (sum, line) =>
+          sum +
+          Math.min(
+            transmissionRatingW(line, conditions) *
+              importAvailabilityFraction(
+                line.corridorId,
+                context,
+                now.minute,
+                conditions,
+              ),
+            adjacentMarketForCorridor(line.corridorId)?.availableSupplyW || 0,
+          ),
+        0,
+      );
+    if (importedW > neighbourLimitW * (1 + RELATIVE_TOLERANCE) + 1) {
+      collector.add(
+        "imports stay within what neighbours can spare",
+        when,
+        `imported ${Math.round(importedW)}W vs ${Math.round(neighbourLimitW)}W available`,
+      );
+    }
   }
 }
 

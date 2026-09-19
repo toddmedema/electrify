@@ -234,21 +234,24 @@ export function allocateIntertieFlows(
 ): { importedW: number[]; exportedW: number[] } {
   const imports = offers.map(() => 0);
   const exports = offers.map(() => 0);
-  const byPrice = offers
-    .map((offer, index) => ({ offer, index }))
-    .sort(
-      (a, b) => a.offer.pricePerMWh - b.offer.pricePerMWh || a.index - b.index,
-    );
+  const indexed = offers.map((offer, index) => ({ offer, index }));
+  // Equal prices keep line order both ways, so a tie never depends on the direction of trade.
+  const cheapestFirst = [...indexed].sort(
+    (a, b) => a.offer.pricePerMWh - b.offer.pricePerMWh || a.index - b.index,
+  );
+  const dearestFirst = [...indexed].sort(
+    (a, b) => b.offer.pricePerMWh - a.offer.pricePerMWh || a.index - b.index,
+  );
   let remaining = importedW;
-  for (const { offer, index } of byPrice) {
+  for (const { offer, index } of cheapestFirst) {
     if (remaining <= 0) break;
-    imports[index] = Math.min(remaining, offer.importLimitW);
+    imports[index] = Math.min(remaining, Math.max(0, offer.importLimitW));
     remaining -= imports[index];
   }
   remaining = exportedW;
-  for (let i = byPrice.length - 1; i >= 0 && remaining > 0; i--) {
-    const { offer, index } = byPrice[i];
-    exports[index] = Math.min(remaining, offer.exportLimitW);
+  for (const { offer, index } of dearestFirst) {
+    if (remaining <= 0) break;
+    exports[index] = Math.min(remaining, Math.max(0, offer.exportLimitW));
     remaining -= exports[index];
   }
   return { importedW: imports, exportedW: exports };
