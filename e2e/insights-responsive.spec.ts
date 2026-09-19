@@ -36,8 +36,6 @@ test("upcoming scenario events stay usable across insight viewports", async ({
     page.getByRole("button", { name: "Insights", exact: true }),
   );
   await expect(insights).toBeVisible();
-  await insights.getByRole("button", { name: "Zoom out" }).click();
-  await insights.getByRole("button", { name: "Zoom out" }).click();
 
   const eventRail = insights.getByRole("region", {
     name: "Upcoming scenario events",
@@ -368,13 +366,13 @@ test("insights header controls stay aligned in one compact row", async ({
     const dateRange = page.getByLabel(/Displayed date range:/);
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: 2019–20",
+      "Displayed date range: Jan 2019",
     );
     await expect(dateRange).toHaveCSS("font-size", "14px");
-    await page.getByRole("button", { name: "Zoom in" }).click();
+    await page.getByRole("button", { name: "Fit full timeline" }).click();
     await expect(dateRange).toHaveAttribute(
       "aria-label",
-      "Displayed date range: Apr–Oct 2019",
+      "Displayed date range: 2019–38",
     );
     expect(
       await dateRange.evaluate(

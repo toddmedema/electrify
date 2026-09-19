@@ -47,8 +47,6 @@ export const uiSlice = createSlice({
       }
     },
     requestEvidence: (state, action: PayloadAction<EvidenceTargetType>) => {
-      delete state.evidenceJourney;
-      delete state.insightsRestore;
       const id = (state.evidenceSequence ?? 0) + 1;
       state.evidenceSequence = id;
       state.evidenceRequest = {
@@ -137,9 +135,7 @@ export const uiSlice = createSlice({
       state.selectedFacilityId = null;
       state.facilityDragActive = false;
       delete state.evidenceRequest;
-      delete state.evidenceJourney;
-      delete state.evidenceJourneyMarker;
-      delete state.insightsRestore;
+      delete state.insightsViewport;
       state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
     builder.addMatcher(
@@ -155,26 +151,15 @@ export const uiSlice = createSlice({
       (state) => {
         delete state.arrivingFacilityId;
         delete state.evidenceRequest;
-        delete state.evidenceJourney;
-        delete state.evidenceJourneyMarker;
-        delete state.insightsRestore;
+        delete state.insightsViewport;
         state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
       },
     );
     builder.addMatcher(
       (action) =>
         action.type === navigate.type || action.type === navigateBack.type,
-      (state, action) => {
+      (state) => {
         delete state.evidenceRequest;
-        const payload = (
-          action as PayloadAction<import("../Types").NavigateActionType>
-        ).payload;
-        if (
-          !payload?.journeyMarker ||
-          payload.journeyMarker.id !== state.evidenceJourney?.id
-        )
-          delete state.evidenceJourney;
-        delete state.insightsRestore;
       },
     );
   },

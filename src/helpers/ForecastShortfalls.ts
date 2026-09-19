@@ -20,6 +20,7 @@ export function forecastShortfalls(
   domainMax: number,
 ) {
   let blackoutTotalWh = 0;
+  let peakW = 0;
   let active: Shortfall | undefined;
   let largestBlackout: Shortfall = { wh: 0, peakW: 0, start: 0, end: 0 };
   const blackouts: { minute: number; value: number }[] = [];
@@ -33,6 +34,7 @@ export function forecastShortfalls(
       }
       const wh = shortageW * (stepMinutes / 60) * GAME_TO_REAL_YEARS;
       blackoutTotalWh += wh;
+      peakW = Math.max(peakW, shortageW);
       active.wh += wh;
       active.peakW = Math.max(active.peakW, shortageW);
       active.end = tick.minute + stepMinutes;
@@ -47,5 +49,5 @@ export function forecastShortfalls(
     blackouts.push({ minute: active.end, value: domainMax });
     if (active.wh > largestBlackout.wh) largestBlackout = active;
   }
-  return { blackouts, blackoutTotalWh, largestBlackout };
+  return { blackouts, blackoutTotalWh, largestBlackout, peakW };
 }

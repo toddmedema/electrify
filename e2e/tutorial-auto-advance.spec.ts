@@ -105,8 +105,9 @@ for (const mission of [
         await expect(hud).toContainText("Find customer growth");
       } else {
         await expect(hud).toContainText("Change the chart time period");
+        // Short tutorials open on their whole run, already the narrowest span.
         await page
-          .getByRole("button", { name: "Zoom in", exact: true })
+          .getByRole("button", { name: "Zoom out", exact: true })
           .click();
         await expect(hud).toContainText(
           "Tap Layers, or choose a preset question",

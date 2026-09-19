@@ -237,8 +237,6 @@ export interface NavigateActionType {
   url?: string;
   skipBrowserHistory?: boolean;
   replaceCurrentCard?: boolean;
-  journeyTraversal?: "origin" | "control";
-  journeyMarker?: { id: number; runId: number; role: "origin" | "control" };
   // Manual entry to open and scroll to, for deep links from terms the game shows elsewhere
   entry?: string;
   storyTarget?: StoryActionTargetType;
@@ -1123,25 +1121,12 @@ export interface VictoryDebriefType {
   >;
 }
 
-export interface InsightsOriginType {
-  viewport: [number, number];
-  month: number;
-  layers: string[];
-  preset: string;
-  revision: number;
-  temporaryLayer?: string;
-  anchor?: string;
-  scrollTop: number;
-}
-
 export interface UIType {
   challengeHref?: string;
   scenarioPreview?: number;
   previewDifficulty?: DifficultyType;
-  insightsConfigurationRevision?: number;
-  evidenceJourney?: { id: number; runId: number; origin: InsightsOriginType };
-  evidenceJourneyMarker?: { id: number; runId: number };
-  insightsRestore?: InsightsOriginType;
+  // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
+  insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
   evidenceSequence?: number;
   evidenceRunId?: number;

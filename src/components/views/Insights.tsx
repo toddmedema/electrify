@@ -35,6 +35,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import SaveIcon from "@mui/icons-material/Save";
 import TuneIcon from "@mui/icons-material/Tune";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
@@ -309,8 +310,10 @@ interface ProjectionView {
   supplyDemandTimeline: TickPresentFutureType[];
   domain: { x: [number, number]; y: [number, number] };
   blackouts: BlackoutEdges[];
-  blackoutTotalWh: number;
-  largestBlackout: { wh: number; peakW: number; start: number; end: number };
+  // The simulated hours alone; supplyDemandTimeline leads with recorded monthly averages.
+  forecast: TickPresentFutureType[];
+  // Forecast shortfall inside the displayed range, filled in per render for the viewport.
+  shortfall?: { wh: number; peakW: number; label: string };
   hasStorage: boolean;
   hasHydro: boolean;
   financePast: MonthlyHistoryType[];
@@ -319,8 +322,7 @@ interface ProjectionView {
 }
 
 export interface StateProps {
-  journeyRestore?: import("../../Types").InsightsOriginType;
-  configurationRevision?: number;
+  savedViewport?: SavedViewport;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   evidenceRunId?: number;
   activeCard?: import("../../Types").CardNameType;
@@ -332,13 +334,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onGeneratorJourney?: (
-    origin: import("../../Types").InsightsOriginType,
-  ) => void;
-  onConfigurationEdit?: () => void;
-  onJourneyRestored?: (
-    origin: import("../../Types").InsightsOriginType,
-  ) => boolean;
+  onViewportChange?: (saved: SavedViewport) => void;
   onEvidenceReady?: (
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
@@ -347,6 +343,8 @@ export interface DispatchProps {
 }
 
 export interface Props extends StateProps, DispatchProps {}
+
+type SavedViewport = { viewport: [number, number]; month: number };
 
 interface State {
   compact: boolean;
@@ -368,20 +366,45 @@ interface State {
 
 const VIEWPORT_ZOOM_FACTOR = 0.5;
 const VIEWPORT_PAN_FRACTION = 0.25;
-const DEFAULT_VIEWPORT_MONTHS = 12;
 const MAX_FORECAST_YEARS = 20;
 
 function viewportBounds(game: GameType): ChartViewportRange {
   return [0, game.date.minute + MAX_FORECAST_YEARS * 12 * MINUTES_PER_MONTH];
 }
 
+function scenarioEndMinute(game: GameType): number | undefined {
+  const months = getScenario(
+    game.scenarioId,
+    game.customScenario,
+  )?.durationMonths;
+  return months ? months * MINUTES_PER_MONTH : undefined;
+}
+
+// The whole run is the question the player is answering, so open on scenario start to end.
 function initialViewport(game: GameType): ChartViewportRange {
   const bounds = viewportBounds(game);
   return clampChartViewport(
     bounds,
+    [bounds[0], scenarioEndMinute(game) ?? bounds[1]],
+    MINUTES_PER_MONTH,
+  );
+}
+
+// A range pinned to scenario start or end keeps that edge as months pass; any other edge slides
+// with the calendar so a zoomed "next few months" window stays ahead of the player.
+function advanceViewport(
+  game: GameType,
+  viewport: ChartViewportRange,
+  elapsedMonths: number,
+): ChartViewportRange {
+  const bounds = viewportBounds(game);
+  const delta = elapsedMonths * MINUTES_PER_MONTH;
+  const end = scenarioEndMinute(game);
+  return clampChartViewport(
+    bounds,
     [
-      game.date.minute,
-      game.date.minute + DEFAULT_VIEWPORT_MONTHS * MINUTES_PER_MONTH,
+      viewport[0] === bounds[0] ? bounds[0] : viewport[0] + delta,
+      viewport[1] === end ? end : viewport[1] + delta,
     ],
     MINUTES_PER_MONTH,
   );
@@ -392,7 +415,8 @@ function viewportLabel(
   startingYear: number,
 ): string {
   const start = getDateFromMinute(range[0], startingYear);
-  const end = getDateFromMinute(range[1], startingYear);
+  // The end is exclusive: a range to 1 Jan 2032 covers the scenario years 2020–31.
+  const end = getDateFromMinute(Math.max(range[0], range[1] - 1), startingYear);
   if (start.year !== end.year) {
     const sameCentury =
       Math.floor(start.year / 100) === Math.floor(end.year / 100);
@@ -728,6 +752,14 @@ export default class Insights extends React.Component<Props, State> {
   private paneRef = React.createRef<HTMLDivElement>();
   private paneObserver?: ResizeObserver;
 
+  private shortfallCache:
+    | {
+        projection: ProjectionView;
+        range: ChartViewportRange;
+        shortfall: ProjectionView["shortfall"];
+      }
+    | undefined;
+
   private projectionCache:
     { key: string; projection: ProjectionView } | undefined;
 
@@ -754,8 +786,8 @@ export default class Insights extends React.Component<Props, State> {
       layersOpen: false,
       leversOpen: true,
       activeEventKey: undefined,
-      viewport: props.journeyRestore
-        ? this.restoredViewport(props.journeyRestore)
+      viewport: props.savedViewport
+        ? this.restoredViewport(props.savedViewport)
         : initialViewport(props.game),
       viewportAnnouncement: "",
     };
@@ -774,7 +806,6 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
-      nextProps.journeyRestore !== this.props.journeyRestore ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.evidenceRunId !== this.props.evidenceRunId ||
       nextProps.activeCard !== this.props.activeCard ||
@@ -811,10 +842,15 @@ export default class Insights extends React.Component<Props, State> {
     }
     this.scrollTutorialPowerExchangeIntoView();
     this.resolveEvidence();
-    this.restoreJourney();
   }
 
-  public componentDidUpdate(previousProps: Props) {
+  public componentDidUpdate(previousProps: Props, previousState: State) {
+    if (this.state.viewport !== previousState.viewport) {
+      this.props.onViewportChange?.({
+        viewport: [...this.state.viewport],
+        month: this.props.game.date.monthsElapsed,
+      });
+    }
     if (
       this.props.evidenceRunId !== previousProps.evidenceRunId ||
       (this.props.activeCard !== previousProps.activeCard &&
@@ -824,7 +860,6 @@ export default class Insights extends React.Component<Props, State> {
         this.setState({ temporaryLayer: undefined });
     }
     this.resolveEvidence();
-    if (this.props.journeyRestore) this.restoreJourney();
     if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
       this.scrollTutorialPowerExchangeIntoView();
     }
@@ -835,17 +870,11 @@ export default class Insights extends React.Component<Props, State> {
       const elapsedMonths =
         this.props.game.date.monthsElapsed -
         previousProps.game.date.monthsElapsed;
-      const delta = elapsedMonths * MINUTES_PER_MONTH;
-      const bounds = viewportBounds(this.props.game);
       this.setState((state) => {
-        const anchoredAtScenarioStart = state.viewport[0] === bounds[0];
-        const viewport = clampChartViewport(
-          bounds,
-          [
-            anchoredAtScenarioStart ? bounds[0] : state.viewport[0] + delta,
-            state.viewport[1] + delta,
-          ],
-          MINUTES_PER_MONTH,
+        const viewport = advanceViewport(
+          this.props.game,
+          state.viewport,
+          elapsedMonths,
         );
         return {
           viewport,
@@ -865,79 +894,11 @@ export default class Insights extends React.Component<Props, State> {
     }
   }
 
-  private restoredViewport(
-    origin: import("../../Types").InsightsOriginType,
-  ): ChartViewportRange {
-    const bounds = viewportBounds(this.props.game);
-    const delta =
-      (this.props.game.date.monthsElapsed - origin.month) * MINUTES_PER_MONTH;
-    return clampChartViewport(
-      bounds,
-      [
-        origin.viewport[0] === 0 ? 0 : origin.viewport[0] + delta,
-        origin.viewport[1] + delta,
-      ],
-      MINUTES_PER_MONTH,
-    );
-  }
-
-  private beginJourney(sourceLayer?: InsightLayerId) {
-    const pane = document.querySelector<HTMLElement>(".insights .scrollable");
-    const anchor = Array.from(
-      document.querySelectorAll<HTMLElement>(".insights [data-layer]"),
-    ).find(
-      (element) =>
-        element.getBoundingClientRect().bottom >
-        (pane?.getBoundingClientRect().top ?? 0),
-    );
-    this.props.onGeneratorJourney?.({
-      viewport: [...this.state.viewport],
-      month: this.props.game.date.monthsElapsed,
-      layers: [...this.state.layers],
-      preset: this.state.preset,
-      revision: this.props.configurationRevision ?? 0,
-      temporaryLayer: this.state.temporaryLayer,
-      anchor: sourceLayer ?? anchor?.dataset.layer,
-      scrollTop: pane?.scrollTop ?? 0,
-    });
-  }
-
-  private restoreJourney() {
-    const origin = this.props.journeyRestore;
-    if (!origin || this.props.facilityDragActive) return;
-    if (this.props.onJourneyRestored && !this.props.onJourneyRestored(origin))
-      return;
-    const unchanged =
-      origin.revision === (this.props.configurationRevision ?? 0);
-    const viewport = this.restoredViewport(origin);
-    this.setState(
-      {
-        viewport,
-        viewportAnnouncement: viewportAnnouncement(
-          viewport,
-          this.props.game.startingYear,
-        ),
-        layers: unchanged
-          ? (origin.layers as InsightLayerId[])
-          : this.state.layers,
-        preset: unchanged
-          ? (origin.preset as InsightPresetId)
-          : this.state.preset,
-        temporaryLayer: (unchanged ? origin.temporaryLayer : origin.anchor) as
-          InsightLayerId | undefined,
-      },
-      () => {
-        const pane = document.querySelector<HTMLElement>(
-          ".insights .scrollable",
-        );
-        if (pane) pane.scrollTop = origin.scrollTop;
-        const anchor = document.querySelector<HTMLElement>(
-          origin.anchor
-            ? '.insights [data-layer="' + origin.anchor + '"]'
-            : "#insightsGeneratorJourney",
-        );
-        anchor?.focus({ preventScroll: true });
-      },
+  private restoredViewport(origin: SavedViewport): ChartViewportRange {
+    return advanceViewport(
+      this.props.game,
+      origin.viewport,
+      this.props.game.date.monthsElapsed - origin.month,
     );
   }
 
@@ -988,7 +949,6 @@ export default class Insights extends React.Component<Props, State> {
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
   ) {
-    this.props.onConfigurationEdit?.();
     const required = layers;
     const savedLayers = presetDefinition(
       preset,
@@ -1024,7 +984,6 @@ export default class Insights extends React.Component<Props, State> {
     if (!preset) {
       return;
     }
-    this.props.onConfigurationEdit?.();
     const layers = [...preset.layers];
     if (this.props.game.scenarioId !== 112) {
       setStorageKeyValue(LAYERS_KEY, layers);
@@ -1289,7 +1248,7 @@ export default class Insights extends React.Component<Props, State> {
     }
     const [rangeMin, rangeMax] = viewportBounds(game);
 
-    const { blackouts, blackoutTotalWh, largestBlackout } = forecastShortfalls(
+    const { blackouts } = forecastShortfalls(
       timeline,
       projectionStepMinutes,
       domainMax,
@@ -1312,8 +1271,7 @@ export default class Insights extends React.Component<Props, State> {
       supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
       domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
       blackouts,
-      blackoutTotalWh,
-      largestBlackout,
+      forecast: timeline,
       hasStorage: [...historicalCharts, ...timeline].some(
         (tick) => tick.storedWh > 0,
       ),
@@ -1668,6 +1626,36 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
+  // Counts only simulated hours inside the displayed range: recorded months are averages, and a
+  // range wholly in the past has no forecast to report.
+  private rangeShortfall(
+    projection: ProjectionView,
+    range: ChartViewportRange,
+  ): ProjectionView["shortfall"] {
+    const cached = this.shortfallCache;
+    if (cached?.projection === projection && rangesEqual(cached.range, range)) {
+      return cached.shortfall;
+    }
+    const forecast = projection.forecast.filter(
+      (tick) => tick.minute >= range[0] && tick.minute < range[1],
+    );
+    const { blackoutTotalWh, peakW } = forecastShortfalls(
+      forecast,
+      projection.projectionStepMinutes,
+      0,
+    );
+    const shortfall =
+      blackoutTotalWh > 0
+        ? {
+            wh: blackoutTotalWh,
+            peakW,
+            label: viewportLabel(range, this.props.game.startingYear),
+          }
+        : undefined;
+    this.shortfallCache = { projection, range, shortfall };
+    return shortfall;
+  }
+
   private setViewport(
     bounds: ChartViewportRange,
     minSpan: number,
@@ -1889,12 +1877,21 @@ export default class Insights extends React.Component<Props, State> {
                 multiyear={multiyear}
                 syncKey={SYNC_KEY}
               />
-              {projection.blackoutTotalWh > 0 && (
-                <Typography className="insightsWarning" variant="body2">
-                  {MAX_FORECAST_YEARS}-year forecast shortfall: ~
-                  {formatWattHours(projection.blackoutTotalWh)} of demand not
-                  met · largest shortage{" "}
-                  {formatWatts(projection.largestBlackout.peakW)}
+              {projection.shortfall && (
+                <Typography
+                  className="insightsWarning"
+                  variant="body2"
+                  role="note"
+                  aria-label={`Forecast shortfall for ${projection.shortfall.label}: about ${formatWattHours(projection.shortfall.wh)} of demand unmet, peak about ${formatWatts(projection.shortfall.peakW)}`}
+                >
+                  <WarningAmberIcon fontSize="small" aria-hidden="true" />
+                  <span>
+                    <strong>
+                      Forecast shortfall, {projection.shortfall.label}:
+                    </strong>{" "}
+                    ~{formatWattHours(projection.shortfall.wh)} unmet · peak ~
+                    {formatWatts(projection.shortfall.peakW)}
+                  </span>
                 </Typography>
               )}
             </>
@@ -2132,15 +2129,6 @@ export default class Insights extends React.Component<Props, State> {
             </div>
           )}
         {body}
-        {id === "supplyDemand" && (
-          <Button
-            id="insightsGeneratorJourney"
-            onClick={() => this.beginJourney("supplyDemand")}
-            sx={{ minHeight: 44, mx: 1, mb: 1 }}
-          >
-            Generator
-          </Button>
-        )}
       </section>
     );
   }
@@ -2316,6 +2304,7 @@ export default class Insights extends React.Component<Props, State> {
       timeline: viewportTimeline,
       sampled,
       supplyDemandTimeline,
+      shortfall: this.rangeShortfall(projection, viewportRange),
     };
     const viewportContext = {
       bounds: viewportBounds,

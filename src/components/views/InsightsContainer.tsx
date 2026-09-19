@@ -1,4 +1,3 @@
-import { beginGeneratorJourney } from "../../helpers/EvidenceJourney";
 import { delta as uiDelta } from "../../reducers/UI";
 import { connect } from "react-redux";
 import type { AppDispatch } from "../../Store";
@@ -20,8 +19,7 @@ const STORY_INSIGHT_LAYERS: Record<string, InsightLayerId> = {
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   evidenceRequest: state.ui.evidenceRequest,
-  journeyRestore: state.ui.insightsRestore,
-  configurationRevision: state.ui.insightsConfigurationRevision,
+  savedViewport: state.ui.insightsViewport,
   evidenceRunId: state.ui.evidenceRunId,
   activeCard: state.card.name,
   game: state.game,
@@ -35,25 +33,7 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
 });
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
-  onGeneratorJourney: (origin) => {
-    dispatch(beginGeneratorJourney(origin));
-  },
-  onJourneyRestored: (origin) =>
-    dispatch((_dispatch, getState) => {
-      if (getState().ui.insightsRestore !== origin) return false;
-      _dispatch(uiDelta({ insightsRestore: undefined }));
-      return true;
-    }),
-  onConfigurationEdit: () => {
-    dispatch((_dispatch, getState) => {
-      _dispatch(
-        uiDelta({
-          insightsConfigurationRevision:
-            (getState().ui.insightsConfigurationRevision ?? 0) + 1,
-        }),
-      );
-    });
-  },
+  onViewportChange: (saved) => dispatch(uiDelta({ insightsViewport: saved })),
   onEvidenceReady: (request, element) => {
     dispatch(focusEvidence(request, element));
   },

@@ -96,6 +96,8 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   }
   await page.setViewportSize(originalViewport);
   await expectTargetVisible(page, "#chartInsightsCustomers");
+  // A resize re-reveals the target once, 450ms after it settles. Let that land first.
+  await page.waitForTimeout(600);
   // Revealing a target must not continuously pull the player away from other information.
   await page.locator("#rateSlider").scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
@@ -194,7 +196,8 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   await expect(page.locator(".tutorialHud")).toContainText(
     "Finish new generation",
   );
-  await expect(
-    page.getByRole("button", { name: "pause", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  // The restart's card transition briefly mounts the outgoing layout beside the new one.
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  await expect(pause).toHaveCount(1);
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
 });
