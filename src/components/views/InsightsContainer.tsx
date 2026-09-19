@@ -19,9 +19,7 @@ const STORY_INSIGHT_LAYERS: Record<string, InsightLayerId> = {
 
 const mapStateToProps = (state: AppStateType): StateProps => ({
   evidenceRequest: state.ui.evidenceRequest,
-  journeyRestore: state.ui.insightsRestore,
   savedViewport: state.ui.insightsViewport,
-  configurationRevision: state.ui.insightsConfigurationRevision,
   evidenceRunId: state.ui.evidenceRunId,
   activeCard: state.card.name,
   game: state.game,
@@ -36,22 +34,6 @@ const mapStateToProps = (state: AppStateType): StateProps => ({
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => ({
   onViewportChange: (saved) => dispatch(uiDelta({ insightsViewport: saved })),
-  onJourneyRestored: (origin) =>
-    dispatch((_dispatch, getState) => {
-      if (getState().ui.insightsRestore !== origin) return false;
-      _dispatch(uiDelta({ insightsRestore: undefined }));
-      return true;
-    }),
-  onConfigurationEdit: () => {
-    dispatch((_dispatch, getState) => {
-      _dispatch(
-        uiDelta({
-          insightsConfigurationRevision:
-            (getState().ui.insightsConfigurationRevision ?? 0) + 1,
-        }),
-      );
-    });
-  },
   onEvidenceReady: (request, element) => {
     dispatch(focusEvidence(request, element));
   },

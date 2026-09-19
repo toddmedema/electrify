@@ -1,4 +1,3 @@
-import { returnToEvidence } from "../../helpers/EvidenceJourney";
 import type { AppDispatch } from "../../Store";
 import { connect } from "react-redux";
 import { navigate } from "../../reducers/Card";
@@ -15,7 +14,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
     evidenceRequest: state.ui.evidenceRequest,
     facilityDragActive: state.ui.facilityDragActive,
     game: state.game,
-    hasEvidenceReturn: !!state.ui.evidenceJourney,
     focusFuel:
       state.card.storyTarget?.card === "FACILITIES"
         ? state.card.storyTarget.fuel
@@ -27,9 +25,6 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onEvidenceReady: (request, element) => {
       dispatch(focusEvidence(request, element));
-    },
-    onEvidenceReturn: () => {
-      dispatch(returnToEvidence());
     },
     onBack: () => {
       dispatch(navigate("FACILITIES"));

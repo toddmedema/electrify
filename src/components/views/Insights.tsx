@@ -322,9 +322,7 @@ interface ProjectionView {
 }
 
 export interface StateProps {
-  journeyRestore?: import("../../Types").InsightsOriginType;
   savedViewport?: SavedViewport;
-  configurationRevision?: number;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   evidenceRunId?: number;
   activeCard?: import("../../Types").CardNameType;
@@ -336,11 +334,7 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onConfigurationEdit?: () => void;
   onViewportChange?: (saved: SavedViewport) => void;
-  onJourneyRestored?: (
-    origin: import("../../Types").InsightsOriginType,
-  ) => boolean;
   onEvidenceReady?: (
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
@@ -792,11 +786,9 @@ export default class Insights extends React.Component<Props, State> {
       layersOpen: false,
       leversOpen: true,
       activeEventKey: undefined,
-      viewport: props.journeyRestore
-        ? this.restoredViewport(props.journeyRestore)
-        : props.savedViewport
-          ? this.restoredViewport(props.savedViewport)
-          : initialViewport(props.game),
+      viewport: props.savedViewport
+        ? this.restoredViewport(props.savedViewport)
+        : initialViewport(props.game),
       viewportAnnouncement: "",
     };
   }
@@ -814,7 +806,6 @@ export default class Insights extends React.Component<Props, State> {
     }
     return (
       nextState !== this.state ||
-      nextProps.journeyRestore !== this.props.journeyRestore ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.evidenceRunId !== this.props.evidenceRunId ||
       nextProps.activeCard !== this.props.activeCard ||
@@ -851,7 +842,6 @@ export default class Insights extends React.Component<Props, State> {
     }
     this.scrollTutorialPowerExchangeIntoView();
     this.resolveEvidence();
-    this.restoreJourney();
   }
 
   public componentDidUpdate(previousProps: Props, previousState: State) {
@@ -870,7 +860,6 @@ export default class Insights extends React.Component<Props, State> {
         this.setState({ temporaryLayer: undefined });
     }
     this.resolveEvidence();
-    if (this.props.journeyRestore) this.restoreJourney();
     if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
       this.scrollTutorialPowerExchangeIntoView();
     }
@@ -910,45 +899,6 @@ export default class Insights extends React.Component<Props, State> {
       this.props.game,
       origin.viewport,
       this.props.game.date.monthsElapsed - origin.month,
-    );
-  }
-
-  private restoreJourney() {
-    const origin = this.props.journeyRestore;
-    if (!origin || this.props.facilityDragActive) return;
-    if (this.props.onJourneyRestored && !this.props.onJourneyRestored(origin))
-      return;
-    const unchanged =
-      origin.revision === (this.props.configurationRevision ?? 0);
-    const viewport = this.restoredViewport(origin);
-    this.setState(
-      {
-        viewport,
-        viewportAnnouncement: viewportAnnouncement(
-          viewport,
-          this.props.game.startingYear,
-        ),
-        layers: unchanged
-          ? (origin.layers as InsightLayerId[])
-          : this.state.layers,
-        preset: unchanged
-          ? (origin.preset as InsightPresetId)
-          : this.state.preset,
-        temporaryLayer: (unchanged ? origin.temporaryLayer : origin.anchor) as
-          InsightLayerId | undefined,
-      },
-      () => {
-        const pane = document.querySelector<HTMLElement>(
-          ".insights .scrollable",
-        );
-        if (pane) pane.scrollTop = origin.scrollTop;
-        const anchor = document.querySelector<HTMLElement>(
-          origin.anchor
-            ? '.insights [data-layer="' + origin.anchor + '"]'
-            : "#insightsGeneratorJourney",
-        );
-        anchor?.focus({ preventScroll: true });
-      },
     );
   }
 
@@ -999,7 +949,6 @@ export default class Insights extends React.Component<Props, State> {
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
   ) {
-    this.props.onConfigurationEdit?.();
     const required = layers;
     const savedLayers = presetDefinition(
       preset,
@@ -1035,7 +984,6 @@ export default class Insights extends React.Component<Props, State> {
     if (!preset) {
       return;
     }
-    this.props.onConfigurationEdit?.();
     const layers = [...preset.layers];
     if (this.props.game.scenarioId !== 112) {
       setStorageKeyValue(LAYERS_KEY, layers);

@@ -1213,14 +1213,6 @@ export const gameSlice = createSlice({
     // The sim should not punish the player for reading, or mutate a quote during a decision.
     builder.addCase(navigate, (state, action) => {
       const payload = action.payload;
-      if (
-        typeof payload === "object" &&
-        payload?.journeyTraversal === "origin"
-      ) {
-        // Return restores presentation only. Discard the construction card's pending resume.
-        speedBeforeBlockingCard = undefined;
-        return;
-      }
       const name = typeof payload === "string" ? payload : payload?.name;
       if (!name || !BLOCKING_CARDS.has(name)) {
         // Navigating anywhere else (rather than backing out) still counts as leaving it

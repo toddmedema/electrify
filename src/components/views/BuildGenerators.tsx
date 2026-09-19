@@ -768,7 +768,6 @@ function valueLabelFormat(x: number) {
 }
 
 export interface StateProps {
-  hasEvidenceReturn?: boolean;
   evidenceRequest?: import("../../Types").EvidenceRequestType;
   facilityDragActive?: boolean;
   game: GameType;
@@ -776,7 +775,6 @@ export interface StateProps {
 }
 
 export interface DispatchProps {
-  onEvidenceReturn?: () => void;
   onEvidenceReady?: (
     request: import("../../Types").EvidenceRequestType,
     element: HTMLElement | null,
@@ -919,14 +917,6 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
       tabIndex={-1}
       aria-label="Generator build options"
     >
-      {props.hasEvidenceReturn && (
-        <Button
-          onClick={props.onEvidenceReturn}
-          sx={{ minHeight: 44, alignSelf: "flex-start" }}
-        >
-          Return to evidence
-        </Button>
-      )}
       {props.focusFuel &&
         !buildableGenerators.some(
           (generator) => generator.fuel === props.focusFuel,
@@ -991,9 +981,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 onCompare={() => toggleCompare(g.name)}
                 onBuild={(financed: boolean) => {
                   props.onBuildGenerator(g, financed);
-                  if (props.hasEvidenceReturn && props.onEvidenceReturn)
-                    props.onEvidenceReturn();
-                  else onBack();
+                  onBack();
                 }}
               />
             </React.Fragment>
