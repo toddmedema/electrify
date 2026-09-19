@@ -37,8 +37,8 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUI,
   reducers: {
+    // Highlight the new row without expanding it: its controls are rarely the next decision
     facilityPurchased: (state, action: PayloadAction<number>) => {
-      state.selectedFacilityId = action.payload;
       state.arrivingFacilityId = action.payload;
     },
     acknowledgeFacilityArrival: (state, action: PayloadAction<number>) => {

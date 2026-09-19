@@ -189,7 +189,7 @@ describe("SaveGame", () => {
     save.game.transmission.lines.push({
       id: 1,
       corridorId: "california-north",
-      name: "Northern intertie upgrade",
+      name: "Northern intertie",
       capacityW: 500000000,
       buildCost: 180000000,
       annualOperatingCost: 3600000,

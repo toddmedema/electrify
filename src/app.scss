@@ -4579,21 +4579,12 @@ $sizemap: (
   border-top: 1px solid var(--border-subtle);
   margin-top: 12px;
 }
-.tradingSummary {
-  margin: 0 16px 8px;
-  > summary {
+.tradingControls {
+  padding: 0 16px 12px;
+}
+@media (pointer: coarse) {
+  .tradingControls .MuiInputBase-root {
     min-height: 44px;
-    cursor: pointer;
-    padding: 8px 0;
-  }
-  .tradingSummaryRule {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--font-color-faded);
-    padding: 4px 0;
-  }
-  .tradingPolicy {
-    margin: 8px 0;
   }
 }
 .transmissionLine {
@@ -4657,7 +4648,7 @@ $sizemap: (
 }
 
 // A shared solid, restrained presentation for the game and its standalone screens.
-// Wider layouts pin the chart and trading summary above the fleet, which scrolls on its own.
+// Wider layouts pin the chart above the fleet, which scrolls on its own.
 // A phone has no room to pin a 180px chart, so the whole body scrolls as one column instead,
 // like Insights -- the list gives up its own scroll so there is one scroll container for drag.
 .facilities .facilitiesBody {
@@ -4678,16 +4669,9 @@ $sizemap: (
     overflow: visible;
   }
 }
-.facilities .tradingSummary {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
-}
 .facilities .facilitySectionLabel {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 12px 16px 8px;
@@ -5184,47 +5168,15 @@ $sizemap: (
   font-size: 1rem;
   font-weight: 600;
 }
-.facilities .tradingSummary > summary {
-  display: flex;
+.facilitySectionMeta {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  min-height: 64px;
-  padding: 8px 0;
-  list-style: none;
-}
-.facilities .tradingSummary > summary::-webkit-details-marker {
-  display: none;
-}
-.facilities .tradingSummary .networkTradingCopy {
-  flex: 1;
+  gap: 4px;
   min-width: 0;
 }
-.facilities .tradingSummary .networkTradingHeading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  flex-wrap: wrap;
-}
-.networkTradingHeading > strong {
-  font-size: 1rem;
-  font-weight: 600;
-}
 .networkTradingFlow {
-  font-size: 0.8125rem;
-  line-height: 1.4;
-}
-.facilities .tradingSummary .tradingSummaryRule {
-  padding: 4px 0 0;
-  font-size: 0.8125rem;
-}
-.facilities .tradingSummary .facilityChevron {
-  flex: 0 0 20px;
-  width: 20px;
-  color: var(--font-color-faded);
-}
-.facilities .tradingSummary[open] .facilityChevron {
-  transform: rotate(180deg);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 .transmissionLine > .facilityDisclosure {
   display: grid;

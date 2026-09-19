@@ -35,7 +35,7 @@ export const TRANSMISSION_PROFILE_DATA = {
       ["desert-southwest","Desert Southwest","Midday solar can be cheap; hot evenings raise both demand and prices.",55,1500000000,1700000000]
     ],
     [
-      ["california-north","pacific-northwest","Northern intertie upgrade","EXISTING",500000000,180000000,3600000,1,30,0.012,0.04],
+      ["california-north","pacific-northwest","Northern intertie","EXISTING",500000000,180000000,3600000,1,30,0.012,0.04],
       ["california-south","desert-southwest","Desert connection","NEW",750000000,420000000,7200000,3,32,0.015,0.06]
     ]
   ],

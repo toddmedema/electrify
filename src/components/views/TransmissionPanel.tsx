@@ -1,6 +1,5 @@
 import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../../data/Manual";
-import { getScenario } from "../../data/Scenarios";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import CloseIcon from "@mui/icons-material/Close";
@@ -13,6 +12,7 @@ import {
   DialogTitle,
   IconButton,
   FormControl,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -47,51 +47,54 @@ export interface TransmissionPanelProps {
   onPolicy: (policy: TradingPolicyType) => void;
 }
 
-export function TransmissionTradingSummary({
+const POLICY_DETAILS: Record<TradingPolicyType, string> = {
+  BALANCED: "Imports cover shortages; spare power is sold to neighbors.",
+  RELIABILITY_FIRST: "Imports cover shortages; spare power is not sold.",
+  SURPLUS_ONLY: "Spare power is sold; shortages are not covered by imports.",
+  CLOSED: "No power moves over your interties.",
+};
+
+// Live state for the section header, beside the rule it results from
+function tradingFlowText(game: GameType): string | null {
+  const lines = game.transmission?.lines ?? [];
+  if (!lines.length) return null;
+  if (lines.every((line) => line.yearsToBuildLeft > 0)) {
+    return "Not connected yet";
+  }
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  const importedW = now?.importedW || 0;
+  const exportedW = now?.exportedW || 0;
+  if (importedW > 0) return "Importing " + formatWatts(importedW);
+  if (exportedW > 0) return "Exporting " + formatWatts(exportedW);
+  return "No power flowing";
+}
+
+// The rule is the only trading decision, so it stays editable in place rather than behind a
+// disclosure that repeats the current choice as a label.
+function TradingControls({
   game,
   onPolicy,
 }: Pick<TransmissionPanelProps, "game" | "onPolicy">) {
   const state = game.transmission;
-  const now = getTimeFromTimeline(game.date.minute, game.timeline);
-  const readOnly = !!game.replayPlayback;
   if (!state?.lines.length) return null;
-  const tutorialStep = getScenario(game.scenarioId, game.customScenario)
-    ?.tutorialSteps?.[game.tutorialStep];
+  if (game.replayPlayback) {
+    return (
+      <div className="tradingControls">
+        <Typography variant="body2">
+          Trading rule: {POLICY_LABELS[state.tradingPolicy]}
+        </Typography>
+      </div>
+    );
+  }
   return (
-    <details
-      className="tradingSummary"
-      open={
-        game.scenarioId === 112 &&
-        (tutorialStep?.target === ".tradingPolicy" || !!tutorialStep?.capstone)
-          ? true
-          : undefined
-      }
-    >
-      <summary>
-        <span className="networkTradingCopy">
-          <span className="networkTradingHeading">
-            <strong>Network trading</strong>
-            <span className="networkTradingFlow">
-              {(now?.importedW || 0) > 0
-                ? "Importing " + formatWatts(now!.importedW || 0)
-                : (now?.exportedW || 0) > 0
-                  ? "Exporting " + formatWatts(now!.exportedW || 0)
-                  : "No power flowing"}
-            </span>
-          </span>
-          <span className="tradingSummaryRule">
-            {POLICY_LABELS[state.tradingPolicy]}
-          </span>
-        </span>
-        <KeyboardArrowDownIcon className="facilityChevron" aria-hidden />
-      </summary>
+    <div className="tradingControls">
       <FormControl fullWidth size="small" className="tradingPolicy">
         <InputLabel id="trading-policy-label">Trading rule</InputLabel>
         <Select
           labelId="trading-policy-label"
           label="Trading rule"
           value={state.tradingPolicy}
-          disabled={readOnly}
+          aria-describedby="trading-policy-detail"
           onChange={(event) =>
             onPolicy(event.target.value as TradingPolicyType)
           }
@@ -102,15 +105,18 @@ export function TransmissionTradingSummary({
             </MenuItem>
           ))}
         </Select>
+        <FormHelperText id="trading-policy-detail">
+          {POLICY_DETAILS[state.tradingPolicy]}
+        </FormHelperText>
       </FormControl>
-      <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
-    </details>
+    </div>
   );
 }
 
 export default function TransmissionPanel({
   game,
   onBuild,
+  onPolicy,
   projectsOnly = false,
 }: TransmissionPanelProps) {
   const units = useUnits();
@@ -120,6 +126,7 @@ export default function TransmissionPanel({
   const availableCorridors = corridorsForLocation(game.location);
   const now = getTimeFromTimeline(game.date.minute, game.timeline);
   const readOnly = !!game.replayPlayback;
+  const flowText = tradingFlowText(game);
   // The guided mission names the northern project. Showing only that choice until it is approved
   // makes an exploratory tap recoverable instead of letting a much dearer three-year project
   // consume the cash and time needed by the lesson.
@@ -154,8 +161,15 @@ export default function TransmissionPanel({
             className="facilitySectionLabel"
             variant="subtitle2"
           >
-            Interties <span>Automatic trading</span>
+            Interties
+            <span className="facilitySectionMeta">
+              {flowText && (
+                <span className="networkTradingFlow">{flowText}</span>
+              )}
+              <ManualLink entry={MANUAL_ENTRY.INTERTIES} label="an intertie" />
+            </span>
           </Typography>
+          <TradingControls game={game} onPolicy={onPolicy} />
           {!state.lines.length && (
             <Typography
               variant="body2"
@@ -285,8 +299,8 @@ export default function TransmissionPanel({
                       variant="outlined"
                       label={
                         corridor.routeType === "EXISTING"
-                          ? "Existing route"
-                          : "New route"
+                          ? "Existing corridor"
+                          : "New corridor"
                       }
                     />
                   </div>
