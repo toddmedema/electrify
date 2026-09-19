@@ -355,7 +355,7 @@ describe("the interties view", () => {
     const south = screen.getByTestId("transmission-project-california-south");
     expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
     expect(within(south).getByText("Solar surplus")).toBeInTheDocument();
-    expect(within(north).getByText("Existing route")).toBeInTheDocument();
+    expect(within(north).getByText("Existing corridor")).toBeInTheDocument();
     for (const card of [north, south]) {
       expect(
         within(card).getByRole("img", { name: /^Typical year of import room/ }),
