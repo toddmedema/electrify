@@ -296,6 +296,9 @@ export default function TransmissionPanel({
               ? transmissionRatingW(line, now)
               : line.capacityW;
             const building = line.yearsToBuildLeft > 0;
+            const importableW = now
+              ? intertieImportLimitW(line, intertieContext, now.minute, now)
+              : rating;
             const outlook =
               selectedLine === line.id
                 ? outlookFor(line.corridorId)
@@ -327,7 +330,7 @@ export default function TransmissionPanel({
                         ? line.yearsToBuildLeft.toFixed(1) +
                           (line.yearsToBuildLeft <= 1 ? " year" : " years") +
                           " remaining"
-                        : formatWatts(rating) + " available"}
+                        : formatWatts(importableW) + " can import"}
                       {" · "}
                       <span className="transmissionLineStatus">
                         {building ? "Building" : "Connected"}
@@ -383,15 +386,8 @@ export default function TransmissionPanel({
                             <div>
                               <dt>Can import now</dt>
                               <dd>
-                                {formatWatts(
-                                  intertieImportLimitW(
-                                    line,
-                                    intertieContext,
-                                    now.minute,
-                                    now,
-                                  ),
-                                )}{" "}
-                                of {formatWatts(rating)}
+                                {formatWatts(importableW)} of{" "}
+                                {formatWatts(rating)}
                               </dd>
                             </div>
                           </>
