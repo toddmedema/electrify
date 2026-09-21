@@ -357,7 +357,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
       // A dam this far down is heading for the minimum generating level, which is worth seeing
       // without opening the row. The reading turns red, and an off-screen "low" carries the
       // same message for anyone who can't use the colour.
-      const low = reservoirFraction < RESERVOIR_WARNING_FRACTION;
+      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
       // Only one of these shows, picked by how wide the row is
       detail = (
         <span className={low ? "facilityStatusLow" : undefined}>

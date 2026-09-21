@@ -22,6 +22,7 @@ import VictoryConditions from "./VictoryConditions";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore, SCORE_LABELS } from "./VictoryDialog";
 import { getMissionStatus } from "../../helpers/MissionStatus";
+import type { MissionRequirement } from "../../helpers/MissionStatus";
 
 export interface Props {
   open: boolean;
@@ -29,7 +30,7 @@ export interface Props {
   onClose: () => void;
 }
 
-const STATUS_LABELS: { [k: string]: string } = {
+const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
   pending: "Not started",
   "in-progress": "In progress",
   completed: "Met",
@@ -38,8 +39,8 @@ const STATUS_LABELS: { [k: string]: string } = {
   waived: "Waived",
 };
 
-function statusLabel(status: string): string {
-  return STATUS_LABELS[status] || status.replace("-", " ");
+function statusLabel(status: MissionRequirement["status"]): string {
+  return STATUS_LABELS[status];
 }
 
 /** An in-game reminder of the mission and its score through completed months. */
@@ -196,7 +197,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               {mission.requirements.map((requirement) => (
                 <React.Fragment key={requirement.id}>
                   <Typography component="dt" sx={{ mt: 2, fontWeight: 700 }}>
-                    {requirement.label}
+                    {requirement.label}{" "}
                     <span
                       className="missionRequirementStatus"
                       data-status={requirement.status}
@@ -204,9 +205,7 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
                       {statusLabel(requirement.status)}
                     </span>
                   </Typography>
-                  <Typography component="dd" className="missionRequirementNow">
-                    {requirement.current}
-                  </Typography>
+                  <Typography component="dd">{requirement.current}</Typography>
                   <Typography
                     component="dd"
                     className="missionRequirementTarget"

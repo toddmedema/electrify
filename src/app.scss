@@ -4858,7 +4858,6 @@ $sizemap: (
   position: relative;
   height: 4px;
   margin-top: 8px;
-  overflow: hidden;
   border-radius: 2px;
   background: var(--border-subtle); /* fallback; the fuel tint is set inline */
 }
@@ -4869,10 +4868,22 @@ $sizemap: (
   left: 0;
   border-radius: inherit;
   transition: width 200ms linear;
-  // A static glow marks where the build has reached. The bar clips it everywhere but the
-  // leading edge, so it reads as a head on the fill rather than an outline around it. Width
-  // rather than scaleX, because a transform squashes the shadow along with the box.
-  box-shadow: 0 0 6px 1px var(--tutorial-glow);
+}
+// The glow is its own head on the leading edge rather than a shadow on the whole fill: a 4px
+// bar clips a shadow away vertically, and at 100% there is no edge left for it to escape past,
+// so the mark disappears exactly when the build is most worth noticing. A dot that overhangs
+// the end stays visible at every width. The blue is fixed on purpose — "under construction"
+// should read the same whatever the fuel accent is.
+.facilityDisclosure .constructionProgressFill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 2px;
+  height: 2px;
+  transform: translate(50%, -50%);
+  border-radius: 50%;
+  box-shadow: 0 0 6px 3px var(--tutorial-glow);
 }
 .transmissionFleet {
   margin-top: 0;
