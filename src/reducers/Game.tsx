@@ -1539,6 +1539,8 @@ function applyBuildTransmissionLine(
       ? getMonthlyPayment(loanAmount, state.interestRate, LOAN_MONTHS)
       : 0,
     interestRate: financed ? state.interestRate : 0,
+    // Nothing flows until the line is energised, which is years away
+    currentFlowW: 0,
   };
   state.transmission.lines.push(line);
   recordMeaningfulDecision(state, {
@@ -2849,6 +2851,16 @@ function updateSupplyFacilitiesFinances(
   const { importedW, exportedW } = clearing;
   // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
   const flows = allocateIntertieFlows(offers, importedW, exportedW);
+  // Per-line flow, signed so a fleet row can show power being sold as well as bought. This is
+  // display state, not a decision, so it is written on real ticks only: a forecast dispatches
+  // against hypothetical weather, and the month-boundary pre-roll re-runs timeline[0] four
+  // times over the live fleet. Forecast passes work on a deep clone of transmission anyway,
+  // but the pre-roll does not, and it would leave the list reading January's trade in July.
+  if (!simulated) {
+    operatingLines.forEach((line, index) => {
+      line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
+    });
+  }
   let importCostPerHour = 0;
   let exportRevenuePerHour = 0;
   let importEmissionsWeight = 0;

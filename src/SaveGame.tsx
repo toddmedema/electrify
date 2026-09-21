@@ -96,6 +96,13 @@ function validTransmissionLine(
     line.interestRate! <= 1 &&
     line.loanAmountLeft! <= corridor.buildCost &&
     line.loanMonthlyPayment! <= corridor.buildCost &&
+    // Derived display state rather than a decision: the next real tick overwrites it, but it
+    // is rendered before that tick lands, so an imported save cannot claim a line is moving
+    // more power than it is rated for. Saves written before this field existed omit it.
+    (line.currentFlowW === undefined ||
+      (typeof line.currentFlowW === "number" &&
+        Number.isFinite(line.currentFlowW) &&
+        Math.abs(line.currentFlowW) <= corridor.capacityW)) &&
     typeof line.financed === "boolean" &&
     (line.financed
       ? line.loanMonthlyPayment! > 0

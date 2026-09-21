@@ -72,6 +72,13 @@ export interface TransmissionLineOperatingType {
   loanAmountLeft: number;
   loanMonthlyPayment: number;
   interestRate: number;
+  /**
+   * Net power over this line as of the last real tick: positive importing, negative selling.
+   * Derived display state rather than a decision, and written only on real ticks -- the same
+   * caveat facility.currentW carries, since forecasts and month-boundary pre-rolls dispatch
+   * against hypothetical weather. Absent until the first tick after construction finishes.
+   */
+  currentFlowW?: number;
 }
 
 export interface TransmissionStateType {

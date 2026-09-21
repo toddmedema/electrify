@@ -6,17 +6,40 @@ import ConceptLegend from "../components/base/ConceptLegend";
 import { useUnits } from "../components/base/UnitsContext";
 import {
   formatLargeMassApprox,
+  formatMass,
   formatPricePerLargeMass,
   KG_PER_MEGATONNE,
   largeMassUnit,
   massUnitName,
 } from "../helpers/Units";
+import { IMPORT_EMISSIONS_ASSUMPTIONS } from "./ImportEmissions";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
 // through a component of their own rather than the array becoming a function of it. Their text
 // is not walked by the search (see manualEntryText), which is what the keywords are for.
 function MassUnitName(): React.JSX.Element {
   return <>{massUnitName(useUnits())}</>;
+}
+
+/**
+ * Where each neighbour's emissions figure comes from. The build cards show the number; a
+ * citation belongs somewhere it can be read properly rather than squeezed into a metric cell.
+ */
+function ImportEmissionsSources(): React.JSX.Element {
+  const units = useUnits();
+  return (
+    <ul className="manual-sources">
+      {IMPORT_EMISSIONS_ASSUMPTIONS.map((assumption) => (
+        <li key={assumption.emissionsSource}>
+          {formatMass(assumption.emissionsKgco2ePerMWh, units)}/MWh CO2e ·{" "}
+          {assumption.emissionsBasis}.{" "}
+          <a href={assumption.emissionsSource} target="_blank" rel="noreferrer">
+            Source
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function LargeMassUnit(): React.JSX.Element {
@@ -698,10 +721,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           relying on imports.
         </p>
         <p>
-          Purchased electricity adds estimated emissions to your score.
-          Interties lists each neighbor's fixed emissions estimate and source.
-          These simplified flows do not model a full transmission network.
+          Purchased electricity adds estimated emissions to your score. Each
+          intertie&rsquo;s build card shows the neighbor&rsquo;s fixed estimate;
+          these are the mixes those estimates stand for. They do not model a
+          full transmission network.
         </p>
+        <ImportEmissionsSources />
       </div>
     ),
   },

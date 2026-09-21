@@ -51,6 +51,14 @@ const MARKET_ASSUMPTIONS: Readonly<Record<string, ImportEmissionsAssumption>> =
     "geo-paris-continental-core": EUROPE,
   };
 
+/**
+ * Every distinct assumption behind a neighbour's emissions, for the manual's citation list.
+ * The build cards carry the number; this is where the number comes from, kept in one place
+ * rather than repeated on each card.
+ */
+export const IMPORT_EMISSIONS_ASSUMPTIONS: readonly ImportEmissionsAssumption[] =
+  [WASHINGTON, CALIFORNIA, QUEBEC, EUROPE, WORLD];
+
 export function importEmissionsAssumption(
   marketId: string,
 ): ImportEmissionsAssumption {

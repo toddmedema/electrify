@@ -356,6 +356,13 @@ describe("the interties view", () => {
     expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
     expect(within(south).getByText("Solar surplus")).toBeInTheDocument();
     expect(within(north).getByText("Existing corridor")).toBeInTheDocument();
+    // Neighbour character and the typical year are comparison material, so they sit behind the
+    // same disclosure the generator and storage cards use.
+    for (const card of [north, south]) {
+      await user.click(
+        within(card).getByRole("button", { name: /^Show .* details$/ }),
+      );
+    }
     for (const card of [north, south]) {
       expect(
         within(card).getByRole("img", { name: /^Typical year of import room/ }),
@@ -482,7 +489,10 @@ describe("unified connections", () => {
     expect(document.querySelectorAll(".tradingControls")).toHaveLength(1);
     expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
     /* eslint-enable testing-library/no-node-access */
-    expect(connections[0]).toHaveTextContent("Connected");
+    // A built line reports the power actually moving over it, signed, instead of a static
+    // "Connected" that never changes
+    expect(connections[0]).toHaveTextContent(/0\/500MW/);
+    expect(connections[0]).not.toHaveTextContent("Connected");
     expect(connections[1]).toHaveTextContent("Building");
     await user.click(screen.getByText(game.transmission!.lines[0].name));
     expect(

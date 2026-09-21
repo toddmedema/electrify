@@ -3,10 +3,17 @@ import { MANUAL_ENTRY } from "../../data/Manual";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ClosableDialogTitle from "../base/ClosableDialogTitle";
 import {
+  Avatar,
+  Box,
   Button,
+  Card,
+  CardHeader,
   Chip,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -30,10 +37,13 @@ import {
   corridorsForLocation,
 } from "../../data/AdjacentMarkets";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
-import { formatMoneyConcise, formatWatts } from "../../helpers/Format";
+import {
+  formatMoneyConcise,
+  formatSignedWattsOfPeak,
+  formatWatts,
+} from "../../helpers/Format";
 import {
   adjacentMarketPricePerMWh,
-  allowsImports,
   intertieContextForGame,
   intertieImportLimitW,
   transmissionRatingW,
@@ -49,12 +59,17 @@ import {
   GameType,
   TickPresentFutureType,
   TradingPolicyType,
+  TransmissionCorridorDefinitionType,
+  UnitSystemType,
 } from "../../Types";
 import { formatMass } from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import Sparkline from "../base/Sparkline";
+import BuildMetric from "../base/BuildMetric";
+import FlowBar from "../base/FlowBar";
+import { chartPalette } from "../../Theme";
 
 const POLICY_LABELS: Record<TradingPolicyType, string> = {
   BALANCED: "Buy for shortages, sell extra",
@@ -151,6 +166,161 @@ function PriceMetric({ outlook }: { outlook: IntertieOutlook }) {
       <dd>{priceRange(outlook)}</dd>
       {periods && <dd className="transmissionMetricNote">{periods}</dd>}
     </div>
+  );
+}
+
+/**
+ * One buildable corridor, laid out like the generator and storage purchase cards: heading and
+ * Review button, the reason it can't be bought when it can't, a metric grid, then everything
+ * that helps you compare neighbours behind the same disclosure. The archetype's character and
+ * its typical year are the "why this one" material, which is what the details are for.
+ */
+function IntertieBuildItem(props: {
+  corridor: TransmissionCorridorDefinitionType;
+  cash: number | undefined;
+  interestRate: number;
+  outlook?: IntertieOutlook;
+  readOnly: boolean;
+  units: UnitSystemType;
+  onReview: () => void;
+}): React.JSX.Element {
+  const { cash, corridor, outlook, readOnly, units } = props;
+  const [expanded, setExpanded] = React.useState(false);
+  const market = adjacentMarketForCorridor(corridor.id);
+  const name = market?.name || corridor.name;
+  const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
+  const financed = corridor.buildCost - downpayment;
+  // The loan is the cheaper of the two ways in, so it sets the bar for whether this is a
+  // decision at all. Cash purchase is still offered in the review dialog when it's affordable.
+  const buildable = cash !== undefined && cash >= downpayment;
+  return (
+    <Card
+      className="build-list-item buildOption transmissionProject"
+      data-corridor-id={corridor.id}
+      data-testid={`transmission-project-${corridor.id}`}
+    >
+      <CardHeader
+        avatar={<Avatar alt="" src="/images/transmission.svg" />}
+        action={
+          readOnly ? undefined : (
+            <Button
+              id={`review-intertie-${corridor.id}`}
+              aria-label={`Review purchase of ${name} intertie`}
+              size="small"
+              variant="outlined"
+              color="primary"
+              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+              disabled={!buildable}
+              onClick={props.onReview}
+            >
+              Review
+            </Button>
+          )
+        }
+        // These corridor names were headings before the card layout, and a list of purchase
+        // options is exactly what heading navigation is for. MUI's default span would take
+        // that away for no visual difference.
+        slotProps={{ title: { component: "h3" } }}
+        title={name}
+      />
+      <Typography className="buildOptionContext" variant="body2">
+        {corridor.name}
+        {" · "}
+        <span className="nowrap">
+          {corridor.routeType === "EXISTING"
+            ? "Existing corridor"
+            : "New corridor"}
+        </span>
+        {market && (
+          <>
+            {" · "}
+            <span className="nowrap">
+              {INTERTIE_ARCHETYPES[market.archetype].label}
+            </span>
+          </>
+        )}
+      </Typography>
+      {!readOnly && !buildable && (
+        <Typography
+          component="div"
+          className="buildOptionWarning"
+          color="textSecondary"
+        >
+          Need {formatMoneyConcise(downpayment)} down payment · you have{" "}
+          {formatMoneyConcise(cash || 0)}
+        </Typography>
+      )}
+      <Box className="buildOptionMetrics">
+        <BuildMetric label="Capacity" value={formatWatts(corridor.capacityW)} />
+        <BuildMetric
+          label="Build time"
+          value={`${corridor.yearsToBuild} year${corridor.yearsToBuild === 1 ? "" : "s"}`}
+        />
+        <BuildMetric
+          label="Total cost"
+          value={formatMoneyConcise(corridor.buildCost)}
+        />
+        <BuildMetric
+          label="Loan payment"
+          value={`${formatMoneyConcise(
+            getMonthlyPayment(financed, props.interestRate, LOAN_MONTHS),
+          )}/mo`}
+        />
+        {market && (
+          <BuildMetric
+            label="Emissions"
+            value={`${formatMass(market.emissionsKgco2ePerMWh, units)}/MWh`}
+          />
+        )}
+      </Box>
+      {!readOnly && buildable && (
+        <Typography
+          component="div"
+          className="buildOptionContext"
+          variant="caption"
+          color="textSecondary"
+        >
+          Pay {formatMoneyConcise(downpayment)} now · finance{" "}
+          {formatMoneyConcise(financed)}
+        </Typography>
+      )}
+      <Box className="buildOptionFooter">
+        <Button
+          color="primary"
+          className="expand-details"
+          size="small"
+          aria-label={`${expanded ? "Hide" : "Show"} ${name} details`}
+          aria-expanded={expanded}
+          endIcon={expanded ? <ArrowDropUpIcon /> : <ArrowDropDownIcon />}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </Button>
+      </Box>
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
+        {market && (
+          <Typography
+            className="buildOptionDescription"
+            variant="body2"
+            color="textSecondary"
+          >
+            {INTERTIE_ARCHETYPES[market.archetype].summary}
+          </Typography>
+        )}
+        {outlook && (
+          <Box className="buildOptionDetailBody">
+            <dl className="transmissionMetrics">
+              <div>
+                <dt>At your peak</dt>
+                <dd>~{percent(outlook.atPeak)} of line</dd>
+              </div>
+              <PriceMetric outlook={outlook} />
+            </dl>
+            <IntertieYear outlook={outlook} />
+          </Box>
+        )}
+      </Collapse>
+    </Card>
   );
 }
 
@@ -316,6 +486,12 @@ export default function TransmissionPanel({
               selectedLine === line.id
                 ? outlookFor(line.corridorId)
                 : undefined;
+            // Signed against the line's current rating, so the row reads the same way a
+            // facility row does: positive is power arriving, negative is power being sold.
+            const flowW = building ? 0 : line.currentFlowW || 0;
+            const flowFraction =
+              rating > 0 ? Math.max(-1, Math.min(1, flowW / rating)) : 0;
+            const flowLabel = formatSignedWattsOfPeak(flowW, rating);
             return (
               <div key={line.id} className="transmissionLine">
                 <button
@@ -327,6 +503,12 @@ export default function TransmissionPanel({
                     setSelectedLine(selectedLine === line.id ? null : line.id)
                   }
                 >
+                  {!building && (
+                    <FlowBar
+                      fraction={flowFraction}
+                      color={chartPalette().intertie}
+                    />
+                  )}
                   <img
                     className="transmissionListIcon"
                     src="/images/transmission.svg"
@@ -339,18 +521,32 @@ export default function TransmissionPanel({
                       variant="body2"
                       color="textSecondary"
                     >
-                      {building
-                        ? line.yearsToBuildLeft.toFixed(1) +
-                          (line.yearsToBuildLeft <= 1 ? " year" : " years") +
-                          " remaining"
-                        : formatWatts(importableW) +
-                          (allowsImports(state.tradingPolicy)
-                            ? " can import"
-                            : " available")}
-                      {" · "}
-                      <span className="transmissionLineStatus">
-                        {building ? "Building" : "Connected"}
-                      </span>
+                      {building ? (
+                        <>
+                          {line.yearsToBuildLeft.toFixed(1) +
+                            (line.yearsToBuildLeft <= 1 ? " year" : " years") +
+                            " remaining"}
+                          {" · "}
+                          <span className="transmissionLineStatus">
+                            Building
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="transmissionLineFlow">
+                            {flowLabel}
+                          </span>
+                          {/* Colour and the bar behind the row say which way power is moving;
+                          this is the same thing for anyone not reading either. */}
+                          <span className="srOnly">
+                            {flowW > 0
+                              ? " importing"
+                              : flowW < 0
+                                ? " selling"
+                                : " no power flowing"}
+                          </span>
+                        </>
+                      )}
                     </Typography>
                   </span>
                   <KeyboardArrowDownIcon
@@ -361,8 +557,9 @@ export default function TransmissionPanel({
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
                     <Typography variant="body2">
-                      {market?.name} · {formatWatts(line.capacityW)} rated
-                      capacity
+                      {market?.name} · {formatWatts(rating)} rating now
+                      {Math.round(rating) !== Math.round(line.capacityW) &&
+                        ` · ${formatWatts(line.capacityW)} rated`}
                     </Typography>
                     {outlook && (
                       <div className="transmissionArchetype">
@@ -446,147 +643,23 @@ export default function TransmissionPanel({
       {projectsOnly && !!unbuiltCorridors.length && (
         <section aria-label="Connection projects">
           <div className="transmissionProjects">
-            {unbuiltCorridors.map((corridor) => {
-              const market = adjacentMarketForCorridor(corridor.id);
-              const downpayment = corridor.buildCost * DOWNPAYMENT_PERCENT;
-              const financed = corridor.buildCost - downpayment;
-              const outlook = outlookFor(corridor.id);
-              return (
-                <article
-                  className="transmissionProject"
-                  data-corridor-id={corridor.id}
-                  data-testid={`transmission-project-${corridor.id}`}
-                  key={corridor.id}
-                >
-                  <div className="transmissionProjectHeading">
-                    <Typography variant="subtitle1">{market?.name}</Typography>
-                    {!readOnly && (
-                      <Button
-                        id={`review-intertie-${corridor.id}`}
-                        aria-label={`Review purchase of ${market?.name} intertie`}
-                        size="small"
-                        startIcon={
-                          <ConceptIcon concept="buy" fontSize="small" />
-                        }
-                        variant="outlined"
-                        disabled={!now || now.cash < downpayment}
-                        onClick={() => setReviewId(corridor.id)}
-                      >
-                        Review
-                      </Button>
-                    )}
-                  </div>
-                  <div className="transmissionProjectMetadata">
-                    <Typography variant="caption" color="textSecondary">
-                      {corridor.name}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={
-                        corridor.routeType === "EXISTING"
-                          ? "Existing corridor"
-                          : "New corridor"
-                      }
-                    />
-                    {market && (
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        className="transmissionArchetypeChip"
-                        label={INTERTIE_ARCHETYPES[market.archetype].label}
-                      />
-                    )}
-                  </div>
-                  <Typography variant="body2">
-                    {market
-                      ? INTERTIE_ARCHETYPES[market.archetype].summary
-                      : ""}
-                  </Typography>
-                  {outlook && <IntertieYear outlook={outlook} />}
-                  <dl className="transmissionMetrics">
-                    {outlook && (
-                      <>
-                        <div>
-                          <dt>At your peak</dt>
-                          <dd>~{percent(outlook.atPeak)} of line</dd>
-                        </div>
-                        <PriceMetric outlook={outlook} />
-                      </>
-                    )}
-                    <div>
-                      <dt>Capacity</dt>
-                      <dd>{formatWatts(corridor.capacityW)}</dd>
-                    </div>
-                    <div>
-                      <dt>Build time</dt>
-                      <dd>
-                        {corridor.yearsToBuild} year
-                        {corridor.yearsToBuild === 1 ? "" : "s"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Total cost</dt>
-                      <dd>{formatMoneyConcise(corridor.buildCost)}</dd>
-                    </div>
-                    <div>
-                      <dt>Loan payment</dt>
-                      <dd>
-                        {formatMoneyConcise(
-                          getMonthlyPayment(
-                            financed,
-                            game.interestRate,
-                            LOAN_MONTHS,
-                          ),
-                        )}
-                        /mo
-                      </dd>
-                    </div>
-                  </dl>
-                  {!readOnly && (
-                    <Typography variant="caption" color="textSecondary">
-                      Pay {formatMoneyConcise(downpayment)} now · finance{" "}
-                      {formatMoneyConcise(financed)}
-                    </Typography>
-                  )}
-                </article>
-              );
-            })}
+            {unbuiltCorridors.map((corridor) => (
+              <IntertieBuildItem
+                key={corridor.id}
+                corridor={corridor}
+                cash={now?.cash}
+                interestRate={game.interestRate}
+                outlook={outlookFor(corridor.id)}
+                readOnly={readOnly}
+                units={units}
+                onReview={() => setReviewId(corridor.id)}
+              />
+            ))}
           </div>
         </section>
       )}
       {projectsOnly && (
-        <>
-          <ManualLink
-            entry={MANUAL_ENTRY.INTERTIES}
-            text="How interties work"
-          />
-          <details>
-            <summary style={{ minHeight: 44, cursor: "pointer" }}>
-              Neighbor emissions
-            </summary>
-            {Array.from(new Set(corridors.map((corridor) => corridor.id))).map(
-              (id) => {
-                const market = adjacentMarketForCorridor(id);
-                return market ? (
-                  <Typography key={id} variant="body2" sx={{ my: 1 }}>
-                    {market.name}:{" "}
-                    {formatMass(market.emissionsKgco2ePerMWh, units)}
-                    /MWh CO2e · {market.emissionsBasis}.{" "}
-                    <a
-                      aria-label={`Source for ${market.name} emissions`}
-                      href={market.emissionsSource}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Source
-                    </a>
-                  </Typography>
-                ) : null;
-              },
-            )}
-          </details>
-        </>
+        <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
       )}
       {review && (
         <Dialog

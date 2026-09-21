@@ -21,6 +21,9 @@
   --bg-selected: #e3f2fd; /* blue50 */
   --border-selected: #bbdefb; /* blue100 */
   --border-subtle: #eeeeee; /* grey200 */
+  /* The diagonal on a reverse-flow row bar: dark enough to read over the 0.18 tint,
+     light enough not to fight the label sitting on top of it */
+  --flow-hatch: rgba(21, 101, 192, 0.22);
   --border-strong: #bdbdbd; /* grey400 */
   --border-tile: #e0e0e0; /* grey300 */
   --font-color-primary: #000000;
@@ -71,6 +74,7 @@
   --bg-selected: #132f46;
   --border-selected: #285f86;
   --border-subtle: #202b38;
+  --flow-hatch: rgba(144, 202, 249, 0.26);
   --border-strong: #48586b;
   --border-tile: #2b3948;
   --font-color-primary: #e6edf5;
@@ -1016,7 +1020,6 @@ $pane_header_height: 48px;
 }
 
 .tradingPolicy,
-.transmissionProject,
 .transmissionLine,
 .powerExchangeSummary {
   background: var(--bg-primary);
@@ -1027,45 +1030,12 @@ $pane_header_height: 48px;
   gap: 12px;
 }
 
-.transmissionProject {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border-tile);
-  border-radius: 8px;
-}
-
-.transmissionProjectHeading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+// Corridor cards are build cards; everything about their chrome comes from
+// `.build-list-item.buildOption`. Only the detail body below is theirs.
+.transmissionProject .buildOptionDetailBody {
+  display: grid;
   gap: 8px;
-
-  .MuiTypography-root {
-    min-width: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  .MuiButton-root {
-    flex-shrink: 0;
-    min-height: 40px;
-  }
-}
-
-.transmissionProjectMetadata {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-@media (pointer: coarse) {
-  .transmissionProjectHeading .MuiButton-root {
-    min-height: 44px;
-  }
+  padding: 0 12px 8px;
 }
 
 // Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the
@@ -2739,6 +2709,23 @@ html[data-theme="dark"] .uplot {
     .MuiAccordionDetails-root {
       padding: 0 $space-4 $space-4;
     }
+
+    // A citation list, not prose: each line is one assumption and the link that backs it
+    .manual-sources {
+      margin: 0 0 $space-3;
+      padding-left: $space-4;
+      font-size: 0.875rem;
+      line-height: 1.5;
+
+      li {
+        margin-bottom: $space-2;
+      }
+      // Touch targets on a phone, without the bullets drifting apart on a desktop
+      a {
+        display: inline-block;
+        min-height: 24px;
+      }
+    }
   }
 
   #gameSetupTable {
@@ -3644,6 +3631,24 @@ html[data-theme="dark"] .uplot {
     transition:
       transform 50ms linear,
       background 50ms linear;
+  }
+
+  // Power moving the other way: a battery charging, an intertie selling. Hue alone can't carry
+  // that, because a full reverse bar and a full forward bar cover identical pixels -- so the
+  // diagonal does the work colour can't (WCAG 1.4.1), alongside the row's signed reading and
+  // the up/down badge on the icon. Sized with width rather than scaleX, which would squash the
+  // diagonal along with the fill.
+  .outputProgressBar.reverseFlow {
+    right: auto;
+    transform: none;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--flow-hatch) 0 2px,
+      transparent 2px 6px
+    );
+    transition:
+      width 50ms linear,
+      background-color 50ms linear;
   }
 
   .storyDerateBadge {
@@ -4922,10 +4927,6 @@ $sizemap: (
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.transmissionProject {
-  padding: 16px;
-  border-radius: 8px;
-}
 .base_main #menuCard #logo {
   margin-top: auto;
   padding-top: 32px;
@@ -5186,6 +5187,18 @@ $sizemap: (
   grid-template-columns: 48px minmax(0, 1fr) 20px;
   align-items: center;
   gap: 8px;
+  // The flow bar is painted behind the row, so everything on top of it needs a stacking
+  // context of its own -- the same lift facility rows give their text and actions.
+  position: relative;
+  overflow: hidden;
+  > *:not(.outputProgressBar) {
+    position: relative;
+    z-index: 1;
+  }
+}
+// Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
+.transmissionLineFlow {
+  font-variant-numeric: tabular-nums;
 }
 .transmissionLine .transmissionLineText {
   min-width: 0;

@@ -79,17 +79,14 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "close", exact: true }).click();
     await facilities.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    // The neighbour's emissions are a metric on the corridor card now, beside its cost and
+    // build time, rather than a separate disclosure below the list.
     const trade = page
       .getByRole("tabpanel", { name: "Interties" })
-      .locator("details")
-      .filter({ hasText: "Neighbor emissions" });
-    expect(
-      (await trade.locator("summary").boundingBox())!.height,
-    ).toBeGreaterThanOrEqual(44);
-    await trade.locator("summary").click();
-    await expect(
-      trade.getByRole("link", { name: /Source for/ }).first(),
-    ).toHaveAttribute("href", /https:\/\//);
+      .locator(".transmissionProject")
+      .first();
+    await expect(trade.getByText("Emissions", { exact: true })).toBeVisible();
+    await expect(trade.getByText(/^[\d,]+\s*\S+\/MWh$/)).toBeVisible();
     expect(
       await page
         .getByRole("tabpanel", { name: "Interties" })

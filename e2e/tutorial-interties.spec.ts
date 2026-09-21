@@ -85,7 +85,9 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
   await page.screenshot({ path: testInfo.outputPath("intertie-approved.png") });
 
   await page.getByRole("button", { name: "fast speed" }).click();
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible({
+  // A finished line reports the power actually moving over it, which is what replaced the
+  // static "Connected" label.
+  await expect(page.locator(".transmissionLineFlow")).toBeVisible({
     timeout: 20000,
   });
   // Construction alone is not enough: the objective advances only after this explicit pause.

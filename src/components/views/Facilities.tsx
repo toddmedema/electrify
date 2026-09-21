@@ -49,6 +49,7 @@ import {
   formatWattsOfPeak,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
@@ -326,8 +327,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     : fuel === "Hydro" && facility.reservoirCapacityWh
       ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
       : null;
+  // Signed: storage sets a negative currentW while it charges, which used to scaleX the row
+  // bar backwards off its own left edge and read as an idle battery.
   const outputFraction =
-    facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
+    facility.peakW > 0
+      ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
+      : 0;
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
   // storage power and the reservoir's absolute size are both in the opened details.
@@ -405,13 +410,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!underConstruction && (
-              <div
-                className="outputProgressBar"
-                style={{
-                  transform: `scaleX(${outputFraction})`,
-                  background: withAlpha(accentColor, 0.18),
-                }}
-              />
+              <FlowBar fraction={outputFraction} color={accentColor} />
             )}
             {!readOnly && (
               <button

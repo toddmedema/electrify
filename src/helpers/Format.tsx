@@ -168,3 +168,14 @@ export function formatWattsOfPeak(current: number, peak: number): string {
 export function formatWattHoursOfPeak(current: number, peak: number): string {
   return formatWattsOfPeak(current, peak) + "h";
 }
+
+/**
+ * The same pair for a value whose sign carries meaning, eg an intertie that can buy power one
+ * hour and sell it the next. formatWattsOfPeak strips everything but digits from the leading
+ * number -- the minus sign included -- so the sign is reattached here rather than lost.
+ */
+export function formatSignedWattsOfPeak(current: number, peak: number): string {
+  const pair = formatWattsOfPeak(Math.abs(current), peak);
+  // Guard against "-0/500MW" when a trickle rounds away
+  return current < 0 && !/^0(\.0*)?\//.test(pair) ? "-" + pair : pair;
+}

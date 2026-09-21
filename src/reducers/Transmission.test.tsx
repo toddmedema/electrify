@@ -552,6 +552,73 @@ describe("transmission actions", () => {
     expect(now.kgco2e).toBeCloseTo(tickMWh(importedW) * intensity, 3);
   });
 
+  it("records each line's own signed flow, not just the fleet total", () => {
+    const state = twoIntertiesWithoutPlants();
+    // Too little room on the cheaper line for the whole shortfall, so both must carry some
+    state.transmission!.lines[0].capacityW = 100000000;
+    state.transmission!.lines[1].capacityW = 300000000;
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const lines = state.transmission!.lines;
+    expect(now.importedW).toBeGreaterThan(0);
+    // Buying reads positive, and the parts add up to the total the tick reported
+    lines.forEach((line) => expect(line.currentFlowW).toBeGreaterThan(0));
+    expect(
+      lines.reduce((sum, line) => sum + (line.currentFlowW || 0), 0),
+    ).toBeCloseTo(now.importedW! - (now.exportedW || 0), 0);
+    lines.forEach((line) =>
+      expect(Math.abs(line.currentFlowW!)).toBeLessThanOrEqual(
+        transmissionRatingW(line, now) + 1,
+      ),
+    );
+  });
+
+  it("signs a line that is selling power the other way", () => {
+    const state = twoIntertiesWithoutPlants();
+    // A large must-run fleet against tiny demand leaves surplus with nowhere to go but out
+    const source = createGame({ scenarioId: 100, seed: 61 });
+    state.facilities = cloneDeep(source.facilities).map((facility) => ({
+      ...facility,
+      yearsToBuildLeft: 0,
+      peakW: 2000000000,
+    }));
+    state.timeline.forEach((t) => {
+      t.demandW = 1000000;
+    });
+    tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    const lines = state.transmission!.lines;
+    expect(now.exportedW).toBeGreaterThan(0);
+    expect(lines.some((line) => (line.currentFlowW || 0) < 0)).toBe(true);
+    expect(
+      lines.reduce((sum, line) => sum + (line.currentFlowW || 0), 0),
+    ).toBeCloseTo((now.importedW || 0) - now.exportedW!, 0);
+  });
+
+  it("leaves per-line flow alone during a forecast", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    const recorded = state.transmission!.lines.map(
+      ({ currentFlowW }) => currentFlowW,
+    );
+    expect(recorded.some((value) => (value || 0) > 0)).toBe(true);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+
+    generateNewTimeline(state, now.cash, now.customers, 8);
+
+    // A forecast dispatches against hypothetical weather; the list must keep showing the
+    // trade that actually happened.
+    expect(
+      state.transmission!.lines.map(({ currentFlowW }) => currentFlowW),
+    ).toEqual(recorded);
+  });
+
   it("imports from the cheaper line first and pays each line its own price", () => {
     const state = twoIntertiesWithoutPlants();
     const { now: upcoming } = nextTick(state);
