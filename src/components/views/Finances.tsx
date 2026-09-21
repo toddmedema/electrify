@@ -1080,6 +1080,15 @@ export default class Finances extends React.Component<Props, State> {
                   : "")
               }
               format={chartKeys[chartKey].format}
+              // Cash clips at zero and names it; profit keeps its axis and names its losses
+              domainMin={chartKey === "cash" ? 0 : undefined}
+              negativeNote={
+                chartKey === "cash"
+                  ? "Cash negative"
+                  : chartKey === "profit"
+                    ? "Loss"
+                    : undefined
+              }
             />
           ) : (
             <span />

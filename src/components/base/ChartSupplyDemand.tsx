@@ -8,6 +8,7 @@ import {
   LegendItem,
   padRange,
   spansFromEdges,
+  splitPastProjected,
   tickLabelFill,
   verticalLinePlugin,
   xAxis,
@@ -112,7 +113,14 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
       },
       {
         stroke: chartPalette().supply,
-        width: 1,
+        width: 1.75,
+        dash: [6, 4],
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: chartPalette().demand,
+        width: 2.5,
         points: { show: false },
         spanGaps: false,
       },
@@ -121,6 +129,7 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         width: 2.5,
         dash: [6, 4],
         points: { show: false },
+        spanGaps: false,
       },
     ],
     plugins: [
@@ -246,17 +255,24 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
   });
 
   // Divide between historic and forecast. One aligned x per tick, with each series blanked out
-  // where it doesn't apply, so the two halves of supply can be styled differently.
+  // where it doesn't apply: the record draws solid (supply with its history wash) and the
+  // forecast dashed, so a line's style says what it is. Each half carries the other's boundary
+  // point, so the two meet at the current minute without a gap.
   const currentMinute = props.currentMinute || 0;
+  const isForecast = timeline.map((d: ChartData) => d.minute >= currentMinute);
+  const supply = splitPastProjected(
+    timeline.map((d: ChartData) => d.supplyW),
+    isForecast,
+    { bridgeEnd: true },
+  );
+  const demand = splitPastProjected(
+    timeline.map((d: ChartData) => d.demandW),
+    isForecast,
+    { bridgeEnd: true },
+  );
   const minutes = new Array<number>(timeline.length);
-  const supplyHistoric = new Array<number | null>(timeline.length);
-  const supplyForecast = new Array<number | null>(timeline.length);
-  const demand = new Array<number>(timeline.length);
   timeline.forEach((d: ChartData, i: number) => {
     minutes[i] = d.minute;
-    supplyHistoric[i] = d.minute <= currentMinute ? d.supplyW : null;
-    supplyForecast[i] = d.minute >= currentMinute ? d.supplyW : null;
-    demand[i] = d.demandW;
   });
 
   // The blackout key only earns its place once there has been a blackout to explain
@@ -290,8 +306,19 @@ const ChartSupplyDemand = (props: Props): React.JSX.Element => {
       id="chartSupplyDemand"
       height={height}
       state={state}
-      data={[minutes, supplyHistoric, supplyForecast, demand]}
-      seriesLabels={["Past supply", "Forecast supply", "Demand"]}
+      data={[
+        minutes,
+        supply.past,
+        supply.projected,
+        demand.past,
+        demand.projected,
+      ]}
+      seriesLabels={[
+        "Past supply",
+        "Forecast supply",
+        "Past demand",
+        "Forecast demand",
+      ]}
       buildOptions={buildOptions}
       tooltip={tooltip}
     />

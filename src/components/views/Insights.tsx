@@ -38,11 +38,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import {
-  GAME_TO_REAL_YEARS,
-  TICK_MINUTES,
-  TICKS_PER_YEAR,
-} from "../../Constants";
+import { TICK_MINUTES } from "../../Constants";
 import {
   DerivedHistoryKeysType,
   FacilityOperatingType,
@@ -61,8 +57,6 @@ import {
   MINUTES_PER_MONTH,
   reduceHistories,
   summarizeHistory,
-  summarizeTimeline,
-  summarizeTimelineByMonth,
 } from "../../helpers/DateTime";
 import {
   customerMarketSizeAt,
@@ -85,7 +79,13 @@ import {
   getStorageString,
   setStorageKeyValue,
 } from "../../LocalStorage";
-import { generateNewTimeline } from "../../reducers/Game";
+import {
+  facilitySignature,
+  forecastViewportBounds,
+  policySignature,
+  ProjectionView,
+  selectProjection,
+} from "../../helpers/Projection";
 import { getScenario, SCENARIOS } from "../../data/Scenarios";
 import {
   chartPalette,
@@ -118,7 +118,7 @@ import { buildChartKeys, formatCustomerChange } from "./Finances";
 import { sampleForecastTimeline } from "../../helpers/ForecastSampling";
 import {
   PUBLIC_RATE_POINTS_PER_CENT,
-  publicRateScoreChange,
+  publicRateYearContribution,
 } from "../../helpers/Scoring";
 import { ChartAnnotationsContext } from "../base/ChartAnnotationsContext";
 import InsightEventRail from "../base/InsightEventRail";
@@ -276,7 +276,6 @@ const MAX_PRESET_NAME_LENGTH = 40;
 const SYNC_KEY = "insights";
 const GROUPS: LayerGroup[] = ["Grid", "Customers", "Economics", "Environment"];
 const ALL_LAYER_IDS = new Set(INSIGHT_LAYERS.map((layer) => layer.id));
-const HOURS_PER_RECORDED_MONTH = 24 * GAME_TO_REAL_YEARS;
 
 function formatRateCompact(rate: number): string {
   return `${Number((rate * 100).toFixed(1))}¢`;
@@ -297,28 +296,6 @@ function rateMarkLabel(
 
 function formatRateScore(points: number): string {
   return `${points > 0 ? "+" : points < 0 ? "−" : "±"}${Math.abs(points).toLocaleString("en-US")} pts`;
-}
-
-interface BlackoutEdges {
-  minute: number;
-  value: number;
-}
-
-interface ProjectionView {
-  timeline: TickPresentFutureType[];
-  sampled: TickPresentFutureType[];
-  supplyDemandTimeline: TickPresentFutureType[];
-  domain: { x: [number, number]; y: [number, number] };
-  blackouts: BlackoutEdges[];
-  // The simulated hours alone; supplyDemandTimeline leads with recorded monthly averages.
-  forecast: TickPresentFutureType[];
-  // Forecast shortfall inside the displayed range, filled in per render for the viewport.
-  shortfall?: { wh: number; peakW: number; label: string };
-  hasStorage: boolean;
-  hasHydro: boolean;
-  financePast: MonthlyHistoryType[];
-  financeProjected: MonthlyHistoryType[];
-  projectionStepMinutes: number;
 }
 
 export interface StateProps {
@@ -366,11 +343,6 @@ interface State {
 
 const VIEWPORT_ZOOM_FACTOR = 0.5;
 const VIEWPORT_PAN_FRACTION = 0.25;
-const MAX_FORECAST_YEARS = 20;
-
-function viewportBounds(game: GameType): ChartViewportRange {
-  return [0, game.date.minute + MAX_FORECAST_YEARS * 12 * MINUTES_PER_MONTH];
-}
 
 function scenarioEndMinute(game: GameType): number | undefined {
   const months = getScenario(
@@ -382,7 +354,7 @@ function scenarioEndMinute(game: GameType): number | undefined {
 
 // The whole run is the question the player is answering, so open on scenario start to end.
 function initialViewport(game: GameType): ChartViewportRange {
-  const bounds = viewportBounds(game);
+  const bounds = forecastViewportBounds(game);
   return clampChartViewport(
     bounds,
     [bounds[0], scenarioEndMinute(game) ?? bounds[1]],
@@ -397,7 +369,7 @@ function advanceViewport(
   viewport: ChartViewportRange,
   elapsedMonths: number,
 ): ChartViewportRange {
-  const bounds = viewportBounds(game);
+  const bounds = forecastViewportBounds(game);
   const delta = elapsedMonths * MINUTES_PER_MONTH;
   const end = scenarioEndMinute(game);
   return clampChartViewport(
@@ -624,12 +596,6 @@ export function withRequiredLayers(
   return next;
 }
 
-function monthMinute(month: MonthlyHistoryType, startingYear: number): number {
-  return (
-    ((month.year - startingYear) * 12 + month.month - 1) * MINUTES_PER_MONTH
-  );
-}
-
 function financeMetadata(
   id: InsightLayerId,
   units: UnitSystemType,
@@ -700,52 +666,6 @@ function financeSeries(
   return points.slice(first, Math.max(first + 1, Math.min(points.length, end)));
 }
 
-function policySignature(game: GameType): string {
-  const policies = game.policies;
-  if (!policies) return "";
-  return JSON.stringify([
-    policies.month,
-    ...Object.keys(policies.programs)
-      .sort()
-      .map((id) => {
-        const program = policies.programs[id as keyof typeof policies.programs];
-        return [
-          id,
-          program.tier,
-          program.adoption,
-          program.spending,
-          program.pending?.tier,
-          program.startHour,
-          program.pending?.startHour,
-          program.pending?.month,
-        ];
-      }),
-  ]);
-}
-
-// Construction progress is deliberately reduced to built or not. The remaining years tick down
-// every game tick, and keying on them re-simulated the whole projection each frame from a start
-// minute that had moved on by one tick, so the hourly-sampled forecast (wind most of all) jittered
-// under the player. The month rollover already refreshes progress; completion refreshes it too.
-function facilitySignature(game: GameType): string {
-  const facilities = game.facilities
-    .map((facility) =>
-      [
-        facility.id,
-        facility.paused,
-        facility.yearsToBuildLeft > 0,
-        facility.peakW,
-      ].join(":"),
-    )
-    .join("|");
-  const transmission = (game.transmission?.lines || [])
-    .map((line) =>
-      [line.id, line.corridorId, line.yearsToBuildLeft > 0].join(":"),
-    )
-    .join("|");
-  return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;
-}
-
 export default class Insights extends React.Component<Props, State> {
   static contextType = UnitsContext;
 
@@ -759,9 +679,6 @@ export default class Insights extends React.Component<Props, State> {
         shortfall: ProjectionView["shortfall"];
       }
     | undefined;
-
-  private projectionCache:
-    { key: string; projection: ProjectionView } | undefined;
 
   constructor(props: Props) {
     super(props);
@@ -1194,96 +1111,12 @@ export default class Insights extends React.Component<Props, State> {
     });
   }
 
+  /**
+   * The game's long-range forecast, shared with the top bar's runway warning through the
+   * memoized helper: one simulation per set of inputs, read by both callers.
+   */
   private getProjection(now: TickPresentFutureType): ProjectionView {
-    const { game } = this.props;
-    const projectionStepMinutes = 60;
-    const tickScale = projectionStepMinutes / TICK_MINUTES;
-    const ticks = (TICKS_PER_YEAR * MAX_FORECAST_YEARS) / tickScale;
-    const monthsAhead = MAX_FORECAST_YEARS * 12;
-    const key = [
-      game.date.monthsElapsed,
-      game.monthlyHistory.length,
-      game.dollarsPerkWh,
-      game.feePerKgCO2e,
-      facilitySignature(game),
-      policySignature(game),
-    ].join("|");
-    if (this.projectionCache?.key === key) {
-      return this.projectionCache.projection;
-    }
-
-    const timeline = generateNewTimeline(
-      game,
-      now.cash,
-      now.customers,
-      ticks,
-      projectionStepMinutes,
-    );
-    const historicalSupplyDemand = [...game.monthlyHistory]
-      .reverse()
-      .map((month) => {
-        const tick = { ...now } as TickPresentFutureType;
-        tick.minute = monthMinute(month, game.startingYear);
-        tick.supplyW = month.supplyWh / HOURS_PER_RECORDED_MONTH;
-        tick.demandW = month.demandWh / HOURS_PER_RECORDED_MONTH;
-        return tick;
-      });
-    const historicalCharts = [...game.monthlyHistory]
-      .reverse()
-      .flatMap((month) =>
-        month.chartAverage
-          ? [
-              {
-                ...month.chartAverage,
-                minute: monthMinute(month, game.startingYear),
-              } as TickPresentFutureType,
-            ]
-          : [],
-      );
-    let domainMin = Number.POSITIVE_INFINITY;
-    let domainMax = 0;
-    for (const tick of [...historicalSupplyDemand, ...timeline]) {
-      domainMin = Math.min(domainMin, tick.supplyW, tick.demandW);
-      domainMax = Math.max(domainMax, tick.supplyW, tick.demandW);
-    }
-    const [rangeMin, rangeMax] = viewportBounds(game);
-
-    const { blackouts } = forecastShortfalls(
-      timeline,
-      projectionStepMinutes,
-      domainMax,
-    );
-    blackouts.unshift({ minute: rangeMin, value: 0 });
-    const sampled = sampleForecastTimeline(
-      timeline,
-      240 * MAX_FORECAST_YEARS,
-      projectionStepMinutes,
-    );
-
-    const currentMonth = summarizeTimeline(game.timeline, game.startingYear);
-    const projectedMonths = summarizeTimelineByMonth(
-      timeline,
-      game.startingYear,
-    ).slice(1, 1 + monthsAhead);
-    const projection: ProjectionView = {
-      timeline: [...historicalCharts, ...timeline],
-      sampled: [...historicalCharts, ...sampled],
-      supplyDemandTimeline: [...historicalSupplyDemand, ...timeline],
-      domain: { x: [rangeMin, rangeMax], y: [domainMin, domainMax] },
-      blackouts,
-      forecast: timeline,
-      hasStorage: [...historicalCharts, ...timeline].some(
-        (tick) => tick.storedWh > 0,
-      ),
-      hasHydro:
-        game.facilities.some((facility) => facility.fuel === "Hydro") ||
-        historicalCharts.some((tick) => tick.hydroReservoirCapacityWh > 0),
-      financePast: game.monthlyHistory,
-      financeProjected: [currentMonth, ...projectedMonths],
-      projectionStepMinutes,
-    };
-    this.projectionCache = { key, projection };
-    return projection;
+    return selectProjection(this.props.game, now);
   }
 
   private available(layer: InsightLayerDefinition, projection: ProjectionView) {
@@ -1338,23 +1171,24 @@ export default class Insights extends React.Component<Props, State> {
     const max = investor
       ? Math.max(0.05, Math.ceil(marketRate * 200) / 100, game.dollarsPerkWh)
       : Math.max(0.3, Math.ceil(targetRate * 150) / 100, game.dollarsPerkWh);
-    // The score judges the lifetime average rate, so what a rate is worth is how far it moves
-    // that average over the coming year: the projection's next twelve months added to the months
-    // already on the record. Always a full year, even near the end of a run, so the figure means
-    // the same thing every time. The projection was built at the current rate; other slider
-    // positions shift its revenue by the difference on the same energy.
+    // The final score decomposes exactly into a supply-weighted sum over the years played, so
+    // what a rate is worth is the coming year's own term of that sum: the distance from the
+    // target, times how much of the lifetime energy the coming year makes up. Always a full
+    // year, even near the end of a run, so the figure means the same thing every time. The
+    // sign is the sign of target minus rate: a rate above target reads as a loss every year it
+    // is in force, no matter what the lifetime average did last period.
     const upcoming = investor
       ? []
       : this.getProjection(now).financeProjected.slice(0, 12);
     const pastTotals = summarizeHistory(game.monthlyHistory);
     const nextSupplyWh = upcoming.reduce((sum, m) => sum + m.supplyWh, 0);
-    const nextRevenue = upcoming.reduce((sum, m) => sum + m.revenue, 0);
     const rateScore = (rate: number) =>
-      publicRateScoreChange(targetRate, pastTotals, {
-        supplyWh: nextSupplyWh,
-        revenue:
-          nextRevenue + (rate - game.dollarsPerkWh) * (nextSupplyWh / 1000),
-      });
+      publicRateYearContribution(
+        targetRate,
+        pastTotals,
+        { supplyWh: nextSupplyWh },
+        rate,
+      );
     const formattedRateScore = formatRateScore(rateScore(game.dollarsPerkWh));
     const marks = investor
       ? [
@@ -1401,7 +1235,7 @@ export default class Insights extends React.Component<Props, State> {
     );
     const rateSummary = investor
       ? `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; market rate ${formatMoneyConcise(marketRate)}; projected customers ${formattedCustomerChange} next month.`
-      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} over the next year at this rate. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it.`;
+      : `Rate ${formatMoneyConcise(game.dollarsPerkWh)} per kilowatt hour; target ${formatMoneyConcise(targetRate)}; rate score ${formattedRateScore} over the next year at this rate. You earn ${PUBLIC_RATE_POINTS_PER_CENT} points for each cent below the target and lose ${PUBLIC_RATE_POINTS_PER_CENT} for each cent above it, weighted by the coming year's share of lifetime sales.`;
     const rateScoreClass = `insightsRateScore ${
       rateScore(game.dollarsPerkWh) > 0
         ? "good"
@@ -1443,7 +1277,8 @@ export default class Insights extends React.Component<Props, State> {
               <strong className={rateScoreClass}>
                 {formattedRateScore}/yr
               </strong>{" "}
-              ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢ of lifetime average)
+              ({PUBLIC_RATE_POINTS_PER_CENT} pts per 1¢ below target, weighted
+              by energy sold)
             </>
           )}
         </Typography>
@@ -1821,6 +1656,15 @@ export default class Insights extends React.Component<Props, State> {
             )}
             title={finance.label}
             format={finance.format}
+            // Cash clips at zero and says so; profit keeps its axis and names its losses
+            domainMin={finance.key === "cash" ? 0 : undefined}
+            negativeNote={
+              finance.key === "cash"
+                ? "Cash negative"
+                : finance.key === "profit"
+                  ? "Loss"
+                  : undefined
+            }
             startingYear={game.startingYear}
             domain={projection.domain.x}
             syncKey={SYNC_KEY}
@@ -1875,6 +1719,7 @@ export default class Insights extends React.Component<Props, State> {
                 domain={projection.domain}
                 startingYear={game.startingYear}
                 multiyear={multiyear}
+                currentMinute={game.date.minute}
                 syncKey={SYNC_KEY}
               />
               {projection.shortfall && (

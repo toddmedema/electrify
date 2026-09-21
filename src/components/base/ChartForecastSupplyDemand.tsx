@@ -5,6 +5,7 @@ import {
   bandsPlugin,
   padRange,
   spansFromEdges,
+  splitPastProjected,
   forecastMonthAxis,
   yAxis,
 } from "./UPlotHelpers";
@@ -25,6 +26,11 @@ export interface Props {
   domain: { x: [number, number]; y: [number, number] };
   startingYear: number;
   multiyear: boolean;
+  /**
+   * The minute the record ends and the forecast begins. Everything at or after it draws dashed.
+   * Omitted and every point draws solid, as before.
+   */
+  currentMinute?: number;
   /** False where a chart below this one carries the month names for the whole stack */
   showXLabels?: boolean;
   /** Shares a cursor with the other charts drawn against the same months */
@@ -70,8 +76,32 @@ function buildOptions(showXLabels: boolean) {
     ],
     series: [
       {},
-      { stroke: chartPalette().supply, width: 1, points: { show: false } },
-      { stroke: chartPalette().demand, width: 2, points: { show: false } },
+      {
+        stroke: chartPalette().supply,
+        width: 1,
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: chartPalette().supply,
+        width: 1,
+        dash: [4, 4],
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: chartPalette().demand,
+        width: 2,
+        points: { show: false },
+        spanGaps: false,
+      },
+      {
+        stroke: chartPalette().demand,
+        width: 2,
+        dash: [4, 4],
+        points: { show: false },
+        spanGaps: false,
+      },
     ],
     plugins: [
       bandsPlugin(() => getState().blackoutSpans, chartPalette().blackout, 0.3),
@@ -102,18 +132,28 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
       blackouts,
       startingYear,
       multiyear,
+      currentMinute,
       showXLabels,
       syncKey,
     } = this.props;
 
     const minutes = new Array<number>(timeline.length);
-    const supply = new Array<number>(timeline.length);
-    const demand = new Array<number>(timeline.length);
+    const supplyValues = new Array<number | null>(timeline.length);
+    const demandValues = new Array<number | null>(timeline.length);
+    const isProjected = timeline.map(
+      (t: TickPresentFutureType) =>
+        currentMinute !== undefined && t.minute >= currentMinute,
+    );
     timeline.forEach((t: TickPresentFutureType, i: number) => {
       minutes[i] = t.minute;
-      supply[i] = t.supplyW;
-      demand[i] = t.demandW;
+      supplyValues[i] = t.supplyW;
+      demandValues[i] = t.demandW;
     });
+    // The recorded months are drawn solid and the simulated hours dashed, the forecast starting
+    // at the last recorded point so the two halves meet. On this month-scale axis that bridge is
+    // the whole gap between them, so no month-scale chart extends the solid line into the future.
+    const supply = splitPastProjected(supplyValues, isProjected);
+    const demand = splitPastProjected(demandValues, isProjected);
 
     const state: State = {
       timeline,
@@ -130,8 +170,19 @@ export default class chartForecastSupplyDemand extends React.PureComponent<
         formatSummaryValue={formatWatts}
         height={height}
         state={state}
-        data={[minutes, supply, demand]}
-        seriesLabels={["Supply", "Demand"]}
+        data={[
+          minutes,
+          supply.past,
+          supply.projected,
+          demand.past,
+          demand.projected,
+        ]}
+        seriesLabels={[
+          "Past supply",
+          "Forecast supply",
+          "Past demand",
+          "Forecast demand",
+        ]}
         buildOptions={buildOptions(showXLabels !== false)}
         structureKey={String(showXLabels !== false)}
         syncKey={syncKey}

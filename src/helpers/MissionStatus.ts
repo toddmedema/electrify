@@ -19,6 +19,7 @@ import {
 import type { UpcomingStoryEventType } from "../components/views/StoryEventSelectors";
 import { TICK_MINUTES } from "../Constants";
 import { formatMoneyConcise } from "./Format";
+import { selectProjection } from "./Projection";
 
 export interface MissionRequirement {
   id: string;
@@ -240,29 +241,35 @@ export function projectedShortfall(
   return result;
 }
 
-// Warn about insolvency this far ahead, from the average cash change over this many recent months.
+// Warn about insolvency this far ahead. A projection that stays solvent to the horizon is quiet.
 const CASH_RUNWAY_WARNING_MONTHS = 12;
-const CASH_RUNWAY_TREND_MONTHS = 3;
 
-/** Months until cash reaches zero at the recent completed-month pace; undefined when not burning. */
+/**
+ * Whole months until the projected cash first falls below zero; undefined when it never does.
+ *
+ * Judged from the forward projection Insights already runs rather than from the average of the
+ * recent completed months. The average is what a single down payment, a restoration bill or a
+ * seasonal swing looked like, and it took months of history before a rate change moved it. The
+ * projection answers the question that is actually being asked -- where does the cash sit in
+ * month six, given the rates, prices and fleet in force? -- and it already reflects a new rate
+ * in the same call that sets one.
+ *
+ * The projected months start where the simulation started, so they are anchored to the balance
+ * on hand before being read: a month's drift since the projection was built is carried along
+ * with them.
+ */
 export function cashRunwayMonths(game: GameType): number | undefined {
-  const current = absoluteMonth(game.date.year, game.date.monthNumber);
-  const history = completedMissionHistory(game);
-  const recent: MonthlyHistoryType[] = [];
-  for (const row of history) {
-    if (absoluteMonth(row.year, row.month) !== current - recent.length - 1)
-      break;
-    recent.push(row);
-    if (recent.length > CASH_RUNWAY_TREND_MONTHS) break;
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  // Negative cash now has its own, more urgent warning; this one is about the months ahead
+  if (!now || now.cash < 0) return undefined;
+  const projection = selectProjection(game, now);
+  const anchor = now.cash - projection.startingCash;
+  for (let i = 0; i < projection.financeProjected.length; i++) {
+    if (projection.financeProjected[i].cash + anchor < 0) {
+      return i + 1;
+    }
   }
-  if (recent.length < 2) return undefined;
-  const burn =
-    (recent[recent.length - 1].cash - recent[0].cash) / (recent.length - 1);
-  if (burn <= 0) return undefined;
-  const cash =
-    getTimeFromTimeline(game.date.minute, game.timeline)?.cash ??
-    recent[0].cash;
-  return cash < 0 ? undefined : cash / burn;
+  return undefined;
 }
 
 export function selectMissionRisk(
@@ -311,7 +318,7 @@ export function selectMissionRisk(
     const months = Math.max(1, Math.round(runway));
     return {
       id: "cash-runway",
-      label: `At the recent pace, cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
+      label: `Projected cash runs out in about ${months} ${months === 1 ? "month" : "months"} · Check finances`,
       shortLabel: `Cash out in ~${months} mo`,
       target: "finances",
     };
