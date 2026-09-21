@@ -136,9 +136,11 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   DISCHARGING: "discharging",
 };
 
-// Display only: below this the row's reservoir reading turns red. Deliberately above
-// LOW_RESERVOIR_FRACTION (HydroOutlook), which marks the point where output is already being
-// held back and drives the "Nearly empty." forecast lead -- the row warns before that bites.
+// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
+// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
+// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
+// (HydroOutlook), which marks the point where output is already being held back and drives the
+// "Nearly empty." forecast lead -- the row warns before that bites.
 const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {

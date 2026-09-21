@@ -4873,7 +4873,11 @@ $sizemap: (
 // bar clips a shadow away vertically, and at 100% there is no edge left for it to escape past,
 // so the mark disappears exactly when the build is most worth noticing. A dot that overhangs
 // the end stays visible at every width. The blue is fixed on purpose — "under construction"
-// should read the same whatever the fuel accent is.
+// should read the same whatever the fuel accent is. The dot's core is the page background
+// rather than an accent-derived colour because the fixed blue glow is byte-identical to the
+// storage fill (--interactive-blue and chartPalette().storage are the same hue), which would
+// otherwise swallow the head on every battery build; a pinhole of page background contrasts
+// against blue, amber and brown alike, and flips light/dark with the theme.
 .facilityDisclosure .constructionProgressFill::after {
   content: "";
   position: absolute;
@@ -4883,6 +4887,7 @@ $sizemap: (
   height: 2px;
   transform: translate(50%, -50%);
   border-radius: 50%;
+  background: var(--bg-primary);
   box-shadow: 0 0 6px 3px var(--tutorial-glow);
 }
 .transmissionFleet {
