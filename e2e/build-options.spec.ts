@@ -171,7 +171,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(battery).toBeVisible();
     await expect(page.locator("main.base_main")).toHaveCount(1);
-    await expect(battery.locator(".buildOptionMetrics")).toContainText("4 h");
+    await expect(battery.locator(".buildOptionMetrics")).toContainText("4 hr");
     await expect(battery.locator(".buildOptionMetrics")).toContainText("125MW");
     await expect(battery.locator(".buildOptionMetrics")).toContainText("85%");
     expect(

@@ -13,7 +13,6 @@ const mapStateToProps = (state: AppStateType): StateProps => {
   return {
     audioEnabled: state.settings.audioEnabled,
     hasSavedGame: !!resumableSave(),
-    uid: state.user.uid,
   };
 };
 

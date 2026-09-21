@@ -34,8 +34,8 @@ export default function HydroPrimer(props: {
       <Typography variant="body2">
         You can build {props.totalSites} hydro{" "}
         {props.totalSites === 1 ? "project" : "projects"} near {props.place},
-        each using one site whatever its size. Output follows rain and snowmelt,
-        not fuel.
+        each using one site whatever its size. The reservoir only refills from
+        rain and snowmelt.
       </Typography>
       <Button size="small" onClick={props.onDismiss}>
         Got it

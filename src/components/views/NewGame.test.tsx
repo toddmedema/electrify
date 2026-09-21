@@ -44,9 +44,7 @@ describe("NewGame", () => {
 
     expect(
       screen.getByTestId(`tutorial-spotlight-${TUTORIALS[0].id}`),
-    ).toHaveTextContent(
-      `Continue learning · 0 of ${TUTORIALS.length} complete`,
-    );
+    ).toHaveTextContent(TUTORIALS[0].summary as string);
     expect(screen.queryByTestId(`mission-row-${TUTORIALS[0].id}`)).toBeNull();
     expect(challengeRows().map((row) => row.textContent)).toEqual([
       expect.stringContaining("Deep Freeze"),
@@ -233,10 +231,12 @@ describe("NewGame", () => {
     render(<NewGame {...props()} />);
 
     const next = screen.getByTestId(`tutorial-spotlight-${TUTORIALS[1].id}`);
-    expect(next).toHaveTextContent(
-      `Continue learning · 1 of ${TUTORIALS.length} complete`,
-    );
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
+    expect(
+      within(next).getByLabelText(
+        `Tutorials: 1 of ${TUTORIALS.length} complete`,
+      ),
+    ).toBeInTheDocument();
     expect(within(next).getByRole("button")).toHaveAccessibleName(
       `Start ${TUTORIALS[1].name.replace(/^Mission \d+:\s*/, "")}`,
     );

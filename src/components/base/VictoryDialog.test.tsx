@@ -181,7 +181,7 @@ describe("VictoryDialog", () => {
 
     await userEvent.click(screen.getByText("Review grid"));
     expect(onClose).toHaveBeenCalled();
-    await userEvent.click(screen.getByText("Choose game"));
+    await userEvent.click(screen.getByText("New game"));
     expect(onQuit).toHaveBeenCalled();
   });
 

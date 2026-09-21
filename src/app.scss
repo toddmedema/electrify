@@ -2615,17 +2615,8 @@ html[data-theme="dark"] .uplot {
         flex-direction: column;
 
         // InstallAppButton can render nothing, leaving an empty discovery row.
-        &:has(> .discoveryActions:empty):not(:has(> .accountActions)) {
+        &:has(> .discoveryActions:empty) {
           display: none;
-        }
-      }
-
-      .accountActions {
-        align-items: center;
-
-        .MuiTypography-caption {
-          font-size: 0.8125rem;
-          line-height: 1.4;
         }
       }
 
@@ -3116,21 +3107,8 @@ html[data-theme="dark"] .uplot {
     }
   }
 
-  .tutorialSpotlightEyebrow,
   .tutorialSpotlightTitle {
     display: block;
-  }
-
-  .tutorialSpotlightEyebrow {
-    margin-bottom: 2px;
-    color: $interactive_blue;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
-  }
-
-  .tutorialSpotlightTitle {
     color: $font_color_primary;
     font-weight: 700;
   }
@@ -4886,10 +4864,15 @@ $sizemap: (
 }
 .facilityDisclosure .constructionProgressFill {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
   border-radius: inherit;
-  transform-origin: left center;
-  transition: transform 200ms linear;
+  transition: width 200ms linear;
+  // A static glow marks where the build has reached. The bar clips it everywhere but the
+  // leading edge, so it reads as a head on the fill rather than an outline around it. Width
+  // rather than scaleX, because a transform squashes the shadow along with the box.
+  box-shadow: 0 0 6px 1px var(--tutorial-glow);
 }
 .transmissionFleet {
   margin-top: 0;
@@ -4972,7 +4955,6 @@ $sizemap: (
   border-radius: 8px;
 }
 .base_main .manual-group,
-.base_main .tutorialSpotlightEyebrow,
 .base_main .missionSectionHeader {
   text-transform: none;
   letter-spacing: 0;
@@ -5372,5 +5354,52 @@ $sizemap: (
   }
   .facilityReady::after {
     opacity: 0;
+  }
+}
+
+// Each requirement is a stacked block: the goal and its state on one line, then where it
+// stands, then what it takes. Before this the dt and both dds ran together as one paragraph.
+.missionRequirements {
+  margin: 0;
+
+  dt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  dd {
+    margin: 2px 0 0;
+  }
+
+  .missionRequirementTarget {
+    color: $font_color_faded;
+    font-size: 0.875rem;
+  }
+}
+
+.missionRequirementStatus {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: $font_color_faded;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  // The word carries the state on its own; the colour is a second, faster read of it
+  &[data-status="failed"] {
+    border-color: var(--delta-bad);
+    color: var(--delta-bad);
+  }
+
+  &[data-status="completed"] {
+    border-color: var(--delta-good);
+    color: var(--delta-good);
   }
 }

@@ -170,7 +170,7 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         />
         <BuildMetric
           label="At full power"
-          value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} h`}
+          value={`${Number((storage.peakWh / storage.peakW).toFixed(1))} hr`}
         />
         <BuildMetric
           label="Round-trip efficiency"
