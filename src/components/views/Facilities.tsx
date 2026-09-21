@@ -50,7 +50,6 @@ import {
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import FacilityDetails from "../base/FacilityDetails";
-import { LOW_RESERVOIR_FRACTION } from "../../helpers/HydroOutlook";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
 import { combineStoryEffects } from "../../data/WorldEvents";
@@ -136,6 +135,13 @@ const ACTIVITY_LABELS: { [k in FacilityActivityType]: string } = {
   CHARGING: "charging",
   DISCHARGING: "discharging",
 };
+
+// Display only: the row turns its reservoir reading red when the *displayed* integer falls below
+// this, so the number and its colour always agree -- which puts the effective cutoff at 19.5%,
+// the point where rounding first lands on 19. Deliberately above LOW_RESERVOIR_FRACTION
+// (HydroOutlook), which marks the point where output is already being held back and drives the
+// "Nearly empty." forecast lead -- the row warns before that bites.
+const RESERVOIR_WARNING_FRACTION = 0.2;
 
 function FacilityActions(props: {
   facility: FacilityOperatingType;
@@ -347,23 +353,21 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   } else {
     reading = formatWattsOfPeak(facility.currentW, facility.peakW);
     if (fuel === "Hydro" && facility.reservoirCapacityWh) {
-      const reservoirPercent = Math.round(
-        ((facility.reservoirWh || 0) / facility.reservoirCapacityWh) * 100,
-      );
-      // Near the minimum generating level the dam can't deliver, which is worth seeing without
-      // opening the row. Words carry it too, so the colour is never the only signal.
-      const low =
-        (facility.reservoirWh || 0) / facility.reservoirCapacityWh <=
-        LOW_RESERVOIR_FRACTION;
+      const reservoirFraction =
+        (facility.reservoirWh || 0) / facility.reservoirCapacityWh;
+      const reservoirPercent = Math.round(reservoirFraction * 100);
+      // A dam this far down is heading for the minimum generating level, which is worth seeing
+      // without opening the row. The reading turns red, and an off-screen "low" carries the
+      // same message for anyone who can't use the colour.
+      const low = reservoirPercent < RESERVOIR_WARNING_FRACTION * 100;
       // Only one of these shows, picked by how wide the row is
       detail = (
         <span className={low ? "facilityStatusLow" : undefined}>
           <span className="facilityStatusLong">
-            reservoir {reservoirPercent}%{low ? " · nearly empty" : ""}
+            reservoir {reservoirPercent}%
           </span>
-          <span className="facilityStatusShort">
-            {reservoirPercent}% {low ? "· low" : "full"}
-          </span>
+          <span className="facilityStatusShort">{reservoirPercent}%</span>
+          {low && <span className="srOnly"> low</span>}
         </span>
       );
     }
@@ -524,7 +528,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                       <span
                         className="constructionProgressFill"
                         style={{
-                          transform: `scaleX(${builtFraction})`,
+                          width: `${builtFraction * 100}%`,
                           background: accentColor,
                         }}
                       />

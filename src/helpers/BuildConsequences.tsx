@@ -24,7 +24,7 @@ export function buildConsequenceMessage(
 export function buildStartedMessage(facility: FacilityShoppingType): string {
   if (facility.peakWh) {
     const duration = Math.round((facility.peakWh / facility.peakW) * 10) / 10;
-    return `Started construction on ${duration}h ${formatWatts(facility.peakW)} ${facility.name}`;
+    return `Started construction on ${duration}hr ${formatWatts(facility.peakW)} ${facility.name}`;
   }
   return `Started construction on ${formatWatts(facility.peakW)} ${facility.name}`;
 }

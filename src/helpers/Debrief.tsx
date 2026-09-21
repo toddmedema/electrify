@@ -123,18 +123,6 @@ function scenarioMetrics(
     const afterArrival = months.filter(
       (month) => month.year > 2026 || (month.year === 2026 && month.month >= 1),
     );
-    const firstArrivalYear = afterArrival.filter(
-      (month) => month.year === 2026,
-    );
-    const minimumMargin = firstArrivalYear.reduce<number | undefined>(
-      (minimum, month) =>
-        month.minimumSupplyMarginW === undefined
-          ? minimum
-          : minimum === undefined
-            ? month.minimumSupplyMarginW
-            : Math.min(minimum, month.minimumSupplyMarginW),
-      undefined,
-    );
     return [
       {
         label: "Months with blackouts after data centers arrived",
@@ -152,14 +140,6 @@ function scenarioMetrics(
         label: "Electricity rate",
         value: `${rate(scenario.dollarsPerkWh)} → ${rate(endingRate)}`,
         concept: "rate",
-      },
-      {
-        label: "Smallest reserve · 2026",
-        value:
-          minimumMargin === undefined
-            ? "Not reached"
-            : `${minimumMargin >= 0 ? "+" : "−"}${formatWatts(Math.abs(minimumMargin))}`,
-        concept: "supply",
       },
     ];
   }

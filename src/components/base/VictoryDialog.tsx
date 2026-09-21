@@ -321,7 +321,7 @@ export default function VictoryDialog(props: Props): React.JSX.Element {
           </Button>
         )}
         <Button color="primary" onClick={onQuit}>
-          Choose game
+          New game
         </Button>
         <Button
           color="primary"

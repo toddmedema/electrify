@@ -40,6 +40,6 @@ it("keeps construction event titles focused on what was started", () => {
     hourlyLoss: 0.001,
   };
   expect(buildStartedMessage(storage)).toBe(
-    "Started construction on 4h 200MW Battery",
+    "Started construction on 4hr 200MW Battery",
   );
 });

@@ -32,6 +32,14 @@ export interface MissionRequirement {
   deadline: number;
 }
 
+// A month that fell a hair short must never print as a whole "100%": the reliability
+// objective can require exactly 100% served, and a rounded-up reading would contradict the
+// FAILED chip beside it. Rounding down keeps the number on the honest side of the threshold.
+function formatServed(fraction: number): string {
+  const floored = Math.floor(fraction * 1000) / 10;
+  return Number.isInteger(floored) ? `${floored}%` : `${floored.toFixed(1)}%`;
+}
+
 export function completedMissionHistory(game: GameType): MonthlyHistoryType[] {
   const current = absoluteMonth(game.date.year, game.date.monthNumber);
   return game.monthlyHistory
@@ -71,15 +79,15 @@ export function getMissionStatus(game: GameType) {
     requirements.push({
       id: "reliability",
       label: objective.label,
-      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : `${(minimum * 100).toFixed(2)}%`})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
+      compact: `Demand served ≥ ${Math.round(objective.minimumDemandServed * 100)}% (${minimum === undefined ? "pending" : formatServed(minimum)})${missing || (monthsRemaining === 0 && observed < count) ? " · incomplete history" : ""}`,
       current:
         (minimum === undefined
           ? "No completed event months"
-          : `${(minimum * 100).toFixed(2)}% minimum served · ${observed}/${count} completed months`) +
+          : `Lowest ${formatServed(minimum)} · ${observed} of ${count} months counted`) +
         (missing || (monthsRemaining === 0 && observed < count)
-          ? " · Missing required history: not verifiable"
+          ? " · history incomplete, not verifiable"
           : ""),
-      target: `Serve at least ${Math.round(objective.minimumDemandServed * 100)}% of demand in each required month`,
+      target: `Every required month needs ${Math.round(objective.minimumDemandServed * 100)}% served`,
       timing: `Completed months ${objective.month}/${objective.year}–${((first + count - 1) % 12) + 1}/${Math.floor((first + count - 1) / 12)}; checked at term end`,
       status: missing
         ? "unknown"
@@ -108,7 +116,7 @@ export function getMissionStatus(game: GameType) {
       current: now
         ? `${Math.round(now.customers).toLocaleString()} current customers`
         : "Current customers unavailable",
-      target: `At least ${Math.ceil(threshold).toLocaleString()} customers (${Math.round(scenario.minimumCustomerRetention * 100)}% of starting customers)`,
+      target: `Keep ${Math.ceil(threshold).toLocaleString()} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
       timing: "Required at term end; current customers can still change",
       status: now ? "in-progress" : "unknown",
       deadline: end,
@@ -120,8 +128,8 @@ export function getMissionStatus(game: GameType) {
       id: "decisions",
       label: "Meaningful decisions",
       compact: `Decisions ≥ ${gate.count} (${game.meaningfulDecisions.length}) · Categories ≥ ${gate.categories} (${meaningfulDecisionCategoryCount(game.meaningfulDecisions)})`,
-      current: `${game.meaningfulDecisions.length} retained decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
-      target: `${gate.count} decisions across ${gate.categories} categories; reverting a decision removes it`,
+      current: `${game.meaningfulDecisions.length} decisions across ${meaningfulDecisionCategoryCount(game.meaningfulDecisions)} categories`,
+      target: `Needs ${gate.count} decisions across ${gate.categories} categories; reverting one removes it`,
       timing: "Required at term end",
       status: game.meaningfulDecisionGateWaived ? "waived" : "in-progress",
       deadline: end,
@@ -134,7 +142,7 @@ export function getMissionStatus(game: GameType) {
     current: now
       ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
       : "Current cash unavailable",
-    target: "Cash must be at least $0 at each month-end check",
+    target: "Cash must be $0 or more at every month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",
@@ -150,17 +158,23 @@ export function getMissionStatus(game: GameType) {
   requirements.push({
     id: "survival",
     label: "Avoid chronic blackouts",
-    compact: `Avoid 3 consecutive months < 90% served (${latest.length ? latest.map((row) => `${(demandServed(row) * 100).toFixed(1)}%`).join(", ") : "no completed months"})`,
+    compact: `Avoid 3 consecutive months < 90% served (${
+      latest.length
+        ? latest
+            .slice()
+            .reverse()
+            .map((row) => formatServed(demandServed(row)))
+            .join(", ")
+        : "no completed months"
+    })`,
     current: latest.length
-      ? latest
-          .map(
-            (row) =>
-              `${row.month}/${row.year}: ${(demandServed(row) * 100).toFixed(1)}% served`,
-          )
-          .join(" · ")
+      ? `Last ${latest.length === 1 ? "month" : `${latest.length} months`}: ${latest
+          .slice()
+          .reverse()
+          .map((row) => formatServed(demandServed(row)))
+          .join(" · ")}`
       : "No completed months",
-    target:
-      "Supply below 90% of demand in each of the latest three completed months ends the term",
+    target: "Ends if under 90% served 3 months in a row",
     timing:
       "Checked at month end; current ticks are not completed-month results",
     status: consecutive

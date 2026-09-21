@@ -67,7 +67,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   });
   expect(requirement(partial, "reliability").status).toBe("in-progress");
   expect(requirement(partial, "reliability").current).toContain(
-    "1/2 completed months",
+    "1 of 2 months counted",
   );
   const completed = createNextState(fixture(14), (g) => {
     g.monthlyHistory = [monthRow(2025, 2), monthRow(2025, 1)];
@@ -78,7 +78,7 @@ test("wildfire window is pending, partial, complete or failed using completed mo
   });
   expect(requirement(failed, "reliability").status).toBe("failed");
   expect(getMissionStatus(failed).prominent?.id).toBe("reliability");
-  expect(getMissionStatus(failed).headline?.compact).toContain("(99.00%)");
+  expect(getMissionStatus(failed).headline?.compact).toContain("(99%)");
   expect(scenarioObjectiveFailure(wildfire, failed.monthlyHistory)).toContain(
     "99.00%",
   );
@@ -132,7 +132,7 @@ test("survival is chronological completed evidence and ignores current partial h
   });
   expect(requirement(game, "survival").status).toBe("failed");
   expect(requirement(game, "survival").compact).toBe(
-    "Avoid 3 consecutive months < 90% served (80.0%, 80.0%, 80.0%)",
+    "Avoid 3 consecutive months < 90% served (80%, 80%, 80%)",
   );
   expect(requirement(game, "cash").timing).toContain(
     "negative cash now is a warning",
@@ -183,7 +183,7 @@ test("decision gates use retained categories, waiver and tutorial/custom rules",
     ];
   });
   expect(requirement(game, "decisions").current).toContain(
-    "1 retained decisions across 1 categories",
+    "1 decisions across 1 categories",
   );
   expect(requirement(game, "decisions").compact).toBe(
     "Decisions ≥ 10 (1) · Categories ≥ 4 (1)",

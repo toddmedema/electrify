@@ -22,11 +22,25 @@ import VictoryConditions from "./VictoryConditions";
 import CustomerGrowthChallenge from "./CustomerGrowthChallenge";
 import { formatScore, SCORE_LABELS } from "./VictoryDialog";
 import { getMissionStatus } from "../../helpers/MissionStatus";
+import type { MissionRequirement } from "../../helpers/MissionStatus";
 
 export interface Props {
   open: boolean;
   game: GameType;
   onClose: () => void;
+}
+
+const STATUS_LABELS: Record<MissionRequirement["status"], string> = {
+  pending: "Not started",
+  "in-progress": "In progress",
+  completed: "Met",
+  failed: "Failed",
+  unknown: "Unknown",
+  waived: "Waived",
+};
+
+function statusLabel(status: MissionRequirement["status"]): string {
+  return STATUS_LABELS[status];
 }
 
 /** An in-game reminder of the mission and its score through completed months. */
@@ -183,12 +197,19 @@ export default function ScenarioDetailsDialog(props: Props): React.JSX.Element {
               {mission.requirements.map((requirement) => (
                 <React.Fragment key={requirement.id}>
                   <Typography component="dt" sx={{ mt: 2, fontWeight: 700 }}>
-                    {requirement.label} · {requirement.status.replace("-", " ")}
+                    {requirement.label}{" "}
+                    <span
+                      className="missionRequirementStatus"
+                      data-status={requirement.status}
+                    >
+                      {statusLabel(requirement.status)}
+                    </span>
                   </Typography>
-                  <Typography component="dd" sx={{ m: 0 }}>
-                    {requirement.current}
-                  </Typography>
-                  <Typography component="dd" sx={{ m: 0 }}>
+                  <Typography component="dd">{requirement.current}</Typography>
+                  <Typography
+                    component="dd"
+                    className="missionRequirementTarget"
+                  >
                     {requirement.target}
                   </Typography>
                 </React.Fragment>

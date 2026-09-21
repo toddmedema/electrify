@@ -37,7 +37,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
   const rows = pane.locator(".facilityRow");
   await expect(rows.getByText(/^Building \d+%/)).toBeVisible();
   await expect(
-    rows.getByText(/^(reservoir \d+%|\d+% full)$/).filter({ visible: true }),
+    rows.getByText(/^(reservoir )?\d+%$/).filter({ visible: true }),
   ).toBeVisible();
   await expect(
     rows.getByText(/Wh · (charging|discharging|idle)/),
