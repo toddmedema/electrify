@@ -73,10 +73,13 @@ export interface TransmissionLineOperatingType {
   loanMonthlyPayment: number;
   interestRate: number;
   /**
-   * Net power over this line as of the last real tick: positive importing, negative selling.
-   * Derived display state rather than a decision, and written only on real ticks -- the same
-   * caveat facility.currentW carries, since forecasts and month-boundary pre-rolls dispatch
-   * against hypothetical weather. Absent until the first tick after construction finishes.
+   * Net power over this line as of the most recent dispatch of the current tick: positive
+   * importing, negative selling. Derived display state rather than a decision. A real tick
+   * writes it, and so does the reforecast any player action triggers, which re-dispatches the
+   * current tick against that action -- important because the clock is paused for most of
+   * them. The month-boundary and startup pre-rolls are the one dispatch that must not write
+   * it: they re-run the same tick four times over the live fleet. Set to 0 the moment the line
+   * is ordered, so it is only genuinely absent on saves written before this field existed.
    */
   currentFlowW?: number;
 }

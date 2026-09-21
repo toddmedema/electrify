@@ -7,10 +7,13 @@ import { chartPalette, withAlpha } from "../../Theme";
  * power moving out. Both directions fill from the left edge at |flow| / rating, which keeps one
  * bar grammar across generator, storage and intertie rows and keeps full resolution at 320px.
  *
- * Direction is carried by three redundant channels rather than hue alone (WCAG 1.4.1): the
- * colour, a diagonal hatch, and -- outside this component -- the row's own signed reading and
- * the up/down activity badge on the icon. That matters most at 100%, where a reverse bar and a
- * forward bar cover exactly the same pixels.
+ * Direction needs more than hue (WCAG 1.4.1), and most of all at 100%, where a reverse bar
+ * and a forward bar cover exactly the same pixels. This component contributes the colour and a
+ * diagonal hatch; the rest is the row's, and differs by row. A storage row reads out stored
+ * energy, which never goes negative, so its direction rides on the up/down activity badge over
+ * its icon and the "charging"/"discharging" it appends to the reading. An intertie row has no
+ * badge -- its icon is a bare decorative image -- and carries direction in its signed reading
+ * and in the row button's own accessible name.
  *
  * Forward flow keeps the compositor-friendly `scaleX` it has always used. Reverse flow sizes
  * with `width` instead, because `scaleX` squashes the hatch along with the fill -- the same

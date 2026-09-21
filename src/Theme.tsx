@@ -157,7 +157,7 @@ interface ChartPaletteType {
 const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   light: {
     storage: blue[800],
-    intertie: "#455a64", // blueGrey800, 8.0:1 on white and clear of every fuel hue
+    intertie: "#455a64", // blueGrey800, 7.24:1 on white and clear of every fuel hue
     demand: grey[900],
     supply: blue[600],
     historicFill: blue[50],
@@ -183,7 +183,7 @@ const CHART_PALETTES: { [mode in ThemeModeType]: ChartPaletteType } = {
   },
   dark: {
     storage: blue[300],
-    intertie: "#90a4ae", // blueGrey300, 7.7:1 on #0f161f
+    intertie: "#90a4ae", // blueGrey300, 7.37:1 on --bg-primary #0b1016 (7.02:1 on the #0f161f chart surface)
     // Near-white demand used to glare against the plot and visually overpower supply. This
     // cooler off-white still clears 13:1 while behaving like a peer rather than a highlight.
     demand: "#dce6f0",

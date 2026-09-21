@@ -497,7 +497,7 @@ describe("unified connections", () => {
     await user.click(screen.getByText(game.transmission!.lines[0].name));
     expect(
       screen.getByRole("button", {
-        name: `Inspect ${game.transmission!.lines[0].name}`,
+        name: `Inspect ${game.transmission!.lines[0].name}, no power flowing`,
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
