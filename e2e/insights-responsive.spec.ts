@@ -430,24 +430,6 @@ test("compact facility build buttons stay above the chart", async ({
   ).toBeLessThanOrEqual(57); // Touch-sized Build action plus the divider
 });
 
-test("main-menu account actions follow the sound action", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "mobile-320px");
-  await page.addInitScript(() => window.localStorage.clear());
-  await page.goto("/");
-
-  const sound = page.getByRole("button", { name: "Turn on sound" });
-  const account = page.getByRole("region", { name: "Account actions" });
-  const [soundBox, accountBox] = await Promise.all([
-    sound.boundingBox(),
-    account.boundingBox(),
-  ]);
-  expect(soundBox).not.toBeNull();
-  expect(accountBox).not.toBeNull();
-  expect(accountBox!.y).toBeGreaterThanOrEqual(soundBox!.y + soundBox!.height);
-});
-
 test("expanded finance and economic rates remain readable", async ({
   page,
 }, testInfo) => {

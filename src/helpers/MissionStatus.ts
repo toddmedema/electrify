@@ -115,7 +115,7 @@ export function getMissionStatus(game: GameType) {
       current: now
         ? `${Math.round(now.customers).toLocaleString()} current customers`
         : "Current customers unavailable",
-      target: `Keep ${Math.round(scenario.minimumCustomerRetention * 100)}% of your starting customers: ${Math.ceil(threshold).toLocaleString()}`,
+      target: `Keep ${Math.ceil(threshold).toLocaleString()} customers · ${Math.round(scenario.minimumCustomerRetention * 100)}% of where you started`,
       timing: "Required at term end; current customers can still change",
       status: now ? "in-progress" : "unknown",
       deadline: end,
@@ -141,7 +141,7 @@ export function getMissionStatus(game: GameType) {
     current: now
       ? `$${Math.round(now.cash).toLocaleString()} now (partial month)`
       : "Current cash unavailable",
-    target: "Cash must be $0 or more at every month end",
+    target: "Cash must be $0 or more at every month-end",
     timing:
       "Checked at month end; negative cash now is a warning, not a final outcome",
     status: "in-progress",
