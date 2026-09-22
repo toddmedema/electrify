@@ -2585,13 +2585,14 @@ html[data-theme="dark"] .uplot {
 
     .homeEnergyPulse {
       fill: none;
-      stroke: var(--interactive-blue);
+      stroke: var(--tutorial-glint);
       stroke-width: 1.2;
       stroke-linecap: round;
+      filter: drop-shadow(0 0 1px var(--tutorial-glow));
       stroke-dasharray: 16 100;
       stroke-dashoffset: 16;
       opacity: 0;
-      animation: homeEnergySweep 1.6s ease-in-out 2;
+      animation: homeEnergySweep 10s ease-in-out infinite;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -4405,11 +4406,11 @@ $sizemap: (
     stroke-dashoffset: 16;
     opacity: 0;
   }
-  10%,
-  65% {
-    opacity: 0.8;
+  1%,
+  5% {
+    opacity: 1;
   }
-  75%,
+  6%,
   100% {
     stroke-dashoffset: -100;
     opacity: 0;

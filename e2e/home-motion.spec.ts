@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 for (const theme of ["light", "dark"]) {
-  test(`home motion settles without moving the logo or actions in ${theme} mode`, async ({
+  test(`home arc glints briefly between long quiet intervals in ${theme} mode`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -17,7 +17,7 @@ for (const theme of ["light", "dark"]) {
     const result = await trace.evaluate(async (element) => {
       const pulse = element.firstElementChild!;
       const animation = pulse.getAnimations()[0];
-      if (!animation) throw new Error("Expected the home entrance animation");
+      if (!animation) throw new Error("Expected the home arc animation");
       animation.pause();
       await Promise.all([
         document.fonts.ready,
@@ -35,31 +35,36 @@ for (const theme of ["light", "dark"]) {
             height: rect.height,
           };
         });
-      animation.currentTime = 320;
       const before = bounds();
-      const firstPosition = getComputedStyle(pulse).strokeDashoffset;
-      animation.currentTime = 800;
-      const secondPosition = getComputedStyle(pulse).strokeDashoffset;
-      const endTime = animation.effect!.getComputedTiming().endTime;
-      animation.play();
-      await animation.finished;
+      const sample = (time: number) => {
+        animation.currentTime = time;
+        const style = getComputedStyle(pulse);
+        return { offset: style.strokeDashoffset, opacity: style.opacity };
+      };
+      const first = sample(150);
+      const second = sample(450);
+      const quiet = [600, 1500, 5000, 9900].map(sample);
+      const nextSweep = sample(10150);
+      const timing = animation.effect!.getComputedTiming();
       return {
         before,
         after: bounds(),
-        firstPosition,
-        secondPosition,
-        endTime,
-        opacity: getComputedStyle(pulse).opacity,
-        running: pulse
-          .getAnimations()
-          .some((item) => item.playState === "running"),
+        first,
+        second,
+        quiet,
+        nextSweep,
+        duration: timing.duration,
+        recurring: timing.iterations === Infinity,
       };
     });
-    expect(result.firstPosition).not.toBe(result.secondPosition);
-    expect(result.endTime).toBeLessThanOrEqual(3200);
+    expect(result.first.offset).not.toBe(result.second.offset);
+    expect(Number(result.first.opacity)).toBeGreaterThan(0);
+    expect(Number(result.second.opacity)).toBeGreaterThan(0);
+    expect(result.quiet.every((sample) => sample.opacity === "0")).toBe(true);
+    expect(result.nextSweep).toEqual(result.first);
+    expect(result.duration).toBe(10000);
+    expect(result.recurring).toBe(true);
     expect(result.after).toEqual(result.before);
-    expect(result.opacity).toBe("0");
-    expect(result.running).toBe(false);
     await expect(
       page.getByRole("button", { name: "Start playing" }),
     ).toBeEnabled();
