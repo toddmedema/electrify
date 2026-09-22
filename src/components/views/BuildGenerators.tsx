@@ -62,7 +62,6 @@ import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import {
   getBuildAvailability,
   getSiteInventory,
-  shortPlaceName,
   siteCountLabel,
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
@@ -1031,11 +1030,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
           return (
             <React.Fragment key={g.name}>
               {showPrimer && g.name === "Hydro" && hydroSites && (
-                <HydroPrimer
-                  place={shortPlaceName(game.location)}
-                  totalSites={hydroSites.total}
-                  onDismiss={dismissPrimer}
-                />
+                <HydroPrimer onDismiss={dismissPrimer} />
               )}
               <GeneratorBuildItem
                 hydroAvailability={

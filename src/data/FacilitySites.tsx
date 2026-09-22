@@ -70,6 +70,16 @@ export const PUMPED_HYDRO_SITES_BY_LOCATION: Readonly<Record<string, number>> =
     // Keep newly playable global locations explicit. Detailed ANU point exports for these
     // regions are available only by request, so do not invent buildable sites from the map.
     Madrid: 0,
+    Ahmedabad: 0,
+    Antananarivo: 0,
+    Bengaluru: 0,
+    CapeTown: 0,
+    Chennai: 0,
+    Durban: 0,
+    Hyderabad: 0,
+    Kolkata: 0,
+    Mumbai: 0,
+    PortLouis: 0,
     Beijing: 0,
     Anchorage: 0,
     Asuncion: 0,

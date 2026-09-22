@@ -21,8 +21,6 @@ export function useHydroPrimer(): [boolean, () => void] {
 }
 
 export default function HydroPrimer(props: {
-  place: string;
-  totalSites: number;
   onDismiss: () => void;
 }): React.JSX.Element {
   const titleId = React.useId();
@@ -32,9 +30,7 @@ export default function HydroPrimer(props: {
         About Hydro
       </Typography>
       <Typography variant="body2">
-        {props.totalSites} {props.totalSites === 1 ? "site" : "sites"} near{" "}
-        {props.place}. Each plant uses a whole site. Reservoirs refill from rain
-        and snowmelt.
+        Each plant uses a whole site. Reservoirs refill from rain and snowmelt.
       </Typography>
       <Button size="small" onClick={props.onDismiss}>
         Got it
