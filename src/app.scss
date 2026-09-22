@@ -2569,6 +2569,38 @@ html[data-theme="dark"] .uplot {
       padding: $space-4 24px 0;
     }
 
+    .homeLogo {
+      position: relative;
+      max-width: 680px;
+      margin: auto;
+    }
+
+    .homeEnergyTrace {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .homeEnergyPulse {
+      fill: none;
+      stroke: var(--tutorial-glint);
+      stroke-width: 1.2;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 1px var(--tutorial-glow));
+      stroke-dasharray: 16 100;
+      stroke-dashoffset: 16;
+      opacity: 0;
+      animation: homeEnergySweep 10s ease-in-out infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .homeEnergyPulse {
+        animation: none;
+      }
+    }
+
     #centeredMenu {
       flex: 1 0 auto;
       display: flex;
@@ -4369,6 +4401,22 @@ $sizemap: (
 }
 
 // KEYFRAMES
+@keyframes homeEnergySweep {
+  0% {
+    stroke-dashoffset: 16;
+    opacity: 0;
+  }
+  1%,
+  5% {
+    opacity: 1;
+  }
+  6%,
+  100% {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
+}
+
 @keyframes fadein {
   from {
     opacity: 0;
@@ -4970,6 +5018,7 @@ $sizemap: (
   margin-top: auto;
   padding-top: 32px;
 }
+
 .base_main #menuCard #centeredMenu {
   flex: 0 0 auto;
   padding-top: 24px;
