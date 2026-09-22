@@ -32,6 +32,7 @@ jest.mock("../base/GameCard", () => ({
 }));
 
 interface ChartMockProps {
+  currentMinute?: number;
   title?: string;
   hideTitle?: boolean;
   id?: string;
@@ -158,13 +159,14 @@ jest.mock("../base/ChartForecastSupplyByFuel", () => ({
 }));
 jest.mock("../base/ChartForecastSupplyDemand", () => ({
   __esModule: true,
-  default: ({ syncKey, timeline, domain }: ChartMockProps) => {
+  default: ({ syncKey, timeline, domain, currentMinute }: ChartMockProps) => {
     mockSupplyDemandPaints++;
     return (
       <div
         role="img"
         data-chart="supply-demand"
         data-testid="supply-demand-chart"
+        data-forecast-start={currentMinute}
         data-sync-key={syncKey}
         data-points={timeline?.length}
         data-domain={domainValue(domain)}
@@ -500,6 +502,8 @@ describe("Insights layers", () => {
     const calls = generate.mock.calls.length;
 
     const nextTick = cloneDeep(game);
+    // Immer preserves completed history during ordinary ticks.
+    nextTick.monthlyHistory = game.monthlyHistory;
     nextTick.date = { ...nextTick.date, minute: nextTick.date.minute + 15 };
     nextTick.facilities.forEach((facility) => {
       if (facility.yearsToBuildLeft > 0) facility.yearsToBuildLeft -= 0.001;
@@ -1167,3 +1171,31 @@ function labelledButton(label: string | RegExp): HTMLElement {
   expect(isInaccessible(button)).toBe(false);
   return button;
 }
+
+it("does not relabel cached simulated samples as recorded history as time advances", () => {
+  localStorage.clear();
+  localStorage.setItem("insightsLayers", JSON.stringify(["supplyDemand"]));
+  const game = createGame({ scenarioId: 100 });
+  const props = {
+    game,
+    selectedFacilityId: null,
+    facilityDragActive: false,
+    onDelta: jest.fn(),
+  };
+  const { rerender } = render(<Insights {...props} />);
+  expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+    "data-forecast-start",
+    "0",
+  );
+  rerender(
+    <Insights
+      {...props}
+      game={{ ...game, date: { ...game.date, minute: 120 } }}
+      selectedFacilityId={game.facilities[0].id}
+    />,
+  );
+  expect(screen.getByTestId("supply-demand-chart")).toHaveAttribute(
+    "data-forecast-start",
+    "0",
+  );
+});

@@ -1,7 +1,16 @@
 import * as React from "react";
 import uPlot from "uplot";
 import UPlotChart, { BuildContext } from "./UPlotChart";
-import { padRange, stepTicks, titlePlugin, xAxis, yAxis } from "./UPlotHelpers";
+import {
+  bandsPlugin,
+  padRange,
+  spansBelow,
+  splitPastProjected,
+  stepTicks,
+  titlePlugin,
+  xAxis,
+  yAxis,
+} from "./UPlotHelpers";
 import {
   axisTicksAreYearly,
   formatMinuteAsMonthAxis,
@@ -26,6 +35,16 @@ export interface Props {
   timeline: ChartData[];
   format: (n: number) => number | string;
   /**
+   * Floors the y axis at this value. Lower points still sit in the data, so the line clips at
+   * the axis and the tooltip and the bands below carry the negative part of the story.
+   */
+  domainMin?: number;
+  /**
+   * Shades the stretches the series spends below zero, and adds this note to a banded month's
+   * tooltip. Cash reads "Cash negative"; profit reads "Loss".
+   */
+  negativeNote?: string;
+  /**
    * Insights draws finance beside operational forecasts. Supplying these puts the financial
    * series on the same minute scale so uPlot can synchronize their cursors honestly.
    */
@@ -42,6 +61,13 @@ interface State {
   domain: [number, number];
   multiyear: boolean;
   startingYear?: number;
+  months: number[];
+  past: Array<number | null>;
+  projected: Array<number | null>;
+  /** Stretches a red band spends below zero, split by what drew it */
+  pastSpans: Array<[number, number]>;
+  projectedSpans: Array<[number, number]>;
+  negativeNote?: string;
 }
 
 /**
@@ -129,14 +155,27 @@ function buildOptions({ getState, scale }: BuildContext<State>): uPlot.Options {
         spanGaps: false,
       },
     ],
-    plugins: [titlePlugin(() => getState().title, 7)],
+    plugins: [
+      titlePlugin(() => getState().title, 7),
+      // The band plugin bails on an empty list, so charts without a note push nothing
+      bandsPlugin(() => getState().pastSpans, chartPalette().blackout, 0.3),
+      bandsPlugin(
+        () => getState().projectedSpans,
+        chartPalette().blackout,
+        // Forecast trouble is a warning about the future, not a fact about the record
+        0.15,
+      ),
+    ],
   };
 }
 
 function tooltip(idx: number, state: State): string {
   const d = state.timeline[idx];
   const monthName = MONTHS[(d.month - 1) % 12];
-  return `${monthName} ${d.year}\n${state.format(d.value)}`;
+  // A banded month says so, since the line itself is clipped at the axis
+  const note =
+    state.negativeNote && d.value < 0 ? `\n${state.negativeNote}` : "";
+  return `${monthName} ${d.year}\n${state.format(d.value)}${note}`;
 }
 
 const ChartFinances = (props: Props): React.JSX.Element => {
@@ -150,25 +189,27 @@ const ChartFinances = (props: Props): React.JSX.Element => {
   const defaultSpan = minuteScale ? 11 * MINUTES_PER_MONTH : 11;
   const rangeMin = props.domain?.[0] ?? firstX;
   const rangeMax = props.domain?.[1] ?? Math.max(rangeMin + defaultSpan, lastX);
-  // One aligned x per month, with each half of the series blanked out where the other one runs,
-  // so that recorded months draw solid and projected ones dashed
   const months = new Array<number>(props.timeline.length);
-  const past = new Array<number | null>(props.timeline.length);
-  const projected = new Array<number | null>(props.timeline.length);
-  let lastPast = -1;
   props.timeline.forEach((d: ChartData, i: number) => {
     domainMin = Math.min(domainMin, d.value);
     domainMax = Math.max(domainMax, d.value);
     months[i] = xValue(d);
-    past[i] = d.projected ? null : d.value;
-    projected[i] = d.projected ? d.value : null;
-    if (!d.projected) {
-      lastPast = i;
-    }
   });
-  // The projection picks up where the record leaves off, rather than starting a month adrift
-  if (lastPast > -1 && lastPast + 1 < props.timeline.length) {
-    projected[lastPast] = props.timeline[lastPast].value;
+  // One aligned x per month, with each half of the series blanked out where the other one runs,
+  // so that recorded months draw solid and projected ones dashed; the dashed half starts at the
+  // last recorded point, so the halves meet
+  const split = splitPastProjected(
+    props.timeline.map((d) => d.value),
+    props.timeline.map((d) => d.projected),
+  );
+  // The floor holds only when the data would sink below it; the headroom then pads the visible
+  // span, and the part below the floor carries as a band and a tooltip note instead
+  let domain = padRange(
+    props.domainMin != null ? Math.max(domainMin, props.domainMin) : domainMin,
+    domainMax,
+  );
+  if (props.domainMin != null && domain[0] < props.domainMin) {
+    domain = [props.domainMin, domain[1]];
   }
   const multiyear =
     rangeMax - rangeMin > (minuteScale ? 12 * MINUTES_PER_MONTH : 12);
@@ -178,9 +219,17 @@ const ChartFinances = (props: Props): React.JSX.Element => {
     title: props.hideTitle ? "" : props.title,
     format: props.format,
     range: [rangeMin, rangeMax],
-    domain: padRange(domainMin, domainMax),
+    domain,
     multiyear,
     startingYear: props.startingYear,
+    months,
+    past: split.past,
+    projected: split.projected,
+    pastSpans: props.negativeNote ? spansBelow(months, split.past) : [],
+    projectedSpans: props.negativeNote
+      ? spansBelow(months, split.projected)
+      : [],
+    negativeNote: props.negativeNote,
   };
 
   return (
@@ -190,7 +239,7 @@ const ChartFinances = (props: Props): React.JSX.Element => {
       id={props.id || "chartFinances"}
       height={props.height}
       state={state}
-      data={[months, past, projected]}
+      data={[months, split.past, split.projected]}
       seriesLabels={[`Past ${props.title}`, `Forecast ${props.title}`]}
       buildOptions={buildOptions}
       syncKey={props.syncKey}

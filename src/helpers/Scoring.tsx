@@ -75,6 +75,39 @@ export function publicRateScoreChange(
   return after - before;
 }
 
+/**
+ * The points a year of sales at `rate` contributes to a public utility's lifetime rate score.
+ *
+ * The final score decomposes exactly as a supply-weighted sum over the years played, and this is
+ * one term of that sum: `PUBLIC_RATE_POINTS_PER_CENT * 100 * (target - rate) * share`, where
+ * `share` is how much of the lifetime energy the coming year makes up. Two properties follow:
+ *
+ * - The sign is always the sign of `target - rate`. A rate above target reads as a loss every
+ *   year it is in force, no matter what the lifetime average did last period, which is what the
+ *   change-based figure below got wrong.
+ * - The magnitude shrinks as the record lengthens: a year of sales still matters, but less, the
+ *   more has already been sold.
+ *
+ * The end-of-run score itself is judged on the lifetime average and is untouched by this; this
+ * is the display's term for the year the player is choosing a rate for.
+ */
+export function publicRateYearContribution(
+  targetRate: number,
+  past: Pick<MonthlyHistoryType, "supplyWh">,
+  next: Pick<MonthlyHistoryType, "supplyWh">,
+  rate: number,
+): number {
+  const lifetimeWh = past.supplyWh + next.supplyWh;
+  if (lifetimeWh <= 0) {
+    // Nothing sold means no rate to judge, so the category stays neutral
+    return 0;
+  }
+  const share = next.supplyWh / lifetimeWh;
+  return Math.round(
+    PUBLIC_RATE_POINTS_PER_CENT * 100 * (targetRate - rate) * share,
+  );
+}
+
 export function totalScore(breakdown: ScoreBreakdownType): number {
   return Object.values(breakdown).reduce((a, b) => a + b, 0);
 }
