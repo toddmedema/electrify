@@ -21,7 +21,13 @@ import {
   setStorageKeyValue,
 } from "./LocalStorage";
 import { snackbarOpen } from "./reducers/UI";
-import { GameType, TransmissionLineOperatingType } from "./Types";
+import { INTERTIE_UPGRADE_STEP, MAX_INTERTIE_UPGRADES } from "./Constants";
+import {
+  GameType,
+  IntertieUpgradeType,
+  TransmissionCorridorDefinitionType,
+  TransmissionLineOperatingType,
+} from "./Types";
 import { validMeaningfulDecisions } from "./helpers/MeaningfulDecisions";
 import {
   emptyTransmissionState,
@@ -60,6 +66,65 @@ export interface SaveGameType {
 // and never an alias of the live (and still mutating) game slice.
 let cached: SaveGameType | null | undefined;
 
+// 1.5 ** 3, the most upgrades a corridor allows. Cost is checked against the same bound rather
+// than against the exact ladder: the escalation makes each step dearer than the last, so an
+// honest three-times-widened line sits well inside this while nothing arbitrary does.
+const MAX_UPGRADED_COST_MULTIPLE = Math.pow(
+  INTERTIE_UPGRADE_STEP,
+  MAX_INTERTIE_UPGRADES,
+);
+
+/**
+ * Capacity must be the corridor's authored rating times a whole number of upgrade steps, within
+ * the allowed count. Compared as a ratio rather than by equality: the reducer compounds
+ * `capacityW * 1.5` one upgrade at a time, and recomputing the same power here is a different
+ * floating-point operation that need not agree to the last bit.
+ */
+function validUpgradedCapacity(capacityW: number, corridorW: number): boolean {
+  if (!(corridorW > 0) || !(capacityW > 0)) return false;
+  const steps = Math.round(
+    Math.log(capacityW / corridorW) / Math.log(INTERTIE_UPGRADE_STEP),
+  );
+  if (steps < 0 || steps > MAX_INTERTIE_UPGRADES) return false;
+  return (
+    Math.abs(
+      capacityW / (corridorW * Math.pow(INTERTIE_UPGRADE_STEP, steps)) - 1,
+    ) <= 1e-9
+  );
+}
+
+function validUpgrade(
+  raw: unknown,
+  capacityW: number,
+  corridor: TransmissionCorridorDefinitionType,
+): boolean {
+  if (raw === undefined) return true;
+  if (typeof raw !== "object" || raw === null) return false;
+  const upgrade = raw as Partial<IntertieUpgradeType>;
+  if (
+    ![
+      upgrade.targetCapacityW,
+      upgrade.buildCost,
+      upgrade.annualOperatingCost,
+      upgrade.yearsToBuild,
+      upgrade.yearsToBuildLeft,
+    ].every(
+      (value) =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    )
+  )
+    return false;
+  return (
+    upgrade.yearsToBuildLeft! <= upgrade.yearsToBuild! &&
+    upgrade.yearsToBuild! <= corridor.yearsToBuild &&
+    // The job in flight must be the next rung of the same ladder the line is standing on, so a
+    // save cannot hand itself an arbitrary rating by way of a pending upgrade.
+    validUpgradedCapacity(upgrade.targetCapacityW!, corridor.capacityW) &&
+    upgrade.targetCapacityW! > capacityW &&
+    upgrade.buildCost! <= corridor.buildCost * MAX_UPGRADED_COST_MULTIPLE
+  );
+}
+
 function validTransmissionLine(
   raw: unknown,
 ): raw is TransmissionLineOperatingType {
@@ -88,10 +153,18 @@ function validTransmissionLine(
       (value) =>
         typeof value === "number" && Number.isFinite(value) && value >= 0,
     ) &&
-    line.capacityW === corridor.capacityW &&
-    line.buildCost === corridor.buildCost &&
-    line.annualOperatingCost === corridor.annualOperatingCost &&
+    validUpgradedCapacity(line.capacityW!, corridor.capacityW) &&
+    // A widened line has paid for its upgrades on top of the corridor's authored price and
+    // costs more to run, so neither can be asserted equal any more. Both are still bounded by
+    // what the ladder above could possibly have cost: an import cannot claim a cheap corridor
+    // that somehow carries three times the power for the original price, nor the reverse.
+    line.buildCost! >= corridor.buildCost &&
+    line.buildCost! <= corridor.buildCost * MAX_UPGRADED_COST_MULTIPLE &&
+    line.annualOperatingCost! >= corridor.annualOperatingCost &&
+    line.annualOperatingCost! <=
+      corridor.annualOperatingCost * MAX_UPGRADED_COST_MULTIPLE &&
     line.yearsToBuildLeft! <= corridor.yearsToBuild &&
+    validUpgrade(line.upgrade, line.capacityW!, corridor) &&
     Number.isInteger(line.minuteCreated) &&
     line.interestRate! <= 1 &&
     line.loanAmountLeft! <= corridor.buildCost &&
@@ -102,7 +175,7 @@ function validTransmissionLine(
     (line.currentFlowW === undefined ||
       (typeof line.currentFlowW === "number" &&
         Number.isFinite(line.currentFlowW) &&
-        Math.abs(line.currentFlowW) <= corridor.capacityW)) &&
+        Math.abs(line.currentFlowW) <= line.capacityW!)) &&
     typeof line.financed === "boolean" &&
     (line.financed
       ? line.loanMonthlyPayment! > 0
@@ -118,6 +191,7 @@ function validEmissions(raw: unknown): boolean {
     kgco2e?: number;
     localKgco2e?: number;
     importedKgco2e?: number;
+    constructionKgco2e?: number;
   };
   if (
     ![record.kgco2e, record.localKgco2e, record.importedKgco2e].every(
@@ -126,8 +200,17 @@ function validEmissions(raw: unknown): boolean {
     )
   )
     return false;
+  // Saves written before construction emissions existed have two components rather than three,
+  // and their total is still the sum of what they do carry.
+  const construction = record.constructionKgco2e ?? 0;
+  if (!Number.isFinite(construction) || construction < 0) return false;
   return (
-    Math.abs(record.kgco2e! - record.localKgco2e! - record.importedKgco2e!) <=
+    Math.abs(
+      record.kgco2e! -
+        record.localKgco2e! -
+        record.importedKgco2e! -
+        construction,
+    ) <=
     Math.max(1, record.kgco2e!) * 1e-9
   );
 }

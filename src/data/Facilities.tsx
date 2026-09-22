@@ -112,6 +112,53 @@ function scaledBuildCost(
   return costPerW * (0.25 * referencePeakW + 0.75 * peakW);
 }
 
+/**
+ * Embodied emissions from building one watt of a technology, in the year it is bought. See
+ * docs/construction-emissions.md for the sources behind every figure and for why the exclusions
+ * are drawn where they are.
+ *
+ * Mature technologies hold flat. The three that do not -- solar, batteries and enhanced
+ * geothermal -- decay toward a floor rather than by a flat annual percentage, because a constant
+ * rate compounds a 50 year run down past what the required mass of steel, concrete and silicon
+ * can physically emit. The floor is the part no amount of clean electricity removes: clinker
+ * calcination is a chemical reaction, primary aluminium consumes its carbon anode, silicon is
+ * won by carbothermic reduction, and a drilling rig burns diesel.
+ */
+export function constructionKgco2eCurve(
+  year: number,
+  base: number,
+  referenceYear: number,
+  declineK: number,
+  floor: number,
+): number {
+  if (declineK <= 0 || year <= referenceYear) return base;
+  return floor + (base - floor) * Math.exp(-declineK * (year - referenceYear));
+}
+
+/** 2023 reference, re-based to 2025 so the whole dataset shares one vintage. */
+function solarConstructionKgco2ePerW(year: number): number {
+  return constructionKgco2eCurve(year, 0.6, 2025, 0.055, 0.12);
+}
+
+/**
+ * Published battery figures fell about 12%/yr from 2017, but only around 60% of that is real
+ * manufacturing improvement -- the rest corrected over-conservative early estimates and banked
+ * the one-time shift from nickel-cobalt chemistries to LFP. Neither of those repeats, so the
+ * forward rate is the 3-4%/yr this curve starts at, not the headline.
+ */
+function batteryConstructionKgco2ePerWh(year: number): number {
+  return constructionKgco2eCurve(year, 0.08, 2025, 0.045, 0.025);
+}
+
+/**
+ * Metres drilled per megawatt, not metres per well, governs this. Published EGS assessments
+ * describe 5 MW plants on 5-6 km wells; a modern horizontal field reaches the same capacity with
+ * roughly a quarter of the drilling, and that gap is still closing.
+ */
+function enhancedGeothermalConstructionKgco2ePerW(year: number): number {
+  return constructionKgco2eCurve(year, 1.0, 2025, 0.12, 0.38);
+}
+
 /** Fold variable non-fuel O&M into the annual expense the simulation knows how to charge. */
 function annualOperatingCost(
   peakW: number,
@@ -283,6 +330,7 @@ export function GENERATORS(
       costPerStart: COAL_START_COST_PER_MW_2023 * (peakW / 1000000),
       yearsToBuild: 4 + magnitude / 3,
       // AEO2025 reference lead time is 60 months and operating life is 40 years.
+      constructionKgco2ePerW: 0.32,
       capacityFactor: 0.68,
       // 66% = Max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
       // ~70% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
@@ -311,6 +359,7 @@ export function GENERATORS(
       tracksStarts: true,
       yearsToBuild: 6 + magnitude / 3,
       // AEO2025 reference lead time is 84 months and operating life is 40 years.
+      constructionKgco2ePerW: 0.3,
       capacityFactor: 0.93,
       // 93% = Max value from https://en.wikipedia.org/wiki/Capacity_factor#United_States
       // ~89% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
@@ -341,6 +390,7 @@ export function GENERATORS(
       // $23,100 per equivalent start for its 419 MW H-class simple-cycle reference plant.
       costPerStart: 23100 * (peakW / 419000000),
       yearsToBuild: 2.46 + magnitude / 3,
+      constructionKgco2ePerW: 0.06,
       capacityFactor: 0.45,
       // ~38% duty cycle - https://sunmetrix.com/what-is-capacity-factor-and-how-does-solar-energy-compare/
       // 55% = max value from https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_6_07_a
@@ -377,6 +427,7 @@ export function GENERATORS(
       variableOperatingCostPerMWh: OIL_VARIABLE_OPERATING_COST_PER_MWH,
       yearsToBuild: 1 + magnitude / 3,
       // https://www.eia.gov/outlooks/aeo/assumptions/pdf/table_8.2.pdf
+      constructionKgco2ePerW: 0.15,
       capacityFactor: 0.2,
       // https://www.eia.gov/todayinenergy/detail.php?id=31232
       lifespanYears: 30,
@@ -410,6 +461,7 @@ export function GENERATORS(
       yearsToBuild: 5,
       // 2022 U.S. "other biomass" fleet average; wood was 57.9% in the same table.
       // https://www.eia.gov/electricity/annual/table.php?t=epa_04_08_b.html
+      constructionKgco2ePerW: 0.45,
       capacityFactor: 0.602,
       lifespanYears: 30,
     },
@@ -450,6 +502,7 @@ export function GENERATORS(
       yearsToBuild: 1 + magnitude / 3,
       // EIA AEO2025 reference lead time is 21 months for a 200MW plant.
       spinMinutes: 1,
+      constructionKgco2ePerW: 0.42,
       capacityFactor: windCapacityFactor,
       // Older fleets lose output faster than modern projects. Rounded from the 0.53% and 0.17%
       // annual declines measured across 917 U.S. wind plants.
@@ -482,6 +535,7 @@ export function GENERATORS(
       annualOperatingCost: 0.154 * peakW,
       yearsToBuild: 3 + magnitude / 3,
       spinMinutes: 1,
+      constructionKgco2ePerW: 0.65,
       capacityFactor: offshoreWindCapacityFactor,
       lifespanYears: 25,
     },
@@ -502,6 +556,7 @@ export function GENERATORS(
       annualOperatingCost: 0.0514 * peakW,
       yearsToBuild: 2 + magnitude / 3,
       spinMinutes: 1,
+      constructionKgco2ePerW: 0.2,
       capacityFactor: airborneWindCapacityFactor,
       lifespanYears: 25,
     },
@@ -529,6 +584,7 @@ export function GENERATORS(
       yearsToBuild: 2.27 + magnitude / 3,
       // EIA AEO2025 reference lead time is 36 months for a 150MW plant.
       spinMinutes: 1,
+      constructionKgco2ePerW: solarConstructionKgco2ePerW(year),
       capacityFactor: solarCapacityFactor,
       // A rounded central case: NREL's 2024 ATB spans 0.7%/yr baseline to 0.5%/yr moderate
       // improvement (and 0.2%/yr advanced).
@@ -558,6 +614,7 @@ export function GENERATORS(
         0,
       ),
       yearsToBuild: 5 + magnitude / 2,
+      constructionKgco2ePerW: 2,
       capacityFactor: HYDRO_TARGET_CAPACITY_FACTOR,
       lifespanYears: 50,
       ...hydroSizing(peakW, state.location.watershedId || state.location.id),
@@ -582,6 +639,7 @@ export function GENERATORS(
       yearsToBuild: 3,
       // EIA AEO2025 reference lead time is 36 months and operating life is 40 years.
       spinMinutes: 1,
+      constructionKgco2ePerW: 0.95,
       capacityFactor: 0.88,
       lifespanYears: 40,
     },
@@ -603,6 +661,7 @@ export function GENERATORS(
       tracksStarts: true,
       yearsToBuild: 3 + magnitude / 4,
       spinMinutes: 1,
+      constructionKgco2ePerW: enhancedGeothermalConstructionKgco2ePerW(year),
       capacityFactor: 0.83,
       lifespanYears: 30,
     },
@@ -681,6 +740,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       // Largest was 50MWh in 2016 - https://en.wikipedia.org/wiki/Battery_storage_power_station#Lithium-ion
       // ~2MWh in 2014, 1MWh before that
       // So roughly doubling in max capacity every 4 years after 2018, but a big step function in 2021
+      constructionKgco2ePerWh: batteryConstructionKgco2ePerWh(year),
       lifespanYears: 20,
       // EIA AEO2025 assumes 7,300 equivalent cycles over 20 years.
       roundTripEfficiency: 0.85,
@@ -707,6 +767,7 @@ export function STORAGE(state: GameType, peakWh: number) {
       maxPeakWh: 20000000000,
       // 24GWh, build in 1970's - http://large.stanford.edu/courses/2014/ph240/galvan-lopez2/
       // Resource availability above keeps this out of regions without suitable hydro potential.
+      constructionKgco2ePerWh: 0.06,
       lifespanYears: 75,
       // https://en.wikipedia.org/wiki/Pumped-storage_hydroelectricity#Economic_efficiency
       roundTripEfficiency: 0.8,

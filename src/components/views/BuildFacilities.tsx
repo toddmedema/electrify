@@ -3,7 +3,11 @@ import { IconButton, Tab, Tabs, Toolbar, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
-import { buildTransmissionLine, setTradingPolicy } from "../../reducers/Game";
+import {
+  buildTransmissionLine,
+  setTradingPolicy,
+  upgradeTransmissionLine,
+} from "../../reducers/Game";
 import { snackbarOpen } from "../../reducers/UI";
 import {
   corridorsForLocation,
@@ -111,6 +115,9 @@ export default function BuildFacilities(): React.JSX.Element {
               game={game}
               projectsOnly
               onPolicy={(policy) => dispatch(setTradingPolicy(policy))}
+              onUpgrade={(corridorId, financed) =>
+                dispatch(upgradeTransmissionLine({ corridorId, financed }))
+              }
               onBuild={(corridorId, financed) => {
                 dispatch(buildTransmissionLine({ corridorId, financed }));
                 const corridor = TRANSMISSION_CORRIDORS.find(

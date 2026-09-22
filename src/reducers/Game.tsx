@@ -87,6 +87,7 @@ import {
 import { getFuelPricesPerMBTU } from "../data/FuelPrices";
 import {
   adjacentMarketForCorridor,
+  corridorById,
   corridorsForLocation,
   emptyTransmissionState,
   intertiesEnabledForScenario,
@@ -95,7 +96,9 @@ import {
   adjacentMarketPricePerMWh,
   allocateIntertieFlows,
   clearTransmissionMarket,
+  corridorConstructionKgco2e,
   intertieContextForGame,
+  intertieUpgradeQuote,
   intertieImportLimitW,
   IntertieOffer,
   transmissionRatingW,
@@ -172,6 +175,7 @@ import { clearSaveFor } from "../SaveGame";
 import { recordReplayAction, recordedDelta, serializeReplay } from "../Replay";
 import {
   ActiveWorldEventType,
+  ConstructionEmissions,
   DateType,
   FacilityOperatingType,
   FacilityShoppingType,
@@ -208,6 +212,10 @@ interface ReprioritizeFacilityAction {
   delta: number;
 }
 
+interface UpgradeTransmissionLineAction {
+  corridorId: string;
+  financed: boolean;
+}
 interface BuildTransmissionLineAction {
   corridorId: string;
   financed: boolean;
@@ -1072,6 +1080,14 @@ export const gameSlice = createSlice({
         recordReplayAction(state, "buildTransmissionLine", action.payload);
       }
     },
+    upgradeTransmissionLine: (
+      state,
+      action: PayloadAction<UpgradeTransmissionLineAction>,
+    ) => {
+      if (applyUpgradeTransmissionLine(state, action.payload)) {
+        recordReplayAction(state, "upgradeTransmissionLine", action.payload);
+      }
+    },
     setTradingPolicy: (state, action: PayloadAction<TradingPolicyType>) => {
       if (applyTradingPolicy(state, action.payload)) {
         recordReplayAction(state, "setTradingPolicy", action.payload);
@@ -1301,6 +1317,7 @@ export const {
   initGame,
   buildFacility,
   buildTransmissionLine,
+  upgradeTransmissionLine,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -1541,6 +1558,7 @@ function applyBuildTransmissionLine(
     interestRate: financed ? state.interestRate : 0,
     // Nothing flows until the line is energised, which is years away
     currentFlowW: 0,
+    constructionKgco2eTotal: corridorConstructionKgco2e(corridor),
   };
   state.transmission.lines.push(line);
   recordMeaningfulDecision(state, {
@@ -1554,6 +1572,76 @@ function applyBuildTransmissionLine(
     state,
     "BUILD",
     `Started ${corridor.name}: ${formatWatts(corridor.capacityW)} to ${adjacentMarketForCorridor(corridor.id)?.name}`,
+    {
+      importance: "NOTABLE",
+      actionTarget: { card: "FACILITIES", view: "FLEET" },
+    },
+  );
+  state.timeline = reforecastSupply(state, true);
+  return true;
+}
+
+/**
+ * Widen a line that is already carrying power. The capacity itself does not move until the work
+ * finishes -- crews restring one circuit at a time rather than taking an interconnector out of
+ * service for a year -- so everything here books the money and starts a clock.
+ */
+function applyUpgradeTransmissionLine(
+  state: GameType,
+  payload: Partial<UpgradeTransmissionLineAction>,
+): boolean {
+  if (typeof payload.corridorId !== "string") return false;
+  const line = state.transmission?.lines.find(
+    ({ corridorId }) => corridorId === payload.corridorId,
+  );
+  const now = getTimeFromTimeline(state.date.minute, state.timeline);
+  // Only a finished line can be widened, and only one job at a time.
+  if (!line || !now || line.yearsToBuildLeft > 0 || line.upgrade) return false;
+  // Priced straight off the authored corridor, with no difficulty or inflation multiplier, the
+  // same way building the line was: interties are quoted from TRANSMISSION_PROFILE_DATA as-is.
+  const quote = intertieUpgradeQuote(line, state.date.year);
+  if (!quote) return false;
+  const financed = !!payload.financed;
+  const amountDue = financed
+    ? quote.buildCost * DOWNPAYMENT_PERCENT
+    : quote.buildCost;
+  if (now.cash < amountDue) return false;
+  now.cash -= amountDue;
+  const loanAmount = financed ? quote.buildCost - amountDue : 0;
+  if (financed) {
+    // One line, one loan. Rolling the new borrowing into the existing balance at the current
+    // rate is the same treatment a facility's build loan gets, and it keeps a widened line from
+    // needing a second schedule of its own.
+    line.loanAmountLeft += loanAmount;
+    line.loanMonthlyPayment = getMonthlyPayment(
+      line.loanAmountLeft,
+      state.interestRate,
+      LOAN_MONTHS,
+    );
+    line.interestRate = state.interestRate;
+    line.financed = true;
+  }
+  line.buildCost += quote.buildCost;
+  line.upgrade = {
+    targetCapacityW: quote.targetCapacityW,
+    buildCost: quote.buildCost,
+    annualOperatingCost: quote.annualOperatingCost,
+    yearsToBuild: quote.yearsToBuild,
+    yearsToBuildLeft: quote.yearsToBuild,
+    constructionKgco2eTotal: quote.constructionKgco2eTotal,
+    constructionKgco2eEmitted: 0,
+  };
+  recordMeaningfulDecision(state, {
+    lever: `intertie-upgrade:${line.id}`,
+    label: `Upgrade ${line.name}`,
+    kind: "asset",
+    before: formatWatts(line.capacityW),
+    after: formatWatts(quote.targetCapacityW),
+  });
+  logGameEvent(
+    state,
+    "BUILD",
+    `Upgrade started: ${line.name}, ${formatWatts(line.capacityW)} to ${formatWatts(quote.targetCapacityW)}`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -1691,6 +1779,11 @@ function applyReplayAction(state: GameType, entry: ReplayActionType) {
     case "buildTransmissionLine": {
       const build = payload as Partial<BuildTransmissionLineAction>;
       applyBuildTransmissionLine(state, build);
+      break;
+    }
+    case "upgradeTransmissionLine": {
+      const upgrade = payload as Partial<UpgradeTransmissionLineAction>;
+      applyUpgradeTransmissionLine(state, upgrade);
       break;
     }
     case "setTradingPolicy":
@@ -2443,6 +2536,35 @@ function updateSupplyFacilitiesFinances(
   const tickDate = getDateFromMinute(now.minute, state.startingYear);
   const difficulty = DIFFICULTIES[state.difficulty];
 
+  // Everything being built right now emits while it is being built, spread evenly across each
+  // project's schedule. Derived from how far each clock actually moved rather than from elapsed
+  // time: the decrements below are clamped at zero, so a project finishing mid-tick advances by
+  // less than a full tick, and only the delta makes the lifetime total come out exact.
+  let constructionKgco2e = 0;
+  const accrueConstruction = (
+    asset: ConstructionEmissions & { yearsToBuildLeft: number },
+    yearsToBuild: number,
+  ) => {
+    const total = asset.constructionKgco2eTotal;
+    if (!total || !(yearsToBuild > 0)) return;
+    const complete = Math.min(
+      1,
+      Math.max(0, 1 - asset.yearsToBuildLeft / yearsToBuild),
+    );
+    // A month-boundary pre-roll moves the live build clock, but its frames are re-run and its
+    // tick is not the one that gets recorded. Booking nothing here and leaving the marker alone
+    // lets the next real tick charge for everything the clock moved, pre-roll included, so the
+    // schedule is unchanged and the lifetime total still comes out exact.
+    if (preRoll) return;
+    const owed = total * complete - (asset.constructionKgco2eEmitted || 0);
+    if (owed <= 0) return;
+    // Charged against how far the build actually got rather than against elapsed time, which is
+    // what makes the last partial tick land on the total instead of overshooting it.
+    asset.constructionKgco2eEmitted =
+      (asset.constructionKgco2eEmitted || 0) + owed;
+    constructionKgco2e += owed;
+  };
+
   // Update facility construction status
   facilities.forEach((f: FacilityOperatingType) => {
     if (f.yearsToBuildLeft > 0) {
@@ -2450,6 +2572,7 @@ function updateSupplyFacilitiesFinances(
         0,
         f.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
       );
+      accrueConstruction(f, f.yearsToBuild);
       if (f.yearsToBuildLeft === 0) {
         f.minuteOperational = now.minute;
         if (!simulated) {
@@ -2472,8 +2595,33 @@ function updateSupplyFacilitiesFinances(
       0,
       line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
     );
+    accrueConstruction(line, corridorById(line.corridorId)?.yearsToBuild ?? 0);
     if (line.yearsToBuildLeft === 0 && !simulated) {
       logGameEvent(state, "CONSTRUCTION", `Intertie open: ${line.name}`);
+    }
+  });
+  // Widening a line that is already open. Kept in its own pass rather than folded into the one
+  // above, whose early return is for lines still being built: an upgrade only exists on a line
+  // that finished long ago, and it must advance on exactly the same frames a build does.
+  transmission.lines.forEach((line) => {
+    const upgrade = line.upgrade;
+    if (preRoll || !upgrade || upgrade.yearsToBuildLeft <= 0) return;
+    upgrade.yearsToBuildLeft = Math.max(
+      0,
+      upgrade.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
+    );
+    accrueConstruction(upgrade, upgrade.yearsToBuild);
+    if (upgrade.yearsToBuildLeft > 0) return;
+    // The new capacity arrives the day the work is signed off, not before.
+    line.capacityW = upgrade.targetCapacityW;
+    line.annualOperatingCost = upgrade.annualOperatingCost;
+    delete line.upgrade;
+    if (!simulated) {
+      logGameEvent(
+        state,
+        "CONSTRUCTION",
+        `Upgrade complete: ${line.name} now carries ${formatWatts(line.capacityW)}`,
+      );
     }
   });
 
@@ -3141,7 +3289,12 @@ function updateSupplyFacilitiesFinances(
   now.expensesInterest = expensesInterest;
   now.localKgco2e = kgco2e;
   now.importedKgco2e = (importedWh / 1000000) * now.importKgco2ePerMWh;
-  now.kgco2e = now.localKgco2e + now.importedKgco2e;
+  // Deliberately added here and not to the `kgco2e` accumulator above, which is what
+  // expensesCarbonFee is charged on. A carbon fee prices what a grid burns in the jurisdiction
+  // levying it; embodied emissions are mostly incurred in someone else's supply chain, years
+  // earlier, and are not what such a scheme reaches. They still count towards the score.
+  now.constructionKgco2e = constructionKgco2e;
+  now.kgco2e = now.localKgco2e + now.importedKgco2e + now.constructionKgco2e;
   // Deliberately this tick's own month rather than `date`, which is the month the game is
   // actually in and is shared by every tick of a forecast. Reading it from the tick is what lets
   // the same line serve the record and the projection: history keeps what the rate was, and the
@@ -3340,6 +3493,7 @@ export function generateNewTimeline(
       kgco2e: 0,
       localKgco2e: 0,
       importedKgco2e: 0,
+      constructionKgco2e: 0,
       reserveW: 0,
       importKgco2ePerMWh: 0,
       // Both overwritten by updateSupplyFacilitiesFinances, from each tick's own date
@@ -3462,6 +3616,13 @@ function buildFacilityHelper(
       generatingLastRealTick:
         g.tracksStarts && newGame && g.peakWh === undefined,
       yearsToBuildLeft: newGame ? 0 : g.yearsToBuild,
+      // Resolved from the quote rather than recomputed later, so a standing plant keeps the
+      // embodied emissions of the year it was actually built. The starting fleet was built
+      // before the run opened and carries none: nothing of it is emitted on the player's watch.
+      constructionKgco2eTotal: newGame
+        ? 0
+        : (g.constructionKgco2ePerW || 0) * g.peakW +
+          (g.constructionKgco2ePerWh || 0) * (g.peakWh || 0),
       minuteCreated: state.date.minute,
       minuteOperational: newGame
         ? state.date.minute - initialAgeYears * DAYS_PER_YEAR * 24 * 60

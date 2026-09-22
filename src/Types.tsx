@@ -79,6 +79,31 @@ export interface TransmissionLineOperatingType {
    * against hypothetical weather. Absent until the first tick after construction finishes.
    */
   currentFlowW?: number;
+  /**
+   * Embodied emissions from building the corridor, accrued over its construction period. Derived
+   * from the corridor's cost per watt at purchase rather than stored per corridor, since the
+   * authored data carries no route length. Absent on legacy saves.
+   */
+  constructionKgco2eTotal?: number;
+  constructionKgco2eEmitted?: number;
+  /**
+   * Work in progress to widen a line that is already carrying power. The line keeps running at
+   * its present rating throughout and steps up on the day the work finishes, which is how a
+   * real reconductoring goes: crews restring one circuit at a time rather than taking the
+   * interconnector down for a year. Absent unless an upgrade is under way.
+   */
+  upgrade?: IntertieUpgradeType;
+}
+
+export interface IntertieUpgradeType {
+  targetCapacityW: number;
+  buildCost: number;
+  /** What the widened line will cost to run, replacing the current figure on completion. */
+  annualOperatingCost: number;
+  yearsToBuild: number;
+  yearsToBuildLeft: number;
+  constructionKgco2eTotal?: number;
+  constructionKgco2eEmitted?: number;
 }
 
 export interface TransmissionStateType {
@@ -292,6 +317,7 @@ export type ReplayActionNameType =
   | "togglePauseFacility"
   | "reprioritizeFacility"
   | "buildTransmissionLine"
+  | "upgradeTransmissionLine"
   | "setTradingPolicy"
   | "delta";
 
@@ -472,9 +498,13 @@ interface HistoryForecastShared {
   expensesOM: number; // total
   expensesCarbonFee: number; // total
   expensesInterest: number; // total - only the interest payments count as an expense, the rest is just a settling of balances between cash and liability
-  kgco2e: number; // Local generation plus purchased-electricity emissions
+  kgco2e: number; // Local generation, purchased electricity and construction under way
   localKgco2e?: number;
   importedKgco2e?: number;
+  // Embodied emissions from everything currently being built, spread evenly across each
+  // project's construction period. Deliberately outside the carbon fee's base: a fee prices
+  // what a grid burns, while this is mostly incurred in someone else's supply chain.
+  constructionKgco2e?: number;
   // Point in time rather than totals: what a new loan would cost, and what prices were doing,
   // as of this tick / the end of this month. Summing them would be meaningless, so reduceHistories
   // keeps the last one it sees, the way it does for cash and net worth.
@@ -492,7 +522,11 @@ export type FacilityOperatingType =
   GeneratorOperatingType | StorageOperatingType;
 
 export interface GeneratorOperatingType
-  extends GeneratorShoppingType, LoanInfo, LifetimeTotals {
+  extends
+    GeneratorShoppingType,
+    LoanInfo,
+    LifetimeTotals,
+    ConstructionEmissions {
   id: number; // Monotonically increasing
   currentW: number;
   yearsToBuildLeft: number;
@@ -515,7 +549,7 @@ export interface GeneratorOperatingType
 }
 
 export interface StorageOperatingType
-  extends StorageShoppingType, LoanInfo, LifetimeTotals {
+  extends StorageShoppingType, LoanInfo, LifetimeTotals, ConstructionEmissions {
   id: number; // Monotonically increasing
   currentWh: number;
   yearsToBuildLeft: number;
@@ -529,6 +563,23 @@ export interface StorageOperatingType
  * updateSupplyFacilitiesFinances, and only while the game is really ticking -- a forecast runs
  * against a deep clone of the fleet and throws the clone away, so its ticks never land here.
  */
+/**
+ * What building this asset emits in total, resolved from the shopping quote at purchase so a
+ * later price or technology revision cannot retroactively change what a standing plant emitted.
+ * Accrued into the company's totals over the construction period rather than booked at once.
+ * Absent on the starting fleet, which was built before the run began, and on legacy saves.
+ */
+export interface ConstructionEmissions {
+  constructionKgco2eTotal?: number;
+  /**
+   * How much of that total the run has already booked. Kept per asset so accrual is driven by
+   * how far the build has actually got rather than by elapsed time: the month-boundary pre-roll
+   * advances a facility's clock on frames that are never recorded, so a tick-shaped share would
+   * quietly lose whatever the pre-roll moved. Catching up against progress cannot.
+   */
+  constructionKgco2eEmitted?: number;
+}
+
 export interface LifetimeTotals {
   lifetimeWh: number; // Delivered to the grid. Storage counts discharge only, not charging
   // What it could have delivered running flat out over the same span, ie the denominator of its
@@ -610,6 +661,15 @@ interface SharedShoppingType {
   viableLocationsRemaining?: number;
   lifespanYears: number;
   yearsToBuild: number;
+  /**
+   * Embodied emissions from building the thing: materials, manufacturing, transport and
+   * installation, excluding everything the plant does once it runs. Generators carry a per-watt
+   * figure and storage a per-watt-hour one; neither carries both, because each storage
+   * technology has a fixed duration, which would make a second coefficient unidentifiable.
+   * Resolved against the catalogue's year at purchase, so a quote locks its vintage.
+   */
+  constructionKgco2ePerW?: number;
+  constructionKgco2ePerWh?: number;
 }
 
 export interface TutorialStepType {

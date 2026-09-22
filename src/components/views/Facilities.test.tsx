@@ -3,8 +3,14 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { Provider } from "react-redux";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { tickState } from "../../reducers/Game";
+import cloneDeep from "lodash.clonedeep";
+import { MINUTES_PER_MONTH, getTimeFromTimeline } from "../../helpers/DateTime";
+import gameReducer, {
+  buildTransmissionLine,
+  tickState,
+  upgradeTransmissionLine,
+} from "../../reducers/Game";
+import { formatWatts } from "../../helpers/Format";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
@@ -62,6 +68,7 @@ function renderFacilities(
         game={game}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
+        onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
         onTradingPolicy={() => undefined}
@@ -240,6 +247,7 @@ describe("the fleet list", () => {
       onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
       onTransmissionBuild: () => undefined,
+      onTransmissionUpgrade: () => undefined,
       onTradingPolicy: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
@@ -324,6 +332,7 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
         game={game}
         projectsOnly
         onBuild={onBuild}
+        onUpgrade={jest.fn()}
         onPolicy={jest.fn()}
       />
     </Provider>,
@@ -538,5 +547,84 @@ describe("unified connections", () => {
     expect(
       screen.getByText("Trading rule: Buy for shortages, sell extra"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the intertie upgrade control", () => {
+  /** A California run whose northern intertie is open and carrying power. */
+  function gameWithOpenIntertie(): GameType {
+    const state = playedGame(0);
+    const built = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: false,
+        }),
+      ),
+    );
+    built.transmission!.lines[0].yearsToBuildLeft = 0;
+    getTimeFromTimeline(built.date.minute, built.timeline)!.cash = 1e11;
+    return built;
+  }
+
+  function renderFleet(game: GameType, handleUpgrade = jest.fn()) {
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={handleUpgrade}
+          onPolicy={jest.fn()}
+        />
+      </Provider>,
+    );
+  }
+
+  it("offers to widen an open line, and says what the work emits", async () => {
+    const user = userEvent.setup();
+    const game = gameWithOpenIntertie();
+    const handleUpgrade = jest.fn();
+    renderFleet(game, handleUpgrade);
+    const line = game.transmission!.lines[0];
+
+    await user.click(screen.getByLabelText(`Inspect ${line.name}`));
+    const upgrade = screen.getByLabelText(
+      `Upgrade ${line.name} to ${formatWatts(line.capacityW * 1.5)}`,
+    );
+    // The embodied cost of the work is on the button's own row, where the decision is made,
+    // rather than somewhere the player has to go looking for it.
+    expect(screen.getByText(/CO2e to build/)).toBeInTheDocument();
+    await user.click(upgrade);
+    expect(handleUpgrade).toHaveBeenCalledWith(line.corridorId, true);
+  });
+
+  it("says the line keeps running while the work is under way", async () => {
+    const user = userEvent.setup();
+    const game = cloneDeep(
+      gameReducer(
+        gameWithOpenIntertie(),
+        upgradeTransmissionLine({
+          corridorId: "california-north",
+          financed: false,
+        }),
+      ),
+    );
+    renderFleet(game);
+    const line = game.transmission!.lines[0];
+    await user.click(screen.getByLabelText(`Inspect ${line.name}`));
+    expect(screen.getByText(/keeps carrying/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Upgrade /)).toBeNull();
+  });
+
+  it("explains which ceiling stopped it rather than just disappearing", async () => {
+    const user = userEvent.setup();
+    const game = gameWithOpenIntertie();
+    // Three steps taken already: the corridor is full.
+    game.transmission!.lines[0].capacityW *= Math.pow(1.5, 3);
+    renderFleet(game);
+    const line = game.transmission!.lines[0];
+    await user.click(screen.getByLabelText(`Inspect ${line.name}`));
+    expect(screen.getByText(/corridor is full/)).toBeInTheDocument();
   });
 });

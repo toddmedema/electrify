@@ -7,6 +7,7 @@ import {
   togglePauseFacility,
   reprioritizeFacility,
   buildTransmissionLine,
+  upgradeTransmissionLine,
   setTradingPolicy,
 } from "../../reducers/Game";
 import {
@@ -101,6 +102,14 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
           ),
         );
       }
+    },
+    onTransmissionUpgrade: (corridorId, financed) => {
+      dispatch(upgradeTransmissionLine({ corridorId, financed }));
+      dispatch(
+        snackbarOpen(
+          "Upgrade approved — the line keeps carrying power while the work runs.",
+        ),
+      );
     },
     onTradingPolicy: (policy) => {
       dispatch(setTradingPolicy(policy));

@@ -452,9 +452,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Local estimates count CO2 from burning fuel, including biomass without
           credit for regrowth. Most import estimates also count CO2; Québec's
-          counts greenhouse gases as CO2e. Construction, fuel supply and land
-          use are excluded, so zero reported emissions does not mean zero
-          environmental impact.
+          counts greenhouse gases as CO2e. Fuel supply and land use are
+          excluded, so zero reported emissions does not mean zero environmental
+          impact.
+        </p>
+        <p>
+          Building a plant emits too, in the steel, concrete, silicon and
+          drilling it takes to put one up. Each build card shows that total, and
+          it is charged evenly across the construction period rather than all at
+          once. It is why wind, solar, nuclear and storage are low-carbon rather
+          than no-carbon. Carbon fees do not apply to it: a fee prices what a
+          grid burns, while most of this is emitted in another country's
+          factories years earlier.
         </p>
         <p>
           Emissions affect fees and score, but do not change local weather in
