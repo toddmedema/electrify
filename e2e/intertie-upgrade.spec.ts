@@ -111,9 +111,11 @@ for (const theme of ["light", "dark"] as const) {
     await speed("fast speed").click();
     await expect(line).not.toContainText("Upgrading to", { timeout: 45000 });
     await speed("pause").click();
-    await expect(
-      line.getByRole("button", { name: "Inspect Northern intertie" }),
-    ).toContainText("750MW");
+    // The collapsed reading uses the weather-dependent operating rating, not nameplate
+    // capacity. Verify the purchased nameplate in the expanded details instead.
+    await expect(line.locator(".transmissionLineDetails")).toContainText(
+      "750MW rated capacity",
+    );
     await expect(
       line.getByRole("button", {
         name: "Upgrade Northern intertie to 1.13GW",

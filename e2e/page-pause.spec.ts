@@ -31,7 +31,24 @@ for (const theme of ["light", "dark"]) {
       page.locator(".facilities"),
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
+    // Browsers use visibilitychange when a tab or mobile app is backgrounded.
+    // Keep it independently exercised from the pagehide/pageshow fallback above.
+    const visibility = async (state: "hidden" | "visible") => {
+      await page.evaluate((value) => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          value,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, state);
+    };
+    await visibility("hidden");
+    await expect(pause).toHaveAttribute("aria-pressed", "true");
+    await visibility("visible");
+    await expect(slow).toHaveAttribute("aria-pressed", "true");
     await page.locator(".button-buildFacility").click();
+    await visibility("hidden");
+    await visibility("visible");
     await expect(page.locator(".pausedChip")).toHaveText("Paused");
     for (const name of ["Storage", "Interties", "Generators"]) {
       await page.getByRole("tab", { name, exact: true }).click();

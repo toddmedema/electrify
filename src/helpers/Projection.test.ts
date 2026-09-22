@@ -1,7 +1,11 @@
 import { createNextState } from "@reduxjs/toolkit";
 import cloneDeep from "lodash.clonedeep";
 import { createGame } from "../testing/Simulator";
-import reducer, { generateNewTimeline } from "../reducers/Game";
+import reducer, {
+  buildTransmissionLine,
+  generateNewTimeline,
+  upgradeTransmissionLine,
+} from "../reducers/Game";
 import * as GameModule from "../reducers/Game";
 import { chooseScenarioResponse } from "../reducers/GameActions";
 import { CUSTOM_SCENARIO_ID, SCENARIOS } from "../data/Scenarios";
@@ -108,4 +112,59 @@ it("caps a 100-year custom game at 20 years of cash and chart simulation", () =>
   expect(projection.financeProjected).toHaveLength(240);
   expect(projection.forecast).toHaveLength(20 * 12 * 24);
   expect(projection.domain.x[1]).toBe(20 * 12 * MINUTES_PER_MONTH);
+});
+
+it("refreshes projections when an intertie upgrade starts and completes", () => {
+  const game = createGame({ scenarioId: 100, seed: 61 });
+  game.timeline[0].cash = 100_000_000_000;
+  const open = cloneDeep(
+    reducer(
+      game,
+      buildTransmissionLine({
+        corridorId: "california-north",
+        financed: false,
+      }),
+    ),
+  );
+  open.transmission!.lines[0].yearsToBuildLeft = 0;
+  const before = selectProjection(open, open.timeline[0]);
+  const upgrading = reducer(
+    open,
+    upgradeTransmissionLine({ corridorId: "california-north", financed: true }),
+  );
+  const during = selectProjection(upgrading, upgrading.timeline[0]);
+  expect(during).not.toBe(before);
+  expect(during.financeProjected).not.toEqual(before.financeProjected);
+  expect(during.forecast).toEqual(
+    generateNewTimeline(
+      upgrading,
+      upgrading.timeline[0].cash,
+      upgrading.timeline[0].customers,
+      during.forecast.length,
+      during.projectionStepMinutes,
+    ),
+  );
+
+  const progressed = createNextState(upgrading, (draft) => {
+    draft.transmission!.lines[0].upgrade!.yearsToBuildLeft -= 0.001;
+  });
+  expect(selectProjection(progressed, progressed.timeline[0])).toBe(during);
+
+  const completed = createNextState(upgrading, (draft) => {
+    const line = draft.transmission!.lines[0];
+    line.capacityW = line.upgrade!.targetCapacityW;
+    line.annualOperatingCost = line.upgrade!.annualOperatingCost;
+    delete line.upgrade;
+  });
+  const after = selectProjection(completed, completed.timeline[0]);
+  expect(after).not.toBe(during);
+  expect(after.forecast).toEqual(
+    generateNewTimeline(
+      completed,
+      completed.timeline[0].cash,
+      completed.timeline[0].customers,
+      after.forecast.length,
+      after.projectionStepMinutes,
+    ),
+  );
 });

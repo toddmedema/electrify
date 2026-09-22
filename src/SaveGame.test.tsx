@@ -60,6 +60,37 @@ describe("SaveGame", () => {
   });
 
   it.each([
+    { minute: NaN },
+    { minute: Infinity },
+    { minute: -1 },
+    { year: undefined },
+    { year: NaN },
+    { monthNumber: undefined },
+    { monthsElapsed: Infinity },
+    { hourOfDay: "noon" },
+    { month: "Unknown" },
+  ])("rejects malformed saved clocks %p before resuming", (date) => {
+    expect(
+      parseSave({
+        ...serializeSave(game),
+        game: { ...game, date: { ...game.date, ...date } },
+      }),
+    ).toBeNull();
+  });
+
+  it.each([NaN, Infinity, -Infinity])(
+    "rejects a non-finite starting year %p",
+    (startingYear) => {
+      expect(
+        parseSave({
+          ...serializeSave(game),
+          game: { ...game, startingYear },
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it.each([
     { constructionKgco2eTotal: "bad" },
     { constructionKgco2eTotal: null },
     { constructionKgco2eTotal: -1 },

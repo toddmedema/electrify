@@ -1,15 +1,21 @@
 # Construction emissions
 
-Last reviewed: 2026-09-21.
+Last reviewed: 2026-09-22. Primary-source audit; simulation coefficients unchanged.
 
-Wind, solar, nuclear, hydro, storage and interties emit nothing while they run, but building them
-emits a great deal. This is where those figures come from, what they deliberately leave out, and
-why the carbon fee never touches them.
+The game separates construction emissions from operating emissions. Wind, solar and nuclear
+have no fuel-combustion emissions during generation; storage and interties also have losses whose
+emissions depend on the electricity supplying them. Hydro can emit reservoir greenhouse gases.
+None of these distinctions makes their construction emissions zero.
 
-Every number below is the **construction phase only**: raw material extraction, component
-manufacturing, transport to site, and installation. Each is expressed per watt of nameplate power,
-or per watt-hour of capacity for storage, because that is the unit a built object actually has. It
-does not depend on how hard the thing is later run.
+The coefficients below are **game engineering estimates for the construction phase**: raw
+material extraction, component manufacturing, transport to site, and installation. They are not
+measurements of the game's individual projects or a reproduced dataset of published construction
+factors. The primary sources below support accounting boundaries, broad magnitudes and technology
+differences; the exact coefficients, decay rates and floors remain modeling assumptions.
+
+Values are expressed per watt of nameplate power, or per watt-hour of capacity for storage.
+They do not depend on how hard the asset is later operated. Future revisions should retain a
+source-specific bill of materials or a transparent conversion before claiming a calibrated value.
 
 ## The model
 
@@ -22,65 +28,66 @@ One resolved coefficient per build option:
 Storage gets only the energy term because each storage technology here has a fixed duration -- a
 battery is always four hours, pumped hydro always ten. A second, power-proportional coefficient
 would be unidentifiable: no choice a player can make would ever distinguish it from the first, and
-carrying both would invite double counting. If duration ever becomes a player choice, the split is
-roughly 88% energy / 12% power for a four-hour battery and 50/50 for ten-hour pumped hydro.
+carrying both would invite double counting. If duration ever becomes a player choice, power and
+energy terms will need separate inventories; no universal percentage split is assumed here.
 
 Most technologies hold their figure flat. Three do not, and they decay toward a floor rather than
 by a flat annual percentage:
 
 ```
-E(year) = floor + (E0 - floor) * exp(-k * (year - referenceYear))
+E(year) = floor + (E0 - floor) * exp(-k * max(0, year - referenceYear))
 ```
 
-A constant percentage is what this shape exists to avoid. Batteries falling 6%/yr from 0.08 reach
-0.0035 kgCO2e/Wh by 2075, which is roughly the mass-specific carbon of sand and well below what
-the required materials can physically emit. The floor is the part no amount of clean electricity
-removes: clinker calcination is a chemical reaction rather than an energy input, primary aluminium
-consumes its carbon anode, silicon is won by carbothermic reduction, and a drilling rig burns
-diesel.
+This shape prevents an unlimited annual percentage improvement from driving the estimate toward
+zero in long games. The floors and decay rates are scenario assumptions, not experimentally
+established physical minima or forecasts. Materials, manufacturing electricity and process changes
+can all affect future construction intensity; these curves do not model those processes separately.
 
 A quote resolves against the catalogue's year at purchase, so a plant keeps the embodied emissions
 of the year it was actually built rather than drifting as the technology improves around it.
 
 ## Generators, kgCO2e per watt of nameplate
 
-| Option                     | Value | Ref year |     k | Floor | Confidence     |
-| -------------------------- | ----: | -------: | ----: | ----: | -------------- |
-| Coal                       |  0.32 |     2025 |     0 |     — | med-high       |
-| Natural Gas (simple cycle) |  0.06 |     2025 |     0 |     — | medium         |
-| Oil                        |  0.15 |     2025 |     0 |     — | low-med        |
-| Biomass                    |  0.45 |     2025 |     0 |     — | low-med        |
-| Nuclear                    |  0.30 |     2025 |     0 |     — | high           |
-| Geothermal                 |  0.95 |     2025 |     0 |     — | medium         |
-| Enhanced Geothermal        |  1.00 |     2025 |  0.12 |  0.38 | med-low        |
-| Wind                       |  0.42 |     2025 |     0 |     — | high           |
-| Offshore Wind              |  0.65 |     2025 |     0 |     — | med-high       |
-| Airborne Wind              |  0.20 |     2025 |     0 |     — | **low**        |
-| Solar                      |  0.60 |     2025 | 0.055 |  0.12 | medium         |
-| Hydro                      |   2.0 |     2025 |     0 |     — | **low, +/-2x** |
+| Option                     | Value | Ref year |     k | Floor |
+| -------------------------- | ----: | -------: | ----: | ----: |
+| Coal                       |  0.32 |     2025 |     0 |     — |
+| Natural Gas (simple cycle) |  0.06 |     2025 |     0 |     — |
+| Oil                        |  0.15 |     2025 |     0 |     — |
+| Biomass                    |  0.45 |     2025 |     0 |     — |
+| Nuclear                    |  0.30 |     2025 |     0 |     — |
+| Geothermal                 |  0.95 |     2025 |     0 |     — |
+| Enhanced Geothermal        |  1.00 |     2025 |  0.12 |  0.38 |
+| Wind                       |  0.42 |     2025 |     0 |     — |
+| Offshore Wind              |  0.65 |     2025 |     0 |     — |
+| Airborne Wind              |  0.20 |     2025 |     0 |     — |
+| Solar                      |  0.60 |     2025 | 0.055 |  0.12 |
+| Hydro                      |   2.0 |     2025 |     0 |     — |
 
-Combined-cycle gas would be 0.10. The game's gas plant is deliberately the simple-cycle fast-start
-machine, which has no heat recovery steam generator, steam turbine, condenser or cooling tower --
-the HRSG alone runs about 5,000 tonnes on a 2x500 MW block, and simple cycle lands near 0.6x the
-combined-cycle figure per watt.
-
-Offshore wind at 0.65 is fixed-bottom monopile, matching the reference the cost model already uses.
-Floating is 1.7-2.0x that, around 1.1-1.3, if that option is ever split out.
+The gas coefficient represents the game's simple-cycle plant, rather than a combined-cycle
+plant. The offshore-wind coefficient represents a fixed-bottom project. Neither distinction
+establishes a universal numeric multiplier: plant equipment, foundations, water depth and supply
+chains need project-specific inventories. Oil and biomass are particularly weakly anchored
+engineering estimates; the sources below do not directly validate their construction coefficients.
 
 ## Storage, kgCO2e per watt-hour of capacity
 
-| Option       | Value | Ref year |     k | Floor | Confidence |
-| ------------ | ----: | -------: | ----: | ----: | ---------- |
-| Battery      | 0.080 |     2025 | 0.045 | 0.025 | high       |
-| Pumped Hydro | 0.060 |     2025 |     0 |     — | medium     |
+| Option       | Value | Ref year |     k | Floor |
+| ------------ | ----: | -------: | ----: | ----: |
+| Battery      | 0.080 |     2025 | 0.045 | 0.025 |
+| Pumped Hydro | 0.060 |     2025 |     0 |     — |
 
-The battery figure is LFP, now the dominant grid chemistry. NMC is about 20% higher with a much
-fatter upper tail, to 0.140.
+The battery estimate is 80 kgCO2e/kWh of installed capacity, intended to include cells and the
+surrounding system. Peiseler et al. report a modeled global 90% interval of **54–69 kgCO2e/kWh
+for LFP cells**, with a median of 62. Their boundary does not establish the installed system's
+80 kg figure: the additional allowance for housing, power electronics and installation is an
+engineering estimate. Their NMC811 cell interval is 59–115 kgCO2e/kWh; it should not be treated as
+a fixed chemistry multiplier. [Primary study, Figures 2–3](https://www.nature.com/articles/s41467-024-54634-y).
 
-Corrected, a ten-hour pumped hydro scheme and a four-hour battery have comparable embodied carbon
-per watt-hour of capacity. Pumped hydro wins decisively over a lifetime -- 75 years with no
-augmentation against 20 years with 30-50% cell replacement -- which is the interesting trade-off
-and the reason the two figures should not be far apart.
+Pumped hydro's 60 kgCO2e/kWh is likewise an estimate, not a quoted result from Simon et al.
+Their functional unit is electricity delivered over the life of storage, which is different from
+installed energy capacity. Charging electricity and project configuration matter to that result;
+a construction coefficient must isolate the construction inventory before converting units.
+[Simon et al., 2023](https://www.nrel.gov/docs/fy23osti/81327.pdf).
 
 ## Interties
 
@@ -91,51 +98,59 @@ for length and terrain:
 kgCO2e/W = 0.08 * (costPerW / 0.56) ** 0.7 * (EXISTING ? 0.7 : 1)
 ```
 
-Two things about that formula are deliberate.
+The coefficient 0.08, exponent 0.7 and EXISTING multiplier 0.7 are game assumptions, not a
+regression fitted to project observations. Cost is an imperfect substitute for route length,
+terrain, conductor design and substation requirements; land and permitting costs need not track
+material emissions. The damping and reuse discount express that limitation without claiming a
+universal share of cost or avoided carbon.
 
-**The exponent is not 1.** Somewhere between a third and a half of transmission capital cost is
-right of way, permitting, legal work and engineering, none of which emits much -- and that share is
-exactly what grows on the expensive, contested routes. Scaling linearly with cost would pile carbon
-onto precisely the corridors where the extra money bought lawyers rather than steel.
+Wei et al. provide inventories for 191 Chinese transmission projects, spanning voltage and terrain
+classes. This supports the need to distinguish projects and include materials, equipment and
+construction activity, but does not validate the game's international cost-to-carbon formula.
+[Primary inventory and methods](https://www.nature.com/articles/s41597-020-00662-4).
 
-**The EXISTING discount is mild.** Reinforcing a standing corridor reuses its towers, foundations
-and cleared route, which really are over half a new line's embodied emissions, and reconductoring
-lands near 20-25% of new build per watt added. But the authored costs already price existing routes
-about a third below new ones, so the full structural discount applied on top of that would count
-the same saving twice. 0.7 on top of the cost ratio reproduces the right end figure.
-
-This yields 0.05-0.13 kgCO2e/W across the shipped corridors, which sits between simple-cycle gas
-and nuclear and about 4x below onshore wind. That ordering is the sanity check: a transmission line
-is metal-heavy per kilometre but metal-light per watt, because one circuit moves gigawatts.
+The current formula yields roughly 0.05–0.13 kgCO2e/W across authored corridors. This is a
+model output, not an observed uncertainty interval.
 
 An upgrade is charged the corridor's own per-watt intensity on the watts it adds, not on the whole
 line over again.
+
+## How upgrades relate to actual projects
+
+The game's 1.5x steps, limited count, escalating cost, construction time and technology/neighbor
+ceilings are a simplified upgrade policy. DOE describes advanced reconductoring that can double
+capacity on suitable lines, sometimes within 1–3 years and without new rights of way. That supports
+offering an upgrade, but does not mean every corridor can repeatedly increase capacity by the
+same factor. [DOE resource adequacy report, page 21](https://www.energy.gov/sites/default/files/2024-04/2024%20The%20Future%20of%20Resource%20Adequacy%20Report.pdf).
+
+Structure condition, clearances, terminal equipment and system constraints remain important.
+DOE's conductor scan explicitly notes that some projects need substation work or replacement
+structures. Keeping the old rating available during construction is a game simplification, not a
+promise that real construction needs no outages. [DOE advanced conductor scan, executive summary](https://www.energy.gov/sites/default/files/2024-08/Advanced%20Conductor%20Report%20December%202023.pdf).
 
 ## What is excluded, and why
 
 **Operation.** Fuel combustion, geothermal geofluid venting, reservoir methane, transmission I2R
 losses. These are the operational emissions the game already models, or deliberately does not.
 
-Reservoir methane is the one worth naming. It is operational, not construction, and it dominates
-tropical hydro assessments -- often 95%+ of a published figure. Excluding it collapses the hydro
-spread from roughly 1000x to about 3x for conventional impoundments of this size. There is
-deliberately no temperate-versus-tropical split on the construction term: climate zone does not
-change how much concrete a dam needs.
+Reservoir methane is operational and excluded from this construction term. Dam geometry,
+materials and site conditions also vary, so excluding methane does not by itself establish a
+narrow universal range for hydro construction emissions.
 
 **Fuel supply chains.** Mining, drilling, enrichment, feedstock cultivation, fuel transport.
 
-Nuclear benefits most from this boundary. Published full-lifecycle nuclear assessments span 1.4 to
-288 gCO2e/kWh -- a 200x range -- almost entirely because of the enrichment assumption: gaseous
-diffusion needs 2,500 kWh/SWU against 50 for centrifuge, and that single choice explains over 90%
-of the variance. Construction alone spans about 4x, and that spread is real physical variation
-rather than methodological disagreement.
+Nuclear fuel-chain emissions must not be presented as reactor construction emissions. Gibon and
+Hahn Menacho identify enrichment, extraction technique and ore grade as influential parameters;
+their simplified models retain enough parameters to explain at least 90% of modeled variation.
+That is not a claim that enrichment alone explains 90% of all published estimates. The paper does
+not directly establish the game's 0.30 kgCO2e/W construction coefficient.
+[Primary study, Sections 4–5](https://pubs.acs.org/doi/10.1021/acs.est.3c03190).
 
-**Operations and maintenance, including mid-life replacement.** The significant omission here is
-**battery augmentation**, which adds 25-35% to a battery's lifetime embodied carbon at one cycle a
-day. It is cells only; the power conversion system, containers and civil works are reused. It is
-excluded because it is an operational stream spread over twenty years, and booking it at
-construction time would put it in the wrong decade. The cost side already prices it: the battery's
-annual operating cost includes augmentation for about 1.5% annual degradation.
+**Operations and maintenance, including mid-life replacement.** Battery augmentation can add
+material emissions after commissioning. It is excluded from this construction charge because
+booking future replacement cells up front would put them in the wrong period. The game's operating
+cost assumptions cover augmentation, but its emissions model does not separately accrue it.
+No universal augmentation percentage is claimed here.
 
 **Decommissioning and recycling credits.** Excluded in both directions. Note that some published
 figures net out recycling credits and will therefore look lower than these for the same object.
@@ -156,27 +171,21 @@ grid should see that the building itself was not free.
 
 ## What this does to the game
 
-Construction emissions are worth roughly 1-3 score points on a typical run. For a fossil plant they
-are invisible -- a 1 GW simple-cycle gas plant emits 0.06 Mt building and 76 Mt burning, so
-construction is under a tenth of a percent of its total. For renewables they convert an exact zero
-into a small non-zero.
-
-That is the intended lesson, and it is deliberately not overstated. Embodied carbon does not rival
-combustion, and the mechanic should not imply it does. Because the carbon fee excludes it and no
-mission objective reads emissions, adding this changes **no cash path and no scenario outcome** --
-only the score and what the charts display.
+Construction emissions increase the headline carbon total and affect score. They do not directly
+change the cash path because the carbon fee excludes them. Their score impact depends on how much
+is built, when it is built and the scenario's scoring rules; no fixed 1–3 point range is guaranteed.
+They should communicate the material cost of building a clean grid without equating it to a fossil
+plant's lifetime fuel combustion.
 
 ## A trap worth recording
 
 **IPCC AR5 Annex III's "infrastructure and supply chain" column is not construction.** It bundles
 the fuel supply chain, and it is the first place anyone revisiting these numbers will look.
 
-Run coal's 9.6 gCO2e/kWh from that column through the conversion and you get 2.3 kgCO2e/W, seven
-times the bottom-up figure. The tells are unmistakable once you look: the same column gives nuclear
-18 gCO2e/kWh, which would imply about 8 kgCO2e/W and is really uranium mining and enrichment, and
-biomass 210, which is feedstock cultivation.
-
-Two further cautions for anyone revising these:
+Do not convert an aggregate lifecycle intensity into construction emissions unless the source
+separates construction from fuel supply, operation and end of life. NREL's harmonization fact
+sheet provides phase-separated estimates, but those are still normalized to each study's generated
+electricity and operating assumptions. [NREL, 2021, Table 1](https://www.nrel.gov/docs/fy21osti/80580.pdf).
 
 **Do not run a published gCO2e/kWh against the game's own capacity factor and lifetime.** Pairing a
 fixed intensity with a longer assumed life raises the per-watt answer, which is backwards -- a
@@ -185,36 +194,35 @@ are the ones to trust; per-kWh figures work only as a cross-check, using the sou
 assumptions. The conversion, when needed, is
 `kgCO2e/W = gCO2e/kWh * CF * 8760 * lifetimeYears / 1e6`.
 
-**Enhanced geothermal literature describes a superseded generation.** Published medians of about
-32 gCO2e/kWh imply roughly 7 kgCO2e/W, seven times the figure here. That gap is not a boundary
-dispute; it is metres drilled per megawatt. Designs from around 2010 assumed 3,000-5,000 m/MW where
-modern horizontal fields reach about 1,000.
+**Enhanced geothermal is design-sensitive.** Sullivan et al. model particular hydrothermal and
+EGS designs; their drilling and plant inventories are useful anchors. The game's lower EGS
+coefficient and rapid future decline are optimistic engineering assumptions, not demonstrated by
+that older study. A quantitative claim about modern meters drilled per MW needs a matched modern
+field inventory before it can justify a revised coefficient.
+[Argonne ANL/ESD/10-5, 2010](https://www1.eere.energy.gov/geothermal/pdfs/lifecycle_analysis_of_geothermal_systems_draft.pdf).
 
-## Numbers to treat with suspicion
+## Evidence strength and remaining gaps
 
-- **Hydro** is site-specific to within a factor of two either way. Head dominates: a high-head
-  scheme needs a fraction of the concrete per megawatt that a low-head one does.
-- **Airborne wind** rests on a single peer-reviewed assessment of a generic, unbuilt system. The
-  robust part is the direction -- it uses roughly a quarter the material of conventional wind per
-  megawatt -- not the absolute value.
-- **Oil and biomass** per-megawatt figures are engineering build-ups rather than published values;
-  no comparable study exists at these plant sizes.
-- **Coal** has the widest genuine disagreement in the set, over 4x, between process-based
-  bottom-ups and input-output studies whose system boundary appears to include the mine and rail.
+The tables report the game's current coefficients without assigning statistical confidence to
+unverified point estimates. In particular:
 
-## Primary references
+- **Hydro** is site-specific; a factor-of-two sensitivity range would be a modeling assumption,
+  not a measured uncertainty bound for all projects.
+- **Airborne wind** is prospective. A 2023 component-level study models future 5 MW systems and
+  finds lower material use and impacts than its conventional comparison. Its functional unit,
+  design and lifetime boundary do not establish a universal quarter-material rule or directly
+  validate the game's 0.20 kgCO2e/W. [Primary study, Sections 2–3](https://www.mdpi.com/1996-1073/16/4/1750).
+- **Coal, gas, oil and biomass** need construction-only inventories matched to the modeled plant.
+  Fossil-fuel combustion and biomass feedstock emissions cannot be used as substitutes.
+- **Solar and wind** have useful lifecycle inventories, but manufacturing region, technology and
+  installation alter the result. The fixed estimates and solar decay curve are simplified choices.
+- **Storage and transmission** have the boundary and proxy limitations described above.
 
-- NREL Life Cycle Assessment Harmonization Project
-- IPCC AR5 WGIII Annex III, Table A.III.2 (with the caveat above)
-- UNECE, _Life Cycle Assessment of Electricity Generation Options_, 2021
-- Hertwich et al., _Integrated life-cycle assessment of electricity-supply scenarios_, PNAS 2015
-- IEA PVPS Task 12, successive editions, for the photovoltaic time trend
-- Ng et al., _Parametric Life Cycle Assessment of Nuclear Power_, ES&T 2023
-- Sullivan et al., ANL/ESD/10-5, for geothermal drilling material intensity
-- Song et al., _Cradle-to-grave greenhouse gas emissions from dams in the USA_, RSER 2018
-- ETH Zurich, _Carbon footprint distributions of lithium-ion batteries_, Nature Communications 2024
-- IVL Swedish Environmental Research Institute, Report C444, 2019
-- Simon et al., _Life Cycle Assessment of Closed-Loop Pumped Storage Hydropower_, ES&T 2023
-- Jorge, Hawkins & Hertwich, _LCA of electricity transmission and distribution_, Int J LCA 2012
-- _A 2015 inventory of embodied carbon emissions for Chinese power transmission infrastructure
-  projects_, Scientific Data 2020
+## Additional primary references
+
+These sources provide context and inventory methods, rather than individually certifying every
+coefficient in the tables:
+
+- [UNECE, Life Cycle Assessment of Electricity Generation Options, 2021](https://unece.org/sites/default/files/2021-11/LCA_final.pdf): comparative lifecycle inventories and technology boundaries.
+- [IEA PVPS Task 12, 2022 fact sheet](https://iea-pvps.org/fact-sheets/fact-sheet-environmental-life-cycle-assessment-of-electricity-from-pv-systems-2022-update/): PV lifecycle scope includes manufacture through end of life, so the headline is not construction-only.
+- [IEA PVPS Task 12, 2026 inventory update](https://iea-pvps.org/key-topics/t12-lci-pv-systems-2026/): updated PERC/TOPCon, CdTe and balance-of-system inventories for a future coefficient recalibration; not a validation of the existing solar decay curve.

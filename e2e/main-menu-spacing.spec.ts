@@ -21,6 +21,8 @@ for (const theme of ["light", "dark"]) {
     const resources = page.getByRole("navigation", { name: "Game resources" });
     const discovery = page.locator(".discoveryActions");
     await expect(primary).toBeVisible();
+    await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
+    await expect(page.getByText(/free.*no sign.?in required/i)).toHaveCount(0);
     await expectGap(page.locator(".gameSubtitle"), primary, 16);
     await expectGap(primary, resources, 8);
     await expectGap(resources, discovery, 0);
