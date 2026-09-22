@@ -317,11 +317,23 @@ export function GeneratorBuildItem(
     </Button>
   );
 
+  const siteMaximum =
+    props.hydroAvailability?.selected || props.hydroAvailability?.largest;
+  const useSiteMaximumAction = siteMaximum && props.onUseSiteMaximum && (
+    <Button
+      size="small"
+      onClick={() => props.onUseSiteMaximum?.(siteMaximum.maxPeakW)}
+    >
+      Use site maximum
+    </Button>
+  );
+
   return (
     <Card
       className={`build-list-item buildOption${props.compared ? " compared" : ""}`}
     >
       <CardHeader
+        className={useSiteMaximumAction ? "hydroBuildHeader" : undefined}
         avatar={
           <Avatar
             alt={generator.name}
@@ -329,33 +341,39 @@ export function GeneratorBuildItem(
           />
         }
         action={
-          <Stack direction="row" spacing={0.5}>
-            {wideLayout && compareAction}
-            <Button
-              className="buy-button"
-              size="small"
-              variant="outlined"
-              color="primary"
-              onClick={toggleOpen}
-              disabled={!canBuild}
-              startIcon={<ConceptIcon concept="buy" fontSize="small" />}
-              aria-label={`Review purchase of ${generator.name}`}
-            >
-              Review
-            </Button>
-          </Stack>
+          <Box className="generatorPurchaseActions">
+            <Stack direction="row" spacing={0.5}>
+              {wideLayout && compareAction}
+              <Button
+                className="buy-button"
+                size="small"
+                variant="outlined"
+                color="primary"
+                onClick={toggleOpen}
+                disabled={!canBuild}
+                startIcon={<ConceptIcon concept="buy" fontSize="small" />}
+                aria-label={`Review purchase of ${generator.name}`}
+              >
+                Review
+              </Button>
+            </Stack>
+            {useSiteMaximumAction}
+          </Box>
         }
         title={generator.name}
+        subheader={useSiteMaximumAction ? role : undefined}
       />
-      <Typography className="buildOptionContext" variant="body2">
-        {role}
-        {sites && sites.remaining > 0 && (
-          <>
-            {" · "}
-            <span className="nowrap">{siteCountLabel(sites)}</span>
-          </>
-        )}
-      </Typography>
+      {!useSiteMaximumAction && (
+        <Typography className="buildOptionContext" variant="body2">
+          {role}
+          {sites && sites.remaining > 0 && (
+            <>
+              {" · "}
+              <span className="nowrap">{siteCountLabel(sites)}</span>
+            </>
+          )}
+        </Typography>
+      )}
       {props.hydroAvailability && (
         <Box sx={{ px: 2, pb: 1 }}>
           <Typography variant="body2">
@@ -374,21 +392,6 @@ export function GeneratorBuildItem(
               {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max
             </Typography>
           )}
-          {(props.hydroAvailability.selected ||
-            props.hydroAvailability.largest) &&
-            props.onUseSiteMaximum && (
-              <Button
-                size="small"
-                onClick={() =>
-                  props.onUseSiteMaximum?.(
-                    (props.hydroAvailability!.selected ||
-                      props.hydroAvailability!.largest)!.maxPeakW,
-                  )
-                }
-              >
-                Use site maximum
-              </Button>
-            )}
         </Box>
       )}
       {!canBuild && (

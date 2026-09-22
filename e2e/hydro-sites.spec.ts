@@ -29,6 +29,27 @@ for (const theme of ["light", "dark"] as const) {
     const before = await slider.getAttribute("aria-valuenow");
     await hydro.getByRole("button", { name: "Use site maximum" }).click();
     await expect(slider).toHaveAttribute("aria-valuenow", before!);
+    const reviewBounds = (await hydro
+      .getByRole("button", { name: "Review purchase of Hydro" })
+      .boundingBox())!;
+    const maximumBounds = (await hydro
+      .getByRole("button", { name: "Use site maximum" })
+      .boundingBox())!;
+    expect(
+      maximumBounds.y - reviewBounds.y - reviewBounds.height,
+    ).toBeGreaterThanOrEqual(4);
+    expect(
+      Math.abs(
+        maximumBounds.x +
+          maximumBounds.width -
+          reviewBounds.x -
+          reviewBounds.width,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(maximumBounds.height).toBeGreaterThanOrEqual(
+      testInfo.project.name.startsWith("mobile") ? 44 : 40,
+    );
+
     await expect(hydro).toContainText("Site:");
     await expect(page.locator(".buildPrimer")).toContainText(
       "Each plant uses a whole site",
