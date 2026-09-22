@@ -625,6 +625,22 @@ describe("transmission actions", () => {
     ).toEqual(recorded);
   });
 
+  it("keeps line readings aligned with the current tick at a month boundary", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 1000000;
+    });
+    while (state.date.monthsElapsed === 0) tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.importedW).toBeGreaterThan(1000000);
+    expect(
+      state.transmission!.lines.reduce(
+        (sum, line) => sum + (line.currentFlowW || 0),
+        0,
+      ),
+    ).toBeCloseTo((now.importedW || 0) - (now.exportedW || 0), 0);
+  });
+
   it("refreshes per-line flow when the rule changes with the clock paused", () => {
     const state = twoIntertiesWithoutPlants();
     state.timeline.forEach((t) => {

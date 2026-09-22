@@ -2851,17 +2851,12 @@ function updateSupplyFacilitiesFinances(
   const { importedW, exportedW } = clearing;
   // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
   const flows = allocateIntertieFlows(offers, importedW, exportedW);
-  // Per-line flow, signed so a fleet row can show power being sold as well as bought. This is
-  // display state, not a decision. Everything but the pre-roll may write it: a real tick writes
-  // the live lines, and a forecast pass writes the deep clone it dispatches against, which
-  // supplyForecastPass then copies back for the current tick alone. The month-boundary and
-  // startup pre-rolls are the exception -- they re-run timeline[0] four times over the *live*
-  // fleet, which would leave the list reading January's trade in July.
-  if (!preRoll) {
-    operatingLines.forEach((line, index) => {
-      line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
-    });
-  }
+  // Keep the row readings aligned with the aggregate flow written to this tick, including
+  // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
+  // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
+  operatingLines.forEach((line, index) => {
+    line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
+  });
   let importCostPerHour = 0;
   let exportRevenuePerHour = 0;
   let importEmissionsWeight = 0;

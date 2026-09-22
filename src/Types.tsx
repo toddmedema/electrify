@@ -73,13 +73,10 @@ export interface TransmissionLineOperatingType {
   loanMonthlyPayment: number;
   interestRate: number;
   /**
-   * Net power over this line as of the most recent dispatch of the current tick: positive
-   * importing, negative selling. Derived display state rather than a decision. A real tick
-   * writes it, and so does the reforecast any player action triggers, which re-dispatches the
-   * current tick against that action -- important because the clock is paused for most of
-   * them. The month-boundary and startup pre-rolls are the one dispatch that must not write
-   * it: they re-run the same tick four times over the live fleet. Set to 0 the moment the line
-   * is ordered, so it is only genuinely absent on saves written before this field existed.
+   * Net power over this line in the current tick: positive importing, negative selling.
+   * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
+   * current-tick dispatch of a player-action reforecast. Future forecasts use cloned lines.
+   * Set to 0 when ordered; older saves may omit it.
    */
   currentFlowW?: number;
 }

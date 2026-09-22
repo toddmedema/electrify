@@ -97,6 +97,38 @@ describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
 
+  it.each([
+    [-500000, "charging"],
+    [500000, "discharging"],
+  ])(
+    "keeps storage activity aligned with %s W on mount and selection",
+    async (currentW, label) => {
+      const storageGame = createGame({ scenarioId: 100 });
+      storageGame.facilities = [
+        {
+          ...storageGame.facilities[0],
+          name: "Battery",
+          peakWh: 2000000,
+          currentWh: 1000000,
+          peakW: 1000000,
+          currentW: Number(currentW),
+          yearsToBuildLeft: 0,
+          paused: false,
+        },
+      ];
+      renderFacilities(storageGame, null);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveAccessibleName(
+        `Inspect Battery, 1/2MWh · ${label}`,
+      );
+      await user.click(rows()[0]);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveAccessibleName(
+        `Inspect Battery, 1/2MWh · ${label}`,
+      );
+    },
+  );
+
   it("selects a facility when its row is clicked", async () => {
     const { onSelect } = renderFacilities(game, null);
     await user.click(rows()[0]);

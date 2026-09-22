@@ -300,22 +300,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     return () => window.clearTimeout(timer);
   }, [ready]);
 
-  // Storage is charging or discharging depending on which way its stored energy moved since the
-  // last tick, which is only knowable by remembering the last one
-  const previousWh = React.useRef(facility.currentWh);
-  const whDelta = facility.currentWh - previousWh.current;
-  React.useEffect(() => {
-    previousWh.current = facility.currentWh;
-  });
-
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
     activity = "BUILDING";
   } else if (facility.paused) {
     activity = "PAUSED";
   } else if (isStorage) {
-    // A battery holding steady is neither charging nor discharging, so don't claim either
-    activity = whDelta > 0 ? "CHARGING" : whDelta < 0 ? "DISCHARGING" : "IDLE";
+    // Use the same dispatch reading as the flow bar. Render-to-render energy deltas
+    // disappear on selection and cannot describe an already-running battery on mount.
+    activity =
+      facility.currentW < 0
+        ? "CHARGING"
+        : facility.currentW > 0
+          ? "DISCHARGING"
+          : "IDLE";
   } else if (facility.currentW <= 0) {
     activity = "IDLE";
   }
@@ -425,7 +423,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             <button
               type="button"
               className="facilityDisclosure"
-              aria-label={"Inspect " + facility.name}
+              aria-label={
+                `Inspect ${facility.name}` + (isStorage ? `, ${status}` : "")
+              }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
