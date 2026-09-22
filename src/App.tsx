@@ -8,6 +8,7 @@ import type { User } from "firebase/auth";
 import CompositorContainer from "./components/CompositorContainer";
 import UnitsProvider from "./components/base/UnitsContext";
 import { navigate, navigateBack } from "./reducers/Card";
+import { pageHidden, pageVisible } from "./reducers/GameActions";
 import { pauseAudio, resumeAudio } from "./reducers/Settings";
 import { snackbarOpen } from "./reducers/UI";
 import { firebaseAppAuth, getDevicePlatform, getHistoryApi } from "./Globals";
@@ -38,8 +39,15 @@ function setupDevice(): () => void {
   document.body.className += " " + platform;
 
   const onBackButton = () => store.dispatch(navigateBack());
-  const onPause = () => store.dispatch(pauseAudio());
-  const onResume = () => store.dispatch(resumeAudio());
+  const onPause = () => {
+    store.dispatch(pauseAudio());
+    // In a WebView visibilitychange is not reliable, so the device events pause the clock too
+    store.dispatch(pageHidden());
+  };
+  const onResume = () => {
+    store.dispatch(resumeAudio());
+    store.dispatch(pageVisible());
+  };
 
   document.addEventListener("backbutton", onBackButton, false);
   document.addEventListener("pause", onPause, false);
@@ -213,11 +221,18 @@ export default function App() {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         store.dispatch(pauseAudio());
+        store.dispatch(pageHidden());
       } else if (document.visibilityState === "visible") {
         store.dispatch(resumeAudio());
+        store.dispatch(pageVisible());
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange, false);
+    // Some mobile browsers never fire visibilitychange before the page goes away
+    const onPageHide = () => {
+      store.dispatch(pageHidden());
+    };
+    window.addEventListener("pagehide", onPageHide, false);
 
     // Registered here rather than next to the store because the tutorial lookup needs the
     // scenarios, and reducers/Game already reaches back into SaveGame -- App sits above both, so
@@ -267,6 +282,7 @@ export default function App() {
         onVisibilityChange,
         false,
       );
+      window.removeEventListener("pagehide", onPageHide, false);
       stopAutosave();
       unsubscribeAuth();
       document.removeEventListener("deviceready", onDeviceReady, false);

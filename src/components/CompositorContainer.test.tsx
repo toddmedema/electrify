@@ -308,10 +308,16 @@ describe("walkthrough steps", () => {
           card = STARTING_CARD;
           return;
         }
+        // A step that declares no card (a "tap the navigation" step) leaves the player on
+        // whatever card they are on, so there is nothing to check it against
+        const declared = cardOf(steps[toStep]);
+        if (declared === undefined) {
+          return;
+        }
         expect([scenario.name, toStep, card]).toEqual([
           scenario.name,
           toStep,
-          cardOf(steps[toStep]),
+          declared,
         ]);
       });
     });

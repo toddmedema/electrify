@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForPaneOrNav } from "./layout";
+import { isPaneLayout, waitForPaneOrNav, waitForSettled } from "./layout";
 
 for (const mission of [
   "Generators",
@@ -85,17 +85,29 @@ for (const mission of [
       await page
         .getByRole("button", { name: "Pause Coal", exact: true })
         .click();
+      // The step after the pause is the navigation itself. Wide layouts advance it on their
+      // own; narrow layouts wait for the player to tap the bottom navigation.
+      if (!isPaneLayout(page)) {
+        await expect(
+          page.getByRole("heading", { name: "Step 3 of 14" }),
+        ).toBeVisible();
+        // The card transition briefly mounts the outgoing layout beside the new one
+        await waitForSettled(page, "#insightsNav");
+        await expect(page.locator("#insightsNav")).toHaveClass(
+          /tutorialTarget/,
+        );
+        await page.locator("#insightsNav").click();
+      }
       await expect(
-        page.getByRole("heading", { name: "Step 3 of 11" }),
+        page.getByRole("heading", { name: "Step 4 of 14" }),
       ).toBeVisible();
     } else {
       const nav = page.locator("#insightsNav");
       await waitForPaneOrNav(page.locator(".insights"), nav);
+      // In the pane layout the navigation step advanced on its own, so there is no Next to
+      // press and the click is at most a no-op on the card it already opened
       if (await nav.isVisible()) {
         await nav.click();
-      } else {
-        // The desktop pane is already visible, so its explanation must remain dismissible.
-        await hud.getByRole("button", { name: "Next" }).click();
       }
       if (mission === "Pricing") {
         await expect(hud).toContainText("Drag the rate slider");

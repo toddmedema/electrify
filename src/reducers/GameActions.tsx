@@ -56,3 +56,11 @@ export const chooseScenarioResponse = createAction<{
   decisionId: string;
   optionId: string;
 }>("game/chooseScenarioResponse");
+
+/**
+ * The page (or app) went to the background: pause the clock, remembering the speed it was at.
+ * Cordova's pause/resume and visibilitychange both dispatch these from App.tsx, so the game
+ * slice -- which owns the tick loop -- reacts without App importing its action creators.
+ */
+export const pageHidden = createAction("game/pageHidden");
+export const pageVisible = createAction("game/pageVisible");

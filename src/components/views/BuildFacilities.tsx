@@ -49,6 +49,16 @@ export default function BuildFacilities(): React.JSX.Element {
               <ConceptIcon concept="build" fontSize="small" />
               Build
             </span>
+            {/* The build screen carries no game bar, so the paused clock it opened with needs
+                saying. Replays hide it: their speed is the player's own, not a stopped game */}
+            {game.inGame && !game.replayPlayback && game.speed === "PAUSED" && (
+              <span className="pausedChip">
+                <span aria-hidden="true">
+                  <ConceptIcon concept="pause" fontSize="small" />
+                </span>
+                Paused
+              </span>
+            )}
             <span
               className="weak constructionCash"
               aria-label={`Available cash ${formatMoneyStable(cash)}`}
