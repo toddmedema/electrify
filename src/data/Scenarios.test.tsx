@@ -14,6 +14,17 @@ import {
   SCENARIOS,
   TUTORIALS,
 } from "./Scenarios";
+import { isPaneLayout } from "../Globals";
+
+// Registered above the imports by babel's jest.mock hoisting, so the step predicates (which
+// call isPaneLayout) see the mock. Kept after the imports for import/first.
+jest.mock("../Globals", () => ({
+  ...jest.requireActual("../Globals"),
+  isPaneLayout: jest.fn(),
+}));
+const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
+  typeof isPaneLayout
+>;
 
 describe("getScenario", () => {
   it("returns the custom scenario for the custom id", () => {
@@ -69,18 +80,46 @@ describe("getNextTutorial", () => {
 });
 
 describe("tutorial mission metadata", () => {
+  afterEach(() => {
+    mockIsPaneLayout.mockReset();
+  });
+
   it("advances the finances tutorial when the mobile Insights tab opens", () => {
+    // A phone: the switch itself is the deed, and the pane escape hatch does not apply
+    mockIsPaneLayout.mockReturnValue(false);
     const finances = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 4: Finances",
     )!;
     const firstStep = finances.tutorialSteps![0];
 
+    // Gated rather than explained: the Next button used to jump the player there instead
+    expect(isGatedStep(firstStep)).toBe(true);
     expect(
-      firstStep.continueOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
     ).toBe(true);
     expect(
-      firstStep.continueOn?.({ card: { name: "FACILITIES" } } as AppStateType),
+      firstStep.advanceOn?.({ card: { name: "FACILITIES" } } as AppStateType),
     ).toBe(false);
+  });
+
+  it("advances the mission 5 opening the same way, keeping its rate escape hatch", () => {
+    mockIsPaneLayout.mockReturnValue(false);
+    const pricing = TUTORIALS.find(
+      (tutorial) => tutorial.name === "Mission 5: Pricing",
+    )!;
+    const firstStep = pricing.tutorialSteps![0];
+
+    expect(isGatedStep(firstStep)).toBe(true);
+    expect(
+      firstStep.advanceOn?.({ card: { name: "INSIGHTS" } } as AppStateType),
+    ).toBe(true);
+    // Already did the next step's deed, so no tap is owed
+    expect(
+      firstStep.advanceOn?.({
+        card: { name: "FACILITIES" },
+        game: { dollarsPerkWh: 0.06 },
+      } as unknown as AppStateType),
+    ).toBe(true);
   });
 
   it("gives every mission one deterministic unguided capstone", () => {

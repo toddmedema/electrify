@@ -53,7 +53,7 @@ describe("the manual pausing the game", () => {
 });
 
 describe("construction catalogs pausing the game", () => {
-  it.each(["BUILD_GENERATORS", "BUILD_STORAGE"] as const)(
+  it.each(["BUILD_GENERATORS", "BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
     "pauses %s and restores the prior speed when it closes",
     (card) => {
       const paused = gameReducer(running("FAST"), navigate(card));
@@ -62,10 +62,72 @@ describe("construction catalogs pausing the game", () => {
     },
   );
 
+  it.each(["BUILD_GENERATORS", "BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
+    "restores the prior speed when %s closes forwards",
+    (card) => {
+      const paused = gameReducer(running("SLOW"), navigate(card));
+      expect(gameReducer(paused, navigate("FACILITIES")).speed).toBe("SLOW");
+    },
+  );
+
+  // The tabs of one shared screen: leaving the catalog is what restores the speed, so
+  // walking the tabs must neither resume the game nor re-capture the player's speed
+  it("keeps the speed paused while switching between build tabs", () => {
+    let state = gameReducer(running("FAST"), navigate("BUILD_GENERATORS"));
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(
+      state,
+      navigate({
+        name: "BUILD_INTERTIES",
+        dontRemember: true,
+        replaceCurrentCard: true,
+      }),
+    );
+    expect(state.speed).toBe("PAUSED");
+    state = gameReducer(
+      state,
+      navigate({
+        name: "BUILD_STORAGE",
+        dontRemember: true,
+        replaceCurrentCard: true,
+      }),
+    );
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("FAST");
+  });
+
+  it("leaves a deliberate pause paused while switching between build tabs", () => {
+    const paused = {
+      ...gameReducer(undefined, setSpeed("PAUSED")),
+      inGame: true,
+    };
+    let state = gameReducer(paused, navigate("BUILD_GENERATORS"));
+    state = gameReducer(
+      state,
+      navigate({
+        name: "BUILD_INTERTIES",
+        dontRemember: true,
+        replaceCurrentCard: true,
+      }),
+    );
+    expect(state.speed).toBe("PAUSED");
+    expect(gameReducer(state, navigate("FACILITIES")).speed).toBe("PAUSED");
+  });
+
   it("stays paused if a global speed shortcut fires while the catalog is open", () => {
     const paused = gameReducer(running("NORMAL"), navigate("BUILD_STORAGE"));
     expect(gameReducer(paused, setSpeed("FAST")).speed).toBe("PAUSED");
     expect(gameReducer(paused, navigate("FACILITIES")).speed).toBe("NORMAL");
+  });
+
+  it("keeps a deliberate pause over the Interties tab", () => {
+    const paused = {
+      ...gameReducer(undefined, setSpeed("PAUSED")),
+      inGame: true,
+    };
+    const inInterties = gameReducer(paused, navigate("BUILD_INTERTIES"));
+    expect(inInterties.speed).toBe("PAUSED");
+    expect(gameReducer(inInterties, navigateBack()).speed).toBe("PAUSED");
   });
 });
 
