@@ -47,6 +47,9 @@ const MainMenu = (props: Props): React.JSX.Element => {
           alt="Electrify"
           style={{ maxWidth: 680 }}
         ></img>
+        <span className="homeEnergyTrace" aria-hidden="true">
+          <span className="homeEnergyPulse" />
+        </span>
       </div>
       <Typography component="h1" className="srOnly">
         Electrify
