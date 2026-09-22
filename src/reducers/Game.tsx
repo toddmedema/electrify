@@ -1,4 +1,10 @@
 import {
+  getHydroAvailability,
+  getHydroInventoryKey,
+  isConventionalHydro,
+  resolveStartingHydroSites,
+} from "../data/HydroSites";
+import {
   captureRunIdentity,
   projectAuthoredRunReference,
 } from "../helpers/RunIdentity";
@@ -761,6 +767,7 @@ const initialGame: GameType = {
   interestRate: INTEREST_RATE_YEARLY,
   creditPremium: 1,
   tutorialStep: -1, // Not set to 0 until after card transition, so that the target element exists
+  commissionedHydroSiteIds: [],
   facilities: [] as FacilityOperatingType[],
   startingYear: 2020,
   date: getDateFromMinute(0, 2020),
@@ -957,6 +964,16 @@ export const gameSlice = createSlice({
       state.startingDemandScale = scenario.startingDemandScale ?? 1;
       state.loadAdditions = cloneDeep(scenario.loadAdditions || []);
       state.location = a.location;
+      state.commissionedHydroSiteIds = [];
+      const hydroAssignments = resolveStartingHydroSites(
+        state.location,
+        startingFacilities,
+        getHydroInventoryKey(state),
+      );
+      if (scenario.startingYear <= 1882 && hydroAssignments.some(Boolean))
+        throw new Error(
+          "Starting Hydro technology is unavailable before 1883.",
+        );
       state.transmission = intertiesEnabledForScenario(scenario, a.location)
         ? emptyTransmissionState()
         : undefined;
@@ -966,70 +983,58 @@ export const gameSlice = createSlice({
         startingCustomers,
       );
 
-      startingFacilities.forEach((search: ScenarioFacilityType) => {
-        // Age is scenario metadata rather than a catalog property, so exclude it from the exact
-        // technology match and pass it to the completed operating asset separately.
-        const {
-          initialAgeYears = 0,
-          initialReservoirFraction,
-          label,
-          ...facilitySearch
-        } = search;
-        // Scenario research may carry more precision than is useful to a player. Resolve the
-        // catalog quote from the rounded size so its costs and technology-derived fields agree
-        // with the two-significant-digit nameplate the operating facility receives.
-        if (facilitySearch.peakW !== undefined) {
-          facilitySearch.peakW = roundToSignificantDigits(
-            facilitySearch.peakW,
-            2,
-          );
-        }
-        if (facilitySearch.peakWh !== undefined) {
-          facilitySearch.peakWh = roundToSignificantDigits(
-            facilitySearch.peakWh,
-            2,
-          );
-        }
-        const generator = GENERATORS(
-          state,
-          facilitySearch.peakW || 1000000,
-          [],
-          [],
-        ).find((g: FacilityShoppingType) =>
-          matchesFacilitySearch(g, facilitySearch),
-        );
-        if (generator) {
-          const existingIds = new Set(state.facilities.map(({ id }) => id));
-          state = buildFacilityHelper(
-            state,
-            generator,
-            false,
-            true,
-            initialAgeYears,
+      startingFacilities.forEach(
+        (search: ScenarioFacilityType, startingIndex: number) => {
+          // Age is scenario metadata rather than a catalog property, so exclude it from the exact
+          // technology match and pass it to the completed operating asset separately.
+          const {
+            hydroSiteId: _hydroSiteId,
+            initialAgeYears = 0,
             initialReservoirFraction,
-          );
-          if (label) {
-            const built = state.facilities.find(
-              ({ id }) => !existingIds.has(id),
+            label,
+            ...facilitySearch
+          } = search;
+          // Scenario research may carry more precision than is useful to a player. Resolve the
+          // catalog quote from the rounded size so its costs and technology-derived fields agree
+          // with the two-significant-digit nameplate the operating facility receives.
+          if (
+            facilitySearch.peakW !== undefined &&
+            facilitySearch.name !== "Hydro" &&
+            facilitySearch.fuel !== "Hydro"
+          ) {
+            facilitySearch.peakW = roundToSignificantDigits(
+              facilitySearch.peakW,
+              2,
             );
-            if (built) {
-              built.name = label;
-            }
           }
-        } else {
-          const storage = STORAGE(state, facilitySearch.peakWh || 1000000).find(
-            (g: FacilityShoppingType) =>
-              matchesFacilitySearch(g, facilitySearch),
+          if (facilitySearch.peakWh !== undefined) {
+            facilitySearch.peakWh = roundToSignificantDigits(
+              facilitySearch.peakWh,
+              2,
+            );
+          }
+          const generator = GENERATORS(
+            state,
+            facilitySearch.peakW || 1000000,
+            [],
+            [],
+          ).find((g: FacilityShoppingType) =>
+            matchesFacilitySearch(g, facilitySearch),
           );
-          if (storage) {
+          if (hydroAssignments[startingIndex] && !generator)
+            throw new Error(
+              `Starting Hydro plant ${startingIndex + 1} is unavailable in ${scenario.startingYear} or has inconsistent technology settings.`,
+            );
+          if (generator) {
             const existingIds = new Set(state.facilities.map(({ id }) => id));
             state = buildFacilityHelper(
               state,
-              storage,
+              generator,
               false,
               true,
               initialAgeYears,
               initialReservoirFraction,
+              hydroAssignments[startingIndex],
             );
             if (label) {
               const built = state.facilities.find(
@@ -1040,14 +1045,40 @@ export const gameSlice = createSlice({
               }
             }
           } else {
-            // A spec that matches nothing used to vanish without a trace, which is a rough way to
-            // find out that the technology you picked wasn't invented yet in the year you started
-            console.warn(
-              `No facility matches ${JSON.stringify(search)} in ${scenario.startingYear}, skipping it`,
+            const storage = STORAGE(
+              state,
+              facilitySearch.peakWh || 1000000,
+            ).find((g: FacilityShoppingType) =>
+              matchesFacilitySearch(g, facilitySearch),
             );
+            if (storage) {
+              const existingIds = new Set(state.facilities.map(({ id }) => id));
+              state = buildFacilityHelper(
+                state,
+                storage,
+                false,
+                true,
+                initialAgeYears,
+                initialReservoirFraction,
+              );
+              if (label) {
+                const built = state.facilities.find(
+                  ({ id }) => !existingIds.has(id),
+                );
+                if (built) {
+                  built.name = label;
+                }
+              }
+            } else {
+              // A spec that matches nothing used to vanish without a trace, which is a rough way to
+              // find out that the technology you picked wasn't invented yet in the year you started
+              console.warn(
+                `No facility matches ${JSON.stringify(search)} in ${scenario.startingYear}, skipping it`,
+              );
+            }
           }
-        }
-      });
+        },
+      );
 
       if (!scenario.tutorialSteps || scenario.intertiesEnabled) {
         // buildFacilityHelper prepends generators because player-built capacity should dispatch
@@ -1400,7 +1431,16 @@ function applyBuildFacility(
   payload: BuildFacilityAction,
 ): boolean {
   if (!validBuildFacility(payload)) return false;
-  const built = payload.facility;
+  const requested = payload.facility;
+  const hydro = isConventionalHydro(requested);
+  const hydroSite = hydro
+    ? getHydroAvailability(state, requested.peakW)
+    : undefined;
+  if (hydro && (state.date.year <= 1882 || hydroSite?.status !== "available"))
+    return false;
+  const built = hydro
+    ? { ...requested, hydroSiteId: hydroSite!.selected!.id }
+    : requested;
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
   const amountDue = payload.financed
     ? built.buildCost * DOWNPAYMENT_PERCENT
@@ -1417,7 +1457,11 @@ function applyBuildFacility(
   );
   // Recheck current state instead of trusting the shopping-card snapshot in the action. It keeps
   // a stale dialog or replay action from claiming one more site after the last one was used.
-  if (viableLocationsRemaining !== undefined && viableLocationsRemaining <= 0) {
+  if (
+    !hydro &&
+    viableLocationsRemaining !== undefined &&
+    viableLocationsRemaining <= 0
+  ) {
     return false;
   }
   const existingIds = new Set(state.facilities.map(({ id }) => id));
@@ -2621,6 +2665,12 @@ function updateSupplyFacilitiesFinances(
       );
       if (f.yearsToBuildLeft === 0) {
         f.minuteOperational = now.minute;
+        if (
+          isConventionalHydro(f) &&
+          f.hydroSiteId &&
+          !state.commissionedHydroSiteIds.includes(f.hydroSiteId)
+        )
+          state.commissionedHydroSiteIds.push(f.hydroSiteId);
         if (!simulated) {
           const message = `Construction complete: ${f.name}, ${f.peakWh ? formatWattHours(f.peakWh) : formatWatts(f.peakW)}`; // defining for functions running inside of setTimeout
           logGameEvent(state, "CONSTRUCTION", message);
@@ -3378,6 +3428,7 @@ function supplyForecastPass(
   const newState = {
     ...state,
     policies: cloneDeep(state.policies),
+    commissionedHydroSiteIds: [...state.commissionedHydroSiteIds],
     facilities: cloneDeep(state.facilities),
     transmission: cloneDeep(state.transmission ?? emptyTransmissionState()),
   };
@@ -3507,6 +3558,7 @@ export function generateNewTimeline(
   // simulation several times a second.
   const state = {
     ...readOnlyState,
+    commissionedHydroSiteIds: [...readOnlyState.commissionedHydroSiteIds],
     facilities: cloneDeep(readOnlyState.facilities),
     transmission: cloneDeep(
       readOnlyState.transmission ?? emptyTransmissionState(),
@@ -3629,6 +3681,7 @@ function buildFacilityHelper(
   newGame = false,
   initialAgeYears = 0,
   initialReservoirFraction = 0.5,
+  hydroSiteId?: string,
 ): GameType {
   const now = getTimeFromTimeline(state.date.minute, state.timeline);
 
@@ -3667,6 +3720,7 @@ function buildFacilityHelper(
     } = g;
     const facility = {
       ...facilitySnapshot,
+      hydroSiteId: hydroSiteId ?? g.hydroSiteId,
       // A scenario's catalog is priced in its starting year, but an inherited wind farm belongs
       // to its commissioning vintage and should use that cohort's observed degradation rate.
       ...(newGame && g.fuel === "Wind"
@@ -3707,6 +3761,13 @@ function buildFacilityHelper(
         ? state.date.minute - initialAgeYears * DAYS_PER_YEAR * 24 * 60
         : undefined,
     } as FacilityOperatingType;
+    if (
+      isConventionalHydro(facility) &&
+      facility.hydroSiteId &&
+      facility.yearsToBuildLeft === 0 &&
+      !state.commissionedHydroSiteIds.includes(facility.hydroSiteId)
+    )
+      state.commissionedHydroSiteIds.push(facility.hydroSiteId);
     if (g.fuel === "Hydro" && g.reservoirCapacityWh) {
       // A completed dam starts at a neutral mid-pool unless a scenario states the level it
       // opens on. New construction carries this initial value until commissioning rather than

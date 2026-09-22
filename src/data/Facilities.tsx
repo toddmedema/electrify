@@ -1,3 +1,4 @@
+import { getHydroAvailability } from "./HydroSites";
 import { LCWH } from "../helpers/Financials";
 import { buildStorySnapshot } from "../helpers/Story";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
@@ -267,12 +268,8 @@ export function GENERATORS(
     return fee;
   };
 
-  const hydroLocations = getViableLocationCount(state.location, "Hydro");
-  const hydroLocationsRemaining = getViableLocationsRemaining(
-    state.location,
-    state.facilities,
-    "Hydro",
-  );
+  const hydroAvailability = getHydroAvailability(state, peakW);
+  const hydroLocationsRemaining = hydroAvailability.remaining.length;
   const geothermalLocations = getViableLocationCount(
     state.location,
     "Geothermal",
@@ -598,13 +595,13 @@ export function GENERATORS(
       fuel: "Hydro",
       description:
         "Low direct emissions and controllable output, but limited by water and suitable sites",
-      available: year > 1882 && (hydroLocations || 0) > 0,
+      available: year > 1882 && hydroAvailability.status === "available",
       buildCost: scaledBuildCost(hydroCostPerW(year), 100000000, peakW),
       // IRENA's inflation-normalized global installed cost was effectively flat from 2020 to
       // 2024 at $2,267/kW. Site scarcity is now an explicit cap rather than a second price.
       peakW,
       viableLocationsRemaining: hydroLocationsRemaining,
-      maxPeakW: 10000000000,
+      maxPeakW: hydroAvailability.largest?.maxPeakW || 0,
       btuPerWh: 0,
       spinMinutes: 1,
       annualOperatingCost: annualOperatingCost(
@@ -695,7 +692,7 @@ export function GENERATORS(
           carbonFeeAtYear,
         )
       : Infinity;
-    return g.available;
+    return g.available || (g.name === "Hydro" && year > 1882);
   });
 
   return generators;

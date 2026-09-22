@@ -400,3 +400,60 @@ it("preserves and exposes a playable custom location that is absent from the cat
     }),
   );
 });
+
+it("offers researched Hydro maxima below 100MW and rejects oversized starting fleets", () => {
+  const onStart = jest.fn();
+  const { rerender } = render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: "PIT",
+        location: LOCATIONS.PIT,
+        facilities: [],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility type" }));
+  fireEvent.click(screen.getByRole("option", { name: "Hydro" }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Facility size" }));
+  const options = screen.getAllByRole("option");
+  expect(
+    options.some((option) =>
+      /^(\d{1,2}(\.\d+)?)MW$/.test(option.textContent || ""),
+    ),
+  ).toBe(true);
+  fireEvent.click(options[0]);
+  fireEvent.click(screen.getByRole("button", { name: "Add facility" }));
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      facilities: [
+        expect.objectContaining({ name: "Hydro", peakW: expect.any(Number) }),
+      ],
+    }),
+  );
+  expect(onStart.mock.calls[0][0].facilities[0].peakW).toBeLessThan(100000000);
+  rerender(
+    <CustomGame
+      key="invalid"
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        locationId: "PIT",
+        location: LOCATIONS.PIT,
+        facilities: [{ name: "Hydro", peakW: 10000000000 }],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Choose a smaller plant or another location",
+  );
+  expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
+});

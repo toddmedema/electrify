@@ -11,13 +11,6 @@ const withHydro: LocationType = {
   resources: { hydro: true, geothermal: false },
 };
 
-const withoutHydro: LocationType = {
-  ...withHydro,
-  id: "Houston",
-  name: "Houston, TX",
-  resources: { hydro: false, geothermal: false },
-};
-
 const hydroOption = {
   name: "Hydro",
   description: "Hydro description",
@@ -27,27 +20,25 @@ const hydroOption = {
 };
 
 describe("getBuildAvailability", () => {
-  test("explains that a location without rivers has no dam sites", () => {
+  test.each([
+    ["prohibited", "prohibited"],
+    ["unavailable", "data unavailable"],
+    ["empty", "No qualifying"],
+    ["exhausted", "permanently used"],
+    ["too-large", "fits this size"],
+  ] as const)("distinguishes Hydro %s", (status, message) => {
     const result = getBuildAvailability({
       ...hydroOption,
-      available: false,
-      location: withoutHydro,
-      viableLocationsRemaining: 0,
+      hydroAvailability: {
+        status,
+        remaining: [],
+        eligible: [],
+        selected: undefined,
+        largest: undefined,
+      },
     });
     expect(result.buildable).toBe(false);
-    expect(result.secondaryText).toBe(
-      "No hydro sites near Houston in this game.",
-    );
-  });
-
-  test("explains that every site has been claimed", () => {
-    const result = getBuildAvailability({
-      ...hydroOption,
-      location: withHydro,
-      viableLocationsRemaining: 0,
-    });
-    expect(result.buildable).toBe(false);
-    expect(result.secondaryText).toBe("You've used all 3 sites near Madrid.");
+    expect(result.secondaryText).toContain(message);
   });
 
   test("pumped hydro names itself in the reason", () => {
@@ -67,7 +58,13 @@ describe("getBuildAvailability", () => {
     const result = getBuildAvailability({
       ...hydroOption,
       location: withHydro,
-      viableLocationsRemaining: 2,
+      hydroAvailability: {
+        status: "available",
+        remaining: [],
+        eligible: [],
+        selected: undefined,
+        largest: undefined,
+      },
     });
     expect(result).toEqual({
       buildable: true,

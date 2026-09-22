@@ -1,3 +1,4 @@
+import { getHydroAvailability } from "../data/HydroSites";
 import cloneDeep from "lodash.clonedeep";
 import gameReducer, {
   buildFacility,
@@ -133,9 +134,11 @@ describe("buildFacility", () => {
     const hydro = GENERATORS(state, 50000000, [20], [500]).find(
       (g: GeneratorShoppingType) => g.name === "Hydro",
     );
-    expect(hydro?.viableLocationsRemaining).toBe(3);
+    const fits = getHydroAvailability(state, 50000000).eligible.length;
+    expect(fits).toBeGreaterThan(0);
+    hydro!.buildCost = 1;
 
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < fits + 1; attempt++) {
       state = gameReducer(
         state,
         buildFacility({ facility: hydro!, financed: true }),
@@ -144,7 +147,7 @@ describe("buildFacility", () => {
 
     expect(
       state.facilities.filter((facility) => facility.name === "Hydro"),
-    ).toHaveLength(3);
+    ).toHaveLength(fits);
     state.facilities.forEach((facility) => {
       expect(facility).not.toHaveProperty("viableLocationsRemaining");
     });

@@ -38,7 +38,7 @@ describe("finite facility sites", () => {
     expect(getViableLocationCount(location("Berlin"), "Hydro")).toBe(0);
     expect(
       getViableLocationCount(location("Chicago", { hydro: true }), "Hydro"),
-    ).toBe(3);
+    ).toBe(0);
     expect(
       getViableLocationCount(
         location("Chicago", { hydro: true }),

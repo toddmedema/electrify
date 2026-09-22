@@ -26,6 +26,7 @@ function fakeGame(overrides: Partial<GameType> = {}): GameType {
     loadAdditions: [],
     location: LOCATIONS.PIT,
     date: getDateFromMinute(185 * MINUTES_PER_MONTH + 1000, 2020),
+    commissionedHydroSiteIds: [],
     facilities: [],
     timeline: [],
     monthlyHistory: [],

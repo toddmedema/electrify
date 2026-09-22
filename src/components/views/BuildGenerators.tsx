@@ -39,6 +39,7 @@ import {
   MONTHS,
   TICKS_PER_YEAR,
 } from "../../Constants";
+import { getHydroAvailability } from "../../data/HydroSites";
 import { GENERATORS } from "../../data/Facilities";
 import {
   DateType,
@@ -178,6 +179,8 @@ function GeneratorDetailRow(props: {
 }
 
 interface GeneratorBuildItemProps {
+  hydroAvailability?: ReturnType<typeof getHydroAvailability>;
+  onUseSiteMaximum?: (peakW: number) => void;
   cash: number;
   date: DateType;
   interestRate: number;
@@ -222,6 +225,7 @@ export function GeneratorBuildItem(
   );
   const sizeBuildable = props.generator.peakW <= props.generator.maxPeakW;
   const { buildable, secondaryText } = getBuildAvailability({
+    hydroAvailability: props.hydroAvailability,
     name: generator.name,
     description: generator.description,
     available: generator.available,
@@ -230,11 +234,13 @@ export function GeneratorBuildItem(
     location: props.location,
     viableLocationsRemaining: generator.viableLocationsRemaining,
   });
-  const sites = getSiteInventory(
-    generator.name,
-    props.location,
-    generator.viableLocationsRemaining,
-  );
+  const sites = props.hydroAvailability
+    ? undefined
+    : getSiteInventory(
+        generator.name,
+        props.location,
+        generator.viableLocationsRemaining,
+      );
   const financingGap = Math.max(0, downpayment - cash);
   const canBuild = buildable && financingGap === 0;
   const buildSubtitle =
@@ -350,6 +356,45 @@ export function GeneratorBuildItem(
           </>
         )}
       </Typography>
+      {props.hydroAvailability && (
+        <Box sx={{ px: 2, pb: 1 }}>
+          <Typography variant="body2">
+            Hydro plant size: {formatWatts(generator.peakW, 6)}
+          </Typography>
+          <Typography variant="body2">
+            {props.hydroAvailability.remaining.length} sites remaining ·{" "}
+            {props.hydroAvailability.eligible.length}{" "}
+            {props.hydroAvailability.eligible.length === 1
+              ? "site fits"
+              : "sites fit"}{" "}
+            this size
+            {props.hydroAvailability.largest &&
+              ` · largest remaining: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
+          </Typography>
+          {props.hydroAvailability.selected && (
+            <Typography variant="body2">
+              Selected site: {props.hydroAvailability.selected.name} · maximum{" "}
+              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)}.{" "}
+              Smaller builds still consume a whole site.
+            </Typography>
+          )}
+          {(props.hydroAvailability.selected ||
+            props.hydroAvailability.largest) &&
+            props.onUseSiteMaximum && (
+              <Button
+                size="small"
+                onClick={() =>
+                  props.onUseSiteMaximum?.(
+                    (props.hydroAvailability!.selected ||
+                      props.hydroAvailability!.largest)!.maxPeakW,
+                  )
+                }
+              >
+                Use site maximum
+              </Button>
+            )}
+        </Box>
+      )}
       {!canBuild && (
         <Typography
           component="div"
@@ -550,9 +595,19 @@ export function GeneratorBuildItem(
 
       <Dialog open={open} onClose={toggleOpen}>
         <ClosableDialogTitle onClose={toggleOpen}>
-          Build {formatWatts(generator.peakW)} {generator.name}?
+          Build {formatWatts(generator.peakW, props.hydroAvailability ? 6 : 1)}{" "}
+          {generator.name}?
         </ClosableDialogTitle>
         <DialogContent className="noPadding">
+          {props.hydroAvailability?.selected && (
+            <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
+              Site: {props.hydroAvailability.selected.name}, maximum{" "}
+              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)}. This
+              project consumes the whole site. Cancelling unfinished
+              construction releases it; once commissioned, selling or retiring
+              the plant never releases it.
+            </Typography>
+          )}
           <DecisionImpactPreview
             facts={[
               {
@@ -666,7 +721,7 @@ export function GeneratorBuildItem(
         <DialogActions>
           <Button
             color="primary"
-            disabled={cash < generator.buildCost}
+            disabled={!canBuild || cash < generator.buildCost}
             variant="contained"
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(false, e)
@@ -678,6 +733,7 @@ export function GeneratorBuildItem(
           <Button
             color="primary"
             variant="outlined"
+            disabled={!canBuild}
             onClick={(e: React.MouseEvent<HTMLElement>) =>
               submitPurchase(true, e)
             }
@@ -813,6 +869,7 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   const [sliderTick, setSliderTick] = React.useState<number>(
     getTickFromW(mostRecentBuiltValue),
   );
+  const [exactHydroW, setExactHydroW] = React.useState<number>();
   const [sort, setSort] = React.useState<GeneratorSortKey>("buildCost");
   const [comparedNames, setComparedNames] = React.useState<string[]>([]);
   const [primerVisible, dismissPrimer] = useHydroPrimer();
@@ -834,6 +891,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
   );
   const airborneWindSpeeds = forecastedTimeline.map((w) => w.windAirborneKph);
   const solarIrradiances = forecastedTimeline.map((w) => w.solarIrradianceWM2);
+  const hydroAvailability = getHydroAvailability(
+    game,
+    exactHydroW ?? getW(sliderTick),
+  );
   const generators = GENERATORS(
     game,
     getW(sliderTick),
@@ -842,6 +903,18 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
     offshoreWindSpeeds,
     airborneWindSpeeds,
   )
+    .map((generator) =>
+      generator.name === "Hydro" && exactHydroW !== undefined
+        ? GENERATORS(
+            game,
+            exactHydroW,
+            windSpeeds,
+            solarIrradiances,
+            offshoreWindSpeeds,
+            airborneWindSpeeds,
+          ).find((candidate) => candidate.name === "Hydro") || generator
+        : generator,
+    )
     .filter(
       (generator) =>
         game.scenarioId !== 1 ||
@@ -888,9 +961,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
 
   // Tutorials script their own path through this list, so the primer waits for a real game
   const hydro = generators.find((generator) => generator.name === "Hydro");
-  const hydroSites =
-    hydro &&
-    getSiteInventory(hydro.name, game.location, hydro.viableLocationsRemaining);
+  const hydroSites = {
+    total: hydroAvailability.remaining.length,
+    remaining: hydroAvailability.remaining.length,
+  };
   const showPrimer =
     primerVisible &&
     !!hydro?.available &&
@@ -937,7 +1011,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
         sort={sort}
         sortOptions={sortOptions}
         onClose={onBack}
-        onSliderChange={setSliderTick}
+        onSliderChange={(value) => {
+          setSliderTick(value);
+          setExactHydroW(undefined);
+        }}
         onSortChange={(value) => setSort(value as GeneratorSortKey)}
       />
       <GeneratorComparison
@@ -964,6 +1041,10 @@ export default function BuildGenerators(props: Props): React.JSX.Element {
                 />
               )}
               <GeneratorBuildItem
+                hydroAvailability={
+                  g.name === "Hydro" ? hydroAvailability : undefined
+                }
+                onUseSiteMaximum={setExactHydroW}
                 date={game.date}
                 seed={game.seed}
                 location={game.location}

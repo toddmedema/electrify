@@ -642,6 +642,7 @@ export interface GeneratorShoppingType extends SharedShoppingType {
 }
 
 interface SharedShoppingType {
+  hydroSiteId?: string;
   // Facility reducers and presentation components read technology-specific fields through the
   // generator/storage union. Keep that established structural API localized here; code that
   // dynamically selects known fields should use a keyed union instead.
@@ -799,6 +800,7 @@ export interface ScenarioBriefingType {
 }
 
 export interface ScenarioType {
+  hydroInventoryKey?: string;
   id: number;
   name: string;
   icon: string; // assumed to be images/<string>.svg
@@ -1070,6 +1072,7 @@ export interface GameType {
   // Headless balance harness only: baseline matrix cells run the identical strategy with authored
   // effects disabled. Undefined means enabled and is what every browser save/replay uses.
   storyEffectsDisabled?: boolean;
+  commissionedHydroSiteIds: string[];
   facilities: Array<StorageOperatingType | GeneratorOperatingType>;
   // Optional so legacy saves and scenarios without intertie access remain readable. Enabled
   // scenarios and their normalized saves carry an explicit empty state.
