@@ -118,7 +118,13 @@ export function facilitySignature(game: GameType): string {
     .join("|");
   const transmission = (game.transmission?.lines || [])
     .map((line) =>
-      [line.id, line.corridorId, line.yearsToBuildLeft > 0].join(":"),
+      [
+        line.id,
+        line.corridorId,
+        line.yearsToBuildLeft > 0,
+        line.capacityW,
+        line.upgrade?.targetCapacityW,
+      ].join(":"),
     )
     .join("|");
   return `${facilities}/${game.transmission?.tradingPolicy || "BALANCED"}/${transmission}`;

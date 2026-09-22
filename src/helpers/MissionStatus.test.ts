@@ -308,6 +308,23 @@ test("a rate below break-even warns immediately and clears when restored", () =>
   expect(selectMissionRisk(restored)?.id).not.toBe("cash-runway");
 });
 
+test("a same-day shortfall outranks a future cash deficit", () => {
+  const burning = runwayGame(0, 1_000_000);
+  const shortageAhead = createNextState(burning, (g) => {
+    g.timeline[1].supplyW = 0;
+    g.timeline[1].demandW = 100;
+  });
+  expect(cashRunwayMonths(shortageAhead)).toBeGreaterThanOrEqual(1);
+  expect(selectMissionRisk(shortageAhead)).toMatchObject({
+    shortLabel: "Projected shortfall",
+    target: "supply-demand",
+  });
+  const cashNegativeNow = createNextState(shortageAhead, (g) => {
+    g.timeline[0].cash = -1;
+  });
+  expect(selectMissionRisk(cashNegativeNow)?.id).toBe("cash");
+});
+
 test("cash that stays solvent through the scenario end stays quiet", () => {
   const deepPocket = runwayGame(0, 50_000_000_000);
   const runway = cashRunwayMonths(deepPocket);

@@ -37,12 +37,25 @@ for (const theme of ["light", "dark"]) {
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
     await page.addInitScript((mode) => {
-      localStorage.clear();
+      if (!sessionStorage.getItem("mission-evidence")) {
+        localStorage.clear();
+        sessionStorage.setItem("mission-evidence", "true");
+      }
       localStorage.setItem("theme", mode);
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
+    // Keep this layout/focus fixture solvent so a valid long-term cash warning does not
+    // replace the upcoming-event label under test.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("pagehide"));
+      const save = JSON.parse(localStorage.getItem("savedGame")!);
+      for (const tick of save.game.timeline) tick.cash = 1e12;
+      localStorage.setItem("savedGame", JSON.stringify(save));
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );

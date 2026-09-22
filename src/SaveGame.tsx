@@ -25,6 +25,7 @@ import {
   DOWNPAYMENT_PERCENT,
   INTERTIE_UPGRADE_STEP,
   MAX_INTERTIE_UPGRADES,
+  MONTHS,
 } from "./Constants";
 import {
   corridorConstructionKgco2e,
@@ -308,6 +309,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
     typeof game.startingYear !== "number" ||
+    !Number.isFinite(game.startingYear) ||
     typeof game.customerMarketSize !== "number" ||
     !Number.isFinite(game.customerMarketSize) ||
     game.customerMarketSize <= 0 ||
@@ -351,7 +353,21 @@ export function parseSave(raw: unknown): SaveGameType | null {
   if (
     typeof game.date !== "object" ||
     game.date === null ||
-    typeof game.date.minute !== "number"
+    // Every field is consumed by the UI or simulation before the next tick rebuilds it.
+    // Do not compare derived fields against minute: synthetic clocks may still be valid.
+    [
+      game.date.minute,
+      game.date.minuteOfDay,
+      game.date.hourOfDay,
+      game.date.hourOfFullYear,
+      game.date.percentOfMonth,
+      game.date.percentOfYear,
+      game.date.monthNumber,
+      game.date.monthsElapsed,
+      game.date.year,
+    ].some((value) => typeof value !== "number" || !Number.isFinite(value)) ||
+    game.date.minute < 0 ||
+    !MONTHS.includes(game.date.month)
   ) {
     return null;
   }
