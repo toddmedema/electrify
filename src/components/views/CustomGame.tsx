@@ -1,3 +1,7 @@
+import {
+  getHydroAvailability,
+  resolveStartingHydroSites,
+} from "../../data/HydroSites";
 import * as React from "react";
 import {
   Avatar,
@@ -143,6 +147,9 @@ function technologiesFor(
     feePerKgCO2e: scenario.feePerKgCO2e,
     seed: 0,
     facilities: [],
+    commissionedHydroSiteIds: [],
+    scenarioId: 0,
+    customScenario: scenario,
     location: getScenarioLocation(scenario),
   } as unknown as GameType;
   // GENERATORS and STORAGE have already filtered out whatever isn't available in the year
@@ -163,7 +170,10 @@ function technologiesFor(
     // offer - batteries were 50MWh-scale in 2010 - which would leave nothing to pick
   ].filter(
     (t: TechnologyType) =>
-      t.maxSize >= (t.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0],
+      t.maxSize >=
+      (t.name === "Hydro"
+        ? 1000000
+        : (t.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0]),
   );
 }
 
@@ -260,9 +270,63 @@ export default function CustomGame(props: Props): React.JSX.Element {
     [scenario, game.difficulty],
   );
   const adding = technologies.find((t) => t.name === addName);
-  const sizes = (adding?.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W).filter(
-    (size) => !adding || size <= adding.maxSize,
-  );
+  const hydroSetup = React.useMemo(() => {
+    const location = getScenarioLocation(scenario);
+    try {
+      if (!location)
+        throw new Error("Choose a location before starting the game.");
+      const assignments = resolveStartingHydroSites(
+        location,
+        scenario.facilities,
+      );
+      const remaining = getHydroAvailability(
+        {
+          location,
+          facilities: [],
+          commissionedHydroSiteIds: assignments.filter(
+            (id): id is string => !!id,
+          ),
+          scenarioId: 0,
+          customScenario: scenario,
+        },
+        1000000,
+      );
+      return {
+        error: "",
+        maxima:
+          remaining.status === "available"
+            ? remaining.remaining.map((site) => site.maxPeakW)
+            : [],
+        assignments,
+      };
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid starting Hydro fleet.",
+        maxima: [],
+        assignments: [],
+      };
+    }
+  }, [scenario]);
+  const sizesFor = (technology?: TechnologyType) =>
+    [
+      ...new Set([
+        ...(technology?.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W),
+        ...(technology?.name === "Hydro" ? hydroSetup.maxima : []),
+      ]),
+    ]
+      .filter(
+        (size) =>
+          !technology ||
+          (size <= technology.maxSize &&
+            (technology.name !== "Hydro" ||
+              hydroSetup.maxima.some((max) => max >= size))),
+      )
+      .sort((a, b) => a - b);
+  const sizes = sizesFor(adding);
+  const selectedSize = sizes.includes(addSize) ? addSize : sizes[0];
   // What the utility starts with, what a kilowatt hour may be charged at, and what a ton of CO2e
   // may be feed, in the money of the year the game starts in. All move with the starting year,
   // which is why changing that year has to re-quote whatever was already chosen rather than
@@ -331,6 +395,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
       if (!technologies.some((t) => t.name === name)) {
         return true;
       }
+      if (name === "Hydro") return false;
       const sitesRemaining = getViableLocationsRemaining(
         location,
         claimedSites,
@@ -343,7 +408,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   React.useEffect(() => {
     const requestId = ++forecastRequestId.current;
-    if (unavailable.length > 0) {
+    if (unavailable.length > 0 || hydroSetup.error) {
       setOutlook({ status: "invalid" });
       return;
     }
@@ -383,7 +448,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [ensureForecastWorker, game.difficulty, scenario, unavailable.length]);
+  }, [
+    ensureForecastWorker,
+    game.difficulty,
+    scenario,
+    unavailable.length,
+    hydroSetup.error,
+  ]);
 
   const change = (delta: Partial<ScenarioType>) => {
     setScenario({ ...scenario, ...delta });
@@ -424,12 +495,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   const addFacility = () => {
-    if (!adding) {
+    if (!adding || !selectedSize) {
       return;
     }
     const facility = adding.storage
-      ? { name: adding.name, peakWh: addSize }
-      : { name: adding.name, peakW: addSize };
+      ? { name: adding.name, peakWh: selectedSize }
+      : { name: adding.name, peakW: selectedSize };
     change({ facilities: [...scenario.facilities, facility] });
   };
 
@@ -741,6 +812,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
             >
               Facilities
             </Typography>
+            {hydroSetup.error && (
+              <Typography color="error" role="alert">
+                {hydroSetup.error}
+              </Typography>
+            )}
             {unavailable.length > 0 && (
               <Typography variant="body2" color="error">
                 {unavailable.map(facilityName).join(", ")} can't be built with
@@ -873,9 +949,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   // offer a watt-hour capacity for a generator. Opens on a middling plant rather
                   // than the biggest one the year allows, which is a lot to hand someone by default
                   if (next) {
-                    const options = (
-                      next.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W
-                    ).filter((s) => s <= next.maxSize);
+                    const options = sizesFor(next);
                     setAddSize(
                       options[
                         Math.min(next.storage ? 1 : 2, options.length - 1)
@@ -898,8 +972,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
               <Select
                 id="addFacilitySize"
                 inputProps={{ "aria-label": "Facility size" }}
-                value={sizes.indexOf(addSize) === -1 ? sizes[0] : addSize}
-                disabled={!adding}
+                value={selectedSize ?? ""}
+                disabled={!adding || sizes.length === 0}
                 onChange={(e: SelectChangeEvent<number>) =>
                   setAddSize(Number(e.target.value))
                 }
@@ -918,7 +992,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 onClick={addFacility}
                 aria-label="Add facility"
                 color="primary"
-                disabled={!adding}
+                disabled={!adding || sizes.length === 0}
                 size="large"
               >
                 <AddIcon />
@@ -932,7 +1006,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
             size="large"
             variant="contained"
             color="primary"
-            disabled={unavailable.length > 0}
+            disabled={unavailable.length > 0 || !!hydroSetup.error}
             onClick={() =>
               onStart({
                 ...scenario,

@@ -64,6 +64,16 @@ export function validBuildFacility(raw: unknown): raw is {
     )
   )
     return false;
+  if (
+    (facility.name === "Hydro" || facility.fuel === "Hydro") &&
+    (facility.name !== "Hydro" ||
+      facility.fuel !== "Hydro" ||
+      facility.peakWh !== undefined ||
+      !Number.isSafeInteger(facility.peakW))
+  )
+    return false;
+  if (facility.name !== "Hydro" && facility.hydroSiteId !== undefined)
+    return false;
   if (facility.peakWh !== undefined) {
     return (
       ["peakWh", "maxPeakWh", "roundTripEfficiency", "hourlyLoss"].every(

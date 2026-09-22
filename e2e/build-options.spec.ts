@@ -106,23 +106,47 @@ for (const theme of ["light", "dark"] as const) {
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
         ).toBeLessThanOrEqual(1);
       }
-      await first.getByRole("button", { name: /Show .* details/ }).click();
-      await expect(first.locator(".buildOptionDescription")).toBeVisible();
-      await expect(first.getByRole("table")).toBeVisible();
+      // Sorting can change the first card. Keep the detail/purchase flow tied to
+      // Hydro and resize it through the UI: the default 500 MW exceeds local sites.
+      const detailCard =
+        kind === "Generator"
+          ? cards.filter({
+              has: page.getByRole("button", {
+                name: "Review purchase of Hydro",
+                exact: true,
+              }),
+            })
+          : first;
+      const detailReview = detailCard.getByRole("button", {
+        name: /Review purchase of/,
+      });
+      if (kind === "Generator") {
+        await expect(detailReview).toBeDisabled();
+        await expect(detailCard).toContainText("0 fit");
+        await detailCard
+          .getByRole("button", { name: "Use site maximum" })
+          .click();
+        await expect(detailCard).toContainText("Plant: 51.2MW");
+        await expect(detailCard).toContainText("Site: Lake Lynn Hydro Station");
+      }
+      await expect(detailReview).toBeEnabled();
+      await detailCard.getByRole("button", { name: /Show .* details/ }).click();
+      await expect(detailCard.locator(".buildOptionDescription")).toBeVisible();
+      await expect(detailCard.getByRole("table")).toBeVisible();
       await expect(
-        first.getByText("Construction emits", { exact: true }),
+        detailCard.getByText("Construction emits", { exact: true }),
       ).toBeVisible();
-      await first
+      await detailCard
         .getByText("Construction emits", { exact: true })
         .scrollIntoViewIfNeeded();
       await expect(
-        first.getByText("Construction emits", { exact: true }),
+        detailCard.getByText("Construction emits", { exact: true }),
       ).toBeInViewport();
       await page.screenshot({
         path: testInfo.outputPath(`${kind}-details-${theme}.png`),
         animations: "disabled",
       });
-      await review.click();
+      await detailReview.click();
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");
       const title = dialog.locator(".closableDialogTitleText");

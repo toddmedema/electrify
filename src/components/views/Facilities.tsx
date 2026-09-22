@@ -557,6 +557,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 {facility.name.toLowerCase()} facility?
               </DialogTitle>
               <DialogContent>
+                {facility.hydroSiteId && (
+                  <DialogContentText>
+                    {underConstruction
+                      ? "Cancelling frees this site."
+                      : "Selling won't free this site."}
+                  </DialogContentText>
+                )}
                 <DialogContentText>
                   You will receive{" "}
                   {formatMoneyConcise(

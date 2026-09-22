@@ -1,3 +1,4 @@
+import { validHydroClaims } from "../data/HydroSites";
 import {
   GAME_TO_REAL_YEARS,
   TICKS_PER_HOUR,
@@ -362,6 +363,13 @@ export function checkTick(
       );
     }
   }
+
+  if (!validHydroClaims(state))
+    collector.add(
+      "Hydro sites remain unique, capacity-limited and historically claimed",
+      when,
+      "Invalid Hydro reservation or commissioned site claim",
+    );
 
   state.facilities.forEach((f: FacilityOperatingType) => {
     const label = `${f.name} #${f.id}`;

@@ -1,10 +1,11 @@
+import { getHydroAvailability } from "./HydroSites";
 import {
   airborneWindCostPerW,
   airborneWindMaxPeakW,
   GENERATORS,
   STORAGE,
 } from "./Facilities";
-import { GAME_TO_REAL_YEARS } from "../Constants";
+import { LOCATIONS, GAME_TO_REAL_YEARS } from "../Constants";
 import { getDateFromMinute } from "../helpers/DateTime";
 import { estimatedAnnualOperatingCost } from "../helpers/Financials";
 import { FacilityOperatingType, GameType, LocationType } from "../Types";
@@ -195,7 +196,9 @@ describe("real technology cost trends", () => {
 describe("location-aware facilities", () => {
   it("does not offer site-dependent technologies without the resource", () => {
     const state = stateAt(france);
-    const fuels = GENERATORS(state, 100000000, [], []).map((g) => g.fuel);
+    const fuels = GENERATORS(state, 100000000, [], [])
+      .filter((g) => g.available)
+      .map((g) => g.fuel);
     const storage = STORAGE(state, 500000000).map((s) => s.name);
     expect(fuels).not.toContain("Geothermal");
     expect(fuels).not.toContain("Hydro");
@@ -203,20 +206,30 @@ describe("location-aware facilities", () => {
   });
 
   it("uses an explicit conventional hydro site limit without changing its benchmark cost", () => {
-    const baseline = GENERATORS(stateAt(iceland, 2024), 100000000, [], []).find(
-      (generator) => generator.name === "Hydro",
-    );
+    const baseline = GENERATORS(
+      stateAt(LOCATIONS.PIT, 2024),
+      100000000,
+      [],
+      [],
+    ).find((generator) => generator.name === "Hydro");
     const withExisting = GENERATORS(
-      stateAt(iceland, 2024, [
-        { name: "Hydro", fuel: "Hydro" } as FacilityOperatingType,
+      stateAt(LOCATIONS.PIT, 2024, [
+        {
+          name: "Hydro",
+          fuel: "Hydro",
+          hydroSiteId: getHydroAvailability(stateAt(LOCATIONS.PIT), 1000000)
+            .remaining[0].id,
+        } as FacilityOperatingType,
       ]),
       100000000,
       [],
       [],
     ).find((generator) => generator.name === "Hydro");
 
-    expect(baseline?.viableLocationsRemaining).toBe(3);
-    expect(withExisting?.viableLocationsRemaining).toBe(2);
+    expect(baseline?.viableLocationsRemaining).toBeGreaterThan(0);
+    expect(withExisting?.viableLocationsRemaining).toBe(
+      baseline!.viableLocationsRemaining! - 1,
+    );
     expect(withExisting?.buildCost).toBeCloseTo(
       baseline?.buildCost as number,
       -2,

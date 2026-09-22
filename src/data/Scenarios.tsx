@@ -1282,7 +1282,12 @@ export const SCENARIOS = [
     // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
     facilities: [
-      { fuel: "Hydro", peakW: 171570000, initialAgeYears: 30 },
+      {
+        fuel: "Hydro",
+        peakW: 171570000,
+        initialAgeYears: 30,
+        hydroSiteId: "azutan-2-esp",
+      },
       { fuel: "Sun", peakW: 320430000, initialAgeYears: 5 },
       { fuel: "Wind", peakW: 320070000, initialAgeYears: 8 },
       { fuel: "Natural Gas", peakW: 263160000, initialAgeYears: 12 },
@@ -1482,6 +1487,7 @@ export const SCENARIOS = [
     name: "The River Runs Dry",
     icon: "river runs dry",
     locationId: "Lusaka",
+    hydroInventoryKey: "scenario:114",
     location: {
       id: "Lusaka",
       name: "Lusaka, Zambia",
@@ -1553,7 +1559,10 @@ export const SCENARIOS = [
     // Twenty percent of Zambia's 2014 fleet: Kariba North Bank at 1,080MW after its extension,
     // Kafue Gorge at 990MW, Victoria Falls at 108MW, and a little emergency diesel. Maamba's
     // coal units had not yet been commissioned, which is what leaves the grid with no reserve.
-    // https://www.zesco.co.zm/aboutUs/powerStations
+    // https://www.zesco.co.zm/generation
+    // Keep the authored 435 MW scaled fleet as one Kariba-site plant: it fits the ceiling.
+    // Splitting changes reservoir dispatch and drought balance; hydrology is unchanged here.
+    // Victoria Falls uses the national-grid inventory exception; see docs/hydro-sites.md.
     facilities: [
       // Kariba was essentially full when 2014 opened, and saying so is what makes the drought
       // the thing that empties it. On the default half-pool the lake cannot survive its first
@@ -1561,6 +1570,7 @@ export const SCENARIOS = [
       {
         fuel: "Hydro",
         peakW: 435000000,
+        hydroSiteId: "kariba-zmb",
         initialAgeYears: 38,
         initialReservoirFraction: 1,
       },

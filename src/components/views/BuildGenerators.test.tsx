@@ -1,3 +1,5 @@
+import { getHydroAvailability, HYDRO_SITES } from "../../data/HydroSites";
+import { LOCATIONS } from "../../Constants";
 import * as React from "react";
 import {
   fireEvent,
@@ -421,4 +423,91 @@ it("keeps expanded details with their generator when tutorial choices expand", (
   expect(
     screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
   ).toBeGreaterThan(3);
+});
+
+it("quotes an exact Hydro site maximum without changing the shared slider", () => {
+  const game = createGame({ scenarioId: 104, difficulty: "CEO" });
+  game.location = LOCATIONS.PIT;
+  game.facilities = [];
+  game.commissionedHydroSiteIds = [];
+  const remaining = getHydroAvailability(game, 1000000).remaining;
+  const site =
+    remaining.find((site) => site.maxPeakW === 24000000) || remaining[0];
+  expect(site).toBeDefined();
+  game.commissionedHydroSiteIds = remaining
+    .filter((candidate) => candidate.id !== site.id)
+    .map((candidate) => candidate.id);
+  game.timeline[0].cash = 1e12;
+  const onBuild = jest.fn();
+  render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  const slider = screen.getByRole("slider");
+  const before = slider.getAttribute("aria-valuenow");
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
+  expect(slider).toHaveAttribute("aria-valuenow", before!);
+  expect(
+    screen.getByText(new RegExp("Site: " + HYDRO_SITES[site.id].name)),
+  ).toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    "Only cancelling before completion frees it",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
+  expect(onBuild).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Hydro", peakW: site.maxPeakW }),
+    false,
+  );
+});
+
+it("updates fit counts and distinguishes exhausted and unavailable Hydro inventories", () => {
+  const game = createGame({ scenarioId: 103 });
+  game.facilities = [];
+  game.commissionedHydroSiteIds = [];
+  const onBuild = jest.fn();
+  const { rerender } = render(
+    <BuildGenerators
+      game={game}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  const sites = getHydroAvailability(game, 1000000).remaining;
+  expect(sites.length).toBeGreaterThan(0);
+  game.commissionedHydroSiteIds = sites.map((site) => site.id);
+  rerender(
+    <BuildGenerators
+      game={{ ...game }}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  expect(screen.getByText(/0 sites left · 0 fit/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/All Hydro sites are used or reserved/),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeDisabled();
+  game.location = { ...game.location, lat: game.location.lat + 1 };
+  rerender(
+    <BuildGenerators
+      game={{ ...game }}
+      onBack={jest.fn()}
+      onBuildGenerator={onBuild}
+    />,
+  );
+  expect(screen.getByText(/Hydro site data unavailable/)).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Review purchase of Hydro" }),
+  ).toBeDisabled();
 });

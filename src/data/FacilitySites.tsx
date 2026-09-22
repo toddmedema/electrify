@@ -1,17 +1,17 @@
+import { resolveHydroInventory, isConventionalHydro } from "./HydroSites";
 import type { LocationType } from "../Types";
-import { hasGeothermalResource, hasHydroResource } from "./LocationProfiles";
+import { hasGeothermalResource } from "./LocationProfiles";
 
 export type SiteLimitedFacilityName = "Hydro" | "Geothermal" | "Pumped Hydro";
 
 /** The only facility state needed to determine whether a project has claimed a site. */
 export interface FacilitySiteClaim {
   name: string;
+  fuel?: unknown;
+  peakWh?: unknown;
 }
 
-// Conventional hydro and geothermal used to express scarcity only through a linear price
-// multiplier. Until those resources get the same site-level GIS treatment as pumped hydro, keep
-// the old curve's three/four-site scale as an explicit, understandable gameplay limit instead.
-const CONVENTIONAL_HYDRO_SITES = 3;
+// Geothermal retains its count-based scarcity model; conventional Hydro uses physical sites.
 const CONVENTIONAL_GEOTHERMAL_SITES = 4;
 
 /**
@@ -249,7 +249,12 @@ export function getViableLocationCount(
   facilityName: string,
 ): number | undefined {
   if (facilityName === "Hydro") {
-    return hasHydroResource(location) ? CONVENTIONAL_HYDRO_SITES : 0;
+    const inventory = resolveHydroInventory(location);
+    return location?.resources?.hydro === false
+      ? 0
+      : inventory?.status === "researched"
+        ? inventory.siteIds.length
+        : 0;
   }
   if (facilityName === "Geothermal") {
     return hasGeothermalResource(location) ? CONVENTIONAL_GEOTHERMAL_SITES : 0;
@@ -270,8 +275,10 @@ export function getViableLocationsRemaining(
   if (total === undefined) {
     return undefined;
   }
-  const used = facilities.filter(
-    (facility) => facility.name === facilityName,
+  const used = facilities.filter((facility) =>
+    facilityName === "Hydro"
+      ? isConventionalHydro(facility)
+      : facility.name === facilityName,
   ).length;
   return Math.max(0, total - used);
 }

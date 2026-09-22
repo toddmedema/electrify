@@ -4525,6 +4525,38 @@ $sizemap: (
       flex-shrink: 0;
     }
   }
+  .generatorPurchaseActions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .MuiCardHeader-root.hydroBuildHeader {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 4px 8px;
+    .MuiCardHeader-avatar {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .MuiCardHeader-content {
+      display: contents;
+    }
+    .MuiCardHeader-title {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .MuiCardHeader-subheader {
+      grid-column: 1 / 3;
+      grid-row: 2;
+      color: inherit;
+    }
+    .MuiCardHeader-action {
+      grid-column: 3;
+      grid-row: 1 / 3;
+      align-self: start;
+    }
+  }
   .MuiButton-root {
     min-height: 40px;
   }

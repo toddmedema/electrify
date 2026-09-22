@@ -1,3 +1,4 @@
+import { HYDRO_SITES } from "../../data/HydroSites";
 import * as React from "react";
 import { Typography } from "@mui/material";
 import { getFuelPricesPerMBTU } from "../../data/FuelPrices";
@@ -157,6 +158,12 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
 
   return (
     <div className="facilityDetails">
+      {facility.hydroSiteId && (
+        <Typography variant="body2">
+          Hydro site:{" "}
+          {HYDRO_SITES[facility.hydroSiteId]?.name || facility.hydroSiteId}
+        </Typography>
+      )}
       <section className="facilityDetailSection" aria-label="Operation">
         <Typography component="h3" className="facilityDetailHeading">
           Operation

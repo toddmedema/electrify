@@ -297,3 +297,7 @@ lifecycle impact.
 - [NREL 2024 ATB, Geothermal](https://atb.nrel.gov/electricity/2024/geothermal)
 - [DOE, Geothermal Basics](https://www.energy.gov/hgeo/geothermal/geothermal-basics)
 - [DOE, Long-Duration Energy Storage portfolio](https://www.energy.gov/cmei/oced/long-duration-energy-storage)
+
+## Conventional Hydro site inventories
+
+Capacity ceilings, provenance, coverage gaps, deterministic allocation and scenario exceptions are documented in [Hydro sites](hydro-sites.md).

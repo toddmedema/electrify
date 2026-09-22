@@ -1,3 +1,4 @@
+import { validHydroClaims } from "./data/HydroSites";
 import {
   validRunIdentity,
   sameRunIdentity,
@@ -371,7 +372,7 @@ export function parseSave(raw: unknown): SaveGameType | null {
   ) {
     return null;
   }
-  if (!Array.isArray(game.facilities)) {
+  if (!Array.isArray(game.facilities) || !validHydroClaims(game as GameType)) {
     return null;
   }
   if (

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { TableCell, TableRow } from "@mui/material";
 import { getViableLocationCount } from "../../data/FacilitySites";
+import { getHydroAvailability } from "../../data/HydroSites";
 import { LocationType } from "../../Types";
 
 interface BuildAvailability {
@@ -48,6 +49,7 @@ const SITE_NOUNS: Record<string, string> = {
 
 /** Shared availability copy and state for generator and storage purchase cards. */
 export function getBuildAvailability(options: {
+  hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   name: string;
   description: string;
   available: boolean;
@@ -57,6 +59,24 @@ export function getBuildAvailability(options: {
   viableLocationsRemaining?: number;
 }): BuildAvailability {
   const place = shortPlaceName(options.location);
+  if (options.hydroAvailability) {
+    const messages: Record<string, string> = {
+      prohibited: "New Hydro is prohibited here.",
+      unavailable: "Hydro site data unavailable.",
+      empty: "No qualifying Hydro sites found.",
+      exhausted: "All Hydro sites are used or reserved.",
+      "too-large": "Too large for any remaining site.",
+    };
+    const status = options.hydroAvailability.status;
+    if (status !== "available")
+      return { buildable: false, secondaryText: messages[status] };
+    if (!options.available)
+      return { buildable: false, secondaryText: "Not available here yet." };
+    return {
+      buildable: options.sizeBuildable,
+      secondaryText: options.description,
+    };
+  }
   const sites = getSiteInventory(
     options.name,
     options.location,
