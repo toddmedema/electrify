@@ -59,6 +59,19 @@ describe("SaveGame", () => {
     );
   });
 
+  it.each([
+    { constructionKgco2eTotal: "bad" },
+    { constructionKgco2eTotal: null },
+    { constructionKgco2eTotal: -1 },
+    { constructionKgco2eTotal: 1e300 },
+    { constructionKgco2eEmitted: -1 },
+    { constructionKgco2eEmitted: 1 },
+  ])("rejects invalid facility construction bookkeeping %p", (patch) => {
+    const raw = JSON.parse(JSON.stringify(serializeSave(game)));
+    Object.assign(raw.game.facilities[0], patch);
+    expect(parseSave(raw)).toBeNull();
+  });
+
   it.each([undefined, null, 1, "", "Expert", "constructor", "toString"])(
     "rejects an unsupported difficulty %p before resuming",
     (difficulty) => {

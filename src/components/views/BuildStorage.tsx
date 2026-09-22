@@ -39,7 +39,8 @@ import {
   siteCountLabel,
   ViableLocationsRow,
 } from "../base/BuildAvailability";
-import BuildMetric from "../base/BuildMetric";
+import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
+import { useUnits } from "../base/UnitsContext";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import { GameType, LocationType, StorageShoppingType } from "../../Types";
 
@@ -53,6 +54,7 @@ interface StorageBuildItemProps {
 
 function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
   const { storage, cash } = props;
+  const units = useUnits();
   const [expanded, setExpanded] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [financingExpanded, setFinancingExpanded] = React.useState(false);
@@ -198,6 +200,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         >
           {storage.description}
         </Typography>
+        <Box className="buildOptionMetrics">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={
+              (storage.constructionKgco2ePerWh || 0) * storage.peakWh
+            }
+            yearsToBuild={storage.yearsToBuild}
+            units={units}
+          />
+        </Box>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>

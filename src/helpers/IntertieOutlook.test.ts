@@ -42,6 +42,35 @@ function corridorWithArchetype(archetype: string) {
 }
 
 describe("intertie outlook", () => {
+  it("uses the upgraded rating when expressing neighbor supply as a share of the line", () => {
+    const ticks = year();
+    const capacityW = 2e9;
+    const outlook = intertieOutlook(
+      "california-north",
+      intern,
+      ticks,
+      -Infinity,
+      capacityW,
+    )!;
+    const expected =
+      ticks.reduce(
+        (sum, tick) =>
+          sum +
+          intertieImportLimitW(
+            { corridorId: "california-north", capacityW },
+            { ...intern, expectedLuck: true },
+            tick.minute,
+            tick,
+          ) /
+            capacityW,
+        0,
+      ) / ticks.length;
+    expect(outlook.mean).toBeCloseTo(expected, 12);
+    expect(outlook.mean).toBeLessThan(
+      intertieOutlook("california-north", intern, ticks)!.mean,
+    );
+  });
+
   it("waits for a forecast covering every calendar month", () => {
     expect(
       intertieOutlook("california-south", intern, year({ months: 11 })),

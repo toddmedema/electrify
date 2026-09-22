@@ -5451,3 +5451,15 @@ $sizemap: (
     color: var(--delta-good);
   }
 }
+
+.transmissionUpgrade {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  .MuiButton-root {
+    min-height: 40px;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
+  }
+}

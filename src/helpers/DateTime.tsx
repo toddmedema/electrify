@@ -36,6 +36,7 @@ export const EMPTY_HISTORY = {
   kgco2e: 0,
   localKgco2e: 0,
   importedKgco2e: 0,
+  constructionKgco2e: 0,
   revenue: 0,
   expensesFuel: 0,
   expensesOM: 0,
@@ -80,6 +81,8 @@ export function reduceHistories(
   acc.kgco2e += t.kgco2e;
   acc.localKgco2e = (acc.localKgco2e || 0) + (t.localKgco2e || 0);
   acc.importedKgco2e = (acc.importedKgco2e || 0) + (t.importedKgco2e || 0);
+  acc.constructionKgco2e =
+    (acc.constructionKgco2e || 0) + (t.constructionKgco2e || 0);
   acc.revenue += t.revenue;
   acc.expensesFuel += t.expensesFuel;
   acc.expensesOM += t.expensesOM;
@@ -117,7 +120,12 @@ export function deriveExpandedSummary(
     profitPerkWh: (s.revenue - expensesWithImports) / supplykWh,
     revenuePerkWh: s.revenue / supplykWh,
     expenses: expensesWithImports,
-    kgco2ePerMWh: s.kgco2e / (supplykWh / 1000),
+    // Operational emissions only. Construction emissions belong to a project's whole schedule,
+    // not to the megawatt-hours one month happened to deliver, and dividing them by this
+    // month's supply would spike the intensity of any month somebody broke ground in.
+    kgco2ePerMWh:
+      ((s.localKgco2e ?? s.kgco2e) + (s.importedKgco2e || 0)) /
+      (supplykWh / 1000),
   };
 }
 
@@ -234,6 +242,8 @@ function accumulateTick(
   summary.localKgco2e = (summary.localKgco2e || 0) + (t.localKgco2e || 0);
   summary.importedKgco2e =
     (summary.importedKgco2e || 0) + (t.importedKgco2e || 0);
+  summary.constructionKgco2e =
+    (summary.constructionKgco2e || 0) + (t.constructionKgco2e || 0);
   summary.revenue += t.revenue;
   summary.expensesFuel += t.expensesFuel;
   summary.expensesOM += t.expensesOM;

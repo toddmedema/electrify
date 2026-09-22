@@ -27,6 +27,7 @@ import {
 import {
   DOWNPAYMENT_PERCENT,
   LOAN_MONTHS,
+  MAX_INTERTIE_UPGRADES,
   MONTH_NAMES,
   MONTHS,
   TICK_MINUTES,
@@ -44,7 +45,12 @@ import {
 } from "../../helpers/Format";
 import {
   adjacentMarketPricePerMWh,
+  corridorConstructionKgco2e,
+  intertieCapacityCeilingW,
   intertieContextForGame,
+  intertieTechnologyCeilingW,
+  intertieUpgradeCount,
+  intertieUpgradeQuote,
   intertieImportLimitW,
   transmissionRatingW,
 } from "../../helpers/Transmission";
@@ -60,14 +66,19 @@ import {
   TickPresentFutureType,
   TradingPolicyType,
   TransmissionCorridorDefinitionType,
+  TransmissionLineOperatingType,
   UnitSystemType,
 } from "../../Types";
-import { formatMass } from "../../helpers/Units";
+import {
+  formatLargeMassValueConcise,
+  formatMass,
+  largeMassUnit,
+} from "../../helpers/Units";
 import { useUnits } from "../base/UnitsContext";
 import ConceptIcon from "../base/ConceptIcon";
 import DecisionImpactPreview from "../base/DecisionImpactPreview";
 import Sparkline from "../base/Sparkline";
-import BuildMetric from "../base/BuildMetric";
+import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import FlowBar from "../base/FlowBar";
 import { chartPalette } from "../../Theme";
 
@@ -274,6 +285,11 @@ function IntertieBuildItem(props: {
             value={`${formatMass(market.emissionsKgco2ePerMWh, units)}/MWh`}
           />
         )}
+        <ConstructionEmissionsMetric
+          kgco2eTotal={corridorConstructionKgco2e(corridor)}
+          yearsToBuild={corridor.yearsToBuild}
+          units={units}
+        />
       </Box>
       {!readOnly && buildable && (
         <Typography
@@ -326,10 +342,166 @@ function IntertieBuildItem(props: {
   );
 }
 
+/**
+ * Widening a line that already runs. Shown in place rather than as a build card, because it is a
+ * decision about an asset the player owns: the question is whether this corridor should carry
+ * more, not which corridor to open.
+ */
+function IntertieUpgradeControl(props: {
+  line: TransmissionLineOperatingType;
+  cash?: number;
+  year: number;
+  interestRate: number;
+  units: UnitSystemType;
+  readOnly?: boolean;
+  onUpgrade: (corridorId: string, financed: boolean) => void;
+}): React.JSX.Element | null {
+  const { line, cash, year, interestRate, units, readOnly, onUpgrade } = props;
+  const [reviewing, setReviewing] = React.useState(false);
+  const titleId = React.useId();
+  if (line.upgrade) {
+    const years = line.upgrade.yearsToBuildLeft;
+    return (
+      <Typography variant="body2" color="textSecondary">
+        Upgrading to {formatWatts(line.upgrade.targetCapacityW, 3)} ·{" "}
+        {years < 1
+          ? `${Math.max(1, Math.round(years * 12))} months`
+          : `${years.toFixed(1)} years`}{" "}
+        remaining. The line keeps carrying {formatWatts(line.capacityW, 3)}{" "}
+        until it is done.
+      </Typography>
+    );
+  }
+  const quote = intertieUpgradeQuote(line, year);
+  if (!quote) {
+    // Say which ceiling was reached. "No further upgrades" on its own reads as a bug.
+    const atStepLimit = intertieUpgradeCount(line) >= MAX_INTERTIE_UPGRADES;
+    return (
+      <Typography variant="body2" color="textSecondary">
+        {atStepLimit
+          ? "This corridor is full. Its towers and substations cannot carry another circuit; more capacity needs a new route."
+          : `${formatWatts(line.capacityW, 3)} is as much as this connection can carry, limited by ${
+              intertieTechnologyCeilingW(year) <=
+              intertieCapacityCeilingW(line.corridorId, year)
+                ? "what can be built today"
+                : "what the neighbor has to spare"
+            }.`}
+      </Typography>
+    );
+  }
+  if (readOnly) return null;
+  const downpayment = quote.buildCost * DOWNPAYMENT_PERCENT;
+  const affordable = (cash ?? 0) >= downpayment;
+  const months = Math.max(1, Math.round(quote.yearsToBuild * 12));
+  return (
+    <div className="transmissionUpgrade">
+      <Typography variant="body2">
+        Upgrade to {formatWatts(quote.targetCapacityW, 3)} ·{" "}
+        {formatMoneyConcise(quote.buildCost)} · {months} mo ·{" "}
+        {formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)}{" "}
+        {largeMassUnit(units)} CO2e to build
+      </Typography>
+      {!affordable && (
+        <Typography variant="caption" color="textSecondary" component="div">
+          Need {formatMoneyConcise(downpayment)} down · you have{" "}
+          {formatMoneyConcise(cash ?? 0)}
+        </Typography>
+      )}
+      <Button
+        size="small"
+        variant="outlined"
+        color="primary"
+        disabled={!affordable}
+        aria-label={`Upgrade ${line.name} to ${formatWatts(quote.targetCapacityW, 3)}`}
+        startIcon={<ConceptIcon concept="build" fontSize="small" />}
+        onClick={() => setReviewing(true)}
+      >
+        Review upgrade
+      </Button>
+      {reviewing && (
+        <Dialog
+          open
+          onClose={() => setReviewing(false)}
+          fullWidth
+          maxWidth="sm"
+          aria-labelledby={titleId}
+        >
+          <ClosableDialogTitle id={titleId} onClose={() => setReviewing(false)}>
+            Upgrade {line.name}?
+          </ClosableDialogTitle>
+          <DialogContent className="noPadding">
+            <DecisionImpactPreview
+              facts={[
+                {
+                  concept: "supply",
+                  label: "Connection capacity",
+                  value: `${formatWatts(line.capacityW, 3)} → ${formatWatts(quote.targetCapacityW, 3)}`,
+                  detail:
+                    "The line keeps operating at its current capacity during construction. Imports still depend on the neighbor's spare supply.",
+                },
+                {
+                  concept: "money",
+                  label: "Cash purchase",
+                  value: `${formatMoneyConcise(cash ?? 0)} → ${formatMoneyConcise((cash ?? 0) - quote.buildCost)}`,
+                },
+                {
+                  concept: "finances",
+                  label: "Loan option",
+                  value: `${formatMoneyConcise(downpayment)} now + ${formatMoneyConcise(getMonthlyPayment(line.loanAmountLeft + quote.buildCost - downpayment, interestRate, LOAN_MONTHS))}/mo`,
+                  detail: `Payments start during construction. Loan term: ${LOAN_MONTHS / 12} years. Interest rate: ${(interestRate * 100).toFixed(2)}%.${line.loanAmountLeft > 0 ? ` Includes refinancing the existing ${formatMoneyConcise(line.loanAmountLeft)} balance at this rate and term.` : ""}`,
+                },
+                {
+                  concept: "money",
+                  label: "Upkeep after upgrade",
+                  value: `${formatMoneyConcise(line.annualOperatingCost / 12)} → ${formatMoneyConcise(quote.annualOperatingCost / 12)}/mo`,
+                  detail: "Electricity purchases and loan payments are extra.",
+                },
+                {
+                  concept: "time",
+                  label: "Upgrade complete in",
+                  value: `${months} months`,
+                },
+                {
+                  concept: "construction",
+                  label: "Construction emits",
+                  value: `${formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)} ${largeMassUnit(units)} CO2e`,
+                },
+              ]}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="contained"
+              disabled={(cash ?? 0) < quote.buildCost}
+              onClick={() => {
+                setReviewing(false);
+                onUpgrade(line.corridorId, false);
+              }}
+            >
+              Pay cash
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={!affordable}
+              onClick={() => {
+                setReviewing(false);
+                onUpgrade(line.corridorId, true);
+              }}
+            >
+              Take loan
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
 export interface TransmissionPanelProps {
   game: GameType;
   projectsOnly?: boolean;
   onBuild: (corridorId: string, financed: boolean) => void;
+  onUpgrade: (corridorId: string, financed: boolean) => void;
   onPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -402,6 +574,7 @@ function TradingControls({
 export default function TransmissionPanel({
   game,
   onBuild,
+  onUpgrade,
   onPolicy,
   projectsOnly = false,
 }: TransmissionPanelProps) {
@@ -417,9 +590,15 @@ export default function TransmissionPanel({
     game,
     projectsOnly || selectedLine !== null,
   );
-  const outlookFor = (corridorId: string) =>
+  const outlookFor = (corridorId: string, capacityW?: number) =>
     forecast &&
-    intertieOutlook(corridorId, intertieContext, forecast, game.date.minute);
+    intertieOutlook(
+      corridorId,
+      intertieContext,
+      forecast,
+      game.date.minute,
+      capacityW,
+    );
   const flowText = tradingFlowText(game);
   // The guided mission names the northern project. Showing only that choice until it is approved
   // makes an exploratory tap recoverable instead of letting a much dearer three-year project
@@ -486,7 +665,7 @@ export default function TransmissionPanel({
               : rating;
             const outlook =
               selectedLine === line.id
-                ? outlookFor(line.corridorId)
+                ? outlookFor(line.corridorId, line.capacityW)
                 : undefined;
             // Signed against the line's current rating, so the row reads the same way a
             // facility row does: positive is power arriving, negative is power being sold.
@@ -560,7 +739,7 @@ export default function TransmissionPanel({
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
                     <Typography variant="body2">
-                      {market?.name} · {formatWatts(line.capacityW)} rated
+                      {market?.name} · {formatWatts(line.capacityW, 3)} rated
                       capacity
                     </Typography>
                     {outlook && (
@@ -619,6 +798,17 @@ export default function TransmissionPanel({
                       </dl>
                     )}
                     {outlook && <IntertieYear outlook={outlook} />}
+                    {!building && (
+                      <IntertieUpgradeControl
+                        line={line}
+                        cash={now?.cash}
+                        year={game.date.year}
+                        interestRate={game.interestRate}
+                        units={units}
+                        readOnly={readOnly}
+                        onUpgrade={onUpgrade}
+                      />
+                    )}
                     {line.loanAmountLeft > 0 && (
                       <Typography variant="body2">
                         Loan balance {formatMoneyConcise(line.loanAmountLeft)}

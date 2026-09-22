@@ -2,11 +2,22 @@ import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
   DIFFICULTIES,
+  INTERTIE_CONSTRUCTION_COST_EXPONENT,
+  INTERTIE_CONSTRUCTION_EXISTING_MULTIPLIER,
+  INTERTIE_CONSTRUCTION_KGCO2E_PER_W,
+  INTERTIE_CONSTRUCTION_REFERENCE_COST_PER_W,
+  INTERTIE_UPGRADE_COST_ESCALATION,
+  INTERTIE_UPGRADE_COST_SHARE,
+  INTERTIE_UPGRADE_OPEX_EXPONENT,
+  INTERTIE_UPGRADE_STEP,
+  INTERTIE_UPGRADE_TIME_SHARE,
+  MAX_INTERTIE_UPGRADES,
   TICK_MINUTES,
 } from "../Constants";
 import {
   TRANSMISSION_CORRIDORS,
   adjacentMarketForCorridor,
+  corridorById,
 } from "../data/AdjacentMarkets";
 import {
   INTERTIE_ARCHETYPES,
@@ -17,6 +28,7 @@ import {
   AdjacentMarketDefinitionType,
   GameType,
   TradingPolicyType,
+  TransmissionCorridorDefinitionType,
   TransmissionLineOperatingType,
 } from "../Types";
 
@@ -401,5 +413,149 @@ export function clearTransmissionMarket({
     // capped imports retain the real shortage.
     localAvailableSupplyW:
       Math.abs(availableW - demandW) <= roundingSlack ? demandW : availableW,
+  };
+}
+
+/**
+ * Embodied emissions from building one corridor, in kgCO2e. The authored data records what a
+ * route costs but not how long it is, so cost per watt stands in for length and terrain, damped
+ * by an exponent because much of what makes an expensive corridor expensive -- land, permits,
+ * lawyers, engineers -- emits almost nothing. See docs/construction-emissions.md.
+ */
+export function corridorConstructionKgco2e(
+  corridor: Pick<
+    TransmissionCorridorDefinitionType,
+    "buildCost" | "capacityW" | "routeType"
+  >,
+): number {
+  if (!(corridor.capacityW > 0)) return 0;
+  const costPerW = corridor.buildCost / corridor.capacityW;
+  const perW =
+    INTERTIE_CONSTRUCTION_KGCO2E_PER_W *
+    Math.pow(
+      costPerW / INTERTIE_CONSTRUCTION_REFERENCE_COST_PER_W,
+      INTERTIE_CONSTRUCTION_COST_EXPONENT,
+    ) *
+    (corridor.routeType === "EXISTING"
+      ? INTERTIE_CONSTRUCTION_EXISTING_MULTIPLIER
+      : 1);
+  return perW * corridor.capacityW;
+}
+
+/**
+ * The largest single point-to-point link the world knows how to build, by year. One link means
+ * one AC circuit or one HVDC bipole, never a corridor carrying several: Itaipu is 3.15 GW per
+ * bipole even though its corridor moves twice that.
+ *
+ * AC leads until the mid-1980s, when Itaipu's bipole passes 765 kV, and HVDC has led since.
+ * The table stops climbing after Changji-Guquan because the binding constraint stops being the
+ * hardware: 12 GW arriving on one link is already larger than most grids can absorb losing all
+ * at once, so the limit becomes the receiving system's contingency rule rather than the valves.
+ */
+const INTERTIE_TECHNOLOGY_CEILING: readonly (readonly [number, number])[] = [
+  [0, 0.3e9], // 220-230 kV AC, the top commercial class before 345 kV
+  [1953, 0.7e9], // First 345 kV line, AEP
+  [1965, 2.0e9], // First 735 kV system, Hydro-Quebec
+  [1969, 2.4e9], // First 765 kV line, AEP
+  [1985, 3.15e9], // Itaipu +/-600 kV bipole overtakes AC
+  [2010, 6.4e9], // Xiangjiaba-Shanghai, first +/-800 kV UHVDC
+  [2014, 8.0e9], // Hami-Zhengzhou
+  [2019, 12.0e9], // Changji-Guquan, +/-1100 kV. Unbeaten since.
+  [2050, 15.0e9], // Extrapolated, and deliberately slight
+];
+
+export function intertieTechnologyCeilingW(year: number): number {
+  let ceiling = INTERTIE_TECHNOLOGY_CEILING[0][1];
+  for (const [from, capacityW] of INTERTIE_TECHNOLOGY_CEILING) {
+    if (year >= from) ceiling = capacityW;
+  }
+  return ceiling;
+}
+
+export interface IntertieUpgradeQuote {
+  targetCapacityW: number;
+  buildCost: number;
+  annualOperatingCost: number;
+  yearsToBuild: number;
+  constructionKgco2eTotal: number;
+}
+
+/** How many 1.5x steps this line has already taken above its corridor's authored rating. */
+export function intertieUpgradeCount(
+  line: Pick<TransmissionLineOperatingType, "corridorId" | "capacityW">,
+): number {
+  const corridor = corridorById(line.corridorId);
+  if (!corridor || !(corridor.capacityW > 0)) return 0;
+  return Math.max(
+    0,
+    Math.round(
+      Math.log(line.capacityW / corridor.capacityW) /
+        Math.log(INTERTIE_UPGRADE_STEP),
+    ),
+  );
+}
+
+/**
+ * The most this corridor may ever carry: whichever runs out first, the technology of the day or
+ * the neighbour's own spare generation. A line to a market with nothing to sell is a line to
+ * nowhere however thick the conductor.
+ */
+export function intertieCapacityCeilingW(
+  corridorId: string,
+  year: number,
+): number {
+  const market = adjacentMarketForCorridor(corridorId);
+  return Math.min(
+    intertieTechnologyCeilingW(year),
+    Math.max(market?.availableSupplyW || 0, market?.availableDemandW || 0) ||
+      Infinity,
+  );
+}
+
+/**
+ * What the next upgrade of this line would cost and deliver, or undefined when there is no next
+ * one. Priced off the corridor's own per-watt cost so an expensive route stays expensive to
+ * widen, at about half of what the same capacity would cost as a fresh corridor, escalating as
+ * the work moves from restringing conductor to rebuilding structures.
+ */
+export function intertieUpgradeQuote(
+  line: Pick<
+    TransmissionLineOperatingType,
+    "corridorId" | "capacityW" | "annualOperatingCost"
+  >,
+  year: number,
+  buildCostMultiplier = 1,
+  buildTimeMultiplier = 1,
+): IntertieUpgradeQuote | undefined {
+  const corridor = corridorById(line.corridorId);
+  if (!corridor) return undefined;
+  const step = intertieUpgradeCount(line);
+  if (step >= MAX_INTERTIE_UPGRADES) return undefined;
+  const targetCapacityW = Math.round(line.capacityW * INTERTIE_UPGRADE_STEP);
+  if (targetCapacityW > intertieCapacityCeilingW(line.corridorId, year)) {
+    return undefined;
+  }
+  const addedW = targetCapacityW - line.capacityW;
+  const newBuildCostPerW = corridor.buildCost / corridor.capacityW;
+  const buildCost =
+    addedW *
+    newBuildCostPerW *
+    INTERTIE_UPGRADE_COST_SHARE *
+    (INTERTIE_UPGRADE_COST_ESCALATION[step] ?? 1) *
+    buildCostMultiplier;
+  return {
+    targetCapacityW,
+    buildCost,
+    annualOperatingCost:
+      line.annualOperatingCost *
+      Math.pow(
+        targetCapacityW / line.capacityW,
+        INTERTIE_UPGRADE_OPEX_EXPONENT,
+      ),
+    yearsToBuild:
+      corridor.yearsToBuild * INTERTIE_UPGRADE_TIME_SHARE * buildTimeMultiplier,
+    // The same per-watt intensity as the corridor itself, charged on the watts being added.
+    constructionKgco2eTotal:
+      (corridorConstructionKgco2e(corridor) / corridor.capacityW) * addedW,
   };
 }

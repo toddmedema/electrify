@@ -672,6 +672,7 @@ export interface DispatchProps {
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
   onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -766,6 +767,7 @@ export default class Facilities extends React.Component<Props> {
       onReprioritize,
       onSelect,
       onTransmissionBuild,
+      onTransmissionUpgrade,
       onTradingPolicy,
       selectedFacilityId,
     } = this.props;
@@ -862,6 +864,7 @@ export default class Facilities extends React.Component<Props> {
                 <TransmissionPanel
                   game={game}
                   onBuild={onTransmissionBuild}
+                  onUpgrade={onTransmissionUpgrade}
                   onPolicy={onTradingPolicy}
                 />
               )}

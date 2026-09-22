@@ -1,5 +1,10 @@
 import { FacilityShoppingType } from "../Types";
 
+const MAXIMUM_CONSTRUCTION_KGCO2E: Readonly<Record<string, number>> = {
+  constructionKgco2ePerW: 20,
+  constructionKgco2ePerWh: 1,
+};
+
 function nonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
@@ -37,6 +42,8 @@ export function validBuildFacility(raw: unknown): raw is {
       "hydroWhPerMm",
       "hydroMeanMonthlyInflowWh",
       "viableLocationsRemaining",
+      "constructionKgco2ePerW",
+      "constructionKgco2ePerWh",
     ].some(
       (key) => facility[key] !== undefined && !nonNegative(facility[key]),
     ) ||
@@ -44,7 +51,17 @@ export function validBuildFacility(raw: unknown): raw is {
       (key) => typeof facility[key] === "number" && facility[key] > 1,
     ) ||
     (facility.tracksStarts !== undefined &&
-      typeof facility.tracksStarts !== "boolean")
+      typeof facility.tracksStarts !== "boolean") ||
+    // Bounded as well as non-negative. These travel through replay documents and go straight
+    // into the run's emissions and score, so an unbounded value from a crafted quote would
+    // poison both. The ceilings sit an order of magnitude above the dirtiest thing buildable
+    // (hydro at 2 kgCO2e/W, batteries at 0.08 kgCO2e/Wh), which leaves plenty of headroom for
+    // any future technology without letting an arbitrary number through.
+    ["constructionKgco2ePerW", "constructionKgco2ePerWh"].some(
+      (key) =>
+        typeof facility[key] === "number" &&
+        facility[key] > MAXIMUM_CONSTRUCTION_KGCO2E[key],
+    )
   )
     return false;
   if (facility.peakWh !== undefined) {

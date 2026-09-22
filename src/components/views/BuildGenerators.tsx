@@ -66,7 +66,7 @@ import {
 } from "../base/BuildAvailability";
 import HydroPrimer, { useHydroPrimer } from "../base/HydroPrimer";
 import { getScenario } from "../../data/Scenarios";
-import BuildMetric from "../base/BuildMetric";
+import BuildMetric, { ConstructionEmissionsMetric } from "../base/BuildMetric";
 import ConstructionBuildHeader from "../base/ConstructionBuildHeader";
 import Sparkline from "../base/Sparkline";
 
@@ -421,6 +421,15 @@ export function GeneratorBuildItem(
             </Stack>
           </Box>
         )}
+        <Box className="buildOptionMetrics">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={
+              (generator.constructionKgco2ePerW || 0) * generator.peakW
+            }
+            yearsToBuild={generator.yearsToBuild}
+            units={units}
+          />
+        </Box>
         <TableContainer>
           <Table
             size="small"
