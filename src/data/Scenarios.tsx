@@ -5,6 +5,16 @@ import TutorialPrompt from "../components/base/TutorialPrompt";
 import { selectFacility } from "../reducers/UI";
 import { AppStateType, ScenarioType, TutorialUiIdType } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { isPaneLayout } from "../Globals";
+
+// Wide layouts hide the bottom navigation and keep Insights and Events on screen, so a step
+// that asks the player to switch to them cannot wait for a tap that cannot happen there.
+// It advances on its own; narrow layouts still require the tap. Kept beside the missions
+// rather than in the HUD because it is part of what the step is for, not how it looks.
+const onInsightsOrPanes = (s: AppStateType) =>
+  s.card.name === "INSIGHTS" || isPaneLayout();
+const onEventsOrPanes = (s: AppStateType) =>
+  s.card.name === "EVENTS" || isPaneLayout();
 
 // Mission 1 is a new player's first minute in the game, so it opens on the fleet and the chart
 // alone and hands over controls only as the steps teach them. Navigation, building, the menu and
@@ -445,7 +455,7 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
-        continueOn: (s: AppStateType) => s.card.name === "INSIGHTS",
+        advanceOn: onInsightsOrPanes,
         action: "Tap Insights",
         content: (
           <TutorialPrompt text="Insights shows your revenue, expenses, cash, and profit over time." />
@@ -531,8 +541,8 @@ export const SCENARIOS = [
         skipBeacon: true, // causes tutorial to auto-start
         card: "FACILITIES",
         target: "#insightsNav",
-        continueOn: (s: AppStateType) =>
-          s.card.name === "INSIGHTS" || s.game.dollarsPerkWh < 0.07,
+        advanceOn: (s: AppStateType) =>
+          onInsightsOrPanes(s) || s.game.dollarsPerkWh < 0.07,
         action: "Tap Insights",
         content: (
           <TutorialPrompt text="Your electricity rate lives in Insights." />
@@ -631,6 +641,23 @@ export const SCENARIOS = [
         ),
       },
       {
+        // No card: the player is the one who makes the switch, and the step is done when
+        // they are on Insights. Wide layouts show the pane and advance on their own
+        target: "#insightsNav",
+        advanceOn: onInsightsOrPanes,
+        action: "Tap Insights",
+        content: (
+          <TutorialPrompt text="The supply forecast that shows the blackout lives in Insights." />
+        ),
+        desktop: {
+          target: "#insightsPane",
+          action: "Find the Insights pane",
+          content: (
+            <TutorialPrompt text="The supply forecast that shows the blackout lives in the Insights pane." />
+          ),
+        },
+      },
+      {
         card: "INSIGHTS",
         target: "#chartForecastSupplyDemand",
         action: "Find the predicted blackout",
@@ -647,6 +674,22 @@ export const SCENARIOS = [
         content: (
           <TutorialPrompt text="See what a forecast blackout looks like when it arrives." />
         ),
+      },
+      {
+        // No card: the player makes the switch, and the step is done when they are on Events
+        target: "#eventsNav",
+        advanceOn: onEventsOrPanes,
+        action: "Tap Events",
+        content: (
+          <TutorialPrompt text="Events explains what just changed, dated and in order." />
+        ),
+        desktop: {
+          target: "#eventsPane",
+          action: "Find the Events pane",
+          content: (
+            <TutorialPrompt text="Events explains what just changed, dated and in order." />
+          ),
+        },
       },
       {
         card: "EVENTS",
@@ -680,6 +723,22 @@ export const SCENARIOS = [
           s.game.facilities.every((f) => !f.paused),
         action: "Tap Resume",
         content: <TutorialPrompt text="Bring your plant back online." />,
+      },
+      {
+        // No card: the player makes the switch, and the step is done when they are on Insights
+        target: "#insightsNav",
+        advanceOn: onInsightsOrPanes,
+        action: "Tap Insights",
+        content: (
+          <TutorialPrompt text="Possible fuel costs live in the Insights forecast." />
+        ),
+        desktop: {
+          target: "#insightsPane",
+          action: "Find the Insights pane",
+          content: (
+            <TutorialPrompt text="Possible fuel costs live in the Insights pane." />
+          ),
+        },
       },
       {
         card: "INSIGHTS",

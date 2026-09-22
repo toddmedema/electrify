@@ -31,6 +31,8 @@ import {
   cancelPolicy,
   openPolicyDecision,
   closePolicyDecision,
+  pageHidden,
+  pageVisible,
 } from "./GameActions";
 import type { AppDispatch } from "../Store";
 import cloneDeep from "lodash.clonedeep";
@@ -242,11 +244,15 @@ let speedBeforeDialog = "PAUSED" as SpeedType;
 // pause. Construction catalogs belong here too: the quote should not change while it is read.
 let speedBeforeBlockingCard: SpeedType | undefined;
 let speedBeforeManualHelp: SpeedType | undefined;
+// While hidden, pause owners read and update this foreground speed; the real clock stays
+// paused even if a dialog or card opens or closes before the page returns.
+let speedBeforeHidden: SpeedType | undefined;
 const BLOCKING_CARDS = new Set([
   "MAIN_MENU",
   "MANUAL",
   "BUILD_GENERATORS",
   "BUILD_STORAGE",
+  "BUILD_INTERTIES",
   "CHALLENGE",
   "NEW_GAME",
   "NEW_GAME_DETAILS",
@@ -784,12 +790,26 @@ function ensureTicking(state: GameType) {
   }
 }
 
+// Backgrounding is an outer pause: UI transitions still update the speed to restore,
+// but may never restart the actual clock until the page is visible.
+function foregroundSpeed(state: GameType): SpeedType {
+  return speedBeforeHidden ?? state.speed;
+}
+
+function setForegroundSpeed(state: GameType, speed: SpeedType) {
+  if (speedBeforeHidden !== undefined) {
+    speedBeforeHidden = speed;
+  } else {
+    state.speed = speed;
+  }
+}
+
 // Puts the clock back the way the player left it before a full-screen card paused it
 function restoreSpeedAfterBlockingCard(state: GameType) {
   if (speedBeforeBlockingCard === undefined) {
     return;
   }
-  state.speed = speedBeforeBlockingCard;
+  setForegroundSpeed(state, speedBeforeBlockingCard);
   speedBeforeBlockingCard = undefined;
   ensureTicking(state);
 }
@@ -1115,10 +1135,12 @@ export const gameSlice = createSlice({
       if (pendingScenarioChoice(state) && action.payload !== "PAUSED") return;
       delete state.policyPause;
       // Global keyboard shortcuts still fire over full-screen cards. Keep their quotes and
-      // instructions frozen until the player actually closes the card.
+      // instructions frozen until the player actually closes the card. A backgrounded page
+      // freezes the same way: pageVisible is the caller that resumes it.
       if (
         (speedBeforeBlockingCard !== undefined ||
-          speedBeforeManualHelp !== undefined) &&
+          speedBeforeManualHelp !== undefined ||
+          speedBeforeHidden !== undefined) &&
         action.payload !== "PAUSED"
       ) {
         return;
@@ -1138,6 +1160,7 @@ export const gameSlice = createSlice({
       if (!projectAuthoredRunReference(identity)) return;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -1168,6 +1191,7 @@ export const gameSlice = createSlice({
       speedBeforeDialog = "PAUSED";
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       // Never resume mid-tick; loaded() flips inGame once the CSVs are back
       restored.speed = "PAUSED";
       restored.inGame = false;
@@ -1186,6 +1210,7 @@ export const gameSlice = createSlice({
       const replay = action.payload;
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       speedBeforeDialog = "PAUSED";
       return {
         ...cloneDeep(initialGame),
@@ -1227,6 +1252,7 @@ export const gameSlice = createSlice({
     builder.addCase(quit, () => {
       speedBeforeBlockingCard = undefined;
       speedBeforeManualHelp = undefined;
+      speedBeforeHidden = undefined;
       return cloneDeep(initialGame);
     });
     // Opening a reading or construction card pauses the game, and closing it puts the speed back.
@@ -1238,9 +1264,10 @@ export const gameSlice = createSlice({
         // Navigating anywhere else (rather than backing out) still counts as leaving it
         restoreSpeedAfterBlockingCard(state);
       } else if (state.inGame && speedBeforeBlockingCard === undefined) {
-        speedBeforeBlockingCard = state.policyPause?.speed ?? state.speed;
+        speedBeforeBlockingCard =
+          state.policyPause?.speed ?? foregroundSpeed(state);
         delete state.policyPause;
-        state.speed = "PAUSED";
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(navigateBack, (state, action) => {
@@ -1249,24 +1276,36 @@ export const gameSlice = createSlice({
     });
     builder.addCase(manualHelpOpen, (state) => {
       if (state.inGame && speedBeforeManualHelp === undefined) {
-        speedBeforeManualHelp = state.speed;
-        state.speed = "PAUSED";
+        speedBeforeManualHelp = foregroundSpeed(state);
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(manualHelpClose, (state) => {
       if (speedBeforeManualHelp !== undefined) {
-        state.speed = speedBeforeManualHelp;
+        setForegroundSpeed(state, speedBeforeManualHelp);
         speedBeforeManualHelp = undefined;
         ensureTicking(state);
       }
     });
+    builder.addCase(pageHidden, (state) => {
+      if (state.inGame && speedBeforeHidden === undefined) {
+        speedBeforeHidden = state.speed;
+        state.speed = "PAUSED";
+      }
+    });
+    builder.addCase(pageVisible, (state) => {
+      if (speedBeforeHidden === undefined) return;
+      state.speed = speedBeforeHidden;
+      speedBeforeHidden = undefined;
+      ensureTicking(state);
+    });
     builder.addCase(dialogOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(dialogClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
     builder.addCase(chooseScenarioResponse, (state, action) => {
@@ -1286,13 +1325,17 @@ export const gameSlice = createSlice({
     });
     builder.addCase(openPolicyDecision, (state, action) => {
       if (!state.policyPause) {
-        state.policyPause = { token: action.payload, speed: state.speed };
-        state.speed = "PAUSED";
+        state.policyPause = {
+          token: action.payload,
+          speed: foregroundSpeed(state),
+        };
+        setForegroundSpeed(state, "PAUSED");
       }
     });
     builder.addCase(closePolicyDecision, (state, action) => {
       if (state.policyPause?.token === action.payload) {
-        if (state.speed === "PAUSED") state.speed = state.policyPause.speed;
+        if (foregroundSpeed(state) === "PAUSED")
+          setForegroundSpeed(state, state.policyPause.speed);
         delete state.policyPause;
         ensureTicking(state);
       }
@@ -1301,11 +1344,11 @@ export const gameSlice = createSlice({
     // resumes at whatever speed the run was going when it ended
     builder.addCase(victoryOpen, (state) => {
       delete state.policyPause;
-      speedBeforeDialog = state.speed;
-      state.speed = "PAUSED";
+      speedBeforeDialog = foregroundSpeed(state);
+      setForegroundSpeed(state, "PAUSED");
     });
     builder.addCase(victoryClose, (state) => {
-      state.speed = speedBeforeDialog;
+      setForegroundSpeed(state, speedBeforeDialog);
       ensureTicking(state);
     });
   },

@@ -551,6 +551,26 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 
+// The build screen has no game bar, so the paused clock it opened with gets the same blue as
+// the selected speed toggle, and the word says it too: color is never the only signal
+.pausedChip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: $space-1;
+  padding: 1px $space-2;
+  color: var(--interactive-blue);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+
+  > span {
+    display: flex;
+    align-items: center;
+  }
+}
+
 .constructionTitleBar #close-button {
   flex: 0 0 auto;
 }

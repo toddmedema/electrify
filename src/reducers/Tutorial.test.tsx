@@ -1,6 +1,7 @@
 import { configureStore, UnknownAction } from "@reduxjs/toolkit";
 import * as React from "react";
 import { getPlayedScenarioIds } from "../LocalStorage";
+import { isPaneLayout } from "../Globals";
 import {
   AppStateType,
   CardNameType,
@@ -23,6 +24,16 @@ import {
 } from "./Tutorial";
 import uiReducer from "./UI";
 import userReducer from "./User";
+
+// Registered above the imports by babel's jest.mock hoisting, so the scenario step predicates
+// (which call isPaneLayout) see the mock. Kept after the imports for import/first.
+jest.mock("../Globals", () => ({
+  ...jest.requireActual("../Globals"),
+  isPaneLayout: jest.fn(),
+}));
+const mockIsPaneLayout = isPaneLayout as jest.MockedFunction<
+  typeof isPaneLayout
+>;
 
 function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
   return {
@@ -338,6 +349,89 @@ describe("tutorialGateMiddleware", () => {
       }),
     );
   });
+});
+
+describe("navigation steps that teach the Insights and Events switch", () => {
+  afterEach(() => {
+    mockIsPaneLayout.mockReset();
+  });
+
+  it.each([4, 3])(
+    "gates the mission %s opening on the navigation itself",
+    (id) => {
+      const [opening] = getScenario(id)!.tutorialSteps!;
+      expect(opening.target).toBe("#insightsNav");
+      // Gated, not a quiet Next that still jumps the player
+      expect(opening.advanceOn).toBeDefined();
+      expect(opening.continueOn).toBeUndefined();
+    },
+  );
+
+  it("routes Mission 6 through the player's navigation before each new pane", () => {
+    const steps = getScenario(5)!.tutorialSteps!;
+    const navSteps = steps
+      .map((step, index) => [step, index] as const)
+      .filter(([step]) => step.card === undefined);
+    expect(navSteps).toHaveLength(3);
+    for (const [step, index] of navSteps) {
+      const nextCard = steps[index + 1]?.card;
+      const name = typeof nextCard === "string" ? nextCard : nextCard?.name;
+      const insights = name !== "EVENTS";
+      expect(step.advanceOn).toBeDefined();
+      expect(step.target).toBe(insights ? "#insightsNav" : "#eventsNav");
+      expect(step.desktop?.target).toBe(
+        insights ? "#insightsPane" : "#eventsPane",
+      );
+    }
+  });
+
+  it.each([4, 3])(
+    "advances the mission %s opening when the player navigates to Insights",
+    (id) => {
+      mockIsPaneLayout.mockReturnValue(false);
+      const steps = getScenario(id)!.tutorialSteps!;
+      const store = tutorialStore(steps, { tutorialStep: 0 });
+      expect(store.getState().game.tutorialStep).toBe(0);
+      store.dispatch({ type: "card/navigate", payload: "INSIGHTS" });
+      expect(store.getState().card.name).toBe("INSIGHTS");
+      expect(store.getState().game.tutorialStep).toBe(1);
+    },
+  );
+
+  it("waits for the tap on a narrow layout", () => {
+    mockIsPaneLayout.mockReturnValue(false);
+    const steps = getScenario(5)!.tutorialSteps!;
+    const store = tutorialStore(steps, { tutorialStep: 2 });
+    // A dispatch that changes nothing: the step must still be where it was
+    store.dispatch({ type: "test/pane-check" });
+    expect(store.getState().game.tutorialStep).toBe(2);
+  });
+
+  it.each([2, 5, 9] as const)(
+    "advances Mission 6's step %d on its own in a pane layout",
+    (index) => {
+      mockIsPaneLayout.mockReturnValue(true);
+      const steps = getScenario(5)!.tutorialSteps!;
+      expect(steps[index].card).toBeUndefined();
+      const store = tutorialStore(steps, { tutorialStep: index });
+      store.dispatch({ type: "test/pane-check" });
+      expect(store.getState().game.tutorialStep).toBe(index + 1);
+    },
+  );
+
+  it.each([2, 5, 9] as const)(
+    "advances Mission 6's step %d when the player makes its navigation",
+    (index) => {
+      mockIsPaneLayout.mockReturnValue(false);
+      const steps = getScenario(5)!.tutorialSteps!;
+      const step = steps[index];
+      const card = step.target === "#eventsNav" ? "EVENTS" : "INSIGHTS";
+      const store = tutorialStore(steps, { tutorialStep: index });
+      expect(store.getState().game.tutorialStep).toBe(index);
+      store.dispatch({ type: "card/navigate", payload: card });
+      expect(store.getState().game.tutorialStep).toBe(index + 1);
+    },
+  );
 });
 
 describe("recordTutorialExited", () => {

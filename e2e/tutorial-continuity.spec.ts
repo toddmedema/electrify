@@ -1,5 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
-import { openPane } from "./layout";
+import { isPaneLayout, openPane, waitForSettled } from "./layout";
 
 async function startLesson(page: Page, name: string) {
   await page.addInitScript((lesson) => {
@@ -75,11 +75,9 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   page,
 }) => {
   await startLesson(page, "Pricing");
-  const opened = await openPane(
-    page.locator(".insights"),
-    page.locator("#insightsNav"),
-  );
-  if (!opened) await next(page);
+  await openPane(page.locator(".insights"), page.locator("#insightsNav"));
+  // openPane's tap is exactly what the navigation step waits for in single-pane mode, and in
+  // the pane layout the step advanced on its own - either way the player is on the next step
   const rate = page.locator("#rateSlider input");
   await rate.focus();
   await rate.press("ArrowLeft");
@@ -89,6 +87,9 @@ test("Pricing reveals customers once and keeps the chosen rate when 1x starts it
   for (const width of [390, 768, 884, 1280]) {
     await page.setViewportSize({ width, height: 1024 });
     await expectTargetVisible(page, "#chartInsightsCustomers");
+    // The layout switch transitions its outgoing card out; let it settle before asserting
+    // on the one rate slider the player can be looking at
+    await waitForSettled(page, "#rateSlider input");
     await expect(page.locator("#rateSlider input")).toHaveValue(selectedRate);
     await expect(page.locator(".tutorialHud")).toContainText(
       "Find customer growth",
@@ -162,14 +163,29 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   page,
 }) => {
   await startLesson(page, "Forecasting");
+  const paneLayout = isPaneLayout(page);
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+  if (!paneLayout) {
+    // Single-pane mode: the next step is the navigation itself, so tap it to reach the chart
+    await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
+    // The card transition briefly mounts the outgoing layout beside the new one
+    await waitForSettled(page, "#insightsNav");
+    await expect(page.locator("#insightsNav")).toHaveClass(/tutorialTarget/);
+    await page.locator("#insightsNav").click();
+  }
   await expectTargetVisible(page, "#chartForecastSupplyDemand");
   await next(page);
   await expect(
     page.getByRole("button", { name: "slow speed", exact: true }),
   ).toHaveCount(1);
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
+  if (!paneLayout) {
+    await expect(page.locator(".tutorialHud")).toContainText("Tap Events");
+    await waitForSettled(page, "#eventsNav");
+    await expect(page.locator("#eventsNav")).toHaveClass(/tutorialTarget/);
+    await page.locator("#eventsNav").click();
+  }
   await expect(page.locator(".tutorialHud")).toContainText(
     "Read the blackout event",
   );
@@ -178,6 +194,12 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
     page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
+  if (!paneLayout) {
+    await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
+    await waitForSettled(page, "#insightsNav");
+    await expect(page.locator("#insightsNav")).toHaveClass(/tutorialTarget/);
+    await page.locator("#insightsNav").click();
+  }
   await expectTargetVisible(page, "#chartForecastFuelPrices");
   await next(page);
   await expectTargetVisible(page, "#chartForecastWeather");
@@ -200,4 +222,16 @@ test("Forecasting reveals later charts and waits for explicit fresh-challenge ap
   const pause = page.getByRole("button", { name: "pause", exact: true });
   await expect(pause).toHaveCount(1);
   await expect(pause).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a paused navigation gate advances when resizing into the pane layout", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startLesson(page, "Pricing");
+  await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator(".tutorialHud")).toContainText(
+    "Drag the rate slider",
+  );
 });
