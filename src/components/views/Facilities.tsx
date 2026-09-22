@@ -49,6 +49,7 @@ import {
   formatWattsOfPeak,
 } from "../../helpers/Format";
 import ChartSupplyDemand from "../base/ChartSupplyDemand";
+import FlowBar from "../base/FlowBar";
 import FacilityDetails from "../base/FacilityDetails";
 import GameCard from "../base/GameCard";
 import ConceptIcon from "../base/ConceptIcon";
@@ -299,22 +300,20 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     return () => window.clearTimeout(timer);
   }, [ready]);
 
-  // Storage is charging or discharging depending on which way its stored energy moved since the
-  // last tick, which is only knowable by remembering the last one
-  const previousWh = React.useRef(facility.currentWh);
-  const whDelta = facility.currentWh - previousWh.current;
-  React.useEffect(() => {
-    previousWh.current = facility.currentWh;
-  });
-
   let activity: FacilityActivityType = "RUNNING";
   if (underConstruction) {
     activity = "BUILDING";
   } else if (facility.paused) {
     activity = "PAUSED";
   } else if (isStorage) {
-    // A battery holding steady is neither charging nor discharging, so don't claim either
-    activity = whDelta > 0 ? "CHARGING" : whDelta < 0 ? "DISCHARGING" : "IDLE";
+    // Use the same dispatch reading as the flow bar. Render-to-render energy deltas
+    // disappear on selection and cannot describe an already-running battery on mount.
+    activity =
+      facility.currentW < 0
+        ? "CHARGING"
+        : facility.currentW > 0
+          ? "DISCHARGING"
+          : "IDLE";
   } else if (facility.currentW <= 0) {
     activity = "IDLE";
   }
@@ -326,8 +325,12 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     : fuel === "Hydro" && facility.reservoirCapacityWh
       ? (facility.reservoirWh || 0) / facility.reservoirCapacityWh
       : null;
+  // Signed: storage sets a negative currentW while it charges, which used to scaleX the row
+  // bar backwards off its own left edge and read as an idle battery.
   const outputFraction =
-    facility.peakW > 0 ? Math.min(1, facility.currentW / facility.peakW) : 0;
+    facility.peakW > 0
+      ? Math.max(-1, Math.min(1, facility.currentW / facility.peakW))
+      : 0;
   // The row's second line has to stay one line on a 320px phone, so it leads with the reading
   // and the state and leaves anything else to a trailing detail that truncates first. Rated
   // storage power and the reservoir's absolute size are both in the opened details.
@@ -405,13 +408,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             fuel so the list reads as the same dispatch stack the supply-by-fuel chart draws, and
             transitioned in CSS so ramping is visible as movement */}
             {!underConstruction && (
-              <div
-                className="outputProgressBar"
-                style={{
-                  transform: `scaleX(${outputFraction})`,
-                  background: withAlpha(accentColor, 0.18),
-                }}
-              />
+              <FlowBar fraction={outputFraction} color={accentColor} />
             )}
             {!readOnly && (
               <button
@@ -426,7 +423,9 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
             <button
               type="button"
               className="facilityDisclosure"
-              aria-label={"Inspect " + facility.name}
+              aria-label={
+                `Inspect ${facility.name}` + (isStorage ? `, ${status}` : "")
+              }
               aria-expanded={selected}
               onClick={() => onSelect(selected ? null : facility.id)}
             >
@@ -673,6 +672,7 @@ export interface DispatchProps {
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
   onTransmissionBuild: (corridorId: string, financed: boolean) => void;
+  onTransmissionUpgrade: (corridorId: string, financed: boolean) => void;
   onTradingPolicy: (policy: TradingPolicyType) => void;
 }
 
@@ -767,6 +767,7 @@ export default class Facilities extends React.Component<Props> {
       onReprioritize,
       onSelect,
       onTransmissionBuild,
+      onTransmissionUpgrade,
       onTradingPolicy,
       selectedFacilityId,
     } = this.props;
@@ -863,6 +864,7 @@ export default class Facilities extends React.Component<Props> {
                 <TransmissionPanel
                   game={game}
                   onBuild={onTransmissionBuild}
+                  onUpgrade={onTransmissionUpgrade}
                   onPolicy={onTradingPolicy}
                 />
               )}

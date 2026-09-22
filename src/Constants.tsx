@@ -158,6 +158,48 @@ export const DOWNPAYMENT_PERCENT = 0.2;
 export const INTEREST_RATE_YEARLY = 0.04;
 export const LOAN_MONTHS = 30 * 12;
 
+// Embodied emissions from building one watt of interconnector, for a corridor priced like the
+// reference below. The authored corridors carry no route length, so cost per watt stands in for
+// how far and how hard the route is -- but only with the exponent below, never linearly: a third
+// to a half of transmission capex is right of way, permitting, legal and engineering work that
+// emits almost nothing, and that share is exactly what grows on the expensive routes.
+// See docs/construction-emissions.md.
+export const INTERTIE_CONSTRUCTION_KGCO2E_PER_W = 0.08;
+// $560k per MW, which is the Desert connection, the reference this scale is anchored on.
+export const INTERTIE_CONSTRUCTION_REFERENCE_COST_PER_W = 0.56;
+export const INTERTIE_CONSTRUCTION_COST_EXPONENT = 0.7;
+// Reinforcing a standing corridor reuses its towers, foundations and cleared route, which are
+// over half of a new line's embodied emissions. Deliberately mild, because the authored costs
+// already price existing routes about a third below new ones; the full structural discount
+// applied on top of that would count the same saving twice.
+export const INTERTIE_CONSTRUCTION_EXISTING_MULTIPLIER = 0.7;
+
+// Capacity added to a standing line, as a multiple of what it carries now. Reconductoring with
+// advanced conductors -- the commonest real upgrade -- roughly doubles a line on its existing
+// towers, while uprating an HVDC converter typically buys 1.1-1.3x. This sits between them.
+export const INTERTIE_UPGRADE_STEP = 1.5;
+// Three times, and then the corridor is full. The first upgrade restrings the conductor, the
+// second hangs a second circuit or lifts the voltage, and the third rebuilds the structures for
+// something close to the price of a new line. Past that the limit stops being the conductor and
+// becomes the width of the right of way and the substation land at either end, neither of which
+// a player can buy their way out of. 1.5^3 is a 3.4x corridor, which is where real ones top out.
+export const MAX_INTERTIE_UPGRADES = 3;
+// Each upgrade costs this share of what the same added capacity would cost as a new corridor.
+// Reconductoring runs about half of new build for the capacity it adds, because the towers,
+// foundations and right of way are already there. The escalation is the work changing: conductor,
+// then steel, then substations.
+export const INTERTIE_UPGRADE_COST_SHARE = 0.5;
+export const INTERTIE_UPGRADE_COST_ESCALATION = [1, 1.6, 2.8];
+// Upgrades skip the routing and land acquisition a new corridor needs, so they are quicker as
+// well as cheaper. Applied to the corridor's own authored schedule.
+export const INTERTIE_UPGRADE_TIME_SHARE = 0.45;
+// Transmission operating cost is mostly proportional to route length, not to what the line
+// carries: the same towers get inspected and the same corridor gets mowed whether the conductor
+// is at half load or full. Only the terminal equipment really scales with capacity, so O&M grows
+// far slower than the rating does. This is what makes upgrading cheaper to run than building
+// alongside, which is the real-world incentive behind reconductoring.
+export const INTERTIE_UPGRADE_OPEX_EXPONENT = 0.3;
+
 export const TICK_MINUTES = 15;
 export const TICKS_PER_HOUR = 60 / TICK_MINUTES;
 export const TICKS_PER_DAY = Math.ceil(1440 / TICK_MINUTES);

@@ -79,17 +79,31 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "close", exact: true }).click();
     await facilities.locator(".button-buildFacility").click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    // The neighbour's emissions are a metric on the corridor card now, beside its cost and
+    // build time, rather than a separate disclosure below the list.
     const trade = page
       .getByRole("tabpanel", { name: "Interties" })
-      .locator("details")
-      .filter({ hasText: "Neighbor emissions" });
-    expect(
-      (await trade.locator("summary").boundingBox())!.height,
-    ).toBeGreaterThanOrEqual(44);
-    await trade.locator("summary").click();
-    await expect(
-      trade.getByRole("link", { name: /Source for/ }).first(),
-    ).toHaveAttribute("href", /https:\/\//);
+      .locator(".transmissionProject")
+      .first();
+    await expect(trade.getByText("Emissions", { exact: true })).toBeVisible();
+    await expect(trade.getByText(/^[\d,]+\s*\S+\/MWh$/)).toBeVisible();
+    // The citation behind that number lives in the manual entry now. It still has to be a
+    // real link with a real touch target, which is what the build tab's old disclosure was
+    // checked for before the number moved onto the card.
+    await page
+      .getByRole("button", { name: "How interties work", exact: true })
+      .click();
+    const manual = page.getByRole("dialog", { name: "Manual help" });
+    const citation = manual.getByRole("link", {
+      name: "Source for Pacific Northwest emissions",
+      exact: true,
+    });
+    await expect(citation).toHaveAttribute("href", /https:\/\//);
+    expect((await citation.boundingBox())!.height).toBeGreaterThanOrEqual(
+      testInfo.project.use.hasTouch ? 44 : 40,
+    );
+    await manual.getByRole("button", { name: "back", exact: true }).click();
+    await expect(manual).not.toBeVisible();
     expect(
       await page
         .getByRole("tabpanel", { name: "Interties" })

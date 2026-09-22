@@ -21,6 +21,11 @@
   --bg-selected: #e3f2fd; /* blue50 */
   --border-selected: #bbdefb; /* blue100 */
   --border-subtle: #eeeeee; /* grey200 */
+  /* The diagonal on a reverse-flow row bar. It is the channel that tells a reverse bar from
+     a forward one, so it has to clear 3:1 against the 0.18 tint it sits on: 3.20:1 here.
+     Nothing that dark can sit under the row's label, which is why the hatch is confined to a
+     band below the text rather than painted across the whole fill. */
+  --flow-hatch: rgba(21, 101, 192, 0.8);
   --border-strong: #bdbdbd; /* grey400 */
   --border-tile: #e0e0e0; /* grey300 */
   --font-color-primary: #000000;
@@ -71,6 +76,8 @@
   --bg-selected: #132f46;
   --border-selected: #285f86;
   --border-subtle: #202b38;
+  /* Going lighter rather than darker against the near-black row: 3.40:1 on the same tint */
+  --flow-hatch: rgba(144, 202, 249, 0.55);
   --border-strong: #48586b;
   --border-tile: #2b3948;
   --font-color-primary: #e6edf5;
@@ -1036,7 +1043,6 @@ $pane_header_height: 48px;
 }
 
 .tradingPolicy,
-.transmissionProject,
 .transmissionLine,
 .powerExchangeSummary {
   background: var(--bg-primary);
@@ -1047,45 +1053,12 @@ $pane_header_height: 48px;
   gap: 12px;
 }
 
-.transmissionProject {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border-tile);
-  border-radius: 8px;
-}
-
-.transmissionProjectHeading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+// Corridor cards are build cards; everything about their chrome comes from
+// `.build-list-item.buildOption`. Only the detail body below is theirs.
+.transmissionProject .buildOptionDetailBody {
+  display: grid;
   gap: 8px;
-
-  .MuiTypography-root {
-    min-width: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  .MuiButton-root {
-    flex-shrink: 0;
-    min-height: 40px;
-  }
-}
-
-.transmissionProjectMetadata {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-@media (pointer: coarse) {
-  .transmissionProjectHeading .MuiButton-root {
-    min-height: 44px;
-  }
+  padding: 0 12px 8px;
 }
 
 // Behaviour of the neighbour behind an intertie: its kind, and its typical year drawn with the
@@ -2759,6 +2732,30 @@ html[data-theme="dark"] .uplot {
     .MuiAccordionDetails-root {
       padding: 0 $space-4 $space-4;
     }
+
+    // A citation list, not prose: each line is one assumption and the link that backs it
+    .manual-sources {
+      margin: 0 0 $space-3;
+      padding-left: $space-4;
+      font-size: 0.875rem;
+      line-height: 1.5;
+
+      li {
+        margin-bottom: $space-2;
+      }
+      // The repo's touch target, the same one .manual-link-text uses. inline-flex rather than
+      // inline-block so the words stay centred in the taller box instead of riding its top.
+      a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+      }
+      @media (pointer: coarse) {
+        a {
+          min-height: 44px;
+        }
+      }
+    }
   }
 
   #gameSetupTable {
@@ -3664,6 +3661,33 @@ html[data-theme="dark"] .uplot {
     transition:
       transform 50ms linear,
       background 50ms linear;
+  }
+
+  // Power moving the other way: a battery charging, an intertie selling. Hue alone can't carry
+  // that, because a full reverse bar and a full forward bar cover identical pixels -- so the
+  // diagonal does the work colour can't (WCAG 1.4.1), alongside whatever the row itself says:
+  // a storage row's up/down activity badge and its "charging"/"discharging" label, an intertie
+  // row's signed reading and button name. Sized with width rather than scaleX, which would
+  // squash the diagonal along with the fill.
+  .outputProgressBar.reverseFlow {
+    right: auto;
+    transform: none;
+    // A band along the bottom edge rather than the whole fill: the hatch has to be strong
+    // enough to read as a pattern (>=3:1 on its own tint), and a stripe that strong crossing
+    // the row's label would take the label's contrast down with it. Below the text it can be
+    // as emphatic as it needs to be. Wider stripes in a wider period than the original 2/6 so
+    // the diagonal still reads as a diagonal in an 8px band.
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--flow-hatch) 0 3px,
+      transparent 3px 8px
+    );
+    background-repeat: no-repeat;
+    background-position: left bottom;
+    background-size: 100% 8px;
+    transition:
+      width 50ms linear,
+      background-color 50ms linear;
   }
 
   .storyDerateBadge {
@@ -4942,10 +4966,6 @@ $sizemap: (
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.transmissionProject {
-  padding: 16px;
-  border-radius: 8px;
-}
 .base_main #menuCard #logo {
   margin-top: auto;
   padding-top: 32px;
@@ -5206,6 +5226,18 @@ $sizemap: (
   grid-template-columns: 48px minmax(0, 1fr) 20px;
   align-items: center;
   gap: 8px;
+  // The flow bar is painted behind the row, so everything on top of it needs a stacking
+  // context of its own -- the same lift facility rows give their text and actions.
+  position: relative;
+  overflow: hidden;
+  > *:not(.outputProgressBar) {
+    position: relative;
+    z-index: 1;
+  }
+}
+// Reading and rating share one unit, so the pair shouldn't jitter as the flow moves
+.transmissionLineFlow {
+  font-variant-numeric: tabular-nums;
 }
 .transmissionLine .transmissionLineText {
   min-width: 0;
@@ -5437,5 +5469,17 @@ $sizemap: (
   &[data-status="completed"] {
     border-color: var(--delta-good);
     color: var(--delta-good);
+  }
+}
+
+.transmissionUpgrade {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  .MuiButton-root {
+    min-height: 40px;
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 }

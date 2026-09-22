@@ -79,12 +79,13 @@ export function intertieOutlook(
   context: IntertieContext,
   timeline: readonly OutlookTick[],
   nowMinute = -Infinity,
+  capacityW?: number,
 ): IntertieOutlook | undefined {
   const market = adjacentMarketForCorridor(corridorId);
   const corridor = TRANSMISSION_CORRIDORS.find(({ id }) => id === corridorId);
   if (!market || !corridor || corridor.capacityW <= 0) return undefined;
   const ticks = timeline.filter((tick) => tick.minute >= nowMinute);
-  const line = { corridorId, capacityW: corridor.capacityW };
+  const line = { corridorId, capacityW: capacityW ?? corridor.capacityW };
   // Average luck, not this run's next wet/dry years: most lines take years to build, and a
   // "typical year" that shifted every January would describe the dice rather than the neighbour.
   const typical = { ...context, expectedLuck: true };
@@ -97,8 +98,7 @@ export function intertieOutlook(
   );
   ticks.forEach((tick) => {
     const share =
-      intertieImportLimitW(line, typical, tick.minute, tick) /
-      corridor.capacityW;
+      intertieImportLimitW(line, typical, tick.minute, tick) / line.capacityW;
     const price = adjacentMarketPricePerMWh(
       corridorId,
       typical,

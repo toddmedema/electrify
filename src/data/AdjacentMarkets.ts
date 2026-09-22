@@ -162,6 +162,13 @@ export function adjacentMarketsForLocation(
   return profileId ? (TRANSMISSION_PROFILES[profileId]?.markets ?? []) : [];
 }
 
+/** The authored corridor an operating line was built from, by id. */
+export function corridorById(
+  corridorId: string,
+): TransmissionCorridorDefinitionType | undefined {
+  return uniqueCorridors.get(corridorId);
+}
+
 export function adjacentMarketForCorridor(
   corridorId: string,
 ): AdjacentMarketDefinitionType | undefined {

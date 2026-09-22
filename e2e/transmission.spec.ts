@@ -193,36 +193,47 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Build", exact: true })
       .click();
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
+    // Corridor cards are build cards now, so the heading and Review button come from
+    // MUI's CardHeader exactly as they do on the generator and storage cards.
     for (const card of await page.locator(".transmissionProject").all()) {
-      const heading = card.locator(".transmissionProjectHeading");
+      const heading = card.locator(".MuiCardHeader-root");
       const review = heading.getByRole("button", {
         name: /Review purchase of/,
       });
       await expect(
         review.locator('[data-testid="ShoppingCartIcon"]'),
       ).toBeVisible();
-      const title = heading.getByRole("heading");
+      // h6, matching the dialog's own "Build..." title: a card list is what heading
+      // navigation is for, and h3 under an h6 was a backwards jump.
+      const title = heading.getByRole("heading", { level: 6 });
       const titleBox = (await title.boundingBox())!;
       const buttonBox = (await review.boundingBox())!;
       const headerBox = (await heading.boundingBox())!;
-      const metadataBox = (await card
-        .locator(".transmissionProjectMetadata")
+      const contextBox = (await card
+        .locator(".buildOptionContext")
+        .first()
         .boundingBox())!;
       expect(buttonBox.x).toBeGreaterThanOrEqual(titleBox.x + titleBox.width);
-      expect(buttonBox.x + buttonBox.width).toBeCloseTo(
-        headerBox.x + headerBox.width,
-        0,
-      );
-      expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(metadataBox.y);
+      expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(contextBox.y);
       expect(buttonBox.height).toBeGreaterThanOrEqual(
         testInfo.project.use.hasTouch ? 44 : 40,
       );
       expect(
         await card.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
-      await expect(card.locator(".transmissionProjectMetadata")).toContainText(
+      await expect(card.locator(".buildOptionContext").first()).toContainText(
         /corridor/,
       );
+      // The metric grid carries the decision; the archetype and outlook wait behind details
+      await expect(card.getByText("Capacity", { exact: true })).toBeVisible();
+      await expect(card.getByText("Emissions", { exact: true })).toBeVisible();
+      await expect(
+        card.getByRole("img", { name: /^Typical year of import room/ }),
+      ).toHaveCount(0);
+      await card.getByRole("button", { name: /^Show .* details$/ }).click();
+      await expect(
+        card.getByRole("img", { name: /^Typical year of import room/ }),
+      ).toBeVisible();
     }
   });
 }

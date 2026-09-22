@@ -4,6 +4,7 @@ import {
   TICKS_PER_MONTH,
 } from "../Constants";
 import {
+  ConstructionEmissions,
   FacilityOperatingType,
   GameType,
   MonthlyHistoryType,
@@ -54,6 +55,7 @@ const FINITE_TICK_FIELDS: TickFieldType[] = [
   "storageDischargeW",
   "localKgco2e",
   "importedKgco2e",
+  "constructionKgco2e",
   "importKgco2ePerMWh",
   "cash",
   "customers",
@@ -220,15 +222,39 @@ export function checkTick(
     );
   }
 
-  const emissionsTotal = (now.localKgco2e || 0) + (now.importedKgco2e || 0);
+  const emissionsTotal =
+    (now.localKgco2e || 0) +
+    (now.importedKgco2e || 0) +
+    (now.constructionKgco2e || 0);
   if (
     Math.abs(now.kgco2e - emissionsTotal) >
     Math.max(1, emissionsTotal) * RELATIVE_TOLERANCE
   ) {
     collector.add(
-      "local and purchased emissions sum to total",
+      "local, purchased and construction emissions sum to total",
       when,
       `${now.kgco2e} vs ${emissionsTotal}`,
+    );
+  }
+
+  // No project may emit more than it was quoted. This is the rule that matters: it bounds the
+  // accrual from above whatever the clock does, and a runaway or double charge trips it on the
+  // tick it happens. Its mirror -- that nothing accrues once everything is paid for -- cannot
+  // be checked here, because the tick that finishes a project both settles the last of its
+  // balance and zeroes it, so the charge and an empty balance are always seen together.
+  let constructionOverpaid = 0;
+  const trackConstruction = (asset: ConstructionEmissions) => {
+    const total = asset.constructionKgco2eTotal || 0;
+    const emitted = asset.constructionKgco2eEmitted || 0;
+    if (emitted > total) constructionOverpaid += emitted - total;
+  };
+  state.facilities.forEach(trackConstruction);
+  (state.transmission?.lines || []).forEach(trackConstruction);
+  if (constructionOverpaid > 1e-6) {
+    collector.add(
+      "no project emits more than it was quoted to",
+      when,
+      `${constructionOverpaid} beyond the quoted totals`,
     );
   }
 

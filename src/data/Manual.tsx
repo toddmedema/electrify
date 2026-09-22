@@ -6,17 +6,48 @@ import ConceptLegend from "../components/base/ConceptLegend";
 import { useUnits } from "../components/base/UnitsContext";
 import {
   formatLargeMassApprox,
+  formatMass,
   formatPricePerLargeMass,
   KG_PER_MEGATONNE,
   largeMassUnit,
   massUnitName,
 } from "../helpers/Units";
+import { IMPORT_EMISSIONS_ASSUMPTIONS } from "./ImportEmissions";
 
 // The entries are static markup, so the handful of places that name a unit read the setting
 // through a component of their own rather than the array becoming a function of it. Their text
 // is not walked by the search (see manualEntryText), which is what the keywords are for.
 function MassUnitName(): React.JSX.Element {
   return <>{massUnitName(useUnits())}</>;
+}
+
+/**
+ * Where each neighbour's emissions figure comes from. The build cards show the number; a
+ * citation belongs somewhere it can be read properly rather than squeezed into a metric cell.
+ */
+function ImportEmissionsSources(): React.JSX.Element {
+  const units = useUnits();
+  return (
+    <ul className="manual-sources">
+      {IMPORT_EMISSIONS_ASSUMPTIONS.map((assumption) => (
+        <li key={assumption.label}>
+          <strong>{assumption.label}</strong>:{" "}
+          {formatMass(assumption.emissionsKgco2ePerMWh, units)}/MWh CO2e ·{" "}
+          {assumption.emissionsBasis}.{" "}
+          {/* Five links reading "Source" are five identical names in a screen reader's link
+              list, so each one says which assumption it backs. */}
+          <a
+            href={assumption.emissionsSource}
+            aria-label={`Source for ${assumption.label} emissions`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Source
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function LargeMassUnit(): React.JSX.Element {
@@ -429,9 +460,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Local estimates count CO2 from burning fuel, including biomass without
           credit for regrowth. Most import estimates also count CO2; Québec's
-          counts greenhouse gases as CO2e. Construction, fuel supply and land
-          use are excluded, so zero reported emissions does not mean zero
-          environmental impact.
+          counts greenhouse gases as CO2e. Fuel supply and land use are
+          excluded, so zero reported emissions does not mean zero environmental
+          impact.
+        </p>
+        <p>
+          Building a plant emits too, in the steel, concrete, silicon and
+          drilling it takes to put one up. Each build card shows that total, and
+          it is charged evenly across the construction period rather than all at
+          once. It is why wind, solar, nuclear and storage are low-carbon rather
+          than no-carbon. Carbon fees do not apply to it: a fee prices what a
+          grid burns, while most of this is emitted in another country's
+          factories years earlier.
         </p>
         <p>
           Emissions affect fees and score, but do not change local weather in
@@ -666,7 +706,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.INTERTIES,
     group: "Gameplay",
     keywords:
-      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype",
+      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype source citation CO2e proxy quebec california washington IEA EIA",
     related: [
       MANUAL_ENTRY.RESERVE_CAPACITY,
       MANUAL_ENTRY.EMISSIONS,
@@ -680,10 +720,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           storage.
         </p>
         <p>
-          Neighbors differ in when they can spare power and what it costs. The
-          chip on each intertie names the kind of grid next door, such as
-          seasonal hydro or solar surplus. The small line shows its typical
-          year: how much of the line it can usually fill each month.
+          Neighbors differ in when they can spare power and what it costs. Each
+          intertie&rsquo;s build card names the kind of grid next door, such as
+          seasonal hydro or solar surplus. Opening Show details on that card
+          describes the neighbor and draws its typical year: how much of the
+          line it can usually fill each month.
         </p>
         <p>
           &ldquo;At your peak&rdquo; matters most. It is how much the neighbor
@@ -698,10 +739,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           relying on imports.
         </p>
         <p>
-          Purchased electricity adds estimated emissions to your score.
-          Interties lists each neighbor's fixed emissions estimate and source.
-          These simplified flows do not model a full transmission network.
+          Purchased electricity adds estimated emissions to your score. Each
+          intertie&rsquo;s build card shows the neighbor&rsquo;s fixed estimate;
+          these are the mixes those estimates stand for. They do not model a
+          full transmission network.
         </p>
+        <ImportEmissionsSources />
       </div>
     ),
   },

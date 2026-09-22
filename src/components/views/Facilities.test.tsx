@@ -3,8 +3,14 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { Provider } from "react-redux";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import { tickState } from "../../reducers/Game";
+import cloneDeep from "lodash.clonedeep";
+import { MINUTES_PER_MONTH, getTimeFromTimeline } from "../../helpers/DateTime";
+import gameReducer, {
+  buildTransmissionLine,
+  tickState,
+  upgradeTransmissionLine,
+} from "../../reducers/Game";
+import { formatWatts } from "../../helpers/Format";
 import uiReducer from "../../reducers/UI";
 import { createGame } from "../../testing/Simulator";
 import { FacilityOperatingType, GameType } from "../../Types";
@@ -62,6 +68,7 @@ function renderFacilities(
         game={game}
         selectedFacilityId={selected}
         onGeneratorBuild={() => undefined}
+        onTransmissionUpgrade={() => undefined}
         onStorageBuild={() => undefined}
         onTransmissionBuild={() => undefined}
         onTradingPolicy={() => undefined}
@@ -96,6 +103,38 @@ function rows(): HTMLElement[] {
 describe("the fleet list", () => {
   // Long enough that both generators have a record worth reporting in an expanded row
   const game = playedGame(60);
+
+  it.each([
+    [-500000, "charging"],
+    [500000, "discharging"],
+  ])(
+    "keeps storage activity aligned with %s W on mount and selection",
+    async (currentW, label) => {
+      const storageGame = createGame({ scenarioId: 100 });
+      storageGame.facilities = [
+        {
+          ...storageGame.facilities[0],
+          name: "Battery",
+          peakWh: 2000000,
+          currentWh: 1000000,
+          peakW: 1000000,
+          currentW: Number(currentW),
+          yearsToBuildLeft: 0,
+          paused: false,
+        },
+      ];
+      renderFacilities(storageGame, null);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveAccessibleName(
+        `Inspect Battery, 1/2MWh · ${label}`,
+      );
+      await user.click(rows()[0]);
+      expect(rows()[0]).toHaveTextContent(String(label));
+      expect(rows()[0]).toHaveAccessibleName(
+        `Inspect Battery, 1/2MWh · ${label}`,
+      );
+    },
+  );
 
   it("selects a facility when its row is clicked", async () => {
     const { onSelect } = renderFacilities(game, null);
@@ -240,6 +279,7 @@ describe("the fleet list", () => {
       onGeneratorBuild: () => undefined,
       onStorageBuild: () => undefined,
       onTransmissionBuild: () => undefined,
+      onTransmissionUpgrade: () => undefined,
       onTradingPolicy: () => undefined,
       onSell: () => undefined,
       onTogglePause: () => undefined,
@@ -324,6 +364,7 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
         game={game}
         projectsOnly
         onBuild={onBuild}
+        onUpgrade={jest.fn()}
         onPolicy={jest.fn()}
       />
     </Provider>,
@@ -356,6 +397,13 @@ describe("the interties view", () => {
     expect(within(north).getByText("Seasonal hydro")).toBeInTheDocument();
     expect(within(south).getByText("Solar surplus")).toBeInTheDocument();
     expect(within(north).getByText("Existing corridor")).toBeInTheDocument();
+    // Neighbour character and the typical year are comparison material, so they sit behind the
+    // same disclosure the generator and storage cards use.
+    for (const card of [north, south]) {
+      await user.click(
+        within(card).getByRole("button", { name: /^Show .* details$/ }),
+      );
+    }
     for (const card of [north, south]) {
       expect(
         within(card).getByRole("img", { name: /^Typical year of import room/ }),
@@ -482,12 +530,15 @@ describe("unified connections", () => {
     expect(document.querySelectorAll(".tradingControls")).toHaveLength(1);
     expect(connections[0].querySelector("[data-rfd-draggable-id]")).toBeNull();
     /* eslint-enable testing-library/no-node-access */
-    expect(connections[0]).toHaveTextContent("Connected");
+    // A built line reports the power actually moving over it, signed, instead of a static
+    // "Connected" that never changes
+    expect(connections[0]).toHaveTextContent(/0\/500MW/);
+    expect(connections[0]).not.toHaveTextContent("Connected");
     expect(connections[1]).toHaveTextContent("Building");
     await user.click(screen.getByText(game.transmission!.lines[0].name));
     expect(
       screen.getByRole("button", {
-        name: `Inspect ${game.transmission!.lines[0].name}`,
+        name: `Inspect ${game.transmission!.lines[0].name}, no power flowing`,
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(connections[0]).toHaveTextContent("Loan balance");
@@ -528,5 +579,122 @@ describe("unified connections", () => {
     expect(
       screen.getByText("Trading rule: Buy for shortages, sell extra"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the intertie upgrade control", () => {
+  /** A California run whose northern intertie is open and carrying power. */
+  function gameWithOpenIntertie(): GameType {
+    const state = playedGame(0);
+    const built = cloneDeep(
+      gameReducer(
+        state,
+        buildTransmissionLine({
+          corridorId: "california-north",
+          financed: false,
+        }),
+      ),
+    );
+    built.transmission!.lines[0].yearsToBuildLeft = 0;
+    getTimeFromTimeline(built.date.minute, built.timeline)!.cash = 1e11;
+    return built;
+  }
+
+  function renderFleet(game: GameType, handleUpgrade = jest.fn()) {
+    render(
+      <Provider store={configureStore({ reducer: { ui: uiReducer } })}>
+        <TransmissionPanel
+          game={game}
+          onBuild={jest.fn()}
+          onUpgrade={handleUpgrade}
+          onPolicy={jest.fn()}
+        />
+      </Provider>,
+    );
+  }
+
+  it("offers to widen an open line, and says what the work emits", async () => {
+    const user = userEvent.setup();
+    const game = gameWithOpenIntertie();
+    const handleUpgrade = jest.fn();
+    renderFleet(game, handleUpgrade);
+    const line = game.transmission!.lines[0];
+
+    await user.click(
+      screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
+    );
+    const upgrade = screen.getByLabelText(
+      `Upgrade ${line.name} to ${formatWatts(line.capacityW * 1.5, 3)}`,
+    );
+    // The embodied cost of the work is on the button's own row, where the decision is made,
+    // rather than somewhere the player has to go looking for it.
+    expect(screen.getByText(/CO2e to build/)).toBeInTheDocument();
+    await user.click(upgrade);
+    expect(handleUpgrade).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Interest rate:");
+    expect(dialog).toHaveTextContent("Upkeep after upgrade");
+    await user.click(within(dialog).getByRole("button", { name: "Take loan" }));
+    expect(handleUpgrade).toHaveBeenCalledWith(line.corridorId, true);
+  });
+
+  it("lets the player cancel or pay cash for an upgrade", async () => {
+    const user = userEvent.setup();
+    const game = gameWithOpenIntertie();
+    const handleUpgrade = jest.fn();
+    renderFleet(game, handleUpgrade);
+    await user.click(
+      screen.getByLabelText(`Inspect ${game.transmission!.lines[0].name}`, {
+        exact: false,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /^Upgrade / }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "close" }),
+    );
+    expect(handleUpgrade).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /^Upgrade / }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Pay cash",
+      }),
+    );
+    expect(handleUpgrade).toHaveBeenCalledWith(
+      game.transmission!.lines[0].corridorId,
+      false,
+    );
+  });
+
+  it("says the line keeps running while the work is under way", async () => {
+    const user = userEvent.setup();
+    const game = cloneDeep(
+      gameReducer(
+        gameWithOpenIntertie(),
+        upgradeTransmissionLine({
+          corridorId: "california-north",
+          financed: false,
+        }),
+      ),
+    );
+    renderFleet(game);
+    const line = game.transmission!.lines[0];
+    await user.click(
+      screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
+    );
+    expect(screen.getByText(/keeps carrying/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Upgrade /)).toBeNull();
+  });
+
+  it("explains which ceiling stopped it rather than just disappearing", async () => {
+    const user = userEvent.setup();
+    const game = gameWithOpenIntertie();
+    // Three steps taken already: the corridor is full.
+    game.transmission!.lines[0].capacityW *= Math.pow(1.5, 3);
+    renderFleet(game);
+    const line = game.transmission!.lines[0];
+    await user.click(
+      screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
+    );
+    expect(screen.getByText(/corridor is full/)).toBeInTheDocument();
   });
 });

@@ -1668,12 +1668,30 @@ export default class Insights extends React.Component<Props, State> {
             syncKey={SYNC_KEY}
           />
           {id === "emissions" &&
-            (game.monthlyHistory[0]?.importedKgco2e || 0) > 0 && (
+            ((game.monthlyHistory[0]?.importedKgco2e || 0) > 0 ||
+              (game.monthlyHistory[0]?.constructionKgco2e || 0) > 0) && (
               <Typography variant="caption" color="textSecondary" component="p">
                 Last month:{" "}
                 {finance.format(game.monthlyHistory[0]?.localKgco2e || 0)} local
-                + {finance.format(game.monthlyHistory[0]?.importedKgco2e || 0)}{" "}
-                imported ({largeMassUnit(this.context as UnitSystemType)} CO2e)
+                {(game.monthlyHistory[0]?.importedKgco2e || 0) > 0 && (
+                  <>
+                    {" + "}
+                    {finance.format(
+                      game.monthlyHistory[0]?.importedKgco2e || 0,
+                    )}{" "}
+                    imported
+                  </>
+                )}
+                {(game.monthlyHistory[0]?.constructionKgco2e || 0) > 0 && (
+                  <>
+                    {" + "}
+                    {finance.format(
+                      game.monthlyHistory[0]?.constructionKgco2e || 0,
+                    )}{" "}
+                    building
+                  </>
+                )}{" "}
+                ({largeMassUnit(this.context as UnitSystemType)} CO2e)
               </Typography>
             )}
         </>
