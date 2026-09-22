@@ -389,13 +389,19 @@ describe("transmission actions", () => {
       expect(constructionTicks).toBeLessThanOrEqual(TICKS_PER_YEAR + 1);
       expect(
         steps
-          .find((step) => step.action === "Pause when the line says Connected")!
+          .find(
+            (step) =>
+              step.action === "Pause when the line shows a power reading",
+          )!
           .advanceOn?.(appState()),
       ).toBe(false);
       state.speed = "PAUSED";
       expect(
         steps
-          .find((step) => step.action === "Pause when the line says Connected")!
+          .find(
+            (step) =>
+              step.action === "Pause when the line shows a power reading",
+          )!
           .advanceOn?.(appState()),
       ).toBe(true);
 
@@ -617,6 +623,44 @@ describe("transmission actions", () => {
     expect(
       state.transmission!.lines.map(({ currentFlowW }) => currentFlowW),
     ).toEqual(recorded);
+  });
+
+  it("keeps line readings aligned with the current tick at a month boundary", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 1000000;
+    });
+    while (state.date.monthsElapsed === 0) tickState(state);
+    const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
+    expect(now.importedW).toBeGreaterThan(1000000);
+    expect(
+      state.transmission!.lines.reduce(
+        (sum, line) => sum + (line.currentFlowW || 0),
+        0,
+      ),
+    ).toBeCloseTo((now.importedW || 0) - (now.exportedW || 0), 0);
+  });
+
+  it("refreshes per-line flow when the rule changes with the clock paused", () => {
+    const state = twoIntertiesWithoutPlants();
+    state.timeline.forEach((t) => {
+      t.demandW = 200000000;
+    });
+    tickState(state);
+    state.speed = "PAUSED";
+    expect(
+      state.transmission!.lines.some((line) => (line.currentFlowW || 0) > 0),
+    ).toBe(true);
+
+    // Every policy decision is made with the clock stopped, so there is no next real tick to
+    // correct a stale reading: the section header says "No power flowing" while the row still
+    // shows the megawatts the line was carrying a moment ago.
+    const after = cloneDeep(gameReducer(state, setTradingPolicy("CLOSED")));
+
+    expect(after.transmission!.tradingPolicy).toBe("CLOSED");
+    after.transmission!.lines.forEach((line) =>
+      expect(line.currentFlowW).toBe(0),
+    );
   });
 
   it("imports from the cheaper line first and pays each line its own price", () => {

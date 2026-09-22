@@ -73,10 +73,10 @@ export interface TransmissionLineOperatingType {
   loanMonthlyPayment: number;
   interestRate: number;
   /**
-   * Net power over this line as of the last real tick: positive importing, negative selling.
-   * Derived display state rather than a decision, and written only on real ticks -- the same
-   * caveat facility.currentW carries, since forecasts and month-boundary pre-rolls dispatch
-   * against hypothetical weather. Absent until the first tick after construction finishes.
+   * Net power over this line in the current tick: positive importing, negative selling.
+   * Derived display state, refreshed by live dispatch, month-boundary pre-rolls, and the
+   * current-tick dispatch of a player-action reforecast. Future forecasts use cloned lines.
+   * Set to 0 when ordered; older saves may omit it.
    */
   currentFlowW?: number;
   /**

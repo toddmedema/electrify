@@ -21,11 +21,7 @@ export default function BuildMetric(props: {
   );
 }
 
-/**
- * What building this emits, and over how long. Shown on every build card because the number is
- * otherwise invisible for the technologies that emit nothing while running -- which is exactly
- * where it changes the comparison.
- */
+/** Construction emissions and schedule, shared by project cards and facility details. */
 export function ConstructionEmissionsMetric(props: {
   kgco2eTotal: number;
   yearsToBuild: number;
@@ -38,7 +34,7 @@ export function ConstructionEmissionsMetric(props: {
       : `${Math.max(1, months)} mo`;
   return (
     <BuildMetric
-      label="Building emits"
+      label="Construction emits"
       value={`${formatLargeMassValueConcise(props.kgco2eTotal, props.units)} ${largeMassUnit(props.units)} over ${over}`}
     />
   );

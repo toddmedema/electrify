@@ -203,7 +203,9 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         review.locator('[data-testid="ShoppingCartIcon"]'),
       ).toBeVisible();
-      const title = heading.locator(".MuiCardHeader-title");
+      // h6, matching the dialog's own "Build..." title: a card list is what heading
+      // navigation is for, and h3 under an h6 was a backwards jump.
+      const title = heading.getByRole("heading", { level: 6 });
       const titleBox = (await title.boundingBox())!;
       const buttonBox = (await review.boundingBox())!;
       const headerBox = (await heading.boundingBox())!;

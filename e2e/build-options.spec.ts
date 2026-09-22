@@ -21,6 +21,7 @@ for (const theme of ["light", "dark"] as const) {
       const cards = page.locator(".buildOption");
       const first = cards.first();
       await expect(first).toBeVisible();
+      await expect(first).not.toContainText("Construction emits");
       await expect(page.locator("main.base_main")).toHaveCount(1);
       for (const card of await cards.all()) {
         expect(
@@ -98,10 +99,8 @@ for (const theme of ["light", "dark"] as const) {
           .evaluateAll((els) =>
             els.map((el) => el.getBoundingClientRect().width),
           );
-        expect(sortedCells).toHaveLength(5);
-        await expect(first.locator(".buildOptionMetrics")).toContainText(
-          "Building emits",
-        );
+        expect(sortedCells).toHaveLength(4);
+        await expect(first).not.toContainText("Construction emits");
         expect(sortedCells.every((width) => width >= 128)).toBe(true);
         expect(
           await first.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -110,6 +109,19 @@ for (const theme of ["light", "dark"] as const) {
       await first.getByRole("button", { name: /Show .* details/ }).click();
       await expect(first.locator(".buildOptionDescription")).toBeVisible();
       await expect(first.getByRole("table")).toBeVisible();
+      await expect(
+        first.getByText("Construction emits", { exact: true }),
+      ).toBeVisible();
+      await first
+        .getByText("Construction emits", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await expect(
+        first.getByText("Construction emits", { exact: true }),
+      ).toBeInViewport();
+      await page.screenshot({
+        path: testInfo.outputPath(`${kind}-details-${theme}.png`),
+        animations: "disabled",
+      });
       await review.click();
       await expect(page.getByRole("dialog")).toBeVisible();
       const dialog = page.getByRole("dialog");

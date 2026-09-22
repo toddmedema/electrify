@@ -30,10 +30,18 @@ function ImportEmissionsSources(): React.JSX.Element {
   return (
     <ul className="manual-sources">
       {IMPORT_EMISSIONS_ASSUMPTIONS.map((assumption) => (
-        <li key={assumption.emissionsSource}>
+        <li key={assumption.label}>
+          <strong>{assumption.label}</strong>:{" "}
           {formatMass(assumption.emissionsKgco2ePerMWh, units)}/MWh CO2e ·{" "}
           {assumption.emissionsBasis}.{" "}
-          <a href={assumption.emissionsSource} target="_blank" rel="noreferrer">
+          {/* Five links reading "Source" are five identical names in a screen reader's link
+              list, so each one says which assumption it backs. */}
+          <a
+            href={assumption.emissionsSource}
+            aria-label={`Source for ${assumption.label} emissions`}
+            target="_blank"
+            rel="noreferrer"
+          >
             Source
           </a>
         </li>
@@ -698,7 +706,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.INTERTIES,
     group: "Gameplay",
     keywords:
-      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype",
+      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype source citation CO2e proxy quebec california washington IEA EIA",
     related: [
       MANUAL_ENTRY.RESERVE_CAPACITY,
       MANUAL_ENTRY.EMISSIONS,
@@ -712,10 +720,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           storage.
         </p>
         <p>
-          Neighbors differ in when they can spare power and what it costs. The
-          chip on each intertie names the kind of grid next door, such as
-          seasonal hydro or solar surplus. The small line shows its typical
-          year: how much of the line it can usually fill each month.
+          Neighbors differ in when they can spare power and what it costs. Each
+          intertie&rsquo;s build card names the kind of grid next door, such as
+          seasonal hydro or solar surplus. Opening Show details on that card
+          describes the neighbor and draws its typical year: how much of the
+          line it can usually fill each month.
         </p>
         <p>
           &ldquo;At your peak&rdquo; matters most. It is how much the neighbor

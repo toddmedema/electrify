@@ -230,8 +230,10 @@ function IntertieBuildItem(props: {
         }
         // These corridor names were headings before the card layout, and a list of purchase
         // options is exactly what heading navigation is for. MUI's default span would take
-        // that away for no visual difference.
-        slotProps={{ title: { component: "h3" } }}
+        // that away for no visual difference. h6 is what the old `variant="subtitle1"` emitted
+        // and what the dialog's own "Build..." title is, so the list stays navigable without
+        // jumping back up a level underneath it.
+        slotProps={{ title: { component: "h6" } }}
         title={name}
       />
       <Typography className="buildOptionContext" variant="body2">
@@ -461,7 +463,7 @@ function IntertieUpgradeControl(props: {
                 },
                 {
                   concept: "construction",
-                  label: "Building emits",
+                  label: "Construction emits",
                   value: `${formatLargeMassValueConcise(quote.constructionKgco2eTotal, units)} ${largeMassUnit(units)} CO2e`,
                 },
               ]}
@@ -671,12 +673,24 @@ export default function TransmissionPanel({
             const flowFraction =
               rating > 0 ? Math.max(-1, Math.min(1, flowW / rating)) : 0;
             const flowLabel = formatSignedWattsOfPeak(flowW, rating);
+            // aria-label replaces a button's descendant content for its accessible name, so a
+            // visually hidden span inside the row would never be announced. The reading and the
+            // direction the bar and the sign carry visually have to be in the label itself.
+            const flowDescription = building
+              ? `building, ${line.yearsToBuildLeft.toFixed(1)}${
+                  line.yearsToBuildLeft <= 1 ? " year" : " years"
+                } remaining`
+              : flowW > 0
+                ? `importing ${formatWatts(flowW)} of ${formatWatts(rating)}`
+                : flowW < 0
+                  ? `selling ${formatWatts(-flowW)} of ${formatWatts(rating)}`
+                  : "no power flowing";
             return (
               <div key={line.id} className="transmissionLine">
                 <button
                   type="button"
                   className="facilityDisclosure"
-                  aria-label={"Inspect " + line.name}
+                  aria-label={`Inspect ${line.name}, ${flowDescription}`}
                   aria-expanded={selectedLine === line.id}
                   onClick={() =>
                     setSelectedLine(selectedLine === line.id ? null : line.id)
@@ -711,20 +725,9 @@ export default function TransmissionPanel({
                           </span>
                         </>
                       ) : (
-                        <>
-                          <span className="transmissionLineFlow">
-                            {flowLabel}
-                          </span>
-                          {/* Colour and the bar behind the row say which way power is moving;
-                          this is the same thing for anyone not reading either. */}
-                          <span className="srOnly">
-                            {flowW > 0
-                              ? " importing"
-                              : flowW < 0
-                                ? " selling"
-                                : " no power flowing"}
-                          </span>
-                        </>
+                        <span className="transmissionLineFlow">
+                          {flowLabel}
+                        </span>
                       )}
                     </Typography>
                   </span>
@@ -736,9 +739,8 @@ export default function TransmissionPanel({
                 {selectedLine === line.id && (
                   <div className="transmissionLineDetails">
                     <Typography variant="body2">
-                      {market?.name} · {formatWatts(rating)} rating now
-                      {Math.round(rating) !== Math.round(line.capacityW) &&
-                        ` · ${formatWatts(line.capacityW, 3)} rated`}
+                      {market?.name} · {formatWatts(line.capacityW, 3)} rated
+                      capacity
                     </Typography>
                     {outlook && (
                       <div className="transmissionArchetype">

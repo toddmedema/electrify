@@ -803,11 +803,11 @@ export const SCENARIOS = [
         advanceOn: (s: AppStateType) =>
           tutorialNorthernIntertie(s)?.yearsToBuildLeft === 0 &&
           s.game.speed === "PAUSED",
-        action: "Pause when the line says Connected",
+        action: "Pause when the line shows a power reading",
         content: (
           <TutorialPrompt text="The line can’t trade until construction finishes." />
         ),
-        hint: "Wait for Building to change to Connected before pausing.",
+        hint: "Once the line is live, Building gives way to a power reading such as 0/500MW. Pause then.",
       },
       {
         card: "FACILITIES",

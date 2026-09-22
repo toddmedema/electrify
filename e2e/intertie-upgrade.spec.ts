@@ -62,7 +62,7 @@ for (const theme of ["light", "dark"] as const) {
     await review.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toContainText("Includes refinancing the existing");
-    await expect(dialog).toContainText("Building emits");
+    await expect(dialog).toContainText("Construction emits");
     await expect(dialog).toContainText("Upkeep after upgrade");
     await dialog.getByRole("button", { name: "close", exact: true }).click();
     await expect(line.getByText(/Upgrading to/)).toHaveCount(0);

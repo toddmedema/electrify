@@ -368,13 +368,6 @@ export function GeneratorBuildItem(
           label="Build time"
           value={`${Math.round(generator.yearsToBuild * 12)} mo`}
         />
-        <ConstructionEmissionsMetric
-          kgco2eTotal={
-            (generator.constructionKgco2ePerW || 0) * generator.peakW
-          }
-          yearsToBuild={generator.yearsToBuild}
-          units={units}
-        />
         <ExpectedOutputMetric
           shape={outputShape}
           ceiling={props.outputCeiling || 1}
@@ -428,6 +421,15 @@ export function GeneratorBuildItem(
             </Stack>
           </Box>
         )}
+        <Box className="buildOptionMetrics">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={
+              (generator.constructionKgco2ePerW || 0) * generator.peakW
+            }
+            yearsToBuild={generator.yearsToBuild}
+            units={units}
+          />
+        </Box>
         <TableContainer>
           <Table
             size="small"

@@ -178,11 +178,6 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
           label="Round-trip efficiency"
           value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
         />
-        <ConstructionEmissionsMetric
-          kgco2eTotal={(storage.constructionKgco2ePerWh || 0) * storage.peakWh}
-          yearsToBuild={storage.yearsToBuild}
-          units={units}
-        />
       </Box>
       <Box className="buildOptionFooter">
         <Button
@@ -205,6 +200,15 @@ function StorageBuildItem(props: StorageBuildItemProps): React.JSX.Element {
         >
           {storage.description}
         </Typography>
+        <Box className="buildOptionMetrics">
+          <ConstructionEmissionsMetric
+            kgco2eTotal={
+              (storage.constructionKgco2ePerWh || 0) * storage.peakWh
+            }
+            yearsToBuild={storage.yearsToBuild}
+            units={units}
+          />
+        </Box>
         <TableContainer>
           <Table size="small" aria-label="storage properties">
             <TableBody>

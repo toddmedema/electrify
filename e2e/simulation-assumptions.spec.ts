@@ -87,6 +87,23 @@ for (const theme of ["light", "dark"] as const) {
       .first();
     await expect(trade.getByText("Emissions", { exact: true })).toBeVisible();
     await expect(trade.getByText(/^[\d,]+\s*\S+\/MWh$/)).toBeVisible();
+    // The citation behind that number lives in the manual entry now. It still has to be a
+    // real link with a real touch target, which is what the build tab's old disclosure was
+    // checked for before the number moved onto the card.
+    await page
+      .getByRole("button", { name: "How interties work", exact: true })
+      .click();
+    const manual = page.getByRole("dialog", { name: "Manual help" });
+    const citation = manual.getByRole("link", {
+      name: "Source for Pacific Northwest emissions",
+      exact: true,
+    });
+    await expect(citation).toHaveAttribute("href", /https:\/\//);
+    expect((await citation.boundingBox())!.height).toBeGreaterThanOrEqual(
+      testInfo.project.use.hasTouch ? 44 : 40,
+    );
+    await manual.getByRole("button", { name: "back", exact: true }).click();
+    await expect(manual).not.toBeVisible();
     expect(
       await page
         .getByRole("tabpanel", { name: "Interties" })

@@ -3016,16 +3016,12 @@ function updateSupplyFacilitiesFinances(
   const { importedW, exportedW } = clearing;
   // Merit order: the cheapest neighbour supplies first and the best-paying one buys first.
   const flows = allocateIntertieFlows(offers, importedW, exportedW);
-  // Per-line flow, signed so a fleet row can show power being sold as well as bought. This is
-  // display state, not a decision, so it is written on real ticks only: a forecast dispatches
-  // against hypothetical weather, and the month-boundary pre-roll re-runs timeline[0] four
-  // times over the live fleet. Forecast passes work on a deep clone of transmission anyway,
-  // but the pre-roll does not, and it would leave the list reading January's trade in July.
-  if (!simulated) {
-    operatingLines.forEach((line, index) => {
-      line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
-    });
-  }
+  // Keep the row readings aligned with the aggregate flow written to this tick, including
+  // month-boundary pre-rolls: those replace the live current tick with the new weather frame.
+  // Forecasts dispatch cloned lines; only their current-tick readings are copied back below.
+  operatingLines.forEach((line, index) => {
+    line.currentFlowW = flows.importedW[index] - flows.exportedW[index];
+  });
   let importCostPerHour = 0;
   let exportRevenuePerHour = 0;
   let importEmissionsWeight = 0;
@@ -3394,6 +3390,22 @@ function supplyForecastPass(
           // equity before the matching principal has actually left cash.
           state.transmission?.lines,
         );
+        // The clone just re-dispatched this very tick against the action that triggered the
+        // reforecast, so its per-line flow is the fresh answer and the live lines' is the one
+        // from before it. Copy it back, or an intertie row keeps last tick's reading until the
+        // clock moves again -- and the clock is paused for every policy decision.
+        const forecastFlows = new Map(
+          newState.transmission.lines.map((line) => [
+            line.id,
+            line.currentFlowW,
+          ]),
+        );
+        state.transmission?.lines.forEach((line) => {
+          const flow = forecastFlows.get(line.id);
+          if (flow !== undefined) {
+            line.currentFlowW = flow;
+          }
+        });
       }
     }
     prev = t;
