@@ -560,8 +560,8 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 {facility.hydroSiteId && (
                   <DialogContentText>
                     {underConstruction
-                      ? "Cancelling releases this unfinished project's Hydro site."
-                      : "This commissioned Hydro site remains permanently used after sale."}
+                      ? "Cancelling frees this site."
+                      : "Selling won't free this site."}
                   </DialogContentText>
                 )}
                 <DialogContentText>

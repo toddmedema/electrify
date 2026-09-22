@@ -24,8 +24,8 @@ describe("getBuildAvailability", () => {
     ["prohibited", "prohibited"],
     ["unavailable", "data unavailable"],
     ["empty", "No qualifying"],
-    ["exhausted", "permanently used"],
-    ["too-large", "fits this size"],
+    ["exhausted", "used or reserved"],
+    ["too-large", "Too large"],
   ] as const)("distinguishes Hydro %s", (status, message) => {
     const result = getBuildAvailability({
       ...hydroOption,

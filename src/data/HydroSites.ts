@@ -186,7 +186,7 @@ export function resolveStartingHydroSites(
       site.maxPeakW < facility.peakW!
     )
       throw new Error(
-        `Starting Hydro plant ${index + 1} (${facility.peakW || 0} W) needs a unique researched site large enough for its capacity. Choose a smaller plant or another location.`,
+        `Hydro plant ${index + 1}: no fitting site. Choose a smaller plant or another location.`,
       );
     assignments[index] = site.id;
     available.delete(site.id);

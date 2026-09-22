@@ -454,13 +454,13 @@ it("quotes an exact Hydro site maximum without changing the shared slider", () =
   fireEvent.click(screen.getByRole("button", { name: "Use site maximum" }));
   expect(slider).toHaveAttribute("aria-valuenow", before!);
   expect(
-    screen.getByText(new RegExp("Selected site: " + HYDRO_SITES[site.id].name)),
+    screen.getByText(new RegExp("Site: " + HYDRO_SITES[site.id].name)),
   ).toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    "selling or retiring the plant never releases it",
+    "Only cancelling before completion frees it",
   );
   fireEvent.click(screen.getByRole("button", { name: "Pay cash" }));
   expect(onBuild).toHaveBeenCalledWith(
@@ -491,13 +491,9 @@ it("updates fit counts and distinguishes exhausted and unavailable Hydro invento
       onBuildGenerator={onBuild}
     />,
   );
+  expect(screen.getByText(/0 sites left · 0 fit/)).toBeInTheDocument();
   expect(
-    screen.getByText(/0 sites remaining · 0 sites fit/),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByText(
-      /All researched Hydro sites are reserved or permanently used/,
-    ),
+    screen.getByText(/All Hydro sites are used or reserved/),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Review purchase of Hydro" }),

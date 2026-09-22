@@ -80,7 +80,7 @@ it("reserves explicit starts first and preserves authored fleet order and exact 
   expect(assigned[0]).not.toBe(large.id);
   expect(() =>
     resolveStartingHydroSites(s.location, [fleet[1], fleet[1]]),
-  ).toThrow("unique researched site");
+  ).toThrow("no fitting site");
   expect(() =>
     resolveStartingHydroSites(s.location, [
       { name: "Hydro", peakW: large.maxPeakW + 1 },

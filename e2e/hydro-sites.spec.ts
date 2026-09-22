@@ -23,15 +23,15 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     });
-    await expect(hydro).toContainText("sites fit this size");
-    await expect(hydro).toContainText("largest remaining:");
+    await expect(hydro).toContainText("sites left");
+    await expect(hydro).toContainText("largest:");
     const slider = page.getByRole("slider");
     const before = await slider.getAttribute("aria-valuenow");
     await hydro.getByRole("button", { name: "Use site maximum" }).click();
     await expect(slider).toHaveAttribute("aria-valuenow", before!);
-    await expect(hydro).toContainText("Selected site:");
-    await expect(hydro).toContainText(
-      "Smaller builds still consume a whole site",
+    await expect(hydro).toContainText("Site:");
+    await expect(page.locator(".buildPrimer")).toContainText(
+      "Each plant uses a whole site",
     );
     expect(
       await hydro.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -46,17 +46,15 @@ for (const theme of ["light", "dark"] as const) {
       name: "Review purchase of Hydro",
     });
     const count = Number(
-      (await hydro.innerText()).match(/(\d+) sites remaining/)![1],
+      (await hydro.innerText()).match(/(\d+) sites left/)![1],
     );
     await expect(review).toBeEnabled();
     {
       await review.click();
       const dialog = page.getByRole("dialog");
+      await expect(dialog).toContainText("Uses the whole site");
       await expect(dialog).toContainText(
-        "Cancelling unfinished construction releases it",
-      );
-      await expect(dialog).toContainText(
-        "selling or retiring the plant never releases it",
+        "Only cancelling before completion frees it",
       );
       expect(
         await dialog.evaluate((el) => el.scrollWidth - el.clientWidth),
@@ -71,7 +69,7 @@ for (const theme of ["light", "dark"] as const) {
     }
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
-    await expect(hydro).toContainText(`${count - 1} sites remaining`);
+    await expect(hydro).toContainText(`${count - 1} sites left`);
     await page.getByRole("button", { name: "close", exact: true }).click();
     const plant = page
       .locator(".facilityRow")
@@ -82,7 +80,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "Cancel construction of Hydro" })
       .click();
     await expect(page.getByRole("dialog")).toContainText(
-      "Cancelling releases this unfinished project's Hydro site",
+      "Cancelling frees this site",
     );
     await page
       .getByRole("dialog")
@@ -90,6 +88,6 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
-    await expect(hydro).toContainText(`${count} sites remaining`);
+    await expect(hydro).toContainText(`${count} sites left`);
   });
 }

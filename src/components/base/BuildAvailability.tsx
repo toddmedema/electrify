@@ -61,12 +61,11 @@ export function getBuildAvailability(options: {
   const place = shortPlaceName(options.location);
   if (options.hydroAvailability) {
     const messages: Record<string, string> = {
-      prohibited: "New Hydro construction is prohibited at this location.",
-      unavailable: "Hydro site data unavailable for this location.",
-      empty: "No qualifying Hydro sites found in the researched inventory.",
-      exhausted: "All researched Hydro sites are reserved or permanently used.",
-      "too-large":
-        "No remaining Hydro site fits this size. Use a site maximum or choose a smaller plant.",
+      prohibited: "New Hydro is prohibited here.",
+      unavailable: "Hydro site data unavailable.",
+      empty: "No qualifying Hydro sites found.",
+      exhausted: "All Hydro sites are used or reserved.",
+      "too-large": "Too large for any remaining site.",
     };
     const status = options.hydroAvailability.status;
     if (status !== "available")

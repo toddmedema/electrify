@@ -942,15 +942,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Sites left counts projects you can still build here for this
-          technology. Each project uses one site. Zero is a game limit, not
-          proof the resource cannot exist there. Conventional Hydro uses
-          researched physical sites: each project claims the smallest remaining
-          site whose capacity ceiling fits the plant. Unused capacity cannot be
-          reclaimed or pooled with another site. Cancelling unfinished
-          construction releases its reservation. Once commissioned, a site
-          remains permanently used after sale or retirement. Missing research
-          disables new Hydro and does not mean that no hydro potential exists.
+          Each project uses one site. Hydro takes the smallest remaining site
+          that fits, including unused capacity. Sites cannot be combined.
+          Cancelling before completion frees the site; sale or retirement does
+          not. Missing research blocks new Hydro. An empty inventory does not
+          prove the area has no hydro potential.
         </p>
       </div>
     ),

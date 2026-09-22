@@ -29,15 +29,12 @@ export default function HydroPrimer(props: {
   return (
     <section className="buildPrimer" aria-labelledby={titleId}>
       <Typography id={titleId} variant="subtitle2" component="h2">
-        How hydro differs
+        About Hydro
       </Typography>
       <Typography variant="body2">
-        You can build {props.totalSites} hydro{" "}
-        {props.totalSites === 1 ? "project" : "projects"} near {props.place},
-        each using the smallest remaining site that fits its capacity. Smaller
-        builds still consume a whole site. Cancelling unfinished construction
-        releases the site; once commissioned, selling or retiring the plant
-        never releases it. The reservoir only refills from rain and snowmelt.
+        {props.totalSites} {props.totalSites === 1 ? "site" : "sites"} near{" "}
+        {props.place}. Each plant uses a whole site. Reservoirs refill from rain
+        and snowmelt.
       </Typography>
       <Button size="small" onClick={props.onDismiss}>
         Got it

@@ -359,23 +359,19 @@ export function GeneratorBuildItem(
       {props.hydroAvailability && (
         <Box sx={{ px: 2, pb: 1 }}>
           <Typography variant="body2">
-            Hydro plant size: {formatWatts(generator.peakW, 6)}
+            Plant: {formatWatts(generator.peakW, 6)}
           </Typography>
           <Typography variant="body2">
-            {props.hydroAvailability.remaining.length} sites remaining ·{" "}
+            {props.hydroAvailability.remaining.length} sites left ·{" "}
             {props.hydroAvailability.eligible.length}{" "}
-            {props.hydroAvailability.eligible.length === 1
-              ? "site fits"
-              : "sites fit"}{" "}
-            this size
+            {props.hydroAvailability.eligible.length === 1 ? "fits" : "fit"}
             {props.hydroAvailability.largest &&
-              ` · largest remaining: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
+              ` · largest: ${formatWatts(props.hydroAvailability.largest.maxPeakW, 6)}`}
           </Typography>
           {props.hydroAvailability.selected && (
             <Typography variant="body2">
-              Selected site: {props.hydroAvailability.selected.name} · maximum{" "}
-              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)}.{" "}
-              Smaller builds still consume a whole site.
+              Site: {props.hydroAvailability.selected.name} ·{" "}
+              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max
             </Typography>
           )}
           {(props.hydroAvailability.selected ||
@@ -601,11 +597,9 @@ export function GeneratorBuildItem(
         <DialogContent className="noPadding">
           {props.hydroAvailability?.selected && (
             <Typography variant="body2" sx={{ px: 2, mb: 2 }}>
-              Site: {props.hydroAvailability.selected.name}, maximum{" "}
-              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)}. This
-              project consumes the whole site. Cancelling unfinished
-              construction releases it; once commissioned, selling or retiring
-              the plant never releases it.
+              {props.hydroAvailability.selected.name} ·{" "}
+              {formatWatts(props.hydroAvailability.selected.maxPeakW, 6)} max.
+              Uses the whole site. Only cancelling before completion frees it.
             </Typography>
           )}
           <DecisionImpactPreview
